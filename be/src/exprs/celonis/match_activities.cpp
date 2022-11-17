@@ -90,8 +90,7 @@ StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities(Fu
         columns[6]->get(0).get_array().size() != 0) {
         std::stringstream error;
         error << "unsupported filter in celonis_match_activities" << std::endl;
-        context->set_error(error.str().c_str());
-        return BooleanColumn::create(columns[0]->size(), 0);
+        throw std::runtime_error(error.str());
     }
 
     auto node_array_col =  columns[2]->get(0).get_array();

@@ -92,8 +92,10 @@ TEST_F(CelonisMatchActivitiesTest, array_celonis_source_unsupported_filter) {
     nodes_filter->append_datum(DatumArray{"string1", "string2"});
     auto other_filters = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     other_filters->append_datum(DatumArray{});
-    std::ignore = CelonisMatchActivitiesFunctions::celonis_match_activities(
-            ctx.get(), {array, nodes_filter, nodes_filter, other_filters, other_filters, other_filters, other_filters});
-    ASSERT_TRUE(ctx->has_error());
+    EXPECT_THROW(CelonisMatchActivitiesFunctions::celonis_match_activities(ctx.get(),
+                                                                           {array, nodes_filter, nodes_filter,
+                                                                            other_filters, other_filters,
+                                                                            other_filters, other_filters}),
+                 std::runtime_error);
 }
 } // namespace starrocks

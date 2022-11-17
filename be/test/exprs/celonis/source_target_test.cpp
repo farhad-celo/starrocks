@@ -143,8 +143,7 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_unsupported_mode) {
     array->append_datum(DatumArray{2});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->all");
-    std::ignore = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier});
-    ASSERT_TRUE(ctx->has_error());
+    EXPECT_THROW(CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}), std::runtime_error);
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_string_data) {

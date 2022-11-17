@@ -79,6 +79,19 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirst) {
             "a2", "first", "first", false, 9L);
 }
 
+TEST_F(CelonisCalcThroughputTest, FirstToFirstNonMatchingArraySizes) {
+    auto activity_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    activity_array->append_datum(DatumArray{"a"});
+    auto timestamp_array = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+    timestamp_array->append_datum(DatumArray{1L, 10L, 20L});
+
+    ColumnPtr start_activity_col, end_activity_col, start_label_col, end_label_col;
+    create_const_params(&start_activity_col, &end_activity_col, &start_label_col, &end_label_col);
+    EXPECT_THROW(CelonisCalcThroughputFunctions::celonis_calc_throughput(
+            nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}),
+                 std::runtime_error);
+}
+
 TEST_F(CelonisCalcThroughputTest, FirstToFirstNullInput) {
     auto activity_array = ColumnHelper::create_const_null_column(1);
     auto timestamp_array = ColumnHelper::create_const_null_column(1);
@@ -91,6 +104,28 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstNullInput) {
 
     ASSERT_EQ(1, result->size());
     ASSERT_TRUE(result->get(0).is_null());
+}
+
+TEST_F(CelonisCalcThroughputTest, InvalidLabel) {
+    auto activity_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    activity_array->append_datum(DatumArray{"a"});
+    auto timestamp_array = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+    timestamp_array->append_datum(DatumArray{1L});
+    ColumnPtr start_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
+    start_activity->append_datum(Slice("a"));
+
+    ColumnPtr end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
+    end_activity->append_datum(Slice("b"));
+
+    ColumnPtr start_label = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
+    start_label->append_datum(Slice("first123"));
+
+    ColumnPtr end_label = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
+    end_label->append_datum(Slice("first"));
+
+    EXPECT_THROW(CelonisCalcThroughputFunctions::celonis_calc_throughput(
+            nullptr, {activity_array, timestamp_array, start_activity, end_activity, start_label, end_label}),
+                 std::runtime_error);
 }
 
 TEST_F(CelonisCalcThroughputTest, InputArrayIsSometimesNull) {

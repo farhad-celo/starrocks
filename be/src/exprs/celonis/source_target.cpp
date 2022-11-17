@@ -91,10 +91,7 @@ StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_sources(Function
         // TODO(gubichev): support other edge configurations.
         std::stringstream error;
         error << "unsupported format in celonis_array_sources" << std::endl;
-        context->set_error(error.str().c_str());
-        // Setting the error in the context will result in query runtime error, so it does not matter what column we
-        // return.
-        return NullableColumn::create(Int32Column::create(), NullColumn::create());
+        throw std::runtime_error(error.str());
     }
 
     ColumnPtr result;

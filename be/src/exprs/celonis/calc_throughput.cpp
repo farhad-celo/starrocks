@@ -118,15 +118,13 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions::celonis_calc_throughput(Func
     if (start_label == INVALID || end_label == INVALID || start_label == CASE_END || end_label == CASE_START) {
         std::stringstream error;
         error << "unsupported format in celonis_calc_throughput" << std::endl;
-        context->set_error(error.str().c_str());
-        return result.build(/*is_const=*/false);
+        throw std::runtime_error(error.str());
     }
 
     if (activity_offsets.size() != timestamp_offsets.size()) {
         std::stringstream error;
         error << "unmatched activity and timestamp offsets in celonis_calc_throughput" << std::endl;
-        context->set_error(error.str().c_str());
-        return result.build(/*is_const=*/false);
+        throw std::runtime_error(error.str());
     }
 
     auto activity_offsets_ptr = activity_offsets.get_data().data();
@@ -144,9 +142,10 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions::celonis_calc_throughput(Func
         const size_t activity_size = activity_offsets_ptr[i + 1] - activity_offsets_ptr[i];
         const size_t timestamp_size = timestamp_offsets_ptr[i + 1] - timestamp_offsets_ptr[i];
         if (activity_size != timestamp_size) {
-            // TODO(a.gubichev): throw an error here once supported.
-            result.append_null();
-            continue;
+            std::stringstream error;
+            error << "activity array and timestamp array have different sizes: " << activity_size << " vs "
+                  << timestamp_size << std::endl;
+            throw std::runtime_error(error.str());
         }
 
         int start_activity_idx = findActivity(*activity_data, activity_nulls, activity_offsets_ptr[i],
