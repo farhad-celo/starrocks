@@ -1,4 +1,4 @@
-name: Celonis branch-2.4-ubuntu build.
+name: Celonis Default Branch Build.
 
 on:
   push:
