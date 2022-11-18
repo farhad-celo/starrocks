@@ -3,7 +3,7 @@ name: Celonis branch-2.4-ubuntu build.
 on:
   push:
     branches:
-      - branch-2.5.0-5fad90c8-celo
+      - branch-2.5.0-b8947be2-celo
 
 env:
   RELEASE_VERSION: "v0.0.0-${{ github.sha }}-2.5.0-5fad90c8"
