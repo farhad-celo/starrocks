@@ -7,6 +7,11 @@ FROM centos:centos7
 # Copy build output into place
 COPY output/ /data/deploy/starrocks
 
+# Note: this is to address the bug introduced by this PR: https://github.com/StarRocks/starrocks/pull/11717#issuecomment-1316005178
+# We should remove copying this file when it the bug is fixed by upstreamCOPY common.sh $DEPLOYDIR/starrocks/be/bin/common.sh
+COPY common.sh /data/deploy/starrocks/fe/bin/common.sh
+COPY common.sh /data/deploy/starrocks/be/bin/common.sh
+
 # Prepare StarRocks Installer.
 RUN yum -y install wget
 RUN mkdir -p /data/deploy/
