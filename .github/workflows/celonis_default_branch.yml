@@ -10,7 +10,7 @@ env:
 
 jobs:
   build-image:
-    runs-on: [ubuntu-latest]
+    runs-on: [self-hosted, saola-linux]
     steps:
       - name: checkout repository
         uses: actions/checkout@v3

@@ -1,0 +1,22 @@
+name: Register Dummy Runner
+
+on:
+  schedule:
+    # Run every half month
+    # For more info: https://docs.github.com/en/actions/reference/events-that-trigger-workflows#scheduled-events-schedule
+    - cron: "0 0 */15 * *"
+
+jobs:
+  register-linux-dummy:
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: celonis/actions
+          token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          path: .github/actions
+      - uses: ./.github/actions/register-dummy-runner
+        name: register-dummy
+        with:
+          runner_tag: saola-linux
+          token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
