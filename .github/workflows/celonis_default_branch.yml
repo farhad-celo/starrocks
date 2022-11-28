@@ -3,7 +3,7 @@ name: Celonis Default Branch Build.
 on:
   push:
     branches:
-      - branch-2.5.0-b8947be2-celo
+      - branch-2.5-70b71794-celo
 
 env:
   RELEASE_VERSION: "v0.0.0-${{ github.sha }}-2.5.0-5fad90c8"
