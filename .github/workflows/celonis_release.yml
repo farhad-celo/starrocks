@@ -55,6 +55,7 @@ jobs:
       - name: build allin1 docker image
         run: |
           DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION} -f celonis/docker/allin1/Dockerfile -t starrocks-allin1:${RELEASE_VERSION} celonis/docker/allin1
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION} --build-arg cgversion=cg2 -f celonis/docker/allin1/Dockerfile -t starrocks-allin1:${RELEASE_VERSION}_cg2 celonis/docker/allin1          
 
       - name: push artifact docker image to ECR
         run: |
@@ -65,6 +66,8 @@ jobs:
         run: |
           docker tag starrocks-allin1:${RELEASE_VERSION} 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}
           docker push 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}
+          docker tag starrocks-allin1:${RELEASE_VERSION}_cg2 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}_cg2
+          docker push 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}_cg2
 
       - name: Amazon ECR logout
         if: ${{ always() }}
@@ -77,9 +80,9 @@ jobs:
 
       - name: push allin1 docker image to GHCR
         run: |
-          docker tag starrocks-allin1:${RELEASE_VERSION} ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}
+          docker tag starrocks-allin1:${RELEASE_VERSION}_cg2 ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}_cg2
           # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}
+          until docker push ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}_cg2
           do
             echo "Could not push to github docker registry, trying again."
           done 

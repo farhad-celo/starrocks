@@ -2,6 +2,8 @@
 # It can be a docker image from any registry or just a image that built locally
 ARG ARTIFACTIMAGE=904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-artifacts:0.0.0-pr43-sr2.5-70b71794
 
+ARG cgversion=cg1
+
 FROM ${ARTIFACTIMAGE} as artifacts
 
 FROM centos:7 as dependencies-installed
@@ -40,9 +42,13 @@ COPY *.conf $DEPLOYDIR
 RUN cat be.conf >> $DEPLOYDIR/starrocks/be/conf/be.conf && \
     cat fe.conf >> $DEPLOYDIR/starrocks/fe/conf/fe.conf
 
+FROM artifacts-deployed as runtime_cg1
+
+FROM artifacts-deployed as runtime_cg2
 # Note: this is to address the bug introduced by this PR: https://github.com/StarRocks/starrocks/pull/11717#issuecomment-1316005178
 # We should remove copying this file when it the bug is fixed by upstreamCOPY common.sh $DEPLOYDIR/starrocks/be/bin/common.sh
-#COPY common.sh $DEPLOYDIR/starrocks/fe/bin/common.sh
-#COPY common.sh $DEPLOYDIR/starrocks/be/bin/common.sh
+COPY common.sh $DEPLOYDIR/starrocks/fe/bin/common.sh
+COPY common.sh $DEPLOYDIR/starrocks/be/bin/common.sh
 
+FROM runtime_${cgversion}
 CMD if [ "$STARTMODE" = 'auto' ] ; then ./start_fe_be_broker.sh ; else ./start_be_broker.sh ; fi
