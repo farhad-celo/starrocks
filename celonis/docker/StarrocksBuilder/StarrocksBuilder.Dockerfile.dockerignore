@@ -1,0 +1,20 @@
+#Ignore any files or directories at any level, including the context root, named thirdparty
+**/thirdparty
+**/cmake-build*
+**/build_*
+**/ut_build_*
+**/be/output
+
+**/target
+**/log
+
+**/.github
+**/.idea
+
+**/*.o
+
+# uncomment to reduce the build time by 10s
+#**/output
+
+
+

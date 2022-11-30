@@ -1,0 +1,90 @@
+name: 'celostar-starrocks release'
+
+# **What it does**: Renders the content of every page and check all internal links.
+# **Why we have it**: To make sure all links connect correctly.
+# **Who does it impact**: Docs content.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  # Needed for the 'trilom/file-changes-action' action
+  pull-requests: read
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+env:
+  RELEASE_VERSION: ${{ github.ref_name }}
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+
+jobs:
+  release-starrocks:
+    runs-on: [self-hosted, saola-linux]
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_HECTOR }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_HECTOR }}
+          aws-region: us-west-1
+
+      - name: Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Pull celostar-dev-env
+        run: |
+          if docker pull 904263465335.dkr.ecr.us-west-1.amazonaws.com/celostar-dev-env:branch-2.5 >/dev/null; then
+            echo "Pulled 904263465335.dkr.ecr.us-west-1.amazonaws.com/celostar-dev-env:branch-2.5"
+          else
+            echo "904263465335.dkr.ecr.us-west-1.amazonaws.com/celostar-dev-env:branch-2.5 does not exist"
+          fi
+
+      - name: build artifact docker image
+        run: |
+          DOCKER_BUILDKIT=1 docker build --build-arg CODE_SOURCE=celostar --build-arg STARROCKS_VERSION=${RELEASE_VERSION} --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} -f celonis/docker/StarrocksBuilder/StarrocksBuilder.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION} .
+
+      - name: build allin1 docker image
+        run: |
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION} -f celonis/docker/allin1/Dockerfile -t starrocks-allin1:${RELEASE_VERSION} celonis/docker/allin1
+
+      - name: push artifact docker image to ECR
+        run: |
+          docker tag starrocks-artifacts:${RELEASE_VERSION} 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-artifacts:${RELEASE_VERSION}
+          docker push 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-artifacts:${RELEASE_VERSION}
+
+      - name: push allin1 docker image to ECR
+        run: |
+          docker tag starrocks-allin1:${RELEASE_VERSION} 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}
+          docker push 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}
+
+      - name: Amazon ECR logout
+        if: ${{ always() }}
+        run: |
+          docker logout ${{ steps.login-ecr.outputs.registry }}
+
+      - name: GitHub Docker login
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+
+      - name: push allin1 docker image to GHCR
+        run: |
+          docker tag starrocks-allin1:${RELEASE_VERSION} ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}
+          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
+          until docker push ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}
+          do
+            echo "Could not push to github docker registry, trying again."
+          done 
+
+      - name: GitHub Docker logout
+        if: ${{ always() }}
+        run: |
+          docker logout ghcr.io
