@@ -1,0 +1,25 @@
+name: Sync upstream branch
+on:
+  schedule:
+    # At minute 0 past every 4th hour.
+    - cron:  '0 */4 * * *'
+
+env:
+  BASE_BRANCH: branch-2.5
+
+permissions:
+  contents: write
+
+jobs:
+  sync-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Sync upstream commits
+        run: |
+          git branch
+          git remote add upstream https://github.com/StarRocks/starrocks.git
+          git remote -v
+          git fetch upstream ${BASE_BRANCH}:${BASE_BRANCH}
+          git push origin ${BASE_BRANCH}
