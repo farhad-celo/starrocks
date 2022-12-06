@@ -69,8 +69,12 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input) {
     array->append_datum(DatumArray{3, 4});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    std::ignore = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier});
-    // ASSERT_TRUE(ctx->has_error());
+    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    EXPECT_EQ(3, result->size());
+    EXPECT_EQ(0, result->get(0).get_array().size());
+    EXPECT_EQ(0, result->get(1).get_array().size());
+    EXPECT_EQ(1, result->get(2).get_array().size());
+    EXPECT_EQ(3, result->get(2).get_array()[0].get_int32());
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input_nullable) {
@@ -86,8 +90,12 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input_nullable)
     array->append_datum(DatumArray{3, 4});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    std::ignore = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier});
-    // ASSERT_TRUE(ctx->has_error());
+    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    EXPECT_EQ(3, result->size());
+    EXPECT_EQ(0, result->get(0).get_array().size());
+    EXPECT_EQ(0, result->get(1).get_array().size());
+    EXPECT_EQ(1, result->get(2).get_array().size());
+    EXPECT_EQ(3, result->get(2).get_array()[0].get_int32());
 }
 
 
