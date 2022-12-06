@@ -1,8 +1,10 @@
 name: Sync upstream branch
 on:
   schedule:
-    # At minute 0 past every 4th hour.
-    - cron:  '0 */4 * * *'
+    # At 00:00.
+    - cron:  '0 0 * * *'
+  # Configuring a workflow to run manually
+  workflow_dispatch:
 
 env:
   BASE_BRANCH: branch-2.5
