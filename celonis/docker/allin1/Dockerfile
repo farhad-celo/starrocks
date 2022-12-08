@@ -11,7 +11,7 @@ FROM centos:7 as dependencies-installed
 RUN yum -y install java-1.8.0-openjdk-devel.x86_64
 
 # Install relevant tools.
-RUN yum -y install mysql net-tools telnet tree
+RUN yum -y install mysql net-tools telnet tree perf
 
 FROM dependencies-installed as artifacts-deployed
 
