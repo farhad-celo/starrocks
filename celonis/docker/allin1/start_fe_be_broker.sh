@@ -32,6 +32,12 @@ mysql -uroot -h${MYFQDN} -P 9030 -e "alter system add backend '${MYFQDN}:9050';"
 mysql -uroot -h${MYFQDN} -P 9030 -e "alter system add broker broker1 '${MYFQDN}:8000';"
 
 
+# TODO(j.yang): Explicitly set pipeline_sink_dop because pipeline load currently only
+# uses parallelism 1 by default. Remove this after automatic parallelism selection
+# works.
+mysql -uroot -h${MYFQDN} -P 9030 -e "set global pipeline_sink_dop=48;"
+
+
 # Loop to detect the process.
 while sleep 60; do
   ps aux | grep starrocks | grep -q -v grep
