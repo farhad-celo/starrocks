@@ -21,4 +21,5 @@ sleep 30;
 # uses parallelism 1 by default. Remove this after automatic parallelism selection
 # works.
 MYFQDN=`hostname --fqdn`
-mysql -uroot -h${MYFQDN} -P 9030 -e "set global pipeline_sink_dop=48;"
+SINK_DOP=$(($(nproc) / 2))
+mysql -uroot -h${MYFQDN} -P 9030 -e "set global pipeline_sink_dop=${SINK_DOP};"

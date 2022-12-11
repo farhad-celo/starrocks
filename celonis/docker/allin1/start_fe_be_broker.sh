@@ -35,7 +35,8 @@ mysql -uroot -h${MYFQDN} -P 9030 -e "alter system add broker broker1 '${MYFQDN}:
 # TODO(j.yang): Explicitly set pipeline_sink_dop because pipeline load currently only
 # uses parallelism 1 by default. Remove this after automatic parallelism selection
 # works.
-mysql -uroot -h${MYFQDN} -P 9030 -e "set global pipeline_sink_dop=48;"
+SINK_DOP=$(($(nproc) / 2))
+mysql -uroot -h${MYFQDN} -P 9030 -e "set global pipeline_sink_dop=${SINK_DOP};"
 
 
 # Loop to detect the process.
