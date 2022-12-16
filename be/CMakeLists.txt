@@ -1201,6 +1201,7 @@ endif()
 if (WITH_BENCH STREQUAL "ON")
     message(STATUS "Build binary with bench")
     add_subdirectory(${SRC_DIR}/bench)
+    add_subdirectory(${SRC_DIR}/bench/celonis)
 endif()
 
 if (${MAKE_TEST} STREQUAL "ON")

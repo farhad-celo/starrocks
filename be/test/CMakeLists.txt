@@ -614,7 +614,7 @@ if ("${USE_STAROS}" STREQUAL "ON")
 endif ()
 
 if (USE_AVX2)
-    set(EXEC_FILES ${EXEC_FILES} ./column/avx_numeric_column_test.cpp exprs/celonis/calc_throughput_bench.cpp)
+    set(EXEC_FILES ${EXEC_FILES} ./column/avx_numeric_column_test.cpp)
 endif ()
 
 add_library(starrocks_test_objs OBJECT ${EXEC_FILES})
@@ -630,5 +630,3 @@ ADD_BE_TEST(storage/lake/compaction_task_test)
 
 # you can simply add test case as single binary without adding `main`
 # ADD_BE_TEST(exec/sorting_test)
-
-ADD_BE_BENCH(exprs/celonis/calc_throughput_bench)
