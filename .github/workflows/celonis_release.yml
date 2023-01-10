@@ -40,17 +40,9 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Pull celostar-dev-env
-        run: |
-          if docker pull 904263465335.dkr.ecr.us-west-1.amazonaws.com/celostar-dev-env:branch-2.5 >/dev/null; then
-            echo "Pulled 904263465335.dkr.ecr.us-west-1.amazonaws.com/celostar-dev-env:branch-2.5"
-          else
-            echo "904263465335.dkr.ecr.us-west-1.amazonaws.com/celostar-dev-env:branch-2.5 does not exist"
-          fi
-
       - name: build artifact docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg CODE_SOURCE=celostar --build-arg STARROCKS_VERSION=${RELEASE_VERSION} --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} -f celonis/docker/StarrocksBuilder/StarrocksBuilder.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION} .
+          DOCKER_BUILDKIT=1 docker build --build-arg CODE_SOURCE=local -f celonis/docker/StarrocksBuilder/StarrocksBuilder.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION} .
 
       - name: build allin1 docker image
         run: |
