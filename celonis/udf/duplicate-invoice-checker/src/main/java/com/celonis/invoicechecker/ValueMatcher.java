@@ -60,7 +60,8 @@ public class ValueMatcher {
             }
             double linearDecaySimilarity = Math.max(0, 1-absDiff/80.0);
             double turnerSimilarity = 0;
-            if (this.getNormalizedValueStr().length() != otherValue.getNormalizedValueStr().length()) {
+            if (this.getNormalizedValueStr().length() != otherValue.getNormalizedValueStr().length() ||
+            !Utils.getCharacterCounts(this.getNormalizedValueStr()).equals(Utils.getCharacterCounts(otherValue.getNormalizedValueStr()))) {
                 turnerSimilarity = 0;
             } else {
                 int turners = 0;

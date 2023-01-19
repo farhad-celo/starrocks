@@ -38,15 +38,7 @@ public class ReferenceMatcher {
             String modifiedReference = reference.getReference().toLowerCase().replaceAll(
                     "[^a-zА-я\\d ]", "").replaceAll(" ", "");
             reference.setModifiedReference(modifiedReference);
-            Map<Character, Integer> counters = new TreeMap<>();
-            for (int j = 0; j < modifiedReference.length(); j++) {
-                Character c = modifiedReference.charAt(j);
-                if (counters.containsKey(c)) {
-                    counters.put(c, counters.get(c) + 1);
-                } else {
-                    counters.put(c, 1);
-                }
-            }
+            Map<Character, Integer> counters = Utils.getCharacterCounts(modifiedReference);
             reference.setCounters(counters);
             String counterStr ="";
             for (Character c : counters.keySet()) {
