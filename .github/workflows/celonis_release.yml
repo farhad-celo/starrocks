@@ -29,16 +29,9 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_HECTOR }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_HECTOR }}
-          aws-region: us-west-1
-
-      - name: Amazon ECR login
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+      - name: GitHub Docker login
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
 
       - name: build artifact docker image
         run: |
@@ -47,39 +40,50 @@ jobs:
       - name: build allin1 docker image
         run: |
           DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION} -f celonis/docker/allin1/Dockerfile -t starrocks-allin1:${RELEASE_VERSION} celonis/docker/allin1
-          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION} --build-arg cgversion=cg2 -f celonis/docker/allin1/Dockerfile -t starrocks-allin1:${RELEASE_VERSION}_cg2 celonis/docker/allin1          
-
-      - name: push artifact docker image to ECR
-        run: |
-          docker tag starrocks-artifacts:${RELEASE_VERSION} 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-artifacts:${RELEASE_VERSION}
-          docker push 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-artifacts:${RELEASE_VERSION}
-
-      - name: push allin1 docker image to ECR
-        run: |
-          docker tag starrocks-allin1:${RELEASE_VERSION} 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}
-          docker push 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}
-          docker tag starrocks-allin1:${RELEASE_VERSION}_cg2 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}_cg2
-          docker push 904263465335.dkr.ecr.us-west-1.amazonaws.com/starrocks-allin1:${RELEASE_VERSION}_cg2
-
-      - name: Amazon ECR logout
-        if: ${{ always() }}
-        run: |
-          docker logout ${{ steps.login-ecr.outputs.registry }}
-
-      - name: GitHub Docker login
-        run: |
-          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION} --build-arg cgversion=cg2 -f celonis/docker/allin1/Dockerfile -t starrocks-allin1:${RELEASE_VERSION}_cg2 celonis/docker/allin1
 
       - name: push allin1 docker image to GHCR
         run: |
-          docker tag starrocks-allin1:${RELEASE_VERSION}_cg2 ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}_cg2
+          docker tag starrocks-allin1:${RELEASE_VERSION} ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}
+          docker tag starrocks-allin1:${RELEASE_VERSION}_cg2 ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}_cg2
           # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}_cg2
+          
+          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}
           do
-            echo "Could not push to github docker registry, trying again."
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION} trying again."
+          done
+          
+          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}_cg2
+          do
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}_cg2, trying again."
           done 
 
       - name: GitHub Docker logout
         if: ${{ always() }}
         run: |
           docker logout ghcr.io
+
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: push allin1 docker image to prod ECR
+        run: |         
+          # push to the prod ECR
+          docker tag starrocks-allin1:${RELEASE_VERSION} 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}
+          docker tag starrocks-allin1:${RELEASE_VERSION}_cg2 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}_cg2
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}_cg2
+
+      - name: Amazon ECR logout
+        if: ${{ always() }}
+        run: |
+          docker logout ${{ steps.login-ecr.outputs.registry }}
+

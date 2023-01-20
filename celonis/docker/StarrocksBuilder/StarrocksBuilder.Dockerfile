@@ -1,4 +1,4 @@
-ARG builder=904263465335.dkr.ecr.us-west-1.amazonaws.com/celostar-dev-env:branch-2.5
+ARG builder=ghcr.io/celonis/celostar/starrocks-dev-env:branch-2.5
 
 FROM ${builder} as fe-builder
 # clean and build Frontend and Spark Dpp application
