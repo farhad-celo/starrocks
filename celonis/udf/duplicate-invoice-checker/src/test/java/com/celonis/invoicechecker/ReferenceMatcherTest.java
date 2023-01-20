@@ -41,7 +41,7 @@ class ReferenceMatcherTest {
     @Test
     void testNotMatchForEmptyStr() {
         ReferenceMatcher.Reference reference1 = new ReferenceMatcher.Reference("10", "      ");
-        ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("10", "   foobar @#");
+        ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("20", "   foobar @#");
         Cluster<ReferenceMatcher.Reference> cluster = new Cluster<>();
         cluster.getClusterObjects().add(reference1);
         cluster.getClusterObjects().add(reference2);
@@ -64,7 +64,7 @@ class ReferenceMatcherTest {
    @Test
    void testNotMatchForLengthDiffGreaterThanThree() {
        ReferenceMatcher.Reference reference1 = new ReferenceMatcher.Reference("10", "      fo");
-       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("10", "   foobar @#");
+       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("20", "   foobar @#");
        Cluster<ReferenceMatcher.Reference> cluster = new Cluster<>();
        cluster.getClusterObjects().add(reference1);
        cluster.getClusterObjects().add(reference2);
@@ -99,7 +99,7 @@ class ReferenceMatcherTest {
    @Test
    void testNotMatchAfterThreeTurners() {
        ReferenceMatcher.Reference reference1 = new ReferenceMatcher.Reference("10", "   foaobr");
-       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("10", "   foobar @#");
+       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("20", "   foobar @#");
        Cluster<ReferenceMatcher.Reference> cluster = new Cluster<>();
        cluster.getClusterObjects().add(reference1);
        cluster.getClusterObjects().add(reference2);
@@ -110,12 +110,24 @@ class ReferenceMatcherTest {
    @Test
    void testNotMatchForShortStrs() {
        ReferenceMatcher.Reference reference1 = new ReferenceMatcher.Reference("10", "   fo");
-       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("10", "   fa @#");
+       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("20", "   fa @#");
        Cluster<ReferenceMatcher.Reference> cluster = new Cluster<>();
        cluster.getClusterObjects().add(reference1);
        cluster.getClusterObjects().add(reference2);
        ReferenceMatcher matcher = new ReferenceMatcher();
        assertEquals(0, matcher.process(cluster.toJsonString()).length);
+   }
+
+   @Test
+   void testFullMatchForTwoSkips() {
+       ReferenceMatcher.Reference reference1 = new ReferenceMatcher.Reference("10", "117090010");
+       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("20", "11709000101");
+       Cluster<ReferenceMatcher.Reference> cluster = new Cluster<>();
+       cluster.getClusterObjects().add(reference1);
+       cluster.getClusterObjects().add(reference2);
+       ReferenceMatcher matcher = new ReferenceMatcher();
+       assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"ref\": \"117090010\"}, {\"id\": \"20\", \"ref\": \"11709000101\"}]}"},
+               matcher.process(cluster.toJsonString()));
    }
 
    @Test
@@ -133,7 +145,7 @@ class ReferenceMatcherTest {
    @Test
    void testNotMatchForNotOrderedSubStr() {
        ReferenceMatcher.Reference reference1 = new ReferenceMatcher.Reference("10", "   footarb");
-       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("10", "   foobartar @#");
+       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("20", "   foobartar @#");
        Cluster<ReferenceMatcher.Reference> cluster = new Cluster<>();
        cluster.getClusterObjects().add(reference1);
        cluster.getClusterObjects().add(reference2);
