@@ -20,6 +20,8 @@ WORKDIR /build/starrocks/celonis/udf/duplicate-invoice-checker
 RUN MAVEN_OPTS='-Dmaven.artifact.threads=128' mvn package
 
 FROM busybox:latest
+LABEL org.opencontainers.image.source = "https://github.com/celonis/celostar-starrocks"
+
 COPY --from=fe-builder /build/starrocks/output /release/fe_artifacts
 COPY --from=be-builder /build/starrocks/output /release/be_artifacts
 COPY --from=udf-builder /build/starrocks/celonis/udf/duplicate-invoice-checker/target/duplicate-invoice-checker-udf-1.0-SNAPSHOT-jar-with-dependencies.jar /release/udf/duplicate-invoice-checker-udf-1.0-SNAPSHOT.jar

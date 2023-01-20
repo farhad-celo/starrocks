@@ -52,4 +52,5 @@ COPY common.sh $DEPLOYDIR/starrocks/fe/bin/common.sh
 COPY common.sh $DEPLOYDIR/starrocks/be/bin/common.sh
 
 FROM runtime_${cgversion}
+LABEL org.opencontainers.image.source = "https://github.com/celonis/celostar-starrocks"
 CMD if [ "$STARTMODE" = 'auto' ] ; then ./start_fe_be.sh ; else ./start_be.sh ; fi
