@@ -55,7 +55,7 @@ public class CompanyMatcher {
         @EqualsAndHashCode.Exclude
         private String modifiedVendorName;
 
-        private final static UDFJaroWinklerDistance distance = new UDFJaroWinklerDistance();
+        private final static UDFJaroDistance distance = new UDFJaroDistance();
 
         public String toJsonString() {
             return "{\"id\": \"" + rowId + "\", \"vendor_name\": \"" + vendorName + "\"}";

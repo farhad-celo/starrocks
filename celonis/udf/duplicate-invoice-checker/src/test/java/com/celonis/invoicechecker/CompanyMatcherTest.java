@@ -40,6 +40,17 @@ class CompanyMatcherTest {
     }
 
     @Test
+    void testEvaluateWithMatch2() {
+        CompanyMatcher.Company company1 = new CompanyMatcher.Company("10", "Wal-Mart Transportation, LLC");
+        CompanyMatcher.Company company2 = new CompanyMatcher.Company("20", "Walmart Inc.");
+        Cluster<CompanyMatcher.Company> cluster = new Cluster<>();
+        cluster.getClusterObjects().add(company1);
+        cluster.getClusterObjects().add(company2);
+        CompanyMatcher matcher = new CompanyMatcher();
+        assertEquals(0, matcher.process(cluster.toJsonString()).length);
+    }
+
+    @Test
     void testEvaluateWithoutMatch1() {
         CompanyMatcher.Company company1 = new CompanyMatcher.Company("10", "   FOO    `LLC   ");
         CompanyMatcher.Company company2 = new CompanyMatcher.Company("20", "   bar @#Inc");

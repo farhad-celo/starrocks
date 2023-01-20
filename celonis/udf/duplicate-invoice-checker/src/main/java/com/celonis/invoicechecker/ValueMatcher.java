@@ -24,7 +24,7 @@ public class ValueMatcher {
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONObject obj = jsonArray.getJSONObject(i);
             Value value = new Value(obj.getString("id"), obj.getDouble("val"));
-            String normalizedValStr = Long.toString((long)(value.getValue() * 100));
+            String normalizedValStr = Long.toString(Math.round(value.getValue() * 100));
             value.setNormalizedValueStr(normalizedValStr);
             values.add(value);
         }
@@ -58,7 +58,7 @@ public class ValueMatcher {
             if (absDiff < EPS) {
                 return 1;
             }
-            double linearDecaySimilarity = Math.max(0, 1-absDiff/80.0);
+            double linearDecaySimilarity = Math.abs(absDiff - 80) < EPS ? 10 * EPS : Math.max(0, 1-absDiff/80.0);
             double turnerSimilarity = 0;
             if (this.getNormalizedValueStr().length() != otherValue.getNormalizedValueStr().length() ||
             !Utils.getCharacterCounts(this.getNormalizedValueStr()).equals(Utils.getCharacterCounts(otherValue.getNormalizedValueStr()))) {

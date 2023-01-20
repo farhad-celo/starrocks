@@ -61,7 +61,6 @@ class ValueMatcherTest {
         assertEquals(0, matcher.process(cluster.toJsonString()).length);
     }
 
-        @Test
     void testFullMatchWhenFourDigitsTurners() {
         ValueMatcher.Value value1 = new ValueMatcher.Value("10", 1234);
         ValueMatcher.Value value2 = new ValueMatcher.Value("20", 3142);
@@ -71,6 +70,30 @@ class ValueMatcherTest {
         ValueMatcher matcher = new ValueMatcher();
         assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"val\": 1234.0}, {\"id\": \"20\", \"val\": 3142.0}]}"},
                 matcher.process(cluster.toJsonString()));
+    }
+
+    @Test
+    void testFullMatchWhenFourDigitsTurners2() {
+        ValueMatcher.Value value1 = new ValueMatcher.Value("10", 1450760.11);
+        ValueMatcher.Value value2 = new ValueMatcher.Value("20", 1050714.16);
+        Cluster<ValueMatcher.Value> cluster = new Cluster<>();
+        cluster.getClusterObjects().add(value1);
+        cluster.getClusterObjects().add(value2);
+        ValueMatcher matcher = new ValueMatcher();
+        assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"val\": 1450760.11}, {\"id\": \"20\", \"val\": 1050714.16}]}"},
+                matcher.process(cluster.toJsonString()));
+    }
+
+    @Test
+    void testFullMatchWhenValueDiffBy80() {
+        ValueMatcher.Value value1 = new ValueMatcher.Value("10", 4644323.18);
+        ValueMatcher.Value value2 = new ValueMatcher.Value("20", 4644403.18);
+        Cluster<ValueMatcher.Value> cluster = new Cluster<>();
+        cluster.getClusterObjects().add(value1);
+        cluster.getClusterObjects().add(value2);
+        ValueMatcher matcher = new ValueMatcher();
+        assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"val\": 4644323.18}, {\"id\": \"20\", \"val\": 4644403.18}]}"},
+
     }
 
     @Test
