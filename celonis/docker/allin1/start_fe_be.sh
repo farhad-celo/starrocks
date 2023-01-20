@@ -14,14 +14,15 @@ cd $SR_HOME/fe/bin/
 cd $SR_HOME/be/bin/
 ./start_be.sh --daemon
 
-# Start broker.
-cd $SR_HOME/apache_hdfs_broker/bin/
-./start_broker.sh --daemon
+
+# Start UDF HTTP server endpoint
+cd $SR_HOME/udf
+python2 -m SimpleHTTPServer 7000 --directory starrocks &
 
 # Sleep until the cluster starts.
 sleep 30;
 
-# Set BE and broker server IP.
+# Set BE server IP.
 # Note this command only works for Centos 7 docker container.
 # It does NOT work on Ubuntu.
 IP=$(ifconfig eth0 | grep 'inet' | cut -d: -f2 | awk '{print $2}')
@@ -29,8 +30,6 @@ IP=$(ifconfig eth0 | grep 'inet' | cut -d: -f2 | awk '{print $2}')
 # Fetch fqdn with the command suggested by AWS official doc: https://docs.aws.amazon.com/managedservices/latest/userguide/find-FQDN.html
 MYFQDN=`hostname --fqdn`
 mysql -uroot -h${MYFQDN} -P 9030 -e "alter system add backend '${MYFQDN}:9050';"
-mysql -uroot -h${MYFQDN} -P 9030 -e "alter system add broker broker1 '${MYFQDN}:8000';"
-
 
 # TODO(j.yang): Explicitly set pipeline_sink_dop because pipeline load currently only
 # uses parallelism 1 by default. Remove this after automatic parallelism selection

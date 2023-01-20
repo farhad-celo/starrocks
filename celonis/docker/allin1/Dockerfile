@@ -28,7 +28,8 @@ WORKDIR $DEPLOYDIR
 # Copy all artifacts to the runtime container image
 COPY --from=artifacts /release/be_artifacts/ $DEPLOYDIR/starrocks
 COPY --from=artifacts /release/fe_artifacts/ $DEPLOYDIR/starrocks
-COPY --from=artifacts /release/broker_artifacts/ $DEPLOYDIR/starrocks
+COPY --from=artifacts /release/udf/ $DEPLOYDIR/starrocks/udf/
+
 
 # Create directory for FE meta and BE storage in StarRocks.
 RUN mkdir -p $DEPLOYDIR/starrocks/fe/meta && mkdir -p $DEPLOYDIR/starrocks/be/storage
@@ -51,4 +52,4 @@ COPY common.sh $DEPLOYDIR/starrocks/fe/bin/common.sh
 COPY common.sh $DEPLOYDIR/starrocks/be/bin/common.sh
 
 FROM runtime_${cgversion}
-CMD if [ "$STARTMODE" = 'auto' ] ; then ./start_fe_be_broker.sh ; else ./start_be_broker.sh ; fi
+CMD if [ "$STARTMODE" = 'auto' ] ; then ./start_fe_be.sh ; else ./start_be.sh ; fi
