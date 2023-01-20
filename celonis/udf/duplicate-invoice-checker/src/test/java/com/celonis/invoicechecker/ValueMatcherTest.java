@@ -93,7 +93,7 @@ class ValueMatcherTest {
         cluster.getClusterObjects().add(value2);
         ValueMatcher matcher = new ValueMatcher();
         assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"val\": 4644323.18}, {\"id\": \"20\", \"val\": 4644403.18}]}"},
-
+                matcher.process(cluster.toJsonString()));
     }
 
     @Test
