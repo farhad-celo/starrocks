@@ -152,4 +152,27 @@ class ReferenceMatcherTest {
        ReferenceMatcher matcher = new ReferenceMatcher();
        assertEquals(0, matcher.process(cluster.toJsonString()).length);
    }
+
+   @Test
+   void testNotMatchWhenTooManySkips() {
+       ReferenceMatcher.Reference reference1 = new ReferenceMatcher.Reference("10", "11709000101000");
+       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("20", "117090010");
+       Cluster<ReferenceMatcher.Reference> cluster = new Cluster<>();
+       cluster.getClusterObjects().add(reference1);
+       cluster.getClusterObjects().add(reference2);
+       ReferenceMatcher matcher = new ReferenceMatcher();
+       assertEquals(0, matcher.process(cluster.toJsonString()).length);
+   }
+
+   @Test
+   void testShouldMatchWhenThreeSkips() {
+       ReferenceMatcher.Reference reference1 = new ReferenceMatcher.Reference("10", "117090001010");
+       ReferenceMatcher.Reference reference2 = new ReferenceMatcher.Reference("20", "117090010");
+       Cluster<ReferenceMatcher.Reference> cluster = new Cluster<>();
+       cluster.getClusterObjects().add(reference1);
+       cluster.getClusterObjects().add(reference2);
+       ReferenceMatcher matcher = new ReferenceMatcher();
+       assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"ref\": \"117090001010\"}, {\"id\": \"20\", \"ref\": \"117090010\"}]}"},
+               matcher.process(cluster.toJsonString()));
+   }
 }
