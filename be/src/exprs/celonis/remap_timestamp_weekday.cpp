@@ -51,7 +51,7 @@ ColumnPtr CelonisRemapTimestampWeekday::_celonis_remap_timestamp_weekday_impl(Fu
         }
     }
     return ArrayColumn::create(
-            result.build(false),
+            ColumnHelper::cast_to_nullable_column(result.build(false)),
             UInt32Column::create(timestamp_offsets));
 }
 
