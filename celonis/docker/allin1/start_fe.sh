@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Set JAVA_HOME.
-export JAVA_HOME=/usr/lib/jvm/java-1.8.0
-
-export SR_HOME=/data/deploy/starrocks
-
 # Start FE.
 cd $SR_HOME/fe/bin/
 

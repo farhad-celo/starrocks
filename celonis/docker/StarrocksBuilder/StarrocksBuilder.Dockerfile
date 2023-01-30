@@ -1,4 +1,8 @@
-ARG builder=ghcr.io/celonis/celostar/starrocks-dev-env:branch-2.5
+# This docker file build the Starrocks artifacts fe/be/udfs and package them into a busybox basedimage
+# Please run this command from the git repo root directory to build:
+# DOCKER_BUILDKIT=1 docker build --rm=true -f celonis/docker/StarrocksBuilder/StarrocksBuilder.Dockerfile -t starrocks-artifacts:tag .
+
+ARG builder=ghcr.io/celonis/celostar/starrocks-dev-env:ubuntu
 
 FROM ${builder} as fe-builder
 # clean and build Frontend and Spark Dpp application

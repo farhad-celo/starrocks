@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Set JAVA_HOME.
-export JAVA_HOME=/usr/lib/jvm/java-1.8.0
-
-export SR_HOME=/data/deploy/starrocks
-
 # Start BE.
 cd $SR_HOME/be/bin/
 
@@ -15,7 +10,7 @@ sleep 3
 
 # Loop to detect the process.
 while sleep 60; do
-  ps aux | grep starrocks | grep -q -v grep
+  ps aux | grep starrocks_be | grep -q -v grep
   PROCESS_STATUS=$?
 
   if [ PROCESS_STATUS -ne 0 ]; then
