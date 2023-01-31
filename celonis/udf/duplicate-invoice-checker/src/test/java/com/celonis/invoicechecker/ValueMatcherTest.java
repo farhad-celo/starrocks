@@ -51,6 +51,22 @@ class ValueMatcherTest {
     }
 
     @Test
+    void testFullMatchWhenSmallValueDiff2() {
+        ValueMatcher.Value value1 = new ValueMatcher.Value("10", 102.5);
+        ValueMatcher.Value value2 = new ValueMatcher.Value("20", 99.5);
+        ValueMatcher.Value value3 = new ValueMatcher.Value("30", 1000.5);
+        ValueMatcher.Value value4 = new ValueMatcher.Value("40", 1200.5);
+        Cluster<ValueMatcher.Value> cluster = new Cluster<>();
+        cluster.getClusterObjects().add(value1);
+        cluster.getClusterObjects().add(value2);
+        cluster.getClusterObjects().add(value3);
+        cluster.getClusterObjects().add(value4);
+        ValueMatcher matcher = new ValueMatcher();
+        assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"val\": 102.5}, {\"id\": \"20\", \"val\": 99.5}]}"},
+                matcher.process(cluster.toJsonString()));
+    }
+
+    @Test
     void testFullMatchWhenDigitsAreDifferent() {
         ValueMatcher.Value value1 = new ValueMatcher.Value("10", 1111.5);
         ValueMatcher.Value value2 = new ValueMatcher.Value("20", 2222.5);

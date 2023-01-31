@@ -13,7 +13,6 @@ public class DateTimeIndexer implements IndexerInterface {
         Map<Integer, Set<String>> dayToIds = new HashMap<>();
         List<Utils.ValueToId<Long>> timestampToIds = new ArrayList<>();
 
-
         for (ClusterObjectInterface clusterObject : clusterObjects) {
             DateTimeMatcher.DateTime dateTime = (DateTimeMatcher.DateTime) clusterObject;
             idToObjects.put(dateTime.getId(), dateTime);
@@ -28,7 +27,7 @@ public class DateTimeIndexer implements IndexerInterface {
             timestampToIds.add(new Utils.ValueToId(calendar.getTimeInMillis(), dateTime.getId()));
         }
 
-        Collections.sort(timestampToIds, (left, right) -> (-left.getValue().compareTo(right.getValue())));
+        Collections.sort(timestampToIds, (left, right) -> left.getValue().compareTo(right.getValue()));
 
         for (String id : idToObjects.keySet()) {
             DateTimeMatcher.DateTime dateTime = (DateTimeMatcher.DateTime) idToObjects.get(id);

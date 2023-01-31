@@ -75,6 +75,23 @@ class DateTimeMatcherTest {
    }
 
    @Test
+   void testFullMatchWhenDatesAreClose2() {
+       DateTimeMatcher.DateTime dateTime1 = new DateTimeMatcher.DateTime("10", "2020-01-10 04:01:01");
+       DateTimeMatcher.DateTime dateTime2 = new DateTimeMatcher.DateTime("20", "2020-01-03 12:01:01");
+       DateTimeMatcher.DateTime dateTime3 = new DateTimeMatcher.DateTime("30", "2019-01-03 12:01:01");
+       DateTimeMatcher.DateTime dateTime4 = new DateTimeMatcher.DateTime("40", "2019-03-05 12:01:01");
+       Cluster<DateTimeMatcher.DateTime> cluster = new Cluster<>();
+       cluster.getClusterObjects().add(dateTime1);
+       cluster.getClusterObjects().add(dateTime2);
+       cluster.getClusterObjects().add(dateTime3);
+       cluster.getClusterObjects().add(dateTime4);
+       DateTimeMatcher matcher = new DateTimeMatcher();
+       assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"date_time\": \"2020-01-10 04:01:01\"}, " +
+               "{\"id\": \"20\", \"date_time\": \"2020-01-03 12:01:01\"}]}"},
+               matcher.process(cluster.toJsonString()));
+   }
+
+   @Test
    void testNotMatchWhenDatesAreNotClose() {
        DateTimeMatcher.DateTime dateTime1 = new DateTimeMatcher.DateTime("10", "2020-01-11 04:01:01");
        DateTimeMatcher.DateTime dateTime2 = new DateTimeMatcher.DateTime("20", "2020-01-03 12:01:01");

@@ -28,7 +28,7 @@ public class ValueIndexer implements IndexerInterface {
             }
         }
 
-        Collections.sort(valueToIds, (left, right) -> (-left.getValue().compareTo(right.getValue())));
+        Collections.sort(valueToIds, (left, right) -> left.getValue().compareTo(right.getValue()));
 
         for (String id : idToObjects.keySet()) {
             ValueMatcher.Value value = (ValueMatcher.Value) idToObjects.get(id);
