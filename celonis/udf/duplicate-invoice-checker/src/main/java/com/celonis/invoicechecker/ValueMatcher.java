@@ -4,6 +4,8 @@ import org.json.*;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.ArrayList;
+import java.util.Map;
+
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -26,11 +28,22 @@ public class ValueMatcher {
             Value value = new Value(obj.getString("id"), obj.getDouble("val"));
             String normalizedValStr = Long.toString(Math.round(value.getValue() * 100));
             value.setNormalizedValueStr(normalizedValStr);
+            Map<Character, Integer> counters = Utils.getCharacterCounts(normalizedValStr);
+            value.setCharacterCounts(counters);
+            String countersStr ="";
+            for (Character c : counters.keySet()) {
+                countersStr += c + counters.get(c) + ",";
+            }
+            value.setCountersHashValue(countersStr.hashCode());
             values.add(value);
         }
 
         // return PairwiseCluster.cluster(values);
-        return GraphCluster.cluster(values);
+        // return GraphCluster.cluster(values);
+        ValueIndexer indexer = new ValueIndexer();
+        indexer.index(values);
+        IndexCluster indexCluster = new IndexCluster(indexer);
+        return indexCluster.cluster(values);
     }
 
     @RequiredArgsConstructor
@@ -49,6 +62,16 @@ public class ValueMatcher {
         @EqualsAndHashCode.Exclude
         private String normalizedValueStr;
 
+        @Setter
+        @Getter
+        @EqualsAndHashCode.Exclude
+        private Map<Character, Integer> characterCounts;
+
+        @Setter
+        @Getter
+        @EqualsAndHashCode.Exclude
+        int countersHashValue;
+
         public String toJsonString() {
             return "{\"id\": \"" + rowId + "\", \"val\": " + value + "}";
         }
@@ -61,7 +84,7 @@ public class ValueMatcher {
             double linearDecaySimilarity = Math.abs(absDiff - 80) < EPS ? 10 * EPS : Math.max(0, 1-absDiff/80.0);
             double turnerSimilarity = 0;
             if (this.getNormalizedValueStr().length() != otherValue.getNormalizedValueStr().length() ||
-            !Utils.getCharacterCounts(this.getNormalizedValueStr()).equals(Utils.getCharacterCounts(otherValue.getNormalizedValueStr()))) {
+            !this.getCharacterCounts().equals(otherValue.getCharacterCounts())) {
                 turnerSimilarity = 0;
             } else {
                 int turners = 0;

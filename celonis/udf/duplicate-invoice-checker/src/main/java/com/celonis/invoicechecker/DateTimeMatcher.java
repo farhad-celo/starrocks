@@ -33,6 +33,7 @@ public class DateTimeMatcher {
                     continue;
                 }
                 dateTime.setDateTime(parsedDate);
+                dateTime.setCalendar(getCalendarFromDateTime(parsedDate));
                 dateTimes.add(dateTime);
             } catch (ParseException e) {
                 // We don't need to terminate the program if the parsing fails. We simply ignore the ill-format.
@@ -42,7 +43,21 @@ public class DateTimeMatcher {
         }
 
         // return PairwiseCluster.cluster(dateTimes);
-        return GraphCluster.cluster(dateTimes);
+        // return GraphCluster.cluster(dateTimes);
+        DateTimeIndexer indexer = new DateTimeIndexer();
+        indexer.index(dateTimes);
+        IndexCluster indexCluster = new IndexCluster(indexer);
+        return indexCluster.cluster(dateTimes);
+    }
+
+    private Calendar getCalendarFromDateTime(Date dateTime) {
+        Calendar calendar = new GregorianCalendar();
+        calendar.setTime(dateTime);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+
+        return calendar;
     }
 
     @RequiredArgsConstructor
@@ -60,33 +75,28 @@ public class DateTimeMatcher {
         @EqualsAndHashCode.Exclude
         private Date dateTime;
 
+        @Setter
+        @Getter
+        @EqualsAndHashCode.Exclude
+        private Calendar calendar;
+
         public String toJsonString() {
             return "{\"id\": \"" + rowId + "\", \"date_time\": \"" + dateTimeStr + "\"}";
         }
 
-        private Calendar getCalendarFromDateTime(Date dateTime) {
-            Calendar calendar = new GregorianCalendar();
-            calendar.setTime(dateTime);
-            calendar.set(Calendar.HOUR_OF_DAY, 0);
-            calendar.set(Calendar.MINUTE, 0);
-            calendar.set(Calendar.SECOND, 0);
-
-            return calendar;
-        }
-
         public boolean isSimilar(ClusterObjectInterface other) {
             DateTime otherDateTime = (DateTime) other;
-            Calendar currentCalendar = getCalendarFromDateTime(getDateTime());
-            Calendar otherCalendar = getCalendarFromDateTime(otherDateTime.getDateTime());
+            Calendar currentCalendar = getCalendar();
+            Calendar otherCalendar = otherDateTime.getCalendar();
 
             if (currentCalendar.get(Calendar.YEAR) == otherCalendar.get(Calendar.YEAR) &&
-                currentCalendar.get(Calendar.DAY_OF_YEAR) == otherCalendar.get(Calendar.DAY_OF_YEAR)) {
+                    currentCalendar.get(Calendar.DAY_OF_YEAR) == otherCalendar.get(Calendar.DAY_OF_YEAR)) {
                 return true;
             }
 
             // If time diff is less than 7 days, we match these two dateTime.
-            if (Math.abs(currentCalendar.getTimeInMillis()-otherCalendar.getTimeInMillis())
-                <= 7 * 24 * 60 * 60 * 1000) {
+            if (Math.abs(currentCalendar.getTimeInMillis() - otherCalendar.getTimeInMillis())
+                    <= 7 * 24 * 60 * 60 * 1000) {
                 return true;
             }
 
@@ -97,7 +107,7 @@ public class DateTimeMatcher {
             // If month and date are swapped, we match these two dateTime.
             // Note that get(Calendar.MONTH) is zero-based.
             if (currentCalendar.get(Calendar.MONTH) + 1 == otherCalendar.get(Calendar.DAY_OF_MONTH) &&
-                currentCalendar.get(Calendar.DAY_OF_MONTH) == otherCalendar.get(Calendar.MONTH) + 1) {
+                    currentCalendar.get(Calendar.DAY_OF_MONTH) == otherCalendar.get(Calendar.MONTH) + 1) {
                 return true;
             }
 

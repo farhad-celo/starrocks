@@ -32,10 +32,10 @@ public class ReferenceIndexer implements IndexerInterface {
                     new StringBuilder(ref.getModifiedReference()).reverse().toString());
             List<String> translatedMatches = translatedStrTrie.findPrefixWithFuzzyMatch(ref.getTranslatedReference(), 3);
             List<String> counterMatches = counterToIds.get(ref.getCountersHashValue());
-            addEdges(id, modifiedMatches, potentialConnectedEdges);
-            addEdges(id, reversedModifiedMatches, potentialConnectedEdges);
-            addEdges(id, translatedMatches, potentialConnectedEdges);
-            addEdges(id, counterMatches, potentialConnectedEdges);
+            Utils.addEdges(id, modifiedMatches, potentialConnectedEdges);
+            Utils.addEdges(id, reversedModifiedMatches, potentialConnectedEdges);
+            Utils.addEdges(id, translatedMatches, potentialConnectedEdges);
+            Utils.addEdges(id, counterMatches, potentialConnectedEdges);
         }
         for (String id : idToObjects.keySet()) {
             List<String> connectedIds = new ArrayList<>();
@@ -50,24 +50,6 @@ public class ReferenceIndexer implements IndexerInterface {
 
     public List<String> findEdges(String id) {
         return connectedEdges.get(id);
-    }
-
-    private void addEdges(String id, List<String> ids, Map<String, Set<String>> potentialConnectedEdges) {
-        if (potentialConnectedEdges.containsKey(id)) {
-            potentialConnectedEdges.get(id).addAll(ids);
-        } else {
-            Set<String> hashIds = new HashSet<>(ids);
-            potentialConnectedEdges.put(id, hashIds);
-        }
-        for (String pointedId : ids) {
-            if (potentialConnectedEdges.containsKey(pointedId)) {
-                potentialConnectedEdges.get(pointedId).add(id);
-            } else {
-                Set<String> hashIds = new HashSet<>();
-                hashIds.add(id);
-                potentialConnectedEdges.put(pointedId, hashIds);
-            }
-        }
     }
 
     private Map<String, List<String>> connectedEdges = new HashMap<>();
