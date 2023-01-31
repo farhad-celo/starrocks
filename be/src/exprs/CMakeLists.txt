@@ -117,6 +117,7 @@ endif()
 
 set(CELONIS_FILES
   celonis/array_functions.cpp
+  celonis/count_edges.cpp
   celonis/source_target.cpp
   celonis/calc_throughput.cpp
   celonis/match_activities.cpp

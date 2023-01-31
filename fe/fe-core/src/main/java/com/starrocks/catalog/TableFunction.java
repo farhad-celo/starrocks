@@ -97,6 +97,7 @@ public class TableFunction extends Function {
     }
 
     public static void initBuiltins(FunctionSet functionSet) {
+        initCelonisBuiltins(functionSet);
         TableFunction unnest = new TableFunction(new FunctionName("unnest"), Lists.newArrayList("unnest"),
                 Lists.newArrayList(Type.ANY_ARRAY), Lists.newArrayList(Type.ANY_ELEMENT), true);
         functionSet.addBuiltin(unnest);
@@ -136,6 +137,13 @@ public class TableFunction extends Function {
                 Lists.newArrayList(/*tablet_id*/Type.BIGINT, /*tablet_version*/Type.BIGINT),
                 Lists.newArrayList(Type.BIGINT, Type.BIGINT, Type.BIGINT, Type.BIGINT, Type.BOOLEAN, Type.STRING));
         functionSet.addBuiltin(listRowsets);
+    }
+
+    private static void initCelonisBuiltins(FunctionSet functionSet) {
+        TableFunction uniqueEdgeFunction =
+                new TableFunction(new FunctionName("celonis_count_edges"), Lists.newArrayList("source", "target", "count"),
+                        Lists.newArrayList(Type.ANY_ARRAY), Lists.newArrayList(Type.ANY_ELEMENT, Type.ANY_ELEMENT, Type.BIGINT));
+        functionSet.addBuiltin(uniqueEdgeFunction);
     }
 
     public List<Type> getTableFnReturnTypes() {

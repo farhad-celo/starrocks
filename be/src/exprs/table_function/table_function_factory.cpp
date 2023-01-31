@@ -18,6 +18,7 @@
 
 #include "column/column.h"
 #include "column/type_traits.h"
+#include "exprs/celonis/count_edges.h"
 #include "exprs/table_function/generate_series.h"
 #include "exprs/table_function/json_each.h"
 #include "exprs/table_function/list_rowsets.h"
@@ -72,9 +73,14 @@ private:
     std::unordered_map<std::tuple<std::string, std::vector<LogicalType>, std::vector<LogicalType>>, TableFunctionPtr,
                        TableFunctionMapHash>
             _infos_mapping;
+
+    // Adds Celonis-specific TVFs.
+    void add_celonis_function_mapping();
 };
 
 TableFunctionResolver::TableFunctionResolver() {
+    add_celonis_function_mapping();
+
     TableFunctionPtr func_unnest = std::make_shared<Unnest>();
     add_function_mapping("unnest", {TYPE_ARRAY}, {TYPE_TINYINT}, func_unnest);
     add_function_mapping("unnest", {TYPE_ARRAY}, {TYPE_SMALLINT}, func_unnest);
@@ -134,6 +140,12 @@ TableFunctionResolver::TableFunctionResolver() {
 }
 
 TableFunctionResolver::~TableFunctionResolver() = default;
+
+void TableFunctionResolver::add_celonis_function_mapping() {
+    TableFunctionPtr func_count_edges = std::make_shared<CountEdges>();
+    add_function_mapping("celonis_count_edges", {TYPE_ARRAY}, {TYPE_VARCHAR, TYPE_VARCHAR, TYPE_BIGINT},
+                         func_count_edges);
+}
 
 const TableFunction* get_table_function(const std::string& name, const std::vector<LogicalType>& arg_type,
                                         const std::vector<LogicalType>& return_type,

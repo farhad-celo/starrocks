@@ -148,6 +148,7 @@ set(EXEC_FILES
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/source_target_test.cpp
         ./exprs/celonis/time_functions_test.cpp
+        ./exprs/celonis/count_edges_test.cpp
         ./exprs/celonis/util.cpp
         ./exprs/decimal_cast_expr_decimal_test.cpp
         ./exprs/decimal_cast_expr_integer_test.cpp
