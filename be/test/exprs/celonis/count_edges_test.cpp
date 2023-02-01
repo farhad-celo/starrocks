@@ -32,6 +32,7 @@ TEST_F(CountEdgesTest, count_edges) {
     input.push_back(array);
     ASSERT_OK(function->init({}, &table_state));
     table_state->set_params(input);
+    ASSERT_OK(function->prepare(table_state));
 
     bool eos = false;
     auto [result, offset] = function->process(table_state, &eos);
@@ -41,36 +42,36 @@ TEST_F(CountEdgesTest, count_edges) {
     ASSERT_EQ(6, result[1]->size());
     ASSERT_EQ(6, result[2]->size());
 
-    ASSERT_EQ("a", result[0]->get(0).get_slice());
-    ASSERT_EQ("b", result[1]->get(0).get_slice());
-    ASSERT_EQ(1, result[2]->get(0).get_int64());
+    EXPECT_EQ("a", result[0]->get(0).get_slice());
+    EXPECT_EQ("b", result[1]->get(0).get_slice());
+    EXPECT_EQ(1, result[2]->get(0).get_int64());
 
-    ASSERT_EQ("b", result[0]->get(1).get_slice());
-    ASSERT_EQ("b", result[1]->get(1).get_slice());
-    ASSERT_EQ(2, result[2]->get(1).get_int64());
+    EXPECT_EQ("b", result[0]->get(1).get_slice());
+    EXPECT_EQ("b", result[1]->get(1).get_slice());
+    EXPECT_EQ(2, result[2]->get(1).get_int64());
 
-    ASSERT_EQ("b", result[0]->get(2).get_slice());
-    ASSERT_EQ("c", result[1]->get(2).get_slice());
-    ASSERT_EQ(2, result[2]->get(2).get_int64());
+    EXPECT_EQ("b", result[0]->get(2).get_slice());
+    EXPECT_EQ("c", result[1]->get(2).get_slice());
+    EXPECT_EQ(2, result[2]->get(2).get_int64());
 
-    ASSERT_EQ("c", result[0]->get(3).get_slice());
-    ASSERT_EQ("c", result[1]->get(3).get_slice());
-    ASSERT_EQ(3, result[2]->get(3).get_int64());
+    EXPECT_EQ("c", result[0]->get(3).get_slice());
+    EXPECT_EQ("c", result[1]->get(3).get_slice());
+    EXPECT_EQ(3, result[2]->get(3).get_int64());
 
-    ASSERT_EQ("c", result[0]->get(4).get_slice());
-    ASSERT_EQ("b", result[1]->get(4).get_slice());
-    ASSERT_EQ(1, result[2]->get(4).get_int64());
+    EXPECT_EQ("c", result[0]->get(4).get_slice());
+    EXPECT_EQ("b", result[1]->get(4).get_slice());
+    EXPECT_EQ(1, result[2]->get(4).get_int64());
 
-    ASSERT_EQ("a", result[0]->get(5).get_slice());
-    ASSERT_EQ("b", result[1]->get(5).get_slice());
-    ASSERT_EQ(1, result[2]->get(5).get_int64());
+    EXPECT_EQ("a", result[0]->get(5).get_slice());
+    EXPECT_EQ("b", result[1]->get(5).get_slice());
+    EXPECT_EQ(1, result[2]->get(5).get_int64());
 
     ASSERT_EQ(5, offset->size());
-    ASSERT_EQ(0, offset->get(0).get_int32());
-    ASSERT_EQ(5, offset->get(1).get_int32());
-    ASSERT_EQ(6, offset->get(2).get_int32());
-    ASSERT_EQ(6, offset->get(2).get_int32());
-    ASSERT_EQ(6, offset->get(2).get_int32());
+    EXPECT_EQ(0, offset->get(0).get_int32());
+    EXPECT_EQ(5, offset->get(1).get_int32());
+    EXPECT_EQ(6, offset->get(2).get_int32());
+    EXPECT_EQ(6, offset->get(2).get_int32());
+    EXPECT_EQ(6, offset->get(2).get_int32());
     function->close(nullptr, table_state);
 }
 
@@ -86,6 +87,7 @@ TEST_F(CountEdgesTest, count_edges_null) {
     input.push_back(array);
     ASSERT_OK(function->init({}, &table_state));
     table_state->set_params(input);
+    ASSERT_OK(function->prepare(table_state));
 
     bool eos = false;
     auto [result, offset] = function->process(table_state, &eos);
@@ -93,23 +95,24 @@ TEST_F(CountEdgesTest, count_edges_null) {
     ASSERT_EQ(3, result[0]->size());
     ASSERT_EQ(3, result[1]->size());
     ASSERT_EQ(3, result[2]->size());
-    ASSERT_EQ("a", result[0]->get(0).get_slice());
-    ASSERT_EQ("b", result[1]->get(0).get_slice());
-    ASSERT_EQ(1, result[2]->get(0).get_int64());
 
-    ASSERT_EQ("b", result[0]->get(1).get_slice());
-    ASSERT_EQ("b", result[1]->get(1).get_slice());
-    ASSERT_EQ(3, result[2]->get(1).get_int64());
+    EXPECT_EQ("a", result[0]->get(0).get_slice());
+    EXPECT_EQ("b", result[1]->get(0).get_slice());
+    EXPECT_EQ(1, result[2]->get(0).get_int64());
 
-    ASSERT_EQ("b", result[0]->get(2).get_slice());
-    ASSERT_EQ("c", result[1]->get(2).get_slice());
-    ASSERT_EQ(1, result[2]->get(2).get_int64());
+    EXPECT_EQ("b", result[0]->get(1).get_slice());
+    EXPECT_EQ("b", result[1]->get(1).get_slice());
+    EXPECT_EQ(3, result[2]->get(1).get_int64());
+
+    EXPECT_EQ("b", result[0]->get(2).get_slice());
+    EXPECT_EQ("c", result[1]->get(2).get_slice());
+    EXPECT_EQ(1, result[2]->get(2).get_int64());
 
     ASSERT_EQ(4, offset->size());
-    ASSERT_EQ(0, offset->get(0).get_int32());
-    ASSERT_EQ(3, offset->get(1).get_int32());
-    ASSERT_EQ(3, offset->get(2).get_int32());
-    ASSERT_EQ(3, offset->get(3).get_int32());
+    EXPECT_EQ(0, offset->get(0).get_int32());
+    EXPECT_EQ(3, offset->get(1).get_int32());
+    EXPECT_EQ(3, offset->get(2).get_int32());
+    EXPECT_EQ(3, offset->get(3).get_int32());
     function->close(nullptr, table_state);
 }
 
