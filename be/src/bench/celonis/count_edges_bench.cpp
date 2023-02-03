@@ -16,7 +16,7 @@ TypeDescriptor array_type(const LogicalType& element_type) {
     t.type = starrocks::TYPE_ARRAY;
     t.children.resize(1);
     t.children[0].type = element_type;
-    t.children[0].len = (element_type == starrocks::TYPE_VARCHAR || element_type == starrocks::TYPE_CHAR) ? 10 : -1;
+    t.children[0].len = (element_type == starrocks::TYPE_VARCHAR || element_type == starrocks::TYPE_CHAR) ? 30 : -1;
     return t;
 }
 
@@ -28,7 +28,7 @@ static void do_bench(benchmark::State& state, int array_size, int num_rows) {
     uniform_int.param(UniformInt::param_type(1, 250));
 
     std::vector<std::string> activities;
-    for (int i = 0; i < array_size/2; ++i) {
+    for (int i = 0; i < array_size; ++i) {
         std::stringstream str;
         str << "ACTIVITY_NUMBER_" << i;
         activities.push_back(str.str());
@@ -37,7 +37,7 @@ static void do_bench(benchmark::State& state, int array_size, int num_rows) {
         int array_len = 1 + uniform_int(rng) % max_length;
         DatumArray result;
         for (int i = 0; i < array_len; ++i) {
-            result.push_back(activities[uniform_int(rng) % activities.size()]);
+            result.push_back((Slice) activities[uniform_int(rng) % activities.size()]);
         }
         return result;
     };
