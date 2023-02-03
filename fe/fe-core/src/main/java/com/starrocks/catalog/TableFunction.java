@@ -142,7 +142,7 @@ public class TableFunction extends Function {
     private static void initCelonisBuiltins(FunctionSet functionSet) {
         TableFunction uniqueEdgeFunction =
                 new TableFunction(new FunctionName("celonis_count_edges"), Lists.newArrayList("source", "target", "edge_count"),
-                        Lists.newArrayList(Type.ANY_ARRAY), Lists.newArrayList(Type.ANY_ELEMENT, Type.ANY_ELEMENT, Type.BIGINT));
+                        Lists.newArrayList(Type.ARRAY_VARCHAR), Lists.newArrayList(Type.VARCHAR, Type.VARCHAR, Type.BIGINT));
         functionSet.addBuiltin(uniqueEdgeFunction);
     }
 
