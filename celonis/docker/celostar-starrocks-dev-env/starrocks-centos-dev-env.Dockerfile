@@ -2,19 +2,16 @@ ARG BRANCH=branch-2.5
 
 FROM starrocks/dev-env:${BRANCH}  as dev-env-with-maven-repo
 
-# Set the artifact threads to 128 to maximize the download speed
-ENV MAVEN_OPTS='-Dmaven.artifact.threads=128'
-ARG STARROCKS_VERSION=2.5.0-rc02
+ARG STARROCKS_VERSION=2.5.1
 WORKDIR /root
 RUN wget https://github.com/StarRocks/starrocks/archive/refs/tags/${STARROCKS_VERSION}.tar.gz && \
         tar zxf ${STARROCKS_VERSION}.tar.gz && rm ${STARROCKS_VERSION}.tar.gz && \
         mv starrocks-${STARROCKS_VERSION} starrocks
 # Copy a customized pom.xml that put kunpeng as the last option for downloading repos
-COPY pom.xml starrocks/fe/pom.xml
+COPY fe/pom.xml starrocks/fe/pom.xml
 
 # Build to get all dependence
-RUN cd starrocks && ./build.sh --fe
-RUN cd starrocks/fs_brokers/apache_hdfs_broker && ./build.sh
+RUN cd starrocks && MAVEN_OPTS='-Dmaven.artifact.threads=128' ./build.sh --fe --clean
 RUN cd starrocks/java-extensions && mvn package -DskipTests
 
 # Remove the entire directory to make the image layer smaller

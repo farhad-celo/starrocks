@@ -23,7 +23,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 jobs:
-  release-starrocks:
+  release-ubuntu-image:
     runs-on: [self-hosted, saola-linux]
     steps:
       - name: checkout repository
@@ -35,20 +35,20 @@ jobs:
 
       - name: build artifact docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg CODE_SOURCE=local -f celonis/docker/StarrocksBuilder/StarrocksBuilder.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION} .
+          DOCKER_BUILDKIT=1 docker build --build-arg builder=ghcr.io/celonis/celostar/starrocks-ubuntu-dev-env:latest -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-ubuntu .
 
       - name: build allin1 docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION} -f celonis/docker/allin1/Dockerfile -t starrocks-allin1:${RELEASE_VERSION} celonis/docker/allin1
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${RELEASE_VERSION}-ubuntu celonis/docker/allin1
 
       - name: push allin1 docker image to GHCR
         run: |
-          docker tag starrocks-allin1:${RELEASE_VERSION} ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}
+          docker tag starrocks-allin1:${RELEASE_VERSION}-ubuntu ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
           
           # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}
+          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
           do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION} trying again."
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu trying again."
           done
 
       - name: GitHub Docker logout
@@ -68,13 +68,68 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: push allin1 docker image to prod ECR
-        run: |         
+        run: |
           # push to the prod ECR
-          docker tag starrocks-allin1:${RELEASE_VERSION} 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}
-          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}
+          docker tag starrocks-allin1:${RELEASE_VERSION}-ubuntu 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
 
       - name: Amazon ECR logout
         if: ${{ always() }}
         run: |
           docker logout ${{ steps.login-ecr.outputs.registry }}
+          
 
+  release-centos-image:
+    runs-on: [self-hosted, saola-linux]
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v3
+
+      - name: GitHub Docker login
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+
+      - name: build artifact docker image
+        run: |
+          DOCKER_BUILDKIT=1 docker build --build-arg builder=ghcr.io/celonis/celostar/starrocks-centos-dev-env:latest -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-centos .
+
+      - name: build allin1 docker image
+        run: |
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-centos -f celonis/docker/allin1/allin1-centos.Dockerfile -t starrocks-allin1:${RELEASE_VERSION}-centos celonis/docker/allin1
+
+      - name: push allin1 docker image to GHCR
+        run: |
+          docker tag starrocks-allin1:${RELEASE_VERSION}-centos ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-centos
+          
+          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
+          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-centos
+          do
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-centos trying again."
+          done
+
+      - name: GitHub Docker logout
+        if: ${{ always() }}
+        run: |
+          docker logout ghcr.io
+
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: push allin1 docker image to prod ECR
+        run: |
+          # push to the prod ECR
+          docker tag starrocks-allin1:${RELEASE_VERSION}-centos 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-centos
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-centos
+
+      - name: Amazon ECR logout
+        if: ${{ always() }}
+        run: |
+          docker logout ${{ steps.login-ecr.outputs.registry }}
