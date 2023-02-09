@@ -15,7 +15,7 @@ cd $SR_HOME/be/bin/
 # Start UDF HTTP server endpoint
 echo "Start UDF HTTP server endpoint"
 cd $SR_HOME/udf
-python2 -m SimpleHTTPServer 7000 &
+python2 -m SimpleHTTPServer 7000 &> $SR_HOME/udf/udf.log &
 
 # Sleep until the cluster starts.
 sleep 15;
