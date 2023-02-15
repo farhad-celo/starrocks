@@ -535,8 +535,12 @@ std::string VariantStatsState::json_string(std::vector<VList>& activity_top_vari
         obj.AddMember("id", i, allocator);
         rapidjson::Value a(rapidjson::kArrayType);
         for (int j = 0; j < activity_top_variants[i].size(); j++) {
+            rapidjson::Value var_obj(rapidjson::kObjectType);
             rapidjson::Value act = activity_top_variants[i][j].first->first.to_json(allocator);
-            a.PushBack(act, allocator);
+            size_t count = activity_top_variants[i][j].second;
+            var_obj.AddMember("variant", act, allocator);
+            var_obj.AddMember("count", count, allocator);
+            a.PushBack(var_obj, allocator);
         }
         obj.AddMember("top", a, allocator);
         topv.PushBack(obj, allocator);
@@ -544,7 +548,11 @@ std::string VariantStatsState::json_string(std::vector<VList>& activity_top_vari
     d.AddMember("top", topv, allocator);
 
     // Happy path
-    rapidjson::Value happy_obj = happy.first->first.to_json(allocator);
+    size_t happy_count = happy.first->second;
+    rapidjson::Value happy_obj(rapidjson::kObjectType);
+    rapidjson::Value happy_var = happy.first->first.to_json(allocator);
+    happy_obj.AddMember("variant", happy_var, allocator);
+    happy_obj.AddMember("count", happy_count, allocator);
     d.AddMember("happy", happy_obj, allocator);
 
     // Encode to string.

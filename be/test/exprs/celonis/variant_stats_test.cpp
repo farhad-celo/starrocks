@@ -175,7 +175,7 @@ TEST_F(VariantStatsTest, test_merge_with_itself) {
     format_result(rs);
     std::cout << rs << "\n";
     EXPECT_EQ(rs,
-              "{'dict':[{'id':3,'name':'sr-2'},{'id':2,'name':'sr-1'},{'id':0,'name':'key1'},{'id':1,'name':'key2'}],'a_stats':[{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':0},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':4,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':2,'count_case':2,'src':0,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3},{'count':2,'count_case':2,'src':3,'dst':3}],'top':[{'id':0,'top':[[0,1]]},{'id':1,'top':[[0,1]]},{'id':2,'top':[[2,3,3]]},{'id':3,'top':[[2,3,3]]}],'happy':[0,1]}");
+              "{'dict':[{'id':3,'name':'sr-2'},{'id':2,'name':'sr-1'},{'id':0,'name':'key1'},{'id':1,'name':'key2'}],'a_stats':[{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':0},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':4,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':2,'count_case':2,'src':0,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3},{'count':2,'count_case':2,'src':3,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3,3],'count':2}]},{'id':3,'top':[{'variant':[2,3,3],'count':2}]}],'happy':{'variant':[0,1],'count':2}}");
 }
 
 TEST_F(VariantStatsTest, test_merge_distinct_dict) {
@@ -223,7 +223,7 @@ TEST_F(VariantStatsTest, test_merge_distinct_dict) {
     std::cout << rs << "\n";
 
     EXPECT_EQ(rs,
-              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':4,'name':'a0'},{'id':0,'name':'a1'},{'id':5,'name':'a5'},{'id':1,'name':'a2'}],'a_stats':[{'count':4,'count_case':4,'count_start':4,'count_end':0,'id':0},{'count':5,'count_case':3,'count_start':0,'count_end':1,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':1,'id':3},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':4},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':5}],'e_stats':[{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3},{'count':1,'count_case':1,'src':0,'dst':3},{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':3,'dst':4},{'count':2,'count_case':1,'src':1,'dst':1},{'count':1,'count_case':1,'src':1,'dst':5}],'top':[{'id':0,'top':[[0,1,2],[0,1,1,1,5],[0,3,4],[0,1]]},{'id':1,'top':[[0,1,2],[0,1,1,1,5],[0,1]]},{'id':2,'top':[[0,1,2],[2,3]]},{'id':3,'top':[[0,3,4],[2,3]]},{'id':4,'top':[[0,3,4]]},{'id':5,'top':[[0,1,1,1,5]]}],'happy':[0,1]}");
+              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':4,'name':'a0'},{'id':0,'name':'a1'},{'id':5,'name':'a5'},{'id':1,'name':'a2'}],'a_stats':[{'count':4,'count_case':4,'count_start':4,'count_end':0,'id':0},{'count':5,'count_case':3,'count_start':0,'count_end':1,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':1,'id':3},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':4},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':5}],'e_stats':[{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3},{'count':1,'count_case':1,'src':0,'dst':3},{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':3,'dst':4},{'count':2,'count_case':1,'src':1,'dst':1},{'count':1,'count_case':1,'src':1,'dst':5}],'top':[{'id':0,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,3,4],'count':1},{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,1],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[0,3,4],'count':1},{'variant':[2,3],'count':1}]},{'id':4,'top':[{'variant':[0,3,4],'count':1}]},{'id':5,'top':[{'variant':[0,1,1,1,5],'count':1}]}],'happy':{'variant':[0,1],'count':1}}");
 }
 
 TEST_F(VariantStatsTest, test_no_merge) {
@@ -254,7 +254,7 @@ TEST_F(VariantStatsTest, test_no_merge) {
     std::cout << rs << "\n";
 
     EXPECT_EQ(rs,
-              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0},{'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3}],'e_stats':[{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3}],'top':[{'id':0,'top':[[0,1],[0,1,2]]},{'id':1,'top':[[0,1],[0,1,2]]},{'id':2,'top':[[0,1,2],[2,3]]},{'id':3,'top':[[2,3]]}],'happy':[0,1]}");
+              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0},{'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3}],'e_stats':[{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[2,3],'count':1}]}],'happy':{'variant':[0,1],'count':2}}");
 }
 
 TEST_F(VariantStatsTest, test_weights) {
@@ -285,7 +285,7 @@ TEST_F(VariantStatsTest, test_weights) {
     std::cout << rs << "\n";
 
     EXPECT_EQ(rs,
-              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':5,'count_case':5,'count_start':5,'count_end':0,'id':0},{'count':8,'count_case':5,'count_start':0,'count_end':5,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':5,'count_case':5,'src':0,'dst':1},{'count':3,'count_case':3,'src':1,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3}],'top':[{'id':0,'top':[[0,1,1],[0,1]]},{'id':1,'top':[[0,1,1],[0,1]]},{'id':2,'top':[[2,3]]},{'id':3,'top':[[2,3]]}],'happy':[0,1,1]}");
+              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':5,'count_case':5,'count_start':5,'count_end':0,'id':0},{'count':8,'count_case':5,'count_start':0,'count_end':5,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':5,'count_case':5,'src':0,'dst':1},{'count':3,'count_case':3,'src':1,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3],'count':2}]},{'id':3,'top':[{'variant':[2,3],'count':2}]}],'happy':{'variant':[0,1,1],'count':3}}");
 }
 
 TEST_F(VariantStatsTest, test_empty) {
@@ -349,7 +349,7 @@ TEST_F(VariantStatsTest, test_empty) {
         format_result(rs);
         std::cout << rs << "\n";
         EXPECT_EQ(rs,
-                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0}],'e_stats':[],'top':[{'id':0,'top':[[0]]}],'happy':[0]}");
+                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1}}");
     }
 
     {
@@ -372,7 +372,7 @@ TEST_F(VariantStatsTest, test_empty) {
         format_result(rs);
         std::cout << rs << "\n";
         EXPECT_EQ(rs,
-                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':2,'count_case':1,'count_start':1,'count_end':1,'id':0}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':0}],'top':[{'id':0,'top':[[0,0]]}],'happy':[0,0]}");
+                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':2,'count_case':1,'count_start':1,'count_end':1,'id':0}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':0}],'top':[{'id':0,'top':[{'variant':[0,0],'count':1}]}],'happy':{'variant':[0,0],'count':1}}");
     }
 }
 
@@ -395,7 +395,7 @@ TEST_F(VariantStatsTest, test_null_activity) {
     std::string rs = slice.to_string();
     format_result(rs);
     std::cout << rs << "\n";
-    EXPECT_EQ(rs, "{'dict':[{'id':1,'name':'b'},{'id':0,'name':'a'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':1}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':1}],'top':[{'id':0,'top':[[0,1]]},{'id':1,'top':[[0,1]]}],'happy':[0,1]}");
+    EXPECT_EQ(rs, "{'dict':[{'id':1,'name':'b'},{'id':0,'name':'a'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':1}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':1}],'top':[{'id':0,'top':[{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':1}]}],'happy':{'variant':[0,1],'count':1}}");
 }
 
 TEST_F(VariantStatsTest, test_large) {
