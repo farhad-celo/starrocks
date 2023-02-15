@@ -304,6 +304,9 @@ public class FunctionSet {
     public static final String FLAT_JSON_META = "flat_json_meta";
     public static final String MANN_WHITNEY_U_TEST = "mann_whitney_u_test";
 
+    // Aggregate celonis functions
+    public static final String CELONIS_VARIANT_STATS = "celonis_variant_stats";
+
     // Bitmap functions:
     public static final String BITMAP_AND = "bitmap_and";
     public static final String BITMAP_ANDNOT = "bitmap_andnot";
@@ -617,6 +620,11 @@ public class FunctionSet {
                     SUBSTRING, SUBSTRING_INDEX,
                     TRIM, UPPER, IF);
 
+    public static final Set<String> celonisAlwaysReturnNonNullableFunctions =
+            ImmutableSet.<String>builder()
+                    .add(FunctionSet.CELONIS_VARIANT_STATS)
+                    .build();
+
     public static final Set<String> alwaysReturnNonNullableFunctions =
             ImmutableSet.<String>builder()
                     .add(FunctionSet.COUNT)
@@ -880,11 +888,13 @@ public class FunctionSet {
         TableFunction.initBuiltins(this);
         VectorizedBuiltinFunctions.initBuiltins(this);
         initAggregateBuiltins();
+        initCelonisAggregateBuiltins();
     }
 
     public boolean isNotAlwaysNullResultWithNullParamFunctions(String funcName) {
         return notAlwaysNullResultWithNullParamFunctions.contains(funcName)
-                || alwaysReturnNonNullableFunctions.contains(funcName);
+                || alwaysReturnNonNullableFunctions.contains(funcName)
+                || celonisAlwaysReturnNonNullableFunctions.contains(funcName);
     }
 
     private Function matchFuncCandidates(Function desc, Function.CompareMode mode, List<Function> fns) {
@@ -997,7 +1007,9 @@ public class FunctionSet {
         if (!fn.isPolymorphic() && getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE) != null) {
             return;
         }
-        fn.setIsNullable(!alwaysReturnNonNullableFunctions.contains(fn.functionName()));
+        fn.setIsNullable(
+                !alwaysReturnNonNullableFunctions.contains(fn.functionName()) ||
+                        celonisAlwaysReturnNonNullableFunctions.contains(fn.functionName()));
         List<Function> fns = vectorizedFunctions.computeIfAbsent(fn.functionName(), k -> Lists.newArrayList());
         fns.add(fn);
     }
@@ -1017,7 +1029,8 @@ public class FunctionSet {
 
     private void addVectorizedBuiltin(Function fn) {
         fn.setCouldApplyDictOptimize(couldApplyDictOptimizationFunctions.contains(fn.functionName()));
-        fn.setIsNullable(!alwaysReturnNonNullableFunctions.contains(fn.functionName()));
+        fn.setIsNullable(!alwaysReturnNonNullableFunctions.contains(fn.functionName()) ||
+                celonisAlwaysReturnNonNullableFunctions.contains(fn.functionName()));
         List<Function> fns = vectorizedFunctions.computeIfAbsent(fn.functionName(), k -> Lists.newArrayList());
         fns.add(fn);
     }
@@ -1054,6 +1067,13 @@ public class FunctionSet {
 
     public static String getAggStateMergeName(String name) {
         return String.format("%s%s", name, AGG_STATE_MERGE_SUFFIX);
+    }
+
+    private void initCelonisAggregateBuiltins() {
+        // celonis_variant_stats
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS,
+                Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT), Type.VARCHAR, Type.VARCHAR,
+                false, false, false));
     }
 
     // Populate all the aggregate builtins in the globalStateMgr.

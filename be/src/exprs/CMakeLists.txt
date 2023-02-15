@@ -125,6 +125,7 @@ set(CELONIS_FILES
   celonis/string_functions.cpp
   celonis/time_functions.cpp
   celonis/util.cpp
+  celonis/variant_stats.cpp
 )
 
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})

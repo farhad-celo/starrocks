@@ -21,6 +21,7 @@
 #include "column/type_traits.h"
 #include "exprs/agg/aggregate.h"
 #include "exprs/agg/factory/aggregate_factory.hpp"
+#include "exprs/celonis/variant_stats.h"
 #include "types/logical_type.h"
 #include "udf/java/java_function_fwd.h"
 
@@ -56,6 +57,7 @@ class AggregateFuncResolver {
     DECLARE_SINGLETON(AggregateFuncResolver);
 
 public:
+    void register_celonis();
     void register_avg();
     void register_bitmap();
     void register_minmaxany();
@@ -173,6 +175,14 @@ public:
                                create_array_function<ArgLT, ResultLT, true>(name));
     }
 
+    template <LogicalType ArgLT, LogicalType ResultLT>
+    void add_array_mapping_celonis(std::string name) {
+        _infos_mapping.emplace(std::make_tuple(name, ArgLT, ResultLT, false, false),
+                               create_array_function_celonis<ArgLT, ResultLT, false>(name));
+        _infos_mapping.emplace(std::make_tuple(name, ArgLT, ResultLT, false, true),
+                               create_array_function_celonis<ArgLT, ResultLT, true>(name));
+    }
+
     template <LogicalType ArgLT, LogicalType ResultLT, bool AddWindowVersion = false>
     void add_decimal_mapping(std::string name) {
         _infos_mapping.emplace(std::make_tuple(name, ArgLT, ResultLT, false, false),
@@ -217,6 +227,19 @@ public:
             }
         }
 
+        return nullptr;
+    }
+
+    template <LogicalType ArgLT, LogicalType ResultLT, bool IsNull>
+    AggregateFunctionPtr create_array_function_celonis(std::string& name) {
+        if constexpr (IsNull) {
+            if (name == "celonis_variant_stats") {
+                auto variant_stats = AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
+                return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantStatsState>(variant_stats);
+            }
+        } else if (name == "celonis_variant_stats") {
+            return AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
+        }
         return nullptr;
     }
 

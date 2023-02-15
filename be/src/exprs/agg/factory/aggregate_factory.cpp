@@ -19,6 +19,7 @@
 #include "exprs/agg/aggregate.h"
 #include "exprs/agg/factory/aggregate_factory.hpp"
 #include "exprs/agg/factory/aggregate_resolver.hpp"
+#include "exprs/celonis/variant_stats.h"
 #include "types/logical_type.h"
 #include "udf/java/java_function_fwd.h"
 #include "util/failpoint/fail_point.h"
@@ -28,6 +29,7 @@ namespace starrocks {
 DEFINE_FAIL_POINT(not_exist_agg_function);
 
 AggregateFuncResolver::AggregateFuncResolver() {
+    register_celonis();
     register_avg();
     register_minmaxany();
     register_bitmap();
@@ -69,6 +71,10 @@ AggregateFunctionPtr AggregateFactory::MakeHllUnionAggregateFunction() {
 
 AggregateFunctionPtr AggregateFactory::MakeHllUnionCountAggregateFunction() {
     return std::make_shared<HllUnionCountAggregateFunction>();
+}
+
+AggregateFunctionPtr AggregateFactory::MakeCelonisVariantStatsAggregateFunction() {
+    return std::make_shared<VariantStatsAggregateFunction>();
 }
 
 AggregateFunctionPtr AggregateFactory::MakePercentileApproxAggregateFunction() {

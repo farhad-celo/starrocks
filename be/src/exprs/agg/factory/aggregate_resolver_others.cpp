@@ -23,6 +23,10 @@
 
 namespace starrocks {
 
+void AggregateFuncResolver::register_celonis() {
+    add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
+}
+
 struct PercentileDiscDispatcher {
     template <LogicalType pt>
     void operator()(AggregateFuncResolver* resolver) {

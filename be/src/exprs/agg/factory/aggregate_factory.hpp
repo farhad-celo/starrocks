@@ -54,6 +54,7 @@
 #include "exprs/agg/variance.h"
 #include "exprs/agg/window.h"
 #include "exprs/agg/window_funnel.h"
+#include "exprs/celonis/variant_stats.h"
 #include "types/logical_type.h"
 #include "types/logical_type_infra.h"
 #include "udf/java/java_function_fwd.h"
@@ -198,6 +199,8 @@ public:
 
     template <LogicalType T>
     static AggregateFunctionPtr MakeHllRawAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisVariantStatsAggregateFunction();
 
     static AggregateFunctionPtr MakePercentileApproxAggregateFunction();
 
