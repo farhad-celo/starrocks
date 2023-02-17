@@ -16,7 +16,10 @@ LABEL org.opencontainers.image.source="https://github.com/celonis/celostar-starr
 RUN apt-get update -y \
         && apt-get install -y --no-install-recommends binutils-dev default-jdk python2 \
            mysql-client curl vim tree net-tools \
+           linux-tools-common linux-tools-generic \
         && rm -rf /var/lib/apt/lists/*
+
+RUN echo "export PATH=/usr/lib/linux-tools/5.15.0-60-generic:$PATH" >> /root/.bashrc
 
 ENV JAVA_HOME=/lib/jvm/default-java
 ENV SR_HOME=/data/deploy/starrocks
