@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  BASE_BRANCH: branch-2.5
+  BRANCH_2_5: branch-2.5
+  BRANCH_3_0: branch-3.0
 
 permissions:
   contents: write
@@ -23,5 +24,7 @@ jobs:
           git branch
           git remote add upstream https://github.com/StarRocks/starrocks.git
           git remote -v
-          git fetch upstream ${BASE_BRANCH}:${BASE_BRANCH}
-          git push origin ${BASE_BRANCH}
+          git fetch upstream ${BRANCH_2_5}:${BRANCH_2_5}
+          git push origin ${BRANCH_2_5}
+          git fetch upstream ${BRANCH_3_0}:${BRANCH_3_0}
+          git push origin ${BRANCH_3_0}
