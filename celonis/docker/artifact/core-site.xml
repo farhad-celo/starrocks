@@ -1,4 +1,4 @@
 <property>
-    <name>fs.azure.account.key.root.blob.core.windows.net</name>
+    <name>fs.azure.account.key.root.azurite.local.com:10000</name>
     <value>rootroot</value>
 </property>
