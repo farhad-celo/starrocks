@@ -1,0 +1,4 @@
+<property>
+    <name>fs.azure.account.key.root.blob.core.windows.net</name>
+    <value>rootroot</value>
+</property>
