@@ -35,7 +35,7 @@ jobs:
 
       - name: build artifact docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg builder=ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0 -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-ubuntu .
+          DOCKER_BUILDKIT=1 docker build --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg builder=ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0 -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-ubuntu .
 
       - name: package allin1 docker image
         run: |
