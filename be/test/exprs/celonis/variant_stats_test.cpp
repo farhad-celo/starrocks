@@ -11,6 +11,10 @@
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
 #include "exprs/arithmetic_operation.h"
+#include "exprs/celonis/variant_stats.h"
+#include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/stringbuffer.h"
 #include "runtime/mem_pool.h"
 #include "runtime/time_types.h"
 #include "testutil/function_utils.h"
@@ -43,6 +47,255 @@ private:
 };
 
 } // namespace
+
+// Parses json to VariantStats data strutures.
+// Compares results in a manner robust to changes in activity dictionary.
+struct VariantStatsResult {
+    std::vector<std::string> act_map; // idx -> activity_name
+    phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge> e_stats;
+    std::vector<ActivityStats> a_stats;
+    std::vector<std::vector<std::pair<Variant, int>>> top;
+    std::pair<Variant, int> happy;
+
+    bool from_json(const std::string& json) {
+        rapidjson::Document document;
+        document.Parse(json.c_str());
+        if (document.HasParseError()) {
+            return false;
+        }
+        if (!dict_from_json(document)) {
+            return false;
+        }
+        if (!a_stats_from_json(document)) {
+            return false;
+        }
+        if (!e_stats_from_json(document)) {
+            return false;
+        }
+        if (!top_from_json(document)) {
+            return false;
+        }
+        if (!happy_from_json(document)) {
+            return false;
+        }
+        return true;
+    }
+
+    bool equals(const VariantStatsResult& other) {
+        // Robust to activity dictionary remapping.
+        if (act_map.size() != other.act_map.size()) {
+            return false;
+        }
+
+        // Build the remap_idx to go from other.activity_id to this.activity_id
+        std::vector<int> remap_idx; // map other_idx to this_idx
+        std::unordered_map<std::string, int> name_to_idx;
+        for (int i = 0; i < act_map.size(); i++) {
+            name_to_idx.emplace(act_map[i], i);
+            //name_to_idx[act_map[i]] = i;
+        }
+        remap_idx.resize(act_map.size());
+        for (int i = 0; i < other.act_map.size(); i++) {
+            const auto it = name_to_idx.find(other.act_map[i]);
+            if (it == name_to_idx.end()) {
+                return false;
+            }
+            remap_idx[i] = it->second;
+        }
+
+        // Check equality of each component.
+        if (!equal_a_stats(other, remap_idx)) {
+            return false;
+        }
+        if (!equal_e_stats(other, remap_idx)) {
+            return false;
+        }
+        if (!equal_top(other, remap_idx)) {
+            return false;
+        }
+        if (!equal_happy(other, remap_idx)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool equal_a_stats(const VariantStatsResult& other, const std::vector<int>& remap_idx) {
+        if (a_stats.size() != other.a_stats.size()) {
+            return false;
+        }
+        for (int i = 0; i < a_stats.size(); i++) {
+            int pos = remap_idx[i];
+            if (!a_stats[pos].equal(other.a_stats[i])) return false;
+        }
+        return true;
+    }
+
+    bool equal_e_stats(const VariantStatsResult& other, const std::vector<int>& remap_idx) {
+        if (e_stats.size() != other.e_stats.size()) {
+            return false;
+        }
+        for (auto it = other.e_stats.begin(); it != other.e_stats.end(); it++) {
+            int32_t src = remap_idx[it->first.src];
+            int32_t dst = remap_idx[it->first.dst];
+            Edge e(src, dst, src, dst);
+            auto e_it = e_stats.find(e);
+            if (e_it == e_stats.end() || !e_it->second.equal(it->second)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool equal_top(const VariantStatsResult& other, const std::vector<int>& remap_idx) {
+        // Top variants per activity are sorted by frequency.
+        if (top.size() != other.top.size()) {
+            return false;
+        }
+        for (int i = 0; i < top.size(); i++) {
+            int pos = remap_idx[i];
+            if (top[pos].size() != other.top[i].size()) {
+                return false;
+            }
+            for (int j = 0; j < other.top[i].size(); j++) {
+                if (!top[pos][j].first.equal_remap_for_testing(other.top[i][j].first, remap_idx)) return false;
+                if (top[pos][j].second != other.top[i][j].second) return false;
+            }
+        }
+        return true;
+    }
+
+    bool equal_happy(const VariantStatsResult& other, const std::vector<int>& remap_idx) {
+        return happy.first.equal_remap_for_testing(other.happy.first, remap_idx) && happy.second == other.happy.second;
+    }
+
+    std::string debug_string() const {
+        std::stringstream ss;
+        ss << "act_map " << act_map.size() << "\n";
+        for (int i = 0; i < act_map.size(); i++) {
+            ss << i << " " << act_map[i] << "\n";
+        }
+        ss << "\na_stats " << a_stats.size() << "\n";
+        for (int i = 0; i < a_stats.size(); i++) {
+            ss << i << " " << a_stats[i].debug_string() << "\n";
+        }
+        ss << "\ne_stats " << e_stats.size() << "\n";
+        for (auto it = e_stats.cbegin(); it != e_stats.cend(); it++) {
+            ss << it->first.debug_string() << " " << it->second.debug_string() << "\n";
+        }
+        ss << "\ntop " << top.size() << "\n";
+        for (int i = 0; i < top.size(); i++) {
+            ss << i << ":\n";
+            for (int j = 0; j < top[i].size(); j++) {
+                ss << top[i][j].first.debug_string() << " " << top[i][j].second << "\n";
+            }
+        }
+        ss << "\nhappy\n";
+        ss << happy.first.debug_string() << " " << happy.second << "\n";
+        return ss.str();
+    }
+
+    bool dict_from_json(const rapidjson::Document& document) {
+        if (!document.HasMember("dict")) {
+            return false;
+        }
+        if (!document["dict"].IsArray()) {
+            return false;
+        }
+        auto a = document["dict"].GetArray();
+        act_map.resize(a.Size());
+        for (int i = 0; i < a.Size(); i++) {
+            const auto& obj = a[i];
+            int id = obj["id"].GetInt64();
+            if (id < 0 || id >= a.Size()) {
+                return false;
+            }
+            std::string name = obj["name"].GetString();
+            act_map[id] = name;
+        }
+        return true;
+    }
+
+    bool a_stats_from_json(const rapidjson::Document& document) {
+        if (!document.HasMember("dict")) {
+            return false;
+        }
+        if (!document["a_stats"].IsArray()) {
+            return false;
+        }
+        const auto& a = document["a_stats"].GetArray();
+        a_stats.resize(a.Size());
+        for (int i = 0; i < a.Size(); i++) {
+            const auto& obj = a[i];
+            int id = obj["id"].GetInt64();
+            if (id < 0 || id >= a.Size()) {
+                return false;
+            }
+            a_stats[id].count = obj["count"].GetInt64();
+            a_stats[id].count_case = obj["count_case"].GetInt64();
+            a_stats[id].count_start = obj["count_start"].GetInt64();
+            a_stats[id].count_end = obj["count_end"].GetInt64();
+        }
+        return true;
+    }
+
+    bool e_stats_from_json(const rapidjson::Document& document) {
+        if (!document["e_stats"].IsArray()) {
+            return false;
+        }
+        const auto& a = document["e_stats"].GetArray();
+        for (int i = 0; i < a.Size(); i++) {
+            EdgeStats es;
+            const auto& obj = a[i];
+            es.count = obj["count"].GetInt64();
+            es.count_case = obj["count_case"].GetInt64();
+            int src = obj["src"].GetInt64();
+            int dst = obj["dst"].GetInt64();
+            Edge e(src, dst, src, dst);
+
+            e_stats[e] = es;
+        }
+        return true;
+    }
+
+    Variant variant_from_json(const rapidjson::Value& v) {
+        Variant result(v.Size());
+        for (int i = 0; i < v.Size(); i++) {
+            result.add(v[i].GetInt64(), 0);
+        }
+        return result;
+    }
+
+    bool top_from_json(const rapidjson::Document& document) {
+        const auto& a = document["top"].GetArray();
+        top.resize(a.Size());
+        for (int i = 0; i < a.Size(); i++) {
+            const auto& obj = a[i];
+            int id = obj["id"].GetInt64();
+            if (id < 0 || id >= a.Size()) {
+                return false;
+            }
+            const auto& t = obj["top"].GetArray();
+            for (int j = 0; j < t.Size(); j++) {
+                std::pair<Variant, int> av;
+                av.first = variant_from_json(t[j]["variant"]);
+                av.second = t[j]["count"].GetInt64();
+                top[id].push_back(av);
+            }
+        }
+        return true;
+    }
+
+    bool happy_from_json(const rapidjson::Document& document) {
+        const auto& obj = document["happy"];
+        if (!obj["variant"].IsArray()) {
+            return false;
+        }
+        happy.first = variant_from_json(obj["variant"]);
+        happy.second = obj["count"].GetInt64();
+        return true;
+    }
+};
 
 class VariantStatsTest : public testing::Test {
 public:
@@ -133,12 +386,70 @@ public:
         std::replace(rs.begin(), rs.end(), '\"', '\'');
     }
 
+    void match(const std::string& expected, const std::string& actual) {
+        VariantStatsResult vs;
+        ASSERT_TRUE(vs.from_json(actual));
+
+        std::string e_s = expected;
+        std::replace(e_s.begin(), e_s.end(), '\'', '\"');
+        VariantStatsResult e_vs;
+        ASSERT_TRUE(e_vs.from_json(e_s));
+
+        EXPECT_TRUE(e_vs.equals(vs));
+    }
+
 private:
     FunctionUtils* utils{};
     FunctionContext* ctx{};
 };
 
-// TODO(hagonzal): Write a helper function to check the correctness of results. Comparing json is fragile.
+TEST_F(VariantStatsTest, test_equality) {
+    std::string s = "{ 'dict':[ {'id':3,'name':'a4'}, {'id':2,'name':'a3'}, {'id':0,'name':'a1'}, {'id':1,'name':'a2'} ], 'a_stats':[ {'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0}, {'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1}, {'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2}, {'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3} ], 'e_stats':[ {'count':3,'count_case':3,'src':0,'dst':1}, {'count':1,'count_case':1,'src':1,'dst':2}, {'count':1,'count_case':1,'src':2,'dst':3} ], 'top':[ {'id':0,'top':[ {'variant':[0,1],'count':2}, {'variant':[0,1,2],'count':1}]}, {'id':1,'top':[ {'variant':[0,1],'count':2}, {'variant':[0,1,2],'count':1}]}, {'id':2,'top':[ {'variant':[0,1,2],'count':1}, {'variant':[2,3],'count':1}]}, {'id':3,'top':[ {'variant':[2,3],'count':1}]} ], 'happy': {'variant':[0,1],'count':2} }";
+    std::replace(s.begin(), s.end(), '\'', '\"');
+    VariantStatsResult vs;
+    ASSERT_TRUE(vs.from_json(s));
+    std::cout << "\n==== vs\n" << vs.debug_string() << "\n===\n";
+
+    // remap 0 to 1 and 1 to 0
+    std::string s1 = "{ 'dict':[ {'id':3,'name':'a4'}, {'id':2,'name':'a3'}, {'id':1,'name':'a1'}, {'id':0,'name':'a2'} ], 'a_stats':[ {'count':3,'count_case':3,'count_start':3,'count_end':0,'id':1}, {'count':3,'count_case':3,'count_start':0,'count_end':2,'id':0}, {'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2}, {'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3} ], 'e_stats':[ {'count':3,'count_case':3,'src':1,'dst':0}, {'count':1,'count_case':1,'src':0,'dst':2}, {'count':1,'count_case':1,'src':2,'dst':3} ], 'top':[ {'id':0,'top':[{ 'variant':[1,0],'count':2},{ 'variant':[1,0,2],'count':1}]}, {'id':1,'top':[{ 'variant':[1,0],'count':2},{ 'variant':[1,0,2],'count':1}]}, {'id':2,'top':[{ 'variant':[1,0,2],'count':1},{ 'variant':[2,3],'count':1}]}, {'id':3,'top':[{ 'variant':[2,3],'count':1}]} ], 'happy':{'variant':[1,0],'count':2} }";
+    std::replace(s1.begin(), s1.end(), '\'', '\"');
+    VariantStatsResult vs1;
+    ASSERT_TRUE(vs1.from_json(s1));
+    std::cout << "\n==== vs1\n" << vs1.debug_string() << "\n===\n";
+
+    EXPECT_TRUE(vs.equals(vs));
+    EXPECT_TRUE(vs1.equals(vs1));
+    EXPECT_TRUE(vs.equals(vs1));
+    EXPECT_TRUE(vs1.equals(vs));
+}
+
+TEST_F(VariantStatsTest, test_no_merge) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col1 = build_variant_column({{"a1", "a2"},
+                                      {"a1", "a2"},
+                                      {"a1", "a2", "a3"},
+                                      {"a3", "a4"}});
+
+    auto weights = build_weight_column({1, 1, 1, 1});
+    std::vector<const Column*> raw_columns;
+    raw_columns.resize(2);
+    raw_columns[0] = col1.get();
+    raw_columns[1] = weights.get();
+    auto state1 = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
+
+    // Get the result
+    auto result = BinaryColumn::create();
+    func->finalize_to_column(ctx, state1->state(), result.get());
+    EXPECT_EQ(result->size(), 1);
+
+    Slice slice = result->get_slice(0);
+    std::string rs = slice.to_string();
+
+    std::string e_s = "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0},{'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3}],'e_stats':[{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[2,3],'count':1}]}],'happy':{'variant':[0,1],'count':2}}";
+    match(e_s, rs);
+}
 
 TEST_F(VariantStatsTest, test_merge_with_itself) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
@@ -171,11 +482,9 @@ TEST_F(VariantStatsTest, test_merge_with_itself) {
 
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
-    std::cout << rs << "\n";
-    format_result(rs);
-    std::cout << rs << "\n";
-    EXPECT_EQ(rs,
-              "{'dict':[{'id':3,'name':'sr-2'},{'id':2,'name':'sr-1'},{'id':0,'name':'key1'},{'id':1,'name':'key2'}],'a_stats':[{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':0},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':4,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':2,'count_case':2,'src':0,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3},{'count':2,'count_case':2,'src':3,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3,3],'count':2}]},{'id':3,'top':[{'variant':[2,3,3],'count':2}]}],'happy':{'variant':[0,1],'count':2}}");
+
+    std::string e_s = "{'dict':[{'id':3,'name':'sr-2'},{'id':2,'name':'sr-1'},{'id':0,'name':'key1'},{'id':1,'name':'key2'}],'a_stats':[{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':0},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':4,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':2,'count_case':2,'src':0,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3},{'count':2,'count_case':2,'src':3,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3,3],'count':2}]},{'id':3,'top':[{'variant':[2,3,3],'count':2}]}],'happy':{'variant':[0,1],'count':2}}";
+    match(e_s, rs);
 }
 
 TEST_F(VariantStatsTest, test_merge_distinct_dict) {
@@ -218,43 +527,8 @@ TEST_F(VariantStatsTest, test_merge_distinct_dict) {
 
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
-    std::cout << rs << "\n";
-    format_result(rs);
-    std::cout << rs << "\n";
-
-    EXPECT_EQ(rs,
-              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':4,'name':'a0'},{'id':0,'name':'a1'},{'id':5,'name':'a5'},{'id':1,'name':'a2'}],'a_stats':[{'count':4,'count_case':4,'count_start':4,'count_end':0,'id':0},{'count':5,'count_case':3,'count_start':0,'count_end':1,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':1,'id':3},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':4},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':5}],'e_stats':[{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3},{'count':1,'count_case':1,'src':0,'dst':3},{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':3,'dst':4},{'count':2,'count_case':1,'src':1,'dst':1},{'count':1,'count_case':1,'src':1,'dst':5}],'top':[{'id':0,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,3,4],'count':1},{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,1],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[0,3,4],'count':1},{'variant':[2,3],'count':1}]},{'id':4,'top':[{'variant':[0,3,4],'count':1}]},{'id':5,'top':[{'variant':[0,1,1,1,5],'count':1}]}],'happy':{'variant':[0,1],'count':1}}");
-}
-
-TEST_F(VariantStatsTest, test_no_merge) {
-    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
-
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2"},
-                                      {"a1", "a2", "a3"},
-                                      {"a3", "a4"}});
-
-    auto weights = build_weight_column({1, 1, 1, 1});
-    std::vector<const Column*> raw_columns;
-    raw_columns.resize(2);
-    raw_columns[0] = col1.get();
-    raw_columns[1] = weights.get();
-    auto state1 = ManagedAggrState::create(ctx, func);
-    func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
-
-    // Get the result
-    auto result = BinaryColumn::create();
-    func->finalize_to_column(ctx, state1->state(), result.get());
-    EXPECT_EQ(result->size(), 1);
-
-    Slice slice = result->get_slice(0);
-    std::string rs = slice.to_string();
-    std::cout << rs << "\n";
-    format_result(rs);
-    std::cout << rs << "\n";
-
-    EXPECT_EQ(rs,
-              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0},{'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3}],'e_stats':[{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[2,3],'count':1}]}],'happy':{'variant':[0,1],'count':2}}");
+    std::string e_s = "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':4,'name':'a0'},{'id':0,'name':'a1'},{'id':5,'name':'a5'},{'id':1,'name':'a2'}],'a_stats':[{'count':4,'count_case':4,'count_start':4,'count_end':0,'id':0},{'count':5,'count_case':3,'count_start':0,'count_end':1,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':1,'id':3},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':4},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':5}],'e_stats':[{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3},{'count':1,'count_case':1,'src':0,'dst':3},{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':3,'dst':4},{'count':2,'count_case':1,'src':1,'dst':1},{'count':1,'count_case':1,'src':1,'dst':5}],'top':[{'id':0,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,3,4],'count':1},{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,1],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[0,3,4],'count':1},{'variant':[2,3],'count':1}]},{'id':4,'top':[{'variant':[0,3,4],'count':1}]},{'id':5,'top':[{'variant':[0,1,1,1,5],'count':1}]}],'happy':{'variant':[0,1],'count':1}}";
+    match(e_s, rs);
 }
 
 TEST_F(VariantStatsTest, test_weights) {
@@ -280,12 +554,8 @@ TEST_F(VariantStatsTest, test_weights) {
 
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
-    std::cout << rs << "\n";
-    format_result(rs);
-    std::cout << rs << "\n";
-
-    EXPECT_EQ(rs,
-              "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':5,'count_case':5,'count_start':5,'count_end':0,'id':0},{'count':8,'count_case':5,'count_start':0,'count_end':5,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':5,'count_case':5,'src':0,'dst':1},{'count':3,'count_case':3,'src':1,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3],'count':2}]},{'id':3,'top':[{'variant':[2,3],'count':2}]}],'happy':{'variant':[0,1,1],'count':3}}");
+    std::string e_s = "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':5,'count_case':5,'count_start':5,'count_end':0,'id':0},{'count':8,'count_case':5,'count_start':0,'count_end':5,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':5,'count_case':5,'src':0,'dst':1},{'count':3,'count_case':3,'src':1,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3],'count':2}]},{'id':3,'top':[{'variant':[2,3],'count':2}]}],'happy':{'variant':[0,1,1],'count':3}}";
+    match(e_s, rs);
 }
 
 TEST_F(VariantStatsTest, test_empty) {
@@ -346,10 +616,9 @@ TEST_F(VariantStatsTest, test_empty) {
         EXPECT_EQ(result->size(), 1);
         Slice slice = result->get_slice(0);
         std::string rs = slice.to_string();
-        format_result(rs);
-        std::cout << rs << "\n";
-        EXPECT_EQ(rs,
-                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1}}");
+        std::string e_s =
+                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1}}";
+        match(e_s, rs);
     }
 
     {
@@ -369,10 +638,9 @@ TEST_F(VariantStatsTest, test_empty) {
         EXPECT_EQ(result->size(), 1);
         Slice slice = result->get_slice(0);
         std::string rs = slice.to_string();
-        format_result(rs);
-        std::cout << rs << "\n";
-        EXPECT_EQ(rs,
-                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':2,'count_case':1,'count_start':1,'count_end':1,'id':0}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':0}],'top':[{'id':0,'top':[{'variant':[0,0],'count':1}]}],'happy':{'variant':[0,0],'count':1}}");
+        std::string e_s =
+                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':2,'count_case':1,'count_start':1,'count_end':1,'id':0}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':0}],'top':[{'id':0,'top':[{'variant':[0,0],'count':1}]}],'happy':{'variant':[0,0],'count':1}}";
+        match(e_s, rs);
     }
 }
 
@@ -393,9 +661,8 @@ TEST_F(VariantStatsTest, test_null_activity) {
     EXPECT_EQ(result->size(), 1);
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
-    format_result(rs);
-    std::cout << rs << "\n";
-    EXPECT_EQ(rs, "{'dict':[{'id':1,'name':'b'},{'id':0,'name':'a'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':1}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':1}],'top':[{'id':0,'top':[{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':1}]}],'happy':{'variant':[0,1],'count':1}}");
+    std::string e_s = "{'dict':[{'id':1,'name':'b'},{'id':0,'name':'a'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':1}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':1}],'top':[{'id':0,'top':[{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':1}]}],'happy':{'variant':[0,1],'count':1}}";
+    match(e_s, rs);
 }
 
 TEST_F(VariantStatsTest, test_large) {

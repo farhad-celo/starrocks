@@ -19,10 +19,16 @@ struct Variant {
     size_t hash{0};
     std::vector<int32_t> data;
 
+    Variant() = default;
+
     explicit Variant(int n) { data.reserve(n); }
 
     // Appends an activity to the variant.
     void add(int32_t index, size_t element_hash);
+
+    // Returns true if the variants are equal with remapping of activities through map.
+    // Only used in unit tests.
+    bool equal_remap_for_testing(const Variant& other, const std::vector<int32_t>& map) const;
 
     rapidjson::Value to_json(rapidjson::Document::AllocatorType& allocator) const;
 
@@ -54,7 +60,7 @@ struct Edge {
 
     rapidjson::Value to_json(rapidjson::Document::AllocatorType& allocator) const;
 
-    std::string debug_string();
+    std::string debug_string() const;
 };
 
 struct EqualOnEdge {
@@ -74,6 +80,10 @@ struct EdgeStats {
 
     static size_t serialize_size() {
         return sizeof(size_t) * 2;
+    }
+
+    bool equal(const EdgeStats& other) {
+        return count == other.count && count_case == other.count_case;
     }
 
     void merge(const EdgeStats& other);
@@ -96,6 +106,13 @@ struct ActivityStats {
 
     static size_t serialize_size() {
         return sizeof(size_t) * 4;
+    }
+
+    bool equal(const ActivityStats& other) {
+        return count == other.count
+        && count_case == other.count_case
+        && count_start == other.count_start
+        && count_end == other.count_end;
     }
 
     void merge(const ActivityStats& other);
