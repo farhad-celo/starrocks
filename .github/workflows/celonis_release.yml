@@ -35,11 +35,18 @@ jobs:
 
       - name: build artifact docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg builder=ghcr.io/celonis/celostar/starrocks-ubuntu-dev-env:latest -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-ubuntu .
+          DOCKER_BUILDKIT=1 docker build --build-arg builder=ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0 -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-ubuntu .
 
-      - name: build allin1 docker image
+      - name: package allin1 docker image
         run: |
           DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${RELEASE_VERSION}-ubuntu celonis/docker/allin1
+      - name: package fe docker image
+        run: |
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f celonis/docker/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${RELEASE_VERSION}-ubuntu celonis/docker/fe
+      - name: package be docker image
+        run: |
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f celonis/docker/be/be-ubuntu.Dockerfile -t starrocks-be:${RELEASE_VERSION}-ubuntu celonis/docker/be
+
 
       - name: push allin1 docker image to GHCR
         run: |
@@ -49,6 +56,24 @@ jobs:
           until docker push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
           do
             echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu trying again."
+          done
+      - name: push fe docker image to GHCR
+        run: |
+          docker tag starrocks-fe:${RELEASE_VERSION}-ubuntu ghcr.io/celonis/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu
+          
+          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
+          until docker push ghcr.io/celonis/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu
+          do
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu trying again."
+          done
+      - name: push be docker image to GHCR
+        run: |
+          docker tag starrocks-be:${RELEASE_VERSION}-ubuntu ghcr.io/celonis/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
+
+          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
+          until docker push ghcr.io/celonis/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
+          do
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu trying again."
           done
 
       - name: GitHub Docker logout
@@ -72,6 +97,16 @@ jobs:
           # push to the prod ECR
           docker tag starrocks-allin1:${RELEASE_VERSION}-ubuntu 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
           docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
+      - name: push fe docker image to prod ECR
+        run: |
+          # push to the prod ECR
+          docker tag starrocks-fe:${RELEASE_VERSION}-ubuntu 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu
+      - name: push be docker image to prod ECR
+        run: |
+          # push to the prod ECR
+          docker tag starrocks-be:${RELEASE_VERSION}-ubuntu 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
 
       - name: Amazon ECR logout
         if: ${{ always() }}
@@ -91,7 +126,7 @@ jobs:
 
       - name: build artifact docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg builder=ghcr.io/celonis/celostar/starrocks-centos-dev-env:latest -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-centos .
+          DOCKER_BUILDKIT=1 docker build --build-arg builder=ghcr.io/celonis/celostar/starrocks-centos-dev-env:branch-3.0 -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-centos .
 
       - name: build allin1 docker image
         run: |

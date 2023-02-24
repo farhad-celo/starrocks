@@ -1,14 +1,9 @@
-ARG BRANCH=branch-2.5
+ARG BRANCH=branch-3.0
 
 FROM starrocks/dev-env:${BRANCH}  as dev-env-with-maven-repo
 
-ARG STARROCKS_VERSION=2.5.1
 WORKDIR /root
-RUN wget https://github.com/StarRocks/starrocks/archive/refs/tags/${STARROCKS_VERSION}.tar.gz && \
-        tar zxf ${STARROCKS_VERSION}.tar.gz && rm ${STARROCKS_VERSION}.tar.gz && \
-        mv starrocks-${STARROCKS_VERSION} starrocks
-# Copy a customized pom.xml that put kunpeng as the last option for downloading repos
-COPY fe/pom.xml starrocks/fe/pom.xml
+COPY . starrocks/
 
 # Build to get all dependence
 RUN cd starrocks && MAVEN_OPTS='-Dmaven.artifact.threads=128' ./build.sh --fe --clean
