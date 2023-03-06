@@ -27,7 +27,7 @@ FROM ubuntu:22.04
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends default-jdk \
-           mysql-client curl vim tree net-tools less
+           mysql-client curl vim tree net-tools less unzip
 
 # Install timezone data. This is needed by Starrocks broker load.
 RUN apt-get install -yq tzdata && \
@@ -37,6 +37,10 @@ RUN apt-get install -yq tzdata && \
 # Install perf tool for low-level performance debug
 RUN apt-get install -yq linux-tools-common linux-tools-generic
 RUN echo "export PATH=/usr/lib/linux-tools/5.15.0-60-generic:$PATH" >> /etc/bash.bashrc
+
+# Install aws cli tool
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && ./aws/install && rm -rf aws awscliv2.zip
 
 RUN rm -rf /var/lib/apt/lists/*
 
