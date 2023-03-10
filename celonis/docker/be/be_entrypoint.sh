@@ -107,5 +107,8 @@ fi
 update_conf_from_configmap
 collect_env_info
 add_self $svc_name || exit $?
+
+# ls the directory becuase it is newly mounted PV volume, file system cache might fool fallocate to create file on the old path that is before the pv mount.
+ls $STARROCKS_HOME/storage && fallocate -l 10G $STARROCKS_HOME/storage/dummydata.headroom
 log_stderr "run start_be.sh"
 $STARROCKS_HOME/bin/start_be.sh
