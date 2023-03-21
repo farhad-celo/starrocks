@@ -1,7 +1,15 @@
 package com.celonis.invoicechecker;
+
 import java.util.*;
 
 public class ReferenceIndexer implements IndexerInterface {
+    private final Map<String, Set<String>> connectedEdges = new HashMap<>();
+
+    private int maxErrors = 3;
+
+    public ReferenceIndexer() {
+    }
+
     public void index(List<ClusterObjectInterface> clusterObjects) {
         Map<String, ClusterObjectInterface> idToObjects = new HashMap<>();
         Map<String, Set<String>> potentialConnectedEdges = new HashMap<>();
@@ -30,7 +38,7 @@ public class ReferenceIndexer implements IndexerInterface {
             List<String> modifiedMatches = modifiedStrTrie.findPrefix(ref.getModifiedReference());
             List<String> reversedModifiedMatches = reversedModifiedStrTrie.findPrefix(
                     new StringBuilder(ref.getModifiedReference()).reverse().toString());
-            List<String> translatedMatches = translatedStrTrie.findPrefixWithFuzzyMatch(ref.getTranslatedReference(), 3);
+            List<String> translatedMatches = translatedStrTrie.findPrefixWithFuzzyMatch(ref.getTranslatedReference(), maxErrors);
             List<String> counterMatches = counterToIds.get(ref.getCountersHashValue());
             Utils.addEdges(id, modifiedMatches, potentialConnectedEdges);
             Utils.addEdges(id, reversedModifiedMatches, potentialConnectedEdges);
@@ -38,7 +46,7 @@ public class ReferenceIndexer implements IndexerInterface {
             Utils.addEdges(id, counterMatches, potentialConnectedEdges);
         }
         for (String id : idToObjects.keySet()) {
-            List<String> connectedIds = new ArrayList<>();
+            Set<String> connectedIds = new HashSet<>();
             for (String pointedId : potentialConnectedEdges.get(id)) {
                 if (pointedId != id && idToObjects.get(id).isSimilar(idToObjects.get(pointedId))) {
                     connectedIds.add(pointedId);
@@ -48,9 +56,7 @@ public class ReferenceIndexer implements IndexerInterface {
         }
     }
 
-    public List<String> findEdges(String id) {
+    public Set<String> findEdges(String id) {
         return connectedEdges.get(id);
     }
-
-    private Map<String, List<String>> connectedEdges = new HashMap<>();
 }

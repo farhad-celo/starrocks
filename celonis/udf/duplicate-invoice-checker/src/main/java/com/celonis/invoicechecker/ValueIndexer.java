@@ -1,13 +1,15 @@
 package com.celonis.invoicechecker;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 import java.util.*;
 
 public class ValueIndexer implements IndexerInterface {
+    private static final int priority = 0;
+    private double maxPriceLimit = 80.0;
+    private final Map<String, Set<String>> connectedEdges = new HashMap<>();
+
+    public ValueIndexer() {
+    }
+
     public void index(List<ClusterObjectInterface> clusterObjects) {
         Map<String, ClusterObjectInterface> idToObjects = new HashMap<>();
         Map<Integer, List<String>> counterToIds = new HashMap<>();
@@ -43,7 +45,7 @@ public class ValueIndexer implements IndexerInterface {
         }
 
         for (String id : idToObjects.keySet()) {
-            List<String> connectedIds = new ArrayList<>();
+            Set<String> connectedIds = new HashSet<>();
             for (String pointedId : potentialConnectedEdges.get(id)) {
                 if (pointedId != id && idToObjects.get(id).isSimilar(idToObjects.get(pointedId))) {
                     connectedIds.add(pointedId);
@@ -53,9 +55,7 @@ public class ValueIndexer implements IndexerInterface {
         }
     }
 
-    public List<String> findEdges(String id) {
+    public Set<String> findEdges(String id) {
         return connectedEdges.get(id);
     }
-
-    private Map<String, List<String>> connectedEdges = new HashMap<>();
 }

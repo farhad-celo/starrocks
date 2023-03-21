@@ -8,7 +8,6 @@ import java.util.*;
 public class IndexCluster {
     public String[] cluster(List<ClusterObjectInterface> clusterObjects) {
         Map<String, ClusterObjectInterface> idToObjects = new HashMap<>();
-        Map<String, List<String>> connectedEdges = new HashMap<>();
         for (ClusterObjectInterface clusterObjectInterface : clusterObjects) {
             idToObjects.put(clusterObjectInterface.getId(), clusterObjectInterface);
         }
@@ -32,7 +31,7 @@ public class IndexCluster {
                     }
                     clusteredNodes.add(candidateId);
                     cluster.getClusterObjects().add(idToObjects.get(candidateId));
-                    List<String> adjacentNodes = indexer.findEdges(candidateId);
+                    Set<String> adjacentNodes = indexer.findEdges(candidateId);
                     if (adjacentNodes != null) {
                         for (String nextLevelCandidateId : adjacentNodes) {
                             if (!clusteredNodes.contains(nextLevelCandidateId)) {

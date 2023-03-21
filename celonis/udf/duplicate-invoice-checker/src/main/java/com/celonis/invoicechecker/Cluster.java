@@ -1,9 +1,10 @@
 package com.celonis.invoicechecker;
 
-import lombok.RequiredArgsConstructor;
 import lombok.Getter;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
+
 import java.util.ArrayList;
+import java.util.List;
 
 @RequiredArgsConstructor
 public class Cluster<T extends ClusterObjectInterface> {
@@ -19,4 +20,5 @@ public class Cluster<T extends ClusterObjectInterface> {
 
         return Utils.wrapArrayObject("c", String.join(", ", objectStrings));
     }
+
 }

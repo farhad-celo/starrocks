@@ -1,20 +1,28 @@
 package com.celonis.invoicechecker;
 
-import org.json.*;
-import java.util.List;
-import java.util.LinkedList;
-import java.util.ArrayList;
-import java.util.Map;
-
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.EqualsAndHashCode;
+import lombok.*;
+import org.json.JSONArray;
 import org.json.JSONObject;
+
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 
 public class ValueMatcher {
+    public static Value preprocess(Value value) {
+        String normalizedValStr = Long.toString(Math.round(value.getValue() * 100));
+        value.setNormalizedValueStr(normalizedValStr);
+        Map<Character, Integer> counters = Utils.getCharacterCounts(normalizedValStr);
+        value.setCharacterCounts(counters);
+        String countersStr = "";
+        for (Character c : counters.keySet()) {
+            countersStr += c + counters.get(c) + ",";
+        }
+        value.setCountersHashValue(countersStr.hashCode());
+        return value;
+    }
+
     // We assume that `input` is the string representation of a json object.
     // { "c" : [{"id": 1, "val": 0.2}, {"id": 2, "value": "}]}
     // We output the string representation of a json object.
@@ -26,16 +34,7 @@ public class ValueMatcher {
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONObject obj = jsonArray.getJSONObject(i);
             Value value = new Value(obj.getString("id"), obj.getDouble("val"));
-            String normalizedValStr = Long.toString(Math.round(value.getValue() * 100));
-            value.setNormalizedValueStr(normalizedValStr);
-            Map<Character, Integer> counters = Utils.getCharacterCounts(normalizedValStr);
-            value.setCharacterCounts(counters);
-            String countersStr ="";
-            for (Character c : counters.keySet()) {
-                countersStr += c + counters.get(c) + ",";
-            }
-            value.setCountersHashValue(countersStr.hashCode());
-            values.add(value);
+            values.add(preprocess(value));
         }
 
         // return PairwiseCluster.cluster(values);
@@ -56,6 +55,9 @@ public class ValueMatcher {
 
         @Getter
         private final double value;
+
+        @Setter
+        private double maxPriceLimit = 80.0;
 
         @Setter
         @Getter
@@ -81,7 +83,7 @@ public class ValueMatcher {
             if (absDiff < EPS) {
                 return 1;
             }
-            double linearDecaySimilarity = Math.abs(absDiff - 80) < EPS ? 10 * EPS : Math.max(0, 1-absDiff/80.0);
+            double linearDecaySimilarity = Math.abs(absDiff - maxPriceLimit) < EPS ? 10 * EPS : Math.max(0, 1 - absDiff / maxPriceLimit);
             double turnerSimilarity = 0;
             if (this.getNormalizedValueStr().length() != otherValue.getNormalizedValueStr().length() ||
             !this.getCharacterCounts().equals(otherValue.getCharacterCounts())) {

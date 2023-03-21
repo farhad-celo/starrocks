@@ -8,6 +8,45 @@ import lombok.Setter;
 import java.util.*;
 
 public class Utils {
+
+    static String dataListToJsonStr(List<List<String>> dataset) {
+        List<String> headers = dataset.get(0);
+        String prefix = "\"c\": [";
+        String suffix = "]";
+        List<String> rows = new ArrayList<>();
+        for (int i = 1; i < dataset.size(); i++) {
+            List<String> row = new ArrayList<>();
+            for (int j = 0; j < headers.size(); j++) {
+                String column = addQuotes(headers.get(j)) + ": " + addQuotes(dataset.get(i).get(j));
+                row.add((column));
+            }
+            rows.add("{ " + String.join(", ", row) + " }");
+        }
+        return prefix + String.join(", ", rows) + suffix;
+    }
+
+    static String patternListToJsonStr(List<List<String>> patterns) {
+        String prefix = "\"p\": [";
+        String suffix = "]";
+        List<String> rows = new ArrayList<>();
+        for (List<String> pattern : patterns) {
+            String columnName = addQuotes("columnName") + ": " + addQuotes(pattern.get(0));
+            String comparer = addQuotes("comparer") + ": {" + addQuotes("comparerName") + ": " + addQuotes(pattern.get(1));
+            if (pattern.get(2) == "") comparer += "}";
+            else comparer += ", \"parameters\": " + pattern.get(2) + "}";
+            rows.add("{ " + columnName + ", " + comparer + " }");
+        }
+        return prefix + String.join(", ", rows) + suffix;
+    }
+
+    static String concatDataPattern(String data, String pattern) {
+        return "{ " + data + ", " + pattern + " }";
+    }
+
+    static String addQuotes(String c) {
+        return "\"" + c + "\"";
+    }
+
     static String wrapArrayObject(String objectName, String objectStr) {
         return "{ \"" + objectName + "\": [" + objectStr + "]}";
     }

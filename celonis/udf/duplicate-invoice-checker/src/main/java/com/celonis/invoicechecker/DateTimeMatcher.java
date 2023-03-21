@@ -6,13 +6,39 @@ import org.json.JSONObject;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
-import java.util.Date;
-import java.util.List;
-import java.util.LinkedList;
+import java.util.*;
 
 public class DateTimeMatcher {
+    private static final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+    public static DateTime preprocess(DateTime dateTime) {
+        try {
+            Date parsedDate = simpleDateFormat.parse(dateTime.getDateTimeStr());
+            Calendar calendar = new GregorianCalendar();
+            calendar.setTime(parsedDate);
+            if (calendar.get(Calendar.YEAR) < 1970 || calendar.get(Calendar.YEAR) >= 2040) {
+                return null;
+            }
+            dateTime.setDateTime(parsedDate);
+            dateTime.setCalendar(getCalendarFromDateTime(parsedDate));
+        } catch (ParseException e) {
+            // We don't need to terminate the program if the parsing fails. We simply ignore the ill-format.
+            e.printStackTrace();
+            return null;
+        }
+        return dateTime;
+    }
+
+    private static Calendar getCalendarFromDateTime(Date dateTime) {
+        Calendar calendar = new GregorianCalendar();
+        calendar.setTime(dateTime);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+
+        return calendar;
+    }
+
     // We assume that `input` is the string representation of a json object.
     // { "c" : [{"id": 1, "date_time": "2020-01-01 12:04:03"}, {"id": 2, "date_time": "2020-01-02 12:03:02"}]}
     // We output the string representation of a json object.
@@ -21,43 +47,19 @@ public class DateTimeMatcher {
         JSONObject inputObjects = new JSONObject(input);
         List<ClusterObjectInterface> dateTimes = new LinkedList<>();
         JSONArray jsonArray = inputObjects.getJSONArray("c");
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONObject obj = jsonArray.getJSONObject(i);
             DateTime dateTime = new DateTime(obj.getString("id"), obj.getString("date_time"));
-            try {
-                Date parsedDate = simpleDateFormat.parse(dateTime.getDateTimeStr());
-                Calendar calendar = new GregorianCalendar();
-                calendar.setTime(parsedDate);
-                if (calendar.get(Calendar.YEAR) < 1970 || calendar.get(Calendar.YEAR) >= 2040) {
-                    continue;
-                }
-                dateTime.setDateTime(parsedDate);
-                dateTime.setCalendar(getCalendarFromDateTime(parsedDate));
-                dateTimes.add(dateTime);
-            } catch (ParseException e) {
-                // We don't need to terminate the program if the parsing fails. We simply ignore the ill-format.
-                e.printStackTrace();
-                continue;
+            DateTime processedDateTime = preprocess(dateTime);
+            if (processedDateTime != null) {
+                dateTimes.add(processedDateTime);
             }
         }
 
-        // return PairwiseCluster.cluster(dateTimes);
-        // return GraphCluster.cluster(dateTimes);
         DateTimeIndexer indexer = new DateTimeIndexer();
         indexer.index(dateTimes);
         IndexCluster indexCluster = new IndexCluster(indexer);
         return indexCluster.cluster(dateTimes);
-    }
-
-    private Calendar getCalendarFromDateTime(Date dateTime) {
-        Calendar calendar = new GregorianCalendar();
-        calendar.setTime(dateTime);
-        calendar.set(Calendar.HOUR_OF_DAY, 0);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-
-        return calendar;
     }
 
     @RequiredArgsConstructor
@@ -69,6 +71,9 @@ public class DateTimeMatcher {
 
         @Getter
         private final String dateTimeStr;
+
+        @Setter
+        private int numDays = 7;
 
         @Setter
         @Getter
@@ -96,7 +101,7 @@ public class DateTimeMatcher {
 
             // If time diff is less than 7 days, we match these two dateTime.
             if (Math.abs(currentCalendar.getTimeInMillis() - otherCalendar.getTimeInMillis())
-                    <= 7 * 24 * 60 * 60 * 1000) {
+                    <= numDays * 24 * 60 * 60 * 1000) {
                 return true;
             }
 

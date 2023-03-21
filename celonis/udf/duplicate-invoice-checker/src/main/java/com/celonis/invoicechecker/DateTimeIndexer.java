@@ -3,7 +3,25 @@ package com.celonis.invoicechecker;
 import java.util.*;
 
 public class DateTimeIndexer implements IndexerInterface {
-    private final long MILLI_SECONDS_IN_WEEK = 7 * 24 * 3600 * 1000;
+
+    private final Map<String, Set<String>> connectedEdges = new HashMap<>();
+
+    private int numDays = 7;
+    private long MILLI_SECONDS_IN_WEEK = numDays * 24 * 3600 * 1000;
+
+
+    public DateTimeIndexer() {
+    }
+
+    private void addTimeToId(int time, String id, Map<Integer, Set<String>> mapping) {
+        if (mapping.containsKey(time)) {
+            mapping.get(time).add(id);
+        } else {
+            Set<String> ids = new HashSet<>();
+            ids.add(id);
+            mapping.put(time, ids);
+        }
+    }
 
     public void index(List<ClusterObjectInterface> clusterObjects) {
         Map<String, ClusterObjectInterface> idToObjects = new HashMap<>();
@@ -96,7 +114,7 @@ public class DateTimeIndexer implements IndexerInterface {
         }
 
         for (String id : idToObjects.keySet()) {
-            List<String> connectedIds = new ArrayList<>();
+            Set<String> connectedIds = new HashSet<>();
             for (String pointedId : potentialConnectedEdges.get(id)) {
                 if (pointedId != id && idToObjects.get(id).isSimilar(idToObjects.get(pointedId))) {
                     connectedIds.add(pointedId);
@@ -106,19 +124,7 @@ public class DateTimeIndexer implements IndexerInterface {
         }
     }
 
-    public List<String> findEdges(String id) {
+    public Set<String> findEdges(String id) {
         return connectedEdges.get(id);
     }
-
-    private void addTimeToId(int time, String id, Map<Integer, Set<String>> mapping) {
-        if (mapping.containsKey(time)) {
-            mapping.get(time).add(id);
-        } else {
-            Set<String> ids = new HashSet<>();
-            ids.add(id);
-            mapping.put(time, ids);
-        }
-    }
-
-    private Map<String, List<String>> connectedEdges = new HashMap<>();
 }
