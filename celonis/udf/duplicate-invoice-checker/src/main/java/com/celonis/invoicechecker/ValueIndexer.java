@@ -1,13 +1,28 @@
 package com.celonis.invoicechecker;
 
+import org.json.JSONObject;
+
 import java.util.*;
 
 public class ValueIndexer implements IndexerInterface {
     private static final int priority = 0;
     private double maxPriceLimit = 80.0;
     private final Map<String, Set<String>> connectedEdges = new HashMap<>();
+    public String columnName = "";
 
     public ValueIndexer() {
+    }
+
+    public ValueIndexer(String columnName) {
+        this.columnName = columnName;
+    }
+
+    public ValueIndexer(String columnName, JSONObject params) {
+        this.columnName = columnName;
+        if (params == null) return;
+        if (params.has("max_price_limit")) {
+            maxPriceLimit = params.getDouble("max_price_limit");
+        }
     }
 
     public void index(List<ClusterObjectInterface> clusterObjects) {
@@ -55,7 +70,22 @@ public class ValueIndexer implements IndexerInterface {
         }
     }
 
-    public Set<String> findEdges(String id) {
-        return connectedEdges.get(id);
+    public Set<String> findEdges(String id, Set<String> candidateIds) {
+        Set<String> resSet = connectedEdges.get(id);
+        if (candidateIds == null) return new HashSet<>(resSet);
+        candidateIds.retainAll(resSet);
+        return candidateIds;
+    }
+
+    public ClusterObjectInterface createClusterObjFromJson(JSONObject obj) {
+        String rowId = obj.getString("id");
+        Double content = obj.getDouble(columnName);
+        ValueMatcher.Value val = new ValueMatcher.Value(rowId, content);
+        val.setMaxPriceLimit(maxPriceLimit);
+        return ValueMatcher.preprocess(val);
+    }
+
+    public Integer getPriority() {
+        return priority;
     }
 }

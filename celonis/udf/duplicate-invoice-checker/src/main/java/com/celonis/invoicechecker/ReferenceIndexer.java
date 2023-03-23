@@ -1,13 +1,29 @@
 package com.celonis.invoicechecker;
 
+import org.json.JSONObject;
+
 import java.util.*;
 
 public class ReferenceIndexer implements IndexerInterface {
+    private static final int priority = 2;
     private final Map<String, Set<String>> connectedEdges = new HashMap<>();
 
     private int maxErrors = 3;
+    public String columnName = "";
 
     public ReferenceIndexer() {
+    }
+
+    public ReferenceIndexer(String columnName) {
+        this.columnName = columnName;
+    }
+
+    public ReferenceIndexer(String columnName, JSONObject params) {
+        this.columnName = columnName;
+        if (params == null) return;
+        if (params.has("max_errors")) {
+            maxErrors = params.getInt("max_errors");
+        }
     }
 
     public void index(List<ClusterObjectInterface> clusterObjects) {
@@ -56,7 +72,23 @@ public class ReferenceIndexer implements IndexerInterface {
         }
     }
 
-    public Set<String> findEdges(String id) {
-        return connectedEdges.get(id);
+
+    public Set<String> findEdges(String id, Set<String> candidateIds) {
+        Set<String> resSet = connectedEdges.get(id);
+        if (candidateIds == null) return new HashSet<>(resSet);
+        candidateIds.retainAll(resSet);
+        return candidateIds;
+    }
+
+    public ClusterObjectInterface createClusterObjFromJson(JSONObject obj) {
+        String rowId = obj.getString("id");
+        String content = obj.getString(columnName);
+        ReferenceMatcher.Reference ref = new ReferenceMatcher.Reference(rowId, content);
+        ref.setMaxErrors(maxErrors);
+        return ReferenceMatcher.preprocess(ref);
+    }
+
+    public Integer getPriority() {
+        return priority;
     }
 }

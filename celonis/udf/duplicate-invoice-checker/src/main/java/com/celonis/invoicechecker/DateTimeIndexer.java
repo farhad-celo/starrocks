@@ -1,16 +1,32 @@
 package com.celonis.invoicechecker;
 
+import org.json.JSONObject;
+
 import java.util.*;
 
 public class DateTimeIndexer implements IndexerInterface {
+    private static final int priority = 1;
 
     private final Map<String, Set<String>> connectedEdges = new HashMap<>();
 
     private int numDays = 7;
+    public String columnName = "";
     private long MILLI_SECONDS_IN_WEEK = numDays * 24 * 3600 * 1000;
 
 
     public DateTimeIndexer() {
+    }
+
+    public DateTimeIndexer(String columnName) {
+        this.columnName = columnName;
+    }
+
+    public DateTimeIndexer(String columnName, JSONObject params) {
+        this.columnName = columnName;
+        if (params == null) return;
+        if (params.has("num_days")) {
+            numDays = params.getInt("num_days");
+        }
     }
 
     private void addTimeToId(int time, String id, Map<Integer, Set<String>> mapping) {
@@ -124,7 +140,22 @@ public class DateTimeIndexer implements IndexerInterface {
         }
     }
 
-    public Set<String> findEdges(String id) {
-        return connectedEdges.get(id);
+    public Set<String> findEdges(String id, Set<String> candidateIds) {
+        Set<String> resSet = connectedEdges.get(id);
+        if (candidateIds == null) return new HashSet<>(resSet);
+        candidateIds.retainAll(resSet);
+        return candidateIds;
+    }
+
+    public ClusterObjectInterface createClusterObjFromJson(JSONObject obj) {
+        String rowId = obj.getString("id");
+        String content = obj.getString(columnName);
+        DateTimeMatcher.DateTime date = new DateTimeMatcher.DateTime(rowId, content);
+        date.setNumDays(numDays);
+        return DateTimeMatcher.preprocess(date);
+    }
+
+    public Integer getPriority() {
+        return priority;
     }
 }
