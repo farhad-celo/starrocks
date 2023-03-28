@@ -16,6 +16,7 @@ TEST(CelonisTimeFunctionsTest, timestamp_millis) {
     col->append_datum(Datum());  // NULL
     col->append_datum(-1L);  // NULL
     col->append_datum(61123L);    // 1970-01-01 00:01:01.123 UTC
+    col->append_datum(172800000L);  // 1970-01-03 00:00:00
 
     const auto result = CelonisTimeFunctions::timestamp_millis(nullptr, {col}).value();
     ASSERT_EQ(result->size(), col->size());
@@ -24,6 +25,6 @@ TEST(CelonisTimeFunctionsTest, timestamp_millis) {
     EXPECT_TRUE(result->get(2).is_null());
     EXPECT_TRUE(result->get(3).is_null());
     EXPECT_EQ("1970-01-01 00:01:01.123000", result->get(4).get_timestamp().to_string());
+    EXPECT_EQ("1970-01-03 00:00:00", result->get(5).get_timestamp().to_string());
 }
-
 } // namespace starrocks

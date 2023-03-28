@@ -34,8 +34,14 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::timestamp_millis(FunctionContext* cont
         int64 seconds = unix_millis / 1000;
         int64 millis = unix_millis % 1000;
         int64 nanoseconds = millis * NANOS_PER_MILLIS;
+
+        Timestamp t;
+        int days = seconds / SECS_PER_DAY;
+        JulianDate jd = days + date::UNIX_EPOCH_JULIAN;
+        t = timestamp::from_julian_and_time(jd,
+                                            seconds % SECS_PER_DAY * USECS_PER_SEC + nanoseconds / NANOSECS_PER_USEC);
         TimestampValue ts;
-        ts.set_timestamp(timestamp::of_epoch_second(seconds, nanoseconds));
+        ts.set_timestamp(t);
         result.append(ts);
     }
 
