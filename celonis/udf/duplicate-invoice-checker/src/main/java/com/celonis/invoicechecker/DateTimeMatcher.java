@@ -32,6 +32,8 @@ public class DateTimeMatcher {
     private static Calendar getCalendarFromDateTime(Date dateTime) {
         Calendar calendar = new GregorianCalendar();
         calendar.setTime(dateTime);
+        TimeZone timeZone = TimeZone.getTimeZone("UTC");
+        calendar.setTimeZone(timeZone);
         calendar.set(Calendar.HOUR_OF_DAY, 0);
         calendar.set(Calendar.MINUTE, 0);
         calendar.set(Calendar.SECOND, 0);

@@ -4,8 +4,12 @@ import lombok.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 public class CompanyMatcher {
@@ -13,10 +17,20 @@ public class CompanyMatcher {
         String modifiedCompanyName = company.getVendorName().toLowerCase().replaceAll("[^a-zА-я\\d ]",
                 "");
         modifiedCompanyName = modifiedCompanyName.replaceAll(" +", " ").trim();
-        modifiedCompanyName = modifiedCompanyName.replaceAll(" gmbh| ag | llc| inc| ltd| limited|" +
-                " sdn| bhd| se| corporation| corp| sl| coltd| group| mbh| co| kg| ltda| sa| sro| des| sas| sasu|"
-                + "zoo| sp| sau| cokg", "");
-        company.setModifiedVendorName(modifiedCompanyName.replaceAll(" ", ""));
+        Set<String> suffix = Stream.of("gmbh", "ag", "llc", "inc", "ltd", "limited", "sdn", "bhd", "se",
+                "corporation", "corp", "sl", "coltd", "group", "mbh", "co", "kg", "ltda", "sa", "sro",
+                "des", "sas", "sasu", "zoo", "sp", "sau", "cokg"
+        ).collect(Collectors.toCollection(HashSet::new));
+        String[] words = modifiedCompanyName.split(" ");
+        for (int i = words.length - 1; i >= 0; i--) {
+            if (suffix.contains(words[i])) {
+                words[i] = "";
+            } else {
+                break;
+            }
+        }
+        modifiedCompanyName = String.join("", words);
+        company.setModifiedVendorName(modifiedCompanyName);
         return company;
     }
 
@@ -38,10 +52,12 @@ public class CompanyMatcher {
         return GraphCluster.cluster(companies);
     }
 
+
     @RequiredArgsConstructor
     @EqualsAndHashCode
     @ToString
     static class Company implements ClusterObjectInterface {
+        private final static UDFJaroDistance distance = new UDFJaroDistance();
         @Getter
         private final String rowId;
         @Getter
@@ -53,8 +69,6 @@ public class CompanyMatcher {
         @EqualsAndHashCode.Exclude
         private String modifiedVendorName;
 
-        private final static UDFJaroDistance distance = new UDFJaroDistance();
-
         public String toJsonString() {
             return "{\"id\": \"" + rowId + "\", \"vendor_name\": \"" + vendorName + "\"}";
         }
@@ -64,10 +78,7 @@ public class CompanyMatcher {
             // TODO(f.li): Upgrade commons-text library to version 1.10.0 and use the new threshold. We
             // currently use version 1.4.0 to match the one used in SR's runtime. We should figure it out why SR's
             // runtime can only use version 1.4.0.
-            if (distance.evaluate(this.getModifiedVendorName(), otherCompany.getModifiedVendorName()) > threshold) {
-                return true;
-            }
-            return false;
+            return distance.evaluate(this.getModifiedVendorName(), otherCompany.getModifiedVendorName()) > threshold;
         }
 
         public String getId() {

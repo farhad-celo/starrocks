@@ -1,11 +1,12 @@
 package com.celonis.invoicechecker;
 
+import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
-import org.json.*;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CompanyMatcherTest {
     @Test
@@ -81,5 +82,16 @@ class CompanyMatcherTest {
         cluster.getClusterObjects().add(company2);
         CompanyMatcher matcher = new CompanyMatcher();
         assertEquals(0, matcher.process(cluster.toJsonString()).length);
+    }
+
+    @Test
+    void testSpecialCase() {
+        CompanyMatcher.Company company1 = new CompanyMatcher.Company("10", "Schenker France SAS");
+        CompanyMatcher.Company company2 = new CompanyMatcher.Company("20", "Schenker S.A.");
+        Cluster<CompanyMatcher.Company> cluster = new Cluster<>();
+        cluster.getClusterObjects().add(company1);
+        cluster.getClusterObjects().add(company2);
+        CompanyMatcher matcher = new CompanyMatcher();
+        assertEquals(1, matcher.process(cluster.toJsonString()).length);
     }
 }

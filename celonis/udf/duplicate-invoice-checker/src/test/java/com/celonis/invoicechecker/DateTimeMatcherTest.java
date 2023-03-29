@@ -9,7 +9,8 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class DateTimeMatcherTest {
     @Test
@@ -137,7 +138,18 @@ class DateTimeMatcherTest {
        cluster.getClusterObjects().add(dateTime2);
        DateTimeMatcher matcher = new DateTimeMatcher();
        assertArrayEquals(new String[]{"{ \"c\": [{\"id\": \"10\", \"date_time\": \"2020-09-10 04:01:01\"}, " +
-               "{\"id\": \"20\", \"date_time\": \"2020-10-10 13:01:01\"}]}"},
+                       "{\"id\": \"20\", \"date_time\": \"2020-10-10 13:01:01\"}]}"},
                matcher.process(cluster.toJsonString()));
    }
+
+    @Test
+    void testSpecialCase() {
+        DateTimeMatcher.DateTime dateTime1 = new DateTimeMatcher.DateTime("10", "2020-10-31 00:00:00");
+        DateTimeMatcher.DateTime dateTime2 = new DateTimeMatcher.DateTime("20", "2020-11-07 00:00:00");
+        DateTimeMatcher matcher = new DateTimeMatcher();
+        Cluster<DateTimeMatcher.DateTime> cluster = new Cluster<>();
+        cluster.getClusterObjects().add(dateTime1);
+        cluster.getClusterObjects().add(dateTime2);
+        assertEquals(1, matcher.process(cluster.toJsonString()).length);
+    }
 }

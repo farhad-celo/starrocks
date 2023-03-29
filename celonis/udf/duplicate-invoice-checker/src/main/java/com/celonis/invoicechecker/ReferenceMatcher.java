@@ -162,17 +162,18 @@ public class ReferenceMatcher {
                 }
             }
 
+            if (left.getTranslatedReference().equals(right.getTranslatedReference())) {
+                return 1;
+            }
+
             if (Math.abs(left.getModifiedReference().length() - right.getModifiedReference().length()) > maxErrors) {
                 return 0;
             }
 
             if (left.getModifiedReference().length() == right.getModifiedReference().length()) {
                 // Trie tree search on translated reference.
-                if (left.getTranslatedReference().equals(right.getTranslatedReference())) {
-                    return 1;
-                }
                 // Use counters hash as the index.
-                if (left.getTranslatedReference().length() > 3 && left.getCounters().equals(right.getCounters())) {
+                if (left.getModifiedReference().length() > 3 && left.getCounters().equals(right.getCounters())) {
                     int numMismatches = 0;
                     for (int i = 0; i < left.getModifiedReference().length(); i++) {
                         Character charLeft = left.getModifiedReference().charAt(i);
