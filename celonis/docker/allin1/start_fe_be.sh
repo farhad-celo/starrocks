@@ -39,10 +39,14 @@ mysql -uroot -h${MYFQDN} -P 9030 -e "set global pipeline_sink_dop=${SINK_DOP};"
 
 # Loop to detect the process.
 while sleep 10; do
-  PROCESS_STATUS=`mysql -uroot -h127.0.0.1 -P 9030 -e "show backends\G" |grep "Alive: true"`
-  if [ -z "$PROCESS_STATUS" ]; then
-        log_stdin "service has exited"
-        exit 1;
-  fi;
-  log_stdin $PROCESS_STATUS
+  if [ "$STARTMODE" = 'auto' ]; then
+    PROCESS_STATUS=`mysql -uroot -h127.0.0.1 -P 9030 -e "show backends\G" |grep "Alive: true"`
+    if [ -z "$PROCESS_STATUS" ]; then
+      log_stdin "service has exited"
+      exit 1;
+    fi;
+    log_stdin $PROCESS_STATUS
+  elif [ "$STARTMODE" = 'debug' ]; then
+    log_stdin "debug mode"
+  fi
 done

@@ -53,5 +53,5 @@ RUN cat be.conf >> $DEPLOYDIR/starrocks/be/conf/be.conf && \
     cat fe.conf >> $DEPLOYDIR/starrocks/fe/conf/fe.conf
 
 
-CMD if [ "$STARTMODE" = 'auto' ] ; then ./start_fe_be.sh ; else ./start_be.sh ; fi
+CMD if [ "$STARTMODE" = 'manual' ] ; then ./start_be.sh; else ./start_fe_be.sh; fi
 
