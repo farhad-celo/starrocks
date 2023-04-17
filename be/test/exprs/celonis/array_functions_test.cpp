@@ -239,7 +239,7 @@ TEST_F(CelonisArrayFunctionsTest, array_is_sorted_nullable_array) {
 TEST_F(CelonisArrayFunctionsTest, array_null_to_empty) {
     auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     array->append_datum(DatumArray{"abc", Datum(), "bcd"});
-    array->append_datum(DatumArray());
+    array->append_datum(Datum());
     array->append_datum(DatumArray{Datum{}});
     array->append_datum(DatumArray{Datum{}, Datum{}});
 
