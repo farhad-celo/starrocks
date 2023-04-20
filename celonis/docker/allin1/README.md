@@ -12,11 +12,12 @@ E.g.
 ```
 
 ### Start container
-The container can be started in two STARTMODE:
-- `manual`: the default mode. will only start be, broker, but not fe. One needs to start fe manually and add be, broker to fe.
-- `auto`: will start fe, be, broker and configure be & broker on fe. This option is suitable for single node cluster
+The container can be started in these STARTMODE:
+- `manual`: the default mode. will only start be, but not fe. One needs to start fe manually and add be to fe. Container will exit if be is stopped.
+- `auto`: will start fe, be and configure be on fe. This option is suitable for single node cluster. Container will exit if either fe or be is stopped.
+- `debug`: no service will be started. Container will not exit.
 ```
-> docker run --env STARTMODE=[auto|manual] --name <container_name> <image_name>:<tag> 
+> docker run --env STARTMODE=[auto|manual|debug] --name <container_name> <image_name>:<tag> 
 
 E.g
 > docker run --env STARTMODE=auto --name starrocks-allin1-2.4.0-rc03 starrocks-allin1:2.4.0-rc03 
