@@ -34,20 +34,6 @@ COPY --from=fe-builder /build/starrocks/output /release/fe_artifacts
 COPY --from=be-builder /build/starrocks/output /release/be_artifacts
 COPY --from=udf-builder /build/starrocks/celonis/udf/duplicate-invoice-checker/target/duplicate-invoice-checker-udf-1.0-SNAPSHOT-jar-with-dependencies.jar /release/udf/duplicate-invoice-checker-udf-1.0-SNAPSHOT.jar
 
-# Add azure bolbstore dependencies.
-# TODO: remove this when StarRocks team having resolved these two issues:
-#   https://github.com/StarRocks/starrocks/issues/18341
-#   https://github.com/StarRocks/starrocks/issues/18342
-ARG BE_AZURE_DIR=/release/be_artifacts/be/lib/hadoop/common
-ARG FE_AZURE_DIR=/release/fe_artifacts/fe/lib
-ADD https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure-datalake/3.3.0/hadoop-azure-datalake-3.3.0.jar \
-    https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure/3.3.0/hadoop-azure-3.3.0.jar \
-    https://repo1.maven.org/maven2/com/microsoft/azure/azure-storage/8.6.6/azure-storage-8.6.6.jar \
-    $FE_AZURE_DIR/
-ADD https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure-datalake/3.3.0/hadoop-azure-datalake-3.3.0.jar \
-    https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure/3.3.0/hadoop-azure-3.3.0.jar \
-    https://repo1.maven.org/maven2/com/microsoft/azure/azure-storage/8.6.6/azure-storage-8.6.6.jar \
-    $BE_AZURE_DIR/
 COPY celonis/docker/artifact/core-site.xml /release/fe_artifacts/fe/conf/
 COPY celonis/docker/artifact/core-site.xml /release/be_artifacts/be/conf/
 
