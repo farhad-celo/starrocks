@@ -5,6 +5,8 @@ log_stdin()
     echo "[`date`] $@" >&1
 }
 
+log_stdin "Starrting all-in-1 container..."
+
 # Start UDF HTTP server endpoint
 log_stdin "Start UDF HTTP server endpoint"
 cd $SR_HOME/udf
@@ -13,22 +15,34 @@ python2 -m SimpleHTTPServer 7000 &> $SR_HOME/udf/udf.log &
 # Start FE.
 cd $SR_HOME/fe/bin/
 # enable [FQDN access](https://docs.starrocks.io/en-us/2.4/administration/enable_fqdn#enable-fqdn-access)
-log_stdin "Start FE"
+log_stdin "Starting FE"
 ./start_fe.sh --host_type FQDN --daemon
 
 # Start BE.
-log_stdin "Start BE"
+log_stdin "Starting BE"
 cd $SR_HOME/be/bin/
 ./start_be.sh --daemon
 
 
-# Sleep until the cluster starts.
-sleep 15;
+while sleep 1; do
+  FE_STATUS=$(curl -s localhost:8030/api/bootstrap | grep -o '"status":"[^"]*"' | cut -d':' -f2 | tr -d '"')
+  BE_STATUS=$(curl -s localhost:8040/api/health | grep -o '"status": *"[^"]*"' | cut -d'"' -f4)
+  log_stdin "FE_STATUS: $FE_STATUS, BE_STATUS: $BE_STATUS"
+
+  if [ "$FE_STATUS" = 'OK' -a "$BE_STATUS" = 'OK' ]; then
+    log_stdin "FE and BE are up"
+    break
+  fi
+
+  log_stdin "wait for 1 sec for BE and FE become ready ..."
+done
+
 
 # Fetch fqdn with the command suggested by AWS official doc: https://docs.aws.amazon.com/managedservices/latest/userguide/find-FQDN.html
 MYFQDN=`hostname --fqdn`
-log_stdin "Register BE ${MYFQDN} to FE"
+log_stdin "Registering BE ${MYFQDN} to FE"
 mysql -uroot -h${MYFQDN} -P 9030 -e "alter system add backend '${MYFQDN}:9050';"
+log_stdin "Registed BE ${MYFQDN} to FE"
 
 # TODO(j.yang): Explicitly set pipeline_sink_dop because pipeline load currently only
 # uses parallelism 1 by default. Remove this after automatic parallelism selection
