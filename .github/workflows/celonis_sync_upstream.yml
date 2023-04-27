@@ -8,6 +8,7 @@ on:
 
 env:
   BRANCH_3_0: branch-3.0
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 permissions:
   contents: write
