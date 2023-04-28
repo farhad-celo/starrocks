@@ -112,14 +112,20 @@ jobs:
           docker tag starrocks-be:${RELEASE_VERSION}-ubuntu 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
           docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
 
-      - name: Amazon ECR logout
+      - name: Clean up and Amazon ECR logout
         if: ${{ always() }}
         run: |
+          # Delete the built docker image from the runner.
+          docker rmi -f $(docker images -q starrocks-allin1:${RELEASE_VERSION}-ubuntu)
+          docker rmi -f $(docker images -q starrocks-fe:${RELEASE_VERSION}-ubuntu)
+          docker rmi -f $(docker images -q starrocks-be:${RELEASE_VERSION}-ubuntu)
+          docker rmi -f $(docker images -q starrocks-artifacts:${RELEASE_VERSION}-ubuntu)
           docker logout ${{ steps.login-ecr.outputs.registry }}
           
 
   release-centos-image:
     runs-on: [self-hosted, celostar]
+    needs: release-ubuntu-image
     steps:
       - name: checkout repository
         uses: actions/checkout@v3
@@ -170,7 +176,10 @@ jobs:
           docker tag starrocks-allin1:${RELEASE_VERSION}-centos 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-centos
           docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-centos
 
-      - name: Amazon ECR logout
+      - name: Clean up and Amazon ECR logout
         if: ${{ always() }}
         run: |
+          # Delete the built docker image from the runner.
+          docker rmi -f $(docker images -q starrocks-allin1:${RELEASE_VERSION}-centos)
+          docker rmi -f $(docker images -q starrocks-artifacts:${RELEASE_VERSION}-centos)
           docker logout ${{ steps.login-ecr.outputs.registry }}
