@@ -1,0 +1,50 @@
+name: 'Presubmit Test'
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  # To manually trigger the workflow. For debugging purpose.
+  workflow_dispatch:
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+env:
+  RELEASE_VERSION: presubmit-test
+  GITHUB_USERNAME: ${{ github.repository }}
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+  Builder: ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0-240ebc36
+
+jobs:
+  presubmit-test:
+    runs-on: [self-hosted, celostar]
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v3
+
+      - name: GitHub Docker login
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+
+      - name: Start container
+        run: |
+          container_id=$(docker run -d -v `pwd`:/celostar-starrocks \
+          -w `pwd` --env GITHUB_TOKEN=${GITHUB_TOKEN} \
+          --env GITHUB_USERNAME=${GITHUB_USERNAME} \
+          ${Builder} \
+          sleep infinity)
+          echo "container_id=$container_id" >> $GITHUB_ENV
+
+      - name: Build and test
+        run: |
+          docker exec ${{ env.container_id }} sh -c "$(cat celonis/docker/presubmit/presubmit_test.sh)"
+
+      - name: Clean up and GitHub Docker logout
+        if: ${{ always() }}
+        run: |
+          docker kill ${{ env.container_id }}
+          docker logout ghcr.io
+        continue-on-error: true
