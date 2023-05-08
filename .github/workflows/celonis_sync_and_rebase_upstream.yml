@@ -1,0 +1,58 @@
+name: Sync and rebase upstream branch
+on:
+  # Configuring a workflow to run manually
+  workflow_dispatch:
+
+env:
+  BRANCH_3_0: branch-3.0
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-rebase-upstream:
+    runs-on: [self-hosted, celostar]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Remote add upstream
+        id: remote-add
+        run: |
+          git remote add upstream https://github.com/StarRocks/starrocks.git
+        continue-on-error: true
+      - name: Fetch upstream and push
+        run: |
+          git fetch upstream ${BRANCH_3_0}:${BRANCH_3_0}
+          git push origin ${BRANCH_3_0}
+      - name: Rebase
+        run: |
+          echo "Start to rebase ..."
+          # Get the default branch
+          git fetch
+          default_branch=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
+          echo "The default branch is ${default_branch}"
+          git checkout $default_branch
+          # Get the latest commit
+          git pull
+          latest_commit=$(git rev-parse --short=8 HEAD)
+          echo "latest_commit=$latest_commit" >> $GITHUB_ENV
+          echo "The latest commit is ${latest_commit}"
+          # Create the new default branch
+          git checkout ${BRANCH_3_0}
+          git checkout -b ${BRANCH_3_0}-${latest_commit}-celo
+          git push --set-upstream origin ${BRANCH_3_0}-${latest_commit}-celo
+          # Rebase
+          git checkout ${default_branch}
+          timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
+          echo "timestamp=$timestamp" >> $GITHUB_ENV
+          git checkout -b gh-rebase-${timestamp}
+          git rebase ${BRANCH_3_0}-${latest_commit}-celo
+          git push --set-upstream origin gh-rebase-${timestamp}
+
+      - name: Clean up
+        if: ${{ always() }}
+        run: |
+          git checkout ${BRANCH_3_0}
+          git branch -D gh-rebase-${{ env.timestamp }}
+        continue-on-error: true
