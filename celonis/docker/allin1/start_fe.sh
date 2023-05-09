@@ -12,9 +12,6 @@ sleep 3
 
 sleep 30;
 
-# TODO(j.yang): Explicitly set pipeline_sink_dop because pipeline load currently only
-# uses parallelism 1 by default. Remove this after automatic parallelism selection
-# works.
 MYFQDN=`hostname --fqdn`
-SINK_DOP=$(($(nproc) / 2))
-mysql -uroot -h${MYFQDN} -P 9030 -e "set global pipeline_sink_dop=${SINK_DOP};"
+mysql -uroot -h${MYFQDN} -P 9030
+
