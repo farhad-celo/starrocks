@@ -26,7 +26,7 @@ jobs:
   release-ubuntu-image:
     runs-on: [self-hosted, celostar]
     env:
-      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0-240ebc36
+      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0-8994b614-celo
     steps:
       - name: checkout repository
         uses: actions/checkout@v3
@@ -125,6 +125,8 @@ jobs:
 
   release-centos-image:
     runs-on: [self-hosted, celostar]
+    env:
+      BUILDER: ghcr.io/celonis/celostar/starrocks-centos-dev-env:branch-3.0-8994b614-celo
     needs: release-ubuntu-image
     steps:
       - name: checkout repository
@@ -135,10 +137,10 @@ jobs:
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
       - name: Pull dev env image
         run: |
-          docker pull ghcr.io/celonis/celostar/starrocks-centos-dev-env:branch-3.0
+          docker pull ${BUILDER}
       - name: build artifact docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg builder=ghcr.io/celonis/celostar/starrocks-centos-dev-env:branch-3.0 -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-centos .
+          DOCKER_BUILDKIT=1 docker build --build-arg builder=${BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-centos .
 
       - name: build allin1 docker image
         run: |
