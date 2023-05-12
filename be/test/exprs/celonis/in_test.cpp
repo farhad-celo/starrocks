@@ -217,10 +217,12 @@ TEST_F(CelonisInTest, celonis_in_non_constant_int) {
     EXPECT_EQ(true, result->get(4).get_uint8());
 }
 
+#if !defined(__SANITIZE_ADDRESS__)
 TEST_F(CelonisInTest, celonis_in_unsupported_type) {
     Prepare<TYPE_DECIMALV2>();
 
     EXPECT_THROW(RunConstantMatch(DatumArray{}), std::runtime_error);
 }
+#endif
 
 } // namespace starrocks

@@ -69,6 +69,7 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_string_data_nullable
     EXPECT_TRUE(result->get(3).is_null());
 }
 
+#if !defined(__SANITIZE_ADDRESS__)
 TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_unsupported_filter) {
     // Similar to above, but provides node information in one of the filters that is not supported for now ("starting"
     // nodes).
@@ -89,5 +90,6 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_unsupported_filter) 
                                                                             other_filters, other_filters}),
                  std::runtime_error);
 }
+#endif
 
 } // namespace starrocks

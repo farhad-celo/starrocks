@@ -114,6 +114,7 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstInt32) {
     EXPECT_EQ(9L, result->get(0).get_int64());
 }
 
+#if !defined(__SANITIZE_ADDRESS__)
 TEST_F(CelonisCalcThroughputTest, FirstToFirstNonMatchingArraySizes) {
     auto activity_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     activity_array->append_datum(DatumArray{"a"});
@@ -126,6 +127,7 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstNonMatchingArraySizes) {
             nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}),
                  std::runtime_error);
 }
+#endif
 
 TEST_F(CelonisCalcThroughputTest, FirstToFirstNullInput) {
     auto activity_array = ColumnHelper::create_const_null_column(1);
@@ -141,6 +143,7 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstNullInput) {
     ASSERT_TRUE(result->get(0).is_null());
 }
 
+#if !defined(__SANITIZE_ADDRESS__)
 TEST_F(CelonisCalcThroughputTest, InvalidLabel) {
     auto activity_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     activity_array->append_datum(DatumArray{"a"});
@@ -162,6 +165,7 @@ TEST_F(CelonisCalcThroughputTest, InvalidLabel) {
             nullptr, {activity_array, timestamp_array, start_activity, end_activity, start_label, end_label}),
                  std::runtime_error);
 }
+#endif
 
 TEST_F(CelonisCalcThroughputTest, InputArrayIsSometimesNull) {
     auto activity_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);

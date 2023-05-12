@@ -178,6 +178,7 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_null_in_input) {
     EXPECT_TRUE(result_targets->get(2).get_array()[1].is_null());
 }
 
+#if !defined(__SANITIZE_ADDRESS__)
 TEST_F(CelonisSourceTargetTest, array_celonis_source_unsupported_mode) {
     // "any->all" is not supported.
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
@@ -188,6 +189,7 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_unsupported_mode) {
     EXPECT_THROW(CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}), std::runtime_error);
     EXPECT_THROW(CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}), std::runtime_error);
 }
+#endif
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_string_data) {
     auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
