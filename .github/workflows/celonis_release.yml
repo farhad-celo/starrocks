@@ -44,12 +44,14 @@ jobs:
       - name: package allin1 docker image
         run: |
           DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${RELEASE_VERSION}-ubuntu celonis/docker/allin1
+
       - name: package fe docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f celonis/docker/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${RELEASE_VERSION}-ubuntu celonis/docker/fe
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${RELEASE_VERSION}-ubuntu .
+
       - name: package be docker image
         run: |
-          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f celonis/docker/be/be-ubuntu.Dockerfile -t starrocks-be:${RELEASE_VERSION}-ubuntu celonis/docker/be
+          DOCKER_BUILDKIT=1 docker build --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${RELEASE_VERSION}-ubuntu .
 
 
       - name: push allin1 docker image to GHCR
