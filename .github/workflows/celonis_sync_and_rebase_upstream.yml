@@ -20,6 +20,7 @@ jobs:
         id: remote-add
         run: |
           git remote add upstream https://github.com/StarRocks/starrocks.git
+        # Skip error of remote upstream already exists
         continue-on-error: true
       - name: Fetch upstream and push
         run: |
@@ -28,28 +29,29 @@ jobs:
       - name: Rebase
         run: |
           echo "Start to rebase ..."
-          # Get the default branch
-          git fetch
-          default_branch=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
-          echo "The default branch is ${default_branch}"
-          git checkout $default_branch
+          
           # Get the latest commit
-          git pull
-          latest_commit=$(git rev-parse --short=8 HEAD)
-          echo "latest_commit=$latest_commit" >> $GITHUB_ENV
-          echo "The latest commit is ${latest_commit}"
-          # Create the new default branch
+          git fetch
           git checkout ${BRANCH_3_0}
-          git checkout -b ${BRANCH_3_0}-${latest_commit}-celo
-          git push --set-upstream origin ${BRANCH_3_0}-${latest_commit}-celo
+          latest_commit=$(git rev-parse --short=8 HEAD)
+          echo "The latest commit is ${latest_commit}"
+          
+          # Create the new default branch
+          newDefaultBranch=${BRANCH_3_0}-${latest_commit}-celo
+          git checkout -b ${newDefaultBranch}
+          git push --set-upstream origin ${newDefaultBranch}
+                    
+          # Get the current default branch
+          default_branch=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
+          echo "The current default branch is ${default_branch}"
+          
           # Rebase
           git checkout ${default_branch}
           timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
           echo "timestamp=$timestamp" >> $GITHUB_ENV
           git checkout -b gh-rebase-${timestamp}
-          git rebase ${BRANCH_3_0}-${latest_commit}-celo
+          git rebase ${newDefaultBranch}
           git push --set-upstream origin gh-rebase-${timestamp}
-
       - name: Clean up
         if: ${{ always() }}
         run: |
