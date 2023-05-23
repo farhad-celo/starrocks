@@ -49,4 +49,9 @@ jobs:
         run: |
           docker kill ${{ env.container_id }}
           docker logout ghcr.io
+          
+          # Clean up the artifacts built by previous step.
+          # Note that we could not simply delete the directory as it will fail the "Post checkout repository" step of checkout action.
+          rm -rf /runner/_work/celostar-starrocks/celostar-starrocks/*
+
         continue-on-error: true
