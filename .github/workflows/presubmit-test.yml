@@ -4,6 +4,8 @@ on:
   pull_request:
     paths-ignore:
       - '**.md'
+      - '**.png'
+      - 'celonis/assets/**'
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 

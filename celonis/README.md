@@ -54,7 +54,7 @@ The images built in ECR will be used for deploying to EKS. The images in GHCR wi
 ![action_workflow_job.png](assets/action_workflow_job.png)
 
 ### How to rebase Celonis internal commits to a new upstream stable version?
-Please refer to [Instructions of rebase Celonis internal commits to a new upstream stable version](https://docs.google.com/document/d/1Vj0Z6-zHYcNC8knGJCZkyZULnx5mo9wCoCXYMz5kXTc/edit#heading=h.e1yprybzha3v)
+Please refer to [here](./rebase_upstream.md).
 
 ### How to build a Starrock docker image locally?
 Please refer to [Normalize Starrocks development, test and deployment workflow with multi-stage docker build
