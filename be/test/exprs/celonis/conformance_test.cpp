@@ -1,5 +1,6 @@
 #include "exprs/celonis/conformance.h"
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <testutil/assert.h>
 
@@ -23,16 +24,7 @@ protected:
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
     TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
 
-    void conform(Columns columns, ColumnPtr expected) {
-        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
-        auto context = ctx.get();
-        context->set_constant_columns(columns);
-
-        ASSERT_OK(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
-        ASSERT_OK(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
-
-        const auto result = CelonisConformance::conformance(context, columns).value();
-
+    void evaluate(Column* result, Column* expected) {
         ASSERT_EQ(result->size(), expected->size());
         for (int i = 0; i < result->size(); ++i) {
             auto result_array = result->get(i).get_array();
@@ -43,8 +35,22 @@ protected:
                                 << "row index: " << i << ", element index: " << j;
             }
         }
-        ASSERT_OK(CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL));
-        ASSERT_OK(CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+    }
+
+    Status conform(const Columns& columns, Column* expected) {
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        auto context = ctx.get();
+        context->set_constant_columns(columns);
+
+        RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
+
+        const auto result = CelonisConformance::conformance(context, columns).value();
+        evaluate(result.get(), expected);
+
+        RETURN_IF_ERROR(CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL));
+        RETURN_IF_ERROR(CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        return Status::OK();
     }
 };
 
@@ -121,43 +127,24 @@ TEST_F(CelonisConformanceTest, pql_conformance_examples) {
     input.push_back(array);
     input.push_back(json_spec);
 
-    conform(input, expected);
+    EXPECT_OK(conform(input, expected.get()));
 }
 
-#if !defined(__SANITIZE_ADDRESS__)
 TEST_F(CelonisConformanceTest, invalid_json_spec) {
     Slice jsonInput(
             R"json({
               "places" : [ "P_0", "P_1", "P_2" ],
-              "transitions" : [ "T_01", "T_12" ],
-              "initial_marking" : [
-                {
-                  "node" : "P_0",
-                  "count" : 1
-                }
-              ],
-              "final_marking" : [
-                {
-                  "node" : "P_2",
-                  "count" : 1
-                }
-              ]
+              "transitions" : [ "T_01", "T_12" ]
             })json");
-    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-    auto dummy_expected = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
-    array->append_datum(DatumArray{"A", "B"});
-    dummy_expected->append_datum(DatumArray{0L, 0L});
 
-    auto json_spec = ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, array->size());
-
+    auto json_spec = ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, 1);
 
     Columns input;
-    input.push_back(array);
+    input.push_back(nullptr);
     input.push_back(json_spec);
 
-    EXPECT_THROW(conform(input, dummy_expected), std::runtime_error);
+    EXPECT_THAT(conform(input, nullptr).message().to_string(), testing::HasSubstr("does not contain 'mapping'."));
 }
-#endif
 
 } // namespace starrocks::vectorized
 

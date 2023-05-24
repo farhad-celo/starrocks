@@ -83,47 +83,48 @@ std::optional<std::string> get_duplicated_activities_string(const rapidjson::Val
     return duplicates;
 }
 
-void add_arc(const std::string& from, const std::string& to, std::map<std::string, PetriNet::Place*>& place_index,
-             std::map<std::string, PetriNet::Transition*>& transition_index) {
+Status add_arc(const std::string& from, const std::string& to, std::map<std::string, PetriNet::Place*>& place_index,
+               std::map<std::string, PetriNet::Transition*>& transition_index) {
     if (place_index.find(from) == place_index.end()) {
         if (place_index.find(to) == place_index.end()) {
             std::stringstream error;
-            error << "celonis_conformance: Place [" << from << "] and Place [" << to << "] not found." << std::endl;
-            throw std::runtime_error(error.str());
+            error << "celonis_conformance: Place [" << from << "] and Place [" << to << "] not found.";
+            return Status::InvalidArgument(error.str());
         }
         if (transition_index.find(from) == transition_index.end()) {
             std::stringstream error;
-            error << "celonis_conformance: Transition [" << from << "] not found." << std::endl;
-            throw std::runtime_error(error.str());
+            error << "celonis_conformance: Transition [" << from << "] not found.";
+            return Status::InvalidArgument(error.str());
         }
         transition_index[from]->outgoing_places.push_back(place_index[to]);
         place_index[to]->incoming_transitions.push_back(transition_index[from]);
     } else {
         if (transition_index.find(to) == transition_index.end()) {
             std::stringstream error;
-            error << "celonis_conformance: Transition [" << to << "] not found." << std::endl;
-            throw std::runtime_error(error.str());
+            error << "celonis_conformance: Transition [" << to << "] not found.";
+            return Status::InvalidArgument(error.str());
         }
         place_index[from]->outgoing_transitions.push_back(transition_index[to]);
         transition_index[to]->incoming_places.push_back(place_index[from]);
     }
+    return Status::OK();
 }
 
-std::unique_ptr<PetriNet> build(const std::string& json_petri_net_spec, FunctionContext* context) {
+StatusOr<std::unique_ptr<PetriNet>> build(const std::string& json_petri_net_spec, FunctionContext* context) {
     auto petri_net = std::make_unique<PetriNet>();
 
     rapidjson::Document document;
     document.Parse(json_petri_net_spec.c_str());
     if (document.HasParseError()) {
         std::stringstream error;
-        error << "celonis_conformance: Can't parse JSON specification." << std::endl;
-        throw std::runtime_error(error.str());
+        error << "celonis_conformance: Can't parse JSON specification.";
+        return Status::InvalidArgument(error.str());
     }
 
     if (!document.HasMember("mapping")) {
         std::stringstream error;
-        error << "celonis_conformance: Your model does not contain 'mapping'." << std::endl;
-        throw std::runtime_error(error.str());
+        error << "celonis_conformance: Your model does not contain 'mapping'.";
+        return Status::InvalidArgument(error.str());
     }
     const rapidjson::Value& mapping_values = document["mapping"];
     const auto duplicates_warning{get_duplicated_activities_string(mapping_values)};
@@ -136,8 +137,8 @@ std::unique_ptr<PetriNet> build(const std::string& json_petri_net_spec, Function
 
     if (!document.HasMember("places")) {
         std::stringstream error;
-        error << "celonis_conformance: Your model does not contain 'places'." << std::endl;
-        throw std::runtime_error(error.str());
+        error << "celonis_conformance: Your model does not contain 'places'.";
+        return Status::InvalidArgument(error.str());
     }
     const rapidjson::Value& place_values = document["places"];
     for (rapidjson::SizeType i = 0; i < place_values.Size(); ++i) {
@@ -148,8 +149,8 @@ std::unique_ptr<PetriNet> build(const std::string& json_petri_net_spec, Function
 
     if (!document.HasMember("transitions")) {
         std::stringstream error;
-        error << "celonis_conformance: Your model does not contain 'transitions'." << std::endl;
-        throw std::runtime_error(error.str());
+        error << "celonis_conformance: Your model does not contain 'transitions'.";
+        return Status::InvalidArgument(error.str());
     }
     const rapidjson::Value& transition_values = document["transitions"];
 
@@ -168,8 +169,8 @@ std::unique_ptr<PetriNet> build(const std::string& json_petri_net_spec, Function
 
     if (!document.HasMember("initial_marking")) {
         std::stringstream error;
-        error << "celonis_conformance: Your model does not contain 'initial_marking'." << std::endl;
-        throw std::runtime_error(error.str());
+        error << "celonis_conformance: Your model does not contain 'initial_marking'.";
+        return Status::InvalidArgument(error.str());
     }
     const rapidjson::Value& initial_marking_values = document["initial_marking"];
     // Saola implemtation ignores count.
@@ -177,31 +178,32 @@ std::unique_ptr<PetriNet> build(const std::string& json_petri_net_spec, Function
         const auto& start_place = initial_marking_values[i]["node"].GetString();
         if (place_index.find(start_place) == place_index.end()) {
             std::stringstream error;
-            error << "celonis_conformance: Initial marking [" << start_place << "] not found in 'places'." << std::endl;
-            throw std::runtime_error(error.str());
+            error << "celonis_conformance: Initial marking [" << start_place << "] not found in 'places'.";
+            return Status::InvalidArgument(error.str());
         }
         petri_net->initial_states[place_index[start_place]->index] = true;
     }
 
     if (!document.HasMember("final_marking")) {
         std::stringstream error;
-        error << "celonis_conformance: Your model does not contain 'final_marking'." << std::endl;
-        throw std::runtime_error(error.str());
+        error << "celonis_conformance: Your model does not contain 'final_marking'.";
+        return Status::InvalidArgument(error.str());
     }
     const rapidjson::Value& final_marking_values = document["final_marking"];
     for (rapidjson::SizeType i = 0; i < final_marking_values.Size(); ++i) {
         const auto& end_place = final_marking_values[i]["node"].GetString();
         if (place_index.find(end_place) == place_index.end()) {
             std::stringstream error;
-            error << "celonis_conformance: Final marking [" << end_place << "] not found in 'places'." << std::endl;
-            throw std::runtime_error(error.str());
+            error << "celonis_conformance: Final marking [" << end_place << "] not found in 'places'.";
+            return Status::InvalidArgument(error.str());
         }
         petri_net->final_states[place_index[end_place]->index] = true;
     }
 
     const rapidjson::Value& arc_values = document["arcs"];
     for (rapidjson::SizeType i = 0; i < arc_values.Size(); ++i) {
-        add_arc(arc_values[i]["from"].GetString(), arc_values[i]["to"].GetString(), place_index, transition_index);
+        RETURN_IF_ERROR(add_arc(arc_values[i]["from"].GetString(), arc_values[i]["to"].GetString(), place_index,
+                                transition_index));
     }
 
     for (rapidjson::SizeType i = 0; i < mapping_values.Size(); ++i) {
@@ -212,8 +214,8 @@ std::unique_ptr<PetriNet> build(const std::string& json_petri_net_spec, Function
         if (transition_index.find(transition_name) == transition_index.end()) {
             std::stringstream error;
             error << "celonis_conformance: Transition [" << transition_name << "] not found while mapping activity ["
-                  << activity_name << "]." << std::endl;
-            throw std::runtime_error(error.str());
+                  << activity_name << "].";
+            return Status::InvalidArgument(error.str());
         }
         auto* transition = transition_index[transition_name];
         transition->invisible = false;
@@ -283,7 +285,7 @@ Status CelonisConformance::conformance_prepare(FunctionContext* context, Functio
     std::string json = ColumnHelper::get_const_value<TYPE_VARCHAR>(json_input).to_string();
 
     auto* state = new ConformanceState();
-    state->petri_net = petri_net_builder::build(json, context);
+    ASSIGN_OR_RETURN(state->petri_net, petri_net_builder::build(json, context));
     context->set_function_state(scope, state);
 
     return Status::OK();
