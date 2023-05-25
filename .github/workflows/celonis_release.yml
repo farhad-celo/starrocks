@@ -123,3 +123,8 @@ jobs:
           docker rmi -f $(docker images -q starrocks-be:${RELEASE_VERSION}-ubuntu)
           docker rmi -f $(docker images -q starrocks-artifacts:${RELEASE_VERSION}-ubuntu)
           docker logout ${{ steps.login-ecr.outputs.registry }}
+          
+          # We could not simply delete the repo as it will fail the "Post checkout repository" step from the checkout action
+          # after this step.
+          rm -rf /runner/_work/celostar-starrocks/celostar-starrocks/*
+        continue-on-error: true
