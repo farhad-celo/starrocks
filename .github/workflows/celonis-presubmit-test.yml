@@ -47,11 +47,17 @@ jobs:
       - name: Clean up and GitHub Docker logout
         if: ${{ always() }}
         run: |
-          docker kill ${{ env.container_id }}
           docker logout ghcr.io
+          
+          docker kill ${{ env.container_id }}
+          
+          # Delete stopped containers, dangling images, dangling build cache, etc.
+          docker system prune -f
           
           # Clean up the artifacts built by previous step.
           # Note that we could not simply delete the directory as it will fail the "Post checkout repository" step of checkout action.
           rm -rf /runner/_work/celostar-starrocks/celostar-starrocks/*
-
+          
+          # Remove temporary files.
+          rm -rf /tmp/*
         continue-on-error: true

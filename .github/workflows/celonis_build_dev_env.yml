@@ -40,7 +40,8 @@ jobs:
           git checkout $default_branch
           # Use the default branch name as the release version.
           echo "release_version=${default_branch}" >> $GITHUB_ENV
-          DOCKER_BUILDKIT=1 docker build --rm=true -f docker/dockerfiles/dev-env/dev-env.Dockerfile -t ghcr.io/celonis/celostar/starrocks-dev-env:${default_branch} .
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker build --force-rm=true -f docker/dockerfiles/dev-env/dev-env.Dockerfile -t ghcr.io/celonis/celostar/starrocks-dev-env:${default_branch} .
 
       - name: push ubuntu docker image to GHCR
         run: |
@@ -53,6 +54,8 @@ jobs:
       - name: Clean up and GitHub Docker logout
         if: ${{ always() }}
         run: |
-          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-dev-env:${{ env.release_version }})
           docker logout ghcr.io
+          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-dev-env:${{ env.release_version }})
+          # Delete stopped containers, dangling images, dangling build cache, etc.
+          docker system prune -f
         continue-on-error: true
