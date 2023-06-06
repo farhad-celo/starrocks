@@ -19,7 +19,7 @@ ARG RELEASE_VERSION
 ARG BUILD_TYPE=Release
 COPY . /build/starrocks
 WORKDIR /build/starrocks
-RUN STARROCKS_VERSION=${RELEASE_VERSION} BUILD_TYPE=${BUILD_TYPE} ./build.sh --be --clean -j `nproc`
+RUN STARROCKS_VERSION=${RELEASE_VERSION} BUILD_TYPE=${BUILD_TYPE} ./build.sh --be --use-staros --clean -j `nproc`
 
 FROM ${builder} as udf-builder
 # clean and build duplicate-invoice-checker UDF
