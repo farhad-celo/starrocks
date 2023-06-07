@@ -24,6 +24,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          ref: ${BRANCH_3_0}
 
       - name: Remote add upstream
         id: remote-add
