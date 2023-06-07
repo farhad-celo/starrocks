@@ -24,6 +24,7 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v3
+        # We need to ref a branch which is not the default one or ${BRANCH_3_0} to make rebase work.
         with:
           ref: branch-3.0-c0d5082c-celo
 
