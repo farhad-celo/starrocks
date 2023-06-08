@@ -39,6 +39,7 @@ jobs:
           git fetch upstream ${BRANCH_3_0}:${BRANCH_3_0}
           git push origin ${BRANCH_3_0}
       - name: Rebase
+        id: rebase
         run: |
           echo "Start to rebase ..."
           
@@ -50,6 +51,7 @@ jobs:
           
           # Create the new default branch
           newDefaultBranch=${BRANCH_3_0}-${latest_commit}-celo
+          echo "new_default_branch=$newDefaultBranch" >> $GITHUB_ENV
           git checkout -b ${newDefaultBranch}
           git push --set-upstream origin ${newDefaultBranch}
                     
@@ -61,9 +63,32 @@ jobs:
           git checkout ${default_branch}
           timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
           echo "timestamp=$timestamp" >> $GITHUB_ENV
-          git checkout -b gh-rebase-${timestamp}
+          rebaseBranch=gh-rebase-${timestamp}
+          echo "new_rebase_branch=$rebaseBranch" >> $GITHUB_ENV
+          git checkout -b $rebaseBranch
           git rebase ${newDefaultBranch}
-          git push --set-upstream origin gh-rebase-${timestamp}
+          git push --set-upstream origin $rebaseBranch
+
+      # Need this step so that create-an-issue action could find the templates.
+      - name: Recheckout the repo
+        if: ${{ always() }}
+        uses: actions/checkout@v3
+
+      - name: Create the failure report
+        if: ${{ failure() }}
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+        with:
+          filename: .github/ISSUE_TEMPLATE/celonis_sync_rebase_failure_report.md
+
+      - name: Create the success report
+        if: ${{ steps.rebase.outcome }} == 'success'
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+        with:
+          filename: .github/ISSUE_TEMPLATE/celonis_sync_rebase_success_report.md
 
       - name: Clean up
         if: ${{ always() }}
