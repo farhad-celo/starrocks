@@ -1,0 +1,67 @@
+target_sources(cpm-accelerator
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/bits/memory_utils.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dynamic_bitset.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/batched_memory_tracking_strategy.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/batched_tracking_memory_resource.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/checked_memory_resource.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/global_memory_tracking_strategy.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/meminfo.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/memory_check.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/memory_consumption_tracker.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/memory_tracking_strategy.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/tracking_memory_resource.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/allocation_threshold.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/type_utils.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/assert.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/exception_framework.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/exception_traits.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/source_location.cpp
+        )
+
+target_include_directories(cpm-accelerator
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        )
+
+target_sources(cpm_test
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/bits/memory_utils_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/batched_memory_tracking_strategy_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/batched_tracking_memory_resource_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/global_memory_tracking_strategy_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/meminfo_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/memory_checked_node_allocator_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/memory_consumption_tracker_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/memory_resource_mock.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/memory_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/memory/resource_owning_allocator_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/utils/allocation_priority_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/utils/allocation_reason_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/utils/allocation_threshold_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/algorithm_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/array_view_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/assert_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/bitset_wrapper_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/buffer_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/cache_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/checked_ptr_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/circular_buffer_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/concepts_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/conversion_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/dynamic_bitset_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/exception_framework_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/exception_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/hash_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/interval_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/math_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/noexcept_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/owning_mutex_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/range_map_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/source_location_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/static_array_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/type_sequence_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/type_traits_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/uniform_bitset_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/utility_test.cpp
+        )
