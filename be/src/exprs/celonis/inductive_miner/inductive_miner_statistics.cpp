@@ -1,0 +1,18 @@
+#include "inductive_miner_statistics.h"
+
+namespace celonis::accelerator::operators::process {
+
+void inductive_miner_statistics::log_to_operator_statistics(
+    const cube::execution::tracking::add_telemetry_counter_fn& add_telemetry_counter) const {
+  for (const auto& [key, value] : data_) {
+    add_telemetry_counter(key, value);
+  }
+}
+
+void inductive_miner_statistics::insert_or_assign(const std::string& key, size_t value) {
+  data_.insert_or_assign(key, value);
+}
+
+void inductive_miner_statistics::insert_or_increment(const std::string& key) { data_[key] += 1; }
+
+}  // namespace celonis::accelerator::operators::process
