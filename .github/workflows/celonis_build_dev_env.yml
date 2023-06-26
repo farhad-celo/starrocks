@@ -1,11 +1,11 @@
 name: 'celostar-starrocks build dev env image'
 
-# **What it does**: Renders the content of every page and check all internal links.
-# **Why we have it**: To make sure all links connect correctly.
-# **Who does it impact**: Docs content.
-
 on:
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'The dev env image tag'
+        required: true
 
 permissions:
   contents: read
@@ -33,29 +33,28 @@ jobs:
 
       - name: build ubuntu docker image
         run: |
-          # Get the default branch
-          git fetch
-          default_branch=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
-          echo "The default branch is ${default_branch}"
-          git checkout $default_branch
-          # Use the default branch name as the release version.
-          echo "release_version=${default_branch}" >> $GITHUB_ENV
+          # Check the current branch.
+          branch=`git branch --show-current`
+          echo "The current branch is ${branch}"
+
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true -f docker/dockerfiles/dev-env/dev-env.Dockerfile -t ghcr.io/celonis/celostar/starrocks-dev-env:${default_branch} .
+          DOCKER_BUILDKIT=1 docker build --force-rm=true -f docker/dockerfiles/dev-env/dev-env.Dockerfile -t ghcr.io/celonis/celostar/starrocks-dev-env:${{ inputs.image_tag }} .
 
       - name: push ubuntu docker image to GHCR
         run: |
           # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-dev-env:${{ env.release_version }}
+          until docker push ghcr.io/celonis/celostar/starrocks-dev-env:${{ inputs.image_tag }}
           do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-dev-env:${{ env.release_version }} trying again."
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-dev-env:${{ inputs.image_tag }} trying again."
           done
 
       - name: Clean up and GitHub Docker logout
         if: ${{ always() }}
         run: |
           docker logout ghcr.io
-          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-dev-env:${{ env.release_version }})
+          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-dev-env:${{ inputs.image_tag }})
+          
           # Delete stopped containers, dangling images, dangling build cache, etc.
           docker system prune -f
+          docker volume prune -f
         continue-on-error: true
