@@ -7,6 +7,7 @@
 
 #include <fmt/format.h>
 
+#ifndef CELOSTAR
 #include "ctl/memory/memory_tracking_strategy.h"
 #include "modules/common/tracing/span.h"
 #include "modules/memory/warnings.h"
@@ -15,6 +16,7 @@ namespace celonis::accelerator {
 // forward declare for "modules/query/communication.pb.h"
 class CommunicationRequest_ExecutionContext;
 }  // namespace celonis::accelerator
+#endif
 
 namespace celonis::accelerator::common {
 
@@ -28,6 +30,9 @@ class execution_context {
    */
   execution_context() noexcept;
 
+#ifdef CELOSTAR
+  execution_context create_sub_context(const std::string& operation_name, const std::string& tags) const noexcept;
+#else
   /**
    * This constructor creates a context which manages a root span.
    * The creation of the root span results in a new empty trace.
@@ -136,6 +141,7 @@ class execution_context {
   mutable memory::warnings_container_t warnings_;
   mutable std::shared_timed_mutex warnings_mutex_;
   ctl::abstract_strategy_t memory_tracking_strategy_{nullptr};
+#endif
 };
 
 }  // namespace celonis::accelerator::common

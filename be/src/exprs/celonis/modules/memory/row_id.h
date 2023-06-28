@@ -6,6 +6,9 @@
 
 namespace celonis::accelerator {
 #ifdef ROW_ID_64
+#ifdef CELOSTAR
+#error "Celostar uses 32 bit hashes for row ids and does not support ROW_ID_64."
+#endif
 using row_id = int64_t;
 #else
 using row_id = int32_t;

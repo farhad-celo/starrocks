@@ -4,6 +4,7 @@
 
 #include <tbb/parallel_for_each.h>
 
+#include "ctl/conversion.h"
 #include "ctl/interval.h"
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/iterator/index_input_iterator.h"

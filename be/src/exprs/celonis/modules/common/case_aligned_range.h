@@ -10,12 +10,15 @@
 #include "ctl/assert.h"
 #include "ctl/conversion.h"
 #include "modules/common/int_types.h"
+#ifndef CELOSTAR
 #include "modules/memory/column.h"
 #include "modules/memory/const_abstract_column_ptrs_accessor.h"
+#endif
 #include "modules/memory/row_id.h"
 
 namespace celonis::accelerator::common {
 
+#ifndef CELOSTAR
 struct case_aligned_range {
   memory::column_t case_column;
   const common::execution_context& context;
@@ -136,6 +139,7 @@ struct group_aligned_range {
     other.end = begin;
   }
 };
+#endif  // !CELOSTAR
 
 template <class CASE_PTR_ACCESSOR>
 std::vector<ctl::half_open_interval<row_id>> generate_case_aligned_blocks(const CASE_PTR_ACCESSOR& case_ptr_ac,

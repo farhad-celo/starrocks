@@ -4,10 +4,21 @@
 
 #include "log/log.h"
 #include "modules/common/exceptions.h"
+#ifndef CELOSTAR
 #include "modules/query/communication.pb.h"
+#endif
 
 namespace celonis::accelerator::common {
 
+#ifdef CELOSTAR
+// TODO(j.kim): Add a proper context and a trace.
+execution_context::execution_context() noexcept {}
+
+execution_context execution_context::create_sub_context(const std::string& operation_name,
+                                                        const std::string& tags) const noexcept {
+  return execution_context();
+}
+#else
 execution_context::execution_context() noexcept : span_() {}
 
 execution_context::execution_context(const std::string& operation_name,
@@ -99,5 +110,6 @@ execution_context::~execution_context() {
     parent_->merge_warnings(std::move(warnings_));
   }
 }
+#endif
 
 }  // namespace celonis::accelerator::common
