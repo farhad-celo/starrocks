@@ -2,6 +2,12 @@
 
 #include <vector>
 
+#ifdef CELOSTAR
+#include "inductive_miner/splittable_eventlog_config.h"
+#include "inductive_miner/splittable_eventlog_fwd.h"
+#include "inductive_miner/splittable_eventlog_types.h"
+#include "modules/common/execution_context_fwd.h"
+#else
 #include "ctl/concepts.h"
 #include "ctl/static_array.h"
 #include "modules/cube/filter_bitset_fwd.h"
@@ -11,6 +17,7 @@
 #include "modules/operators/process/inductive_miner/splittable_eventlog_fwd.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog_types.h"
 #include "parallel_stable_integer_sort_copy.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -19,8 +26,10 @@ class splittable_eventlog {
   splittable_eventlog() = default;
   [[nodiscard]] static splittable_eventlog extract(const splittable_eventlog_config_t& extraction_config,
                                                    const common::execution_context& context);
+#ifndef CELOSTAR
   [[nodiscard]] static splittable_eventlog canonicalize_if_necessary(splittable_eventlog&& other, size_t extra_space,
                                                                      const common::execution_context& context);
+#endif
   [[nodiscard]] activity_domain_count_t activity_domain_count() const noexcept { return activity_domain_count_; }
   [[nodiscard]] trace_domain_count_t trace_domain_count() const { return trace_domain_count_; }
   // TODO(a.swoboda) encapsulate the logic that requires an update of the case domain count instead of exposing this
@@ -98,6 +107,10 @@ class splittable_eventlog {
  private:
   splittable_eventlog(activity_domain_count_t activity_domain_count, trace_domain_count_t case_domain_count,
                       eventlog_buffer_t eventlog, std::optional<eventlog_view_t> optional_current_view = std::nullopt);
+#ifdef CELOSTAR
+  [[nodiscard]] static splittable_eventlog extract(const splittable_eventlog_config_for_using_variant_map& config,
+                                                   const common::execution_context& context);
+#else
   [[nodiscard]] static splittable_eventlog extract(const splittable_eventlog_config_for_using_entire_eventlog& config,
                                                    const common::execution_context& context);
   [[nodiscard]] static splittable_eventlog extract(const splittable_eventlog_config_for_using_variants& config,
@@ -107,6 +120,7 @@ class splittable_eventlog {
   template <
       ctl::one_of<memory::col_ptr_8_t, memory::col_ptr_16_t, memory::col_ptr_32_t, memory::col_ptr_64_t> CASE_ID_TYPE>
   [[nodiscard]] splittable_eventlog copy(const common::execution_context& context) const;
+#endif
 
   activity_domain_count_t activity_domain_count_{};
   trace_domain_count_t trace_domain_count_{};

@@ -6,8 +6,10 @@
 #include "../fallback_strategy.h"
 #include "ctl/conversion.h"
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
 #include "modules/cube/filter_bitset.h"
 #include "modules/memory/column.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -33,9 +35,13 @@ size_t split_log_and_dfg(inductive_miner_config& miner_config, directly_follows_
                          common::execution_context& context) {
   // compute the number of additional sub-traces and already split the dfg
   const auto num_additional_traces{split_dfg_slack_tau_style(dfg)};
+#ifdef CELOSTAR
+  // In Celostar, we use a fixed 32bit space.
+#else
   // ensure that our event-log has enough "space" to accommodate additional group ids
   miner_config.eventlog =
       splittable_eventlog::canonicalize_if_necessary(std::move(miner_config.eventlog), num_additional_traces, context);
+#endif
 
   std::visit(
       [&miner_config, &dfg](auto view) {

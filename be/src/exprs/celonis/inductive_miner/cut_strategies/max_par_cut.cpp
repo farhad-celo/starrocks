@@ -4,11 +4,18 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
+#ifdef CELOSTAR
+#include "inductive_miner/cut_strategy.h"
+#include "inductive_miner/inductive_miner.h"
+#else
 #include "ctl/dynamic_bitset.h"
+#endif
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
 #include "modules/operators/process/inductive_miner/inductive_miner.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 

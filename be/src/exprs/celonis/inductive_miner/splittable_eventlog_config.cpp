@@ -1,7 +1,9 @@
 #include "splittable_eventlog_config.h"
 
+#ifndef CELOSTAR
 #include "modules/common/exceptions.h"
 #include "modules/memory/column.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -9,6 +11,12 @@ size_t grain_size_from_splittable_eventlog_config(const splittable_eventlog_conf
   return std::visit([](const auto& config) { return config.grain_size; }, config);
 }
 
+#ifdef CELOSTAR
+splittable_eventlog_config_t make_splittable_eventlog_config(
+        const starrocks::VariantHashMap& variant_map, const size_t grain_size) {
+  return splittable_eventlog_config_for_using_variant_map{.variant_map = variant_map, .grain_size = grain_size};
+}
+#else
 splittable_eventlog_config_t make_splittable_eventlog_config(memory::column_t activities, memory::column_t cases,
                                                              const size_t grain_size, cube::filter_bitset_t selections,
                                                              const common::execution_context& operator_context) {
@@ -36,5 +44,6 @@ splittable_eventlog_config_t make_splittable_eventlog_config(
   return splittable_eventlog_config_for_using_variants{.variant_trace_cache_ptr = std::move(variant_trace_cache_ptr),
                                                        .grain_size = grain_size};
 }
+#endif
 
 }  // namespace celonis::accelerator::operators::process

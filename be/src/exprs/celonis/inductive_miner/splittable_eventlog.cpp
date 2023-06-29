@@ -1,23 +1,36 @@
 #include "splittable_eventlog.h"
 
 #include <algorithm>
+#include <memory>
 #include <ranges>
+#ifdef CELOSTAR
+#include <span>
+#endif
 #include <variant>
 
 #include <tbb/concurrent_unordered_set.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
+#ifndef CELOSTAR
 #include "ctl/array_view.h"
+#endif
+#include "ctl/assert.h"
 #include "ctl/utility.h"
+#ifdef CELOSTAR
+#include "inductive_miner/parallel_stable_integer_sort_copy.h"
+#endif
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
 #include "modules/cube/filter_bitset.h"
 #include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/memory/column.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
+#ifndef CELOSTAR
 namespace {
 
 template <typename T>
@@ -141,12 +154,14 @@ class thread_safe_max_activity_domain_count {
 };
 
 }  // namespace
+#endif
 
 splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_config_t& extraction_config,
                                                  const common::execution_context& context) {
   return std::visit([&context](const auto& config) { return extract(config, context); }, extraction_config);
 }
 
+#ifndef CELOSTAR
 splittable_eventlog splittable_eventlog::canonicalize_if_necessary(splittable_eventlog&& other, size_t extra_space,
                                                                    const common::execution_context& context) {
   const auto max_representable{std::visit(
@@ -167,6 +182,7 @@ splittable_eventlog splittable_eventlog::canonicalize_if_necessary(splittable_ev
   }
   return std::move(other);
 }
+#endif
 
 std::vector<splittable_eventlog> splittable_eventlog::split(const split_mapping_t& mapping) {
   return std::visit(
@@ -176,7 +192,11 @@ std::vector<splittable_eventlog> splittable_eventlog::split(const split_mapping_
           return mapping[lhs.activity_id()] < mapping[rhs.activity_id()];
         }};
         using value_type = std::decay_t<decltype(view.front())>;
+#ifdef CELOSTAR
+        auto temp = std::vector<value_type>(view.size());
+#else
         auto temp{ctl::make_static_array_for_overwrite<value_type>(view.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+#endif
         std::ranges::copy(view, temp.begin());
         parallel_stable_integer_sort_copy(begin(temp), end(temp), begin(view), 1 << 16,
                                           ctl::cast<row_id>(std::ranges::max(mapping)),
@@ -191,13 +211,18 @@ std::vector<splittable_eventlog> splittable_eventlog::split(const split_mapping_
           result.emplace_back(
               splittable_eventlog{activity_domain_count(), trace_domain_count(), eventlog_, {sub_view}});
           debug_assert(eventlog_ == result.back().eventlog_);
+#ifdef CELOSTAR
+          view = view.subspan(sub_view.size());
+#else
           view = view.sub_view(sub_view.size());
+#endif
         }
         return result;
       },
       current_view_);
 }
 
+#ifndef CELOSTAR
 void splittable_eventlog::canonicalize_case_ids() {
   std::visit(
       [this]<typename VIEW>(const VIEW& v) {
@@ -239,6 +264,7 @@ splittable_eventlog splittable_eventlog::copy(const common::execution_context& c
       current_view_)};
   return {activity_domain_count(), trace_domain_count(), {std::move(buffer)}};
 }
+#endif
 
 splittable_eventlog::splittable_eventlog(const activity_domain_count_t activity_domain_count_value,
                                          const trace_domain_count_t case_domain_count, eventlog_buffer_t eventlog,
@@ -248,8 +274,46 @@ splittable_eventlog::splittable_eventlog(const activity_domain_count_t activity_
       eventlog_{std::move(eventlog)},
       current_view_{optional_current_view.has_value()
                         ? *optional_current_view
+#ifdef CELOSTAR
+                        : std::visit([](auto&& e) -> eventlog_view_t { return std::span{e.buffer.get(), e.size}; }, eventlog_)} {}
+
+#else
                         : std::visit([](auto&& e) -> eventlog_view_t { return e; }, eventlog_)} {}
 
+#endif
+#ifdef CELOSTAR
+splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_config_for_using_variant_map& config,
+                                                 const common::execution_context& context) {
+  const auto& [variant_map, grain_size]{config};
+  const auto variant_count{static_cast<trace_domain_count_t>(variant_map.size())};
+  size_t size = 0;
+  for (const auto& [variant, count] : variant_map) {
+    size += variant.data.size();
+  }
+
+  // TODO(j.kim): Check if we need to use memory management.
+  shared_static_array_of_activity_id_and_trace_id<row_id> result;
+  result.buffer = std::shared_ptr<activity_id_and_trace_id<row_id>[]>(new activity_id_and_trace_id<row_id>[size]);
+  result.size = size;
+
+  // Stores the largest encountered activity ID
+  row_id max_activity_domain_count = 0;
+
+  // Fetch all variants, materialize its elements (i.e., activity IDs) together with the variant ID.
+  int index = 0;
+  int variant_index = 0;
+  for (const auto& [variant, count] : variant_map) {
+    for (const auto& activity_id : variant.data) {
+      max_activity_domain_count = std::max(max_activity_domain_count, activity_id);
+      result.buffer[index++] = {activity_id, variant_index};
+    }
+    variant_index++;
+  }
+  max_activity_domain_count++;  // One more for empty activity. TODO. Confirm.
+
+  return splittable_eventlog{activity_domain_count_t{max_activity_domain_count}, variant_count, result};
+}
+#else
 splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_config_for_using_entire_eventlog& config,
                                                  const common::execution_context& context) {
   const auto& [activities, cases, grain_size, selections]{config};
@@ -322,5 +386,6 @@ template splittable_eventlog splittable_eventlog::copy<memory::col_ptr_8_t>(cons
 template splittable_eventlog splittable_eventlog::copy<memory::col_ptr_16_t>(const common::execution_context&) const;
 template splittable_eventlog splittable_eventlog::copy<memory::col_ptr_32_t>(const common::execution_context&) const;
 template splittable_eventlog splittable_eventlog::copy<memory::col_ptr_64_t>(const common::execution_context&) const;
+#endif
 
 }  // namespace celonis::accelerator::operators::process

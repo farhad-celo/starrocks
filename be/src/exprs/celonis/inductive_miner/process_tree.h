@@ -10,10 +10,16 @@
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
+#ifdef CELOSTAR
+#include "inductive_miner/process_tree_ref.h"
+#include "modules/memory/row_id.h"
+#include "result_table.h"
+#else
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/row_id.h"
 #include "modules/memory/table_fwd.h"
 #include "modules/operators/process/inductive_miner/process_tree_ref.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -201,8 +207,12 @@ struct process_tree {
 
 void minimize(process_tree& pt);
 
+#ifdef CELOSTAR
+process_tree_ref convert_to_tables(const process_tree& pt);
+#else
 process_tree_ref convert_to_tables(const process_tree& pt, const memory::column_t& activity_column,
                                    memory::table_row_limit_t table_row_limit, common::execution_context& context);
+#endif
 
 template <typename>
 extern const cel_int_t vertex_code_of;

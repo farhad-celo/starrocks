@@ -8,8 +8,12 @@
 #include "format/json/json.h"
 #include "log/log.h"
 #include "modules/common/exceptions.h"
+#ifdef CELOSTAR
+#include "inductive_miner/process_tree.h"
+#else
 #include "modules/operators/process/dot_format_helper.h"
 #include "modules/operators/process/inductive_miner/process_tree.h"
+#endif
 
 namespace celonis::accelerator::operators::process::reduction {
 
@@ -581,14 +585,18 @@ void reduce_node(process_tree& pt, const cel_string_t* dict) {
   }
 
   format::json::json_object_t log_message{};
+#ifndef CELOSTAR
   log_message.insert({"Mined process tree", pt2dot(pt, dict)});
+#endif
 
   auto transformations{get_transformations()};
   for (size_t i{0}; i < transformations.size(); ++i) {
     const auto& transformation{transformations[i]};
 
     if (transformation(pt)) {
+#ifndef CELOSTAR
       log_message.insert({fmt::format("Process tree after reduction rule {}", i), pt2dot(pt, dict)});
+#endif
     }
   }
 

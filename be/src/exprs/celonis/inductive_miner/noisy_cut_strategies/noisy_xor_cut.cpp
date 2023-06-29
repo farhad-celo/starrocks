@@ -15,9 +15,13 @@ noisy_xor_cut::apply_result noisy_xor_cut::apply(inductive_miner_config& miner_c
   // Filter deviating traces according to cut
   miner_config.eventlog.remove_if_per_trace(
       [&activity_dfg_mapping, &context, component_count](const auto first, const auto last) {
+#ifdef CELOSTAR
+        thread_local std::vector<uint64_t> component_counts(component_count);
+#else
         thread_local auto component_counts{memory::tracking::make_static_array_for_overwrite<uint64_t>(
             component_count, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context)};
         std::fill(component_counts.begin(), component_counts.end(), 0);
+#endif
 
         auto trace_start{first};
         // Count number of events per component in the current trace

@@ -1,4 +1,8 @@
+#ifdef CELOSTAR
+#include "process_tree.h"
+#else
 #include "modules/operators/process/inductive_miner/process_tree.h"
+#endif
 
 #include <algorithm>
 #include <iterator>
@@ -9,14 +13,26 @@
 #include <boost/graph/graphviz.hpp>
 
 #include "ctl/conversion.h"
+#ifndef CELOSTAR
 #include "ctl/static_array.h"
+#endif
 #include "ctl/utility.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types.h"
+#ifdef CELOSTAR
+#include "result_table.h"
+#else
 #include "modules/memory/column.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/null_flags.h"
 #include "modules/memory/table.h"
+#endif
+
+#ifdef CELOSTAR
+using starrocks::celonis::ResultColumn;
+using starrocks::celonis::ResultTable;
+using starrocks::celonis::NullableResultColumn;
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -292,10 +308,16 @@ class table_sizes {
   [[nodiscard]] constexpr size_t node_size() const noexcept { return edge_size_ + 1; }
 };
 
+#ifdef CELOSTAR
+void fill_tables(ResultColumn<cel_int_t>& vertex_pt_types, NullableResultColumn<cel_int_t>& vertex_activities,
+                 ResultColumn<cel_int_t>& edge_source_ids, ResultColumn<cel_int_t>& edge_target_ids,
+                 const process_tree& pt) {
+#else
 template <class VERTEX_ACTIVITIES_PTR_AC_TYPE>
 void fill_tables(ctl::shared_static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIES_PTR_AC_TYPE& vertex_activities,
                  ctl::shared_static_array<cel_int_t>& edge_source_ids,
                  ctl::shared_static_array<cel_int_t>& edge_target_ids, const process_tree& pt) {
+#endif
   std::queue<const process_tree*> buffer;
   buffer.push(&pt);
 
@@ -306,6 +328,16 @@ void fill_tables(ctl::shared_static_array<cel_int_t>& vertex_pt_types, VERTEX_AC
     const auto& current_node{*buffer.front()};
 
     vertex_pt_types[current_vertex_id] = to_vertex_code(current_node);
+#ifdef CELOSTAR
+    std::visit(ctl::overloaded{[&](const process_tree::activity& a) {
+                                 vertex_activities[current_vertex_id] = a.activity_id;
+                               },
+                               [&](const process_tree::tau& /*unused*/) {
+                                 vertex_activities.set_null(current_vertex_id);
+                               },
+                               [&](const process_tree::parent& p) {
+                                 vertex_activities.set_null(current_vertex_id);
+#else
     auto& current_vertex_activity{vertex_activities[current_vertex_id]};
     using col_pointer_type = typename VERTEX_ACTIVITIES_PTR_AC_TYPE::type;
     std::visit(ctl::overloaded{[&current_vertex_activity](const process_tree::activity& a) {
@@ -316,6 +348,7 @@ void fill_tables(ctl::shared_static_array<cel_int_t>& vertex_pt_types, VERTEX_AC
                                },
                                [&](const process_tree::parent& p) {
                                  current_vertex_activity = col_pointer_type{};
+#endif
                                  for (const auto& child : p.children) {
                                    edge_source_ids[current_edge_id] = current_vertex_id;
                                    edge_target_ids[current_edge_id] = static_cast<cel_int_t>(
@@ -332,6 +365,7 @@ void fill_tables(ctl::shared_static_array<cel_int_t>& vertex_pt_types, VERTEX_AC
   }
 }
 
+#ifndef CELOSTAR
 struct exec_convert_to_tables {
   row_id num_vertices;
   const process_tree& pt;
@@ -362,6 +396,7 @@ struct exec_convert_to_tables {
     return raw_column_pointers;
   }
 };
+#endif
 
 template <typename ITERATOR1, typename ITERATOR2>
 auto zip_to_map(ITERATOR1 first1, ITERATOR1 last1, ITERATOR2 first2) {
@@ -506,6 +541,23 @@ void minimize(process_tree& pt) {
       pt.node);
 }
 
+#ifdef CELOSTAR
+process_tree_ref convert_to_tables(const process_tree& pt) {
+  const table_sizes sizes{pt};
+
+  auto vertex_table = std::make_unique<ResultTable>("vertex_properties", sizes.node_size());
+  auto vertex_pt_types = vertex_table->AddColumn<ResultColumn<cel_int_t>>("process_tree_type");
+  auto vertex_activities = vertex_table->AddColumn<NullableResultColumn<cel_int_t>>("activity");
+
+  auto edge_table = std::make_unique<ResultTable>("edge_properties", sizes.edge_size());
+  auto edge_source_ids = edge_table->AddColumn<ResultColumn<cel_int_t>>("edge_source_id");
+  auto edge_target_ids = edge_table->AddColumn<ResultColumn<cel_int_t>>("edge_target_id");
+
+  fill_tables(*vertex_pt_types, *vertex_activities, *edge_source_ids, *edge_target_ids, pt);
+
+  return process_tree_ref(std::move(vertex_table), std::move(edge_table));
+}
+#else
 process_tree_ref convert_to_tables(const process_tree& pt, const memory::column_t& activity_column,
                                    const memory::table_row_limit_t table_row_limit,
                                    common::execution_context& context) {
@@ -550,6 +602,7 @@ process_tree_ref convert_to_tables(const process_tree& pt, const memory::column_
 
   return tables;
 }
+#endif
 
 // NOLINTNEXTLINE(bugprone-exception-escape)
 bool process_tree::exclusive::operator==(const process_tree::exclusive& rhs) const noexcept {

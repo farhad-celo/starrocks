@@ -10,14 +10,20 @@
 #include <tbb/parallel_for_each.h>
 
 #include "ctl/conversion.h"
+#ifdef CELOSTAR
+#include "inductive_miner/splittable_eventlog.h"
+#else
 #include "ctl/static_array.h"
 #include "ctl/utility.h"
+#endif
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
 #include "modules/cube/filter_bitset.h"
 #include "modules/memory/column.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -146,8 +152,12 @@ void fix_filtered_graph(const directly_follows_graph& dfg, directly_follows_grap
 directly_follows_graph build_dfg(dfg_pre_aggregation&& dfg_pre_agg) {
   directly_follows_graph dfg{};
 
+#ifdef CELOSTAR
+  size_t activity_vertex_mapping[dfg_pre_agg.activity_statistics.size()];
+#else
   auto activity_vertex_mapping{ctl::make_static_array_value_init<size_t>(dfg_pre_agg.activity_statistics.size(),
                                                                          ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+#endif
 
   for (row_id id{0}; id < ctl::cast<row_id>(dfg_pre_agg.activity_statistics.size()); ++id) {
     const auto& activity_statistics{dfg_pre_agg.activity_statistics[id]};
@@ -184,7 +194,11 @@ void add_edge(size_t from, size_t to, size_t multiplicity, directly_follows_grap
   dfg[descriptor_and_success.first].count += multiplicity;
 }
 
+#ifdef CELOSTAR
+void filter_dfg_count_map(phmap::flat_hash_map<size_t, size_t>& map, const dfg_filter_config& filter_config) {
+#else
 void filter_dfg_count_map(ska::bytell_hash_map<size_t, size_t>& map, const dfg_filter_config& filter_config) {
+#endif
   // Find maximum cardinality.
   size_t max_count{0};
   for (const auto& pair : map) {

@@ -1,4 +1,5 @@
 #include "../base_case_strategy.h"
+#include "ctl/conversion.h"
 
 namespace celonis::accelerator::operators::process {
 

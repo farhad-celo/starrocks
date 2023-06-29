@@ -1,3 +1,7 @@
+#ifdef CELOSTAR
+#include <boost/dynamic_bitset.hpp>
+#endif
+
 #include "../fallback_strategy.h"
 #include "modules/common/for_each_group.h"
 
@@ -25,7 +29,11 @@ cut_t activity_once_per_trace::find(const inductive_miner_config& miner_config, 
     const auto activity_count{miner_config.eventlog.activity_domain_count()};
     // Create mapping activity `id ~> dfg vertex id`
     std::vector<size_t> activity_dfg_mapping(activity_count);
+#ifdef CELOSTAR
+    boost::dynamic_bitset<> considered_activities{ctl::cast_unsigned(activity_count.get())};
+#else
     ctl::dynamic_bitset_t considered_activities{ctl::cast_unsigned(activity_count.get())};
+#endif
     for (size_t vertex_idx{0}; vertex_idx < vertex_count; ++vertex_idx) {
       const auto activity_id = dfg[vertex_idx].activity_id;
       activity_dfg_mapping[activity_id] = vertex_idx;
@@ -35,11 +43,22 @@ cut_t activity_once_per_trace::find(const inductive_miner_config& miner_config, 
     auto activity_occurs_exactly_once{std::visit(
         [activity_count](auto view) {
           if (view.empty()) {
+#ifdef CELOSTAR
+            return boost::dynamic_bitset<>(activity_count);
+#else
             return ctl::dynamic_bitset_t(activity_count, false);
+#endif
           }
+#ifdef CELOSTAR
+          boost::dynamic_bitset<> occurs_exactly_once(activity_count);
+          occurs_exactly_once.set();
+          boost::dynamic_bitset<> activity_occurs_once(activity_count);
+          boost::dynamic_bitset<> activity_occurs_twice(activity_count);
+#else
           ctl::dynamic_bitset_t occurs_exactly_once(activity_count, true);
           ctl::dynamic_bitset_t activity_occurs_once(activity_count, false);
           ctl::dynamic_bitset_t activity_occurs_twice(activity_count, false);
+#endif
           common::for_each_group_stopping(element<PICK_TRACE_ID>(view), [&](auto interval) {
             activity_occurs_once.reset();
             activity_occurs_twice.reset();
@@ -60,7 +79,11 @@ cut_t activity_once_per_trace::find(const inductive_miner_config& miner_config, 
 
     auto candidate{(activity_occurs_exactly_once & considered_activities).find_first()};
 
+#ifdef CELOSTAR
+    if (candidate != boost::dynamic_bitset<>::npos) {
+#else
     if (candidate != ctl::dynamic_bitset_t::npos) {
+#endif
       component_mapping[activity_dfg_mapping[candidate]] = 1;  // Put candidate in its own component
       ret = {2, component_mapping};
     } else {

@@ -4,6 +4,14 @@
 
 #include <fmt/format.h>
 
+#include "ctl/assert.h"
+#ifdef CELOSTAR
+#include "inductive_miner/base_case_strategy.h"
+#include "inductive_miner/cut_strategy.h"
+#include "inductive_miner/fallback_strategy.h"
+#include "inductive_miner/process_tree_reduction.h"
+#include "modules/common/execution_context.h"  // To be deleted
+#else
 #include "ctl/conversion.h"
 #include "modules/memory/column.h"
 #include "modules/operators/process/dot_format_helper.h"
@@ -11,6 +19,7 @@
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
 #include "modules/operators/process/inductive_miner/fallback_strategy.h"
 #include "modules/operators/process/inductive_miner/process_tree_reduction.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -155,12 +164,21 @@ inductive_miner_result inductive_miner(inductive_miner_config& miner_config, dir
   auto result{inductive_miner_recurse(miner_config, dfg, context, miner_statistics)};
   auto is_valid{is_valid_tree(result)};
   warning_assert(is_valid,
+#ifdef CELOSTAR
+                 // TODO(j.kim): Add pt2dot.
+                 "The inductive miner generates an inconsistent process tree");
+#else
                  fmt::format("The inductive miner generates an inconsistent process tree {}", pt2dot(result, nullptr)));
+#endif
   reduction::reduce_to_normal_form(result, dict);
   if (!is_valid_tree(result)) {
     is_valid = false;
     warning_assert(
+#ifdef CELOSTAR
+        false, "The reduction rules generate an inconsistent process tree");
+#else
         false, fmt::format("The reduction rules generate an inconsistent process tree {}", pt2dot(result, nullptr)));
+#endif
   }
   return {result, is_valid};
 }

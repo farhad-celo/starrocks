@@ -1,8 +1,10 @@
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/copy.hpp>
 #include <boost/graph/filtered_graph.hpp>
+#include <ranges>
 
 #include "../cut_strategy.h"
+#include "ctl/assert.h"
 #include "ctl/conversion.h"
 
 namespace celonis::accelerator::operators::process {

@@ -1,3 +1,6 @@
+#ifdef CELOSTAR
+#include <boost/dynamic_bitset.hpp>
+#endif
 #include <cstddef>
 #include <iterator>
 #include <vector>
@@ -5,18 +8,29 @@
 #include "../fallback_strategy.h"
 #include "ctl/conversion.h"
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
 #include "modules/cube/filter_bitset.h"
 #include "modules/memory/column.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
 namespace {
 
 struct exec_is_applicable {
+#ifdef CELOSTAR
+  const boost::dynamic_bitset<>& start_activity_flags_;
+  const boost::dynamic_bitset<>& end_activity_flags_;
+#else
   const ctl::dynamic_bitset<>& start_activity_flags_;
   const ctl::dynamic_bitset<>& end_activity_flags_;
+#endif
 
+#ifdef CELOSTAR
+  exec_is_applicable(const boost::dynamic_bitset<>& start_activity_flags, const boost::dynamic_bitset<>& end_activity_flags)
+#else
   exec_is_applicable(const ctl::dynamic_bitset<>& start_activity_flags, const ctl::dynamic_bitset<>& end_activity_flags)
+#endif
       : start_activity_flags_{start_activity_flags}, end_activity_flags_{end_activity_flags} {}
 
   template <typename EVENTLOG>
@@ -52,9 +66,13 @@ size_t apply_internal(inductive_miner_config& miner_config, directly_follows_gra
                       common::execution_context& context) {
   // compute the number of additional sub-traces and already split the dfg
   const auto num_additional_traces{split_dfg_strict_tau_style(dfg)};
+#ifdef CELOSTAR
+  // In Celostar, we use a fixed 32bit space.
+#else
   // ensure that our event-log has enough "space" to accommodate additional group ids
   miner_config.eventlog =
       splittable_eventlog::canonicalize_if_necessary(std::move(miner_config.eventlog), num_additional_traces, context);
+#endif
   std::visit(
       [&miner_config, &dfg](auto view) {
         using activity_id_type = typename std::decay_t<decltype(view.front())>::first_type;
@@ -103,11 +121,19 @@ size_t apply_internal(inductive_miner_config& miner_config, directly_follows_gra
 bool strict_tau_loop_fallback::is_applicable(const inductive_miner_config& miner_config,
                                              const directly_follows_graph& dfg,
                                              const common::execution_context& context) {
+#ifdef CELOSTAR
+  boost::dynamic_bitset<> start_activities(miner_config.eventlog.activity_domain_count());
+#else
   ctl::dynamic_bitset start_activities(miner_config.eventlog.activity_domain_count(), false);
+#endif
   std::ranges::for_each(dfg[boost::graph_bundle].start_vertices,
                         [&](auto v) { start_activities.set(dfg[v.first].activity_id); });
   const auto is_applicable_context{context.create_sub_context("strict_tau_loop_fallback::is_applicable", {})};
+#ifdef CELOSTAR
+  boost::dynamic_bitset<> end_activities(miner_config.eventlog.activity_domain_count());
+#else
   ctl::dynamic_bitset end_activities(miner_config.eventlog.activity_domain_count(), false);
+#endif
   std::ranges::for_each(dfg[boost::graph_bundle].end_vertices,
                         [&](auto v) { end_activities.set(dfg[v.first].activity_id); });
   return std::visit(exec_is_applicable{start_activities, end_activities},

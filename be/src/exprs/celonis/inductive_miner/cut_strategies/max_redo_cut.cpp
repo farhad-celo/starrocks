@@ -1,5 +1,8 @@
 #include <numeric>
 
+#ifdef CELOSTAR
+#include <boost/dynamic_bitset.hpp>
+#endif
 #include <boost/graph/connected_components.hpp>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
@@ -13,6 +16,7 @@ namespace celonis::accelerator::operators::process {
 
 namespace {
 
+#ifndef CELOSTAR
 // NB this is actually an overestimate
 size_t extra_trace_identifier_count(const directly_follows_graph& dfg, const cut_t& cut) {
   debug_assert(std::accumulate(begin(dfg[boost::graph_bundle].start_vertices),
@@ -34,6 +38,7 @@ size_t extra_trace_identifier_count(const directly_follows_graph& dfg, const cut
   debug_assert(outgoing_count == ingoing_count);
   return ingoing_count;
 }
+#endif
 
 std::vector<directly_follows_graph> get_sub_dfgs_from_old_dfg(directly_follows_graph const& old_dfg, const cut_t& cut) {
   auto sub_dfgs{sub_dfgs::build_sub_dfgs_from_components(old_dfg, cut, true)};
@@ -170,6 +175,9 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
                                                common::execution_context& context) {
   const auto apply_context{context.create_sub_context("max_redo_cut::apply", {})};
 
+#ifdef CELOSTAR
+  // In Celostar, we use a fixed 32bit space.
+#else
   // ensure that we have enough space
   const auto extra_id_count{extra_trace_identifier_count(old_dfg, cut)};
   {
@@ -177,6 +185,7 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
     miner_config.eventlog = splittable_eventlog::canonicalize_if_necessary(
         std::move(miner_config.eventlog), trace_domain_count + extra_id_count, context);
   }
+#endif
   // find the mapping of activity ids to dfgs
   const auto activity_to_dfg_mapping{
       cut_strategy::to_activity_dfg_map(cut, old_dfg, miner_config.eventlog.activity_domain_count())};
@@ -191,7 +200,11 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
               id.store(size, std::memory_order_relaxed);
             });
         common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size, [&](auto interval) {
+#ifdef CELOSTAR
+          boost::dynamic_bitset sublog_iteration_counts(cut.first, false);
+#else
           ctl::dynamic_bitset sublog_iteration_counts(cut.first, false);
+#endif
           const auto first{std::next(view.begin(), interval.begin())};
           const auto last{std::next(view.begin(), interval.end())};
           // find beginning of next sublog

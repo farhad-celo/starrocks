@@ -1,16 +1,25 @@
 #pragma once
 
+#ifdef CELOSTAR
+#include <span>
+#endif
 #include <utility>
 #include <variant>
 #include <vector>
 
+#ifndef CELOSTAR
 #include "ctl/array_view.h"
+#endif
 #include "ctl/concepts.h"
 #include "ctl/named_type.h"
+#ifndef CELOSTAR
 #include "ctl/static_array.h"
+#endif
 #include "ctl/type_sequence.h"
 #include "ctl/type_traits.h"
+#ifndef CELOSTAR
 #include "modules/memory/column_pointers.h"
+#endif
 #include "modules/memory/row_id.h"
 
 namespace celonis::accelerator::operators::process {
@@ -55,6 +64,35 @@ struct activity_id_and_trace_id : public id_pair<ID_TYPE> {
 template <compatible_with_row_id ACTIVITY_ID_T, compatible_with_row_id TRACE_ID_T>
 using activity_id_and_trace_id_t = activity_id_and_trace_id<ctl::max_integer_t<ACTIVITY_ID_T, TRACE_ID_T>>;
 
+#ifdef CELOSTAR
+template <typename TYPE>
+struct shared_static_array_of_activity_id_and_trace_id {
+  std::shared_ptr<activity_id_and_trace_id<TYPE>[]> buffer;
+  size_t size;
+
+  bool operator==(const shared_static_array_of_activity_id_and_trace_id<TYPE>& rhs) const {
+    if (size != rhs.size) {
+      return false;
+    }
+    for (int i = 0; i < size; i++) {
+      if (buffer[i] != rhs.buffer[i]) return false;
+    }
+    return true;
+  }
+};
+
+template <typename TYPE>
+struct as_static_array_of_activity_id_and_trace_id {
+  using type = shared_static_array_of_activity_id_and_trace_id<TYPE>;
+};
+
+template <typename TYPE>
+struct as_view_of_activity_id_and_trace_id {
+  using type = std::span<activity_id_and_trace_id<TYPE>>;
+};
+
+using ptr_types = ctl::type_sequence<ctl::type_sequence<int32_t>>;
+#else
 template <typename TYPE>
 struct as_static_array_of_activity_id_and_trace_id {
   using type = ctl::shared_static_array<activity_id_and_trace_id<TYPE>>;
@@ -68,6 +106,7 @@ struct as_view_of_activity_id_and_trace_id {
 using ptr_types =
     ctl::type_sequence<ctl::type_sequence<memory::col_ptr_8_t>, ctl::type_sequence<memory::col_ptr_16_t>,
                        ctl::type_sequence<memory::col_ptr_32_t>, ctl::type_sequence<memory::col_ptr_64_t>>;
+#endif
 
 using eventlog_buffer_t = typename ctl::repack_types<
     std::variant, typename ctl::transform_types<ptr_types, as_static_array_of_activity_id_and_trace_id>::type>::type;
@@ -83,8 +122,13 @@ struct eventlog_view_element<activity_id_and_trace_id<ID_T>> {
   using type = activity_id_and_trace_id<ID_T>;
 };
 
+#ifdef CELOSTAR
+template <typename T>
+struct eventlog_view_element<std::span<T>> : eventlog_view_element<T> {};
+#else
 template <typename T>
 struct eventlog_view_element<ctl::array_view<T>> : eventlog_view_element<T> {};
+#endif
 
 template <typename... Ts>
 using eventlog_view_element_t = typename eventlog_view_element<Ts...>::type;

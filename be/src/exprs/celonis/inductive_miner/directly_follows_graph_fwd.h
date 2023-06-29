@@ -3,10 +3,15 @@
 #include <vector>
 
 #include <boost/graph/adjacency_list.hpp>
+#ifndef CELOSTAR
 #include <bytell_hash_map.hpp>
+#endif
 
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
+#ifdef CELOSTAR
+#include "util/phmap/phmap.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -58,8 +63,13 @@ struct dfg_graph_properties {
   // to activity ids (of the column dictionary) depends on the current recursion
   // depth of the algorithm, thus every vertex stores its corresponding activity
   // id.
+#ifdef CELOSTAR
+  phmap::flat_hash_map<size_t, size_t> start_vertices;
+  phmap::flat_hash_map<size_t, size_t> end_vertices;
+#else
   ska::bytell_hash_map<size_t, size_t> start_vertices;
   ska::bytell_hash_map<size_t, size_t> end_vertices;
+#endif
   // I expect O(1) many start and end vertices (even though there might be n
   // vertices in the graph), therefore the above counts are stored here and not
   // inside their corresponding vertices.

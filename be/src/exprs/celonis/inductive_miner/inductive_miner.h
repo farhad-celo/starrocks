@@ -2,6 +2,13 @@
 
 #include <vector>
 
+#ifdef CELOSTAR
+#include "exprs/celonis/variant.h"
+#include "inductive_miner/directly_follows_graph.h"
+#include "inductive_miner/inductive_miner_statistics.h"
+#include "inductive_miner/process_tree.h"
+#include "inductive_miner/splittable_eventlog.h"
+#else
 #include "ctl/dynamic_bitset.h"
 #include "modules/common/case_aligned_range.h"
 #include "modules/cube/filter_bitset.h"
@@ -11,6 +18,7 @@
 #include "modules/operators/process/inductive_miner/process_tree.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog_config.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 

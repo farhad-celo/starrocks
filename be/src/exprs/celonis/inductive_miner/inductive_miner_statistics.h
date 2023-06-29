@@ -1,9 +1,12 @@
 #pragma once
 
+#include <string>
 #include <unordered_map>
 
 #include "modules/common/int_types.h"
+#ifndef CELOSTAR
 #include "modules/cube/execution/tracking/operator_tracker_fwd.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -138,8 +141,10 @@ class inductive_miner_statistics {
    */
   void insert_or_increment(const std::string& key);
 
+#ifndef CELOSTAR
   void log_to_operator_statistics(
       const cube::execution::tracking::add_telemetry_counter_fn& add_telemetry_counter) const;
+#endif
 
  private:
   std::unordered_map<std::string, size_t> data_{};
