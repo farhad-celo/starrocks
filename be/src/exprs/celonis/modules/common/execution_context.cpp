@@ -1,10 +1,10 @@
 #include "execution_context.h"
 
+#ifndef CELOSTAR
 #include <chrono>
 
 #include "log/log.h"
 #include "modules/common/exceptions.h"
-#ifndef CELOSTAR
 #include "modules/query/communication.pb.h"
 #endif
 
