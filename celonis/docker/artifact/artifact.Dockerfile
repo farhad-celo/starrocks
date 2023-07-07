@@ -3,7 +3,7 @@
 # DOCKER_BUILDKIT=1 docker build --rm=true -f celonis/docker/StarrocksBuilder/StarrocksBuilder.Dockerfile -t starrocks-artifacts:tag .
 
 # dev-env image, replace it with ghcr.io/celonis/celostar/starrocks-centos-dev-env:latest to build centos artifacts
-ARG builder=ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0-a5dd8c36-celo
+ARG builder=ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0-a5dd8c36-celo-fmt8
 ARG RELEASE_VERSION
 
 FROM ${builder} as fe-builder
