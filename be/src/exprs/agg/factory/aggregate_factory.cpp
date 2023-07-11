@@ -19,6 +19,7 @@
 #include "exprs/agg/aggregate.h"
 #include "exprs/agg/factory/aggregate_factory.hpp"
 #include "exprs/agg/factory/aggregate_resolver.hpp"
+#include "exprs/celonis/inductive_miner.h"
 #include "exprs/celonis/variant_stats.h"
 #include "types/logical_type.h"
 #include "udf/java/java_function_fwd.h"
@@ -71,6 +72,10 @@ AggregateFunctionPtr AggregateFactory::MakeHllUnionAggregateFunction() {
 
 AggregateFunctionPtr AggregateFactory::MakeHllUnionCountAggregateFunction() {
     return std::make_shared<HllUnionCountAggregateFunction>();
+}
+
+AggregateFunctionPtr AggregateFactory::MakeCelonisInductiveMinerAggregateFunction() {
+    return std::make_shared<InductiveMinerAggregateFunction>();
 }
 
 AggregateFunctionPtr AggregateFactory::MakeCelonisVariantStatsAggregateFunction() {

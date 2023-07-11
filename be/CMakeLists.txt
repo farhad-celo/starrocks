@@ -891,6 +891,7 @@ set(STARROCKS_LINK_LIBS
     Tools
     Geo
     Cache
+    Celonis
     ${WL_END_GROUP}
 )
 
@@ -1188,7 +1189,7 @@ add_subdirectory(${SRC_DIR}/testutil)
 add_subdirectory(${SRC_DIR}/types)
 add_subdirectory(${SRC_DIR}/udf)
 add_subdirectory(${SRC_DIR}/cache)
-
+add_subdirectory(${SRC_DIR}/exprs/celonis)
 add_subdirectory(${SRC_DIR}/tools)
 add_subdirectory(${SRC_DIR}/util)
 add_subdirectory(${SRC_DIR}/script)

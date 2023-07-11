@@ -148,6 +148,7 @@ set(EXEC_FILES
         ./exprs/celonis/count_edges_test.cpp
         ./exprs/celonis/in_test.cpp
         ./exprs/celonis/index_activity_order_test.cpp
+        ./exprs/celonis/inductive_miner_test.cpp
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/match_activities_test.cpp
         ./exprs/celonis/match_process_test.cpp

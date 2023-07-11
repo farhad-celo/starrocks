@@ -21,6 +21,7 @@
 #include "column/type_traits.h"
 #include "exprs/agg/aggregate.h"
 #include "exprs/agg/factory/aggregate_factory.hpp"
+#include "exprs/celonis/inductive_miner.h"
 #include "exprs/celonis/variant_stats.h"
 #include "types/logical_type.h"
 #include "udf/java/java_function_fwd.h"
@@ -233,12 +234,19 @@ public:
     template <LogicalType ArgLT, LogicalType ResultLT, bool IsNull>
     AggregateFunctionPtr create_array_function_celonis(std::string& name) {
         if constexpr (IsNull) {
-            if (name == "celonis_variant_stats") {
+            if (name == "celonis_inductive_miner") {
+                auto inductive_miner = AggregateFactory::MakeCelonisInductiveMinerAggregateFunction();
+                return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantStatsState>(inductive_miner);
+            } else if (name == "celonis_variant_stats") {
                 auto variant_stats = AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
                 return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantStatsState>(variant_stats);
             }
-        } else if (name == "celonis_variant_stats") {
-            return AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
+        } else {
+            if (name == "celonis_inductive_miner") {
+                return AggregateFactory::MakeCelonisInductiveMinerAggregateFunction();
+            } else if (name == "celonis_variant_stats") {
+                return AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
+            }
         }
         return nullptr;
     }

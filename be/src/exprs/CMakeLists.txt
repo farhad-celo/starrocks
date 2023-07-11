@@ -122,6 +122,7 @@ set(CELONIS_FILES
   celonis/count_edges.cpp
   celonis/in.cpp
   celonis/index_activity_order.cpp
+  celonis/inductive_miner.cpp
   celonis/like.cpp
   celonis/match_activities.cpp
   celonis/match_process.cpp
