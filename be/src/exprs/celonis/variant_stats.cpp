@@ -1,6 +1,8 @@
 #include "exprs/celonis/variant_stats.h"
 
-#include "column/object_column.h"
+#include "column/array_column.h"
+#include "column/binary_column.h"
+#include "column/const_column.h"
 #include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate.h"
 #include "gutil/casts.h"
@@ -575,6 +577,58 @@ std::string VariantStatsState::finalize() const {
         return "{}";
     }
     return json_string(activity_top_variants, happy);
+}
+
+void VariantStatsAggregateFunction::update(FunctionContext* ctx, const Column** columns, AggDataPtr state,
+                                           size_t row_num) const  {
+    // Expects columns: [0] variant_column, [1] weight_column
+    // Pass a constant column with value 1 to ignore weight.
+
+    if (columns[0]->is_nullable() && columns[0]->is_null(row_num)) {
+        return;
+    }
+    if (columns[1]->is_nullable() && columns[1]->is_null(row_num)) {
+        return;
+    }
+    int64_t weight = 0;
+    if (!columns[1]->is_constant()) {
+        const auto& w_column = down_cast<const Int64Column&>(*columns[1]);
+        weight = w_column.get(row_num).get_int64();
+    } else {
+        const auto& w_column = down_cast<const ConstColumn&>(*columns[1]);
+        weight = w_column.get(0).get_int64();
+    }
+    const ArrayColumn& activity_column = down_cast<const ArrayColumn&>(*columns[0]);
+    this->data(state).update(ctx->mem_pool(), activity_column, row_num, weight);
+}
+
+void VariantStatsAggregateFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,
+                                          size_t row_num) const {
+    // merge internal state with column[row_num]
+    // the column type is binary
+    DCHECK(column->is_binary());
+    const auto* input_column = down_cast<const BinaryColumn*>(column);
+    Slice slice = input_column->get_slice(row_num);
+    size_t mem_usage = 0;
+    mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*) slice.data, slice.size);
+    ctx->add_mem_usage(mem_usage);
+}
+
+void VariantStatsAggregateFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
+                                                        Column* to) const {
+    // append our serialized state to column "to"
+    auto* column = down_cast<BinaryColumn*>(to);
+    size_t old_size = column->get_bytes().size();
+    size_t new_size = old_size + this->data(state).serialized_size();
+    column->get_bytes().resize(new_size);
+    this->data(state).serialize(column->get_bytes().data() + old_size);
+    column->get_offset().emplace_back(new_size);
+}
+
+void VariantStatsAggregateFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
+                                                       Column* to) const {
+    std::string s = this->data(state).finalize();
+    down_cast<BinaryColumn*>(to)->append(s);
 }
 
 } // namespace starrocks

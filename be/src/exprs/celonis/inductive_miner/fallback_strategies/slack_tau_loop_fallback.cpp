@@ -61,15 +61,23 @@ size_t split_log_and_dfg(inductive_miner_config& miner_config, directly_follows_
         const auto find_next_start_activity{[&](auto first, auto last) {
           return first == last ? first : std::ranges::find_if(std::next(first), last, is_start_activity);
         }};
+#ifndef CELOSTAR
         // TODO(a.swoboda) consider parallelizing this
         std::atomic<group_id_type> index{ctl::cast<group_id_type>(miner_config.eventlog.trace_domain_count().get())};
+#endif
         common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size, [&](auto interval) {
           const auto interval_last{std::next(view.begin(), interval.end())};
           for (auto it{find_next_start_activity(std::next(view.begin(), interval.begin()), interval_last)}, next_it{it};
                it != interval_last; it = next_it) {
             next_it = find_next_start_activity(it, interval_last);
+#ifdef CELOSTAR
+            int multiplicity = miner_config.eventlog.get_variant_multiplicity(it->second);
+            auto new_trace_id = miner_config.eventlog.add_variant(multiplicity);
+            std::for_each(it, next_it, [new_trace_id](auto& p) { p.second = new_trace_id; });
+#else
             std::for_each(it, next_it,
                           [idx = index.fetch_add(1, std::memory_order_relaxed)](auto& p) { p.second = idx; });
+#endif
           }
         });
       },

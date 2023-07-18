@@ -97,16 +97,24 @@ size_t apply_internal(inductive_miner_config& miner_config, directly_follows_gra
           }
           return it;
         }};
+#ifndef CELOSTAR
         // TODO(a.swoboda) consider parallelizing this
         std::atomic<group_id_type> index{ctl::cast<group_id_type>(miner_config.eventlog.trace_domain_count().get())};
+#endif
         common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size, [&](auto interval) mutable {
           // find adjacent end and start indices, and fill all the following elements with a new index
           const auto interval_last{std::next(view.begin(), interval.end())};
           for (auto it{get_next_start(std::next(view.begin(), interval.begin()), interval_last)}, next_it{it};
                it != interval_last; it = next_it) {
             next_it = get_next_start(it, interval_last);
+#ifdef CELOSTAR
+            int multiplicity = miner_config.eventlog.get_variant_multiplicity(it->second);
+            auto new_trace_id = miner_config.eventlog.add_variant(multiplicity);
+            std::for_each(it, next_it, [new_trace_id](auto& p) { p.second = new_trace_id; });
+#else
             std::for_each(it, next_it,
                           [idx = index.fetch_add(1, std::memory_order_relaxed)](auto& p) { p.second = idx; });
+#endif
           }
         });
       },

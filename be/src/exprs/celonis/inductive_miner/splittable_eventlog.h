@@ -35,6 +35,18 @@ class splittable_eventlog {
   // TODO(a.swoboda) encapsulate the logic that requires an update of the case domain count instead of exposing this
   void set_trace_domain_count(row_id count) noexcept { trace_domain_count_ = trace_domain_count_t{count}; }
   [[nodiscard]] eventlog_view_t current_split_eventlog_view() const noexcept { return current_view_; }
+#ifdef CELOSTAR
+  row_id add_variant(size_t multiplicity) {
+    set_trace_domain_count(trace_domain_count_ + 1);
+    return std::visit([&multiplicity](auto& eventlog)
+                      { return eventlog.variant_multiplicities->add_variant(multiplicity); }, eventlog_);
+  }
+
+  size_t get_variant_multiplicity(row_id trace_id) const {
+    return std::visit([&trace_id](auto& eventlog)
+                      { return eventlog.variant_multiplicities->get_multiplicity(trace_id); }, eventlog_);
+  }
+#endif
 
   /**
    * Iterates over every trace in the current view and applies the given filter function to it. Sets the current view

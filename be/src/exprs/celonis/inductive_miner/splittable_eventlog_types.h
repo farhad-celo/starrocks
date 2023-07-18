@@ -1,6 +1,7 @@
 #pragma once
 
 #ifdef CELOSTAR
+#include <mutex>
 #include <span>
 #endif
 #include <utility>
@@ -66,9 +67,29 @@ using activity_id_and_trace_id_t = activity_id_and_trace_id<ctl::max_integer_t<A
 
 #ifdef CELOSTAR
 template <typename TYPE>
+class variant_multiplicities_t {
+public:
+  TYPE add_variant(size_t multiplicity) {
+    std::lock_guard<std::mutex> guard(mu_);
+    multiplicities_.push_back(multiplicity);
+    return multiplicities_.size() - 1;
+  }
+
+  size_t get_multiplicity(TYPE trace_id) {
+    std::lock_guard<std::mutex> guard(mu_);
+    return multiplicities_[trace_id];
+  }
+
+private:
+  std::vector<size_t> multiplicities_;
+  std::mutex mu_;
+};
+
+template <typename TYPE>
 struct shared_static_array_of_activity_id_and_trace_id {
   std::shared_ptr<activity_id_and_trace_id<TYPE>[]> buffer;
   size_t size;
+  std::shared_ptr<variant_multiplicities_t<TYPE>> variant_multiplicities;
 
   bool operator==(const shared_static_array_of_activity_id_and_trace_id<TYPE>& rhs) const {
     if (size != rhs.size) {

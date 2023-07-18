@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <gtest/gtest.h>
+#include <random>
 #include <re2/re2.h>
 
 #include "column/array_column.h"
@@ -75,14 +76,48 @@ public:
         return ArrayColumn::create(data_col, offsets);
     }
 
-    void Run(const VariantRows& variant_rows, std::string expected) {
+    Column::Ptr build_weight_column(const std::vector<int>& weights) {
+        ColumnBuilder<TYPE_BIGINT> builder(config::vector_chunk_size);
+
+        for (int i = 0; i < weights.size(); i++) {
+            builder.append(weights[i]);
+        }
+        return builder.build(false);
+    }
+
+    Column::Ptr build_random_weight_column(int size) {
+        ColumnBuilder<TYPE_BIGINT> builder(config::vector_chunk_size);
+
+        std::random_device rd;
+        std::uniform_int_distribution<size_t> weight(1, 10000);
+
+        for (int i = 0; i < size; i++) {
+            builder.append(weight(rd));
+        }
+        return builder.build(false);
+    }
+
+    Column::Ptr build_const_weight_column(int weight, int size) {
+        return ColumnHelper::create_const_column<TYPE_BIGINT>(weight, size);
+    }
+
+    void Run(const VariantRows& variant_rows, std::string expected, Column::Ptr weight_column,
+             double imfd_frequency_threshold = 0.0) {
         const AggregateFunction* func = get_aggregate_function("celonis_inductive_miner", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto variants = build_variant_column(variant_rows);
-        auto weights = ColumnHelper::create_const_column<TYPE_BIGINT>(1, variants->size());
+        auto threshold_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(imfd_frequency_threshold, variant_rows.size());
+
+        Columns columns;
+        columns.push_back(variants);
+        columns.push_back(weight_column);
+        columns.push_back(threshold_column);
+        ctx->set_constant_columns(columns);
+
         std::vector<const Column*> raw_columns;
-        raw_columns.resize(2);
+        raw_columns.resize(3);
         raw_columns[0] = variants.get();
-        raw_columns[1] = weights.get();
+        raw_columns[1] = weight_column.get();
+        raw_columns[2] = threshold_column.get();
         auto state = ManagedAggrState::create(ctx, func);
         func->update_batch_single_state(ctx, variants->size(), raw_columns.data(), state->state());
 
@@ -96,6 +131,15 @@ public:
         re2::RE2::GlobalReplace(&rs, "[\\t ]+", "");
         re2::RE2::GlobalReplace(&expected, "[\\t ]+", "");
         EXPECT_EQ(rs, expected);
+    }
+
+    void Run(const VariantRows& variant_rows, const std::string& expected) {
+        int size = variant_rows.size();
+        Run(variant_rows, expected, build_const_weight_column(1, size));
+        Run(variant_rows, expected, build_const_weight_column(1000, size));
+        for (int i = 0; i < 100; i++) {
+            Run(variant_rows, expected, build_random_weight_column(size));
+        }
     }
 
 private:
@@ -1435,6 +1479,184 @@ TEST_F(CelonisInductiveMinerTest, SkipFirst) {
             ]
         })json";
     Run(variants, expected);
+}
+
+/*
+ * Splitttable eventlogs with filtering does not work properly in cpm-query-engine.
+ * https://celonis.atlassian.net/browse/CPL-7787
+ * https://github.com/celonis/cpm-query-engine/blob/main/query-engine/src/test/java/de/celonis/pm/integration/pql/internal/InductiveMinerTest.java#L397
+ * TODO(j.kim): Uncomment the test once it is fixed.
+TEST_F(CelonisInductiveMinerTest, FilterInfrequentBehavior) {
+    VariantRows variants = {{"A", "B", "D", "E"}, // 5
+                            {"A", "C", "B", "D", "E"}, // 5
+                            {"A", "B", "D", "C", "B", "D", "E"}}; // 1
+    std::string expected =
+            R"json({
+            "vertex_properties": [
+                {
+                    "process_tree_type": 3,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "A"
+                },
+                {
+                    "process_tree_type": 2,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "B"
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "D"
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "E"
+                },
+                {
+                    "process_tree_type": 0,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "C"
+                }
+            ],
+            "edge_properties": [
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 1
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 2
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 3
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 4
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 5
+                },
+                {
+                    "edge_source_id": 2,
+                    "edge_target_id": 6
+                },
+                {
+                    "edge_source_id": 2,
+                    "edge_target_id": 7
+                }
+            ]
+        })json";
+    Run(variants, expected, build_weight_column({5, 5, 1}), 0.8);
+}
+*/
+
+TEST_F(CelonisInductiveMinerTest, LowThresholdNoFiltering) {
+    VariantRows variants = {{"A", "B", "D", "E"}, // 4
+                            {"A", "C", "B", "D", "E"}, // 4
+                            {"A", "B", "D", "C", "B", "D", "E"}}; // 1
+    std::string expected =
+            R"json({
+            "vertex_properties": [
+                {
+                    "process_tree_type": 3,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "A"
+                },
+                {
+                    "process_tree_type": 5,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "E"
+                },
+                {
+                    "process_tree_type": 3,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 0,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 2,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "B"
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "D"
+                },
+                {
+                    "process_tree_type": 0,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "C"
+                }
+            ],
+            "edge_properties": [
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 1
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 2
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 3
+                },
+                {
+                    "edge_source_id": 2,
+                    "edge_target_id": 4
+                },
+                {
+                    "edge_source_id": 2,
+                    "edge_target_id": 5
+                },
+                {
+                    "edge_source_id": 4,
+                    "edge_target_id": 6
+                },
+                {
+                    "edge_source_id": 4,
+                    "edge_target_id": 7
+                },
+                {
+                    "edge_source_id": 4,
+                    "edge_target_id": 8
+                },
+                {
+                    "edge_source_id": 6,
+                    "edge_target_id": 9
+                },
+                {
+                    "edge_source_id": 6,
+                    "edge_target_id": 10
+                }
+            ]
+        })json";
+    Run(variants, expected, build_weight_column({4, 4, 1}), 0.1);
 }
 
 // While there are 10 more tests in Saola inductive_miner_test.cpp, the above tests would be enough to check porting.

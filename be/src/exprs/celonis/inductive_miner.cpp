@@ -1,5 +1,6 @@
 #include "exprs/celonis/inductive_miner.h"
 
+#include "column/column_helper.h"
 #include "exprs/celonis/inductive_miner/inductive_miner_helper.h"
 #include "exprs/celonis/result_table.h"
 #include "exprs/celonis/variant.h"
@@ -90,7 +91,12 @@ void InductiveMinerAggregateFunction::finalize_to_column(FunctionContext* ctx, C
     auto activity_map = increment_id(this->data(state).get_activity_map());
     auto variant_map = increment_id(this->data(state).get_variant_map());
 
-    InductiveMinerHelper helper(variant_map);
+    double imfd_frequency_threshold = 0.0;
+    if (ctx->is_constant_column(2)) {
+        imfd_frequency_threshold = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(2));
+    }
+
+    InductiveMinerHelper helper(variant_map, imfd_frequency_threshold);
     std::string s = json_string(activity_map, helper.vertex_table(), helper.edge_table());
     down_cast<BinaryColumn*>(to)->append(s);
 }

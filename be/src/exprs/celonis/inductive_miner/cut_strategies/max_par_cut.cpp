@@ -220,6 +220,7 @@ std::vector<directly_follows_graph> max_par_cut::apply_dfgs(const inductive_mine
             element<PICK_TRACE_ID>(view), miner_config.grain_size,
             [&, last_activities = std::vector<activity_type>(cut.first)](auto interval, auto& local_pre_aggs) mutable {
               std::ranges::fill(last_activities, 0);
+#ifndef CELOSTAR
               for (auto idx{interval.begin()}; idx != interval.end(); ++idx) {
                 const auto current_activity{view[idx].activity_id_raw()};
                 const auto dfg_idx{activity_to_dfg_mapping[view[idx].activity_id()]};
@@ -243,6 +244,33 @@ std::vector<directly_follows_graph> max_par_cut::apply_dfgs(const inductive_mine
                   pre_agg.activity_statistics[end_activity].end_count += 1;
                 }
               }
+#else
+              size_t multiplicity = miner_config.eventlog.get_variant_multiplicity(view[interval.begin()].trace_id());
+              for (auto idx{interval.begin()}; idx != interval.end(); ++idx) {
+                const auto current_activity{view[idx].activity_id_raw()};
+                const auto dfg_idx{activity_to_dfg_mapping[view[idx].activity_id()]};
+                auto& pre_agg{local_pre_aggs[dfg_idx]};
+                auto& last_activity{last_activities[dfg_idx]};
+                if (last_activity == 0) {  // this is the first activity in this subgraph
+                  pre_agg.activity_statistics[current_activity].start_count += multiplicity;
+                } else {  // add edge
+                  pre_agg.add_edge(static_cast<row_id>(last_activity), static_cast<row_id>(current_activity),
+                                   multiplicity);
+                }
+                pre_agg.activity_statistics[current_activity].frequency_count += multiplicity;
+                last_activity = current_activity;
+              }
+              // set trace counts, end activities, and empty traces
+              for (size_t dfg_idx{0}; dfg_idx != cut.first; ++dfg_idx) {
+                auto& pre_agg{local_pre_aggs[dfg_idx]};
+                pre_agg.log_properties.trace_count += multiplicity;
+                if (const auto end_activity{last_activities[dfg_idx]}; end_activity == 0) {
+                  pre_agg.log_properties.contains_empty_trace += multiplicity;
+                } else {
+                  pre_agg.activity_statistics[end_activity].end_count += multiplicity;
+                }
+              }
+#endif
             },
             thread_pre_aggs);
       },

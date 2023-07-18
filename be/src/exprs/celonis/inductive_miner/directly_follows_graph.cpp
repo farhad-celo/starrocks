@@ -296,6 +296,7 @@ directly_follows_graph initialize_dfg(const splittable_eventlog& eventlog, commo
                                       size_t grain_size) {
   const auto context{parent_context.create_sub_context("initialize_dfg", {})};
   tbb::enumerable_thread_specific<dfg_pre_aggregation> dfg_pre_aggs{eventlog.activity_domain_count()};
+#ifndef CELOSTAR
   std::visit(
       [grain_size, &dfg_pre_aggs](auto eventlog_data) {
         common::for_each_group(
@@ -320,6 +321,33 @@ directly_follows_graph initialize_dfg(const splittable_eventlog& eventlog, commo
             dfg_pre_aggs);
       },
       eventlog.current_split_eventlog_view());
+#else
+ std::visit(
+     [grain_size, &dfg_pre_aggs, &eventlog](auto eventlog_data) {
+       common::for_each_group(
+           element<PICK_TRACE_ID>(eventlog_data), grain_size,
+           [&eventlog_data, &eventlog](auto interval, auto& local_pre_agg) {
+             if (std::empty(interval)) {
+               return;
+             }
+             size_t multiplicity = eventlog.get_variant_multiplicity(eventlog_data[std::begin(interval)].trace_id());
+             local_pre_agg.activity_statistics[eventlog_data[std::begin(interval)].activity_id()].start_count += multiplicity;
+             local_pre_agg.activity_statistics[eventlog_data[std::end(interval) - 1].activity_id()].end_count += multiplicity;
+             local_pre_agg.log_properties.trace_count += multiplicity;
+             // update the first activity's count here, and all others as we add edges
+             local_pre_agg.activity_statistics[eventlog_data[std::begin(interval)].activity_id()].frequency_count += multiplicity;
+             for (auto source_index{std::begin(interval)}, target_index{source_index + 1};
+                  target_index != std::end(interval); ++source_index, ++target_index) {
+               const auto source_id{eventlog_data[source_index].activity_id()};
+               const auto target_id{eventlog_data[target_index].activity_id()};
+               local_pre_agg.activity_statistics[target_id].frequency_count += multiplicity;
+               local_pre_agg.add_edge(static_cast<row_id>(source_id), static_cast<row_id>(target_id), multiplicity);
+             }
+           },
+           dfg_pre_aggs);
+     },
+     eventlog.current_split_eventlog_view());
+#endif
   std::vector dfg_pre_agg_vec(std::move_iterator(dfg_pre_aggs.begin()), std::move_iterator(dfg_pre_aggs.end()));
   auto dfg_pre_agg{reduce_pre_aggregates(std::move(dfg_pre_agg_vec))};
   return dfg::build_dfg(std::move(dfg_pre_agg));

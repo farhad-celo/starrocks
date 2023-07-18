@@ -194,11 +194,13 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
   std::visit(
       [&]<typename VIEW>(const VIEW& view) {
         using trace_id_type = typename eventlog_view_element_t<VIEW>::trace_id_raw_type;
+#ifndef CELOSTAR
         std::vector<std::atomic<trace_id_type>> extra_ids(cut.first);
         std::ranges::for_each(
             extra_ids, [size = ctl::cast<trace_id_type>(miner_config.eventlog.trace_domain_count().get())](auto& id) {
               id.store(size, std::memory_order_relaxed);
             });
+#endif
         common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size, [&](auto interval) {
 #ifdef CELOSTAR
           boost::dynamic_bitset sublog_iteration_counts(cut.first, false);
@@ -212,16 +214,24 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
             next = std::ranges::mismatch(it, last, std::next(it), last, std::ranges::equal_to{}, get_dfg, get_dfg).in2;
             if (const auto dfg_index{get_dfg(*it)}; sublog_iteration_counts.test(dfg_index)) {
               // fill trace id with new value
+#ifdef CELOSTAR
+              int multiplicity = miner_config.eventlog.get_variant_multiplicity(it->second);
+              auto new_trace_id = miner_config.eventlog.add_variant(multiplicity);
+              std::for_each(it, next, [new_trace_id](auto& p) { p.second = new_trace_id; });
+#else
               std::for_each(it, next, [index = extra_ids[dfg_index]++](auto& p) { p.second = index; });
+#endif
             } else {
               sublog_iteration_counts.set(dfg_index);
             }
           }
         });
+#ifndef CELOSTAR
         miner_config.eventlog.set_trace_domain_count(
             ctl::cast<row_id>(std::ranges::max_element(extra_ids, [](const auto& lhs, const auto& rhs) {
                                 return lhs.load(std::memory_order_relaxed) < rhs.load(std::memory_order_relaxed);
                               })->load(std::memory_order_relaxed)));
+#endif
       },
       miner_config.eventlog.current_split_eventlog_view());
   auto sub_eventlogs{miner_config.eventlog.split(activity_to_dfg_mapping)};

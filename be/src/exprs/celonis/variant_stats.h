@@ -1,10 +1,6 @@
 #pragma once
 
-#include "column/array_column.h"
-#include "column/column_helper.h"
 #include "column/hash_set.h"
-#include "column/object_column.h"
-#include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate.h"
 #include "exprs/celonis/variant.h"
 #include "exprs/function_context.h"
@@ -166,49 +162,11 @@ private:
 class VariantStatsAggregateFunction
         : public AggregateFunctionBatchHelper<VariantStatsState, VariantStatsAggregateFunction> {
 public:
-    void update(FunctionContext* ctx, const Column** columns, AggDataPtr state, size_t row_num) const  {
-        // Expects columns: [0] variant_column, [1] weight_column
-        // Pass a constant column with value 1 to ignore weight.
+    void update(FunctionContext* ctx, const Column** columns, AggDataPtr state, size_t row_num) const;
 
-        if (columns[0]->is_nullable() && columns[0]->is_null(row_num)) {
-            return;
-        }
-        if (columns[1]->is_nullable() && columns[1]->is_null(row_num)) {
-            return;
-        }
-        int64_t weight = 0;
-        if (!columns[1]->is_constant()) {
-            const auto& w_column = down_cast<const Int64Column&>(*columns[1]);
-            weight = w_column.get(row_num).get_int64();
-        } else {
-            const auto& w_column = down_cast<const ConstColumn&>(*columns[1]);
-            weight = w_column.get(0).get_int64();
-        }
-        const ArrayColumn& activity_column = down_cast<const ArrayColumn&>(*columns[0]);
-        this->data(state).update(ctx->mem_pool(), activity_column, row_num, weight);
-    }
+    void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override;
 
-    void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
-        // merge internal state with column[row_num]
-        // the column type is binary
-        DCHECK(column->is_binary());
-        const auto* input_column = down_cast<const BinaryColumn*>(column);
-        Slice slice = input_column->get_slice(row_num);
-        size_t mem_usage = 0;
-        mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*) slice.data,
-                                                             slice.size);
-        ctx->add_mem_usage(mem_usage);
-    }
-
-    void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
-        // append our serialized state to column "to"
-        auto* column = down_cast<BinaryColumn*>(to);
-        size_t old_size = column->get_bytes().size();
-        size_t new_size = old_size + this->data(state).serialized_size();
-        column->get_bytes().resize(new_size);
-        this->data(state).serialize(column->get_bytes().data() + old_size);
-        column->get_offset().emplace_back(new_size);
-    }
+    void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override;
 
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const override {
@@ -216,10 +174,7 @@ public:
         DCHECK(false) << "convert_to_serialize_format is not supported";
     }
 
-    void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
-        std::string s = this->data(state).finalize();
-        down_cast<BinaryColumn*>(to)->append(s);
-    }
+    void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override;
 
     std::string get_name() const override { return "celonis_variant_stats"; }
 };

@@ -295,19 +295,19 @@ splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_confi
   shared_static_array_of_activity_id_and_trace_id<row_id> result;
   result.buffer = std::shared_ptr<activity_id_and_trace_id<row_id>[]>(new activity_id_and_trace_id<row_id>[size]);
   result.size = size;
+  result.variant_multiplicities = std::make_shared<variant_multiplicities_t<row_id>>();
 
   // Stores the largest encountered activity ID
   row_id max_activity_domain_count = 0;
 
   // Fetch all variants, materialize its elements (i.e., activity IDs) together with the variant ID.
   int index = 0;
-  int variant_index = 0;
   for (const auto& [variant, count] : variant_map) {
+    auto trace_id = result.variant_multiplicities->add_variant(count);
     for (const auto& activity_id : variant.data) {
       max_activity_domain_count = std::max(max_activity_domain_count, activity_id);
-      result.buffer[index++] = {activity_id, variant_index};
+      result.buffer[index++] = {activity_id, trace_id};
     }
-    variant_index++;
   }
   max_activity_domain_count++;  // One more for empty activity. TODO. Confirm.
 
