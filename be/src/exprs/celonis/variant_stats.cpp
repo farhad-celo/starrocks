@@ -449,17 +449,16 @@ int VariantStatsState::compute_top_variants(std::vector<VList>& activity_top_var
         std::vector<int8_t> a_seen(activity_map.size(), 0);
         for (int j = 0; j < variant.data.size(); j++) {
             uint32_t idx = variant.data[j];
-            if (activity_top_variants[idx].size() < 10 && a_seen[idx] == 0) {
-                activity_top_variants[idx].push_back(v_count[i]);
+            if (a_done[idx] == 0 && a_seen[idx] == 0) {
                 a_seen[idx] = 1;
-            } else {
-                if (a_done[idx] == 0) {
+                activity_top_variants[idx].push_back(v_count[i]);
+                if (activity_top_variants[idx].size() >= 10) {
                     a_done[idx] = 1;
                     done_count++;
                 }
             }
         }
-        // Stop early if we have already collected 10  variants for every activity.
+        // Stop early if we have already collected 10 variants for every activity.
         if (done_count == activity_map.size()) {
             break;
         }

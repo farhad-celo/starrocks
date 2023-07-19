@@ -395,7 +395,7 @@ public:
         VariantStatsResult e_vs;
         ASSERT_TRUE(e_vs.from_json(e_s));
 
-        EXPECT_TRUE(e_vs.equals(vs));
+        EXPECT_TRUE(e_vs.equals(vs)) << "Actual: " << vs.debug_string()<< "\nExpected: " << e_vs.debug_string();
     }
 
 private:
@@ -705,6 +705,106 @@ TEST_F(VariantStatsTest, test_large) {
     std::cout << rs << "\n";
     format_result(rs);
     std::cout << rs << "\n";
+}
+
+TEST_F(VariantStatsTest, test_top_with_repeated_activities) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col1 = build_variant_column({{"a1", "a2"},
+                                      {"a1", "a2", "a1", "a2"}});
+
+    auto weights = build_weight_column({1, 10});
+    std::vector<const Column*> raw_columns;
+    raw_columns.resize(2);
+    raw_columns[0] = col1.get();
+    raw_columns[1] = weights.get();
+    auto state1 = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
+
+    // Get the result
+    auto result = BinaryColumn::create();
+    func->finalize_to_column(ctx, state1->state(), result.get());
+    EXPECT_EQ(result->size(), 1);
+
+    Slice slice = result->get_slice(0);
+    std::string rs = slice.to_string();
+
+    std::string e_s =
+        R"json({
+            "dict": [
+                {
+                    "id": 0,
+                    "name": "a1"
+                },
+                {
+                    "id": 1,
+                    "name": "a2"
+                }
+            ],
+            "a_stats": [
+                {
+                    "count": 21,
+                    "count_case": 11,
+                    "count_start": 11,
+                    "count_end": 0,
+                    "id": 0
+                },
+                {
+                    "count": 21,
+                    "count_case": 11,
+                    "count_start": 0,
+                    "count_end": 11,
+                    "id": 1
+                }
+            ],
+            "e_stats": [
+                {
+                    "count": 21,
+                    "count_case": 11,
+                    "src": 0,
+                    "dst": 1
+                },
+                {
+                    "count": 10,
+                    "count_case": 10,
+                    "src": 1,
+                    "dst": 0
+                }
+            ],
+            "top": [
+                {
+                    "id": 0,
+                    "top": [
+                        {
+                            "variant": [0,1,0,1],
+                            "count": 10
+                        },
+                        {
+                            "variant": [0,1],
+                            "count": 1
+                        }
+                    ]
+                },
+                {
+                    "id": 1,
+                    "top": [
+                        {
+                            "variant": [0,1,0,1],
+                            "count": 10
+                        },
+                        {
+                            "variant": [0,1],
+                            "count": 1
+                        }
+                    ]
+                }
+            ],
+            "happy": {
+                "variant": [0,1,0,1],
+                "count": 10
+            }
+        })json";
+    match(e_s, rs);
 }
 
 } // namespace starrocks
