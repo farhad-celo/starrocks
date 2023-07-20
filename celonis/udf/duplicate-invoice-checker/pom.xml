@@ -48,7 +48,15 @@
         </dependency>
     </dependencies>
     <build>
-        <plugins>
+      <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0</version> <!-- Use the latest version of Surefire Plugin -->
+                <configuration>
+                    <!-- Optionally, you can configure Surefire Plugin properties here -->
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
