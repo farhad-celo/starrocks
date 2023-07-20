@@ -169,7 +169,8 @@ size_t VariantStatsState::update(MemPool* mem_pool, const ArrayColumn& activity_
         }
         if (i == 0) {
             a_stats.count_start += weight;
-        } else if (i == n - 1) {
+        }
+        if (i == n - 1) {
             a_stats.count_end += weight;
         }
 

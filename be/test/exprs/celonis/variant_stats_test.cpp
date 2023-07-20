@@ -617,7 +617,7 @@ TEST_F(VariantStatsTest, test_empty) {
         Slice slice = result->get_slice(0);
         std::string rs = slice.to_string();
         std::string e_s =
-                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1}}";
+                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':1,'id':0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1}}";
         match(e_s, rs);
     }
 
