@@ -35,7 +35,7 @@ public class ValueIndexer implements IndexerInterface {
             ValueMatcher.Value value = (ValueMatcher.Value) clusterObject;
             idToObjects.put(value.getId(), value);
             valueToIds.add(new Utils.ValueToId(value.getValue(), value.getId()));
-            int hashCode = value.getCountersHashValue();
+            int hashCode = value.getCounterHashValue();
             if (counterToIds.containsKey(hashCode)) {
                 counterToIds.get(hashCode).add(value.getId());
             } else {
@@ -49,7 +49,7 @@ public class ValueIndexer implements IndexerInterface {
 
         for (String id : idToObjects.keySet()) {
             ValueMatcher.Value value = (ValueMatcher.Value) idToObjects.get(id);
-            List<String> counterMatches = counterToIds.get(value.getCountersHashValue());
+            List<String> counterMatches = counterToIds.get(value.getCounterHashValue());
             Utils.addEdges(id, counterMatches, potentialConnectedEdges);
             Utils.Range range = Utils.findRange(value.getValue()-80, value.getValue() + 80, valueToIds);
             List<String> linearDecayMatches = new ArrayList<>();

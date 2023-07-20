@@ -13,13 +13,13 @@ public class ValueMatcher {
     public static Value preprocess(Value value) {
         String normalizedValStr = Long.toString(Math.round(value.getValue() * 100));
         value.setNormalizedValueStr(normalizedValStr);
-        Map<Character, Integer> counters = Utils.getCharacterCounts(normalizedValStr);
-        value.setCharacterCounts(counters);
-        String countersStr = "";
-        for (Character c : counters.keySet()) {
-            countersStr += c + counters.get(c) + ",";
+        Map<Character, Integer> counter = Utils.getCharacterCounter(normalizedValStr);
+        value.setCharacterCounter(counter);
+        StringBuilder sb = new StringBuilder();
+        for (Character c : counter.keySet()) {
+          sb.append(c + counter.get(c) + ",");
         }
-        value.setCountersHashValue(countersStr.hashCode());
+        value.setCounterHashValue(sb.toString().hashCode());
         return value;
     }
 
@@ -37,8 +37,6 @@ public class ValueMatcher {
             values.add(preprocess(value));
         }
 
-        // return PairwiseCluster.cluster(values);
-        // return GraphCluster.cluster(values);
         ValueIndexer indexer = new ValueIndexer();
         indexer.index(values);
         IndexCluster indexCluster = new IndexCluster(indexer);
@@ -67,12 +65,12 @@ public class ValueMatcher {
         @Setter
         @Getter
         @EqualsAndHashCode.Exclude
-        private Map<Character, Integer> characterCounts;
+        private Map<Character, Integer> characterCounter;
 
         @Setter
         @Getter
         @EqualsAndHashCode.Exclude
-        int countersHashValue;
+        int counterHashValue;
 
         public String toJsonString() {
             return "{\"id\": \"" + rowId + "\", \"val\": " + value + "}";
@@ -86,7 +84,7 @@ public class ValueMatcher {
             double linearDecaySimilarity = Math.abs(absDiff - maxPriceLimit) < EPS ? 10 * EPS : Math.max(0, 1 - absDiff / maxPriceLimit);
             double turnerSimilarity = 0;
             if (this.getNormalizedValueStr().length() != otherValue.getNormalizedValueStr().length() ||
-            !this.getCharacterCounts().equals(otherValue.getCharacterCounts())) {
+            !this.getCharacterCounter().equals(otherValue.getCharacterCounter())) {
                 turnerSimilarity = 0;
             } else {
                 int turners = 0;

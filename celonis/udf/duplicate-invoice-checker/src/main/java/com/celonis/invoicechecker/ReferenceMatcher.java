@@ -26,7 +26,7 @@ public class ReferenceMatcher {
         String modifiedReference = reference.getReference().toLowerCase().replaceAll(
                 "[^a-zА-я\\d ]", "").replaceAll(" ", "");
         reference.setModifiedReference(modifiedReference);
-        Map<Character, Integer> counters = Utils.getCharacterCounts(modifiedReference);
+        Map<Character, Integer> counters = Utils.getCharacterCounter(modifiedReference);
         reference.setCounters(counters);
         String counterStr = "";
         for (Character c : counters.keySet()) {

@@ -51,35 +51,20 @@ public class Utils {
         return "{ \"" + objectName + "\": [" + objectStr + "]}";
     }
 
-    static Map<Character, Integer> getCharacterCounts(String str) {
-        Map<Character, Integer> counters = new TreeMap<>();
+    static Map<Character, Integer> getCharacterCounter(String str) {
+        Map<Character, Integer> counter = new HashMap<>();
         for (int j = 0; j < str.length(); j++) {
             Character c = str.charAt(j);
-            if (counters.containsKey(c)) {
-                counters.put(c, counters.get(c) + 1);
-            } else {
-                counters.put(c, 1);
-            }
+            counter.put(c, counter.getOrDefault(c, 0) + 1);
         }
 
-        return counters;
+        return counter;
     }
 
     static void addEdges(String id, Collection<String> ids, Map<String, Set<String>> potentialConnectedEdges) {
-        if (potentialConnectedEdges.containsKey(id)) {
-            potentialConnectedEdges.get(id).addAll(ids);
-        } else {
-            Set<String> hashIds = new HashSet<>(ids);
-            potentialConnectedEdges.put(id, hashIds);
-        }
+        potentialConnectedEdges.computeIfAbsent(id, k -> new HashSet<>()).addAll(ids);
         for (String pointedId : ids) {
-            if (potentialConnectedEdges.containsKey(pointedId)) {
-                potentialConnectedEdges.get(pointedId).add(id);
-            } else {
-                Set<String> hashIds = new HashSet<>();
-                hashIds.add(id);
-                potentialConnectedEdges.put(pointedId, hashIds);
-            }
+            potentialConnectedEdges.computeIfAbsent(pointedId, k -> new HashSet<>()).add(id);
         }
     }
 
