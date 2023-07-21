@@ -6,17 +6,13 @@
 <path_to_the_repo>/celostar-starrocks$ gh workflow run celonis_sync_and_rebase_upstream.yml
 ```
 
-2. Find the workflow link in the GitHub repo's "Actions" menu and click it to see its steps.
-
-![find_workflow.png](assets/find_workflow.png)
-
-3. Find the new default branch and the link to create the pull request in the step of "Rebase".
-
-![new_default_branch_and_pr_link.png](assets/new_default_branch_and_pr_link.png)
-
-4. Click the last link and it will direct you to a web page to create the pull request. Remember to change the merge 
-branch to the new default branch from step 3.
-
-![create_pull_request.png](assets/create_pull_request.png)
+2. After the run, it will generate a GitHub issue based on the result. 
+   * If the run fails, the issue will only contain the run link.
+   * If the run succeeds, in the issue, it will tell about the new default branch and the link which will direct you to 
+     a web page to create the pull request. See [this example](https://github.com/celonis/celostar-starrocks/issues/249).
+     Remember to change the merge branch to the new default branch.
+     ![create_pull_request.png](assets/create_pull_request.png)
+     After presubmit succeeds, remember to click "**Rebase and merge**" button to submit so that it will keep the history. 
+     If using "Squash and merge", we will lose the history.
 
 For more details, please refer to the details in [this doc](https://docs.google.com/document/d/1Vj0Z6-zHYcNC8knGJCZkyZULnx5mo9wCoCXYMz5kXTc/edit#heading=h.e1yprybzha3v).
