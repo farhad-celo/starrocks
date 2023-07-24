@@ -2,7 +2,12 @@ package com.celonis.invoicechecker;
 
 
 public class UDFJaroDistance {
+
     public final Double evaluate(String s, String t) {
+        return 1.0 - computeJaroSimilarity(s, t);
+    }
+    
+    private Double computeJaroSimilarity(String s, String t) {
         int s_len = s.length();
         int t_len = t.length();
 

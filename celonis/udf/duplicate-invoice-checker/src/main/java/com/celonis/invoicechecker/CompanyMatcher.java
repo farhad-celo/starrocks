@@ -78,7 +78,7 @@ public class CompanyMatcher {
             // TODO(f.li): Upgrade commons-text library to version 1.10.0 and use the new threshold. We
             // currently use version 1.4.0 to match the one used in SR's runtime. We should figure it out why SR's
             // runtime can only use version 1.4.0.
-            return distance.evaluate(this.getModifiedVendorName(), otherCompany.getModifiedVendorName()) > threshold;
+            return (1.0 - distance.evaluate(this.getModifiedVendorName(), otherCompany.getModifiedVendorName())) > threshold;
         }
 
         public String getId() {

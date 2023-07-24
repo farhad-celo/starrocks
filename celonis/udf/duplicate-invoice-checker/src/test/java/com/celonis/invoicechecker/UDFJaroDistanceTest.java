@@ -10,21 +10,21 @@ class UDFJaroDistanceTest {
     @Test
     void testFullMatch() {
         UDFJaroDistance distance = new UDFJaroDistance();
-        assertTrue(Math.abs(distance.evaluate("foobar", "foobar") - 1) < EPS);
+        assertTrue(Math.abs(distance.evaluate("foobar", "foobar") - 0.0) < EPS);
     }
 
     @Test
     void testNotMatch() {
         UDFJaroDistance distance = new UDFJaroDistance();
-        assertTrue(distance.evaluate("def", "abc") < EPS);
+        assertTrue((1 - distance.evaluate("def", "abc")) < EPS);
     }
 
     @Test
     void testPartialMatach() {
         UDFJaroDistance distance = new UDFJaroDistance();
-        assertTrue(Math.abs(distance.evaluate("MARTHA", "MARHTA") - 0.944444)< EPS);
-        assertTrue(Math.abs(distance.evaluate("DIXON", "DICKSONX") - 0.766666)< EPS);
-        assertTrue(Math.abs(distance.evaluate("JELLYFISH", "SMELLYFISH") - 0.896296)< EPS);
-        assertTrue(Math.abs(distance.evaluate("walmarttechnoligies", "walmart") - 0.7894736842105262)< EPS);
+        assertTrue(Math.abs(distance.evaluate("MARTHA", "MARHTA") - 0.055556) < EPS);
+        assertTrue(Math.abs(distance.evaluate("DIXON", "DICKSONX") - 0.233334) < EPS);
+        assertTrue(Math.abs(distance.evaluate("JELLYFISH", "SMELLYFISH") - 0.103704) < EPS);
+        assertTrue(Math.abs(distance.evaluate("walmarttechnoligies", "walmart") - 0.210526) < EPS);
     }
 }
