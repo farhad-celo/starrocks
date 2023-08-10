@@ -236,10 +236,10 @@ public:
         if constexpr (IsNull) {
             if (name == "celonis_inductive_miner") {
                 auto inductive_miner = AggregateFactory::MakeCelonisInductiveMinerAggregateFunction();
-                return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantStatsState>(inductive_miner);
+                return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantAggregateState>(inductive_miner);
             } else if (name == "celonis_variant_stats") {
                 auto variant_stats = AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
-                return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantStatsState>(variant_stats);
+                return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantAggregateState>(variant_stats);
             }
         } else {
             if (name == "celonis_inductive_miner") {

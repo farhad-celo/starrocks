@@ -4,17 +4,42 @@
 #include "exprs/celonis/inductive_miner/inductive_miner_helper.h"
 #include "exprs/celonis/result_table.h"
 #include "exprs/celonis/variant.h"
-#include "exprs/celonis/variant_stats.h"
+#include "exprs/celonis/variant_agg.h"
 #include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/stringbuffer.h"
 
 using celonis::accelerator::operators::process::InductiveMinerHelper;
 using cel_int_t = int64_t;
 
-namespace starrocks{
+namespace starrocks {
 namespace {
 
-std::string json_string(const VariantStatsState::SliceHashMap& activity_map, const celonis::ResultTable& vertex_table,
-                        const ResultTable& edge_table) {
+VariantAggregateState::SliceHashMap increment_id(const VariantAggregateState::SliceHashMap& input_activity_map) {
+    VariantAggregateState::SliceHashMap activity_map;
+    for (auto it = input_activity_map.begin(); it != input_activity_map.end(); it++) {
+        activity_map.insert(std::pair<SliceWithHash, int32_t>(it->first, it->second + 1));
+    }
+    return activity_map;
+}
+
+starrocks::VariantHashMap increment_id(const starrocks::VariantHashMap& input_variant_map) {
+    starrocks::VariantHashMap variant_map;
+    for (auto it = input_variant_map.begin(); it != input_variant_map.end(); it++) {
+        Variant variant = it->first;
+        for (auto& id : variant.data) {
+            id++;
+        }
+        variant_map.insert(std::pair(variant, it->second));
+    }
+    return variant_map;
+}
+
+} // namespace
+
+std::string InductiveMinerFinalizer::json_string(const VariantAggregateState::SliceHashMap& activity_map,
+                                                 const celonis::ResultTable& vertex_table,
+                                                 const ResultTable& edge_table) {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
@@ -29,7 +54,8 @@ std::string json_string(const VariantStatsState::SliceHashMap& activity_map, con
     }
 
     rapidjson::Value vertex_properties(rapidjson::kArrayType);
-    auto& process_tree_type = *dynamic_cast<const celonis::ResultColumn<cel_int_t>*>(vertex_table.column("process_tree_type"));
+    auto& process_tree_type =
+            *dynamic_cast<const celonis::ResultColumn<cel_int_t>*>(vertex_table.column("process_tree_type"));
     auto& activity = *dynamic_cast<const celonis::NullableResultColumn<cel_int_t>*>(vertex_table.column("activity"));
     for (int i = 0; i < vertex_table.size(); i++) {
         rapidjson::Value obj(rapidjson::kObjectType);
@@ -38,7 +64,8 @@ std::string json_string(const VariantStatsState::SliceHashMap& activity_map, con
             obj.AddMember("activity", rapidjson::Value(), allocator);
         } else {
             auto& slice = activities[activity[i]];
-            obj.AddMember("activity", rapidjson::Value().SetString(slice.get_data(), slice.get_size(), allocator), allocator);
+            obj.AddMember("activity", rapidjson::Value().SetString(slice.get_data(), slice.get_size(), allocator),
+                          allocator);
         }
         vertex_properties.PushBack(obj, allocator);
     }
@@ -63,43 +90,18 @@ std::string json_string(const VariantStatsState::SliceHashMap& activity_map, con
     return buf.GetString();
 }
 
-VariantStatsState::SliceHashMap increment_id(const VariantStatsState::SliceHashMap& input_activity_map) {
-    VariantStatsState::SliceHashMap activity_map;
-    for (auto it = input_activity_map.begin(); it != input_activity_map.end(); it++) {
-        activity_map.insert(std::pair<SliceWithHash, int32_t>(it->first, it->second + 1));
-    }
-    return activity_map;
-}
-
-starrocks::VariantHashMap increment_id(const starrocks::VariantHashMap& input_variant_map) {
-    starrocks::VariantHashMap variant_map;
-    for (auto it = input_variant_map.begin(); it != input_variant_map.end(); it++) {
-        Variant variant = it->first;
-        for (auto& id : variant.data) {
-            id++;
-        }
-        variant_map.insert(std::pair(variant, it->second));
-    }
-    return variant_map;
-}
-
-} // namespace
-
-void InductiveMinerAggregateFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
-                                                         Column* to) const {
+std::string InductiveMinerFinalizer::finalize() {
     // Activity ID 0 is reserved for NULL in Saola and implementations depend on it.
-    auto activity_map = increment_id(this->data(state).get_activity_map());
-    auto variant_map = increment_id(this->data(state).get_variant_map());
+    auto activity_map = increment_id(activity_map_);
+    auto variant_map = increment_id(variant_map_);
 
     double imfd_frequency_threshold = 0.0;
-    if (ctx->is_constant_column(2)) {
-        imfd_frequency_threshold = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(2));
+    if (ctx_->is_constant_column(2)) {
+        imfd_frequency_threshold = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx_->get_constant_column(2));
     }
 
     InductiveMinerHelper helper(variant_map, imfd_frequency_threshold);
-    std::string s = json_string(activity_map, helper.vertex_table(), helper.edge_table());
-    down_cast<BinaryColumn*>(to)->append(s);
+    return json_string(activity_map, helper.vertex_table(), helper.edge_table());
 }
 
 } // namespace starrocks
-

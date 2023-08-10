@@ -1,20 +1,31 @@
 #pragma once
 
 #include "exprs/celonis/inductive_miner/inductive_miner_helper.h"
-#include "exprs/celonis/variant_stats.h"
+#include "exprs/celonis/variant_agg.h"
 
 namespace starrocks {
 
-// Extends VariantStatsAggregateFunction as it reuses all aggregation logic except for finalize_to_column() which
-// implements the inductive miner algorithm on top of the activity_map produced by variant stats.
-class InductiveMinerAggregateFunction final : public VariantStatsAggregateFunction {
+class InductiveMinerFinalizer : public VariantAggregateFinalizer {
 public:
-    void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override;
+    InductiveMinerFinalizer(FunctionContext* ctx, const VariantAggregateState& state)
+            : VariantAggregateFinalizer(ctx, state) {}
 
-    std::string get_name() const override { return "celonis_inductive_miner"; }
+    std::string finalize() override;
 
 private:
-    //inductive_miner_operator_config operator_config_;
+    std::string json_string(const VariantAggregateState::SliceHashMap& activity_map,
+                            const celonis::ResultTable& vertex_table, const ResultTable& edge_table);
+};
+
+// Extends VariantAggregateFunction and runs the inductive miner algorithm.
+class InductiveMinerAggregateFunction final : public VariantAggregateFunction {
+public:
+    std::unique_ptr<VariantAggregateFinalizer> get_finalizer(FunctionContext* ctx,
+                                                             const VariantAggregateState& state) const override {
+        return std::make_unique<InductiveMinerFinalizer>(ctx, state);
+    }
+
+    std::string get_name() const override { return "celonis_inductive_miner"; }
 };
 
 } // namespace starrocks

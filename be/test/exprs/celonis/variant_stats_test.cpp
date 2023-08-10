@@ -52,7 +52,7 @@ private:
 // Compares results in a manner robust to changes in activity dictionary.
 struct VariantStatsResult {
     std::vector<std::string> act_map; // idx -> activity_name
-    phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge> e_stats;
+    VariantStatsFinalizer::EdgeHashMap e_stats;
     std::vector<ActivityStats> a_stats;
     std::vector<std::vector<std::pair<Variant, int>>> top;
     std::pair<Variant, int> happy;
@@ -138,7 +138,7 @@ struct VariantStatsResult {
         for (auto it = other.e_stats.begin(); it != other.e_stats.end(); it++) {
             int32_t src = remap_idx[it->first.src];
             int32_t dst = remap_idx[it->first.dst];
-            Edge e(src, dst, src, dst);
+            Edge e(src, dst);
             auto e_it = e_stats.find(e);
             if (e_it == e_stats.end() || !e_it->second.equal(it->second)) {
                 return false;
@@ -251,7 +251,7 @@ struct VariantStatsResult {
             es.count_case = obj["count_case"].GetInt64();
             int src = obj["src"].GetInt64();
             int dst = obj["dst"].GetInt64();
-            Edge e(src, dst, src, dst);
+            Edge e(src, dst);
 
             e_stats[e] = es;
         }

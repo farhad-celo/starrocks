@@ -70,7 +70,7 @@ public:
         size_t memory = 0;
         std::vector<std::string> activities = {"A", "B", "C", "D", "E"};
         for (const auto& activity: activities) {
-            state_.maybe_add_activity(&mem_pool_, Slice(activity), memory);
+            state_.maybe_add_activity(&mem_pool_, Slice(activity), &memory);
         }
     }
     void TearDown() override {}
@@ -79,7 +79,7 @@ public:
         size_t memory = 0;
         starrocks::Variant variant(activities.size());
         for (const auto& activity: activities) {
-            auto idx_hash = state_.maybe_add_activity(&mem_pool_, Slice(activity), memory);
+            auto idx_hash = state_.maybe_add_activity(&mem_pool_, Slice(activity), &memory);
             variant.add(idx_hash.first, idx_hash.second);
         }
         variant_map_[variant] = count;
@@ -88,7 +88,7 @@ public:
 private:
     starrocks::MemPool mem_pool_;
     starrocks::VariantHashMap variant_map_;
-    starrocks::VariantStatsState state_;
+    starrocks::VariantAggregateState state_;
 };
 
 TEST_F(CelonisDirectlyFollowsGraphTest, FilteringNoise) {
