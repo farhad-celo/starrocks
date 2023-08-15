@@ -37,7 +37,7 @@ public:
 };
 
 template<bool element_has_null>
-std::pair<Columns, ColumnPtr> process_impl(TableFunctionState* state, const Column& elements, const UInt32Column& offsets,
+std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, const Column& elements, const UInt32Column& offsets,
                           const NullColumn::Container* null_offsets,
                           const NullColumn::Container* activity_array_nulls) {
 
@@ -114,8 +114,7 @@ std::pair<Columns, ColumnPtr> process_impl(TableFunctionState* state, const Colu
 }
 }  // namespace
 
-std::pair<Columns, ColumnPtr> CountEdges::process(TableFunctionState* state, bool* eos) const {
-    *eos = true;
+std::pair<Columns, UInt32Column::Ptr> CountEdges::process(TableFunctionState* state) const {
     if (state->get_columns().empty()) {
         return {};
     }

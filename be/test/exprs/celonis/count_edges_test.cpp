@@ -34,8 +34,7 @@ TEST_F(CountEdgesTest, count_edges) {
     table_state->set_params(input);
     ASSERT_OK(function->prepare(table_state));
 
-    bool eos = false;
-    auto [result, offset] = function->process(table_state, &eos);
+    auto [result, offset] = function->process(table_state);
 
     // result[0] is source, result[1] is target, result[2] is count
     ASSERT_EQ(6, result[0]->size());
@@ -89,8 +88,7 @@ TEST_F(CountEdgesTest, count_edges_null) {
     table_state->set_params(input);
     ASSERT_OK(function->prepare(table_state));
 
-    bool eos = false;
-    auto [result, offset] = function->process(table_state, &eos);
+    auto [result, offset] = function->process(table_state);
     // result[0] is source, result[1] is target, result[2] is count
     ASSERT_EQ(3, result[0]->size());
     ASSERT_EQ(3, result[1]->size());
