@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BRANCH_3_0: branch-3.0
+  LATEST_UPSTREAM_BRANCH: branch-3.1
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
 
       - name: checkout repository
         uses: actions/checkout@v3
-        # We need to ref a branch which is not the default one or ${BRANCH_3_0} to make rebase work.
+        # We need to ref a branch which is not the default one or ${LATEST_UPSTREAM_BRANCH} to make rebase work.
         with:
           ref: branch-3.0-c0d5082c-celo
 
@@ -42,20 +42,20 @@ jobs:
         continue-on-error: true
       - name: Fetch upstream and push
         run: |
-          git fetch upstream ${BRANCH_3_0}:${BRANCH_3_0}
-          git push origin ${BRANCH_3_0}
+          git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
+          git push origin ${LATEST_UPSTREAM_BRANCH}
       - name: Rebase
         run: |
           echo "Start to rebase ..."
 
           # Get the latest commit
           git fetch
-          git checkout ${BRANCH_3_0}
+          git checkout ${LATEST_UPSTREAM_BRANCH}
           latest_commit=$(git rev-parse --short=8 HEAD)
           echo "The latest commit is ${latest_commit}"
 
           # Create the new default branch
-          newDefaultBranch=auto-${BRANCH_3_0}-${latest_commit}
+          newDefaultBranch=auto-${LATEST_UPSTREAM_BRANCH}-${latest_commit}
           git checkout -b ${newDefaultBranch}
 
           # Get the current default branch
@@ -65,7 +65,7 @@ jobs:
           # Rebase
           git checkout ${default_branch}
           timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
-          dev_env_branch=dev-env-${BRANCH_3_0}-${latest_commit}-${timestamp}
+          dev_env_branch=dev-env-${LATEST_UPSTREAM_BRANCH}-${latest_commit}-${timestamp}
           echo "dev_env_branch=${dev_env_branch}" >> $GITHUB_ENV
           git checkout -b $dev_env_branch
           git rebase ${newDefaultBranch}

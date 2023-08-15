@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BRANCH_3_0: branch-3.0
+  LATEST_UPSTREAM_BRANCH: branch-3.1
   BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:branch-3.0-62d8aaf5-dev
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
@@ -35,7 +35,7 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v3
-        # We need to ref a branch which is not the default one or ${BRANCH_3_0} to make rebase work.
+        # We need to ref a branch which is not the default one or ${LATEST_UPSTREAM_BRANCH} to make rebase work.
         with:
           ref: branch-3.0-c0d5082c-celo
 
@@ -47,8 +47,8 @@ jobs:
         continue-on-error: true
       - name: Fetch upstream and push
         run: |
-          git fetch upstream ${BRANCH_3_0}:${BRANCH_3_0}
-          git push origin ${BRANCH_3_0}
+          git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
+          git push origin ${LATEST_UPSTREAM_BRANCH}
       - name: Rebase
         id: rebase
         run: |
@@ -56,12 +56,12 @@ jobs:
           
           # Get the latest commit
           git fetch
-          git checkout ${BRANCH_3_0}
+          git checkout ${LATEST_UPSTREAM_BRANCH}
           latest_commit=$(git rev-parse --short=8 HEAD)
           echo "The latest commit is ${latest_commit}"
           
           # Create the new default branch
-          newDefaultBranch=${BRANCH_3_0}-${latest_commit}-celo
+          newDefaultBranch=${LATEST_UPSTREAM_BRANCH}-${latest_commit}-celo
           echo "new_default_branch=$newDefaultBranch" >> $GITHUB_ENV
           git checkout -b ${newDefaultBranch}
           git push --set-upstream origin ${newDefaultBranch}
