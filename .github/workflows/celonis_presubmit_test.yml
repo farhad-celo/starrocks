@@ -2,6 +2,7 @@ name: 'Presubmit Test'
 
 on:
   pull_request:
+    # If you update paths-ignore, please update celonis_presubmit_test_ignore.yml accordingly.
     paths-ignore:
       - '**.md'
       - '**.png'
