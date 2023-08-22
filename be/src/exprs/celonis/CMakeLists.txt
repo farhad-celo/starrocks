@@ -60,20 +60,22 @@ add_library(onetbb SHARED IMPORTED)
 set_target_properties(onetbb PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib/libtbb.so)
 target_link_libraries(Celonis PRIVATE onetbb)
 
-add_library(gtest_main STATIC IMPORTED)
-set_target_properties(gtest_main PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib/libgtest_main.a)
+if (${MAKE_TEST} STREQUAL "ON")
+    add_library(gtest_main STATIC IMPORTED)
+    set_target_properties(gtest_main PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib/libgtest_main.a)
 
-set(EXEC_FILES
-        ${TEST_DIR}/exprs/celonis/inductive_miner/directly_follows_graph_test.cpp
-        )
-add_executable(celonis_test ${EXEC_FILES})
-target_compile_definitions(celonis_test PRIVATE CELOSTAR)
+    set(EXEC_FILES
+            ${TEST_DIR}/exprs/celonis/inductive_miner/directly_follows_graph_test.cpp
+            )
+    add_executable(celonis_test ${EXEC_FILES})
+    target_compile_definitions(celonis_test PRIVATE CELOSTAR)
 
-target_link_libraries(celonis_test
-        PRIVATE ${TEST_LINK_LIBS}
-        PRIVATE gtest_main
-        PRIVATE Celonis)
-target_include_directories(celonis_test
-        PRIVATE $<TARGET_PROPERTY:Celonis,INCLUDE_DIRECTORIES>
-        )
-set_target_properties(celonis_test PROPERTIES COMPILE_FLAGS "-fno-access-control")
+    target_link_libraries(celonis_test
+            PRIVATE ${TEST_LINK_LIBS}
+            PRIVATE gtest_main
+            PRIVATE Celonis)
+    target_include_directories(celonis_test
+            PRIVATE $<TARGET_PROPERTY:Celonis,INCLUDE_DIRECTORIES>
+            )
+    set_target_properties(celonis_test PROPERTIES COMPILE_FLAGS "-fno-access-control")
+endif ()
