@@ -202,4 +202,16 @@ class null_pointer_exception final : public ctl_exception {
   static constexpr std::string_view EXCEPTION_TYPE_AS_TEXT{"ctl::null_pointer_exception"};
 };
 
+/**
+ * @brief Exception thrown on null dereference
+ */
+class timeout_exception final : public ctl_exception {
+ public:
+  [[nodiscard]] explicit timeout_exception(std::string message)
+      // NOLINTNEXTLINE(bugprone-throw-keyword-missing)
+      : ctl_exception{std::move(message), EXCEPTION_TYPE_AS_TEXT} {}
+
+ private:
+  static constexpr std::string_view EXCEPTION_TYPE_AS_TEXT{"ctl::timeout_exception"};
+};
 }  // namespace celonis::accelerator::ctl

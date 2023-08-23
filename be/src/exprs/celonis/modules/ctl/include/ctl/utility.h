@@ -3,6 +3,9 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <future>
+#include <optional>
 #include <stdexcept>
 #include <thread>
 #include <type_traits>
@@ -50,6 +53,27 @@ template <typename CALLABLE>
  */
 [[nodiscard]] inline std::intptr_t ptr_to_int(const void* const pointer) noexcept {
   return reinterpret_cast<std::intptr_t>(pointer);
+}
+
+template <typename T>
+using optional_ref = std::optional<std::reference_wrapper<T>>;
+
+template <typename T>
+[[nodiscard]] optional_ref<T> element_or_null(std::shared_future<T>& future) {
+  try {
+    return std::reference_wrapper<T>{future.get()};
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+template <typename T>
+[[nodiscard]] optional_ref<const T> element_or_null(const std::shared_future<T>& future) {
+  try {
+    return std::reference_wrapper<const T>{future.get()};
+  } catch (...) {
+    return std::nullopt;
+  }
 }
 
 }  // namespace celonis::accelerator::ctl

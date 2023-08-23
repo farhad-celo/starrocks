@@ -23,8 +23,8 @@ using json_key_t = std::string;
 using json_object_t = std::map<json_key_t, json_value_t>;
 using json_array_t = std::vector<json_value_t>;
 
-using json_value_base_t = std::variant<bool, int64_t, uint64_t, double, std::string, std::string_view, const char*,
-                                       std::nullptr_t, json_array_t, json_object_t>;
+using json_value_base_t =
+    std::variant<bool, int64_t, uint64_t, double, std::string, std::nullptr_t, json_array_t, json_object_t>;
 
 /**
  * Default type for creating JSON structures

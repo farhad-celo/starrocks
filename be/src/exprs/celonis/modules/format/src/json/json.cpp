@@ -141,6 +141,7 @@ json_value::reference json_value::operator[](json_key_t&& key) {
 
 std::string json_value::to_string() const {
   // Don't use braced list initializer because it constructs a JSON array instead of a JSON object
+  // See: https://github.com/nlohmann/json/issues/1359
   nlohmann::json j(*this);
   /*
    * Change behavior for invalid UTF-8 characters:

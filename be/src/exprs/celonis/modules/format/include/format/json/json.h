@@ -68,10 +68,10 @@ class json_value : public json_value_base_t {
   template <typename T, typename std::enable_if_t<std::is_floating_point_v<T>>* = nullptr>
   json_value(T t) noexcept : json_value_base_t{static_cast<double>(t)} {}  // NOLINT(google-explicit-constructor)
 
-  json_value(const char* s) noexcept : json_value_base_t{s} {}               // NOLINT(google-explicit-constructor)
-  json_value(const std::string& s) : json_value_base_t{s} {}                 // NOLINT(google-explicit-constructor)
-  json_value(std::string&& s) noexcept : json_value_base_t{std::move(s)} {}  // NOLINT(google-explicit-constructor)
-  json_value(std::string_view s) noexcept : json_value_base_t{s} {}          // NOLINT(google-explicit-constructor)
+  json_value(const char* s) : json_value_base_t{std::string{s}} {}       // NOLINT(google-explicit-constructor)
+  json_value(const std::string& s) : json_value_base_t{s} {}             // NOLINT(google-explicit-constructor)
+  json_value(std::string&& s) : json_value_base_t{std::move(s)} {}       // NOLINT(google-explicit-constructor)
+  json_value(std::string_view s) : json_value_base_t{std::string{s}} {}  // NOLINT(google-explicit-constructor)
 
   json_value(const json_array_t& values) : json_value_base_t{values} {}  // NOLINT(google-explicit-constructor)
   json_value(json_array_t&& values) noexcept                             // NOLINT(google-explicit-constructor)

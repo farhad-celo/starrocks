@@ -35,7 +35,7 @@ class uuid_storage {
   /**
    * @brief constructs a uuid_storage object from a string in canonical format
    */
-  explicit uuid_storage(const std::string& uuid_string);
+  explicit uuid_storage(std::string_view uuid_string);
 
   /* comparison operators */
   // NOLINTNEXTLINE(modernize-use-nullptr)
@@ -74,10 +74,10 @@ class uuid_storage {
 
 inline uuid_storage::uuid_storage(uint8_t data[]) { std::copy_n(data, UUID_STORAGE_BYTES, uuid_.begin()); }
 
-inline uuid_storage::uuid_storage(const std::string& uuid_string) {
-  if (uuid_string.length() != UUID_STRING_LENGTH) {
-    throw common::cpm_exception{"Invalid uuid format. Expected a string of size {} but got size {}", UUID_STRING_LENGTH,
-                                uuid_string.length()};
+inline uuid_storage::uuid_storage(const std::string_view uuid_string) {
+  if (uuid_string.size() != UUID_STRING_LENGTH) {
+    throw common::cpm_exception{"Invalid uuid format. Expected a string of size {} but got size {}.",
+                                UUID_STRING_LENGTH, uuid_string.size()};
   }
 
   auto hex_char_to_value = [&uuid_string](size_t i) {

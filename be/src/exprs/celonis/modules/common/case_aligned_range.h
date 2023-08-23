@@ -73,14 +73,14 @@ struct case_aligned_range {
         end(static_cast<size_t>(this->case_column->get_row_count())) {}
 };
 
-template <ctl::parallelism_settings_t PARALLELISM_SETTING, typename ALLOCATOR_TYPE>
+template <ctl::parallelism_settings_t PARALLELISM_SETTING>
 struct set_bit_aligned_range {
-  const ctl::dynamic_bitset<PARALLELISM_SETTING, ALLOCATOR_TYPE>& bitset;
+  const ctl::dynamic_bitset<PARALLELISM_SETTING>& bitset;
   size_t begin;
   size_t end;
   size_t grain_size;
-  explicit set_bit_aligned_range(const ctl::dynamic_bitset<PARALLELISM_SETTING, ALLOCATOR_TYPE>& bitset, size_t begin,
-                                 size_t end, size_t grain_size = 1) noexcept
+  explicit set_bit_aligned_range(const ctl::dynamic_bitset<PARALLELISM_SETTING>& bitset, size_t begin, size_t end,
+                                 size_t grain_size = 1) noexcept
       : bitset{bitset}, begin{begin}, end{end}, grain_size{grain_size} {}
   set_bit_aligned_range(set_bit_aligned_range& other, tbb::split /**/) noexcept
       : bitset{other.bitset}, begin{other.midpoint()}, end{other.end}, grain_size{other.grain_size} {

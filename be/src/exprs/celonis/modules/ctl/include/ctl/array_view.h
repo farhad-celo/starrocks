@@ -10,6 +10,7 @@
 #include "ctl/assert.h"
 #include "ctl/concepts.h"
 #include "ctl/exception.h"
+#include "ctl/hash.h"
 #include "ctl/utility.h"
 
 namespace celonis::accelerator::ctl {
@@ -20,6 +21,14 @@ class array_view;
 /** Returns whether the given view is a (sub-)view into the given range */
 template <typename T, std::ranges::contiguous_range RANGE>
 [[nodiscard]] bool is_view_into_range(array_view<T> view, RANGE&& r);
+
+template <typename T>
+[[nodiscard]] bool cmp_ref(const array_view<T>& lhs, const array_view<T>& rhs);
+
+struct array_view_hash_ref {
+  template <typename T>
+  [[nodiscard]] std::size_t operator()(const array_view<T>& array_view) const;
+};
 
 namespace details {
 template <typename TO, typename FROM>
@@ -113,6 +122,19 @@ inline bool is_view_into_range(array_view<T> view, RANGE&& r) {
   using std::to_address;
   static constexpr std::less_equal<> leq;
   return leq(to_address(begin(r)), to_address(begin(view))) && leq(to_address(end(view)), to_address(end(r)));
+}
+
+template <typename T>
+inline bool cmp_ref(const array_view<T>& lhs, const array_view<T>& rhs) {
+  return lhs.begin() == rhs.begin() && lhs.size() == rhs.size();
+}
+
+template <typename T>
+inline std::size_t array_view_hash_ref::operator()(const array_view<T>& array_view) const {
+  std::size_t hash_value{0};
+  hash_combine(hash_value, array_view.begin());
+  hash_combine(hash_value, array_view.size());
+  return hash_value;
 }
 
 template <typename ITER, typename END_OR_SIZE>

@@ -16,7 +16,19 @@ static constexpr const char* DATADOG_LOG_MESSAGE_ATTRIBUTE{"message"};
  * @brief Enum depicting keys of metadata that improve the distinction of log and trace messages of different engine
  * processes.
  */
-enum class metadata_key : int8_t { DATAMODEL_ID, DATAMODEL_NAME, TEAM_ID, QUERY_ID, QUERY_BATCHLIST_ID };
+enum class metadata_key : int8_t {
+  QUERY_ENGINE_VERSION,
+  DATAMODEL_ID,
+  DATAMODEL_NAME,
+  TEAM_ID,
+  LOAD_VERSION,
+  ACCELERATOR_ID,
+  QUERY_ID,
+  QUERY_BATCHLIST_ID,
+  LOG_TIMESTAMP,
+  LOG_THREAD,
+  LOG_LEVEL
+};
 
 /**
  * @brief Incoming request types processed by the engine

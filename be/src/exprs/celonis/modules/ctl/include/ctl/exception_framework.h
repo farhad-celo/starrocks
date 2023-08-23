@@ -72,19 +72,20 @@ class base_exception : public std::exception {
   virtual ~base_exception() noexcept = default;  // NOLINT(modernize-use-override)
 
  public:
+  /** The exception context is written into this key of the json_key_value_container_ **/
+  inline static const format::json::json_key_t EXCEPTION_CONTEXT_KEY{"saola_exception"};  // NOLINT(cert-err58-cpp)
+
   [[deprecated("Use the more explicit 'internal_message()' or 'external_message()' calls.")]] [[nodiscard]] const char*
   what() const noexcept final;  // final as internal-/external_message should be overloaded
   /** Message to be used for internal communication (defaults to 'what()') */
   [[nodiscard]] virtual std::string internal_message() const;
   /** Message to be used for external communication (defaults to 'what()') */
   [[nodiscard]] virtual std::string external_message() const;
-  /** Provides access to the internal JSON map */
+  /** Returns a JSON object with key #EXCEPTION_CONTEXT_KEY that contains additional data stored for the exception. */
   [[nodiscard]] const format::json::json_object_t& json_key_value_container() const noexcept;
-  /** JSON string to be used for internal logging */
-  [[nodiscard]] std::string format_as_json_string() const;
   /** Allows to add further key-value pairs to the internal JSON map */
   auto add_or_overwrite(const format::json::json_key_t& key, const format::json::json_value_t& value) {
-    return json_key_value_container_.insert_or_assign(key, value);
+    return json_exception_context().insert_or_assign(key, value);
   }
   /** Same as above but supports batch input */
   void add_or_overwrite(const format::json::json_object_t& json_key_value_container);
@@ -93,6 +94,8 @@ class base_exception : public std::exception {
   static constexpr std::string_view BACKTRACE_KEY{"backtrace"};
   // To make virtual multiple inheritance easier to work with, this can be called from the ctor bodies of sub classes
   void init(std::string message, std::string_view exception_type_as_text);
+  /** Returns the JSON object that contains additional data stored for the exception. **/
+  [[nodiscard]] format::json::json_object_t& json_exception_context();
   /**Do not change the order of these members! 'gdb_data_table_cache_content_command.py' relies on this memory layout*/
   std::string error_message_{};                             // NOLINT(misc-non-private-member-variables-in-classes)
   format::json::json_object_t json_key_value_container_{};  // NOLINT(misc-non-private-member-variables-in-classes)

@@ -9,7 +9,12 @@
 
 #ifndef CELOSTAR
 #include "ctl/memory/memory_tracking_strategy.h"
+#include "ctl/mutex.h"
 #include "modules/common/tracing/span.h"
+#include "modules/cube/extended_tables.h"
+#include "modules/cube/table_to_user_visible_name_mapping.h"
+#include "modules/memory/column_fwd.h"
+#include "modules/memory/table_fwd.h"
 #include "modules/memory/warnings.h"
 
 namespace celonis::accelerator {
@@ -72,7 +77,6 @@ class execution_context {
 
   // not copyable as it would interfere with span time measurement
   execution_context& operator=(const execution_context&) = delete;
-  execution_context(const execution_context&) = delete;
 
   /**
    * Creates a sub context. This results in the creation a child span of the span managed by this context.
@@ -85,10 +89,22 @@ class execution_context {
   execution_context create_sub_context(const std::string& operation_name, const tracing::tags_t& tags) const noexcept;
 
   /**
+   * Creates a sub context that references the same span as the current context.
+   *
+   * @return the created sub context
+   */
+  execution_context create_sub_context_with_same_span() const;
+
+  /**
    * @return span managed by this context
    */
-  const tracing::span& get_span() const noexcept { return span_; }
-  tracing::span& get_span() noexcept { return span_; }
+  const tracing::span& get_span() const { return *span_; }
+  tracing::span& get_span() { return *span_; }
+
+  /**
+   * @return shared_ptr to the span managed by this context. Only used for testing.
+   */
+  const tracing::span_t& get_shared_span() const { return span_; }
 
   /**
    * Changes the memory tracking strategy that will be unsed in the scope of this execution context.
@@ -123,6 +139,19 @@ class execution_context {
    */
   memory::warnings_container_t get_warnings() const noexcept;
 
+  void add_user_visible_name_mapping(const memory::table* table, memory::user_visible_table_name name);
+
+  [[nodiscard]] std::optional<memory::user_visible_table_name> lookup_user_visible_name(
+      const memory::table* table) const;
+
+  void add_column_to_extended_table(const memory::table* table, const std::string& column_name,
+                                    memory::column_t column);
+
+  [[nodiscard]] std::optional<memory::column_t> lookup_column_from_extended_table(const memory::table* table,
+                                                                                  std::string_view column_name) const;
+
+  std::vector<std::string> get_columns_from_extended_table(const memory::table* table) const;
+
   ~execution_context();
 
  private:
@@ -134,13 +163,23 @@ class execution_context {
    */
   execution_context(tracing::span&& managed_span, const execution_context* parent) noexcept;
 
+  /**
+   * Constructor for creating a sub context that shares the same span with the root context.
+   *
+   * @param parent pointer to root execution_context.
+   */
+  explicit execution_context(const execution_context* parent);
+
   void merge_warnings(memory::warnings_container_t warnings) const noexcept;
 
-  tracing::span span_;
   const execution_context* parent_{nullptr};
+  tracing::span_t span_;
   mutable memory::warnings_container_t warnings_;
   mutable std::shared_timed_mutex warnings_mutex_;
   ctl::abstract_strategy_t memory_tracking_strategy_{nullptr};
+  ctl::owning_mutex<ctl::checked_shared_ptr<cube::table_to_user_visible_name_mapping>>
+      table_to_user_visible_name_mapping_;
+  ctl::owning_mutex<ctl::checked_shared_ptr<cube::extended_tables>> extended_tables_;
 #endif
 };
 

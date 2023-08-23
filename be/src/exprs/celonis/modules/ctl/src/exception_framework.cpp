@@ -45,10 +45,6 @@ const format::json::json_object_t& base_exception::json_key_value_container() co
   return json_key_value_container_;
 }
 
-std::string base_exception::format_as_json_string() const {
-  return format::json::json_t{json_key_value_container()}.to_string();
-}
-
 void base_exception::add_or_overwrite(const format::json::json_object_t& json_key_value_container) {
   std::for_each(json_key_value_container.cbegin(), json_key_value_container.cend(),
                 [this](const std::pair<const format::json::json_key_t&, const format::json::json_value_t&>& key_value) {
@@ -57,12 +53,20 @@ void base_exception::add_or_overwrite(const format::json::json_object_t& json_ke
                 });
 }
 
+format::json::json_object_t& base_exception::json_exception_context() {
+  const auto exception_context_entry_it{
+      json_key_value_container_.try_emplace(EXCEPTION_CONTEXT_KEY, format::json::json_object_t{}).first};
+  return std::get<format::json::json_object_t>(exception_context_entry_it->second);
+}
+
 void base_exception::init(std::string message, std::string_view exception_type_as_text) {
   static const format::json::json_key_t EXCEPTION_TYPE_KEY{"type"};
-  static const format::json::json_key_t MESSAGE_KEY{"message"};
+  static const format::json::json_key_t EXCEPTION_MESSAGE_KEY{"message"};
   error_message_ = std::move(message);
   add_or_overwrite(EXCEPTION_TYPE_KEY, exception_type_as_text);
-  add_or_overwrite(MESSAGE_KEY, error_message_);
+  // The exception message should be part of the exception context for cases where neither internal nor external message
+  // are logged, but only the exception context and some other explanatory text
+  add_or_overwrite(EXCEPTION_MESSAGE_KEY, error_message_);
 }
 
 }  // namespace celonis::accelerator::ctl
