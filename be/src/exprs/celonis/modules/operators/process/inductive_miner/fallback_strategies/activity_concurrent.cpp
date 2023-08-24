@@ -2,16 +2,11 @@
 
 #ifdef CELOSTAR
 #include "ctl/assert.h"
-#include "inductive_miner/base_case_strategy.h"
-#include "inductive_miner/cut_strategy.h"
-#include "inductive_miner/fallback_strategy.h"
-#include "inductive_miner/inductive_miner.h"
-#else
+#endif
 #include "modules/operators/process/inductive_miner/base_case_strategy.h"
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
 #include "modules/operators/process/inductive_miner/fallback_strategy.h"
 #include "modules/operators/process/inductive_miner/inductive_miner.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

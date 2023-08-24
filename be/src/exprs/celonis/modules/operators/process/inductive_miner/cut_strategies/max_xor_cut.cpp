@@ -3,14 +3,9 @@
 #include <boost/graph/filtered_graph.hpp>
 #include <ranges>
 
-#ifdef CELOSTAR
-#include "../cut_strategy.h"
-#endif
 #include "ctl/assert.h"
 #include "ctl/conversion.h"
-#ifndef CELOSTAR
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

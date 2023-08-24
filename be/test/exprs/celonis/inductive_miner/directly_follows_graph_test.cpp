@@ -3,10 +3,10 @@
 
 #include "exprs/celonis/variant.h"
 #include "exprs/celonis/variant_stats.h"
-#include "inductive_miner/directly_follows_graph.h"
-#include "inductive_miner/inductive_miner.h"
-#include "inductive_miner/splittable_eventlog_config.h"
 #include "modules/common/execution_context.h"
+#include "modules/operators/process/inductive_miner/directly_follows_graph.h"
+#include "modules/operators/process/inductive_miner/inductive_miner.h"
+#include "modules/operators/process/inductive_miner/splittable_eventlog_config.h"
 #include "runtime/mem_pool.h"
 #include "util/slice.h"
 

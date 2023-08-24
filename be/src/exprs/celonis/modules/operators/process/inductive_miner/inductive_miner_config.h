@@ -2,17 +2,15 @@
 
 #include <optional>
 
-#ifdef CELOSTAR
-#include "inductive_miner/directly_follows_graph_fwd.h"
-#include "inductive_miner/splittable_eventlog.h"
-#include "inductive_miner/splittable_eventlog_config.h"
-#else
+#ifndef CELOSTAR
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/cache/variant_trace_cache_fwd.h"
 #include "modules/memory/column_fwd.h"
+#endif
 #include "modules/operators/process/inductive_miner/directly_follows_graph_fwd.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog_config.h"
+#ifndef CELOSTAR
 #include "modules/operators/process/variant_constants.h"
 #endif
 

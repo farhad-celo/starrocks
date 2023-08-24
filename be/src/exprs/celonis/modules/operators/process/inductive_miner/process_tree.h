@@ -7,9 +7,6 @@
 #include <vector>
 
 #include "ctl/utility.h"
-#ifdef CELOSTAR
-#include "inductive_miner/process_tree_ref.h"
-#endif
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
@@ -18,11 +15,12 @@
 #include "modules/memory/column_fwd.h"
 #endif
 #include "modules/memory/row_id.h"
+#ifndef CELOSTAR
+#include "modules/memory/table_fwd.h"
+#endif
+#include "modules/operators/process/inductive_miner/process_tree_ref.h"
 #ifdef CELOSTAR
 #include "result_table.h"
-#else
-#include "modules/memory/table_fwd.h"
-#include "modules/operators/process/inductive_miner/process_tree_ref.h"
 #endif
 
 namespace celonis::accelerator::operators::process {

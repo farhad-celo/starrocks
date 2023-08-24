@@ -8,14 +8,9 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
-#ifdef CELOSTAR
-#include "../cut_strategy.h"
-#endif
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/for_each_group.h"
-#ifndef CELOSTAR
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

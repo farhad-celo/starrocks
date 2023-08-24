@@ -1,10 +1,6 @@
 #include "inductive_miner_config.h"
 
-#ifdef CELOSTAR
-#include "inductive_miner/splittable_eventlog.h"
-#else
 #include "modules/operators/process/inductive_miner/splittable_eventlog.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

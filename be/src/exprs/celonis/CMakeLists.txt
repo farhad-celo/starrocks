@@ -30,12 +30,12 @@ endfunction()
 
 add_main_source(modules/common)
 add_main_source(modules/cube/execution/tracking)
-add_main_source(inductive_miner)
-add_main_source(inductive_miner/base_case_strategies)
-add_main_source(inductive_miner/cut_strategies)
-add_main_source(inductive_miner/fallback_strategies)
-add_main_source(inductive_miner/noisy_cut_strategies)
 add_main_source(modules/memory)
+add_main_source(modules/operators/process/inductive_miner)
+add_main_source(modules/operators/process/inductive_miner/base_case_strategies)
+add_main_source(modules/operators/process/inductive_miner/cut_strategies)
+add_main_source(modules/operators/process/inductive_miner/fallback_strategies)
+add_main_source(modules/operators/process/inductive_miner/noisy_cut_strategies)
 
 # modularization split
 add_module("concurrency")

@@ -1,7 +1,7 @@
 #include "exprs/celonis/inductive_miner.h"
 
 #include "column/column_helper.h"
-#include "exprs/celonis/inductive_miner/inductive_miner_helper.h"
+#include "exprs/celonis/modules/operators/process/inductive_miner/inductive_miner_helper.h"
 #include "exprs/celonis/result_table.h"
 #include "exprs/celonis/variant.h"
 #include "exprs/celonis/variant_agg.h"

@@ -5,22 +5,18 @@
 #include <fmt/format.h>
 
 #include "ctl/assert.h"
-#ifdef CELOSTAR
-#include "inductive_miner/base_case_strategy.h"
-#include "inductive_miner/cut_strategy.h"
-#include "inductive_miner/fallback_strategy.h"
-#include "inductive_miner/process_tree_reduction.h"
-#include "modules/common/execution_context.h"  // To be deleted
-#else
 #include "ctl/conversion.h"
 #include "ctl/exception_traits.h"
 #include "log/log.h"
+#ifndef CELOSTAR
 #include "modules/memory/column.h"
 #include "modules/operators/process/dot_format_helper.h"
+#endif
 #include "modules/operators/process/inductive_miner/base_case_strategy.h"
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
 #include "modules/operators/process/inductive_miner/fallback_strategy.h"
 #include "modules/operators/process/inductive_miner/process_tree_reduction.h"
+#ifndef CELOSTAR
 #include "modules/operators/process/inductive_miner/replay_eventlog_on_process_tree.h"
 #include "modules/operators/process/mka/m2_abstraction.h"
 #include "modules/operators/process/mka/mk_abstraction.h"

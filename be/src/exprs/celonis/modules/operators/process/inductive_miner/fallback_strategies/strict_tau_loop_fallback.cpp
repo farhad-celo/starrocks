@@ -5,16 +5,13 @@
 #include <iterator>
 #include <vector>
 
-#ifdef CELOSTAR
-#include "../fallback_strategy.h"
-#endif
 #include "ctl/conversion.h"
 #include "modules/common/for_each_group.h"
 #ifndef CELOSTAR
 #include "modules/cube/filter_bitset.h"
 #include "modules/memory/column.h"
-#include "modules/operators/process/inductive_miner/fallback_strategy.h"
 #endif
+#include "modules/operators/process/inductive_miner/fallback_strategy.h"
 
 namespace celonis::accelerator::operators::process {
 

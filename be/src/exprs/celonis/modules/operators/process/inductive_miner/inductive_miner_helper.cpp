@@ -4,12 +4,12 @@
 
 #include "exprs/celonis/result_table.h"
 #include "exprs/celonis/variant.h"
-#include "inductive_miner/directly_follows_graph.h"
-#include "inductive_miner/inductive_miner.h"
-#include "inductive_miner/inductive_miner_statistics.h"
-#include "inductive_miner/splittable_eventlog_config.h"
 #include "modules/common/execution_context.h"
 #include "modules/cube/execution/tracking/stop_token.h"
+#include "modules/operators/process/inductive_miner/directly_follows_graph.h"
+#include "modules/operators/process/inductive_miner/inductive_miner.h"
+#include "modules/operators/process/inductive_miner/inductive_miner_statistics.h"
+#include "modules/operators/process/inductive_miner/splittable_eventlog_config.h"
 
 using starrocks::celonis::ResultTable;
 

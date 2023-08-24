@@ -2,17 +2,10 @@
 
 #include <optional>
 
-#ifdef CELOSTAR
-#include "inductive_miner/cut_strategy.h"
-#include "inductive_miner/directly_follows_graph.h"
-#include "inductive_miner/inductive_miner.h"
-#include "inductive_miner/process_tree.h"
-#else
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
 #include "modules/operators/process/inductive_miner/directly_follows_graph.h"
 #include "modules/operators/process/inductive_miner/inductive_miner.h"
 #include "modules/operators/process/inductive_miner/process_tree.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

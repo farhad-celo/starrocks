@@ -17,9 +17,6 @@
 #endif
 #include "ctl/assert.h"
 #include "ctl/utility.h"
-#ifdef CELOSTAR
-#include "inductive_miner/parallel_stable_integer_sort_copy.h"
-#endif
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/for_each_group.h"
 #ifndef CELOSTAR

@@ -1,8 +1,4 @@
-#ifdef CELOSTAR
-#include "../cut_strategy.h"
-#else
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

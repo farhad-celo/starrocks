@@ -2,22 +2,17 @@
 
 #include <vector>
 
-#ifdef CELOSTAR
-#include "inductive_miner/splittable_eventlog_config.h"
-#include "inductive_miner/splittable_eventlog_fwd.h"
-#include "inductive_miner/splittable_eventlog_types.h"
-#include "modules/common/execution_context_fwd.h"
-#else
+#ifndef CELOSTAR
 #include "ctl/concepts.h"
 #include "ctl/static_array.h"
 #include "modules/cube/filter_bitset_fwd.h"
 #include "modules/memory/cache/variant_trace_cache_fwd.h"
 #include "modules/memory/column_pointers.h"
+#endif
 #include "modules/operators/process/inductive_miner/splittable_eventlog_config.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog_fwd.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog_types.h"
 #include "parallel_stable_integer_sort_copy.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

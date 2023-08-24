@@ -10,15 +10,13 @@
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/shared_types.h"
 #ifdef CELOSTAR
-#include "inductive_miner/directly_follows_graph_fwd.h"
-#include "inductive_miner/splittable_eventlog_fwd.h"
 #include "util/phmap/phmap.h"
 #else
 #include "modules/cube/filter_bitset_fwd.h"
 #include "modules/memory/column_fwd.h"
+#endif
 #include "modules/operators/process/inductive_miner/directly_follows_graph_fwd.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog_fwd.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

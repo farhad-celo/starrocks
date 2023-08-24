@@ -1,9 +1,5 @@
 #pragma once
-#ifdef CELOSTAR
-#include "inductive_miner/process_tree.h"
-#else
 #include "modules/operators/process/inductive_miner/process_tree.h"
-#endif
 
 namespace celonis::accelerator::operators::process::reduction {
 // associativity reduction rules

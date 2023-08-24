@@ -2,13 +2,8 @@
 #include <boost/dynamic_bitset.hpp>
 #endif
 
-#ifdef CELOSTAR
-#include "../fallback_strategy.h"
-#endif
 #include "modules/common/for_each_group.h"
-#ifndef CELOSTAR
 #include "modules/operators/process/inductive_miner/fallback_strategy.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 

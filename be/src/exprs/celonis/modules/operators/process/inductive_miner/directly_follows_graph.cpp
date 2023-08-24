@@ -10,9 +10,7 @@
 #include <tbb/parallel_for_each.h>
 
 #include "ctl/conversion.h"
-#ifdef CELOSTAR
-#include "inductive_miner/splittable_eventlog.h"
-#else
+#ifndef CELOSTAR
 #include "ctl/static_array.h"
 #include "ctl/utility.h"
 #endif
@@ -22,8 +20,8 @@
 #ifndef CELOSTAR
 #include "modules/cube/filter_bitset.h"
 #include "modules/memory/column.h"
-#include "modules/operators/process/inductive_miner/splittable_eventlog.h"
 #endif
+#include "modules/operators/process/inductive_miner/splittable_eventlog.h"
 
 namespace celonis::accelerator::operators::process {
 

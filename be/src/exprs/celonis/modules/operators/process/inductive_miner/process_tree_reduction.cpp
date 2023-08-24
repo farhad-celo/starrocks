@@ -6,16 +6,13 @@
 
 #include "ctl/assert.h"
 #include "format/json/json.h"
-#ifdef CELOSTAR
-#include "inductive_miner/process_tree.h"
-#endif
 #include "log/log.h"
 #include "modules/common/exceptions.h"
 #include "modules/cube/execution/tracking/stop_token.h"
 #ifndef CELOSTAR
 #include "modules/operators/process/dot_format_helper.h"
-#include "modules/operators/process/inductive_miner/process_tree.h"
 #endif
+#include "modules/operators/process/inductive_miner/process_tree.h"
 
 namespace celonis::accelerator::operators::process::reduction {
 

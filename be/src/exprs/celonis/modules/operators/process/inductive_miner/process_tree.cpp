@@ -1,8 +1,4 @@
-#ifdef CELOSTAR
-#include "process_tree.h"
-#else
 #include "modules/operators/process/inductive_miner/process_tree.h"
-#endif
 
 #include <algorithm>
 #include <iterator>

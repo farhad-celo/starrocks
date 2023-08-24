@@ -2,19 +2,12 @@
 
 #ifdef CELOSTAR
 #include "exprs/celonis/variant.h"
-#include "inductive_miner/directly_follows_graph.h"
-#include "inductive_miner/inductive_miner_config.h"
-#include "inductive_miner/inductive_miner_statistics.h"
-#include "inductive_miner/process_tree.h"
-#include "inductive_miner/splittable_eventlog.h"
 #endif
 #include "modules/cube/execution/tracking/stop_token.h"
-#ifndef CELOSTAR
 #include "modules/operators/process/inductive_miner/directly_follows_graph_fwd.h"
 #include "modules/operators/process/inductive_miner/inductive_miner_config.h"
 #include "modules/operators/process/inductive_miner/inductive_miner_statistics.h"
 #include "modules/operators/process/inductive_miner/process_tree.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 
