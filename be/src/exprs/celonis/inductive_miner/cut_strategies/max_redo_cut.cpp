@@ -7,10 +7,15 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
+#ifdef CELOSTAR
 #include "../cut_strategy.h"
+#endif
 #include "ctl/algorithm.h"
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
+#include "modules/operators/process/inductive_miner/cut_strategy.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -172,7 +177,8 @@ cut_t max_redo_cut::find(const directly_follows_graph& dfg) {
 
 max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_config,
                                                const directly_follows_graph& old_dfg, const cut_t& cut,
-                                               common::execution_context& context) {
+                                               const common::execution_context& context,
+                                               const cube::execution::tracking::stop_token& stop_token) {
   const auto apply_context{context.create_sub_context("max_redo_cut::apply", {})};
 
 #ifdef CELOSTAR
@@ -181,27 +187,28 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
   // ensure that we have enough space
   const auto extra_id_count{extra_trace_identifier_count(old_dfg, cut)};
   {
-    const auto trace_domain_count{miner_config.eventlog.trace_domain_count()};
-    miner_config.eventlog = splittable_eventlog::canonicalize_if_necessary(
-        std::move(miner_config.eventlog), trace_domain_count + extra_id_count, context);
+    const auto trace_domain_count{miner_config.eventlog().trace_domain_count()};
+    miner_config.eventlog() = splittable_eventlog::canonicalize_if_necessary(
+        std::move(miner_config.eventlog()), trace_domain_count + extra_id_count, context);
   }
 #endif
   // find the mapping of activity ids to dfgs
   const auto activity_to_dfg_mapping{
-      cut_strategy::to_activity_dfg_map(cut, old_dfg, miner_config.eventlog.activity_domain_count())};
+      cut_strategy::to_activity_dfg_map(cut, old_dfg, miner_config.eventlog().activity_domain_count())};
   const auto get_dfg{[&activity_to_dfg_mapping](const auto& p) { return activity_to_dfg_mapping[p.activity_id()]; }};
   // add extra trace ids
+  stop_token.stop_execution_if_requested();
   std::visit(
       [&]<typename VIEW>(const VIEW& view) {
         using trace_id_type = typename eventlog_view_element_t<VIEW>::trace_id_raw_type;
 #ifndef CELOSTAR
         std::vector<std::atomic<trace_id_type>> extra_ids(cut.first);
         std::ranges::for_each(
-            extra_ids, [size = ctl::cast<trace_id_type>(miner_config.eventlog.trace_domain_count().get())](auto& id) {
+            extra_ids, [size = ctl::cast<trace_id_type>(miner_config.eventlog().trace_domain_count().get())](auto& id) {
               id.store(size, std::memory_order_relaxed);
             });
 #endif
-        common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size, [&](auto interval) {
+        common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size(), [&](auto interval) {
 #ifdef CELOSTAR
           boost::dynamic_bitset sublog_iteration_counts(cut.first, false);
 #else
@@ -215,8 +222,8 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
             if (const auto dfg_index{get_dfg(*it)}; sublog_iteration_counts.test(dfg_index)) {
               // fill trace id with new value
 #ifdef CELOSTAR
-              int multiplicity = miner_config.eventlog.get_variant_multiplicity(it->second);
-              auto new_trace_id = miner_config.eventlog.add_variant(multiplicity);
+              int multiplicity = miner_config.eventlog().get_variant_multiplicity(it->second);
+              auto new_trace_id = miner_config.eventlog().add_variant(multiplicity);
               std::for_each(it, next, [new_trace_id](auto& p) { p.second = new_trace_id; });
 #else
               std::for_each(it, next, [index = extra_ids[dfg_index]++](auto& p) { p.second = index; });
@@ -227,14 +234,15 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
           }
         });
 #ifndef CELOSTAR
-        miner_config.eventlog.set_trace_domain_count(
+        miner_config.eventlog().set_trace_domain_count(
             ctl::cast<row_id>(std::ranges::max_element(extra_ids, [](const auto& lhs, const auto& rhs) {
                                 return lhs.load(std::memory_order_relaxed) < rhs.load(std::memory_order_relaxed);
                               })->load(std::memory_order_relaxed)));
 #endif
       },
-      miner_config.eventlog.current_split_eventlog_view());
-  auto sub_eventlogs{miner_config.eventlog.split(activity_to_dfg_mapping)};
+      miner_config.eventlog().current_split_eventlog_view());
+  stop_token.stop_execution_if_requested();
+  auto sub_eventlogs{miner_config.eventlog().split(activity_to_dfg_mapping)};
   debug_assert(sub_eventlogs.size() == cut.first);
   auto dfgs{get_sub_dfgs_from_old_dfg(old_dfg, cut)};
   debug_assert(
@@ -246,8 +254,10 @@ max_redo_cut::apply_result max_redo_cut::apply(inductive_miner_config miner_conf
 }
 
 process_tree::redo max_redo_cut::from_dfgs(inductive_miner_config miner_config,
-                                           max_redo_cut::apply_result logs_and_dfgs, common::execution_context& context,
-                                           inductive_miner_statistics& miner_statistics) {
+                                           max_redo_cut::apply_result logs_and_dfgs,
+                                           const common::execution_context& context,
+                                           inductive_miner_statistics& miner_statistics,
+                                           const cube::execution::tracking::stop_token& stop_token) {
   process_tree::redo result{};
   result.child_redo_counts.resize(logs_and_dfgs.dfgs.size());
   std::ranges::transform(logs_and_dfgs.dfgs, begin(result.child_redo_counts),
@@ -255,8 +265,8 @@ process_tree::redo max_redo_cut::from_dfgs(inductive_miner_config miner_config,
   result.children.resize(result.child_redo_counts.size());
   std::ranges::transform(logs_and_dfgs.eventlogs, logs_and_dfgs.dfgs, begin(result.children),
                          [&](auto& log, auto& dfg) {
-                           miner_config.eventlog = std::move(log);
-                           return inductive_miner_recurse(miner_config, dfg, context, miner_statistics);
+                           miner_config.eventlog() = std::move(log);
+                           return inductive_miner_recurse(miner_config, dfg, context, miner_statistics, stop_token);
                          });
   if (!result.child_redo_counts.empty()) {
     // Since the number of repetitions of the first child is the sum of the counts of the other children,

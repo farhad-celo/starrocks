@@ -23,42 +23,6 @@
 namespace celonis::accelerator::operators::process {
 
 /**
- * This struct stores all the details on how infrequent behavior should be filtered.
- */
-struct dfg_filter_config {
-  /**
-   * Stores whether start and end activities should be filtered at all.
-   */
-  bool vertices{false};
-  /**
-   * Stores the threshold to be used for the start and end activities.
-   */
-  cel_float_t vertices_threshold{0.};
-
-  /**
-   * Inside the base case of a noise affected single activity, `noisy_single_activity_base_case`,
-   * this is an upper bound on the average number of occurences (of a single activity) per trace,
-   * so that the activity will be considered as a true singleton. Remember: empty traces will be
-   * removed before this average is computed.
-   */
-  cel_float_t vertices_max_avg_occurences{1.};
-
-  /**
-   * Stores whether the successions should be filtered at all.
-   */
-  bool edges{false};
-  /**
-   * Stores the threshold to be used for the successions.
-   */
-  cel_float_t edges_threshold{0.};
-  /**
-   * Stores whether the count of an activity being the end activity of a trace
-   * should be included in the maximum of the cardinalities of the out edges.
-   */
-  bool edges_consider_end_activities{true};
-};
-
-/**
  * boost::adjacency list only supports vector and unordered_map which are too slow to aggregate the edges
  * We use flat hashmaps to pre-aggregate the statistics. The DFG is built in a final build step.
  */
@@ -110,8 +74,8 @@ namespace dfg {
  * @param grain_size the grain size to use for parallelization
  * @return the directly-follows graph corresponding to
  */
-directly_follows_graph initialize_dfg(const splittable_eventlog& eventlog_data, common::execution_context& context,
-                                      size_t grain_size = 1 << 17);
+directly_follows_graph initialize_dfg(const splittable_eventlog& eventlog_data,
+                                      const common::execution_context& context, size_t grain_size = 1 << 17);
 
 /**
  * This function may be used to remove noise out of the start and end activities

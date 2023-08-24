@@ -5,12 +5,15 @@
 #include <iterator>
 #include <vector>
 
+#ifdef CELOSTAR
 #include "../fallback_strategy.h"
+#endif
 #include "ctl/conversion.h"
 #include "modules/common/for_each_group.h"
 #ifndef CELOSTAR
 #include "modules/cube/filter_bitset.h"
 #include "modules/memory/column.h"
+#include "modules/operators/process/inductive_miner/fallback_strategy.h"
 #endif
 
 namespace celonis::accelerator::operators::process {
@@ -63,15 +66,15 @@ size_t split_dfg_strict_tau_style(directly_follows_graph& dfg) {
 }
 
 size_t apply_internal(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                      common::execution_context& context) {
+                      const common::execution_context& context) {
   // compute the number of additional sub-traces and already split the dfg
   const auto num_additional_traces{split_dfg_strict_tau_style(dfg)};
 #ifdef CELOSTAR
   // In Celostar, we use a fixed 32bit space.
 #else
   // ensure that our event-log has enough "space" to accommodate additional group ids
-  miner_config.eventlog =
-      splittable_eventlog::canonicalize_if_necessary(std::move(miner_config.eventlog), num_additional_traces, context);
+  miner_config.eventlog() = splittable_eventlog::canonicalize_if_necessary(std::move(miner_config.eventlog()),
+                                                                           num_additional_traces, context);
 #endif
   std::visit(
       [&miner_config, &dfg](auto view) {
@@ -99,17 +102,17 @@ size_t apply_internal(inductive_miner_config& miner_config, directly_follows_gra
         }};
 #ifndef CELOSTAR
         // TODO(a.swoboda) consider parallelizing this
-        std::atomic<group_id_type> index{ctl::cast<group_id_type>(miner_config.eventlog.trace_domain_count().get())};
+        std::atomic<group_id_type> index{ctl::cast<group_id_type>(miner_config.eventlog().trace_domain_count().get())};
 #endif
-        common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size, [&](auto interval) mutable {
+        common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size(), [&](auto interval) mutable {
           // find adjacent end and start indices, and fill all the following elements with a new index
           const auto interval_last{std::next(view.begin(), interval.end())};
           for (auto it{get_next_start(std::next(view.begin(), interval.begin()), interval_last)}, next_it{it};
                it != interval_last; it = next_it) {
             next_it = get_next_start(it, interval_last);
 #ifdef CELOSTAR
-            int multiplicity = miner_config.eventlog.get_variant_multiplicity(it->second);
-            auto new_trace_id = miner_config.eventlog.add_variant(multiplicity);
+            int multiplicity = miner_config.eventlog().get_variant_multiplicity(it->second);
+            auto new_trace_id = miner_config.eventlog().add_variant(multiplicity);
             std::for_each(it, next_it, [new_trace_id](auto& p) { p.second = new_trace_id; });
 #else
             std::for_each(it, next_it,
@@ -118,38 +121,37 @@ size_t apply_internal(inductive_miner_config& miner_config, directly_follows_gra
           }
         });
       },
-      miner_config.eventlog.current_split_eventlog_view());
-  miner_config.eventlog.set_trace_domain_count(miner_config.eventlog.trace_domain_count() +
-                                               ctl::cast<row_id>(num_additional_traces));
+      miner_config.eventlog().current_split_eventlog_view());
+  miner_config.eventlog().set_trace_domain_count(miner_config.eventlog().trace_domain_count() +
+                                                 ctl::cast<row_id>(num_additional_traces));
   return num_additional_traces;
 }
 
 }  // namespace
 
-bool strict_tau_loop_fallback::is_applicable(const inductive_miner_config& miner_config,
-                                             const directly_follows_graph& dfg,
+bool strict_tau_loop_fallback::is_applicable(inductive_miner_config& miner_config, const directly_follows_graph& dfg,
                                              const common::execution_context& context) {
 #ifdef CELOSTAR
-  boost::dynamic_bitset<> start_activities(miner_config.eventlog.activity_domain_count());
+  boost::dynamic_bitset<> start_activities(miner_config.eventlog().activity_domain_count());
 #else
-  ctl::dynamic_bitset start_activities(miner_config.eventlog.activity_domain_count(), false);
+  ctl::dynamic_bitset start_activities(miner_config.eventlog().activity_domain_count(), false);
 #endif
   std::ranges::for_each(dfg[boost::graph_bundle].start_vertices,
                         [&](auto v) { start_activities.set(dfg[v.first].activity_id); });
   const auto is_applicable_context{context.create_sub_context("strict_tau_loop_fallback::is_applicable", {})};
 #ifdef CELOSTAR
-  boost::dynamic_bitset<> end_activities(miner_config.eventlog.activity_domain_count());
+  boost::dynamic_bitset<> end_activities(miner_config.eventlog().activity_domain_count());
 #else
-  ctl::dynamic_bitset end_activities(miner_config.eventlog.activity_domain_count(), false);
+  ctl::dynamic_bitset end_activities(miner_config.eventlog().activity_domain_count(), false);
 #endif
   std::ranges::for_each(dfg[boost::graph_bundle].end_vertices,
                         [&](auto v) { end_activities.set(dfg[v.first].activity_id); });
   return std::visit(exec_is_applicable{start_activities, end_activities},
-                    miner_config.eventlog.current_split_eventlog_view());
+                    miner_config.eventlog().current_split_eventlog_view());
 }
 
 tau_loop_split_result strict_tau_loop_fallback::apply(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                                                      common::execution_context& context) {
+                                                      const common::execution_context& context) {
   auto apply_context{context.create_sub_context("strict_tau_loop_fallback::apply", {})};
   const auto redo_count{apply_internal(miner_config, dfg, context)};
   return redo_count;

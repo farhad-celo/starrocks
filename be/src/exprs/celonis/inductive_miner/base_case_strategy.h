@@ -43,7 +43,8 @@ class empty_traces_base_case {
    */
   static bool is_applicable(const directly_follows_graph& dfg);
   static process_tree apply(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                            common::execution_context& context, inductive_miner_statistics& miner_statistics);
+                            const common::execution_context& context, inductive_miner_statistics& miner_statistics,
+                            const cube::execution::tracking::stop_token& stop_token);
   static counts update_dfg(directly_follows_graph& dfg);
 };
 

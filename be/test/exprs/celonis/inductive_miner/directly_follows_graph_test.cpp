@@ -96,10 +96,11 @@ TEST_F(CelonisDirectlyFollowsGraphTest, FilteringNoise) {
     add_variant({"C", "B", "A"}, 1);
 
     dfg_filter_config filter_config;
-    inductive_miner_operator_config op_config{make_splittable_eventlog_config(variant_map_, 1024), filter_config};
     common::execution_context dummy_context;
-    auto miner_config = inductive_miner_config::from_op_config(op_config, dummy_context);
-    auto dfg{dfg::initialize_dfg(miner_config.eventlog, dummy_context, miner_config.grain_size)};
+    size_t grain_size{1024};
+    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variant_map_, grain_size), dummy_context,
+                                               grain_size, filter_config};
+    auto dfg{dfg::initialize_dfg(miner_config.eventlog(), dummy_context, miner_config.grain_size())};
 
     // TODO(j.kim): Use a graph comparison.
     EXPECT_THAT(extract_start_activities(dfg), UnorderedElementsAre(Pair(A, 8), Pair(C, 1)));
@@ -130,10 +131,11 @@ TEST_F(CelonisDirectlyFollowsGraphTest, FilterInfrequentBehaviorFromInductiveMin
     add_variant({"B", "D", "C", "B", "D"}, 1);
 
     dfg_filter_config filter_config;
-    inductive_miner_operator_config op_config{make_splittable_eventlog_config(variant_map_, 1024), filter_config};
     common::execution_context dummy_context;
-    auto miner_config = inductive_miner_config::from_op_config(op_config, dummy_context);
-    auto dfg{dfg::initialize_dfg(miner_config.eventlog, dummy_context, miner_config.grain_size)};
+    size_t grain_size{1024};
+    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variant_map_, grain_size), dummy_context,
+                                               grain_size, filter_config};
+    auto dfg{dfg::initialize_dfg(miner_config.eventlog(), dummy_context, miner_config.grain_size())};
 
     EXPECT_THAT(extract_start_activities(dfg), UnorderedElementsAre(Pair(B, 6), Pair(C, 5)));
     EXPECT_THAT(extract_end_activities(dfg), UnorderedElementsAre(Pair(D, 11)));
@@ -163,10 +165,11 @@ TEST_F(CelonisDirectlyFollowsGraphTest, SimpleFromNoisyXorCutTest) {
     add_variant({"C"}, 1);
 
     dfg_filter_config filter_config;
-    inductive_miner_operator_config op_config{make_splittable_eventlog_config(variant_map_, 1024), filter_config};
     common::execution_context dummy_context;
-    auto miner_config = inductive_miner_config::from_op_config(op_config, dummy_context);
-    auto dfg{dfg::initialize_dfg(miner_config.eventlog, dummy_context, miner_config.grain_size)};
+    size_t grain_size{1024};
+    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variant_map_, grain_size), dummy_context,
+                                               grain_size, filter_config};
+    auto dfg{dfg::initialize_dfg(miner_config.eventlog(), dummy_context, miner_config.grain_size())};
 
     EXPECT_THAT(extract_start_activities(dfg), UnorderedElementsAre(Pair(A, 3), Pair(C, 1)));
     EXPECT_THAT(extract_end_activities(dfg), UnorderedElementsAre(Pair(A, 2), Pair(C, 2)));

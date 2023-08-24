@@ -79,7 +79,8 @@ std::vector<reduction_rules::apply_fn> get_transformations();
 bool is_reduced(const process_tree& pt);
 constexpr int max_iterations{1000};
 void reduce_to_normal_form_recurse(process_tree& pt, const cel_string_t* dict);
-void reduce_to_normal_form(process_tree& pt, const cel_string_t* dict = nullptr);
+void reduce_to_normal_form(process_tree& pt, const cube::execution::tracking::stop_token& stop_token,
+                           const cel_string_t* dict = nullptr);
 void reduce_node(process_tree& pt, const cel_string_t* dict);
 
 template <class CONTROL_FLOW_NODE>

@@ -200,24 +200,27 @@ cut_t max_par_cut::find(const directly_follows_graph& dfg) {
 
 max_par_cut::apply_result max_par_cut::apply(inductive_miner_config& miner_config,
                                              const directly_follows_graph& old_dfg, const cut_t& cut,
-                                             common::execution_context& context) {
-  auto dfgs{apply_dfgs(miner_config, old_dfg, cut, context)};
-  return {apply_split(miner_config, old_dfg, cut, context), std::move(dfgs)};
+                                             const common::execution_context& context,
+                                             const cube::execution::tracking::stop_token& stop_token) {
+  auto dfgs{apply_dfgs(miner_config, old_dfg, cut, context, stop_token)};
+  return {apply_split(miner_config, old_dfg, cut, context, stop_token), std::move(dfgs)};
 }
 
 std::vector<directly_follows_graph> max_par_cut::apply_dfgs(const inductive_miner_config& miner_config,
                                                             const directly_follows_graph& old_dfg, const cut_t& cut,
-                                                            common::execution_context& /*context*/) {
+                                                            const common::execution_context& /*context*/,
+                                                            const cube::execution::tracking::stop_token& stop_token) {
   const auto activity_to_dfg_mapping{
-      cut_strategy::to_activity_dfg_map(cut, old_dfg, miner_config.eventlog.activity_domain_count())};
+      cut_strategy::to_activity_dfg_map(cut, old_dfg, miner_config.eventlog().activity_domain_count())};
   tbb::enumerable_thread_specific<std::vector<dfg_pre_aggregation>> thread_pre_aggs(
-      cut.first, dfg_pre_aggregation{miner_config.eventlog.activity_domain_count()});
+      cut.first, dfg_pre_aggregation{miner_config.eventlog().activity_domain_count()});
+  stop_token.stop_execution_if_requested();
   std::visit(
       [&]<typename VIEW>(const VIEW& view) {
         using activity_type = typename eventlog_view_element_t<VIEW>::activity_id_raw_type;
 
         common::for_each_group(
-            element<PICK_TRACE_ID>(view), miner_config.grain_size,
+            element<PICK_TRACE_ID>(view), miner_config.grain_size(),
             [&, last_activities = std::vector<activity_type>(cut.first)](auto interval, auto& local_pre_aggs) mutable {
               std::ranges::fill(last_activities, 0);
 #ifndef CELOSTAR
@@ -245,7 +248,7 @@ std::vector<directly_follows_graph> max_par_cut::apply_dfgs(const inductive_mine
                 }
               }
 #else
-              size_t multiplicity = miner_config.eventlog.get_variant_multiplicity(view[interval.begin()].trace_id());
+              size_t multiplicity = miner_config.eventlog().get_variant_multiplicity(view[interval.begin()].trace_id());
               for (auto idx{interval.begin()}; idx != interval.end(); ++idx) {
                 const auto current_activity{view[idx].activity_id_raw()};
                 const auto dfg_idx{activity_to_dfg_mapping[view[idx].activity_id()]};
@@ -274,7 +277,7 @@ std::vector<directly_follows_graph> max_par_cut::apply_dfgs(const inductive_mine
             },
             thread_pre_aggs);
       },
-      miner_config.eventlog.current_split_eventlog_view());
+      miner_config.eventlog().current_split_eventlog_view());
   // "transpose" the thread local pre-aggregations
   std::vector<std::vector<dfg_pre_aggregation>> pre_aggs(cut.first);
   std::ranges::for_each(thread_pre_aggs, [&](auto& local_pre_aggs) {
@@ -296,17 +299,20 @@ std::vector<directly_follows_graph> max_par_cut::apply_dfgs(const inductive_mine
 
 std::vector<splittable_eventlog> max_par_cut::apply_split(inductive_miner_config& miner_config,
                                                           const directly_follows_graph& old_dfg, const cut_t& cut,
-                                                          common::execution_context& context) {
+                                                          const common::execution_context& context,
+                                                          const cube::execution::tracking::stop_token& stop_token) {
   auto sub_eventlog_context{context.create_sub_context("max_par_cut: compute sub-eventlogs", {})};
-  const auto activity_count{miner_config.eventlog.activity_domain_count()};
+  const auto activity_count{miner_config.eventlog().activity_domain_count()};
   // create mapping from activity id to dfg id.
   const auto activity_dfg_mapping{cut_strategy::to_activity_dfg_map(cut, old_dfg, activity_count)};
-  return miner_config.eventlog.split(activity_dfg_mapping);
+  stop_token.stop_execution_if_requested();
+  return miner_config.eventlog().split(activity_dfg_mapping);
 }
 
 process_tree::parallel max_par_cut::from_dfgs(inductive_miner_config miner_config, apply_result logs_and_dfgs,
-                                              common::execution_context& context,
-                                              inductive_miner_statistics& miner_statistics) {
+                                              const common::execution_context& context,
+                                              inductive_miner_statistics& miner_statistics,
+                                              const cube::execution::tracking::stop_token& stop_token) {
   auto& [logs, dfgs]{logs_and_dfgs};
   debug_assert(logs.size() == dfgs.size());
   debug_assert(!dfgs.empty());
@@ -317,8 +323,8 @@ process_tree::parallel max_par_cut::from_dfgs(inductive_miner_config miner_confi
     const auto cmp_dfg{dfg::initialize_dfg(log, context)};
     debug_assert(cmp_dfg[boost::graph_bundle].log.trace_count ==
                  dfg[boost::graph_bundle].log.trace_count - dfg[boost::graph_bundle].log.contains_empty_trace);
-    miner_config.eventlog = std::move(log);
-    return inductive_miner_recurse(miner_config, dfg, context, miner_statistics);
+    miner_config.eventlog() = std::move(log);
+    return inductive_miner_recurse(miner_config, dfg, context, miner_statistics, stop_token);
   });
   return result;
 }

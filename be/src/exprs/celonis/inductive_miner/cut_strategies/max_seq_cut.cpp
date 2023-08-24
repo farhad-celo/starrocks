@@ -8,9 +8,14 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
+#ifdef CELOSTAR
 #include "../cut_strategy.h"
+#endif
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
+#include "modules/operators/process/inductive_miner/cut_strategy.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -233,15 +238,15 @@ cut_t merge_optional(const directly_follows_graph& dfg, const cut_t& cut) {
 
 std::vector<splittable_eventlog> compute_sub_eventlogs(inductive_miner_config& miner_config,
                                                        const directly_follows_graph& old_dfg, const cut_t& cut,
-                                                       common::execution_context& context) {
+                                                       const common::execution_context& context) {
   auto sub_eventlog_context{context.create_sub_context("max_seq_cut: compute sub-eventlogs", {})};
   auto merged_cut{merge_optional(old_dfg, cut)};
-  const auto activity_count{miner_config.eventlog.activity_domain_count()};
+  const auto activity_count{miner_config.eventlog().activity_domain_count()};
 
   const auto& [dfg_count, vertex_mapping]{merged_cut};
   // Initialize the sub-graphs and create mappings from activity id to dfg id.
   const auto activity_dfg_mapping{cut_strategy::to_activity_dfg_map(cut, old_dfg, activity_count)};
-  auto sub_eventlogs{miner_config.eventlog.split(activity_dfg_mapping)};
+  auto sub_eventlogs{miner_config.eventlog().split(activity_dfg_mapping)};
   debug_assert(sub_eventlogs.size() == dfg_count);
   return sub_eventlogs;
 }
@@ -356,9 +361,11 @@ cut_t max_seq_cut::find(const directly_follows_graph& dfg) {
 
 max_seq_cut::apply_result max_seq_cut::apply(inductive_miner_config& miner_config,
                                              const directly_follows_graph& old_dfg, const cut_t& cut,
-                                             common::execution_context& context) {
+                                             const common::execution_context& context,
+                                             const cube::execution::tracking::stop_token& stop_token) {
   auto apply_context{context.create_sub_context("max_seq_cut::apply", {})};
   auto merged_cut{merge_optional(old_dfg, cut)};
+  stop_token.stop_execution_if_requested();
   auto sub_eventlogs{compute_sub_eventlogs(miner_config, old_dfg, merged_cut, context)};
   auto sub_dfgs{get_sub_dfs_from_old_dfg(old_dfg, merged_cut)};
   debug_assert(sub_eventlogs.size() == sub_dfgs.size());
@@ -367,14 +374,15 @@ max_seq_cut::apply_result max_seq_cut::apply(inductive_miner_config& miner_confi
 
 process_tree::sequence max_seq_cut::from_dfgs(inductive_miner_config miner_config,
                                               max_seq_cut::apply_result logs_and_dfgs,
-                                              common::execution_context& context,
-                                              inductive_miner_statistics& miner_statistics) {
+                                              const common::execution_context& context,
+                                              inductive_miner_statistics& miner_statistics,
+                                              const cube::execution::tracking::stop_token& stop_token) {
   auto& [sub_eventlogs, dfgs]{logs_and_dfgs};
   process_tree::sequence result{{}, dfgs.front()[boost::graph_bundle].log.trace_count};
   std::ranges::transform(dfgs, sub_eventlogs, std::back_inserter(result.children), [&](auto& dfg, auto eventlog) {
     debug_assert(dfg[boost::graph_bundle].log.trace_count == result.object_count);
-    miner_config.eventlog = std::move(eventlog);
-    return inductive_miner_recurse(miner_config, dfg, context, miner_statistics);
+    miner_config.eventlog() = std::move(eventlog);
+    return inductive_miner_recurse(miner_config, dfg, context, miner_statistics, stop_token);
   });
 
   return result;

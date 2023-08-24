@@ -2,8 +2,13 @@
 #include <boost/dynamic_bitset.hpp>
 #endif
 
+#ifdef CELOSTAR
 #include "../fallback_strategy.h"
+#endif
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
+#include "modules/operators/process/inductive_miner/fallback_strategy.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -20,13 +25,14 @@ bool possible_activities_in_dfg(const directly_follows_graph& dfg) {
 }  // namespace
 
 cut_t activity_once_per_trace::find(const inductive_miner_config& miner_config, const directly_follows_graph& dfg,
-                                    const common::execution_context& context) {
+                                    const common::execution_context& context,
+                                    const cube::execution::tracking::stop_token& stop_token) {
   const auto find_context{context.create_sub_context("activity_once_per_trace::find", {})};
   const size_t vertex_count{boost::num_vertices(dfg)};
   cut_t ret;
   std::vector<size_t> component_mapping(vertex_count, 0);  // All vertices in one component
   if (possible_activities_in_dfg(dfg)) {
-    const auto activity_count{miner_config.eventlog.activity_domain_count()};
+    const auto activity_count{miner_config.eventlog().activity_domain_count()};
     // Create mapping activity `id ~> dfg vertex id`
     std::vector<size_t> activity_dfg_mapping(activity_count);
 #ifdef CELOSTAR
@@ -40,6 +46,7 @@ cut_t activity_once_per_trace::find(const inductive_miner_config& miner_config, 
       considered_activities.set(activity_id);
     }
 
+    stop_token.stop_execution_if_requested();
     auto activity_occurs_exactly_once{std::visit(
         [activity_count](auto view) {
           if (view.empty()) {
@@ -75,7 +82,7 @@ cut_t activity_once_per_trace::find(const inductive_miner_config& miner_config, 
           });
           return occurs_exactly_once;
         },
-        miner_config.eventlog.current_split_eventlog_view())};
+        miner_config.eventlog().current_split_eventlog_view())};
 
     auto candidate{(activity_occurs_exactly_once & considered_activities).find_first()};
 
@@ -95,23 +102,21 @@ cut_t activity_once_per_trace::find(const inductive_miner_config& miner_config, 
   return ret;
 }
 
-activity_once_per_trace::apply_result activity_once_per_trace::apply(inductive_miner_config& miner_config,
-                                                                     const directly_follows_graph& old_dfg,
-                                                                     const cut_t& cut,
-                                                                     common::execution_context& context) {
+activity_once_per_trace::apply_result activity_once_per_trace::apply(
+    inductive_miner_config& miner_config, const directly_follows_graph& old_dfg, const cut_t& cut,
+    const common::execution_context& context, const cube::execution::tracking::stop_token& stop_token) {
   // Log splitting/DFG construction for this fallthrough behaves the same as in a parallel cut
   // TODO(j.kruska) CPL-7902 Does it really? Is the max_par_cut mathematically guaranteed to split correctly for this
   //  fallthrough?
   static const max_par_cut strategy{};
-  return strategy.apply(miner_config, old_dfg, cut, context);
+  return strategy.apply(miner_config, old_dfg, cut, context, stop_token);
 };
 
-[[nodiscard]] process_tree::parallel activity_once_per_trace::from_dfgs(const inductive_miner_config& miner_config,
-                                                                        apply_result dfgs,
-                                                                        common::execution_context& context,
-                                                                        inductive_miner_statistics& miner_statistics) {
+[[nodiscard]] process_tree::parallel activity_once_per_trace::from_dfgs(
+    const inductive_miner_config& miner_config, apply_result dfgs, const common::execution_context& context,
+    inductive_miner_statistics& miner_statistics, const cube::execution::tracking::stop_token& stop_token) {
   // This fallthrough puts components in parallel, reuse max_par_cut PT construction
-  return max_par_cut::from_dfgs(miner_config, std::move(dfgs), context, miner_statistics);
+  return max_par_cut::from_dfgs(miner_config, std::move(dfgs), context, miner_statistics, stop_token);
 };
 
 }  // namespace celonis::accelerator::operators::process

@@ -53,11 +53,13 @@ class max_xor_cut : public cut_strategy {
   [[nodiscard]] static cut_t find(const directly_follows_graph& dfg);
 
   [[nodiscard]] static apply_result apply(inductive_miner_config& miner_config, const directly_follows_graph& old_dfg,
-                                          const cut_t& cut, common::execution_context& context);
+                                          const cut_t& cut, const common::execution_context& context,
+                                          const cube::execution::tracking::stop_token& stop_token);
 
   [[nodiscard]] static process_tree::exclusive from_dfgs(inductive_miner_config miner_config, apply_result dfgs,
-                                                         common::execution_context& context,
-                                                         inductive_miner_statistics& miner_statistics);
+                                                         const common::execution_context& context,
+                                                         inductive_miner_statistics& miner_statistics,
+                                                         const cube::execution::tracking::stop_token& stop_token);
 };
 
 /**
@@ -74,7 +76,8 @@ class noisy_xor_cut : public max_xor_cut {
   explicit noisy_xor_cut() = default;
 
   [[nodiscard]] static apply_result apply(inductive_miner_config& miner_config, const directly_follows_graph& old_dfg,
-                                          const cut_t& cut, common::execution_context& context);
+                                          const cut_t& cut, const common::execution_context& context,
+                                          const cube::execution::tracking::stop_token& stop_token);
 };
 
 /**
@@ -87,11 +90,13 @@ class max_seq_cut : public cut_strategy {
   [[nodiscard]] static cut_t find(const directly_follows_graph& dfg);
 
   [[nodiscard]] static apply_result apply(inductive_miner_config& miner_config, const directly_follows_graph& old_dfg,
-                                          const cut_t& cut, common::execution_context& context);
+                                          const cut_t& cut, const common::execution_context& context,
+                                          const cube::execution::tracking::stop_token& stop_token);
 
   [[nodiscard]] static process_tree::sequence from_dfgs(inductive_miner_config miner_config, apply_result dfgs,
-                                                        common::execution_context& context,
-                                                        inductive_miner_statistics& miner_statistics);
+                                                        const common::execution_context& context,
+                                                        inductive_miner_statistics& miner_statistics,
+                                                        const cube::execution::tracking::stop_token& stop_token);
 };
 
 /**
@@ -104,21 +109,21 @@ class max_par_cut : public cut_strategy {
   [[nodiscard]] static cut_t find(const directly_follows_graph& dfg);
 
   [[nodiscard]] static apply_result apply(inductive_miner_config& miner_config, const directly_follows_graph& old_dfg,
-                                          const cut_t& cut, common::execution_context& context);
+                                          const cut_t& cut, const common::execution_context& context,
+                                          const cube::execution::tracking::stop_token& stop_token);
 
-  [[nodiscard]] static std::vector<directly_follows_graph> apply_dfgs(const inductive_miner_config& miner_config,
-                                                                      const directly_follows_graph& old_dfg,
-                                                                      const cut_t& cut,
-                                                                      common::execution_context& context);
+  [[nodiscard]] static std::vector<directly_follows_graph> apply_dfgs(
+      const inductive_miner_config& miner_config, const directly_follows_graph& old_dfg, const cut_t& cut,
+      const common::execution_context& context, const cube::execution::tracking::stop_token& stop_token);
 
-  [[nodiscard]] static std::vector<splittable_eventlog> apply_split(inductive_miner_config& miner_config,
-                                                                    const directly_follows_graph& old_dfg,
-                                                                    const cut_t& cut,
-                                                                    common::execution_context& context);
+  [[nodiscard]] static std::vector<splittable_eventlog> apply_split(
+      inductive_miner_config& miner_config, const directly_follows_graph& old_dfg, const cut_t& cut,
+      const common::execution_context& context, const cube::execution::tracking::stop_token& stop_token);
 
   [[nodiscard]] static process_tree::parallel from_dfgs(inductive_miner_config miner_config, apply_result dfgs,
-                                                        common::execution_context& context,
-                                                        inductive_miner_statistics& miner_statistics);
+                                                        const common::execution_context& context,
+                                                        inductive_miner_statistics& miner_statistics,
+                                                        const cube::execution::tracking::stop_token& stop_token);
 };
 
 /**
@@ -131,11 +136,13 @@ class max_redo_cut : public cut_strategy {
   [[nodiscard]] static cut_t find(const directly_follows_graph& dfg);
 
   [[nodiscard]] static apply_result apply(inductive_miner_config miner_config, const directly_follows_graph& old_dfg,
-                                          const cut_t& cut, common::execution_context& context);
+                                          const cut_t& cut, const common::execution_context& context,
+                                          const cube::execution::tracking::stop_token& stop_token);
 
   [[nodiscard]] static process_tree::redo from_dfgs(inductive_miner_config miner_config, apply_result dfgs,
-                                                    common::execution_context& context,
-                                                    inductive_miner_statistics& miner_statistics);
+                                                    const common::execution_context& context,
+                                                    inductive_miner_statistics& miner_statistics,
+                                                    const cube::execution::tracking::stop_token& stop_token);
 };
 
 template <class CUT_STRATEGY>
@@ -146,27 +153,30 @@ cut_t find_cut(const directly_follows_graph& dfg) {
 
 template <class CUT_STRATEGY>
 cut_t find_cut(const inductive_miner_config& miner_config, const directly_follows_graph& dfg,
-               const common::execution_context& context) {
+               const common::execution_context& context, const cube::execution::tracking::stop_token& stop_token) {
   static const CUT_STRATEGY strategy{};
-  return strategy.find(miner_config, dfg, context);
+  return strategy.find(miner_config, dfg, context, stop_token);
 }
 
 template <typename CUT_STRATEGY>
 process_tree apply_cut_composite(const cut_t& cut, inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                                 common::execution_context& context, inductive_miner_statistics& miner_statistics) {
+                                 const common::execution_context& context, inductive_miner_statistics& miner_statistics,
+                                 const cube::execution::tracking::stop_token& stop_token) {
   static const CUT_STRATEGY strategy{};
-  auto new_dfgs{strategy.apply(miner_config, dfg, cut, context)};
+  auto new_dfgs{strategy.apply(miner_config, dfg, cut, context, stop_token)};
 
-  return {{CUT_STRATEGY::from_dfgs(miner_config, new_dfgs, context, miner_statistics)}};
+  return {{CUT_STRATEGY::from_dfgs(miner_config, new_dfgs, context, miner_statistics, stop_token)}};
 }
 
 template <>
 inline process_tree apply_cut_composite<max_redo_cut>(const cut_t& cut, inductive_miner_config& miner_config,
-                                                      directly_follows_graph& dfg, common::execution_context& context,
-                                                      inductive_miner_statistics& miner_statistics) {
-  auto new_dfgs{max_redo_cut{}.apply(miner_config, dfg, cut, context)};
+                                                      directly_follows_graph& dfg,
+                                                      const common::execution_context& context,
+                                                      inductive_miner_statistics& miner_statistics,
+                                                      const cube::execution::tracking::stop_token& stop_token) {
+  auto new_dfgs{max_redo_cut{}.apply(miner_config, dfg, cut, context, stop_token)};
 
-  return {max_redo_cut::from_dfgs(miner_config, new_dfgs, context, miner_statistics)};
+  return {max_redo_cut::from_dfgs(miner_config, new_dfgs, context, miner_statistics, stop_token)};
 }
 
 template <typename T>
@@ -174,11 +184,12 @@ concept TAU_LOOP = std::is_same_v<T, slack_tau_loop_fallback> || std::is_same_v<
 
 template <TAU_LOOP CUT_STRATEGY>
 process_tree apply_cut_composite(inductive_miner_config miner_config, directly_follows_graph& dfg,
-                                 common::execution_context& context, inductive_miner_statistics& miner_statistics) {
+                                 const common::execution_context& context, inductive_miner_statistics& miner_statistics,
+                                 const cube::execution::tracking::stop_token& stop_token) {
   // copy miner_config in order to not propagate changes beyond this cut's children
   static const CUT_STRATEGY strategy{};
   auto tau_loop_result{strategy.apply(miner_config, dfg, context)};
-  return {CUT_STRATEGY::from_dfgs(miner_config, dfg, tau_loop_result, context, miner_statistics)};
+  return {CUT_STRATEGY::from_dfgs(miner_config, dfg, tau_loop_result, context, miner_statistics, stop_token)};
 }
 
 namespace sub_dfgs {

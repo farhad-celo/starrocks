@@ -6,11 +6,13 @@
 
 #include "ctl/assert.h"
 #include "format/json/json.h"
-#include "log/log.h"
-#include "modules/common/exceptions.h"
 #ifdef CELOSTAR
 #include "inductive_miner/process_tree.h"
-#else
+#endif
+#include "log/log.h"
+#include "modules/common/exceptions.h"
+#include "modules/cube/execution/tracking/stop_token.h"
+#ifndef CELOSTAR
 #include "modules/operators/process/dot_format_helper.h"
 #include "modules/operators/process/inductive_miner/process_tree.h"
 #endif
@@ -556,11 +558,14 @@ bool is_reduced(const process_tree& pt) {
          std::none_of(begin(rules), end(rules), [pt](const auto& p) { return p(pt); });
 }
 
-void reduce_to_normal_form(process_tree& pt, const cel_string_t* dict) {
+void reduce_to_normal_form(process_tree& pt, const cube::execution::tracking::stop_token& stop_token,
+                           const cel_string_t* dict) {
   for (auto i = 0; i < max_iterations; i++) {
+    stop_token.stop_execution_if_requested();
     if (is_reduced(pt)) {
       return;
     }
+    stop_token.stop_execution_if_requested();
     reduce_to_normal_form_recurse(pt, dict);
   }
 }
@@ -584,24 +589,24 @@ void reduce_node(process_tree& pt, const cel_string_t* dict) {
     return;
   }
 
-  format::json::json_object_t log_message{};
 #ifndef CELOSTAR
-  log_message.insert({"Mined process tree", pt2dot(pt, dict)});
+  format::json::json_object_t log_details{{"Mined process tree", pt2dot(pt, dict)}};
 #endif
-
   auto transformations{get_transformations()};
   for (size_t i{0}; i < transformations.size(); ++i) {
     const auto& transformation{transformations[i]};
 
     if (transformation(pt)) {
 #ifndef CELOSTAR
-      log_message.insert({fmt::format("Process tree after reduction rule {}", i), pt2dot(pt, dict)});
+      log_details[fmt::format("Process tree after reduction rule {}", i)] = pt2dot(pt, dict);
 #endif
     }
   }
 
+#ifndef CELOSTAR
   // TODO(bluppes): CPL-7544 remove eventually
-  log::info(format::json::json_t{log_message}.to_string());
+  log::jinfo("Process tree information", log_details);
+#endif
 }
 
 }  // namespace celonis::accelerator::operators::process::reduction

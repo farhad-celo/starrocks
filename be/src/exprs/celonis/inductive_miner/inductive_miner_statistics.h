@@ -127,6 +127,10 @@ class inductive_miner_statistics {
     static std::string key{"m2a_precision_times_1E4"};
     return key;
   }
+  [[nodiscard]] static const std::string& fitness_key() {
+    static std::string key{"m2a_fitness_times_1E4"};
+    return key;
+  }
 
   /**
    * Adds a new value to the statistics or updates it if the value already exists

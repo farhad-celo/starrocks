@@ -292,8 +292,8 @@ directly_follows_graph filter_dfg_edges(const directly_follows_graph& dfg, const
   return filtered_dfg;
 }
 
-directly_follows_graph initialize_dfg(const splittable_eventlog& eventlog, common::execution_context& parent_context,
-                                      size_t grain_size) {
+directly_follows_graph initialize_dfg(const splittable_eventlog& eventlog,
+                                      const common::execution_context& parent_context, size_t grain_size) {
   const auto context{parent_context.create_sub_context("initialize_dfg", {})};
   tbb::enumerable_thread_specific<dfg_pre_aggregation> dfg_pre_aggs{eventlog.activity_domain_count()};
 #ifndef CELOSTAR

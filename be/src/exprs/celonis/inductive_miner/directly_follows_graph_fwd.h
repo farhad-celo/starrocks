@@ -8,12 +8,49 @@
 #endif
 
 #include "modules/common/int_types.h"
+#include "modules/common/shared_types_fwd.h"
 #include "modules/memory/row_id.h"
 #ifdef CELOSTAR
 #include "util/phmap/phmap.h"
 #endif
 
 namespace celonis::accelerator::operators::process {
+
+/**
+ * This struct stores all the details on how infrequent behavior should be filtered.
+ */
+struct dfg_filter_config {
+  /**
+   * Stores whether start and end activities should be filtered at all.
+   */
+  bool vertices{false};
+  /**
+   * Stores the threshold to be used for the start and end activities.
+   */
+  cel_float_t vertices_threshold{0.};
+
+  /**
+   * Inside the base case of a noise affected single activity, `noisy_single_activity_base_case`,
+   * this is an upper bound on the average number of occurences (of a single activity) per trace,
+   * so that the activity will be considered as a true singleton. Remember: empty traces will be
+   * removed before this average is computed.
+   */
+  cel_float_t vertices_max_avg_occurences{1.};
+
+  /**
+   * Stores whether the successions should be filtered at all.
+   */
+  bool edges{false};
+  /**
+   * Stores the threshold to be used for the successions.
+   */
+  cel_float_t edges_threshold{0.};
+  /**
+   * Stores whether the count of an activity being the end activity of a trace
+   * should be included in the maximum of the cardinalities of the out edges.
+   */
+  bool edges_consider_end_activities{true};
+};
 
 /**
  * Boost graphs are veeery cumbersome. However, since there are many advanced

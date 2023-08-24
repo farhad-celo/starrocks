@@ -7,16 +7,20 @@
 #include <vector>
 
 #include "ctl/utility.h"
+#ifdef CELOSTAR
+#include "inductive_miner/process_tree_ref.h"
+#endif
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
-#ifdef CELOSTAR
-#include "inductive_miner/process_tree_ref.h"
+#include "modules/cube/execution/tracking/stop_token_fwd.h"
+#ifndef CELOSTAR
+#include "modules/memory/column_fwd.h"
+#endif
 #include "modules/memory/row_id.h"
+#ifdef CELOSTAR
 #include "result_table.h"
 #else
-#include "modules/memory/column_fwd.h"
-#include "modules/memory/row_id.h"
 #include "modules/memory/table_fwd.h"
 #include "modules/operators/process/inductive_miner/process_tree_ref.h"
 #endif
@@ -211,7 +215,8 @@ void minimize(process_tree& pt);
 process_tree_ref convert_to_tables(const process_tree& pt);
 #else
 process_tree_ref convert_to_tables(const process_tree& pt, const memory::column_t& activity_column,
-                                   memory::table_row_limit_t table_row_limit, common::execution_context& context);
+                                   memory::table_row_limit_t table_row_limit, const common::execution_context& context,
+                                   const cube::execution::tracking::stop_token& stop_token);
 #endif
 
 template <typename>

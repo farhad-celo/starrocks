@@ -32,15 +32,15 @@ size_t split_dfg_slack_tau_style(directly_follows_graph& dfg) {
 }
 
 size_t split_log_and_dfg(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                         common::execution_context& context) {
+                         const common::execution_context& context) {
   // compute the number of additional sub-traces and already split the dfg
   const auto num_additional_traces{split_dfg_slack_tau_style(dfg)};
 #ifdef CELOSTAR
   // In Celostar, we use a fixed 32bit space.
 #else
   // ensure that our event-log has enough "space" to accommodate additional group ids
-  miner_config.eventlog =
-      splittable_eventlog::canonicalize_if_necessary(std::move(miner_config.eventlog), num_additional_traces, context);
+  miner_config.eventlog() = splittable_eventlog::canonicalize_if_necessary(std::move(miner_config.eventlog()),
+                                                                           num_additional_traces, context);
 #endif
 
   std::visit(
@@ -63,16 +63,16 @@ size_t split_log_and_dfg(inductive_miner_config& miner_config, directly_follows_
         }};
 #ifndef CELOSTAR
         // TODO(a.swoboda) consider parallelizing this
-        std::atomic<group_id_type> index{ctl::cast<group_id_type>(miner_config.eventlog.trace_domain_count().get())};
+        std::atomic<group_id_type> index{ctl::cast<group_id_type>(miner_config.eventlog().trace_domain_count().get())};
 #endif
-        common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size, [&](auto interval) {
+        common::for_each_group(element<PICK_TRACE_ID>(view), miner_config.grain_size(), [&](auto interval) {
           const auto interval_last{std::next(view.begin(), interval.end())};
           for (auto it{find_next_start_activity(std::next(view.begin(), interval.begin()), interval_last)}, next_it{it};
                it != interval_last; it = next_it) {
             next_it = find_next_start_activity(it, interval_last);
 #ifdef CELOSTAR
-            int multiplicity = miner_config.eventlog.get_variant_multiplicity(it->second);
-            auto new_trace_id = miner_config.eventlog.add_variant(multiplicity);
+            int multiplicity = miner_config.eventlog().get_variant_multiplicity(it->second);
+            auto new_trace_id = miner_config.eventlog().add_variant(multiplicity);
             std::for_each(it, next_it, [new_trace_id](auto& p) { p.second = new_trace_id; });
 #else
             std::for_each(it, next_it,
@@ -81,9 +81,9 @@ size_t split_log_and_dfg(inductive_miner_config& miner_config, directly_follows_
           }
         });
       },
-      miner_config.eventlog.current_split_eventlog_view());
-  miner_config.eventlog.set_trace_domain_count(miner_config.eventlog.trace_domain_count() +
-                                               ctl::cast<row_id>(num_additional_traces));
+      miner_config.eventlog().current_split_eventlog_view());
+  miner_config.eventlog().set_trace_domain_count(miner_config.eventlog().trace_domain_count() +
+                                                 ctl::cast<row_id>(num_additional_traces));
   return num_additional_traces;
 }
 
@@ -100,7 +100,7 @@ bool slack_tau_loop_fallback::is_applicable(const inductive_miner_config& /*mine
 }
 
 tau_loop_split_result slack_tau_loop_fallback::apply(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                                                     common::execution_context& context) {
+                                                     const common::execution_context& context) {
   auto apply_context{context.create_sub_context("slack_tau_loop_fallback::apply", {})};
   return split_log_and_dfg(miner_config, dfg, context);
 }

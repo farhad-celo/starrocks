@@ -29,6 +29,7 @@ function(add_module path)
 endfunction()
 
 add_main_source(modules/common)
+add_main_source(modules/cube/execution/tracking)
 add_main_source(inductive_miner)
 add_main_source(inductive_miner/base_case_strategies)
 add_main_source(inductive_miner/cut_strategies)
@@ -46,13 +47,6 @@ add_module("types")
 add_library(Celonis ${SOURCES})
 target_include_directories(Celonis PRIVATE ${HEADERS})
 target_compile_definitions(Celonis PRIVATE CELOSTAR)
-
-# Exclude files from compilation until supported
-set_source_files_properties(
-        inductive_miner/replay_on_process_tree.cpp
-        PROPERTIES
-            HEADER_FILE_ONLY ON
-)
 
 # onetbb does not support static build.
 # ${THIRDPARTY_DIR}/lib should be added to ${LD_LIBRARY_PATH} or be copied in runtime.

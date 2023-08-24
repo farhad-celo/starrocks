@@ -7,13 +7,14 @@ bool empty_traces_base_case::is_applicable(const directly_follows_graph& dfg) {
 }
 
 process_tree empty_traces_base_case::apply(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                                           common::execution_context& context,
-                                           inductive_miner_statistics& miner_statistics) {
+                                           const common::execution_context& context,
+                                           inductive_miner_statistics& miner_statistics,
+                                           const cube::execution::tracking::stop_token& stop_token) {
   const auto counts{update_dfg(dfg)};
-  return process_tree{
-      {process_tree::exclusive{{std::vector{{process_tree::tau{counts.empty_count}},
-                                            inductive_miner_recurse(miner_config, dfg, context, miner_statistics)}},
-                               {counts.empty_count, counts.nonempty_count}}}};
+  return process_tree{{process_tree::exclusive{
+      {std::vector{{process_tree::tau{counts.empty_count}},
+                   inductive_miner_recurse(miner_config, dfg, context, miner_statistics, stop_token)}},
+      {counts.empty_count, counts.nonempty_count}}}};
 }
 
 empty_traces_base_case::counts empty_traces_base_case::update_dfg(directly_follows_graph& dfg) {

@@ -19,6 +19,7 @@
 #include "ctl/utility.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types.h"
+#include "modules/cube/execution/tracking/stop_token.h"
 #ifdef CELOSTAR
 #include "result_table.h"
 #else
@@ -314,9 +315,9 @@ void fill_tables(ResultColumn<cel_int_t>& vertex_pt_types, NullableResultColumn<
                  const process_tree& pt) {
 #else
 template <class VERTEX_ACTIVITIES_PTR_AC_TYPE>
-void fill_tables(ctl::shared_static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIES_PTR_AC_TYPE& vertex_activities,
-                 ctl::shared_static_array<cel_int_t>& edge_source_ids,
-                 ctl::shared_static_array<cel_int_t>& edge_target_ids, const process_tree& pt) {
+void fill_tables(ctl::static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIES_PTR_AC_TYPE& vertex_activities,
+                 ctl::static_array<cel_int_t>& edge_source_ids, ctl::static_array<cel_int_t>& edge_target_ids,
+                 const process_tree& pt, const cube::execution::tracking::stop_token& stop_token) {
 #endif
   std::queue<const process_tree*> buffer;
   buffer.push(&pt);
@@ -325,6 +326,9 @@ void fill_tables(ctl::shared_static_array<cel_int_t>& vertex_pt_types, VERTEX_AC
   row_id current_edge_id{0};
 
   while (!buffer.empty()) {
+#ifndef CELOSTAR
+    stop_token.stop_execution_if_requested();
+#endif
     const auto& current_node{*buffer.front()};
 
     vertex_pt_types[current_vertex_id] = to_vertex_code(current_node);
@@ -339,7 +343,7 @@ void fill_tables(ctl::shared_static_array<cel_int_t>& vertex_pt_types, VERTEX_AC
                                  vertex_activities.set_null(current_vertex_id);
 #else
     auto& current_vertex_activity{vertex_activities[current_vertex_id]};
-    using col_pointer_type = typename VERTEX_ACTIVITIES_PTR_AC_TYPE::type;
+    using col_pointer_type = typename VERTEX_ACTIVITIES_PTR_AC_TYPE::value_type;
     std::visit(ctl::overloaded{[&current_vertex_activity](const process_tree::activity& a) {
                                  current_vertex_activity = ctl::cast<col_pointer_type>(a.activity_id);
                                },
@@ -369,29 +373,31 @@ void fill_tables(ctl::shared_static_array<cel_int_t>& vertex_pt_types, VERTEX_AC
 struct exec_convert_to_tables {
   row_id num_vertices;
   const process_tree& pt;
-  ctl::shared_static_array<cel_int_t>& vertex_pt_types;
-  ctl::shared_static_array<cel_int_t>& edge_source_ids;
-  ctl::shared_static_array<cel_int_t>& edge_target_ids;
+  ctl::static_array<cel_int_t>& vertex_pt_types;
+  ctl::static_array<cel_int_t>& edge_source_ids;
+  ctl::static_array<cel_int_t>& edge_target_ids;
   const common::execution_context& context;
+  const cube::execution::tracking::stop_token& stop_token;
 
   exec_convert_to_tables(const row_id num_vertices, const process_tree& pt,
-                         ctl::shared_static_array<cel_int_t>& vertex_pt_types,
-                         ctl::shared_static_array<cel_int_t>& edge_source_ids,
-                         ctl::shared_static_array<cel_int_t>& edge_target_ids, const common::execution_context& context)
+                         ctl::static_array<cel_int_t>& vertex_pt_types, ctl::static_array<cel_int_t>& edge_source_ids,
+                         ctl::static_array<cel_int_t>& edge_target_ids, const common::execution_context& context,
+                         const cube::execution::tracking::stop_token& stop_token)
       : num_vertices{num_vertices},
         pt{pt},
         vertex_pt_types{vertex_pt_types},
         edge_source_ids{edge_source_ids},
         edge_target_ids{edge_target_ids},
-        context{context} {}
+        context{context},
+        stop_token{stop_token} {}
 
   template <typename COL_PTRS_TYPE>
   memory::raw_column_ptrs_t operator()() {
     auto raw_column_pointers =
         memory::create_raw_column_pointer<COL_PTRS_TYPE>(num_vertices, memory::zero_init_t{false}, context);
-    auto vertex_activities_ptrs_ac = raw_column_pointers->get_accessor();
+    auto vertex_activities_ptrs = raw_column_pointers->get_data();
 
-    fill_tables(vertex_pt_types, vertex_activities_ptrs_ac, edge_source_ids, edge_target_ids, pt);
+    fill_tables(vertex_pt_types, vertex_activities_ptrs, edge_source_ids, edge_target_ids, pt, stop_token);
 
     return raw_column_pointers;
   }
@@ -560,15 +566,16 @@ process_tree_ref convert_to_tables(const process_tree& pt) {
 #else
 process_tree_ref convert_to_tables(const process_tree& pt, const memory::column_t& activity_column,
                                    const memory::table_row_limit_t table_row_limit,
-                                   common::execution_context& context) {
+                                   const common::execution_context& context,
+                                   const cube::execution::tracking::stop_token& stop_token) {
   process_tree_ref tables{};
   const table_sizes sizes{pt};
   auto vertex_pt_types{
-      ctl::make_shared_static_array_for_overwrite<cel_int_t>(sizes.node_size(), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+      ctl::make_static_array_for_overwrite<cel_int_t>(sizes.node_size(), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
 
-  auto edge_source_ids{memory::tracking::make_shared_static_array_for_overwrite<cel_int_t>(
+  auto edge_source_ids{memory::tracking::make_static_array_for_overwrite<cel_int_t>(
       sizes.edge_size(), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
-  auto edge_target_ids{memory::tracking::make_shared_static_array_for_overwrite<cel_int_t>(
+  auto edge_target_ids{memory::tracking::make_static_array_for_overwrite<cel_int_t>(
       sizes.edge_size(), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
 
   const auto& dictionary{activity_column->get_typed_dict<cel_string_t>(context)};
@@ -580,25 +587,22 @@ process_tree_ref convert_to_tables(const process_tree& pt, const memory::column_
 
   const auto vertex_activities_ptrs{memory::create_tmp_column_pointers(memory::execute_with_column_pointers_type(
       exec_convert_to_tables{ctl::cast<row_id>(sizes.node_size()), pt, vertex_pt_types, edge_source_ids,
-                             edge_target_ids, context},
+                             edge_target_ids, context, stop_token},
       dictionary->get_size()))};
 
-  tables.vertex_table->add_column<cel_int_t>(memory::col_name("PROCESS_TREE_TYPE"), memory::col_id("PROCESS_TREE_TYPE"),
-                                             ctl::cast<row_id>(sizes.node_size()), vertex_pt_types,
-                                             memory::create_null_flags(sizes.node_size(), context),
-                                             memory::column_processing_state(), table_row_limit);
+  tables.vertex_table->add_column<cel_int_t>(
+      memory::col_name("PROCESS_TREE_TYPE"), memory::col_id("PROCESS_TREE_TYPE"), std::move(vertex_pt_types),
+      memory::create_null_flags(sizes.node_size(), context), memory::column_processing_state(), table_row_limit);
   tables.vertex_table->add_column_with_dictified_data(
       cel_string, memory::col_name("ACTIVITY"), memory::col_id("ACTIVITY"), memory::col_cache_key(""),
       vertex_activities_ptrs, dictionary, memory::column_processing_state(), table_row_limit);
 
-  tables.edge_table->add_column<cel_int_t>(memory::col_name("EDGE_SOURCE_ID"), memory::col_id("EDGE_SOURCE_ID"),
-                                           ctl::cast<row_id>(sizes.edge_size()), edge_source_ids,
-                                           memory::create_null_flags(sizes.edge_size(), context),
-                                           memory::column_processing_state(), table_row_limit);
-  tables.edge_table->add_column<cel_int_t>(memory::col_name("EDGE_TARGET_ID"), memory::col_id("EDGE_TARGET_ID"),
-                                           ctl::cast<row_id>(sizes.edge_size()), edge_target_ids,
-                                           memory::create_null_flags(sizes.edge_size(), context),
-                                           memory::column_processing_state(), table_row_limit);
+  tables.edge_table->add_column<cel_int_t>(
+      memory::col_name("EDGE_SOURCE_ID"), memory::col_id("EDGE_SOURCE_ID"), std::move(edge_source_ids),
+      memory::create_null_flags(sizes.edge_size(), context), memory::column_processing_state(), table_row_limit);
+  tables.edge_table->add_column<cel_int_t>(
+      memory::col_name("EDGE_TARGET_ID"), memory::col_id("EDGE_TARGET_ID"), std::move(edge_target_ids),
+      memory::create_null_flags(sizes.edge_size(), context), memory::column_processing_state(), table_row_limit);
 
   return tables;
 }

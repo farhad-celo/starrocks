@@ -3,9 +3,14 @@
 #include <boost/graph/filtered_graph.hpp>
 #include <ranges>
 
+#ifdef CELOSTAR
 #include "../cut_strategy.h"
+#endif
 #include "ctl/assert.h"
 #include "ctl/conversion.h"
+#ifndef CELOSTAR
+#include "modules/operators/process/inductive_miner/cut_strategy.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -40,21 +45,24 @@ cut_t max_xor_cut::find(const directly_follows_graph& dfg) {
 
 max_xor_cut::apply_result max_xor_cut::apply(inductive_miner_config& miner_config,
                                              const directly_follows_graph& old_dfg, const cut_t& cut,
-                                             common::execution_context& context) {
+                                             const common::execution_context& context,
+                                             const cube::execution::tracking::stop_token& stop_token) {
   auto sub_eventlog_context{context.create_sub_context("max_xor_cut: compute sub-eventlogs", {})};
-  const auto activity_count{miner_config.eventlog.activity_domain_count()};
+  const auto activity_count{miner_config.eventlog().activity_domain_count()};
 
   // create mappings from activity id to dfg id.
   const auto activity_dfg_mapping{cut_strategy::to_activity_dfg_map(cut, old_dfg, activity_count)};
-  auto sub_eventlogs{miner_config.eventlog.split(activity_dfg_mapping)};
+  stop_token.stop_execution_if_requested();
+  auto sub_eventlogs{miner_config.eventlog().split(activity_dfg_mapping)};
   auto dfgs{get_sub_dfgs_from_old_dfg(old_dfg, cut)};
 
   return {sub_eventlogs, dfgs};
 }
 
 process_tree::exclusive max_xor_cut::from_dfgs(inductive_miner_config miner_config, apply_result logs_and_dfgs,
-                                               common::execution_context& context,
-                                               inductive_miner_statistics& miner_statistics) {
+                                               const common::execution_context& context,
+                                               inductive_miner_statistics& miner_statistics,
+                                               const cube::execution::tracking::stop_token& stop_token) {
   process_tree::exclusive result{};
   auto& [logs, dfgs]{logs_and_dfgs};
   debug_assert(logs.size() == dfgs.size());
@@ -64,8 +72,8 @@ process_tree::exclusive max_xor_cut::from_dfgs(inductive_miner_config miner_conf
                          [](const auto& dfg) { return dfg[boost::graph_bundle].log.trace_count; });
   result.children.resize(logs.size());
   std::ranges::transform(logs, dfgs, begin(result.children), [&](auto& log, auto& dfg) {
-    miner_config.eventlog = std::move(log);
-    return inductive_miner_recurse(miner_config, dfg, context, miner_statistics);
+    miner_config.eventlog() = std::move(log);
+    return inductive_miner_recurse(miner_config, dfg, context, miner_statistics, stop_token);
   });
   return result;
 }

@@ -24,16 +24,19 @@ struct activity_once_per_trace {
    * Universiteit Eindhoven]
    */
   [[nodiscard]] static cut_t find(const inductive_miner_config& miner_config, const directly_follows_graph& dfg,
-                                  const common::execution_context& context);
+                                  const common::execution_context& context,
+                                  const cube::execution::tracking::stop_token& stop_token);
 
   using apply_result = cut_strategy::apply_result;
 
   static apply_result apply(inductive_miner_config& miner_config, const directly_follows_graph& old_dfg,
-                            const cut_t& cut, common::execution_context& context);
+                            const cut_t& cut, const common::execution_context& context,
+                            const cube::execution::tracking::stop_token& stop_token);
 
   [[nodiscard]] static process_tree::parallel from_dfgs(const inductive_miner_config& miner_config, apply_result dfgs,
-                                                        common::execution_context& context,
-                                                        inductive_miner_statistics& miner_statistics);
+                                                        const common::execution_context& context,
+                                                        inductive_miner_statistics& miner_statistics,
+                                                        const cube::execution::tracking::stop_token& stop_token);
 };
 
 struct activity_concurrent {
@@ -47,8 +50,9 @@ struct activity_concurrent {
   // does not follow the usual find and apply pattern as the find cut requires to apply the cut
   static std::optional<process_tree> apply_if_applicable(inductive_miner_config& miner_config,
                                                          const directly_follows_graph& dfg,
-                                                         common::execution_context& context,
-                                                         inductive_miner_statistics& miner_statistics);
+                                                         const common::execution_context& context,
+                                                         inductive_miner_statistics& miner_statistics,
+                                                         const cube::execution::tracking::stop_token& stop_token);
 
  protected:
   struct cut_and_dfgs {
@@ -57,17 +61,19 @@ struct activity_concurrent {
   };
   static std::vector<cut_and_dfgs> compute_parallel_dfgs(const inductive_miner_config& miner_config,
                                                          const directly_follows_graph& dfg,
-                                                         common::execution_context& context);
+                                                         const common::execution_context& context,
+                                                         const cube::execution::tracking::stop_token& stop_token);
 };
 
 using tau_loop_split_result = size_t;
 
 struct tau_loop_fallback_base {
   static process_tree::redo from_dfgs(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                                      tau_loop_split_result loop_count, common::execution_context& context,
-                                      inductive_miner_statistics& miner_statistics) {
+                                      tau_loop_split_result loop_count, const common::execution_context& context,
+                                      inductive_miner_statistics& miner_statistics,
+                                      const cube::execution::tracking::stop_token& stop_token) {
     const auto object_count{dfg[boost::graph_bundle].log.trace_count};
-    auto redo_child{inductive_miner_recurse(miner_config, dfg, context, miner_statistics)};
+    auto redo_child{inductive_miner_recurse(miner_config, dfg, context, miner_statistics, stop_token)};
     return process_tree::redo{{{std::move(redo_child), {process_tree::tau{loop_count}}}},
                               object_count - loop_count,
                               {object_count, loop_count}};
@@ -81,11 +87,11 @@ struct strict_tau_loop_fallback final : public tau_loop_fallback_base {
    * by an end activity within (!) a trace. If so, these traces are split and
    * the miner is rerun on the split event log.
    */
-  static bool is_applicable(const inductive_miner_config& miner_config, const directly_follows_graph& dfg,
+  static bool is_applicable(inductive_miner_config& miner_config, const directly_follows_graph& dfg,
                             const common::execution_context& context);
 
   static tau_loop_split_result apply(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                                     common::execution_context& context);
+                                     const common::execution_context& context);
 };
 
 struct slack_tau_loop_fallback final : public tau_loop_fallback_base {
@@ -99,7 +105,7 @@ struct slack_tau_loop_fallback final : public tau_loop_fallback_base {
                             const common::execution_context& context);
 
   static tau_loop_split_result apply(inductive_miner_config& miner_config, directly_follows_graph& dfg,
-                                     common::execution_context& context);
+                                     const common::execution_context& context);
 };
 
 struct flower_fallback {
