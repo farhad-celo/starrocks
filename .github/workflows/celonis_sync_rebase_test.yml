@@ -74,7 +74,7 @@ jobs:
           git checkout ${default_branch}
           timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
           echo "timestamp=$timestamp" >> $GITHUB_ENV
-          testBranch=gh-rebase-${timestamp}
+          testBranch=gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}
           echo "test_branch=$testBranch" >> $GITHUB_ENV
           git checkout -b $testBranch
           git rebase ${newDefaultBranch}
@@ -111,6 +111,16 @@ jobs:
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${{ env.test_branch }} -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${{ env.test_branch }} celonis/docker/allin1
           echo "allin1_image_tag=starrocks-allin1:${{ env.test_branch }}" >> $GITHUB_ENV
+
+      - name: Push allin1 docker image to GHCR
+        run: |
+          docker tag starrocks-allin1:${{ env.test_branch }} ghcr.io/celonis/celostar/starrocks-allin1:${{ env.test_branch }}
+          
+          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
+          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${{ env.test_branch }}
+          do
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${{ env.test_branch }} trying again."
+          done
 
       - name: Checkout celostar repo
         uses: actions/checkout@v3
