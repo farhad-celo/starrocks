@@ -6,6 +6,8 @@ labels: sync_rebase_test_success
 The run is successful. The full log is in:
 [https://github.com/celonis/celostar-starrocks/actions/runs/{{ env.GITHUB_RUN_ID }}](https://github.com/celonis/celostar-starrocks/actions/runs/{{ env.GITHUB_RUN_ID }})
 
+The new allin1 image tag is: `{{ env.allin1_image_tag }}`
+
 The new default branch is: `{{ env.new_default_branch }}`
 
 The rebase branch is: `{{ env.test_branch }}`

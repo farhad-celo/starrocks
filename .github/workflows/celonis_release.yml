@@ -26,7 +26,7 @@ jobs:
   release-ubuntu-image:
     runs-on: [self-hosted, celostar]
     env:
-      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-92ac4855
+      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-a368a710
     steps:
       - name: checkout repository
         uses: actions/checkout@v3
