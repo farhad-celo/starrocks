@@ -1,4 +1,4 @@
-name: 'Presubmit Test'
+name: 'Ignore Presubmit Test'
 
 on:
   pull_request:
