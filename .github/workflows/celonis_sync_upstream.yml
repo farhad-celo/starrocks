@@ -32,3 +32,6 @@ jobs:
           git remote -v
           git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
           git push origin ${LATEST_UPSTREAM_BRANCH}
+          git fetch upstream main:main
+          git push origin main
+
