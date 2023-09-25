@@ -1,0 +1,1314 @@
+syntax = "proto2";
+package celonis.accelerator;
+
+import "types.proto";
+
+message FilterItem {
+  required OperatorNode filter_expression = 1;
+  required string cache_key = 2;
+}
+
+message FilterRequest {
+  required int32 computation_id = 1;
+  repeated FilterItem filter_items = 2;
+
+  optional bool forced_filter = 5;
+}
+
+message FilterStates { repeated FilterRequest states = 1; }
+
+message OperatorMetadata {
+  required int32 output_id = 1;
+  required string cache_key = 2;
+}
+
+message OperatorFilter {
+  // Standard filter execution
+  optional OperatorRef filter_ref = 1;
+  // Native filter execution
+  optional FilterItem filter_item = 2;
+}
+
+message OrderByExpression {
+  required OperatorRef order_by_ref = 1;
+  required OrderByDirection order_by_direction = 2;
+}
+
+message OrderByExpressions { repeated OrderByExpression expressions = 1; }
+
+message WeekdayCalendarConfigurationEntry {
+  required WeekdayType weekday = 1;
+  required bool use_day = 2;
+  message WeekdayCalendarConfigurationEntryShift {
+    required int32 begin = 1;
+    required int32 end = 2;
+  }
+  optional WeekdayCalendarConfigurationEntryShift shift = 3;
+}
+
+message WeekdayCalendarConfiguration {
+  message RegularSpec {
+    required WeekdayCalendarConfigurationEntry monday = 1;
+    required WeekdayCalendarConfigurationEntry tuesday = 2;
+    required WeekdayCalendarConfigurationEntry wednesday = 3;
+    required WeekdayCalendarConfigurationEntry thursday = 4;
+    required WeekdayCalendarConfigurationEntry friday = 5;
+    required WeekdayCalendarConfigurationEntry saturday = 6;
+    required WeekdayCalendarConfigurationEntry sunday = 7;
+  }
+
+  message CalendarIdColumnSpec { required TableRef calendar_table_ref = 1; }
+
+  optional RegularSpec regular_calendar_specification = 1;
+  optional CalendarIdColumnSpec id_column_calendar_specification = 2;
+}
+
+message FactoryCalendarConfiguration {
+  message RegularSpec {
+    required OperatorRef start_column_ref = 1;
+    required OperatorRef end_column_ref = 2;
+    optional OperatorRef condition_ref = 3;
+  }
+
+  message CalendarIdColumnSpec {
+    required TableRef calendar_table_ref = 1;
+    optional OperatorRef condition_ref = 2;
+  }
+
+  optional RegularSpec regular_calendar_specification = 1;
+  optional CalendarIdColumnSpec id_column_calendar_specification = 2;
+}
+
+message WorkdayCalendarConfiguration {
+  required TableRef tfacs_table_ref = 1;
+  optional string tfacs_entry_id = 2;
+}
+
+message ProcessMatchOperatorNode {
+  message ProcessMatchTransition {
+    required int32 current_state = 1;
+    required string activity_name = 2;
+    required bool like = 3 [ default = false ];
+    required bool unmatched_activity = 4 [ default = false ];
+    // NFA so a single activity may lead to multiple states
+    repeated int32 next_states = 5;
+  }
+
+  required OperatorMetadata metadata = 1;
+  repeated int32 states = 2;
+  repeated int32 final_states = 3;
+  required int32 initial_state = 4;
+  repeated ProcessMatchTransition transitions = 5;
+
+  optional OperatorRef activity_expression = 7;
+}
+
+message ProcessMatchRegexOperatorNode {
+
+  message RegexTreeOperatorNode {
+
+    enum RegexTreeOperatorNodeType {
+      PLUS = 1;
+      STAR = 2;
+      QUESTION_MARK = 3;
+      CHOICE = 4;
+      CONCAT = 5;
+      ANY = 6;
+      ACTIVITY_NAME = 7;
+      ACTIVITY_SET = 8;
+      ALIAS_REF = 9;
+    }
+
+    required RegexTreeOperatorNodeType node_type = 1;
+    required int32 id = 2;
+    repeated RegexTreeOperatorNode children = 3;
+    optional string activity_name = 4 [ default = ''];
+    optional bool like = 5 [ default = false ];
+    optional bool complement = 6 [ default = false ];
+    optional string alias_ref = 7 [ default = ''];
+  }
+
+  message RegexTreeAliasNode {
+    required string alias = 1;
+    required RegexTreeOperatorNode regex_tree = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required RegexTreeOperatorNode root_node = 2;
+  repeated RegexTreeAliasNode alias_nodes = 3;
+
+  optional OperatorRef activity_expression = 5;
+
+  required bool match_at_start = 6;
+  required bool match_at_end = 7;
+}
+
+message ActivitySelectionOperatorNode {
+  required OperatorMetadata metadata = 1;
+  repeated string starting_activities = 3;
+  repeated string flowing_activities = 4;
+  repeated string ending_activities = 5;
+  repeated string exclude_activities = 6;
+  repeated string all_exclude_activities = 7;
+  repeated string any_flowing_activities = 8;
+
+  optional OperatorRef activity_expression = 9;
+}
+
+message PetriNetDescription {
+  message StringPair {
+    required string from = 1;
+    required string to = 2;
+  }
+
+  message StringIntPair {
+    required string node = 1;
+    required int32 count = 2;
+  }
+
+  repeated string places = 1;
+  repeated string transitions = 2;
+  repeated StringPair arcs = 3;
+  repeated StringPair mapping = 4;
+  repeated StringIntPair initial_marking = 5;
+  repeated StringIntPair final_marking = 6;
+}
+
+message ConformanceOperatorNode {
+  required OperatorMetadata metadata = 1;
+  optional OperatorRef activity_expression = 2;
+  required PetriNetDescription petri_net_description = 3;
+}
+
+message ReadableConformanceOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef conformance_expression = 4;
+}
+
+message AliasOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef expression = 3;
+  optional string alias = 4 [ default = ''];
+  optional string format = 5 [ default = ''];
+}
+
+message PuQueryOperatorNode {
+  enum PuQueryCommand {
+    COUNT = 1;
+    SUM = 2;
+    AVG = 3;
+    MIN = 4;
+    MAX = 5;
+    MEDIAN = 6;
+    FIRST = 7;
+    LAST = 8;
+    COUNT_DISTINCT = 9;
+    QUANTILE = 10;
+    STRING_AGG = 11;
+    MODE = 12;
+    PRODUCT = 13;
+    TRIMMED_MEAN = 14;
+    STDEV = 15;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required PuQueryCommand query_command = 2;
+
+  optional bool constant = 12;
+
+  reserved 11;
+  optional TableRef table = 3;
+
+  required OperatorRef column = 4;
+  required OperatorFilter filter = 5;
+
+  // parameter that can be used on QUANTILE aggregate
+  optional double quantile = 8;
+
+  // PU_TRIMMED_MEAN has an optional lower cutoff and upper cutoff.
+  optional int64 lower_cutoff = 9;
+  optional int64 upper_cutoff = 10;
+
+  // IMPORTANT: required delimiter for the STRING_AGG operator
+  optional string delimiter = 13;
+
+  // The OrderByExpression is needed since STRING_AGG allows multiple order
+  // by-Expressions
+  optional OrderByExpressions order_by_expressions = 14;
+}
+
+message IsNullOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef op_ref = 2;
+}
+
+message ElseNullOperatorNode {
+  required int32 operator_id = 1;
+  required OperatorRef if_ref = 2;
+  required OperatorRef then_ref = 3;
+  optional string operator_cache_key = 4 [ default = ''];
+}
+
+message ThenNullOperatorNode {
+  required int32 operator_id = 1;
+  required OperatorRef if_ref = 2;
+  required OperatorRef else_ref = 3;
+  optional string operator_cache_key = 4 [ default = ''];
+}
+
+message VariantOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef activity_expression = 3;
+}
+
+message ShortenedVariantOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef activity_expression = 3;
+  required OperatorRef variant_expression = 4;
+  required int32 max_cycle_length = 5;
+}
+
+message ABCOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required bool use_filters = 2;
+  required OperatorRef expression = 3;
+  optional double a_value = 4;
+  optional double b_value = 5;
+  optional FilterStates filters = 6;
+}
+
+message ActivityLeadLagOperatorNode {
+  enum ActivityLeadLagCommand {
+    ACTIVITY_LEAD = 1;
+    ACTIVITY_LAG = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required ActivityLeadLagCommand query_command = 2;
+  required OperatorRef activity_expression = 3;
+  required int32 offset_value = 4;
+}
+
+message ClusterStringsOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef column_expression = 2;
+  required int32 edit_threshold = 3;
+  required string token_string = 4;
+  required int32 token_weight = 5;
+  repeated OperatorRef partition_expression = 6;
+}
+
+message MatchStringsOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef input_column = 2;
+  required OperatorRef match_column = 3;
+  required int32 top_k = 4;
+  optional string separator = 5;
+}
+
+message BindOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required TableRef target_table = 2;
+  required OperatorRef column_expression = 3;
+}
+
+message DateToStringOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef column = 2;
+  required string format = 3;
+}
+
+message ToDateOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef column = 2;
+  required string format = 3;
+}
+
+message ToFloatOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef column = 2;
+}
+
+message WindowOperatorNode {
+
+  enum CommandType {
+    LEAD = 1;
+    LAG = 2;
+    RUNNING_SUM = 3;
+    INDEX_ORDER = 4;
+    INTERPOLATE = 5;
+    WINDOW_AVG = 6;
+  }
+
+  enum InterpolationType {
+    CONSTANT = 1;
+    LINEAR = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required CommandType query_command = 2;
+  required OperatorRef column_expression = 3;
+  optional OrderByExpressions order_by_expression = 4;
+  repeated OperatorRef partition_expression = 5;
+  optional OperatorRef offset_value = 6;
+  optional InterpolationType interpolation_type = 7;
+  optional OperatorRef window_start = 8;
+  optional OperatorRef window_end = 9;
+}
+
+message SimulateOperatorNode {
+  enum RequestedColumnType {
+    RUN = 1;
+    ACTIVITY = 2;
+    COLUMN = 3;
+  }
+  required OperatorMetadata metadata = 1;
+  optional OperatorRef column_expression = 2;
+  required RequestedColumnType requested_column_type = 3;
+  required string simulation_config_cache_key = 10;
+  required OperatorRef activity_expression = 11;
+  optional int32 runs = 12;
+}
+
+message IndexActivityOperatorNode {
+  enum PropertyType {
+    PROCESS_ORDER = 1;
+    ACTIVATION_COUNT = 2;
+    INDEX_ACTIVITY_TYPE = 3;
+    INDEX_ACTIVITY_ORDER = 4;
+    INDEX_ACTIVITY_LOOP = 5;
+  }
+  enum OrderType {
+    FORWARD = 1;
+    REVERSE = 2;
+  }
+  required OperatorMetadata metadata = 1;
+  required OperatorRef activity_expression = 2;
+  required PropertyType type = 4;
+  required OrderType order_type = 5;
+}
+
+message EdgifyConfig {
+  optional SourceTargetMode source_mode = 1;
+  optional SourceTargetMode target_mode = 2;
+}
+
+message SourceTargetOperatorNode {
+  enum SourceTargetType {
+    SOURCE = 1;
+    TARGET = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required SourceTargetType type = 2;
+  required OperatorRef expression = 3;
+  optional OperatorRef filter_column = 4;
+  optional EdgifyConfig edgify_config = 5;
+  required string edgifier_cache_key = 7;
+  optional OperatorRef startEndValue = 8;
+}
+
+message LinkSourceTargetAttributesOperatorNode {
+  enum LinkInfoType {
+    SOURCE = 1;
+    TARGET = 2;
+    ATTRIBUTES = 3;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required LinkInfoType type = 2;
+  repeated OperatorRef expressions = 3;
+}
+
+message LinkFilter {
+  enum Direction {
+    ANCESTORS = 1;
+    DESCENDANTS = 2;
+  }
+  required OperatorNode filter_expression = 3;
+  required Direction direction = 4;
+  required bool ordered = 5;
+  optional int32 number_of_hops = 6;
+}
+
+message LinkPathOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef input_column = 2;
+  optional OperatorFilter start_nodes_filter = 3;
+  optional OperatorFilter end_nodes_filter = 4;
+
+  enum Direction {
+    FORWARDS = 1;
+    BACKWARDS = 2;
+  }
+
+  optional Direction direction = 5 [ default = FORWARDS ];
+
+  message LengthCondition {
+    enum Comparison {
+      EQUAL = 0;
+      NOT_EQUAL = 1;
+      GREATER = 2;
+      GREATER_EQUAL = 3;
+      LESS = 4;
+      LESS_EQUAL = 5;
+    }
+
+    required Comparison comparison = 1;
+    required int32 length = 2;
+  }
+
+  optional LengthCondition length_condition = 6;
+
+  required string link_path_tables_creation_cache_key = 7;
+}
+
+message LinkPathSourceTargetOperatorNode {
+  enum SourceTargetType {
+    SOURCE = 1;
+    TARGET = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required SourceTargetType type = 2;
+  optional OperatorRef link_path_column = 3;
+  optional TableRef link_path_table = 4;
+  repeated OperatorRef mapping_table_columns = 5;
+}
+
+message LinkVisibleEdges {
+  repeated OperatorRef related_outgoing_expressions = 11;
+  repeated OperatorRef related_incoming_expressions = 12;
+}
+
+message BindFiltersOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required TableRef target_table = 2;
+  repeated FilterItem filter_items = 3;
+}
+
+message Nodify {
+  required SourceTargetMode mode = 1;
+  optional OperatorRef activity_column = 2;
+  optional FilterStates filters = 3;
+}
+
+message NodeOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef expression = 2;
+  required Nodify configuration = 3;
+}
+
+enum SourceTargetMode {
+  ANY = 1;
+  FIRST = 2;
+  LAST = 3;
+  ANY_WITH_SELF = 4;
+  ALL = 5;
+}
+
+message SourceTargetConfiguration {
+  required SourceTargetMode mode = 1;
+  optional OperatorRef operator_ref = 2;
+  repeated string activity = 3;
+}
+
+message TransitColumnOperatorNode {
+
+  enum TransitType {
+    INTERLEAVED = 1;
+    NONINTERLEAVED = 2;
+    MATCH = 3;
+    MANUAL = 4;
+  }
+  message ManualPair {
+    optional string left_value = 1;
+    optional string right_value = 2;
+  }
+
+  message TransitConfiguration {
+    required string transit_configuration_cache_key = 1;
+    required OperatorRef left_activity_expression = 11;
+    required OperatorRef right_activity_expression = 12;
+    required TransitType transit_type = 13;
+    optional OperatorRef out_msg_expression = 14;
+    optional OperatorRef in_msg_expression = 15;
+    repeated ManualPair manual_values = 20;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required TransitConfiguration transit_configuration = 2;
+
+  required OperatorRef activity_expression = 5;
+}
+
+message MergeEventlogOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef activity_to_expression = 2;
+  required OperatorRef activity_from_expression = 3;
+  required bool is_distinct = 4 [ default = false ];
+  required OperatorFilter activity_to_filter = 5;
+  required OperatorFilter activity_from_filter = 6;
+}
+
+message EventlogSourceTableOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef merge_eventlog_expression = 2;
+}
+
+// Right now tailored towards throughput time calculations.
+message ThroughputOperatorNode {
+  required OperatorMetadata metadata = 1;
+
+  required string source_activity = 2;
+  required string target_activity = 3;
+
+  required SourceTargetMode source_mode = 4;
+  required SourceTargetMode target_mode = 5;
+
+  required OperatorRef operator_ref = 6;
+
+  optional OperatorRef activity_expression = 7;
+}
+
+message ProcessCropOperatorNode {
+  required OperatorMetadata metadata = 1;
+
+  required string source_activity = 2;
+  required string target_activity = 3;
+
+  required SourceTargetMode source_mode = 4;
+  required SourceTargetMode target_mode = 5;
+
+  optional OperatorRef activity_expression = 8;
+
+  // do not map to 0|1 but to existing values. non-matching activities will be
+  // mapped to NULL.
+  optional bool remap_to_existing_values = 9 [ default = false ];
+}
+
+message ToTimestampOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required int32 year_start = 2;
+  required int32 year_end = 3;
+  required int32 month_start = 4;
+  required int32 month_end = 5;
+  required int32 day_start = 6;
+  required int32 day_end = 7;
+  required int32 hours_start = 8;
+  required int32 hours_end = 9;
+  required int32 minutes_start = 10;
+  required int32 minutes_end = 11;
+  required int32 seconds_start = 12;
+  required int32 seconds_end = 13;
+  required OperatorRef column = 15;
+}
+
+message ConvertTimezoneOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef timestamp_column_ref = 2;
+  required string from_timezone = 3;
+  required string to_timezone = 4;
+}
+
+message CalendarConfiguration {
+  required CalendarType calendar_type = 1;
+  optional WeekdayCalendarConfiguration weekday_calendar_config = 2;
+  optional FactoryCalendarConfiguration factory_calendar_config = 3;
+  optional WorkdayCalendarConfiguration workday_calendar_config = 4;
+}
+
+message Intersect {
+  required CalendarNode lhs = 1;
+  required CalendarNode rhs = 2;
+}
+
+message CalendarNode {
+  optional CalendarConfiguration calendar_config = 1;
+  optional Intersect intersection = 2;
+}
+
+message RemapTimestampsOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef timestamp_column_ref = 2;
+  required TimeUnits time_unit = 3;
+  optional CalendarNode calendar_tree = 4;
+  optional OperatorRef calendar_column = 5;
+}
+
+message WorkdaysBetweenOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef operator_ref_start = 2;
+  required OperatorRef operator_ref_end = 3;
+
+  optional OperatorRef operator_ref_workday_calendar_id = 4;
+  required bool invalid_to_null = 5;
+
+  optional CalendarNode calendar_tree = 6;
+  optional OperatorRef operator_ref_calendar_id = 7;
+}
+
+message AddWorkdaysOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef operator_ref_timestamps = 2;
+  required OperatorRef operator_ref_days = 3;
+
+  optional OperatorRef operator_ref_workday_calendar_id = 4;
+  required bool invalid_to_null = 5;
+
+  optional WorkdayCalendarConfiguration workday_calendar_configuration = 6;
+
+  optional CalendarNode calendar_tree = 7;
+  optional OperatorRef operator_ref_calendar_id = 8;
+}
+
+message AddTimeunitsCalendarOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required string function_name = 2;
+  required OperatorRef operator_ref_timestamps = 3;
+  required OperatorRef operator_ref_timeunits = 4;
+  required CalendarNode calendar_tree = 5;
+  optional OperatorRef operator_ref_calendar_id = 6;
+}
+
+message TimeunitsBetweenCalendarOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required string function_name = 2;
+  required OperatorRef operator_ref_start = 3;
+  required OperatorRef operator_ref_end = 4;
+  required CalendarNode calendar_tree = 5;
+  optional OperatorRef operator_ref_calendar_id = 6;
+}
+
+message InCalendarOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef operator_ref_timestamps = 2;
+  required CalendarNode calendar_tree = 3;
+  optional OperatorRef operator_ref_calendar_id = 4;
+}
+
+message StringHashOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef operator_ref = 3;
+}
+
+message LinearModel {
+  repeated OperatorRef model_input = 1;
+  required OperatorRef model_output = 2;
+  optional string operator_cache_key = 3 [ default = ''];
+  required bool filtered = 4;
+}
+
+message LinearRegressionOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required LinearModel linear_model = 3;
+  repeated OperatorRef predict_input = 4;
+  optional FilterStates filters = 5;
+}
+
+message KMeansModel {
+  repeated OperatorRef model_input = 1;
+  required int32 k = 2;
+  required bool filtered = 3;
+  optional string operator_cache_key = 4 [ default = ''];
+}
+
+message KMeansOperatorNode {
+  required OperatorMetadata metadata = 1;
+  repeated OperatorRef cluster_input = 3;
+  required KMeansModel kmeansModel = 4;
+  optional FilterStates filters = 5;
+}
+
+message ClusterVariantsNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef variants = 3;
+  required int32 minPts = 4;
+  required int32 epsilon = 5;
+}
+
+message EstimateClusterParamsNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef variants = 3;
+  required int32 epsilon = 4;
+  required int32 number_of_values = 5;
+  required int32 recursion_depth = 6;
+}
+
+message ZScoreOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef operator_ref_input = 3;
+  repeated OperatorRef partition_expression = 4;
+}
+
+message RemapValuesOperatorNode {
+
+  message RemapValuesPair {
+    optional string original_value = 1;
+    optional string mapped_value = 2;
+  }
+
+  message RemapValuesIntPair {
+    optional int64 original_value = 1;
+    optional int64 mapped_value = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  repeated RemapValuesPair values = 3;
+  repeated RemapValuesIntPair int_values = 4;
+  optional string value_others = 5;
+  optional int64 int_value_others = 6;
+  optional bool null_others = 7;
+  required OperatorRef operator_ref = 8;
+}
+
+message ReworkOperatorNode {
+  required OperatorMetadata metadata = 1;
+  // The optional activity expression
+  optional OperatorRef activity_expression = 2;
+  required OperatorFilter filter = 3;
+}
+
+message DateMatchOperatorNode {
+  required OperatorMetadata metadata = 1;
+  optional OperatorRef operator_ref = 3;
+
+  repeated int32 year = 4 [ packed = true ];
+  repeated int32 quarter = 5 [ packed = true ];
+  repeated int32 month = 6 [ packed = true ];
+  repeated int32 week = 7 [ packed = true ];
+  repeated int32 day = 8 [ packed = true ];
+}
+
+message RangeAppendOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef expression = 2;
+  required OperatorRef step_size = 3;
+  optional OperatorRef range_start = 4;
+  optional OperatorRef range_end = 5;
+}
+
+message GenerateRangeOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef step_size = 2;
+  required OperatorRef range_start = 3;
+  required OperatorRef range_end = 4;
+  required bool old_version_used = 5 [ default = false ];
+}
+
+message BucketBoundaryOperatorNode {
+  enum BucketBoundaryType {
+    LOWER = 1;
+    UPPER = 2;
+  }
+  required OperatorMetadata metadata = 1;
+  required BucketBoundaryType type = 2;
+  required OperatorRef expression = 3;
+  optional OperatorNode bucket_width = 4;
+  optional uint64 bucket_count = 5;
+  repeated OperatorNode suggested_ticks = 6;
+  optional uint64 max_bucket_count = 7;
+  required string bucket_boundary_table_cache_key = 8;
+}
+
+message FilterToBoolColumnOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorNode node = 3;
+}
+
+message DaysInMonthOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef timestamp_column = 2;
+}
+
+message TableNode {
+  message MOFlattenEventsConfig {
+    required string object_name = 1;
+    repeated string activity_names = 2;
+  }
+
+  message MOProjectOnObjectsConfig {
+    message ObjectList { repeated string object_names = 1; }
+
+    required string lead_object_name = 1;
+    optional ObjectList included_objects = 2;
+  }
+
+  message ProjectOnObjectConfig {
+    message IncludedEventType {
+      required string event_type = 1;
+      optional string via_relationship = 2;
+    }
+
+    required string lead_object_name = 1;
+    repeated IncludedEventType included_event_types = 2;
+  }
+
+  message TableGroupMemberAccess {
+    required TableGroupRef table_group_id = 1;
+    required string referenced_table_name = 2;
+  }
+
+  message InitEventlogConfig {
+    required TableRef case_table = 1;
+    repeated string join_keys_eventlog = 2;
+    repeated string join_keys_case_table = 3;
+    repeated ExtractOperatorNode extracts = 4;
+  }
+
+  message DomainTable { repeated OperatorRef columns = 1; }
+
+  message LinkObjectsConfig { required OperatorRef input_column = 1; }
+
+  enum ReferenceTarget {
+    ACTIVITY = 1;
+    CASE = 2;
+  }
+
+  optional string table_name = 1;
+
+  optional ReferenceTarget reference_target = 2;
+  optional OperatorRef reference_expression = 3;
+  // the current augmentation table version during query compilation
+  optional int64 augmentation_min_load_version = 4;
+  // skipped 5, since it was used for initEventlogOperatorNode
+  optional InitEventlogConfig init_eventlog_config = 14;
+  optional OperatorRef timeline_expression = 6;
+  optional MOFlattenEventsConfig mo_flatten_events_config = 7;
+  optional MOProjectOnObjectsConfig mo_project_on_objects_config = 10;
+  optional TableGroupMemberAccess table_group_member_access_config = 11;
+  optional ProjectOnObjectConfig project_on_object_config = 12;
+  optional DomainTable domain_table = 13;
+  optional LinkObjectsConfig link_objects_config = 15;
+
+  required int32 table_operator_id = 8;
+  required string cache_key = 9;
+}
+
+message TableGroupNode {
+  message NamedTableGroupNode { required string name = 1; }
+
+  message AlignModelTableGroupNode {
+    optional OperatorRef activity_expression = 1;
+    // Case ID is optional, as it can be deduced if registered as such
+    optional OperatorRef case_expression = 2;
+    optional BpmnModelDescription model = 3;
+  }
+
+  optional NamedTableGroupNode table_group_name = 1;
+  required int32 table_group_operator_id = 2;
+  required string cache_key = 3;
+
+  optional AlignModelTableGroupNode align_model_table_group_node = 4;
+}
+
+// Operator tree requests
+message OperatorNode {
+
+  enum Operator {
+    // Conditional operations (not used in filters)
+    AND = 2;
+    OR = 3;
+    NOT = 4;
+    OP_EQUALS = 5;
+    OP_GREATER = 6;
+    OP_GREATER_EQ = 7;
+    OP_NOT_EQUALS = 8;
+    OP_LESS = 9;
+    OP_LESS_EQ = 10;
+    OP_LIKE = 15;
+    OP_IN = 18;
+    OP_IN_LIKE = 131;
+
+    // Constant Op Codes
+    CONST_INT = 20;
+    CONST_FLOAT = 21;
+    CONST_STRING = 22;
+    CONST_DATE = 23;
+    CONST_BOOLEAN = 24;
+    OP_REF = 26;
+
+    // basic operations
+    ADD = 27;
+    SUB = 28;
+    MULT = 29;
+    DIV = 30;
+    MODULO = 31;
+    CONCAT = 32;
+    // date functions
+    DAY = 36;
+    DAY_OF_WEEK = 37;
+    CALENDAR_WEEK = 38;
+    MONTH = 39;
+    QUARTER = 40;
+    YEAR = 41;
+    HOURS = 42;
+    MINUTES = 43;
+    SECONDS = 44;
+    MILLIS = 45;
+
+    ROUND_YEAR = 46;
+    ROUND_QUARTER = 47;
+    ROUND_MONTH = 48;
+    ROUND_DAY = 49;
+    ROUND_WEEK = 50;
+    ROUND_HOUR = 51;
+    ROUND_MINUTE = 52;
+    ROUND_SECOND = 53;
+
+    DATE_BETWEEN = 54;
+
+    MILLIS_BETWEEN = 56;
+    SECONDS_BETWEEN = 57;
+    MINUTES_BETWEEN = 58;
+    HOURS_BETWEEN = 59;
+    DAYS_BETWEEN = 60;
+    MONTHS_BETWEEN = 61;
+    YEARS_BETWEEN = 62;
+
+    ADD_MILLIS = 63;
+    ADD_SECONDS = 64;
+    ADD_MINUTES = 65;
+    ADD_HOURS = 66;
+    ADD_DAYS = 67;
+    ADD_MONTHS = 68;
+    ADD_YEARS = 69;
+    // math functions
+    ABS = 70;
+    ROUND = 71;
+    FLOOR = 72;
+    CEIL = 73;
+    SQRT = 76;
+    SQUARE = 77;
+    POWER = 78;
+    LOG = 79;
+
+    // statistic operations
+    QNORM = 80;
+
+    // string functions
+    LEFT = 83;
+    LEN = 84;
+    LOWER = 85;
+    LTRIM = 86;
+    REPLACE = 87;
+    REVERSE = 89;
+    RIGHT = 90;
+    RTRIM = 91;
+    SUBSTRING = 92;
+    UPPER = 93;
+    ISNULL = 94;
+    // conversion functions
+    STR_TO_INT = 95;
+    CASE_WHEN = 96;
+    NULL_VALUE = 97;
+    // data generation
+    RANGE_APPEND = 98;
+
+    COALESCE = 101;
+    ISNULLWHEN = 102;
+    INVERSE = 103;
+    GREATEST = 104;
+    LEAST = 105;
+    OP_MULTI_IN = 106;
+
+    // string function (here because number run out)
+    PATINDEX = 120;
+    STRING_SPLIT = 121;
+
+    // explicit data type conversion
+    TO_INT = 125;
+    TO_STRING = 126;
+
+    BETWEEN = 130;
+
+    DELETE_CHARACTERS = 140;
+    MAP_CHARACTERS = 141;
+
+    LINK_FILTER = 200;
+    LINK_VISIBLE_EDGES = 201;
+  }
+
+  required Operator operator_type = 1;
+
+  optional string string_value = 4;
+  optional int64 int_value = 5;
+  optional double float_value = 6;
+  optional int64 date_value = 7;
+  optional bool bool_value = 8;
+
+  repeated OperatorNode inputs = 9;
+
+  // the operator id for the current query
+  // note that this is usually only set on the root operator
+  optional int32 operator_id = 17 [ default = -1 ];
+  optional int32 operator_ref_id = 18 [ default = 0 ];
+
+  optional string operator_cache_key = 19 [ default = ''];
+  optional string operator_domain_table_cache_key = 20 [ default = ''];
+
+  optional LinkFilter link_filter = 100;
+  optional LinkVisibleEdges link_visible_edges = 101;
+
+  optional string match_set = 110;
+  optional string replace_set = 111;
+}
+
+message ColumnReferenceOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required TableRef table = 2;
+  required string column_name = 3;
+}
+
+message ProcessColumnReferenceOperatorNode {
+  enum ReferenceTarget {
+    CASE_ID_COLUMN = 0;
+    ACTIVITY_COLUMN = 1;
+    TIMESTAMP_COLUMN = 2;
+    END_TIMESTAMP_COLUMN = 3;
+    SORTING_COLUMN = 4;
+  }
+  required OperatorMetadata metadata = 1;
+  required ReferenceTarget reference_target = 2;
+  optional OperatorRef activity_column_expression = 3;
+  optional TableRef activity_table_expression = 4;
+}
+
+message OperatorHandle {
+  required int32 operator_id = 1;
+  required OperatorNode operator_node = 2;
+}
+
+message OperatorRef { required int32 operator_ref_id = 1; }
+message TableRef {
+  required int32 table_operator_ref_id = 1;
+  optional string registered_table_ref_name = 2;
+}
+message TableGroupRef { required int32 table_group_operator_ref_id = 1; }
+
+message CurrencyConvert {
+  required OperatorMetadata metadata = 1;
+  required string to_currency = 2;
+  required OperatorRef from_currency_expression = 3;
+  required OperatorRef amount_expression = 4;
+  required OperatorRef date_expression = 5;
+  optional TableRef conversion_rates_table = 6;
+}
+
+message CurrencyConvertSAP {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef to_currency_expression = 2;
+  required string exchange_rate_type = 3;
+  required OperatorRef mandt_expression = 4;
+  required OperatorRef document_currency_expression = 5;
+  required OperatorRef document_date_expression = 6;
+  required OperatorRef amount_expression = 7;
+  optional OperatorRef source_system_main_table = 8;
+}
+
+message CurrencySAP {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef amount_expression = 2;
+  required OperatorRef document_currency_type_expression = 3;
+  optional OperatorRef source_system_expression = 4;
+}
+
+message VerifyOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef column_expression = 2;
+}
+
+message FilterToNullOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef column_expression = 2;
+  optional FilterStates filters = 3;
+}
+
+message ExtractJoinOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required TableRef target_table = 2;
+  required OperatorRef source_column = 3;
+  message JoinCondition {
+    required OperatorRef target_condition = 1;
+    required OperatorRef source_condition = 2;
+  }
+  repeated JoinCondition join_conditions = 4;
+}
+
+message ExtractOperatorNode {
+  required string cache_key = 1;
+  required OperatorRef case_key_column = 2;
+  required OperatorRef activity_column = 3;
+  required OperatorRef timestamp_column = 4;
+  optional OperatorRef sorting_column = 5;
+
+  message OptionalColumn {
+    required string column_name = 1;
+    required OperatorRef column = 2;
+  }
+  repeated OptionalColumn optional_columns = 6;
+  optional FilterItem filter = 7;
+  required bool is_distinct = 8 [ default = false ];
+}
+
+message UnionAllOperatorNode {
+  required OperatorMetadata metadata = 1;
+  repeated OperatorRef column_expressions = 2;
+}
+
+message MinuteNowOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required int64 timestamp_value = 2;
+}
+
+message RLAlignOperatorNode {
+  enum RLAlignType {
+    ACTIVITY = 1;
+    MOVE = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required RLAlignType type = 2;
+
+  required OperatorRef activity_expression = 3;
+  required OperatorRef pruned_activity_expression = 8;
+  required OperatorRef variants = 4;
+  required OperatorRef pruned_variants = 7;
+  required PetriNetDescription petri_net_description = 5;
+  required string petri_net_cache_key = 6;
+}
+
+message UnionAllPullbackOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef expression = 2;
+  required int64 index = 3;
+}
+
+message UniqueIDOperatorNode {
+  required OperatorMetadata metadata = 1;
+  repeated OperatorRef column_expressions = 2;
+}
+
+message TimelineOperatorNode {
+  enum TimelineReturnType {
+    COLUMN = 1;
+    TABLE = 2;
+  }
+
+  enum TimelineTimeUnit {
+    YEAR = 1;
+    QUARTER = 2;
+    MONTH = 3;
+    WEEK = 4;
+    DAY = 5;
+    HOUR = 6;
+    MINUTE = 7;
+  }
+
+  message TimelinePartitionConfiguration {
+    enum TimelinePartitionBorderType {
+      FIRST_OCCURRENCE = 1;
+      LAST_OCCURRENCE = 2;
+      TIMELINE_START = 3;
+      TIMELINE_END = 4;
+    }
+
+    required TimelinePartitionBorderType from_border_type = 1;
+    required TimelinePartitionBorderType to_border_type = 2;
+  }
+
+  message TimelinePartition {
+    repeated OperatorRef partition_expressions = 1;
+    required TimelinePartitionConfiguration partition_configuration = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required TimelineReturnType return_type = 2;
+  required TimelineTimeUnit time_unit = 3;
+  repeated OperatorRef timestamp_columns_expressions = 4;
+  optional TimelinePartition partition = 5;
+  optional OperatorRef range_start = 6;
+  optional OperatorRef range_end = 7;
+  required string timeline_table_cache_key = 8;
+}
+
+message TimelineTableColumnOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required TableRef timeline_table = 2;
+  required string column_name = 3;
+}
+
+message LinkObjectsValueOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required TableRef link_objects_table = 2;
+  required OperatorRef input_column = 3;
+}
+
+message BpmnModelDescription {
+  message BpmnNode {
+    enum BpmnNodeType {
+      TASK = 1;
+      EXCLUSIVE_CHOICE = 2;
+      PARALLEL = 3;
+      START = 4;
+      END = 5;
+    }
+
+    required int64 node_id = 1;
+    required BpmnNodeType node_type = 2;
+    optional string task_name = 3;
+  }
+
+  message BpmnEdge {
+    required int64 from = 1;
+    required int64 to = 2;
+  }
+
+  repeated BpmnNode nodes = 1;
+  repeated BpmnEdge edges = 2;
+  required string cache_key = 3;
+}
+
+message BpmnConformsOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef expression = 2;
+  required BpmnModelDescription model = 3;
+}
+
+message MoBpmnSourceTargetOperatorNode {
+  enum MoBpmnSourceTargetType {
+    SOURCE = 1;
+    TARGET = 2;
+  }
+
+  required OperatorMetadata metadata = 1;
+  required MoBpmnSourceTargetType type = 2;
+  required BpmnModelDescription model = 3;
+  required OperatorRef expression = 4; // source/target column
+  required bool do_return_ids = 5;     // whether to return the BPMN model IDs
+}
+
+message KPIOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required string name = 2;
+  required OperatorRef body = 3;
+}
+
+message TypeOfOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required TableRef table = 2;
+}
+
+message RegisteredTable {
+  required int32 table_operator_id = 1;
+  required string name = 2;
+  optional TableRef table = 3;
+  required bool is_permanent = 4;
+}
+
+message ExtendTableOperatorNode {
+  required OperatorMetadata metadata = 1;
+  required TableRef target_table = 2;
+  required string column_name = 3;
+  required OperatorRef query = 4;
+}

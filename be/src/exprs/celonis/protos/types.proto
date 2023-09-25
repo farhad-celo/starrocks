@@ -1,0 +1,55 @@
+syntax = "proto2";
+package celonis.accelerator;
+
+// CPM Data Types
+enum DataType {
+  TYPE_INT = 0;
+  TYPE_FLOAT = 1;
+  TYPE_STRING = 2;
+  TYPE_DATE = 3;
+  TYPE_INVALID = 4;
+}
+
+enum TimeUnits {
+  UNIT_YEARS = 0;
+  UNIT_QUARTERS = 1;
+  UNIT_MONTHS = 2;
+  UNIT_WEEKS = 3;
+  UNIT_DAYS = 4;
+  UNIT_HOURS = 5;
+  UNIT_MINUTES = 6;
+  UNIT_SECONDS = 7;
+  UNIT_MILLISECONDS = 8;
+}
+
+enum WeekdayType {
+  MONDAY = 1;
+  TUESDAY = 2;
+  WEDNESDAY = 3;
+  THURSDAY = 4;
+  FRIDAY = 5;
+  SATURDAY = 6;
+  SUNDAY = 7;
+}
+
+enum CalendarType {
+  WEEKDAY_CALENDAR = 1;
+  WORKDAY_CALENDAR = 2;
+  FACTORY_CALENDAR = 3;
+}
+
+enum DatabaseTypes {
+  INVALID = 1;
+  POSTGRES = 2;
+}
+
+enum OrderByDirection {
+  ASC = 1;
+  DESC = 2;
+  NONE = 3;
+}
+
+enum FilterMode {
+  DEFAULT_PROPAGATE = 1;
+  CCMM_PROPAGATE = 2;
+}
