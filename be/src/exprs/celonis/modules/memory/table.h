@@ -10,7 +10,12 @@
 #include "ctl/conversion.h"
 #include "ctl/static_array.h"
 #include "modules/common/shared_types_fwd.h"
+#ifndef CELOSTAR
 #include "modules/memory/cache/data_table_cache.h"
+#endif
+#ifdef CELOSTAR
+#include "modules/memory/column.h"
+#endif
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/dictionary_fwd.h"
 #include "modules/memory/null_flags_fwd.h"
@@ -184,7 +189,9 @@ class table {
 
   [[nodiscard]] const management::swap_info& get_swap_info() const noexcept { return sinfo; }
 
+#ifndef CELOSTAR
   [[nodiscard]] cache::data_table_cache& get_table_cache() noexcept { return cache; }
+#endif
 
   /**
    * @brief Returns whether this table is a query scope (i.e., temporary) table
@@ -247,8 +254,10 @@ class table {
                                           const column_processing_state& processing_state,
                                           table_row_limit_t table_row_limit);
 
+#ifndef CELOSTAR
   column_t add_column_from_swap(data_type type, const col_name& column_name, const col_id& column_id,
                                 const column_processing_state& state, table_row_limit_t table_row_limit);
+#endif
 
   /**
    * Adds an existing column to the table.
@@ -418,7 +427,9 @@ class table {
 
   const management::swap_info sinfo;
 
+#ifndef CELOSTAR
   cache::data_table_cache cache;
+#endif
 
   mutable std::shared_timed_mutex table_mutex;
 };

@@ -26,13 +26,17 @@
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/timer.h"
+#ifndef CELOSTAR
 #include "modules/io/file_utils.h"
 #include "modules/io/storage_manager.h"
 #include "modules/io/swap_data_types.h"
+#endif
 #include "modules/memory/management/const_bitset_data_accessor.h"
 #include "modules/memory/management/data_handler.h"
 #include "modules/memory/management/load_status.h"
+#ifndef CELOSTAR
 #include "modules/memory/management/swap_context.h"
+#endif
 #include "modules/memory/management/swap_file_utils.h"
 #include "modules/memory/management/swap_info.h"
 #include "modules/memory/row_id.h"
@@ -48,6 +52,7 @@ std::shared_ptr<swappable_bitset> swappable_bitset::create_data_handler(const me
   return raw_data;
 }
 
+#ifndef CELOSTAR
 std::shared_ptr<swappable_bitset> swappable_bitset::init_from_swap(const std::string& swap_file, const swap_info& sinfo,
                                                                    const std::string& description) {
   if (swap_file_exists(swap_file, sinfo)) {
@@ -110,6 +115,7 @@ void swappable_bitset::write_out(common::execution_context& context) {
 
   write_to_disk(context);
 }
+#endif
 
 swappable_bitset::const_data_accessor_t swappable_bitset::get_const_data(const common::execution_context& context) {
   last_usage = mem_clock_t::now();
@@ -119,6 +125,7 @@ swappable_bitset::const_data_accessor_t swappable_bitset::get_const_data(const c
 
 bool swappable_bitset::is_swappable() const { return swap_information.is_swappable(); }
 
+#ifndef CELOSTAR
 bool swappable_bitset::compress() {
   {
     const auto data_mutex_lock{concurrency::lock_shared_with_logging(data_mutex, LOCK_LOGGING_THRESHOLD)};
@@ -136,6 +143,7 @@ bool swappable_bitset::compress() {
   status = load_status::COMPRESSED;  // we just pretend to compress. Data should be small anyway
   return true;
 };
+#endif
 
 size_t swappable_bitset::get_size_in_memory() const {
   if (status == load_status::SWAPPED) {
@@ -150,6 +158,7 @@ void swappable_bitset::set_delete_from_disk_when_destructed(const bool value) {
 }
 
 swappable_bitset::~swappable_bitset() {
+#ifndef CELOSTAR
   if (swap_information.is_swappable()) {
     if (persisted && delete_from_disk_when_destructed_.load()) {
       const io::storage_manager& sm{swap_information.storage_manager()};
@@ -167,8 +176,12 @@ swappable_bitset::~swappable_bitset() {
         [this]() { swap_information.storage_manager().deregister_file(swap_file, swap_information); },
         fmt::format("Couldn't deregister file: {}", swap_file));
   }
+#endif
 };
 
+#ifdef WIP
+// TODO: Confirm that it's not loaded.
+#endif
 swappable_bitset::swappable_bitset(load_status status, memory::null_flags_t data, size_t size, std::string swap_file,
                                    swap_info swap_information, bool persisted, size_t size_on_disk,
                                    std::string description)
@@ -184,10 +197,12 @@ swappable_bitset::swappable_bitset(load_status status, memory::null_flags_t data
       persisted(persisted),
       usage_count(0),
       desc(std::move(description)) {
+#ifndef CELOSTAR
   const auto& sinfo = this->swap_information;
   if (sinfo.is_swappable()) {
     sinfo.storage_manager().register_file(this->swap_file, sinfo, desc);
   }
+#endif
 
   if (status == load_status::LOADED) {
     loaded_by = std::this_thread::get_id();
@@ -210,6 +225,10 @@ memory::null_flags_t swappable_bitset::load_from_swap(const common::execution_co
 
   const auto data_mutex_unique_lock{concurrency::lock_with_logging(data_mutex, LOCK_LOGGING_THRESHOLD)};
 
+#ifdef CELOSTAR
+  debug_assert(status == load_status::LOADED);
+  return data;
+#else
   common::timer timer_after_lock;
   if (status == load_status::LOADED) {
     return data;
@@ -274,8 +293,10 @@ memory::null_flags_t swappable_bitset::load_from_swap(const common::execution_co
   add_swap_invocation_to_operator_statistics(swap_information.memory_manager(), BITSET_SWAP_IN_KEY,
                                              timer_after_lock.duration());
   return data;
+#endif
 }
 
+#ifndef CELOSTAR
 void swappable_bitset::swap_out_bitset(common::execution_context& context) {
   auto swap_out_context = create_swap_out_context(context, status.load(), swap_file, description(),
                                                   size.load() * sizeof(bool), size_on_disk.load(), 0);
@@ -310,5 +331,6 @@ void swappable_bitset::write_to_disk(common::execution_context& context) {
   timer.stop();
   add_swap_invocation_to_operator_statistics(swap_information.memory_manager(), BITSET_SWAP_OUT_KEY, timer.duration());
 }
+#endif
 
 }  // namespace celonis::accelerator::memory::management

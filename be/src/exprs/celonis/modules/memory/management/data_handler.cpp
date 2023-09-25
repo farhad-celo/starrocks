@@ -1,7 +1,9 @@
 #include "data_handler.h"
 
 #include "log/log.h"
+#ifndef CELOSTAR
 #include "modules/io/file_utils.h"
+#endif
 #include "modules/memory/management/memory_manager.h"
 #include "modules/memory/table.h"
 
@@ -31,7 +33,11 @@ void log_warning_if_swap_in_too_long(common::timer& timer_with_lock, common::tim
 }
 
 bool data_handler::swap_file_exists(const std::string& swap_file, const swap_info& sinfo) {
+#ifdef CELOSTAR
+  return false;
+#else
   return io::file_exists(swap_file, sinfo);
+#endif
 }
 
 void data_handler::add_swap_invocation_to_operator_statistics(const std::shared_ptr<memory_manager>& manager,

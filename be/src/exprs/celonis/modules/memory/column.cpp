@@ -19,8 +19,10 @@
 #include "modules/common/date/celonis_date_storage.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/timer.h"
+#ifndef CELOSTAR
 #include "modules/cube/query_scope.h"
 #include "modules/io/swap/swap_loader.h"
+#endif
 #include "modules/memory/builders/temp_column_builder.h"
 #include "modules/memory/management/memory_manager.h"
 #include "modules/memory/null_flags.h"
@@ -145,6 +147,7 @@ void column::dictify_if_needed(const common::execution_context& context) {
                                   *null_flags_bitset, config_.description, context);
     auto [resulting_dict,
           resulting_column_pointers]{raw.to_swappable(config_.id, config_.swap_information, config_.description)};
+#ifndef CELOSTAR
     if (config_.swap_information.is_persistent()) {
       const bool success{resulting_dict->write_out(dictify_context)};
       if (!success) {
@@ -153,6 +156,7 @@ void column::dictify_if_needed(const common::execution_context& context) {
       }
       resulting_column_pointers->write_out(dictify_context);
     }
+#endif
     dict_ = std::move(resulting_dict);
     column_pointers_ = std::move(resulting_column_pointers);
   };
@@ -208,6 +212,10 @@ void column::load_if_missing(const common::execution_context& context) {
   const auto lck{concurrency::lock_with_logging(column_mutex_, LOCK_LOGGING_THRESHOLD)};
   wait_span.finish_span();
 
+#ifdef CELOSTAR
+  debug_assert(!is_missing());
+  return;
+#else
   auto load_context{context.create_sub_context("load_if_missing", {})};
 
   if (is_missing()) {
@@ -242,6 +250,7 @@ void column::load_if_missing(const common::execution_context& context) {
       config_.swap_information.memory_manager()->register_persistent_group(managed_group_);
     }
   }
+#endif
 }
 
 namespace {
@@ -308,6 +317,7 @@ void column::swap_in(common::execution_context& context) {
   }
 }
 
+#ifndef CELOSTAR
 void column::swap_out(common::execution_context& context) {
   if (is_dictified()) {
     dict_->swap_out(context);
@@ -348,6 +358,7 @@ void column::swap_out_transaction(common::execution_context& context,
                                   std::chrono::steady_clock::time_point query_start) {
   managed_group_->swap_out(std::this_thread::get_id(), query_start, context);
 }
+#endif
 
 bool column::is_at_least_partially_swapped_out() const {
   std::shared_lock lock{column_mutex_};

@@ -30,9 +30,11 @@ using join_data_handler64_t = management::raw_data_handler_t<join_64_t>;
 
 using join_data_handler_t = std::variant<join_data_handler64_t, join_data_handler32_t>;
 
+#ifndef CELOSTAR
 [[nodiscard]] std::optional<join_data_handler_t> create_join_from_swap(const std::string& swap_file,
                                                                        const management::swap_info& sinfo,
                                                                        const std::string& description);
+#endif
 
 template <typename JOIN_TYPE>
 [[nodiscard]] management::raw_data_handler_t<JOIN_TYPE> create_join_from_raw_data(

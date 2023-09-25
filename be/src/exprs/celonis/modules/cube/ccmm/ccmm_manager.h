@@ -1,5 +1,6 @@
 #pragma once
 
+#ifndef CELOSTAR
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -21,9 +22,11 @@
 #include "modules/memory/management/swap_info.h"
 #include "modules/memory/row_id.h"
 #include "modules/memory/table.h"
+#endif
 
 namespace celonis::accelerator::cube::ccmm {
 
+#ifndef CELOSTAR
 namespace details {
 
 /** Counts how often each event occurs in the specified activity column. NULL values are ignored. */
@@ -31,6 +34,7 @@ namespace details {
                                                                             common::execution_context& parent_context);
 
 }  // namespace details
+#endif
 
 constexpr const char* EVENT_ID_COLUMN_KEY{"EVENT_ID"};
 constexpr const char* ACTIVITY_COLUMN_KEY{"ACTIVITY"};
@@ -39,6 +43,7 @@ constexpr const char* OBJECT_ID_COLUMN_KEY{"OBJECT_ID"};
 constexpr const char* SORTING_COLUMN_KEY{"SORTING"};
 constexpr const char* SOURCE_COLUMN_KEY{"SOURCE_EVENT_TABLE"};
 
+#ifndef CELOSTAR
 class central_event_table {
  public:
   central_event_table() = delete;
@@ -374,5 +379,6 @@ class cube_ccmm_manager : public ccmm_manager {
   relationship_name_to_join_info_t relationship_name_to_join_info_{};
   std::unordered_map<std::string, row_id> event_instance_counts_;
 };
+#endif
 
 }  // namespace celonis::accelerator::cube::ccmm

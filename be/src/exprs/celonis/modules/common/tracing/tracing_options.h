@@ -4,7 +4,9 @@
 #include <string>
 
 #include "log/metadata.h"
+#ifndef CELOSTAR
 #include "logging/builder/level.h"
+#endif
 #include "modules/common/tracing/sampling/span_sampling_rules.h"
 
 namespace celonis::accelerator::common::tracing {

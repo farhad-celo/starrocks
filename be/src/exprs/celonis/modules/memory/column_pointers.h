@@ -12,7 +12,9 @@
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
+#ifndef CELOSTAR
 #include "modules/memory/cache/column_register_fwd.h"
+#endif
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/management/raw_data_handler.h"
 #include "modules/memory/row_id.h"
@@ -160,8 +162,10 @@ class column_ptrs_abstract : public details::column_ptrs_abstract_base {
   using concrete_type = column_ptrs_impl<COL_PTRS_TYPE>;
 
   virtual void swap_in(common::execution_context& context) = 0;
+#ifndef CELOSTAR
   virtual void swap_out(common::execution_context& context) = 0;
   virtual void write_out(common::execution_context& context) = 0;
+#endif
   [[nodiscard]] virtual usage_time_t time_of_last_usage() const = 0;
   [[nodiscard]] virtual bool is_swappable() const = 0;
   [[nodiscard]] virtual management::load_status get_load_status() const = 0;
@@ -201,8 +205,10 @@ class column_ptrs_impl final : public column_ptrs_abstract {
 
   // column_ptrs_abstract interface
   void swap_in(common::execution_context& context) override { ptrs->swap_in(context); }
+#ifndef CELOSTAR
   void swap_out(common::execution_context& context) override { ptrs->swap_out(context); }
   void write_out(common::execution_context& context) override { ptrs->write_out(context); }
+#endif
   [[nodiscard]] usage_time_t time_of_last_usage() const override { return ptrs->get_last_usage(); }
   [[nodiscard]] bool is_swappable() const override { return ptrs->is_swappable(); }
   [[nodiscard]] management::load_status get_load_status() const override { return ptrs->get_load_status(); }
@@ -248,7 +254,9 @@ class raw_column_ptrs_abstract : public details::column_ptrs_abstract_base {
 
   explicit raw_column_ptrs_abstract(col_pointer_type type) noexcept : column_ptrs_abstract_base{type} {}
 
+  #ifndef CELOSTAR
   [[nodiscard]] virtual column_ptrs_t create_cache_column_pointer(const cache::column_register& column_register) = 0;
+  #endif
   [[nodiscard]] virtual column_ptrs_t create_temp_column_pointer() = 0;
 
   [[nodiscard]] virtual raw_immutable_column_ptrs_t as_immutable() const = 0;
@@ -275,8 +283,10 @@ class raw_column_ptrs_impl final : public raw_column_ptrs_abstract {
   // column_ptrs_abstract_base interface
   [[nodiscard]] size_t get_row_count() const noexcept override { return data_.size(); }
 
+#ifndef CELOSTAR
   // column_ptrs_abstract interface
   [[nodiscard]] column_ptrs_t create_cache_column_pointer(const cache::column_register& column_register) override;
+#endif
   [[nodiscard]] column_ptrs_t create_temp_column_pointer() override;
   [[nodiscard]] raw_immutable_column_ptrs_t as_immutable() const override;
   [[nodiscard]] raw_immutable_column_ptrs_t create_immutable_view(size_t offset, size_t size) const override;

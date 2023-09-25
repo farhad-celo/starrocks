@@ -3,8 +3,10 @@
 #include <memory>
 
 #include "ctl/assert.h"
+#ifndef CELOSTAR
 #include "modules/memory/cache/column_register.h"
 #include "modules/memory/table.h"
+#endif
 
 namespace celonis::accelerator::memory {
 
@@ -104,11 +106,13 @@ raw_immutable_column_ptrs_t column_ptrs_impl<COL_PTRS_TYPE>::create_immutable_vi
                                                                          size);
 }
 
+#ifndef CELOSTAR
 template <typename COL_PTRS_TYPE>
 column_ptrs_t raw_column_ptrs_impl<COL_PTRS_TYPE>::create_cache_column_pointer(
     const cache::column_register& column_register) {
   return column_register.create_column_pointers(data_);
 }
+#endif
 
 template <typename COL_PTRS_TYPE>
 column_ptrs_t raw_column_ptrs_impl<COL_PTRS_TYPE>::create_temp_column_pointer() {
@@ -143,5 +147,10 @@ raw_immutable_column_ptrs_t raw_immutable_column_ptrs_impl<COL_PTRS_TYPE>::creat
   return raw_immutable_column_ptrs_t{
       new raw_immutable_column_ptrs_impl<COL_PTRS_TYPE>{data_, static_cast<row_id>(offset), static_cast<row_id>(size)}};
 }
+
+#ifdef CELOSTAR
+// TODO(j.kim): Locate where it is instantiated in cpm-query-engine.
+template class column_ptrs_impl<col_ptr_64_t>;
+#endif
 
 }  // namespace celonis::accelerator::memory

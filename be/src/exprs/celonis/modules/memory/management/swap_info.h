@@ -6,7 +6,9 @@
 
 #include "modules/common/int_types.h"
 #include "modules/cube/execution/tracking/operator_statistics.h"
+#ifndef CELOSTAR
 #include "modules/io/storage_manager_fwd.h"
+#endif
 #include "modules/memory/management/memory_manager_fwd.h"
 
 namespace celonis::accelerator::memory::management {
@@ -20,22 +22,29 @@ constexpr size_t LARGE_SWAP_FILE_THRESHOLD{std::numeric_limits<int32_t>::max()};
  */
 enum class persistence_status : int8_t { PERSISTENT, NON_PERSISTENT };
 
+#ifndef CELOSTAR
 [[nodiscard]] std::string get_tmp_swap_file_name(const std::string& swap_file);
+#endif
 
 /**
  * @brief collection of various swap-related meta-data required for swapping data to disk.
  */
 class swap_info {
  public:
+#ifdef CELOSTAR
+  // TODO: Add swap_info() w/o storage_manager.
+#else
   swap_info(bool swappable, std::string base_directory, persistence_status persistence_state,
             const io::storage_manager& storage_manager, std::shared_ptr<management::memory_manager> manager,
             std::string encryption_key);
+#endif
 
   /** getter */
   [[nodiscard]] bool is_swappable() const noexcept;
   [[nodiscard]] persistence_status persistence_state() const noexcept;
   [[nodiscard]] bool is_persistent() const noexcept;
   [[nodiscard]] bool is_non_persistent() const noexcept;
+#ifndef CELOSTAR
   /**
    * @brief provides access to the used storage manager
    * @return a const reference to the storage manager in use
@@ -43,6 +52,7 @@ class swap_info {
    * abort or exception if this condition does not hold.
    */
   [[nodiscard]] const io::storage_manager& storage_manager() const;
+#endif
   [[nodiscard]] const std::shared_ptr<management::memory_manager>& memory_manager() const noexcept;
   [[nodiscard]] std::shared_ptr<management::memory_manager>& memory_manager() noexcept;
   [[nodiscard]] const std::string& base_directory() const noexcept;
@@ -67,7 +77,9 @@ class swap_info {
   bool swappable{false};
   std::string swap_base_directory{};
   persistence_status swap_persistence_state{persistence_status::NON_PERSISTENT};
+#ifndef CELOSTAR
   const io::storage_manager* swap_storage_manager{nullptr};
+#endif
   std::shared_ptr<management::memory_manager> manager{nullptr};
   std::string swap_encryption_key{};
 };
@@ -92,7 +104,11 @@ inline const std::string& swap_info::encryption_key() const noexcept { return sw
 
 inline std::string& swap_info::encryption_key() noexcept { return swap_encryption_key; }
 
+#ifdef CELOSTAR
+inline bool swap_info::is_no_swap() const noexcept { return true; }
+#else
 inline bool swap_info::is_no_swap() const noexcept { return swap_storage_manager == nullptr; }
+#endif
 
 [[nodiscard]] swap_info no_swap();
 

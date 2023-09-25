@@ -8,9 +8,11 @@
 
 #include "modules/cube/execution/tracking/operator_statistics_fwd.h"
 
+#ifndef CELOSTAR
 namespace celonis::accelerator {
 class Response_QueryStatistics;
 }  // namespace celonis::accelerator
+#endif
 
 namespace celonis::accelerator::cube::execution::tracking {
 
@@ -67,7 +69,9 @@ class operator_statistics_per_query {
  public:
   void add_invocation(const std::string& operator_key, size_t peak_memory);
 
+#ifndef CELOSTAR
   void write_to_query_statistics_response(Response_QueryStatistics* query_statistics);
+#endif
 
   // Warning: This function is for testing purposes only since it is not thread-safe.
   [[nodiscard]] const memory_stats_map_t& unsafe_get_stats_map() const noexcept { return memory_stats_map_; }

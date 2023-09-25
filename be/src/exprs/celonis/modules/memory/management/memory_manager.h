@@ -62,9 +62,11 @@ class memory_manager {
   // is sent to the process. They apply the corresponding operation to all contained data handles.
   void force_swap_in(const common::execution_context& context) const;
 
+#ifndef CELOSTAR
   void force_swap_out(common::execution_context& context) const;
 
   void force_compress() const;
+  #endif
 
   void force_clean_up();
 
@@ -90,10 +92,12 @@ class memory_manager {
 
   void set_cache_compression_time(int64_t t) { cache_compression_time_in_min_ = t; }
 
+  #ifndef CELOSTAR
   /**
    * Tries to swap out all groups that are associated with the given transaction.
    */
   void end_transaction(const cube::query_transaction& transaction) const;
+  #endif
 
   /**
    * Used in testing scenarios to override the real memory status with a mocked one to be able to more easily test

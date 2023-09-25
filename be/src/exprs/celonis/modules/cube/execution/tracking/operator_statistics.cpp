@@ -8,7 +8,9 @@
 #include "ctl/conversion.h"
 #include "format/json/json.h"
 #include "log/log.h"
+#ifndef CELOSTAR
 #include "modules/query/queries.pb.h"
+#endif
 
 namespace celonis::accelerator::cube::execution::tracking {
 
@@ -90,6 +92,7 @@ void log_operator_telemetry(const stats_map_t& stats_map) {
   }
 }
 
+#ifndef CELOSTAR
 bool cmp(std::pair<std::string, size_t>& a, std::pair<std::string, size_t>& b) { return a.second > b.second; }
 
 std::vector<std::pair<std::string, size_t>> sort_descending(const memory_stats_map_t& map) {
@@ -102,6 +105,7 @@ std::vector<std::pair<std::string, size_t>> sort_descending(const memory_stats_m
   sort(vector.begin(), vector.end(), cmp);
   return vector;
 }
+#endif
 
 }  // namespace
 
@@ -176,6 +180,7 @@ void operator_statistics_per_query::add_invocation(const std::string& operator_k
   }
 }
 
+#ifndef CELOSTAR
 void operator_statistics_per_query::write_to_query_statistics_response(
     Response_QueryStatistics* const query_statistics) {
   const std::scoped_lock lock{mutex_};
@@ -189,5 +194,6 @@ void operator_statistics_per_query::write_to_query_statistics_response(
     }
   }
 }
+#endif
 
 }  // namespace celonis::accelerator::cube::execution::tracking

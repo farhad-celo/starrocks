@@ -11,7 +11,9 @@
 
 #include "ctl/static_array_fwd.h"
 #include "modules/common/execution_context.h"
+#ifndef CELOSTAR
 #include "modules/io/compressed_data.h"
+#endif
 #include "modules/memory/management/const_data_accessor.h"
 #include "modules/memory/management/data_handler.h"
 #include "modules/memory/management/load_status.h"
@@ -42,6 +44,7 @@ class raw_data_handler : public data_handler {
   [[nodiscard]] static std::shared_ptr<raw_data_handler<T>> create_temp_data_handler(
       const ctl::shared_static_array<T>& data);
 
+#ifndef CELOSTAR
   /**
    * Constructs a raw data handler whose data already exists in the specified swap file on disk.
    * For this operation only the data size stored in the swap file header is read, but not the actual data.
@@ -52,6 +55,7 @@ class raw_data_handler : public data_handler {
    */
   static raw_data_handler_t<T> init_from_swap(const std::string& swap_file, const swap_info& sinfo,
                                               const std::string& description);
+#endif
 
   load_status get_load_status() const override { return status; };
 
@@ -61,7 +65,9 @@ class raw_data_handler : public data_handler {
 
   bool is_swappable() const override { return swap_information.is_swappable(); }
 
+#ifndef CELOSTAR
   bool compress() override;
+#endif
 
   size_t get_size_in_memory() const override;
 
@@ -79,9 +85,11 @@ class raw_data_handler : public data_handler {
 
   [[nodiscard]] load_time_t get_loaded_at() const override { return load_time_t{loaded_at}; }
 
+#ifndef CELOSTAR
   bool swap_out(common::execution_context& context) override;
 
   void write_out(const common::execution_context& context);
+#endif
 
   using const_data_accessor_t = const_data_accessor<T>;
 
@@ -106,6 +114,7 @@ class raw_data_handler : public data_handler {
 
   ctl::shared_static_array<T> swap_in_data(const common::execution_context& context);
 
+#ifndef CELOSTAR
   void swap_to_disk(common::execution_context& context);
 
   void write_to_disk(const common::execution_context& context);
@@ -118,15 +127,18 @@ class raw_data_handler : public data_handler {
    * After locking, all validity checks and compression succeeded in 'compress', set the data and post conditions
    */
   void init_compressed_state(io::compressed_data&& compressed_data);
+#endif
 
   mutable std::shared_mutex data_mutex;
   std::atomic<load_status> status;
   ctl::shared_static_array<T> data;
   std::atomic<size_t> size;
   std::atomic<size_t> size_on_disk;
+#ifndef CELOSTAR
   // TODO(n.weber): Maybe a strong type for the different states the data can be in makes sense (ensuring all post
   // conditions such as 'status' are always correctly set
   std::optional<io::compressed_data> compressed_data_{std::nullopt};
+#endif
   std::atomic<mem_time_t> last_usage{mem_clock_t::now()};
   std::atomic<std::thread::id> loaded_by{std::thread::id{}};
   std::atomic<mem_time_t> loaded_at{mem_clock_t::time_point{}};

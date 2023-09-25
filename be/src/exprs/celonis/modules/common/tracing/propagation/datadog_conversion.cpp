@@ -1,5 +1,6 @@
 #include "datadog_conversion.h"
 
+#ifndef CELOSTAR
 #include <array>
 #include <charconv>
 #include <optional>
@@ -64,3 +65,4 @@ opentelemetry::trace::TraceFlags to_opentelemetry_trace_flags(
 }
 
 }  // namespace celonis::accelerator::common::tracing::propagation
+#endif

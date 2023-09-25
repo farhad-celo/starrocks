@@ -4,10 +4,16 @@
 #include <memory>
 #include <string>
 
+#ifdef CELOSTAR
+#include "exprs/celonis/result_table.h"
+#endif
 #include "modules/memory/table_fwd.h"
 
 namespace celonis::accelerator::memory {
 
+#ifdef CELOSTAR
+using table_group_t = starrocks::celonis::ResultTableMap;
+#else
 // Use transparent comparator to make lookup work with string views
 using table_map_t = std::map<std::string, memory::table_t, std::less<>>;
 
@@ -60,5 +66,6 @@ class table_group {
 };
 
 using table_group_t = ctl::checked_shared_ptr<table_group>;
+#endif
 
 }  // namespace celonis::accelerator::memory

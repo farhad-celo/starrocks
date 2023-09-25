@@ -40,6 +40,7 @@ class dictionary {
    */
   virtual void swap_in(common::execution_context& context) = 0;
 
+#ifndef CELOSTAR
   /**
    * Swaps the column to disk.
    */
@@ -49,6 +50,7 @@ class dictionary {
    * Writes the column to disk.
    */
   virtual bool write_out(common::execution_context& context) = 0;
+#endif
 
   [[nodiscard]] virtual management::load_status get_load_status() const = 0;
 

@@ -8,12 +8,15 @@
 #include "ctl/static_array.h"
 #include "ctl/utility.h"
 #include "log/log.h"
+#ifndef CELOSTAR
 #include "modules/common/call_and_log_unsafe_callable.h"
+#endif
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types.h"
 #include "modules/common/timer.h"
 #include "modules/common/trace_types.h"
+#ifndef CELOSTAR
 #include "modules/io/byte_view_utils.h"
 #include "modules/io/compress_encrypt_utils.h"
 #include "modules/io/file_utils.h"
@@ -21,6 +24,7 @@
 #include "modules/io/storage_manager.h"
 #include "modules/memory/management/swap_context.h"
 #include "modules/memory/management/swap_file_utils.h"
+#endif
 
 namespace celonis::accelerator::memory::management {
 
@@ -48,6 +52,7 @@ std::string_view get_pointer_buffer_file_ending(pointer_data_handler_swap_type t
   }
 }
 
+#ifndef CELOSTAR
 // Has to be called before one of the underlying data handlers is triggered to write data to disk.
 template <typename T>
 inline void convert_to_relative_addresses(
@@ -148,6 +153,7 @@ void delete_swap_file(const swap_info& sinfo, const std::string& swap_file) {
     log::warn("Failed to deleted swap file \"{}\" by destructor of raw_data_handler.", swap_file);
   }
 }
+#endif
 
 }  // anonymous namespace
 
@@ -157,12 +163,17 @@ namespace details {
 
 template <typename T>
 size_t get_size_in_memory(const data_handler_data<T>& data) {
+#ifdef CELOSTAR
+  return std::visit(ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); }),
+#else
   return std::visit(ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); },
                                     [](const io::compressed_data& compressed) { return compressed.size(); },
                                     [](const swapped_data&) { return size_t{0}; }),
+#endif
                     data);
 }
 
+#ifndef CELOSTAR
 template <typename T>
 std::optional<size_t> write_out_pointers(const loaded_data<T>& pointers,
                                          const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer,
@@ -209,6 +220,7 @@ std::optional<size_t> write_out_buffer(const loaded_data<T>& pointers,
       buffer_swap_file, iter, buffer.data.byte_size(), sinfo,
       io::get_type_id<std::remove_const_t<std::remove_pointer_t<T>>>(), context);
 }
+#endif
 
 }  // namespace details
 
@@ -246,6 +258,7 @@ std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_temp_da
                              no_swap(), "");
 }
 
+#ifndef CELOSTAR
 template <typename T>
 std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::init_from_swap(const std::string& swap_file,
                                                                                  swap_info sinfo,
@@ -274,13 +287,18 @@ std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::init_from_swap
 
   return nullptr;
 }
+#endif
 
 template <typename T>
 load_status pointer_data_handler<T>::get_load_status() const {
   return data_.lock_shared([](const auto& data_wrapper) {
+#ifdef CELOSTAR
+    return std::visit(ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; }),
+#else
     return std::visit(ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; },
                                       [](const io::compressed_data&) { return load_status::COMPRESSED; },
                                       [](const swapped_data&) { return load_status::SWAPPED; }),
+#endif
                       data_wrapper.pointer);
   });
 }
@@ -305,6 +323,7 @@ bool pointer_data_handler<T>::swap_file_broken() const {
   return pointer_broken_swap_file_ || buffer_broken_swap_file_;
 }
 
+#ifndef CELOSTAR
 template <typename T>
 bool pointer_data_handler<T>::swap_out(common::execution_context& context) {
   if (data_.lock_shared([this](const auto& data_wrapper) {
@@ -356,6 +375,7 @@ bool pointer_data_handler<T>::compress() {
     return false;
   });
 };
+#endif
 
 template <typename T>
 const_data_accessor<T> pointer_data_handler<T>::get_const_data(const common::execution_context& context) {
@@ -384,12 +404,17 @@ const_data_accessor<T> pointer_data_handler<T>::get_const_data(const common::exe
     drop_short_wait_spans(timer_with_lock, wait_context);
     wait_context.get_span().finish_span();
 
+#ifdef CELOSTAR
+    debug_assert(std::holds_alternative<loaded_data<STORAGE_T>>(data_wrapper.buffer));
+    debug_assert(std::holds_alternative<loaded_data<POINTER_T>>(data_wrapper.pointer));
+#else
     if (std::holds_alternative<loaded_data<POINTER_T>>(data_wrapper.pointer)) {
       return const_data_accessor_t{std::get<loaded_data<STORAGE_T>>(data_wrapper.buffer).data,
                                    std::get<loaded_data<POINTER_T>>(data_wrapper.pointer).data};
     }
 
     swap_in_data(data_wrapper, timer_with_lock, timer_after_lock, context);
+#endif
     return const_data_accessor_t{std::get<loaded_data<STORAGE_T>>(data_wrapper.buffer).data,
                                  std::get<loaded_data<POINTER_T>>(data_wrapper.pointer).data};
   });
@@ -444,6 +469,7 @@ std::string pointer_data_handler<T>::description() const {
 
 template <typename T>
 pointer_data_handler<T>::~pointer_data_handler() {
+#ifndef CELOSTAR
   if (sinfo_.is_swappable()) {
     if (delete_from_disk_when_destructed_.load()) {
       if (pointer_persisted_) {
@@ -461,8 +487,10 @@ pointer_data_handler<T>::~pointer_data_handler() {
         [this]() { sinfo_.storage_manager().deregister_file(buffer_swap_file_, sinfo_); },
         fmt::format("Couldn't deregister file: {}", buffer_swap_file_));
   }
+#endif
 }
 
+#ifndef CELOSTAR
 template <typename T>
 bool pointer_data_handler<T>::write_out(common::execution_context& context) {
   auto wait_context{context.create_sub_context("swap_in_wait_for_lock", {})};
@@ -484,6 +512,7 @@ bool pointer_data_handler<T>::write_out(common::execution_context& context) {
     return write_out_if_applicable(data_wrapper, context);
   });
 }
+#endif
 
 template <typename T>
 void pointer_data_handler<T>::swap_in(const common::execution_context& context) {
@@ -499,6 +528,9 @@ void pointer_data_handler<T>::swap_in(const common::execution_context& context) 
     return false;
   });
 
+#ifdef CELOSTAR
+  debug_assert(already_swapped_in);
+#else
   if (already_swapped_in) {
     // nothing to do
     drop_short_wait_spans(timer_with_lock, wait_context);
@@ -518,6 +550,7 @@ void pointer_data_handler<T>::swap_in(const common::execution_context& context) 
 
     swap_in_data(data_wrapper, timer_with_lock, timer_after_lock, context);
   });
+#endif
 }
 
 template <typename T>
@@ -525,6 +558,7 @@ void pointer_data_handler<T>::set_delete_from_disk_when_destructed(bool value) {
   delete_from_disk_when_destructed_ = value;
 }
 
+#ifndef CELOSTAR
 template <typename T>
 void pointer_data_handler<T>::register_files() {
   if (sinfo_.is_swappable()) {
@@ -532,6 +566,7 @@ void pointer_data_handler<T>::register_files() {
     sinfo_.storage_manager().register_file(buffer_swap_file_, sinfo_, desc_);
   }
 }
+#endif
 
 template <typename T>
 pointer_data_handler<T>::pointer_data_handler(const ctl::shared_static_array<POINTER_T>& ptr_data,
@@ -548,9 +583,12 @@ pointer_data_handler<T>::pointer_data_handler(const ctl::shared_static_array<POI
       sinfo_{std::move(sinfo)},
       desc_{std::move(description)},
       write_with_sorting_{type == pointer_data_handler_swap_type::SWAPPED_DICTIONARY} {
+#ifndef CELOSTAR
   register_files();
+#endif
 }
 
+#ifndef CELOSTAR
 template <typename T>
 pointer_data_handler<T>::pointer_data_handler(size_t pointer_size, size_t buffer_size, size_t pointer_size_on_disk,
                                               size_t buffer_size_on_disk, swap_info sinfo,
@@ -657,6 +695,7 @@ void pointer_data_handler<T>::write_out_buffer(const io::compressed_data& compre
     buffer_broken_swap_file_ = false;
   }
 }
+#endif
 
 template <typename T>
 void pointer_data_handler<T>::swap_in_data(data_wrapper& data, common::timer& timer_with_lock,
@@ -673,6 +712,10 @@ template <typename T>
 void pointer_data_handler<T>::swap_in_pointers(data_handler_data<POINTER_T>& pointer,
                                                const loaded_data<STORAGE_T>& buffer,
                                                const common::execution_context& context) {
+#ifdef CELOSTAR
+  debug_assert(std::holds_alternative<loaded_data<POINTER_T>>(pointer));
+  return;
+#else
   if (std::holds_alternative<loaded_data<POINTER_T>>(pointer)) {
     return;
   }
@@ -702,11 +745,16 @@ void pointer_data_handler<T>::swap_in_pointers(data_handler_data<POINTER_T>& poi
                  pointer);
 
   pointer = loaded_pointer;
+#endif
 }
 
 template <typename T>
 void pointer_data_handler<T>::swap_in_buffer(data_handler_data<STORAGE_T>& buffer,
                                              const common::execution_context& context) {
+#ifdef CELOSTAR
+  debug_assert(std::holds_alternative<loaded_data<STORAGE_T>>(buffer));
+  return;
+#else
   if (std::holds_alternative<loaded_data<STORAGE_T>>(buffer)) {
     return;
   }
@@ -734,8 +782,10 @@ void pointer_data_handler<T>::swap_in_buffer(data_handler_data<STORAGE_T>& buffe
                      }),
                  buffer);
   buffer = std::move(loaded_buffer);
+#endif
 }
 
+#ifndef CELOSTAR
 template <typename T>
 template <typename TYPE>
 loaded_data<TYPE> pointer_data_handler<T>::swap_in_impl(
@@ -771,9 +821,16 @@ loaded_data<TYPE> pointer_data_handler<T>::swap_in_impl(
     throw;
   }
 }
+#endif
 
 template <typename T>
 auto pointer_data_handler<T>::get_buffer_start() const -> const STORAGE_T* {
+#ifdef CELOSTAR
+  return data_.lock_shared([](const auto& data_wrapper) {
+    return std::visit(ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); }),
+                      data_wrapper.buffer);
+  });
+#else
   static const STORAGE_T never_used{};
   return data_.lock_shared([](const auto& data_wrapper) {
     return std::visit(ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); },
@@ -787,6 +844,7 @@ auto pointer_data_handler<T>::get_buffer_start() const -> const STORAGE_T* {
                                       }),
                       data_wrapper.buffer);
   });
+#endif
 }
 
 template <typename T>
@@ -796,6 +854,12 @@ size_t pointer_data_handler<T>::get_buffer_size() const {
 
 template <typename T>
 auto pointer_data_handler<T>::get_pointer_start() const -> const POINTER_T* {
+#ifdef CELOSTAR
+  return data_.lock_shared([](const auto& data_wrapper) {
+    return std::visit(ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); }),
+                      data_wrapper.pointer);
+  });
+#else
   static const POINTER_T never_used{};
   return data_.lock_shared([](const auto& data_wrapper) {
     return std::visit(ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); },
@@ -809,6 +873,7 @@ auto pointer_data_handler<T>::get_pointer_start() const -> const POINTER_T* {
                                       }),
                       data_wrapper.pointer);
   });
+#endif
 }
 
 template <typename T>

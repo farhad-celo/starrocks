@@ -77,6 +77,7 @@ void typed_dictionary<T>::swap_in(common::execution_context& context) {
   data_handler->swap_in(context);
 }
 
+#ifndef CELOSTAR
 template <typename T>
 void typed_dictionary<T>::swap_out(common::execution_context& context) {
   data_handler->swap_out(context);
@@ -87,6 +88,7 @@ bool typed_dictionary<T>::write_out(common::execution_context& context) {
   data_handler->write_out(context);
   return true;
 }
+#endif
 
 template <typename T>
 management::load_status typed_dictionary<T>::get_load_status() const {
@@ -241,6 +243,7 @@ dictionary_t typed_dictionary<T>::create_dictionary(ctl::static_array<T>&& data,
       std::move(data), swap_file_name + memory::management::DICT_ENDING, sinfo, description));
 }
 
+#ifndef CELOSTAR
 template <typename T>
 std::shared_ptr<dictionary> typed_dictionary<T>::init_from_swap(const std::string& swap_file_name,
                                                                 const management::swap_info& sinfo,
@@ -253,6 +256,7 @@ std::shared_ptr<dictionary> typed_dictionary<T>::init_from_swap(const std::strin
   }
   return {};
 }
+#endif
 
 typed_dictionary<cel_string_t>::typed_dictionary(std::shared_ptr<management::string_data_handler> string_data)
     : dictionary(data_type::cel_string), string_data_(std::move(string_data)) {}
@@ -266,11 +270,13 @@ using const_data_accessor_t = management::string_data_handler::const_data_access
 
 void typed_dictionary<cel_string_t>::swap_in(common::execution_context& context) { string_data_->swap_in(context); }
 
+#ifndef CELOSTAR
 void typed_dictionary<cel_string_t>::swap_out(common::execution_context& context) { string_data_->swap_out(context); }
 
 bool typed_dictionary<cel_string_t>::write_out(common::execution_context& context) {
   return string_data_->write_out(context);
 }
+#endif
 
 management::load_status typed_dictionary<cel_string_t>::get_load_status() const {
   return string_data_->get_load_status();
@@ -402,6 +408,7 @@ std::string typed_dictionary<cel_string_t>::get_string_value(row_id ptr) const {
       sinfo, description));
 }
 
+#ifndef CELOSTAR
 std::shared_ptr<dictionary> typed_dictionary<cel_string_t>::init_from_swap(const std::string& swap_file_name,
                                                                            const management::swap_info& sinfo,
                                                                            const std::string& description) {
@@ -413,6 +420,7 @@ std::shared_ptr<dictionary> typed_dictionary<cel_string_t>::init_from_swap(const
   }
   return std::shared_ptr<dictionary>(nullptr);
 }
+#endif
 
 // These are needed for the correct linkage of the test
 template class typed_dictionary<cel_boolean_t>;

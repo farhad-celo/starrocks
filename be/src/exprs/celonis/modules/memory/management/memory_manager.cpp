@@ -12,7 +12,9 @@
 #include "log/log.h"
 #include "modules/common/call_and_log_unsafe_callable.h"
 #include "modules/common/execution_context.h"
+#ifndef CELOSTAR
 #include "modules/cube/query_transaction.h"
+#endif
 #include "modules/memory/allocator_utils.h"
 #include "modules/memory/management/data_handler.h"
 
@@ -103,6 +105,7 @@ bool memory_manager::evict_cache_if_needed(const memory_threshold& threshold, co
   }
   size_t not_swapped_bytes{0};
   auto curr_memory_status = old_memory_status;
+#ifndef CELOSTAR
   for (auto& handler_time_pair : sorted_data_handlers) {
     bool swapped_out{handler_time_pair.first->swap_out(context)};
     if (!swapped_out) {
@@ -123,6 +126,7 @@ bool memory_manager::evict_cache_if_needed(const memory_threshold& threshold, co
       return true;  // leave function as enough data was evicted
     }
   }
+#endif
 
   log::jinfo("High Memory",
              ctl::meminfo_change_json(old_memory_status, curr_memory_status, not_swapped_bytes, "Eviction"));
@@ -157,6 +161,7 @@ void memory_manager::force_swap_in(const common::execution_context& context) con
   }
 }
 
+#ifndef CELOSTAR
 void memory_manager::force_swap_out(common::execution_context& context) const {
   auto group_vectors{get_groups(std::chrono::seconds{60})};
   const auto old_memory_status = get_memory_status();
@@ -196,6 +201,7 @@ void memory_manager::force_compress() const {
   log::jinfo("Forced Compression",
              ctl::meminfo_change_json(old_memory_status, new_memory_status, std::nullopt, "Forced Compression"));
 }
+#endif
 
 void memory_manager::force_clean_up() {
   const auto set_lock{concurrency::lock_validated(data_mutex_, std::chrono::seconds{60})};
@@ -216,6 +222,13 @@ struct collect_garbage_mem_groups_result {
   std::vector<std::string> non_swapped_out_mem_handlers;
 };
 
+#ifdef CELOSTAR
+bool memory_manager::collect_garbage(concurrency::shared_counting_mutex& cube_mutex,
+                                     std::optional<std::chrono::steady_clock::time_point> last_query_finished,
+                                     common::execution_context& context) {
+  return true;
+}
+#else
 template <class SETTYPE>
 collect_garbage_mem_groups_result collect_garbage_handle_groups(
     concurrency::shared_counting_mutex& cube_mutex, common::execution_context& context, const SETTYPE& groups,
@@ -315,6 +328,7 @@ bool memory_manager::collect_garbage(concurrency::shared_counting_mutex& cube_mu
 
   return !(persistent_result.stopped_collecting || volatile_result.stopped_collecting);
 }
+#endif
 
 void memory_manager::report_non_swapped_dhs(const collect_garbage_mem_groups_result& persistent_result,
                                             const collect_garbage_mem_groups_result& volatile_result) {
@@ -405,6 +419,7 @@ void memory_manager::erase_volatile(const volatile_group_t& volatile_group, bool
   }
 }
 
+#ifndef CELOSTAR
 void memory_manager::end_transaction(const cube::query_transaction& transaction) const {
   const auto group_vectors{get_groups(std::chrono::seconds{60})};
 
@@ -427,6 +442,7 @@ void memory_manager::end_transaction(const cube::query_transaction& transaction)
     }
   }
 }
+#endif
 
 void memory_manager::add_invocation_to_operator_statistics(const std::string& key,
                                                            std::chrono::milliseconds runtime) const {

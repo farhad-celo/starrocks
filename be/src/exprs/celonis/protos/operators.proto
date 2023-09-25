@@ -1,7 +1,7 @@
 syntax = "proto2";
 package celonis.accelerator;
 
-import "types.proto";
+import "celonis_types.proto";
 
 message FilterItem {
   required OperatorNode filter_expression = 1;

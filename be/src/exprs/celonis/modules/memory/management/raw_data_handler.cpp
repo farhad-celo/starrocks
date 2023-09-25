@@ -26,22 +26,28 @@
 #include "ctl/utils/allocation_messages.h"
 #include "ctl/utils/allocation_reason.h"
 #include "log/log.h"
+#ifndef CELOSTAR
 #include "modules/common/call_and_log_unsafe_callable.h"
+#endif
 #include "modules/common/date/celonis_date_storage.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/timer.h"
 #include "modules/common/tracing/span.h"
+#ifndef CELOSTAR
 #include "modules/io/byte_iterator.h"
 #include "modules/io/byte_view_utils.h"
 #include "modules/io/compress_encrypt_utils.h"
 #include "modules/io/file_utils.h"
 #include "modules/io/storage_manager.h"
 #include "modules/io/swap_data_types.h"
+#endif
 #include "modules/memory/management/const_data_accessor.h"
 #include "modules/memory/management/data_handler.h"
 #include "modules/memory/management/load_status.h"
+#ifndef CELOSTAR
 #include "modules/memory/management/swap_context.h"
+#endif
 #include "modules/memory/management/swap_file_utils.h"
 #include "modules/memory/management/swap_info.h"
 #include "modules/memory/row_id.h"
@@ -83,6 +89,7 @@ raw_data_handler_t<T> raw_data_handler<T>::create_temp_data_handler(const ctl::s
   return raw_data;
 }
 
+#ifndef CELOSTAR
 template <typename T>
 raw_data_handler_t<T> raw_data_handler<T>::init_from_swap(const std::string& swap_file, const swap_info& sinfo,
                                                           const std::string& description) {
@@ -123,9 +130,14 @@ bool raw_data_handler<T>::compress() {
   init_compressed_state(io::compress_to_memory_mt(iter));
   return true;
 }
+#endif
 
 template <typename T>
 size_t raw_data_handler<T>::get_size_in_memory() const {
+#ifdef CELOSTAR
+  debug_assert(status == load_status::LOADED);
+  return size * sizeof(T);
+#else
   if (status == load_status::LOADED) {
     return size * sizeof(T);
   }
@@ -141,8 +153,10 @@ size_t raw_data_handler<T>::get_size_in_memory() const {
       throw common::internal_exception{"Unknown load status [{} ({})].", to_string(status.load()),
                                        ctl::enum_to_underlying_type(status.load())};
   }
+#endif
 }
 
+#ifndef CELOSTAR
 template <typename T>
 bool raw_data_handler<T>::swap_out(common::execution_context& context) {
   {
@@ -194,9 +208,11 @@ void raw_data_handler<T>::write_out(const common::execution_context& context) {
 
   write_to_disk(context);
 }
+#endif
 
 template <typename T>
 raw_data_handler<T>::~raw_data_handler() {
+#ifndef CELOSTAR
   if (swap_information.is_swappable()) {
     if (persisted && delete_from_disk_when_destructed_.load()) {
       const io::storage_manager& sm{swap_information.storage_manager()};
@@ -214,6 +230,7 @@ raw_data_handler<T>::~raw_data_handler() {
         [this]() { swap_information.storage_manager().deregister_file(swap_file, swap_information); },
         fmt::format("Couldn't deregister file: {}", swap_file));
   }
+#endif
 }
 
 template <typename T>
@@ -228,6 +245,11 @@ raw_data_handler<T>::raw_data_handler(load_status status, ctl::shared_static_arr
       swap_information(std::move(swap_information)),
       persisted(persisted),
       desc(std::move(description)) {
+#ifdef CELOSTAR
+  debug_assert(status == load_status::LOADED);
+  loaded_by = std::this_thread::get_id();
+  loaded_at = mem_clock_t::now();
+#else
   const auto& sinfo = this->swap_information;
   if (sinfo.is_swappable()) {
     sinfo.storage_manager().register_file(this->swap_file, sinfo, desc);
@@ -241,8 +263,10 @@ raw_data_handler<T>::raw_data_handler(load_status status, ctl::shared_static_arr
   if (size > static_cast<size_t>(std::numeric_limits<row_id>::max())) {
     log::jinfo("Loading large swap file.", to_json_swap_file_info(this->swap_file, desc, size, size_on_disk));
   }
+#endif
 }
 
+#ifndef CELOSTAR
 namespace {
 template <typename T>
 io::storage_manager::read_return_data<T> read_from_swap(swap_info& swap_info, const std::string& swap_file,
@@ -255,6 +279,7 @@ io::storage_manager::read_return_data<T> read_from_swap(swap_info& swap_info, co
   return sm.read_compressed_mt<T>(swap_file, swap_info, size_on_disk);
 }
 }  // namespace
+#endif
 
 template <typename T>
 ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::execution_context& context) {
@@ -276,6 +301,10 @@ ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::exec
   drop_short_wait_spans(timer_with_lock, wait_context);
   wait_context.get_span().finish_span();
   // check status after lock is acquired
+#ifdef CELOSTAR
+  debug_assert(status == load_status::LOADED);
+  return data;
+#else
   if (status == load_status::LOADED) {
     return data;
   }
@@ -333,8 +362,10 @@ ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::exec
   add_swap_invocation_to_operator_statistics(swap_information.memory_manager(), RAW_DATA_HANDLER_SWAP_IN_KEY,
                                              timer_after_lock.duration());
   return data;
+#endif
 }
 
+#ifndef CELOSTAR
 template <typename T>
 void raw_data_handler<T>::swap_to_disk(common::execution_context& context) {
   auto swap_out_context{create_swap_out_context(context, status, swap_file, description(), size * sizeof(T),
@@ -392,6 +423,7 @@ template <typename T>
   debug_assert(!compressed_data_.has_value());
   return 0;
 }
+#endif
 
 template <typename T>
 const_data_accessor<T> raw_data_handler<T>::get_const_data(const common::execution_context& context) requires(
@@ -409,12 +441,14 @@ const_data_accessor<T> raw_data_handler<T>::get_const_data(const common::executi
   }
 }
 
+#ifndef CELOSTAR
 template <typename T>
 inline void raw_data_handler<T>::init_compressed_state(io::compressed_data&& compressed_data) {
   compressed_data_ = std::move(compressed_data);
   data.reset();  // frees memory of data
   status = load_status::COMPRESSED;
 }
+#endif
 
 template class raw_data_handler<date::celonis_date_storage>;
 template class raw_data_handler<types::uuid::uuid_storage>;

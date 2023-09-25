@@ -1,5 +1,6 @@
 #include "table_group.h"
 
+#ifndef CELOSTAR
 #include "modules/common/exceptions.h"
 
 namespace celonis::accelerator::memory {
@@ -21,3 +22,4 @@ const table_map_t& table_group::get_tables() const { return table_map_; }
 table_map_t::size_type table_group::size() const { return table_map_.size(); }
 
 }  // namespace celonis::accelerator::memory
+#endif

@@ -37,6 +37,7 @@ class variant_trace_cache_manager {
   std::atomic<uint32_t> curr_cache_id;
   ctl::owning_mutex<std::unordered_map<std::string, map_value>> locked_variant_trace_caches;
 
+#ifndef CELOSTAR
   std::string get_next_cache_id();
 
   memory::cache::variant_trace_cache_t retrieve_variant_cache_internal(const std::string& cache_key);
@@ -45,12 +46,14 @@ class variant_trace_cache_manager {
                            memory::cache::variant_trace_cache_t&& cache);
   void store_variant_cache_col_ptrs(const std::string& cache_key, const std::string& table_name,
                                     memory::cache::variant_trace_cache_t&& cache);
+#endif
 
  public:
   explicit variant_trace_cache_manager(const memory::management::swap_info& sinfo);
 
   [[nodiscard]] size_t size() const;
 
+#ifndef CELOSTAR
   void create_and_store_variant_cache(const std::string& cache_key, const std::string& table_name,
                                       ctl::static_array<trace_type> traces,
                                       ctl::static_array<trace_buffer_type> trace_buffer,
@@ -66,6 +69,7 @@ class variant_trace_cache_manager {
   memory::cache::variant_trace_cache_t retrieve_variant_cache_col_ptrs(const std::string& cache_key);
 
   size_t erase_tables(const std::unordered_set<std::string>& table_names);
+#endif
 };
 
 }  // namespace celonis::accelerator::cube

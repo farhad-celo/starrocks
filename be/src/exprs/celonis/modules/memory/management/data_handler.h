@@ -59,11 +59,15 @@ class data_handler {
    */
   [[nodiscard]] virtual bool swap_file_broken() const = 0;
 
+#ifndef CELOSTAR
   virtual bool swap_out(common::execution_context& context) = 0;
+#endif
 
   virtual void swap_in(const common::execution_context& context) = 0;
 
+#ifndef CELOSTAR
   virtual bool compress() = 0;
+#endif
 
   [[nodiscard]] virtual size_t get_size_in_memory() const = 0;
 

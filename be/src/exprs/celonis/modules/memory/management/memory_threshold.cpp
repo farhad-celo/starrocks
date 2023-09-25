@@ -1,5 +1,6 @@
 #include "memory_threshold.h"
 
+#ifndef CELOSTAR
 #include "modules/common/exceptions.h"
 #include "modules/query/loading.pb.h"
 
@@ -18,3 +19,4 @@ void memory_threshold::set(const MemoryThreshold& protobuf_memory_threshold) {
 }
 
 }  // namespace celonis::accelerator::memory::management
+#endif

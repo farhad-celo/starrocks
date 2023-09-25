@@ -30,9 +30,11 @@ class materialized_data {
 
   virtual void swap_in(common::execution_context& context) = 0;
 
+#ifndef CELOSTAR
   virtual void swap_out(common::execution_context& context) = 0;
 
   virtual bool write_out(common::execution_context& context) = 0;
+#endif
 
   [[nodiscard]] virtual bool is_swappable() const = 0;
 
@@ -79,18 +81,22 @@ class materialized_typed_data : public materialized_data {
     null_flags->swap_in(context);
   }
 
+#ifndef CELOSTAR
   void swap_out(common::execution_context& context) override {
     data->swap_out(context);
     null_flags->swap_out(context);
   }
+#endif
 
   [[nodiscard]] bool is_swappable() const override { return data->is_swappable() && null_flags->is_swappable(); }
 
+#ifndef CELOSTAR
   bool write_out(common::execution_context& context) override {
     data->write_out(context);
     null_flags->write_out(context);
     return true;
   }
+#endif
 
   [[nodiscard]] std::string get_string_value(row_id row, const common::execution_context& context) const override {
     const auto size = get_size();
@@ -201,18 +207,22 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
     null_flags->swap_in(context);
   }
 
+#ifndef CELOSTAR
   void swap_out(common::execution_context& context) override {
     string_data->swap_out(context);
     null_flags->swap_out(context);
   }
+#endif
 
   [[nodiscard]] bool is_swappable() const override { return string_data->is_swappable() && null_flags->is_swappable(); }
 
+#ifndef CELOSTAR
   bool write_out(common::execution_context& context) override {
     const bool success = string_data->write_out(context);
     null_flags->write_out(context);
     return success;
   }
+#endif
 
   [[nodiscard]] std::string get_string_value(row_id row, const common::execution_context& context) const override {
     const auto size = get_size();
@@ -258,6 +268,7 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
                                                                    std::move(data_handler));
   }
 
+#ifndef CELOSTAR
   static std::shared_ptr<materialized_typed_data<cel_string_t>> init_from_swap(const std::string& id,
                                                                                const management::swap_info& s_info,
                                                                                const std::string& description) {
@@ -284,6 +295,7 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
     }
     return std::shared_ptr<materialized_typed_data<cel_string_t>>(nullptr);
   }
+#endif
 
   ~materialized_typed_data() override = default;
 

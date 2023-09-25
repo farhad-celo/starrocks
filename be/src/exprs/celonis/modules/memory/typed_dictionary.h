@@ -33,9 +33,11 @@ class typed_dictionary : public dictionary {
 
   void swap_in(common::execution_context& context) override;
 
+#ifndef CELOSTAR
   void swap_out(common::execution_context& context) override;
 
   bool write_out(common::execution_context& context) override;
+#endif
 
   [[nodiscard]] management::load_status get_load_status() const override;
 
@@ -99,6 +101,7 @@ class typed_dictionary : public dictionary {
                                                       const management::swap_info& sinfo,
                                                       const std::string& description);
 
+#ifndef CELOSTAR
   /**
    *
    * @param swap_file_name The name of the swap file.
@@ -108,6 +111,7 @@ class typed_dictionary : public dictionary {
    */
   static std::shared_ptr<dictionary> init_from_swap(const std::string& swap_file_name,
                                                     const management::swap_info& sinfo, const std::string& description);
+#endif
 
  private:
   management::raw_data_handler_t<T> data_handler;
@@ -128,9 +132,11 @@ class typed_dictionary<cel_string_t> : public dictionary {
 
   void swap_in(common::execution_context& context) override;
 
+#ifndef CELOSTAR
   void swap_out(common::execution_context& context) override;
 
   bool write_out(common::execution_context& context) override;
+#endif
 
   [[nodiscard]] management::load_status get_load_status() const override;
 
@@ -179,6 +185,7 @@ class typed_dictionary<cel_string_t> : public dictionary {
                                                       const management::swap_info& sinfo,
                                                       const std::string& description);
 
+#ifndef CELOSTAR
   /**
    *
    * @param swap_file_name The name of the swap file.
@@ -188,6 +195,7 @@ class typed_dictionary<cel_string_t> : public dictionary {
    */
   static std::shared_ptr<dictionary> init_from_swap(const std::string& swap_file_name,
                                                     const management::swap_info& sinfo, const std::string& description);
+#endif
 
  private:
   std::shared_ptr<management::string_data_handler> string_data_;

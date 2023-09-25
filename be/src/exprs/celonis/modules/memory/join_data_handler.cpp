@@ -1,7 +1,9 @@
 #include "join_data_handler.h"
 
 #include "ctl/static_array.h"
+#ifndef CELOSTAR
 #include "modules/io/storage_manager.h"
+#endif
 #include "modules/memory/management/swap_info.h"
 #include "modules/memory/tracking/static_array_with_context_tracking.h"
 
@@ -33,6 +35,7 @@ join_raw_t create_raw_join(row_id fact_table_size, row_id dim_table_size, zero_i
   return create_raw_join_impl<join_32_t>(fact_table_size, initialize_to_0, context);
 }
 
+#ifndef CELOSTAR
 std::optional<join_data_handler_t> create_join_from_swap(const std::string& swap_file,
                                                          const management::swap_info& sinfo,
                                                          const std::string& description) {
@@ -51,6 +54,7 @@ std::optional<join_data_handler_t> create_join_from_swap(const std::string& swap
   throw common::internal_exception{"The join swap file [{}] has type {} which is not an integer type.", swap_file,
                                    static_cast<int>(*data_type)};
 }
+#endif
 
 join_data_handler_t create_join_from_raw_data(const join_raw_t& raw_join, const std::string& file_name,
                                               const std::string& description, const management::swap_info& sinfo) {

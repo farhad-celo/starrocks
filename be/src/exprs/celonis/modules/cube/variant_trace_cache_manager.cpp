@@ -17,6 +17,7 @@
 
 namespace celonis::accelerator::cube {
 
+#ifndef CELOSTAR
 namespace {
 
 inline std::string decorate_cache_key_col_ptrs(const std::string& variant_trace_cache_key) {
@@ -24,6 +25,7 @@ inline std::string decorate_cache_key_col_ptrs(const std::string& variant_trace_
 }
 
 }  // namespace
+#endif
 
 variant_trace_cache_manager::variant_trace_cache_manager(const memory::management::swap_info& sinfo)
     : sinfo(sinfo.swap_into_sub_dir("variants", memory::management::persistence_status::NON_PERSISTENT)),
@@ -34,6 +36,7 @@ size_t variant_trace_cache_manager::size() const {
       [](const auto& variant_trace_caches) { return variant_trace_caches.size(); });
 }
 
+#ifndef CELOSTAR
 void variant_trace_cache_manager::create_and_store_variant_cache(const std::string& cache_key,
                                                                  const std::string& table_name,
                                                                  ctl::static_array<trace_type> traces,
@@ -145,5 +148,6 @@ size_t variant_trace_cache_manager::erase_tables(const std::unordered_set<std::s
     });
   });
 }
+#endif
 
 }  // namespace celonis::accelerator::cube

@@ -14,9 +14,11 @@
 #include "ctl/static_array.h"
 #include "log/log.h"
 #include "modules/common/call_and_log_unsafe_callable.h"
+#ifndef CELOSTAR
 #include "modules/io/swap/swap_loader.h"
 #include "modules/memory/builders/cache_column_from_dictionary.h"
 #include "modules/memory/cache/column_register.h"
+#endif
 #include "modules/memory/column.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/null_flags.h"
@@ -70,8 +72,12 @@ table::table(std::nullopt_t rows, std::string name, std::string id, const std::s
       name{std::move(name)},
       id{std::move(id)},
       meta_data{meta_data},
+#ifdef CELOSTAR
+      sinfo{sinfo.swap_into_sub_dir(version + "/" + this->id)} {
+#else
       sinfo{sinfo.swap_into_sub_dir(version + "/" + this->id)},
       cache{this, this->id, this->name, sinfo.swap_into_sub_dir(version + "/tmp/" + this->id)} {
+#endif
   verify_table_setting(*this);
 }
 
@@ -91,8 +97,12 @@ table::table(std::nullopt_t rows, std::string name, std::string id, const manage
       user_visible_name{user_visible_name.get_name().empty() ? std::nullopt
                                                              : std::make_optional(std::move(user_visible_name))},
       meta_data{meta_data},
+#ifdef CELOSTAR
+      sinfo{sinfo.swap_into_sub_dir(this->id)} {
+#else
       sinfo{sinfo.swap_into_sub_dir(this->id)},
       cache{this, this->id, this->name, sinfo.swap_into_sub_dir("/tmp/" + this->id)} {
+#endif
   verify_table_setting(*this);
 }
 
@@ -139,7 +149,9 @@ table::~table() {
           for (auto& column : this->headers) {
             column->set_remove_swap_files_on_destruct();
           }
+#ifndef CELOSTAR
           cache.set_remove_swap_files_on_destruct();
+#endif
         }
       },
       "Failed to set remove_swap_files_on_destruct_flag");
@@ -184,7 +196,10 @@ column_t table::create_column_with_dictified_data(data_type type, const col_name
 
   if (sinfo.memory_manager() != nullptr) {
     column_res->register_to_managed_group();
+#ifndef CELOSTAR
+    // TODO(j.kim): Revisit.
     sinfo.memory_manager()->register_persistent_group(group);
+#endif
   }
   return column_res;
 }
@@ -208,7 +223,9 @@ column_t table::create_column_with_data(data_type type, const col_name& column_n
 
   if (sinfo.memory_manager() != nullptr) {
     column_res->register_to_managed_group();
+#ifndef CELOSTAR
     sinfo.memory_manager()->register_persistent_group(group);
+#endif
   }
   return column_res;
 }
@@ -238,13 +255,16 @@ column_t table::create_empty_column(data_type type, const col_name& column_name,
   column_t column_res(new column(std::move(config), this, nullptr, std::move(column_pointers), std::move(dict),
                                  std::move(plain_data), column_loading::column_status::MISSING, group, state,
                                  column_load));
+#ifndef CELOSTAR
   if (sinfo.memory_manager() != nullptr) {
     sinfo.memory_manager()->register_persistent_group(group);
   }
+#endif
 
   return column_res;
 }
 
+#ifndef CELOSTAR
 column_t table::create_column_from_swap(data_type type, const col_name& column_name, const col_id& column_id,
                                         const column_processing_state& state) {
   std::shared_ptr<materialized_data> plain_data(nullptr);
@@ -260,13 +280,16 @@ column_t table::create_column_from_swap(data_type type, const col_name& column_n
   return create_column_with_dictified_data(type, column_name, column_id, col_cache_key({}), column_pointers, dict,
                                            state);
 }
+#endif
 
 std::vector<column_t> table::get_column_headers() const {
   std::shared_lock<std::shared_timed_mutex> lck(table_mutex);
   return std::vector<column_t>(std::cbegin(headers), std::cend(headers));
 }
 
+#ifndef CELOSTAR
 void table::clear_cache() { cache.clear_cache(); }
+#endif
 
 bool table::has_column(const std::string_view column_name) const {
   std::shared_lock<std::shared_timed_mutex> lck(table_mutex);
@@ -450,10 +473,12 @@ column_t table::add_column_with_dictified_data(data_type type, const col_name& c
                     table_row_limit);
 }
 
+#ifndef CELOSTAR
 column_t table::add_column_from_swap(data_type type, const col_name& column_name, const col_id& column_id,
                                      const column_processing_state& state, const table_row_limit_t table_row_limit) {
   return add_column(create_column_from_swap(type, column_name, column_id, state), table_row_limit);
 }
+#endif
 
 void table::add_existing_column(const column_t& column, const table_row_limit_t table_row_limit) {
   const auto lck{concurrency::lock_validated(table_mutex, std::chrono::seconds{60})};
@@ -549,7 +574,9 @@ void table::deregister() {
   for (auto& column : headers) {
     column->erase_column();
   }
+#ifndef CELOSTAR
   cache.deregister_columns();
+#endif
 }
 
 std::optional<row_id> table::get_rows_if_known() const {
@@ -638,6 +665,8 @@ void table::check_consistency_for_testing(const std::unordered_set<table*>& tabl
     common::runtime_assert(col->get_owner() == this);
   }
 
+#ifndef CELOSTAR
   cache.check_consistency_for_testing(tables);
+#endif
 }
 }  // namespace celonis::accelerator::memory

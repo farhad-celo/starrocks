@@ -7,6 +7,13 @@
 #include "log/log.h"
 #include "modules/common/exceptions.h"
 
+#ifdef CELOSTAR
+// TODO(j.kim): Sync jemalloc version or set a separate thirdparty libraries.
+#  define mallctl jemallctl
+#  define mallctlbymib jemallctlbymib
+#  define mallctlnametomib jemallctlnametomib
+#endif
+
 namespace celonis::accelerator::memory {
 
 std::pair<std::array<size_t, 3>, size_t> init_purge_mib() {

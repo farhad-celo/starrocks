@@ -38,9 +38,11 @@ class swappable_bitset : public data_handler {
 
   bool swap_file_broken() const override { return broken_swap_file; }
 
+#ifndef CELOSTAR
   bool swap_out(common::execution_context& context) override;
 
   void write_out(common::execution_context& context);
+#endif
 
   using const_data_accessor_t = const_bitset_data_accessor;
 
@@ -48,7 +50,9 @@ class swappable_bitset : public data_handler {
 
   bool is_swappable() const override;
 
+#ifndef CELOSTAR
   bool compress() override;
+#endif
 
   size_t get_size_in_memory() const override;
 
