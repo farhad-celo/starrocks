@@ -126,6 +126,14 @@ std::string AlignModelHelper::json_string() {
     d.SetObject();
 
     {
+        rapidjson::Value alignment_schema(rapidjson::kObjectType);
+        alignment_schema.AddMember("variant", "ARRAY<STRING>", allocator);
+        alignment_schema.AddMember("model_vertex_id", "ARRAY<BIGINT>", allocator);
+        alignment_schema.AddMember("vertex_label", "ARRAY<STRING>", allocator);
+        alignment_schema.AddMember("move_type", "ARRAY<STRING>", allocator);
+        alignment_schema.AddMember("activity_index", "ARRAY<BIGINT>", allocator);
+        d.AddMember("alignment__SCHEMA", alignment_schema, allocator);
+
         rapidjson::Value alignment(rapidjson::kArrayType);
         const auto& variant = alignment_table_->column<std::vector<std::string>>("variant");
         const auto& model_vertex_id = alignment_table_->column<utils::nullable_vec_t<cel_int_t>>("model_vertex_id");
@@ -145,6 +153,12 @@ std::string AlignModelHelper::json_string() {
     }
 
     {
+        rapidjson::Value association_schema(rapidjson::kObjectType);
+        association_schema.AddMember("variant", "ARRAY<STRING>", allocator);
+        association_schema.AddMember("edge_class", "ARRAY<BIGINT>", allocator);
+        association_schema.AddMember("alignment_index", "ARRAY<BIGINT>", allocator);
+        d.AddMember("association__SCHEMA", association_schema, allocator);
+
         rapidjson::Value association(rapidjson::kArrayType);
         const auto& variant = association_table_->column<std::vector<std::string>>("variant");
         const auto& edge_class = association_table_->column<std::vector<row_id>>("edge_class");
@@ -160,6 +174,12 @@ std::string AlignModelHelper::json_string() {
     }
 
     {
+        rapidjson::Value edge_class_schema(rapidjson::kObjectType);
+        edge_class_schema.AddMember("variant", "ARRAY<STRING>", allocator);
+        edge_class_schema.AddMember("id", "ARRAY<BIGINT>", allocator);
+        edge_class_schema.AddMember("type", "ARRAY<STRING>", allocator);
+        d.AddMember("edge_class__SCHEMA", edge_class_schema, allocator);
+
         rapidjson::Value edge_class(rapidjson::kArrayType);
         const auto& variant = edge_class_table_->column<std::vector<std::string>>("variant");
         const auto& id = edge_class_table_->column<std::vector<row_id>>("id");

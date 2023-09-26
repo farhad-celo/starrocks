@@ -222,6 +222,13 @@ TEST_F(CelonisAlignModelTest, Parallel) {
         })json";
     std::string expected =
         R"json({
+            "alignment__SCHEMA": {
+                    "variant": "ARRAY<STRING>",
+                    "model_vertex_id": "ARRAY<BIGINT>",
+                    "vertex_label": "ARRAY<STRING>",
+                    "move_type": "ARRAY<STRING>",
+                    "activity_index": "ARRAY<BIGINT>"
+             },
             "alignment": [
                 {
                     "variant": ["A", "C"],
@@ -245,6 +252,11 @@ TEST_F(CelonisAlignModelTest, Parallel) {
                     "activity_index": [0, 0, 0, 0, 1, 2, 1, 2]
                 }
             ],
+            "association__SCHEMA": {
+                    "variant": "ARRAY<STRING>",
+                    "edge_class": "ARRAY<BIGINT>",
+                    "alignment_index": "ARRAY<BIGINT>"
+             },
             "association": [
                 {
                     "variant": ["A", "C"],
@@ -262,6 +274,11 @@ TEST_F(CelonisAlignModelTest, Parallel) {
                     "alignment_index": [2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7]
                 }
             ],
+            "edge_class__SCHEMA": {
+                    "variant": "ARRAY<STRING>",
+                    "id": "ARRAY<BIGINT>",
+                    "type": "ARRAY<STRING>"
+             },
             "edge_class": [
                 {
                     "variant": ["A", "C"],
@@ -356,6 +373,13 @@ TEST_F(CelonisAlignModelTest, Loop) {
         })json";
     std::string expected =
             R"json({
+            "alignment__SCHEMA": {
+                    "variant": "ARRAY<STRING>",
+                    "model_vertex_id": "ARRAY<BIGINT>",
+                    "vertex_label": "ARRAY<STRING>",
+                    "move_type": "ARRAY<STRING>",
+                    "activity_index": "ARRAY<BIGINT>"
+             },
             "alignment": [
                 {
                     "variant": ["A", "B", "C", "A", "B"],
@@ -379,6 +403,11 @@ TEST_F(CelonisAlignModelTest, Loop) {
                     "activity_index": [0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3]
                 }
             ],
+            "association__SCHEMA": {
+                    "variant": "ARRAY<STRING>",
+                    "edge_class": "ARRAY<BIGINT>",
+                    "alignment_index": "ARRAY<BIGINT>"
+             },
             "association": [
                 {
                     "variant": ["A", "B", "C", "A", "B"],
@@ -396,6 +425,11 @@ TEST_F(CelonisAlignModelTest, Loop) {
                     "alignment_index": [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 4, 5, 6, 4, 6]
                 }
             ],
+            "edge_class__SCHEMA": {
+                    "variant": "ARRAY<STRING>",
+                    "id": "ARRAY<BIGINT>",
+                    "type": "ARRAY<STRING>"
+             },
             "edge_class": [
                 {
                     "variant": ["A", "B", "C", "A", "B"],
