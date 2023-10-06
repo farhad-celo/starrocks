@@ -12,7 +12,9 @@
 
 namespace starrocks {
 
-struct TranslateState {
+struct CelonisTranslateState {
+    CelonisTranslateState(Slice pattern, Slice replace)
+            : pattern_chars(pattern.to_string()), replace_chars(replace.to_string()) {}
     std::string pattern_chars;
     std::string replace_chars;
     phmap::flat_hash_map<Slice, Slice, SliceHashWithSeed<PhmapSeed1>, SliceEqual> translate_mapping;
@@ -42,27 +44,22 @@ Status CelonisStringFunctions::translate_prepare(FunctionContext* context, Funct
         return Status::InvalidArgument("The third parameter should not be null");
     }
     const auto pattern_col = context->get_constant_column(1);
-    Slice pattern_chars = ColumnHelper::get_const_value<TYPE_VARCHAR>(pattern_col);
-    std::string pattern(pattern_chars.get_data(), pattern_chars.get_size());
+    Slice pattern = ColumnHelper::get_const_value<TYPE_VARCHAR>(pattern_col);
     if (pattern.empty()) {
         return Status::InvalidArgument("The second parameter should not be empty string");
     }
 
     const auto replace_col = context->get_constant_column(2);
-    Slice replace_chars = ColumnHelper::get_const_value<TYPE_VARCHAR>(replace_col);
-    std::string replace(replace_chars.get_data(), replace_chars.get_size());
+    Slice replace = ColumnHelper::get_const_value<TYPE_VARCHAR>(replace_col);
     if (replace.empty()) {
         return Status::InvalidArgument("The third parameter should not be empty string");
     }
 
-    auto *state = new TranslateState();
+    auto *state = new CelonisTranslateState(pattern, replace);
     context->set_function_state(scope, state);
 
-    state->pattern_chars = std::move(pattern);
-    pattern_chars = Slice(state->pattern_chars);
-
-    state->replace_chars = std::move(replace);
-    replace_chars = Slice(state->replace_chars);
+    Slice pattern_chars{state->pattern_chars};
+    Slice replace_chars{state->replace_chars};
 
     const char *replace_p = replace_chars.get_data();
     const char *replace_end = replace_p + replace_chars.get_size();
@@ -86,7 +83,7 @@ Status CelonisStringFunctions::translate_prepare(FunctionContext* context, Funct
 
 Status CelonisStringFunctions::translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
-        auto* state = reinterpret_cast<TranslateState*>(context->get_function_state(scope));
+        auto* state = reinterpret_cast<CelonisTranslateState*>(context->get_function_state(scope));
         delete state;
     }
 
@@ -94,7 +91,8 @@ Status CelonisStringFunctions::translate_close(FunctionContext* context, Functio
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, const Columns& columns) {
-    const auto* state = reinterpret_cast<const TranslateState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    const auto* state = reinterpret_cast<const CelonisTranslateState*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     DCHECK(state != nullptr);
     const auto & translate_mapping = state->translate_mapping;
 
