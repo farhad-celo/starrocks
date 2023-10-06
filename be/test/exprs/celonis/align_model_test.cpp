@@ -283,8 +283,7 @@ const std::string CelonisAlignModelTest::LOOP_MODEL =
     std::vector<Result> expected = {
             {
                     {0, 1, 2, 4, 3, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_PARALLEL",
-                            "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
                             "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 0, 1, 1},
@@ -295,8 +294,7 @@ const std::string CelonisAlignModelTest::LOOP_MODEL =
             },
             {
                     {0, 1, 2, 3, 4, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK B", "BPMN_TASK C", "BPMN_PARALLEL",
-                            "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
                             "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 2, 2, 2},
@@ -307,8 +305,7 @@ const std::string CelonisAlignModelTest::LOOP_MODEL =
             },
             {
                     {0, 1, 2, 4, 3, 3, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_TASK B",
-                            "BPMN_PARALLEL", "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
                             "GATEWAY_MOVE", "GATEWAY_MOVE"},
                     {0, 0, 0, 0, 1, 2, 1, 2},
@@ -328,9 +325,8 @@ TEST_F(CelonisAlignModelTest, Loop) {
     std::vector<Result> expected = {
             {
                     {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                    {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE",
-                            "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B",
-                            "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                    {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
+                            "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
                     {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
                             "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 4},
@@ -341,9 +337,8 @@ TEST_F(CelonisAlignModelTest, Loop) {
             },
             {
                     {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                    { "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE",
-                            "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B",
-                            "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                    { "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
+                            "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
                     {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
                             "GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2},
@@ -354,9 +349,8 @@ TEST_F(CelonisAlignModelTest, Loop) {
             },
             {
                     {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                    { "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE",
-                            "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B",
-                            "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                    { "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE",
+                            "C", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
                     {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE",
                             "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3},
@@ -377,8 +371,7 @@ TEST_F(CelonisAlignModelTest, Parallel_DuplicatedVariants) {
     std::vector<Result> expected = {
             {
                     {0, 1, 2, 4, 3, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_PARALLEL",
-                            "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
                             "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 0, 1, 1},
@@ -389,8 +382,7 @@ TEST_F(CelonisAlignModelTest, Parallel_DuplicatedVariants) {
             },
             {
                     {0, 1, 2, 3, 4, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK B", "BPMN_TASK C", "BPMN_PARALLEL",
-                            "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
                             "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 2, 2, 2},
@@ -401,8 +393,7 @@ TEST_F(CelonisAlignModelTest, Parallel_DuplicatedVariants) {
             },
             {
                     {0, 1, 2, 4, 3, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_PARALLEL",
-                            "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
                             "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 0, 1, 1},
@@ -413,8 +404,7 @@ TEST_F(CelonisAlignModelTest, Parallel_DuplicatedVariants) {
             },
             {
                     {0, 1, 2, 4, 3, 3, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_TASK B",
-                            "BPMN_PARALLEL", "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
                             "GATEWAY_MOVE", "GATEWAY_MOVE"},
                     {0, 0, 0, 0, 1, 2, 1, 2},
@@ -438,8 +428,7 @@ TEST_F(CelonisAlignModelTest, Parallel_NULL) {
     std::vector<Result> expected = {
             {
                     {0, 1, 2, 4, 3, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_PARALLEL",
-                            "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
                             "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 0, 1, 1},
@@ -450,8 +439,7 @@ TEST_F(CelonisAlignModelTest, Parallel_NULL) {
             },
             {
                     {0, 1, 2, 3, 4, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK B", "BPMN_TASK C", "BPMN_PARALLEL",
-                            "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
                             "GATEWAY_MOVE"},
                     {0, 0, 0, 1, 2, 2, 2},
@@ -492,8 +480,7 @@ TEST_F(CelonisAlignModelTest, Parallel_NULL) {
             },
             {
                     {0, 1, 2, 4, 3, 3, 5, 6},
-                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_TASK B",
-                            "BPMN_PARALLEL", "BPMN_END"},
+                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B", "BPMN_PARALLEL", "BPMN_END"},
                     {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
                             "GATEWAY_MOVE", "GATEWAY_MOVE"},
                     {0, 0, 0, 0, 1, 2, 1, 2},

@@ -141,68 +141,9 @@ class bpmn_graph {
  */
 [[nodiscard]] bpmn_graph convert_from_proto(const BpmnModelDescription& bpmn_proto,
                                             const memory::column_t& activity_column,
-
                                             common::execution_context& operator_context);
-class vertex_name_decorator {
- public:
-  [[nodiscard]] std::string get_decorated() const {
-    if (decoration_.has_value()) {
-      return fmt::format("{} {}", decoration_.value(), underlying_string_);
-    }
-    return underlying_string_;
-  }
 
-  [[nodiscard]] size_t decorated_size() const {
-    if (decoration_.has_value()) {
-      // "{decoration} {underlying}"
-      return underlying_string_.size() + decoration_.value().size() + 1;
-    }
-    return underlying_string_.size();
-  }
-
-  /**
-   * Returns the task name for task vertices - and the type of the gateway otherwise.
-   * @return
-   */
-  [[nodiscard]] std::string_view get_underlying() const { return underlying_string_; }
-
-  /**
-   * Decorates TASK_NAME for tasks in the BPMN model such that we get "BPMN_TASK TASK_NAME"
-   * @param vertex_name
-   * @return
-   */
-  [[nodiscard]] static vertex_name_decorator for_bpmn_task(std::string_view vertex_name) {
-    return vertex_name_decorator{vertex_name, "BPMN_TASK"};
-  }
-
-  /**
-   * Decorates TASK_NAME for tasks not in the BPMN model with UNMAPPED_TASK TASK_NAME
-   * @param vertex_name
-   * @return
-   */
-  [[nodiscard]] static vertex_name_decorator for_non_bpmn_task(std::string_view vertex_name) {
-    return vertex_name_decorator{vertex_name, "UNMAPPED_TASK"};
-  }
-
-  /**
-   * Identity: no decoration.
-   * @param vertex_name
-   * @return
-   */
-  [[nodiscard]] static vertex_name_decorator for_gateway(std::string_view vertex_name) {
-    return vertex_name_decorator{vertex_name, std::nullopt};
-  }
-
- private:
-  vertex_name_decorator() = default;
-  vertex_name_decorator(std::string_view underlying, std::optional<std::string_view> decoration)
-      : underlying_string_{underlying}, decoration_(decoration) {}
-
-  std::string underlying_string_;
-  std::optional<std::string_view> decoration_;
-};
-
-using bpmn_to_string_t = std::unordered_map<vertex_id_type, vertex_name_decorator>;
+using bpmn_to_string_t = std::unordered_map<vertex_id_type, std::string>;
 /**
  * Creates a bpmn_graph from the protobuf message, and creates strings for all vertices.
  *

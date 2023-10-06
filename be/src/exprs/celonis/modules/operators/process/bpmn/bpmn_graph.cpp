@@ -319,18 +319,18 @@ bpmn_graph convert_from_proto(const BpmnModelDescription& bpmn_proto, const memo
   return bpmn_graph{vertices, edges};
 }
 
-[[nodiscard]] vertex_name_decorator convert_to_string(const BpmnModelDescription::BpmnNode& proto_node) {
+[[nodiscard]] std::string convert_to_string(const BpmnModelDescription::BpmnNode& proto_node) {
   switch (proto_node.node_type()) {
     case BpmnModelDescription_BpmnNode_BpmnNodeType_TASK:
-      return vertex_name_decorator::for_bpmn_task(proto_node.task_name());
+      return proto_node.task_name();
     case BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE:
-      return vertex_name_decorator::for_gateway("BPMN_EXCLUSIVE_CHOICE");
+      return "BPMN_EXCLUSIVE_CHOICE";
     case BpmnModelDescription_BpmnNode_BpmnNodeType_PARALLEL:
-      return vertex_name_decorator::for_gateway("BPMN_PARALLEL");
+      return "BPMN_PARALLEL";
     case BpmnModelDescription_BpmnNode_BpmnNodeType_START:
-      return vertex_name_decorator::for_gateway("BPMN_START");
+      return "BPMN_START";
     case BpmnModelDescription_BpmnNode_BpmnNodeType_END:
-      return vertex_name_decorator::for_gateway("BPMN_END");
+      return "BPMN_END";
     default:
       ctl::assert_unreachable();
   }

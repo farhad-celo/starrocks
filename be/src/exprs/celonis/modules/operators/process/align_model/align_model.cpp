@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <string_view>
 #include <tuple>
+#include <unordered_set>
 
 #include <tbb/enumerable_thread_specific.h>
 
@@ -381,13 +382,6 @@ struct enum_to_buffer_mapper {
 }
 #endif
 
-using dict_to_decorated_t = std::unordered_map<cel_string_t, bpmn::vertex_name_decorator>;
-
-struct buffer_with_decorated_lookup {
-  ctl::static_array<char> buffer;
-  std::unordered_map<std::string_view, cel_string_t> undecorated_to_decorated_buffer;
-};
-
 /**
  * Returns ptrs into a string buffer (referenced by 'undecorated_to_decorated_buffer') for a petri_net_label_id. Since
  * these label ids could either represent activities in the trace i.e. be from the string dictionary of the activity
@@ -402,86 +396,58 @@ struct petri_net_label_id_to_string_mapper {
         throw common::internal_exception{"Could not find activity name {} with id {} in the buffer.",
                                          string_dict.get_string_value(petri_net_label), petri_net_label};
       }
-      return iter->second;
+      return iter->data();
     }
 
     debug_assert(move.move_on_model.has_value());
     const auto bpmn_vertex_id{*move.move_on_model};
-    const auto iter{buffer_lookup.find(bpmn_to_string.at(bpmn_vertex_id).get_underlying())};
+    const auto iter{buffer_lookup.find(bpmn_to_string.at(bpmn_vertex_id))};
     if (iter == buffer_lookup.end()) {
       throw common::internal_exception{"Could not find bpmn vertex with name {} and id {} in the buffer.",
-                                       bpmn_to_string.at(bpmn_vertex_id).get_underlying(), bpmn_vertex_id};
+                                       bpmn_to_string.at(bpmn_vertex_id), bpmn_vertex_id};
     }
 
-    return iter->second;
+    return iter->data();
   }
 
   const bpmn::bpmn_to_string_t& bpmn_to_string;
   const memory::string_dictionary& string_dict;
-  const std::unordered_map<std::string_view, cel_string_t>& buffer_lookup;
+  const buffer_lookup_t& buffer_lookup;
 };
 
-struct decorated_dict_result {
-  dict_to_decorated_t mapping;
-  size_t decorated_buffer_size;
-};
-
-[[nodiscard]] std::pair<dict_to_decorated_t, size_t> construct_decorated_dict_strings(
-    const memory::string_dictionary& string_dict, const common::execution_context& context) {
-  dict_to_decorated_t result{};
-  size_t decorated_buffer_size{};
+[[nodiscard]] buffer_with_lookup create_merged_buffer_for_alignment_labels(const bpmn::bpmn_to_string_t& bpmn_to_string,
+                                                                           const memory::string_dictionary& string_dict,
+                                                                           const common::execution_context& context) {
+  std::unordered_set<std::string> buffer_entries{};
 
   for (const auto* dict_ptr : string_dict.get_const_data(context)) {
-    std::string dict_string{dict_ptr};
-    auto decorator{bpmn::vertex_name_decorator::for_non_bpmn_task(dict_string)};
-    decorated_buffer_size += decorator.decorated_size() + 1;
-    result.try_emplace(dict_ptr, std::move(decorator));
+    buffer_entries.emplace(std::string{dict_ptr});
   }
-  return {std::move(result), decorated_buffer_size};
-}
+  for (const auto& [_, vertex_label] : bpmn_to_string) {
+    buffer_entries.emplace(vertex_label);
+  }
 
-[[nodiscard]] buffer_with_decorated_lookup create_merged_buffer_for_alignment_labels(
-    const bpmn::bpmn_to_string_t& bpmn_to_string, const memory::string_dictionary& string_dict,
-    const common::execution_context& context) {
-  const auto [dict_to_decorated, decorated_buffer_size]{construct_decorated_dict_strings(string_dict, context)};
+  // The NULL string must be part of the string dict
+  debug_assert(buffer_entries.contains(std::string(NULL_STRING.data())));
 
-  // todo(h.ashraf): this is an upper bound on the size of the buffer (CPL-8989)
-  const auto buffer_size{std::accumulate(
-      bpmn_to_string.begin(), bpmn_to_string.end(), decorated_buffer_size,
-      [](const auto accumulated, const auto& pair) { return accumulated + pair.second.decorated_size() + 1; })};
+  auto buffer_size{std::accumulate(std::begin(buffer_entries), std::end(buffer_entries), size_t{0},
+                                   [](const auto acc, const auto& entry) { return acc + entry.size() + 1; })};
 
   auto buffer{
       memory::tracking::make_static_array_for_overwrite<char>(buffer_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
 
+  std::unordered_set<std::string_view> buffer_lookup;
+
   auto* buffer_ptr{buffer.data()};
-
-  std::unordered_map<std::string_view, cel_string_t> undecorated_to_decorated_buffer;
-
-  for (const auto& [vertex_id, decorator] : bpmn_to_string) {
-    if (!undecorated_to_decorated_buffer.contains(decorator.get_underlying())) {
-      const auto* old_buffer_ptr{buffer_ptr};
-      const auto decorated_string{decorator.get_decorated()};
-      buffer_ptr =
-          std::ranges::copy_n(decorated_string.c_str(),
-                              ctl::cast<std::iter_difference_t<cel_string_t>>(decorated_string.size() + 1), buffer_ptr)
-              .out;
-      undecorated_to_decorated_buffer.try_emplace(decorator.get_underlying(), old_buffer_ptr);
-    }
+  for (const auto& entry : buffer_entries) {
+    const auto* old_buffer_ptr{buffer_ptr};
+    buffer_ptr = std::ranges::copy_n(entry.c_str(), ctl::cast<std::iter_difference_t<cel_string_t>>(entry.size() + 1),
+                                     buffer_ptr)
+                     .out;
+    buffer_lookup.emplace(old_buffer_ptr, entry.size());
   }
 
-  for (const auto* dict_ptr : string_dict.get_const_data()) {
-    if (std::string_view dict_string_view{dict_ptr}; !undecorated_to_decorated_buffer.contains(dict_string_view)) {
-      const auto* old_buffer_ptr{buffer_ptr};
-      const auto decorated_string{dict_to_decorated.at(dict_ptr).get_decorated()};
-      buffer_ptr =
-          std::ranges::copy_n(decorated_string.c_str(),
-                              ctl::cast<std::iter_difference_t<cel_string_t>>(decorated_string.size() + 1), buffer_ptr)
-              .out;
-      undecorated_to_decorated_buffer.try_emplace(dict_string_view, old_buffer_ptr);
-    }
-  }
-
-  return {std::move(buffer), undecorated_to_decorated_buffer};
+  return {std::move(buffer), buffer_lookup};
 }
 
 struct table_sizes {
@@ -816,7 +782,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
       create_merged_buffer_for_alignment_labels(bpmn_to_string, *activity_column->get_string_dict(context), context)};
   const petri_net_label_id_to_string_mapper petri_net_to_string_mapper{
       bpmn_to_string, *activity_column->get_string_dict(context),
-      alignment_label_buffer_with_lookup.undecorated_to_decorated_buffer};
+      alignment_label_buffer_with_lookup.buffer_lookup};
 #else
   const auto& [alignment_table_size, association_table_size, edge_class_table_size]{table_sizes};
   auto storages{create_column_and_join_arrays(alignment_table_size, association_table_size, edge_class_table_size,
@@ -825,8 +791,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
   // maps petri net label ids to strings to create alignment_labels - uses either the string dictionary (e.g. for
   // unmapped activities) or the bpmn model
   const petri_net_label_id_to_string_mapper petri_net_to_string_mapper{
-      bpmn_to_string, *activity_column->get_string_dict(context),
-      std::get<3>(storages).undecorated_to_decorated_buffer};
+      bpmn_to_string, *activity_column->get_string_dict(context), std::get<3>(storages).buffer_lookup};
 
   // maps from alignment_move_type to the alignment_move string buffer
   const enum_to_buffer_mapper<alignment_move_type, &alignment_move_to_string> alignment_move_to_buffer{
