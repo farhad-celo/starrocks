@@ -20,11 +20,12 @@ TEST(CelonisTimeFunctionsTest, timestamp_millis) {
 
     const auto result = CelonisTimeFunctions::timestamp_millis(nullptr, {col}).value();
     ASSERT_EQ(result->size(), col->size());
-    EXPECT_EQ("1970-01-01 00:00:00", result->get(0).get_timestamp().to_string());
-    EXPECT_EQ("1970-01-01 00:00:00.123000", result->get(1).get_timestamp().to_string());
+    EXPECT_EQ(result->get(0).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    EXPECT_EQ(result->get(1).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0, 123000));
     EXPECT_TRUE(result->get(2).is_null());
     EXPECT_TRUE(result->get(3).is_null());
-    EXPECT_EQ("1970-01-01 00:01:01.123000", result->get(4).get_timestamp().to_string());
-    EXPECT_EQ("1970-01-03 00:00:00", result->get(5).get_timestamp().to_string());
+    EXPECT_EQ(result->get(4).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 1, 1, 123000));
+    EXPECT_EQ(result->get(5).get_timestamp(), TimestampValue::create(1970, 1, 3, 0, 0, 0));
 }
+
 } // namespace starrocks
