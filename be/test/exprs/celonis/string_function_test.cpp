@@ -211,4 +211,31 @@ TEST(CelonisStringFunctionsSanitizeStringTest, Simple) {
     EXPECT_EQ(v->get(4).get_slice(), "This is ? invalid");
 }
 
+TEST(CelonisStringFunctionsSanitizeStringTest, NullTerminated) {
+    using namespace std::string_literals;
+
+    std::vector<std::string> input_strs {
+            "\0"s,
+            "abc\0def"s,
+            "\0abc\0def"s,
+            "Invalid \xFF and \0 valid str"s
+    };
+
+    auto input = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    for (const auto& str : input_strs) {
+        input->append_datum(Slice(str));
+    }
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    const auto result = CelonisStringFunctions::sanitize_invalid_utf8(ctx.get(), {input}).value();
+
+    ASSERT_EQ(input->size(), result->size());
+    const auto v = ColumnHelper::as_column<NullableColumn>(result);
+
+    EXPECT_EQ(v->get(0).get_slice(), "");
+    EXPECT_EQ(v->get(1).get_slice(), "abc");
+    EXPECT_EQ(v->get(2).get_slice(), "");
+    EXPECT_EQ(v->get(3).get_slice(), "Invalid ? and ");
+}
+
 } // namespace starrocks

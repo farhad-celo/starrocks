@@ -142,6 +142,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
         // Sanitization logic is copied from query-engine/src/main/native/cpm-accelerator/modules/format/src/utf/utf_utils.cpp
         // in cpm-query-engine repository.
         auto input = std::string_view(str_viewer.value(row));
+        size_t found = input.find('\0');
+        input = input.substr(0, found);
         std::string sanitized;
         sanitized.reserve(input.length());
 
