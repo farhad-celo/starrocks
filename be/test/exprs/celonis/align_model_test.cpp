@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <random>
+#include <thread>
 
 #include "column/array_column.h"
 #include "column/column_helper.h"
@@ -22,14 +24,17 @@ protected:
     void TearDown() override {}
 
 private:
+    typedef std::vector<std::string> Variant;
+    typedef std::vector<Variant> VariantRows;
     typedef std::tuple<std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
                        std::vector<int64_t>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>>
             Result;
-
-    typedef std::vector<std::vector<std::string>> VariantRows;
+    typedef std::map<Variant, Result> ResultMap;
 
     static const std::string PARALLEL_MODEL;
     static const std::string LOOP_MODEL;
+    static const ResultMap PARALLEL_MODEL_RESULTS;
+    static const ResultMap LOOP_MODEL_RESULTS;
 
     FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR =
             AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_VARCHAR));
@@ -208,6 +213,54 @@ const std::string CelonisAlignModelTest::PARALLEL_MODEL =
             "cache_key": "CACHE_KEY"
         })json";
 
+const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RESULTS = {
+        {
+                {"A", "C"},
+                {
+                        // alignment
+                        {0, 1, 2, 4, 3, 5, 6},
+                        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
+                        {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
+                         "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 0, 1, 1},
+                        // association
+                        {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
+                        {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
+                        // edge_class
+                        {0, 1, 2},
+                        {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
+                }
+        },
+        {
+                {"A", "B", "C"},
+                {
+                        {0, 1, 2, 3, 4, 5, 6},
+                        {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
+                        {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
+                         "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 2, 2, 2},
+                        {0, 0, 0, 0, 0, 0, 1, 1, 1},
+                        {0, 1, 2, 3, 5, 6, 2, 4, 5},
+                        {0, 1},
+                        {"SYNC_EDGE", "SYNC_EDGE"}
+                },
+        },
+        {
+                {"C", "B", "B"},
+                {
+                        {0, 1, 2, 4, 3, 3, 5, 6},
+                        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B", "BPMN_PARALLEL", "BPMN_END"},
+                        {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
+                         "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 0, 1, 2, 1, 2},
+                        {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
+                        {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7},
+                        {0, 1, 2, 3, 4},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE"}
+                }
+        }
+};
+
 const std::string CelonisAlignModelTest::LOOP_MODEL =
         R"json({
             "nodes": [
@@ -276,44 +329,62 @@ const std::string CelonisAlignModelTest::LOOP_MODEL =
             "cache_key": "CACHE_KEY"
         })json";
 
-    TEST_F(CelonisAlignModelTest, Parallel) {
+const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::LOOP_MODEL_RESULTS = {
+        {
+                {"A", "B", "C", "A", "B"},
+                {
+                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
+                        {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
+                         "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
+                         "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 4},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+                        {0},
+                        {"SYNC_EDGE"}
+                }
+        },
+        {
+                {"A", "B", "C"},
+                {
+                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
+                        {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
+                         "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
+                                "GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2},
+                        {0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3},
+                        {0, 1, 2, 3, 4, 5, 6, 9, 10, 6, 7, 8, 9, 6, 9},
+                        {0, 1, 2, 3},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
+                }
+        },
+        {
+                {"A", "B", "A", "B"},
+                {
+                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
+                        {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
+                         "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE",
+                                    "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3},
+                        {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3},
+                        {0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 4, 5, 6, 4, 6},
+                        {0, 1, 2, 3},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
+                }
+        }
+};
+
+TEST_F(CelonisAlignModelTest, Parallel) {
     VariantRows variants = {{"A", "C"},
                             {"A", "B", "C"},
                             {"C", "B", "B"}};
     std::vector<Result> expected = {
-            {
-                    {0, 1, 2, 4, 3, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                            "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 0, 1, 1},
-                    {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
-                    {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
-                    {0, 1, 2},
-                    {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
-            },
-            {
-                    {0, 1, 2, 3, 4, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
-                            "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 2, 2, 2},
-                    {0, 0, 0, 0, 0, 0, 1, 1, 1},
-                    {0, 1, 2, 3, 5, 6, 2, 4, 5},
-                    {0, 1},
-                    {"SYNC_EDGE", "SYNC_EDGE"}
-            },
-            {
-                    {0, 1, 2, 4, 3, 3, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
-                            "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                    {0, 0, 0, 0, 1, 2, 1, 2},
-                    {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
-                    {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7},
-                    {0, 1, 2, 3, 4},
-                    {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE"}
-            }
+            PARALLEL_MODEL_RESULTS.at(variants[0]),
+            PARALLEL_MODEL_RESULTS.at(variants[1]),
+            PARALLEL_MODEL_RESULTS.at(variants[2])
     };
     Run(variants, PARALLEL_MODEL, expected);
 }
@@ -323,42 +394,9 @@ TEST_F(CelonisAlignModelTest, Loop) {
                             {"A", "B", "C"},
                             {"A", "B", "A", "B"}};
     std::vector<Result> expected = {
-            {
-                    {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                    {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
-                            "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
-                    {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
-                            "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 4},
-                    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-                    {0},
-                    {"SYNC_EDGE"}
-            },
-            {
-                    {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                    { "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
-                            "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
-                    {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
-                            "GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2},
-                    {0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3},
-                    {0, 1, 2, 3, 4, 5, 6, 9, 10, 6, 7, 8, 9, 6, 9},
-                    {0, 1, 2, 3},
-                    {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
-            },
-            {
-                    {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                    { "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE",
-                            "C", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
-                    {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE",
-                            "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3},
-                    {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3},
-                    {0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 4, 5, 6, 4, 6},
-                    {0, 1, 2, 3},
-                    {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
-            }
+            LOOP_MODEL_RESULTS.at(variants[0]),
+            LOOP_MODEL_RESULTS.at(variants[1]),
+            LOOP_MODEL_RESULTS.at(variants[2])
     };
     Run(variants, LOOP_MODEL, expected);
 }
@@ -369,50 +407,10 @@ TEST_F(CelonisAlignModelTest, Parallel_DuplicatedVariants) {
                             {"A", "C"},
                             {"C", "B", "B"}};
     std::vector<Result> expected = {
-            {
-                    {0, 1, 2, 4, 3, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                            "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 0, 1, 1},
-                    {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
-                    {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
-                    {0, 1, 2},
-                    {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
-            },
-            {
-                    {0, 1, 2, 3, 4, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
-                            "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 2, 2, 2},
-                    {0, 0, 0, 0, 0, 0, 1, 1, 1},
-                    {0, 1, 2, 3, 5, 6, 2, 4, 5},
-                    {0, 1},
-                    {"SYNC_EDGE", "SYNC_EDGE"}
-            },
-            {
-                    {0, 1, 2, 4, 3, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                            "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 0, 1, 1},
-                    {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
-                    {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
-                    {0, 1, 2},
-                    {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
-            },
-            {
-                    {0, 1, 2, 4, 3, 3, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
-                            "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                    {0, 0, 0, 0, 1, 2, 1, 2},
-                    {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
-                    {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7},
-                    {0, 1, 2, 3, 4},
-                    {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE"}
-            }
+            PARALLEL_MODEL_RESULTS.at(variants[0]),
+            PARALLEL_MODEL_RESULTS.at(variants[1]),
+            PARALLEL_MODEL_RESULTS.at(variants[2]),
+            PARALLEL_MODEL_RESULTS.at(variants[3])
     };
     Run(variants, PARALLEL_MODEL, expected);
 }
@@ -426,109 +424,78 @@ TEST_F(CelonisAlignModelTest, Parallel_NULL) {
                             {"C", "B", "B"},
                             {}};
     std::vector<Result> expected = {
-            {
-                    {0, 1, 2, 4, 3, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                            "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 0, 1, 1},
-                    {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
-                    {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
-                    {0, 1, 2},
-                    {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
-            },
-            {
-                    {0, 1, 2, 3, 4, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
-                            "GATEWAY_MOVE"},
-                    {0, 0, 0, 1, 2, 2, 2},
-                    {0, 0, 0, 0, 0, 0, 1, 1, 1},
-                    {0, 1, 2, 3, 5, 6, 2, 4, 5},
-                    {0, 1},
-                    {"SYNC_EDGE", "SYNC_EDGE"}
-            },
-            {
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {}
-            },
-            {
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {}
-            },
-            {
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {}
-            },
-            {
-                    {0, 1, 2, 4, 3, 3, 5, 6},
-                    {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B", "BPMN_PARALLEL", "BPMN_END"},
-                    {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
-                            "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                    {0, 0, 0, 0, 1, 2, 1, 2},
-                    {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
-                    {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7},
-                    {0, 1, 2, 3, 4},
-                    {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE"}
-            },
-            {
-                {},
-                {},
-                {},
-                {},
-                {},
-                {},
-                {},
-                {}
-            }
+            PARALLEL_MODEL_RESULTS.at({"A", "C"}),
+            PARALLEL_MODEL_RESULTS.at({"A", "B", "C"}),
+            {},
+            {},
+            {},
+            PARALLEL_MODEL_RESULTS.at({"C", "B", "B"}),
+            {}
     };
-        Run(variants, PARALLEL_MODEL, expected);
+    Run(variants, PARALLEL_MODEL, expected);
 }
 
 TEST_F(CelonisAlignModelTest, Parallel_ONLYNULL) {
     VariantRows variants = {{},
                             {}};
     std::vector<Result> expected = {
-            {
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {}
-            },
-            {
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {}
-            }
+            {},
+            {}
     };
     Run(variants, PARALLEL_MODEL, expected);
+}
+
+TEST_F(CelonisAlignModelTest, Concurrency) {
+    int num_inputs = 100;
+    int num_threads = 1000;
+
+    const std::string* models[2] = {&PARALLEL_MODEL, &LOOP_MODEL};
+    std::vector<ResultMap::const_iterator> results[2];
+    for (auto it = PARALLEL_MODEL_RESULTS.cbegin(); it != PARALLEL_MODEL_RESULTS.cend(); it++) {
+        results[0].push_back(it);
+    }
+    for (auto it = LOOP_MODEL_RESULTS.cbegin(); it != LOOP_MODEL_RESULTS.cend(); it++) {
+        results[1].push_back(it);
+    }
+
+    struct Input {
+        Input(const std::string& model, VariantRows variants, std::vector<Result> expected)
+                : model(model), variants(std::move(variants)), expected(std::move(expected)) {}
+        const std::string& model;
+        VariantRows variants;
+        std::vector<Result> expected;
+    };
+
+    std::vector<Input> inputs;
+    inputs.reserve(num_threads);
+
+    std::random_device rd;
+    std::uniform_int_distribution<size_t> model_d(0, 1);
+    std::uniform_int_distribution<size_t> num_variants_d(1, 20);
+
+    for (int i = 0; i < num_inputs; i++) {
+        int model = model_d(rd);
+        VariantRows variants;
+        std::vector<Result> expected;
+        int num_variants = num_variants_d(rd);
+        std::uniform_int_distribution<size_t> variant_d(0, results[model].size() - 1);
+        for (int j = 0; j < num_variants; j++) {
+            int variant = variant_d(rd);
+            variants.push_back(results[model][variant]->first);
+            expected.push_back(results[model][variant]->second);
+        }
+        inputs.emplace_back(*models[model], std::move(variants), std::move(expected));
+    }
+
+    std::uniform_int_distribution<size_t> input_d(0, num_inputs - 1);
+    std::vector<std::thread> threads;
+    for (int i = 0; i < num_threads; i++) {
+        int id = input_d(rd);
+        threads.emplace_back([&](const Input& input) { Run(input.variants, input.model, input.expected); }, inputs[id]);
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
 }
 
 } // namespace starrocks
