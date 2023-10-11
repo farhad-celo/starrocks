@@ -33,7 +33,7 @@ jobs:
   release-ubuntu-image:
     runs-on: [self-hosted, celostar]
     env:
-      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-54a4553b
+      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-cf5a4c2d
     steps:
       - name: Reset environmental variables for asan build
         if: ${{ github.event_name == 'workflow_dispatch' }}
