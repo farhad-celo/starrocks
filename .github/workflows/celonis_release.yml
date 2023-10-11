@@ -7,6 +7,11 @@ name: 'celostar-starrocks release'
 on:
   release:
     types: [published]
+  workflow_dispatch:
+      inputs:
+        asan_release_version:
+          description: "The release version for build in asan mode"
+          required: true
 
 permissions:
   contents: read
@@ -20,6 +25,8 @@ concurrency:
 
 env:
   RELEASE_VERSION: ${{ github.ref_name }}
+  IMAGE_TAG: "${{ github.ref_name }}-ubuntu"
+  BUILD_TYPE: Release
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 jobs:
@@ -28,6 +35,18 @@ jobs:
     env:
       BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-54a4553b
     steps:
+      - name: Reset environmental variables for asan build
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          RELEASE_VERSION=${{inputs.asan_release_version}}
+          IMAGE_TAG="${{inputs.asan_release_version}}-asan"
+          BUILD_TYPE=ASAN
+          
+          # Write to env
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+          echo "BUILD_TYPE=${BUILD_TYPE}" >> $GITHUB_ENV
+
       - name: checkout repository
         uses: actions/checkout@v3
 
@@ -39,51 +58,55 @@ jobs:
           docker pull ${BUILDER}
       - name: build artifact docker image
         run: |
+          echo "The build type is ${BUILD_TYPE}"
+          echo "The release version is ${RELEASE_VERSION}"
+          echo "The image tag is ${IMAGE_TAG}"
+          
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg builder=${BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION}-ubuntu .
+          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${IMAGE_TAG} .
 
       - name: package allin1 docker image
         run: |
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${RELEASE_VERSION}-ubuntu celonis/docker/allin1
+          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${IMAGE_TAG} celonis/docker/allin1
 
       - name: package fe docker image
         run: |
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${RELEASE_VERSION}-ubuntu .
+          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${IMAGE_TAG} .
 
       - name: package be docker image
         run: |
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${RELEASE_VERSION}-ubuntu -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${RELEASE_VERSION}-ubuntu .
+          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${IMAGE_TAG} .
 
 
       - name: push allin1 docker image to GHCR
         run: |
-          docker tag starrocks-allin1:${RELEASE_VERSION}-ubuntu ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
+          docker tag starrocks-allin1:${IMAGE_TAG} ghcr.io/celonis/celostar/starrocks-allin1:${IMAGE_TAG}
           
           # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
+          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${IMAGE_TAG}
           do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu trying again."
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${IMAGE_TAG} trying again."
           done
       - name: push fe docker image to GHCR
         run: |
-          docker tag starrocks-fe:${RELEASE_VERSION}-ubuntu ghcr.io/celonis/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu
+          docker tag starrocks-fe:${IMAGE_TAG} ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG}
           
           # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu
+          until docker push ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG}
           do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu trying again."
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG} trying again."
           done
       - name: push be docker image to GHCR
         run: |
-          docker tag starrocks-be:${RELEASE_VERSION}-ubuntu ghcr.io/celonis/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
+          docker tag starrocks-be:${IMAGE_TAG} ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
 
           # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
+          until docker push ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
           do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu trying again."
+            echo "Could not push ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG} trying again."
           done
 
       - name: GitHub Docker logout
@@ -105,18 +128,18 @@ jobs:
       - name: push allin1 docker image to prod ECR
         run: |
           # push to the prod ECR
-          docker tag starrocks-allin1:${RELEASE_VERSION}-ubuntu 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
-          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${RELEASE_VERSION}-ubuntu
+          docker tag starrocks-allin1:${IMAGE_TAG} 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${IMAGE_TAG}
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${IMAGE_TAG}
       - name: push fe docker image to prod ECR
         run: |
           # push to the prod ECR
-          docker tag starrocks-fe:${RELEASE_VERSION}-ubuntu 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu
-          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-fe:${RELEASE_VERSION}-ubuntu
+          docker tag starrocks-fe:${IMAGE_TAG} 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-fe:${IMAGE_TAG}
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-fe:${IMAGE_TAG}
       - name: push be docker image to prod ECR
         run: |
           # push to the prod ECR
-          docker tag starrocks-be:${RELEASE_VERSION}-ubuntu 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
-          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${RELEASE_VERSION}-ubuntu
+          docker tag starrocks-be:${IMAGE_TAG} 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${IMAGE_TAG}
+          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${IMAGE_TAG}
 
       - name: Clean up and Amazon ECR logout
         if: ${{ always() }}
@@ -124,10 +147,10 @@ jobs:
           docker logout ${{ steps.login-ecr.outputs.registry }}
           
           # Delete the built docker image from the runner.
-          docker rmi -f $(docker images -q starrocks-allin1:${RELEASE_VERSION}-ubuntu)
-          docker rmi -f $(docker images -q starrocks-fe:${RELEASE_VERSION}-ubuntu)
-          docker rmi -f $(docker images -q starrocks-be:${RELEASE_VERSION}-ubuntu)
-          docker rmi -f $(docker images -q starrocks-artifacts:${RELEASE_VERSION}-ubuntu)
+          docker rmi -f $(docker images -q starrocks-allin1:${IMAGE_TAG})
+          docker rmi -f $(docker images -q starrocks-fe:${IMAGE_TAG})
+          docker rmi -f $(docker images -q starrocks-be:${IMAGE_TAG})
+          docker rmi -f $(docker images -q starrocks-artifacts:${IMAGE_TAG})
           
           # Delete stopped containers, dangling images, dangling build cache, etc.
           docker system prune -f
