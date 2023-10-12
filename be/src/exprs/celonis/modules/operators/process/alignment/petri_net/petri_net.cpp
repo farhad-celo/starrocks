@@ -411,7 +411,11 @@ void safe_petri_net_data::add_transitions(input_output_mapper& io_mapper, const 
   transitions_to_add.emplace_back(petri_net_transition_id::create_null_transition(),
                                   string_to_int_mapper::get_tau_transition_id(), "");
 
-  for (const auto& [transition_str_id, label] : pn_repr.transitions) {
+  // In order to achieve stable output, we sort the transitions
+  std::vector<std::pair<std::string, label_type>> sorted_transitions(begin(pn_repr.transitions),
+                                                                     end(pn_repr.transitions));
+  std::ranges::sort(sorted_transitions);
+  for (const auto& [transition_str_id, label] : sorted_transitions) {
     const auto transition{io_mapper.add_transition_for_str_id(transition_str_id)};
     transitions_to_add.emplace_back(transition, label, transition_str_id);
   }

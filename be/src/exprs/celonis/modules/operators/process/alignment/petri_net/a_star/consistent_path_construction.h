@@ -82,7 +82,8 @@ class consistent_path_construction {
     transition_value_type enabling_transition;
     constexpr bool operator>(const open_node_type& rhs) const {
       // Break ties in a depth-first manner.
-      return std::pair{this->cost + estimate, estimate} > std::pair{rhs.cost + rhs.estimate, rhs.estimate};
+      return std::forward_as_tuple(this->cost + estimate, estimate, enabling_transition) >
+             std::forward_as_tuple(rhs.cost + rhs.estimate, rhs.estimate, enabling_transition);
     }
   };
 

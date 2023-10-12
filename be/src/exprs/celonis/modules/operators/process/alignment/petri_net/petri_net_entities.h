@@ -32,13 +32,11 @@ struct petri_net_transition_id {
   /// Default constructor (NULL transition)
   constexpr petri_net_transition_id() noexcept = default;
   explicit constexpr petri_net_transition_id(uint16_t id) noexcept : id{id} {}
-  [[nodiscard]] constexpr bool operator==(const petri_net_transition_id& other) const noexcept {
-    return id == other.id;
-  }
-  [[nodiscard]] constexpr bool operator!=(const petri_net_transition_id& other) const noexcept {
-    return id != other.id;
-  }
+
   [[nodiscard]] constexpr bool is_null() const noexcept { return id == 0; }
+
+  // NOLINTNEXTLINE(modernize-use-nullptr,readability-implicit-bool-conversion)
+  auto operator<=>(const petri_net_transition_id& rhs) const = default;
 };
 
 struct petri_net_place {

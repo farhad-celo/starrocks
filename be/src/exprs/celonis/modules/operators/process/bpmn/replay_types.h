@@ -82,6 +82,7 @@ class transition final {
   [[nodiscard]] const tokens_t& consumed() const noexcept;
   [[nodiscard]] const tokens_t& produced() const noexcept;
   [[nodiscard]] bool operator==(const transition& rhs) const noexcept;
+  [[nodiscard]] auto operator<=>(const transition& rhs) const noexcept { return vertex_id_ <=> rhs.vertex_id_; }
 
  private:
   // vertex_id_ is duplicated data, as it is also stored in each of the consumed and produced edges.

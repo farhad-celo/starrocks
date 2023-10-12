@@ -93,7 +93,8 @@ class inconsistent_path_construction {
       cost_value_type estimate;
       transition_value_type enabling_transition;
       friend constexpr bool operator>(const node_type& lhs, const node_type& rhs) noexcept {
-        return std::pair{lhs.cost + lhs.estimate, lhs.estimate} > std::pair{rhs.cost + rhs.estimate, rhs.estimate};
+        return std::tuple{lhs.cost + lhs.estimate, lhs.estimate, lhs.enabling_transition} >
+               std::tuple{rhs.cost + rhs.estimate, rhs.estimate, rhs.enabling_transition};
       }
     };
 

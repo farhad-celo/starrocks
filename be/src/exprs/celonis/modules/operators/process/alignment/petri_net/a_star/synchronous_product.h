@@ -23,6 +23,9 @@ class synchronous_product {
     bool is_visible_model{false};
     std::optional<petri_net_transition_id> petri_net_transition{};
 
+    // NOLINTNEXTLINE(modernize-use-nullptr,readability-implicit-bool-conversion)
+    auto operator<=>(const transition_type& rhs) const = default;
+
     [[nodiscard]] constexpr bool is_log_move() const { return move_on_log && !petri_net_transition.has_value(); }
     [[nodiscard]] constexpr bool is_model_move() const { return !move_on_log && petri_net_transition.has_value(); }
     [[nodiscard]] constexpr bool is_synchronous_move() const { return move_on_log && petri_net_transition.has_value(); }

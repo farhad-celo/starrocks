@@ -17,6 +17,8 @@ struct sequence_product final {
     bool move_first{false};
     bool move_second{false};
     bool is_tau{false};
+    // NOLINTNEXTLINE(modernize-use-nullptr,readability-implicit-bool-conversion)
+    auto operator<=>(const transition_type& rhs) const = default;
   };
 
   struct marking_type final {
