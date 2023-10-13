@@ -297,9 +297,9 @@ struct VariantStatsResult {
     }
 };
 
-class VariantStatsTest : public testing::Test {
+class CelonisVariantStatsTest : public testing::Test {
 public:
-    VariantStatsTest() = default;
+    CelonisVariantStatsTest() = default;
 
     void SetUp() override {
         utils = new FunctionUtils();
@@ -403,7 +403,7 @@ private:
     FunctionContext* ctx{};
 };
 
-TEST_F(VariantStatsTest, test_equality) {
+TEST_F(CelonisVariantStatsTest, test_equality) {
     std::string s = "{ 'dict':[ {'id':3,'name':'a4'}, {'id':2,'name':'a3'}, {'id':0,'name':'a1'}, {'id':1,'name':'a2'} ], 'a_stats':[ {'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0}, {'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1}, {'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2}, {'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3} ], 'e_stats':[ {'count':3,'count_case':3,'src':0,'dst':1}, {'count':1,'count_case':1,'src':1,'dst':2}, {'count':1,'count_case':1,'src':2,'dst':3} ], 'top':[ {'id':0,'top':[ {'variant':[0,1],'count':2}, {'variant':[0,1,2],'count':1}]}, {'id':1,'top':[ {'variant':[0,1],'count':2}, {'variant':[0,1,2],'count':1}]}, {'id':2,'top':[ {'variant':[0,1,2],'count':1}, {'variant':[2,3],'count':1}]}, {'id':3,'top':[ {'variant':[2,3],'count':1}]} ], 'happy': {'variant':[0,1],'count':2} }";
     std::replace(s.begin(), s.end(), '\'', '\"');
     VariantStatsResult vs;
@@ -423,7 +423,7 @@ TEST_F(VariantStatsTest, test_equality) {
     EXPECT_TRUE(vs1.equals(vs));
 }
 
-TEST_F(VariantStatsTest, test_no_merge) {
+TEST_F(CelonisVariantStatsTest, test_no_merge) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
     auto col1 = build_variant_column({{"a1", "a2"},
@@ -451,7 +451,7 @@ TEST_F(VariantStatsTest, test_no_merge) {
     match(e_s, rs);
 }
 
-TEST_F(VariantStatsTest, test_merge_with_itself) {
+TEST_F(CelonisVariantStatsTest, test_merge_with_itself) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
     auto col = build_variant_column({{},
@@ -487,7 +487,7 @@ TEST_F(VariantStatsTest, test_merge_with_itself) {
     match(e_s, rs);
 }
 
-TEST_F(VariantStatsTest, test_merge_distinct_dict) {
+TEST_F(CelonisVariantStatsTest, test_merge_distinct_dict) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
     auto col1 = build_variant_column({{"a1", "a2"},
@@ -531,7 +531,7 @@ TEST_F(VariantStatsTest, test_merge_distinct_dict) {
     match(e_s, rs);
 }
 
-TEST_F(VariantStatsTest, test_weights) {
+TEST_F(CelonisVariantStatsTest, test_weights) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
     auto col1 = build_variant_column({{"a1", "a2"},
@@ -558,7 +558,7 @@ TEST_F(VariantStatsTest, test_weights) {
     match(e_s, rs);
 }
 
-TEST_F(VariantStatsTest, test_empty) {
+TEST_F(CelonisVariantStatsTest, test_empty) {
     {
         // No data.
         const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
@@ -644,7 +644,7 @@ TEST_F(VariantStatsTest, test_empty) {
     }
 }
 
-TEST_F(VariantStatsTest, test_null_activity) {
+TEST_F(CelonisVariantStatsTest, test_null_activity) {
     // null activity.
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
                                                            false);
@@ -665,7 +665,7 @@ TEST_F(VariantStatsTest, test_null_activity) {
     match(e_s, rs);
 }
 
-TEST_F(VariantStatsTest, test_large) {
+TEST_F(CelonisVariantStatsTest, test_large) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
     auto col1 = build_random_variant_column(100, 10000, 10);
@@ -707,7 +707,7 @@ TEST_F(VariantStatsTest, test_large) {
     std::cout << rs << "\n";
 }
 
-TEST_F(VariantStatsTest, test_top_with_repeated_activities) {
+TEST_F(CelonisVariantStatsTest, test_top_with_repeated_activities) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
     auto col1 = build_variant_column({{"a1", "a2"},

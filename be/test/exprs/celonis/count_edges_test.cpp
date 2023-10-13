@@ -10,7 +10,7 @@
 
 namespace starrocks {
 
-class CountEdgesTest : public ::testing::Test {
+class CelonisCountEdgesTest : public ::testing::Test {
 protected:
     void SetUp() override {}
 
@@ -18,7 +18,7 @@ protected:
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
 };
 
-TEST_F(CountEdgesTest, count_edges) {
+TEST_F(CelonisCountEdgesTest, count_edges) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
     auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     array->append_datum(DatumArray{"a", "b", "b", "b", "c", "c", "c", "b", "c", "c"});
@@ -74,7 +74,7 @@ TEST_F(CountEdgesTest, count_edges) {
     function->close(nullptr, table_state);
 }
 
-TEST_F(CountEdgesTest, count_edges_null) {
+TEST_F(CelonisCountEdgesTest, count_edges_null) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
     auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     array->append_datum(DatumArray{"a", "b", "b", "b", Datum(), "b", Datum(), "c"});

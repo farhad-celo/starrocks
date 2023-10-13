@@ -48,6 +48,8 @@ public:
     VariantAggregateFinalizer(FunctionContext* ctx, const VariantAggregateState& state)
             : ctx_(ctx), activity_map_(state.activity_map()), variant_map_(state.variant_map()) {}
 
+    virtual ~VariantAggregateFinalizer() = default;
+
     // Finalizes the state and returns a json string representing the result.
     virtual std::string finalize() = 0;
 
