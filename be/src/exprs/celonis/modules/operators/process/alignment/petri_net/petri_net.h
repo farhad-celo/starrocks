@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -9,11 +10,13 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/functional/hash.hpp>
 
-#include "ctl/memory/batched_tracking_memory_resource.h"
+#include "ctl/utils/allocation_messages.h"
+#include "ctl/utils/allocation_reason.h"
+#include "modules/memory/management/memory_checked_containers.h"
 #include "modules/memory/row_id.h"
 #include "modules/operators/process/alignment/input_output_mapper.h"
-#include "modules/operators/process/alignment/rl_align_configs_fwd.h"
-#include "petri_net_entities.h"
+#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
+#include "modules/operators/process/alignment/rl_align/rl_align_configs_fwd.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net {
 
@@ -61,7 +64,8 @@ struct unfolding_representation {
   std::unordered_set<std::string> leaves{};
 };
 
-petri_net_representation reconnect_unfolding(const unfolding_representation& unf_repr, unfolding_config unf_config);
+petri_net_representation reconnect_unfolding(const unfolding_representation& unf_repr,
+                                             rl_align::unfolding_config unf_config);
 
 /**
  * Data object representing a SAFE Petri net.
@@ -102,15 +106,26 @@ static_assert(sizeof(transitions_container_t<petri_net_transition_id>) ==
  * Accessor object for Petri net class. It offers an interface to manipulate the Petri net referred by this accessor,
  * which is stored as a const reference in the accessor object. Multiple accessors can be created for the same Petri net
  * (for parallelization for example).
- *
- * The object can't be made const because of its internal enabled_transitions_cache, but it's safe to pass it around.
  */
 class petri_net_accessor {
  public:
+  using transition_type = petri_net_transition_id;
   using label_type = petri_net_representation::label_type;
-  using transition_list_type = transitions_container_t<petri_net_transition_id>;
+  using transition_list_type = transitions_container_t<transition_type>;
+  using transition_span_type = std::span<const transition_type>;
 
-  explicit petri_net_accessor(const safe_petri_net_data& pn_data) : pn_data_{pn_data} {}
+  petri_net_accessor(const safe_petri_net_data& pn_data, const common::execution_context& context)
+      : enabled_transitions_cache_{memory::management::checked_allocator<cache_t>(
+            context, ALLOC_MSG(ctl::ENABLED_TRANSITIONS_CACHE))},
+        pn_data_{pn_data} {}
+
+  // TODO (goulart.e) we wish to make this non-copiable, but right now we can't (see CPL-10395)
+  // // This is non-copiable because we don't want to copy the cache
+  // petri_net_accessor(const petri_net_accessor& pn_accessor) = delete;
+  // petri_net_accessor& operator=(const petri_net_accessor& pn_accessor) = delete;
+  // // Moving is fine
+  // petri_net_accessor(petri_net_accessor&& pn_accessor) = default;
+  // petri_net_accessor& operator=(petri_net_accessor&& pn_accessor) = default;
 
   [[nodiscard]] marking_type get_initial_marking() const;
 
@@ -125,27 +140,26 @@ class petri_net_accessor {
    * This truncation can lead to wrong results later on, but it is acceptable since that the algorithm explicitly
    * asks for safe Petri nets.
    */
-  [[nodiscard]] marking_type fire_transition(const marking_type& marking, petri_net_transition_id transition);
+  [[nodiscard]] marking_type fire(const marking_type& marking, petri_net_transition_id transition) const;
 
   /** The method assumes that the given transition was enabled by the previous marking */
   // This is generally used when firing a sequence of transitions.
   //  In that case, one would be better off by having a function "fire_all_transitions"...
-  void fire_transition_no_alloc(marking_type& marking, petri_net_transition_id transition);
+  void fire_no_alloc(marking_type& marking, petri_net_transition_id transition) const;
 
   /**
    * "Undo" the transition on the marking. Assumes that there is a marking that can fire the transition, thus leading to
    * the provided marking. If not, the result will be truncated!
    */
-  [[nodiscard]] marking_type fire_transition_inverse(const marking_type& marking,
-                                                     petri_net_transition_id transition) const;
+  [[nodiscard]] marking_type fire_inverse(const marking_type& marking, petri_net_transition_id transition) const;
 
   /**
    * "Undo" the transition on the marking. Assumes that there is a marking that can fire the transition, thus leading to
    * the provided marking. If not, the result will be truncated!
    */
-  void fire_transition_inverse_no_alloc(marking_type& marking, petri_net_transition_id transition) const;
+  void fire_inverse_no_alloc(marking_type& marking, petri_net_transition_id transition) const;
 
-  [[nodiscard]] transition_list_type get_enabled_transitions(const marking_type& marking);
+  [[nodiscard]] transition_span_type get_enabled_transitions(const marking_type& marking) const;
 
   [[nodiscard]] size_t get_max_transition_id() const;
 
@@ -191,31 +205,14 @@ class petri_net_accessor {
 
   [[nodiscard]] transition_list_type get_transitions_for_label(label_type label) const;
 
-  [[nodiscard]] transition_list_type get_silent_enabled_transitions(const marking_type& marking);
+  [[nodiscard]] transition_list_type get_silent_enabled_transitions(const marking_type& marking) const;
 
  private:
-  class enabled_transitions_cache {
-    std::unique_ptr<ctl::batched_tracking_memory_resource> memory_resource_{
-        std::make_unique<ctl::batched_tracking_memory_resource>()};
-    // TODO(a.swoboda) boost::container::pmr -> std::pmr with GCC11
-    template <typename T>
-    using polymorphic_allocator = boost::container::pmr::polymorphic_allocator<T>;
-    using transitions_t = std::vector<petri_net_transition_id, polymorphic_allocator<petri_net_transition_id>>;
-    using cache_entry_allocator_t = polymorphic_allocator<std::pair<const marking_type, transitions_t>>;
-    using cache_t = std::unordered_map<marking_type, transitions_t, boost::hash<marking_type>, std::equal_to<>,
-                                       cache_entry_allocator_t>;
-    cache_t cache_{};
+  using tracked_transition_list_type = memory::management::checked_vector_t<petri_net_transition_id>;
+  using cache_t = memory::management::checked_ska_hash_map_t<marking_type, tracked_transition_list_type,
+                                                             boost::hash<marking_type>, std::equal_to<>>;
 
-   public:
-    enabled_transitions_cache() : cache_(cache_entry_allocator_t{memory_resource_.get()}) {}
-    [[nodiscard]] auto end() const { return cache_.end(); }
-    [[nodiscard]] auto find(const marking_type& m) const { return cache_.find(m); }
-    template <typename... TS>
-    auto emplace(TS&&... ts) {
-      return cache_.emplace(std::forward<TS>(ts)...);
-    }
-  };
-  enabled_transitions_cache enabled_transitions_cache_{};
+  mutable cache_t enabled_transitions_cache_;
   const safe_petri_net_data& pn_data_;
 
   [[nodiscard]] static std::vector<petri_net_place_id> get_marked_place_ids(const marking_type& marking);
@@ -235,7 +232,7 @@ class petri_net_accessor_with_parallel_sections {
    public:
     using parallel_sections_t = std::unordered_map<petri_net_transition_id, petri_net_transition_id, hash_transition>;
 
-    [[nodiscard]] static petri_net_parallel_sections compute(petri_net_accessor& pn_accessor);
+    [[nodiscard]] static petri_net_parallel_sections compute(const petri_net_accessor& pn_accessor);
 
     [[nodiscard]] bool is_section(petri_net_transition_id fork, petri_net_transition_id join) const {
       const auto parallel_section_from{parallel_sections_.find(fork)};
@@ -256,56 +253,16 @@ class petri_net_accessor_with_parallel_sections {
   };
 
  public:
-  explicit petri_net_accessor_with_parallel_sections(const safe_petri_net_data& pn_data)
-      : accessor_{pn_data}, par_sections_{petri_net_parallel_sections::compute(accessor_)} {}
+  petri_net_accessor_with_parallel_sections(const safe_petri_net_data& pn_data,
+                                            const common::execution_context& context)
+      : accessor_{pn_data, context}, par_sections_{petri_net_parallel_sections::compute(accessor_)} {}
 
-  // Petri net accessor can be modified (because of its internal cache), parallel sections cannot
-  [[nodiscard]] petri_net_accessor& accessor() { return accessor_; }
+  [[nodiscard]] const petri_net_accessor& accessor() const { return accessor_; }
   [[nodiscard]] const petri_net_parallel_sections& par_sections() const { return par_sections_; }
 
  private:
   petri_net_accessor accessor_;
   petri_net_parallel_sections par_sections_;
-};
-
-/** Caches paths from Marking to Transition/Marking. Used to speed up completion step. */
-class petri_net_path_cache {
-  using transition_marking_pair_t = std::pair<petri_net_transition_id, marking_type>;
-  using marking_marking_pair_t = std::pair<marking_type, marking_type>;
-
- public:
-  using path_t = transitions_container_t<petri_net_transition_id>;
-
-  petri_net_path_cache()
-      : marking_to_transition_path_(memory_resource_.get()), marking_to_marking_path_(memory_resource_.get()) {}
-  /// Checks if the cache contains path from src_marking to tgt_transition
-  [[nodiscard]] std::pair<bool, path_t> path_to_transition(const marking_type& src_marking,
-                                                           petri_net_transition_id tgt_transition);
-
-  /// Sets path_transitions as path from src_marking to tgt_transition
-  void insert_path_to_transition(const marking_type& src_marking, petri_net_transition_id tgt_transition,
-                                 const path_t& path_transitions);
-
-  /// Checks if the cache contains path from src_marking to tgt_marking
-  [[nodiscard]] std::pair<bool, path_t> path_to_marking(const marking_type& src_marking,
-                                                        const marking_type& tgt_marking);
-
-  /// Sets path_transitions as path from src_marking to tgt_marking
-  void insert_path_to_marking(const marking_type& src_marking, const marking_type& tgt_marking,
-                              const path_t& path_transitions);
-
- private:
-  template <typename T>
-  using polymorphic_allocator = boost::container::pmr::polymorphic_allocator<T>;
-  using tracked_path_t = std::vector<petri_net_transition_id, polymorphic_allocator<petri_net_transition_id>>;
-  std::unique_ptr<ctl::batched_tracking_memory_resource> memory_resource_{
-      std::make_unique<ctl::batched_tracking_memory_resource>()};
-  std::unordered_map<transition_marking_pair_t, tracked_path_t, boost::hash<transition_marking_pair_t>, std::equal_to<>,
-                     polymorphic_allocator<std::pair<const transition_marking_pair_t, tracked_path_t>>>
-      marking_to_transition_path_;
-  std::unordered_map<marking_marking_pair_t, tracked_path_t, boost::hash<marking_marking_pair_t>, std::equal_to<>,
-                     polymorphic_allocator<std::pair<const marking_marking_pair_t, tracked_path_t>>>
-      marking_to_marking_path_;
 };
 
 }  // namespace celonis::accelerator::operators::process::alignment::petri_net

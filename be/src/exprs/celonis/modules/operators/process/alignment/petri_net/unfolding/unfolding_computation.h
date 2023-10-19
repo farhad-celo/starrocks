@@ -39,7 +39,7 @@ using co_occurrences_t = std::unordered_set<unfolding_condition_pair_t, boost::h
  */
 class unfolding_computation {
  public:
-  explicit unfolding_computation(petri_net_accessor&& pn_accessor) noexcept;
+  explicit unfolding_computation(const petri_net_accessor& pn_accessor) noexcept;
 
   unfolding_representation compute_unfolding();
 
@@ -48,7 +48,7 @@ class unfolding_computation {
   std::unordered_set<unfolding_event*> cutoff_events_{};
   possible_extensions_queue_t possible_extensions_{};
   co_occurrences_t co_occurrences_{};
-  petri_net_accessor pn_accessor_;
+  const petri_net_accessor& pn_accessor_;
 
   void add_initial_conditions();
 
@@ -56,7 +56,7 @@ class unfolding_computation {
 
   [[nodiscard]] unfolding_event* get_minimal_event() const;
 
-  [[nodiscard]] bool is_cutoff(unfolding_event* event);
+  [[nodiscard]] bool is_cutoff(unfolding_event* event) const;
 
   void expand_unfolding(unfolding_event* event);
 
@@ -70,7 +70,7 @@ class unfolding_computation {
 
   /// Using that cond, event concurrent <=> cond concurrent to all cond' in *event
   /// The proof is intuitive
-  [[nodiscard]] std::vector<unfolding_condition*> concurrent_conditions_for_event(unfolding_event* event);
+  [[nodiscard]] std::vector<unfolding_condition*> concurrent_conditions_for_event(unfolding_event* event) const;
 
   [[nodiscard]] bool co_occurs(unfolding_condition* condition_1, unfolding_condition* condition_2) const;
 

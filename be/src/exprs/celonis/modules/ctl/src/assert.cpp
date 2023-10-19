@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <string>
 
 #include "ctl/exception.h"
 #include "log/log.h"
@@ -23,9 +24,9 @@ void abort_assert_fail() {
   std::abort();
 }
 
-void abort_assert_fail(const std::string& message) {
+void abort_assert_fail(const std::string_view message) {
   if (is_abort_disabled()) {
-    throw failed_assertion{message};
+    throw failed_assertion{std::string{message}};
   }
   std::cerr << message << std::endl;
   std::abort();
@@ -68,7 +69,7 @@ void abort_assert(const bool condition) {
   }
 }
 
-void abort_assert(const bool condition, const std::string& message) {
+void abort_assert(const bool condition, const std::string_view message) {
   if (!condition) {
     details::abort_assert_fail(message);
   }

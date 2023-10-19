@@ -7,9 +7,42 @@
 
 #include <boost/container_hash/hash.hpp>  // for boost::hash_detail::hash_combine_impl
 
+#include "ctl/assert.h"
 #include "ctl/bit.h"
 
 namespace celonis::accelerator::ctl {
+
+namespace details {
+
+/**
+ * @brief Computes a CRC32 checksum.
+ *
+ * @details Computes a 32bit CRC32 bit checksum on the given eight bytes of input data and eight bytes of seed data and
+ * stores the result in the four least-significant bytes of the output word.
+ *
+ * @note The "seed" values is also referred to as the "initial" or "accumulator" value in some descriptions of CRC32.
+ */
+[[nodiscard]] inline std::uint64_t crc32(std::uint64_t seed, std::uint64_t data) {
+#ifdef __SSE4_2__
+  return __builtin_ia32_crc32di(seed, data);
+#else
+  ctl::assert_unreachable();
+#endif
+}
+
+// TODO(lwolf): Generalize to operate on std::span<uint8_t> after evaluation
+[[nodiscard]] inline std::uint64_t crc32_hash_internal(std::uint64_t key) {
+  constexpr auto XOR_SHIFT{0x2545F4914F6CDD1DULL};
+
+  const auto hash1{crc32(0xC83A91E1, key)};
+  const auto hash2{crc32(0x8648DBDB, key)};
+
+  const auto result = hash1 ^ (hash2 << 32);
+
+  return result * XOR_SHIFT;
+}
+
+}  // namespace details
 
 /**
  * @brief Utility to compute a single hash value over multiple data values
@@ -44,24 +77,12 @@ template <typename CONTAINER_T, typename HASHER_T = std::hash<
   return hash_range<iterator_type, HASHER_T>(cbegin(container), cend(container));
 }
 
-[[nodiscard]] inline constexpr std::uint64_t hash_fnv1a64(const char* const key) noexcept {
-  // FNV-1a 64bit hashing algorithm.
-  std::uint64_t hash = 0xcbf29ce484222325;
-  constexpr std::uint64_t prime = 0x100000001b3;
-  for (std::size_t idx = 0; key[idx] != '\0'; ++idx) {
-    const char current_char = key[idx];
-    hash ^= current_char;
-    hash *= prime;
-  }
-  return hash;
-}
-
 // TODO(n.weber): can be made constexpr
-[[nodiscard]] inline std::uint64_t hash_murmur_64a(std::string_view input) noexcept {
+[[nodiscard]] inline std::uint64_t hash_murmur_64a(std::string_view input,
+                                                   const std::uint64_t seed = 0xc70f6907UL) noexcept {
   const char* key{input.data()};
   const std::size_t len{input.size()};
 
-  const std::uint64_t seed = 0xc70f6907UL;
   const std::uint64_t m = 0xc6a4a7935bd1e995;
   const int r = 47;
 
@@ -119,5 +140,13 @@ template <typename CONTAINER_T, typename HASHER_T = std::hash<
 
   return h;
 }
+
+template <typename Key>
+struct hash_crc32;
+
+template <>
+struct hash_crc32<std::int64_t> {
+  [[nodiscard]] std::uint64_t operator()(const std::int64_t& key) const { return details::crc32_hash_internal(key); }
+};
 
 }  // namespace celonis::accelerator::ctl

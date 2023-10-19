@@ -93,70 +93,65 @@ struct log_and_unmapped_components {
   replay_components_t unmapped_components;
 };
 
+auto sync_neighbor(auto it, const auto sentinel, const partial_order_graph& run_graph, const auto& is_parallel,
+                   auto inc) {
+  while (it != sentinel && (run_graph[*it].move_type != alignment_move_type::SYNC_MOVE ||
+                            is_parallel(run_graph[*it].bpmn_vertex_id.value()))) {
+    it = inc(it);
+  }
+  return it;
+}
+
+auto sync_predecessor(auto first, auto it, const partial_order_graph& run_graph, const auto& is_parallel) {
+  return sync_neighbor(it, first, run_graph, is_parallel, std::ranges::prev);
+}
+
+auto sync_successor(auto it, auto last, const partial_order_graph& run_graph, const auto& is_parallel) {
+  return sync_neighbor(it, last, run_graph, is_parallel, std::ranges::next);
+}
+
+auto get_parallel_test(const std::optional<bpmn::vertex_id_type>& bpmn_id,
+                       const parallel_vertex_pairs<>& parallel_vertices) {
+  return [&bpmn_id, &parallel_vertices](bpmn::vertex_id_type other_id) {
+    return bpmn_id.has_value() && parallel_vertices.test(other_id, bpmn_id.value());
+  };
+}
+
 log_and_unmapped_components construct_log_and_unmapped_components(const partial_order_graph& run_graph,
-                                                                  const bpmn::bpmn_graph& graph) {
+                                                                  const bpmn::bpmn_graph& graph,
+                                                                  const parallel_vertex_pairs<>& parallel_vertices) {
   // this could be a lot simpler if we created filtered views with std::ranges but that does not work with clang-14 :(
+  static_assert(std::is_same_v<typename partial_order_graph::vertex_list_selector, boost::vecS>);
   debug_assert(run_graph[0].bpmn_vertex_id.has_value());
   debug_assert(bpmn::is_start(graph.get_vertex(run_graph[0].bpmn_vertex_id.value())));
-  const auto invalid_vertex_id{boost::num_vertices(run_graph)};
 
-  const auto complete_last_if_required{[invalid_vertex_id]<edge_type type>(partial_vertex_t current_activity,
-                                                                           alignment_move_type move_type,
-                                                                           replay_components_t& components) {
-    static const alignment_move_type other_type{type == edge_type::LOG ? alignment_move_type::UNMAPPED_MOVE
-                                                                       : alignment_move_type::LOG_MOVE};
-    // no edges between LOG / UNMAPPED components
-    if (other_type == move_type || components.empty() ||
-        components.back().edges_as_vertices.at(2) != invalid_vertex_id) {
-      return;
-    }
+  replay_components_t log_components{};
+  replay_components_t unmapped_components{};
 
-    // otherwise, we should complete the last component
-    components.back().edges_as_vertices.at(2) = current_activity;
-  }};
+  auto [first, past_end]{boost::vertices(run_graph)};
 
-  replay_components_t log_components;
-  replay_components_t unmapped_components;
+  if (std::distance(first, past_end) < 3) {  // besides start and end, there has to be at least one other move
+    return {std::move(log_components), std::move(unmapped_components)};
+  }
+  const auto end_vertex_it{std::prev(past_end)};
+  debug_assert(run_graph[*end_vertex_it].bpmn_vertex_id.has_value());
+  debug_assert(bpmn::is_end(graph.get_vertex(run_graph[*end_vertex_it].bpmn_vertex_id.value())));
 
-  // by construction, the descriptors in the run_graph are the same as the index of the element in the alignment vector
-  partial_vertex_t previous_for_log{0};
-  partial_vertex_t previous_for_unmapped{0};
-
-  for (const auto curr_vertex : boost::make_iterator_range(boost::vertices(run_graph))) {
-    const auto [bpmn_vertex_id, move_type]{run_graph[curr_vertex]};
-
-    if (move_type == alignment_move_type::MODEL_MOVE) {
+  for (auto it{std::next(first)}; it != end_vertex_it; ++it) {
+    const auto& [bpmn_vertex_id, move_type]{run_graph[*it]};
+    const auto& bpmn_id{bpmn_vertex_id};  // making clang happy, so that we can use it in a lambda capture
+    if (move_type != alignment_move_type::LOG_MOVE && move_type != alignment_move_type::UNMAPPED_MOVE) {
       continue;
     }
-    if (bpmn_vertex_id.has_value() && (bpmn::is_gateway(graph.get_vertex(bpmn_vertex_id.value())) ||
-                                       bpmn::is_start(graph.get_vertex(bpmn_vertex_id.value())))) {
-      continue;
-    }
-
-    // is task or end, could be LOG_MOVE / UNMAPPED_MOVE
-
-    // first complete any previous components
-    complete_last_if_required.template operator()<edge_type::LOG>(curr_vertex, move_type, log_components);
-    complete_last_if_required.template operator()<edge_type::UNMAPPED>(curr_vertex, move_type, unmapped_components);
-
-    // if this is a LOG or UNMAPPED_MOVE then we have a new LOG/UNMAPPED component
-    // the previous activity for UNMAPPED_MOVE or LOG_MOVE can be an UNMAPPED (resp. LOG) move
-    // this allows for e.g. {A(SYNC_MOVE), B(LOG_MOVE), C(LOG_MOVE), D(SYNC_MOVE)} -> (A -> B -> C AND B -> C -> D)
-    if (move_type == alignment_move_type::LOG_MOVE) {
-      log_components.emplace_back(edges_as_vertices_t{previous_for_log, curr_vertex, invalid_vertex_id},
-                                  edge_type::LOG);
-      previous_for_log = curr_vertex;
-      continue;
-    }
-    if (move_type == alignment_move_type::UNMAPPED_MOVE) {
-      unmapped_components.emplace_back(edges_as_vertices_t{previous_for_unmapped, curr_vertex, invalid_vertex_id},
-                                       edge_type::UNMAPPED);
-      previous_for_unmapped = curr_vertex;
-      continue;
-    }
-    // neither LOG nor UNMAPPED
-    previous_for_log = curr_vertex;
-    previous_for_unmapped = curr_vertex;
+    const auto is_parallel{get_parallel_test(bpmn_id, parallel_vertices)};
+    // find the preceding sync move that is not parallel
+    auto prev_it{sync_predecessor(first, std::prev(it), run_graph, is_parallel)};
+    // find the succeeding sync move that is not parallel
+    const auto next_it{sync_successor(std::next(it), end_vertex_it, run_graph, is_parallel)};
+    auto [components, edge_type]{move_type == alignment_move_type::LOG_MOVE
+                                     ? std::make_pair(std::ref(log_components), edge_type::LOG)
+                                     : std::make_pair(std::ref(unmapped_components), edge_type::UNMAPPED)};
+    components.emplace_back(edges_as_vertices_t{*prev_it, *it, *next_it}, edge_type);
   }
 
   return {std::move(log_components), std::move(unmapped_components)};
@@ -178,9 +173,9 @@ map_iter_t get_last_added_for(const bpmn_to_partial_order_map_t::key_type& key,
 /**
  * Firing a bpmn transition consumes tokens ("edges") and produces new tokens. The consumed tokens/edges in the
  * bpmn-model correspond to edges in the partial_order_graph. This function takes bpmn edges consumed in a transition
- * and adds the corresponding edges to the partial_order_graph. Note that such bpmn edges, generated through replay can
- * only generate SYNC and MODEL edges since LOG, UNMAPPED and SKIP edges cannot be generated by directly replaying on
- * the model.
+ * and adds the corresponding edges to the partial_order_graph. Note that such bpmn edges, generated through replay
+ * can only generate SYNC and MODEL edges since LOG, UNMAPPED and SKIP edges cannot be generated by directly replaying
+ * on the model.
  */
 template <typename BeginIter, typename EndIter>
 void construct_edges_and_add_to_partial_order_graph(BeginIter edge_begin, EndIter edge_end,
@@ -238,7 +233,8 @@ struct replay_result {
  * @param alignment aligned variant
  * @return
  */
-replay_result build_partial_order_graph(const bpmn::bpmn_graph& graph, const alignment_t& alignment) {
+replay_result build_partial_order_graph(const bpmn::bpmn_graph& graph, const alignment_t& alignment,
+                                        const parallel_vertex_pairs<>& parallel_vertices) {
   debug_assert(!alignment.empty());
   debug_assert(graph.is_single_object());
 
@@ -283,13 +279,13 @@ replay_result build_partial_order_graph(const bpmn::bpmn_graph& graph, const ali
 
     const auto current_bpmn_vertex_id{move.move_on_model.value()};
 
-    // a single bpmn_vertex can of course be associated with multiple vertices in the partial order graph. Additionally
-    // note that we do not store mapping for LOG and UNMAPPED moves because we use this mapping for generating partial
-    // order graph edges from bpmn edges - but there are no bpmn edges for LOG/UNMAPPED moves
+    // a single bpmn_vertex can of course be associated with multiple vertices in the partial order graph.
+    // Additionally note that we do not store mapping for LOG and UNMAPPED moves because we use this mapping for
+    // generating partial order graph edges from bpmn edges - but there are no bpmn edges for LOG/UNMAPPED moves
     bpmn_to_partial_order.emplace(current_bpmn_vertex_id, current_vertex_descriptor);
 
-    // we need an enabled transition on the current_bpmn_vertex_id that we can fire in order to evolve the marking (i.e.
-    // our position in the model)
+    // we need an enabled transition on the current_bpmn_vertex_id that we can fire in order to evolve the marking
+    // (i.e. our position in the model)
     next_transitions = bpmn::get_enabled_vertex_transitions(graph, marking, current_bpmn_vertex_id);
     // NB: aligned, so there is always at least one transition. Usually, there is only one enabled transition. If
     // there are multiple, find the next by looking ahead in the alignment.
@@ -323,7 +319,8 @@ replay_result build_partial_order_graph(const bpmn::bpmn_graph& graph, const ali
   construct_edges_and_add_to_partial_order_graph(marking.cbegin(), marking.cend(), end_vertex_id, end_move.move_type,
                                                  bpmn_to_partial_order, run_graph);
 
-  auto [log_components, unmapped_components]{construct_log_and_unmapped_components(run_graph, graph)};
+  auto [log_components,
+        unmapped_components]{construct_log_and_unmapped_components(run_graph, graph, parallel_vertices)};
   add_components_to_graph(log_components, run_graph);
   add_components_to_graph(unmapped_components, run_graph);
 
@@ -474,8 +471,8 @@ using alignment_idx_to_log_idx_t = std::unordered_map<size_t, size_t>;
 
 /**
  * Assign an order to each non-model activity in the alignment - these are the activities that also occur in the input
- * eventlog in this exact same order. We need to do this because we want to generate the timestamp join map relative to
- * the order of the activities in the input activity column.
+ * eventlog in this exact same order. We need to do this because we want to generate the timestamp join map relative
+ * to the order of the activities in the input activity column.
  *
  * The assumption we need here is that the alignment cannot reorder activities in the eventlog - which is the case for
  * any valid alignment.
@@ -517,8 +514,8 @@ alignment_idx_to_log_idx_t map_alignment_activities_to_eventlog_idx(const alignm
  * @param alignment a vector containing the alignment. We assume that the first element in the alignment array
  * corresponds to the 'start' vertex and the last to the 'end' vertex.
  *
- * @param run_graph a run graph containing at least the SYNC, MODEL LOG and UNMAPPED edges. SKIP edges do not contribute
- * to timestamps since they skip over model-move components.
+ * @param run_graph a run graph containing at least the SYNC, MODEL LOG and UNMAPPED edges. SKIP edges do not
+ * contribute to timestamps since they skip over model-move components.
  */
 timestamp_join_map_t generate_timestamp_join_map(const partial_order_graph& run_graph,
                                                  const bpmn::bpmn_graph& bpmn_graph, const alignment_t& alignment) {
@@ -595,8 +592,8 @@ struct sync_and_model_components {
 };
 
 /**
- * Create SYNC and MODEL edge components by performing DFS (two separate DFS iterations) over the filtered partial order
- * graph (once for SYNC, once for MODEL). We filter so as to get larger SYNC/MODEL components.
+ * Create SYNC and MODEL edge components by performing DFS (two separate DFS iterations) over the filtered partial
+ * order graph (once for SYNC, once for MODEL). We filter so as to get larger SYNC/MODEL components.
  */
 sync_and_model_components create_sync_and_model_components(const partial_order_graph& run_graph,
                                                            const bpmn::bpmn_graph& bpmn_graph) {
@@ -632,9 +629,12 @@ sync_and_model_components create_sync_and_model_components(const partial_order_g
 
 }  // namespace
 
-replay_result_type replay_aligned_variant(const bpmn::bpmn_graph& bpmn_graph, const alignment_t& aligned_variant) {
+replay_result_type replay_aligned_variant(const bpmn::bpmn_graph& bpmn_graph, const alignment_t& aligned_variant,
+                                          const parallel_vertex_pairs<>& parallel_vertices) {
   // get the run_graph with model and sync edges and additionally the log_edges
-  auto [run_graph, log_components, unmapped_components]{build_partial_order_graph(bpmn_graph, aligned_variant)};
+  auto [run_graph_, log_components,
+        unmapped_components]{build_partial_order_graph(bpmn_graph, aligned_variant, parallel_vertices)};
+  auto& run_graph{run_graph_};  // for lambda capture below
 
   const auto [sync_components_edges, model_components_edges]{create_sync_and_model_components(run_graph, bpmn_graph)};
 
@@ -657,8 +657,11 @@ replay_result_type replay_aligned_variant(const bpmn::bpmn_graph& bpmn_graph, co
     }
   }
 
+  // the L1_MISSING components are almost the same as the model components, except that we do not connect to gateways
+  auto missing_components_edges_size{model_components_edges.size()};
+
   const size_t num_components{sync_components_edges.size() + model_components_edges.size() + log_components.size() +
-                              unmapped_components.size() + skip_components.size()};
+                              unmapped_components.size() + skip_components.size() + missing_components_edges_size};
 
   replay_components_t result_components(num_components);
   replay_components_t::iterator next_component_start_iter{result_components.begin()};
@@ -669,9 +672,11 @@ replay_result_type replay_aligned_variant(const bpmn::bpmn_graph& bpmn_graph, co
       std::transform(sync_components_edges.begin(), sync_components_edges.end(), next_component_start_iter,
                      [](const run_graph_edges_t& edges) { return to_result_component_type(edges, edge_type::SYNC); });
 
+  const auto model_components_first{next_component_start_iter};
   next_component_start_iter =
       std::transform(model_components_edges.begin(), model_components_edges.end(), next_component_start_iter,
                      [](const run_graph_edges_t& edges) { return to_result_component_type(edges, edge_type::MODEL); });
+  const auto model_components_last{next_component_start_iter};
 
   next_component_start_iter = std::copy(std::make_move_iterator(skip_components.begin()),
                                         std::make_move_iterator(skip_components.end()), next_component_start_iter);
@@ -681,6 +686,26 @@ replay_result_type replay_aligned_variant(const bpmn::bpmn_graph& bpmn_graph, co
 
   next_component_start_iter = std::copy(std::make_move_iterator(unmapped_components.begin()),
                                         std::make_move_iterator(unmapped_components.end()), next_component_start_iter);
+
+  // Add the L1_MISSING components: They are mostly the same as the model components, but if the first or last vertex is
+  // a gateway, then we need to look for the next synchronous, non-parallel move (or the start/end gateway)
+  const auto first_last{boost::vertices(run_graph)};
+  next_component_start_iter = std::transform(
+      model_components_first, model_components_last, next_component_start_iter,
+      [&run_graph, &parallel_vertices, first = first_last.first, last = first_last.second](auto component) {
+        debug_assert(component.component_type == edge_type::MODEL);
+        component.component_type = edge_type::L1_MISSING;
+        const auto front_it{std::ranges::find(first, last, component.edges_as_vertices.front())};
+        const auto back_it{std::ranges::find(front_it, last, component.edges_as_vertices.back())};
+        const auto first_sync_it{sync_predecessor(
+            first, front_it, run_graph, get_parallel_test(run_graph[*front_it].bpmn_vertex_id, parallel_vertices))};
+        component.edges_as_vertices.front() = *first_sync_it;
+        const auto last_sync_it{
+            sync_successor(back_it, std::prev(last), run_graph,
+                           get_parallel_test(run_graph[*back_it].bpmn_vertex_id, parallel_vertices))};
+        component.edges_as_vertices.back() = *last_sync_it;
+        return component;
+      });
 
   debug_assert(next_component_start_iter == result_components.end());
 

@@ -14,9 +14,9 @@
 #include "modules/memory/table_fwd.h"
 #include "modules/operators/framework/cached_operator.h"
 #include "modules/operators/framework/operator_node.h"
+#include "modules/operators/process/alignment/log_aligner.h"
 #include "modules/operators/process/alignment/log_alignment_result_cache_fwd.h"
 #include "modules/operators/process/alignment/log_alignment_result_fwd.h"
-#include "modules/operators/process/alignment/rl_align_configs.h"
 #include "modules/query/operators.pb.h"
 
 namespace celonis::accelerator::operators::process::alignment {
@@ -41,7 +41,7 @@ class alignment_operator final : public cached_operator {
                      const cube::event_table_config* event_config,
                      operators::process::alignment::log_alignment_result_cache& log_alignment_cache,
                      const RLAlignOperatorNode& node, cube::query_scope& scope,
-                     common::execution_context& operator_context, int num_a_star_iterations,
+                     common::execution_context& operator_context, log_aligner_config log_aligner_cfg,
                      cube::execution::tracking::add_telemetry_counter_fn add_telemetry_counter);
 
   [[nodiscard]] const std::string& get_operator_tracking_key() const noexcept override;
@@ -71,7 +71,7 @@ class alignment_operator final : public cached_operator {
   log_alignment_result_cache& log_alignment_cache_;
   const cube::event_table_config* event_config_;
   const RLAlignOperatorNode& node_;
-  rl_align_config rl_align_cfg_;
+  log_aligner_config log_aligner_cfg_;
   const cube::query_scope& scope_;
   std::string table_cache_key_;
   memory::warnings_t warnings{std::make_shared<memory::warnings_container_t>()};
@@ -80,8 +80,6 @@ class alignment_operator final : public cached_operator {
    * The specific column referred by the RLAlignOperatorNode is stored in the align_table under this cache key
    */
   const std::string column_cache_key_;
-
-  const int num_a_star_iterations_{0};
   cube::execution::tracking::add_telemetry_counter_fn add_telemetry_counter_;
 };
 
@@ -91,7 +89,7 @@ class alignment_operator_node final : public framework::operator_node {
       operator_node* activity_column_operator_node, operator_node* pruned_activity_column_operator_node,
       operator_node* variant_column_operator_node, operator_node* pruned_variant_column_operator_node,
       log_alignment_result_cache& log_alignment_cache, const RLAlignOperatorNode& node, cube::query_scope& scope,
-      int num_a_star_iterations = NUM_A_STAR_ITERATIONS,
+      log_aligner_config log_aligner_cfg = log_aligner_config::make_default(),
       std::optional<cube::execution::tracking::add_telemetry_counter_fn> add_telemetry_counter = std::nullopt);
 
   [[nodiscard]] const std::string& get_cache_key() const override { return node_.metadata().cache_key(); }
@@ -112,16 +110,14 @@ class alignment_operator_node final : public framework::operator_node {
   const cube::event_table_config* get_event_table_config(memory::table* table,
                                                          const common::execution_context& operator_context) const;
 
-  static constexpr int NUM_A_STAR_ITERATIONS{5'000};
   operator_node* activity_column_operator_node_;
   operator_node* pruned_activity_column_operator_node_;
   operator_node* variant_column_operator_node_;
   operator_node* pruned_variant_column_operator_node_;
   log_alignment_result_cache& log_alignment_cache_;
-  rl_align_config rl_align_config_;
-  int num_a_star_iterations_;
   const RLAlignOperatorNode& node_;
   cube::query_scope& scope_;
+  log_aligner_config log_aligner_cfg_;
   std::optional<cube::execution::tracking::add_telemetry_counter_fn> add_telemetry_counter_{};
 };
 

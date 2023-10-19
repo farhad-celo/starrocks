@@ -42,6 +42,9 @@ class materialized_data {
 
   [[nodiscard]] virtual std::string get_string_value(row_id row, const common::execution_context& context) const = 0;
 
+  [[nodiscard]] virtual std::optional<std::string> get_string_value_opt(
+      row_id row, const common::execution_context& context) const = 0;
+
   [[nodiscard]] virtual management::load_status get_load_status() const = 0;
 
   [[nodiscard]] virtual usage_time_t time_of_last_usage() const = 0;
@@ -99,12 +102,16 @@ class materialized_typed_data : public materialized_data {
 #endif
 
   [[nodiscard]] std::string get_string_value(row_id row, const common::execution_context& context) const override {
-    const auto size = get_size();
-    if (row < 0 || row >= size) {
-      throw common::out_of_bounds_exception{"materialized_data::get_string_value", row_id{0}, (size - 1), row};
+    return get_string_value_opt(row, context).value_or("NULL");
+  }
+
+  [[nodiscard]] std::optional<std::string> get_string_value_opt(
+      row_id row, const common::execution_context& context) const override {
+    if (const auto size = get_size(); row < 0 || row >= size) {
+      throw common::out_of_bounds_exception{"materialized_data::get_string_value_opt", row_id{0}, (size - 1), row};
     }
     if (null_flags->get_const_data(context)[row]) {
-      return "NULL";
+      return std::nullopt;
     }
 
     const auto value = get_const_data()[row];
@@ -156,6 +163,7 @@ class materialized_typed_data : public materialized_data {
     return std::make_shared<materialized_typed_data<T>>(row_count, std::move(bitset), std::move(data_handler));
   }
 
+#ifndef CELOSTAR
   static std::shared_ptr<materialized_typed_data<T>> init_from_swap(const std::string& id,
                                                                     const management::swap_info& s_info,
                                                                     const std::string& description) {
@@ -182,6 +190,7 @@ class materialized_typed_data : public materialized_data {
     }
     return std::shared_ptr<materialized_typed_data<T>>(nullptr);
   }
+#endif
 
   ~materialized_typed_data() override = default;
 
@@ -225,12 +234,16 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
 #endif
 
   [[nodiscard]] std::string get_string_value(row_id row, const common::execution_context& context) const override {
-    const auto size = get_size();
-    if (row < 0 || row >= size) {
-      throw common::out_of_bounds_exception{"materialized_data::get_string_value", row_id{0}, (size - 1), row};
+    return get_string_value_opt(row, context).value_or("NULL");
+  }
+
+  [[nodiscard]] std::optional<std::string> get_string_value_opt(
+      row_id row, const common::execution_context& context) const override {
+    if (const auto size = get_size(); row < 0 || row >= size) {
+      throw common::out_of_bounds_exception{"materialized_data::get_string_value_opt", row_id{0}, (size - 1), row};
     }
     if (null_flags->get_const_data(context)[row]) {
-      return "NULL";
+      return std::nullopt;
     }
 
     return std::string(get_const_data()[row]);

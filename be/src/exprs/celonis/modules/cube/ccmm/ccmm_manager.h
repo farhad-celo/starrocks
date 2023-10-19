@@ -26,61 +26,18 @@
 
 namespace celonis::accelerator::cube::ccmm {
 
-#ifndef CELOSTAR
-namespace details {
-
-/** Counts how often each event occurs in the specified activity column. NULL values are ignored. */
-[[nodiscard]] std::unordered_map<std::string, row_id> count_event_instances(const memory::column_t& activity_column,
-                                                                            common::execution_context& parent_context);
-
-}  // namespace details
-#endif
-
+// TODO(n.weber): CPL-10401 - This should only be 'ID' in the future
 constexpr const char* EVENT_ID_COLUMN_KEY{"EVENT_ID"};
+// TODO(n.weber): CPL-10401 - Deprecated for removal
 constexpr const char* ACTIVITY_COLUMN_KEY{"ACTIVITY"};
+// TODO(n.weber): CPL-10401 - This should only be 'TIME' in the future
 constexpr const char* TIMESTAMP_COLUMN_KEY{"TIMESTAMP"};
+// TODO(n.weber): CPL-10401 - This should only be 'ID' in the future
 constexpr const char* OBJECT_ID_COLUMN_KEY{"OBJECT_ID"};
 constexpr const char* SORTING_COLUMN_KEY{"SORTING"};
 constexpr const char* SOURCE_COLUMN_KEY{"SOURCE_EVENT_TABLE"};
 
 #ifndef CELOSTAR
-class central_event_table {
- public:
-  central_event_table() = delete;
-  explicit central_event_table(memory::table_t table, bool has_sorting_column = false)
-      : table_{std::move(table)}, has_sorting_col_{has_sorting_column} {
-    if (table_ == nullptr) {
-      throw common::internal_exception{"central_event_table table cannot be null."};
-    }
-    if (has_sorting_col_ && !table_->has_column(SORTING_COLUMN_KEY)) {
-      throw common::internal_exception{"The sorting column cannot be found on the central_event_table."};
-    }
-  }
-
-  [[nodiscard]] memory::table_t get() const noexcept { return table_; }
-  [[nodiscard]] memory::column_t get_event_id_column(const common::execution_context& context) const {
-    return table_->get_column_header(EVENT_ID_COLUMN_KEY, context);
-  }
-  [[nodiscard]] memory::column_t get_activity_column(const common::execution_context& context) const {
-    return table_->get_column_header(ACTIVITY_COLUMN_KEY, context);
-  }
-  [[nodiscard]] memory::column_t get_timestamp_column(const common::execution_context& context) const {
-    return table_->get_column_header(TIMESTAMP_COLUMN_KEY, context);
-  }
-  [[nodiscard]] memory::column_t get_source_column(const common::execution_context& context) const {
-    return table_->get_column_header(SOURCE_COLUMN_KEY, context);
-  }
-  [[nodiscard]] memory::column_t get_sorting_column(const common::execution_context& context) const {
-    return has_sorting_col_ ? table_->get_column_header(SORTING_COLUMN_KEY, context) : nullptr;
-  }
-
- private:
-  memory::table_t table_;
-  // Even if the central event table has column SORTING_COLUMN_KEY, it can still be a normal attribute column if the
-  // sorting column configuration is not set, so we use has_sorting_col_ here indicating whether there is a sorting
-  // column.
-  bool has_sorting_col_;
-};
 /**
  * @brief Represents a user provided event table.
  */
@@ -94,6 +51,7 @@ class event_table {
               const common::execution_context& context, std::optional<std::string> event_type_priority = std::nullopt);
 
   [[nodiscard]] memory::table_t get() const noexcept { return table_; }
+  [[nodiscard]] const memory::table* get_raw() const noexcept { return table_.get(); }
   [[nodiscard]] const std::string& get_name() const noexcept { return table_->get_name(); }
   [[nodiscard]] memory::column_t get_event_id_column() const { return event_id_column_; }
   [[nodiscard]] memory::column_t get_activity_column() const;
@@ -127,6 +85,7 @@ class object_table {
   }
 
   [[nodiscard]] memory::table_t get() const noexcept { return table_; }
+  [[nodiscard]] const memory::table* get_raw() const noexcept { return table_.get(); }
   [[nodiscard]] const std::string& get_name() const noexcept { return table_->get_name(); }
   [[nodiscard]] memory::column_t get_object_id_column() const { return object_id_column_; }
 
@@ -147,40 +106,11 @@ class relationship_table {
   }
 
   [[nodiscard]] memory::table_t get() const noexcept { return table_; }
+  [[nodiscard]] const memory::table* get_raw() const noexcept { return table_.get(); }
   [[nodiscard]] const std::string& get_name() const noexcept { return table_->get_name(); }
 
  private:
   memory::table_t table_;
-};
-
-/**
- * Represents the generated mapping table an object table and the central events table.
- *
- * N.B: This is not the mapping table which was provided by the user, but a generated one.
- */
-class mapping_table {
- public:
-  mapping_table() = delete;
-  mapping_table(memory::management::raw_data_handler_t<row_id> object_ids_data_handler,
-                memory::management::raw_data_handler_t<row_id> event_ids_data_handler)
-      : object_ids_data_handler_{std::move(object_ids_data_handler)},
-        event_ids_data_handler_{std::move(event_ids_data_handler)} {
-    if (object_ids_data_handler_->get_size() != event_ids_data_handler_->get_size()) {
-      throw common::internal_exception{"Object IDs and event IDs must have the same size."};
-    }
-  }
-
-  [[nodiscard]] const auto& object_ids() const noexcept { return object_ids_data_handler_; }
-  [[nodiscard]] const auto& event_ids() const noexcept { return event_ids_data_handler_; }
-
-  [[nodiscard]] size_t size() const noexcept {
-    debug_assert(object_ids_data_handler_->get_size() == event_ids_data_handler_->get_size());
-    return object_ids_data_handler_->get_size();
-  }
-
- private:
-  memory::management::raw_data_handler_t<row_id> object_ids_data_handler_;
-  memory::management::raw_data_handler_t<row_id> event_ids_data_handler_;
 };
 
 /**
@@ -192,11 +122,11 @@ class mapping_table {
 // TODO(l.karnowski) A better name would be something like ccmm_instance
 class ccmm_manager {
  public:
-  using object_and_mapping_tables_t = std::vector<std::pair<object_table, mapping_table>>;
   using event_tables_t = std::vector<event_table>;
   using relationship_tables_t = std::vector<relationship_table>;
   using object_tables_t = std::vector<object_table>;
-  using relationship_name_to_join_info_t = std::unordered_map<std::string, join_tables_info>;
+  using relationship_name_to_join_info_t = std::unordered_map<std::string, join_tables_info, common::ignore_case_hasher,
+                                                              common::ignore_case_comparator_equal>;
 
   virtual ~ccmm_manager() = default;
 
@@ -210,11 +140,6 @@ class ccmm_manager {
   [[nodiscard]] virtual bool is_relationship_table(std::string_view table_name) const = 0;
   [[nodiscard]] bool is_relationship_table(memory::raw_table_ptr_t raw_table_ptr) const;
 
-  /**
-   * Returns the central event table (containing all events which have been merged from (potentially more than one)
-   * user-provided event tables.
-   */
-  [[nodiscard]] virtual central_event_table get_central_event_table() const = 0;
   /**
    * Returns all object tables in a vector
    */
@@ -291,18 +216,6 @@ class ccmm_manager {
    * Returns all relationship tables.
    */
   [[nodiscard]] virtual const relationship_tables_t& get_relationship_tables() const = 0;
-  /**
-   * Returns the mapping "table" to the central event table for the given object. One of these mapping tables exists
-   * per object. Effectively, this is simply two join vectors, one indexing into the object and the other indexing into
-   * the central event table.
-   */
-  [[nodiscard]] virtual std::optional<mapping_table> get_events_object_mapping(
-      const std::string& object_table_name) const = 0;
-
-  /**
-   * Returns a mapping between each activity name and it's respective total event instance count.
-   */
-  [[nodiscard]] virtual const std::unordered_map<std::string, row_id>& get_event_instance_counts() const = 0;
 
   [[nodiscard]] virtual std::optional<join_tables_info> get_join_info_for_relationship_name(
       const std::string& relationship_name) const = 0;
@@ -335,16 +248,13 @@ class cube_ccmm_manager : public ccmm_manager {
 
   ~cube_ccmm_manager() override = default;
   cube_ccmm_manager() = delete;
-  cube_ccmm_manager(central_event_table central_event_table, object_and_mapping_tables_t object_tables,
-                    event_tables_t event_tables, relationship_tables_t relationship_tables,
-                    relationship_name_to_join_info_t relationship_name_to_join_info,
-                    std::unordered_map<std::string, row_id> event_instance_counts);
+  cube_ccmm_manager(object_tables_t object_tables, event_tables_t event_tables,
+                    relationship_tables_t relationship_tables,
+                    relationship_name_to_join_info_t relationship_name_to_join_info);
 
   [[nodiscard]] bool is_object_table(std::string_view table_name) const final;
   [[nodiscard]] bool is_event_table(std::string_view table_name) const final;
   [[nodiscard]] bool is_relationship_table(std::string_view table_name) const final;
-
-  [[nodiscard]] central_event_table get_central_event_table() const override { return central_event_table_; }
   [[nodiscard]] std::optional<object_table> get_object_table(std::string_view object_table_name) const final;
   [[nodiscard]] std::optional<object_table> get_object_table(const object_name& object_table_name) const final;
   [[nodiscard]] object_tables_t get_object_tables() const override;
@@ -356,11 +266,6 @@ class cube_ccmm_manager : public ccmm_manager {
   [[nodiscard]] std::optional<relationship_table> get_relationship_table(
       const relationship_name& relationship_table_name) const final;
   [[nodiscard]] const relationship_tables_t& get_relationship_tables() const override;
-  [[nodiscard]] std::optional<mapping_table> get_events_object_mapping(
-      const std::string& object_table_name) const override;
-  [[nodiscard]] const std::unordered_map<std::string, row_id>& get_event_instance_counts() const override {
-    return event_instance_counts_;
-  }
   [[nodiscard]] std::optional<join_tables_info> get_join_info_for_relationship_name(
       const std::string& relationship_name) const override {
     if (relationship_name_to_join_info_.contains(relationship_name)) {
@@ -370,14 +275,12 @@ class cube_ccmm_manager : public ccmm_manager {
   }
 
  private:
-  central_event_table central_event_table_;
-  object_and_mapping_tables_t object_tables_;
+  object_tables_t object_tables_;
   event_tables_t event_tables_;
   // TODO(j.kruska): Long term plan is to get rid of central event and internal mapping tables. Until then both mapping
   // table types exist side-by-side.
   relationship_tables_t user_provided_relationship_tables_;
   relationship_name_to_join_info_t relationship_name_to_join_info_{};
-  std::unordered_map<std::string, row_id> event_instance_counts_;
 };
 #endif
 

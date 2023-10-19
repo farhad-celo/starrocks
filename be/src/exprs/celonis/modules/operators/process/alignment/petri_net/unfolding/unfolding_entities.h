@@ -51,7 +51,7 @@ class unfolding_event {
   // TODO (goulart.e) consider if it's better to move this 3 methods to unfolding_net
   [[nodiscard]] const local_configuration_t& get_local_configuration();
   [[nodiscard]] const foata_normal_form_t& get_foata_normal_form();
-  [[nodiscard]] const marking_type& get_marking(petri_net_accessor& pn_accessor);
+  [[nodiscard]] const marking_type& get_marking(const petri_net_accessor& pn_accessor);
 
  private:
   // Each Unfolding Event is a pair (S, t) where S is the preset (pre-conditions)
@@ -66,7 +66,7 @@ class unfolding_event {
 
   void compute_local_configuration();
   void compute_foata_normal_form();
-  void compute_marking(petri_net_accessor& pn_accessor);
+  void compute_marking(const petri_net_accessor& pn_accessor);
 };
 
 struct unfolding_data {

@@ -26,6 +26,7 @@
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table_fwd.h"
 #include "modules/memory/table_to_column_projection.h"
+#include "modules/memory/transform/join_projection_factories.h"
 #ifndef CELOSTAR
 #include "modules/operators/aggregation/projection.h"
 #endif
@@ -84,20 +85,6 @@ using optional_caching_meta_data_t = std::optional<caching_meta_data>;
 // Basically the same as the join projection vector but with a more generalized name
 using value_idx_to_group_id_mapping_t = memory::join_projection_vector_t;
 
-/** Simple proxy which allows to provide a value index to group ID mapping together with the optional group ID domain */
-struct group_id_mapping_and_group_id_domain final {
-  /** The group ID domain value (largest value contained within the mapping + 1) */
-  [[nodiscard]] row_id get_or_compute_group_id_domain();
-
-  // Note: The 'density' of the group IDs directly affects how sparse the group ID to trace ID mapping in the
-  // variant_trace_cache will be. To reduce the memory overhead, try to keep the mapping dense.
-  value_idx_to_group_id_mapping_t value;
-  // If the following is not set, it must be fetched from the mapping which has the cost of iterating over it
-  // The value must be at least +1 the largest group ID value in the mapping (as the group IDs will be used to index an
-  // array allocated with that size)
-  std::optional<row_id> optional_group_id_domain{std::nullopt};
-};
-
 /**
  * @brief Interface for a 'generalized' internal variant computation.
  * Here 'generalized' refers to the following:
@@ -108,10 +95,15 @@ struct group_id_mapping_and_group_id_domain final {
  * @param mapping_and_group_id_domain Contains the mapping from a value index to its group ID and optionally the domain
  * @param values The values to aggregate into groups (TODO:n.weber: Generalize to some accessor to work with arrays)
  * @return Either 'permanent' or 'temporary' variant entries
+ *
+ * @note: This function guarantees that variant-ids are assigned in a stable manner: that is, between two
+ * calls to the function with the same input, ids assigned to variants will not change. This is useful if the output
+ * of an operator depends on variant-id assignment.
+ *
  */
 [[nodiscard]] memory::cache::variant_entries_t generalized_variant_row_ids_computation(  //
     optional_caching_meta_data_t optional_caching_meta_data,                             //
-    group_id_mapping_and_group_id_domain mapping_and_group_id_domain,                    //
+    memory::group_id_mapping_and_group_id_domain mapping_and_group_id_domain,            //
     const memory::column_t& values,                                                      //
     const common::execution_context& context,                                            //
     size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);

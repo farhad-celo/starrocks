@@ -1,7 +1,6 @@
 #include "splittable_eventlog.h"
 
 #include <algorithm>
-#include <memory>
 #include <ranges>
 #ifdef CELOSTAR
 #include <span>
@@ -15,7 +14,6 @@
 #ifndef CELOSTAR
 #include "ctl/array_view.h"
 #endif
-#include "ctl/assert.h"
 #include "ctl/utility.h"
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/for_each_group.h"
@@ -83,6 +81,9 @@ template <ctl::nested_iterable NESTED_ITERABLE>
 requires ctl::contiguous_sized_range<std::ranges::range_value_t<NESTED_ITERABLE>>
 [[nodiscard]] eventlog_buffer_t transform_to_eventlog_buffer(const NESTED_ITERABLE& eventlog_extraction_containers,
                                                              const common::execution_context& ctx) {
+  const auto sub_ctx{
+      ctx.create_sub_context("transform_to_single_eventlog_buffer",
+                             {{"number_of_eventlog_buffers_to_merge", eventlog_extraction_containers.size()}})};
   const auto size{std::accumulate(std::cbegin(eventlog_extraction_containers),
                                   std::cend(eventlog_extraction_containers), size_t{0},
                                   [](const size_t current_size, const auto& inner_container) {
@@ -92,7 +93,7 @@ requires ctl::contiguous_sized_range<std::ranges::range_value_t<NESTED_ITERABLE>
   using eventlog_element_t = eventlog_container_element_t<NESTED_ITERABLE>;
 
   auto result_buffer{memory::tracking::make_shared_static_array_for_overwrite<eventlog_element_t>(
-      size, ALLOC_MSG(ctl::RETURN_VALUE_MSG), ctx)};
+      size, ALLOC_MSG(ctl::RETURN_VALUE_MSG), sub_ctx)};
 
   auto result_buffer_output_iter{result_buffer.begin()};
   for (const auto& eventlog_extraction_container : eventlog_extraction_containers) {
@@ -112,14 +113,15 @@ requires ctl::contiguous_sized_range<std::ranges::range_value_t<NESTED_ITERABLE>
                                                         const memory::column_t& cases,
                                                         const cube::filter_bitset_t& eventlog_selections,
                                                         const common::execution_context& context, size_t grain_size) {
+  const auto sub_ctx{context.create_sub_context("extract_eventlog_buffer_from_eventlog", {})};
   return memory::cast_execute_column_pointers(
-      [&eventlog_selections, &cases, &context, grain_size]<typename TUP>(TUP&& tup) -> eventlog_buffer_t {
+      [&eventlog_selections, &cases, &sub_ctx, grain_size]<typename TUP>(TUP&& tup) -> eventlog_buffer_t {
         using activity_index_type = typename std::decay_t<std::tuple_element_t<0, TUP>>::value_type;
         using case_index_type = typename std::decay_t<std::tuple_element_t<1, TUP>>::value_type;
 
         using parallel_container_t = parallel_eventlog_extraction_container_t<activity_index_type, case_index_type>;
         parallel_container_t locals{};
-        tbb::parallel_for(common::case_aligned_range{cases, context, grain_size},
+        tbb::parallel_for(common::case_aligned_range{cases, sub_ctx, grain_size},
                           [&locals, &eventlog_selections, activity_ac = std::get<0>(tup).get_const_accessor(),
                            case_ac = std::get<1>(tup).get_const_accessor()](const auto& range) {
                             auto& local_data{locals.local()};
@@ -129,9 +131,9 @@ requires ctl::contiguous_sized_range<std::ranges::range_value_t<NESTED_ITERABLE>
                               }
                             }
                           });
-        return transform_to_eventlog_buffer(locals, context);
+        return transform_to_eventlog_buffer(locals, sub_ctx);
       },
-      activities->get_column_pointers(context), cases->get_column_pointers(context));
+      activities->get_column_pointers(sub_ctx), cases->get_column_pointers(sub_ctx));
 }
 
 class thread_safe_max_activity_domain_count {
@@ -321,12 +323,13 @@ splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_confi
 
 splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_config_for_using_variants& config,
                                                  const common::execution_context& context) {
+  const auto sub_ctx{context.create_sub_context("extract_eventlog_buffer_from_variants", {})};
   const auto& [variant_trace_cache_ptr, grain_size]{config};
   const auto& variant_trace_cache{*variant_trace_cache_ptr};
   /* All the meta data and accessors from the variant trace cache */
   const auto variant_count{trace_domain_count_t{variant_trace_cache.get_num_traces()}};
-  const auto variants_accessor{variant_trace_cache.get_traces(context)};
-  const auto variant_lengths_accessor{variant_trace_cache.get_trace_lengths(context)};
+  const auto variants_accessor{variant_trace_cache.get_traces(sub_ctx)};
+  const auto variant_lengths_accessor{variant_trace_cache.get_trace_lengths(sub_ctx)};
 
   // View over the entire variant buffer. Used for out-of-bounds check verification.
   const ctl::array_view<const trace_element_type> trace_buffer_view{variants_accessor.buffer_begin(),
@@ -373,7 +376,7 @@ splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_confi
         }
       });
 
-  auto materialized_eventlog{transform_to_eventlog_buffer(thread_local_activity_variant_containers, context)};
+  auto materialized_eventlog{transform_to_eventlog_buffer(thread_local_activity_variant_containers, sub_ctx)};
 
   return splittable_eventlog{max_activity_domain_count.get_with_null(), variant_count,
                              std::move(materialized_eventlog)};

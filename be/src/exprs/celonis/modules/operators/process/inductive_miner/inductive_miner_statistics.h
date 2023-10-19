@@ -1,8 +1,8 @@
 #pragma once
 
-#include <string>
 #include <unordered_map>
 
+#include "format/json/json_fwd.h"
 #include "modules/common/int_types.h"
 #ifndef CELOSTAR
 #include "modules/cube/execution/tracking/operator_tracker_fwd.h"
@@ -31,6 +31,8 @@ class inductive_miner_statistics {
     insert_or_assign(noisy_par_count_key(), 0);
     insert_or_assign(noisy_loop_count_key(), 0);
     insert_or_assign(activity_concurrent_count_key(), 0);
+    insert_or_assign(activity_concurrent_find_count_key(), 0);
+    insert_or_assign(activity_concurrent_subfinds_count_key(), 0);
     insert_or_assign(activity_once_per_trace_count_key(), 0);
     insert_or_assign(strict_tau_loop_count_key(), 0);
     insert_or_assign(slack_tau_loop_count_key(), 0);
@@ -39,7 +41,7 @@ class inductive_miner_statistics {
     insert_or_assign(precision_key(), 0);
   }
 
-  [[nodiscard]] static const std::string& tree_size_key() {
+  [[nodiscard]] static inline const std::string& tree_size_key() {
     static std::string key{"tree_size"};
     return key;
   }
@@ -99,8 +101,25 @@ class inductive_miner_statistics {
     static std::string key{"noisy_loop_count"};
     return key;
   }
+  /*
+   * The number of successful activity concurrent fallthroughs
+   */
   [[nodiscard]] static const std::string& activity_concurrent_count_key() {
     static std::string key{"activity_concurrent_count"};
+    return key;
+  }
+  /*
+   * The number of times we tried finding an activity concurrent fallthrough
+   */
+  [[nodiscard]] static const std::string& activity_concurrent_find_count_key() {
+    static std::string key{"activity_concurrent_find_count"};
+    return key;
+  }
+  /*
+   *  The number of cuts that were tried out within activity concurrent fallthroughs
+   */
+  [[nodiscard]] static const std::string& activity_concurrent_subfinds_count_key() {
+    static std::string key{"activity_concurrent_subfinds_count"};
     return key;
   }
   [[nodiscard]] static const std::string& activity_once_per_trace_count_key() {
@@ -149,6 +168,8 @@ class inductive_miner_statistics {
   void log_to_operator_statistics(
       const cube::execution::tracking::add_telemetry_counter_fn& add_telemetry_counter) const;
 #endif
+
+  format::json::json_object_t to_json() const;
 
  private:
   std::unordered_map<std::string, size_t> data_{};

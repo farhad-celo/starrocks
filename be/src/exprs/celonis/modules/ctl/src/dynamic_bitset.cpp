@@ -49,7 +49,7 @@ dynamic_bitset<PARALLELISM_SETTING>::dynamic_bitset(const dynamic_bitset& other)
 template <parallelism_settings_t PARALLELISM_SETTING>
 dynamic_bitset<PARALLELISM_SETTING>::dynamic_bitset(const size_type size, allocator_type allocator)
     : size_{size},
-      bitset_data_{make_static_array_for_overwrite<block_type>(details::calc_number_of_blocks(size_),
+      bitset_data_{make_static_array_for_overwrite<block_type>(details::calc_number_of_bitset_blocks(size_),
                                                                ALLOC_MSG(MEMBER_INIT_MSG), std::move(allocator))} {}
 
 template <parallelism_settings_t PARALLELISM_SETTING>

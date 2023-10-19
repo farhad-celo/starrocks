@@ -227,7 +227,7 @@ raw_data_handler<T>::~raw_data_handler() {
     }
 
     common::call_and_log_unsafe_callable(
-        [this]() { swap_information.storage_manager().deregister_file(swap_file, swap_information); },
+        [this]() { swap_information.storage_manager().deregister_file(swap_file, swap_information, description()); },
         fmt::format("Couldn't deregister file: {}", swap_file));
   }
 #endif
@@ -272,8 +272,8 @@ template <typename T>
 io::storage_manager::read_return_data<T> read_from_swap(swap_info& swap_info, const std::string& swap_file,
                                                         const std::string& desc, const size_t size_on_disk) {
   const io::storage_manager& sm = swap_info.storage_manager();
-  if (sm.supports_storage() && !data_handler::swap_file_exists(swap_file, swap_info)) {
-    log::error("could not find swap file {} for {} ", swap_file, desc);
+  if (!data_handler::swap_file_exists(swap_file, swap_info)) {
+    log::jerror("Could not find swap file.", {{"swap_file", swap_file}, {"description", desc}});
     throw common::file_exception{"Could not find swap file: {}.", swap_file};
   }
   return sm.read_compressed_mt<T>(swap_file, swap_info, size_on_disk);
@@ -385,9 +385,6 @@ template <typename T>
 void raw_data_handler<T>::write_to_disk(const common::execution_context& context) {
   common::timer timer;
   const io::storage_manager& sm = swap_information.storage_manager();
-  if (!sm.supports_storage()) {
-    return;
-  }
 
   if (status == load_status::LOADED) {
     io::byte_iterator iter{io::create_byte_iterator_from(std::span<const T>{data})};

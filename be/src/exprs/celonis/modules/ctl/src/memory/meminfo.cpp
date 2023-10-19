@@ -23,6 +23,7 @@ format::json::json_t to_json(const full_meminfo& mi) {
   json["total"] = mi.total<UNIT>();
   json["global"] = mi.in_use_global<UNIT>();
   json["process"] = mi.in_use_by_process<UNIT>();
+  json["estimate"] = mi.current_estimate<UNIT>();
   return json;
 }
 
@@ -129,8 +130,14 @@ full_meminfo fetch_current_full_meminfo() {
   const auto [total_in_bytes, available_in_bytes]{fetch_total_and_available_memory()};
   const auto in_use_by_process_in_bytes{fetch_memory_in_use_by_process(page_size_in_bytes)};
   const auto peak_consumption_by_process_in_bytes{fetch_peak_memory_consumption_by_process()};
-  return full_meminfo{page_size_in_bytes, total_in_bytes, available_in_bytes, in_use_by_process_in_bytes,
-                      peak_consumption_by_process_in_bytes};
+  const auto current_estimate_in_bytes{
+      global_memory_consumption_tracker::get_consumption_tracker().cur_net_allocated()};
+  return full_meminfo{page_size_in_bytes,
+                      total_in_bytes,
+                      available_in_bytes,
+                      in_use_by_process_in_bytes,
+                      peak_consumption_by_process_in_bytes,
+                      current_estimate_in_bytes};
 }
 
 void log_if_net_allocated_nonzero() {

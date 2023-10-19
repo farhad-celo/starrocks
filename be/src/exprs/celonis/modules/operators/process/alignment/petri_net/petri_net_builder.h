@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <type_traits>
+#include <unordered_set>
 #include <variant>
 
 #include <boost/graph/adjacency_list.hpp>
@@ -69,6 +70,7 @@ class petri_net_builder_node {
  * underlying graph data-structure, while the last is enforced by correct implementation of the modifier functions.
  *
  * TODO (goulart.e) this should eventually replace the petri_net_representation class
+ * TODO (goulart.e) the API for this builder should be typed
  */
 class petri_net_builder {
  public:
@@ -114,20 +116,29 @@ class petri_net_builder {
   [[nodiscard]] bool is_transition_place_arc(const node_id_type& src_node_id, const node_id_type& tgt_node_id) const;
   [[nodiscard]] bool is_initial_place(const node_id_type& node_id) const;
   [[nodiscard]] bool is_final_place(const node_id_type& node_id) const;
+  // ALSO QUERYING but returns a number. This functions will throw with the node is not on the graph
+  [[nodiscard]] size_t in_degree(const node_id_type& node_id) const;
+  [[nodiscard]] size_t out_degree(const node_id_type& node_id) const;
 
   // GETTERS They are checked and will throw on a bad access
   [[nodiscard]] const petri_net_builder_node& at_node(const node_id_type& node_id) const;
   [[nodiscard]] const petri_net_builder_node::place_data& at_place(const node_id_type& node_id) const;
   [[nodiscard]] const petri_net_builder_node::transition_data& at_transition(const node_id_type& node_id) const;
   [[nodiscard]] arc_weight_type at_arc(const node_id_type& src_node_id, const node_id_type& tgt_node_id) const;
+  // GRAPH GETTERS they don't throw but you can't modify the graph in parallel or it will break
+  // Not happy with this since it leaks implementation details for this class
+  [[nodiscard]] boost::iterator_range<id_map_type::const_iterator> get_nodes() const;
+  [[nodiscard]] size_t node_count() const;
 
-  [[nodiscard]] const graph_type& graph() const;
+  // COMPUTE STUFF
+  [[nodiscard]] std::unordered_set<node_id_type> pre_set(const node_id_type& node_id) const;
+  [[nodiscard]] std::unordered_set<node_id_type> post_set(const node_id_type& node_id) const;
 
+ protected:
   // Methods that we must implement ourselves because boost::labeled_graph is broken.
   // We use a similar API to the boost::labeled_graph since that our hope is that in the future we can reuse it
   [[nodiscard]] vertex_descriptor get_vertex(const node_id_type& node_id) const;
 
- private:
   [[nodiscard]] std::pair<edge_descriptor, bool> edge_by_label(const node_id_type& src_node_id,
                                                                const node_id_type& tgt_node_id) const;
   [[nodiscard]] std::pair<edge_descriptor, bool> add_edge_by_label(const node_id_type& src_node_id,
@@ -135,8 +146,8 @@ class petri_net_builder {
                                                                    const arc_weight_type& weight);
   void remove_edge_by_label(const node_id_type& src_node_id, const node_id_type& tgt_node_id);
 
-  graph_type graph_{};
-  id_map_type id_map_{};
+  graph_type graph_{};    // NOLINT(misc-non-private-member-variables-in-classes)
+  id_map_type id_map_{};  // NOLINT(misc-non-private-member-variables-in-classes)
 };
 
 }  // namespace celonis::accelerator::operators::process::alignment::petri_net

@@ -94,25 +94,32 @@ class iterative_a_star {
 
   template <typename COST>
   void explore(const MARKING& marking, COST cost) {
-    auto transitions{petri_net_.get_enabled_transitions(marking)};
+    // TODO (goulart.e) not really happy with this fix, but there is a refactoring due anyways (CPL-9327)
+    auto do_explore{[this, &marking = std::as_const(marking), cost](auto filter_function) {
+      auto transitions{petri_net_.get_enabled_transitions(marking)};
+      // expand the remaining transitions
+      for (const auto& transition : transitions) {
+        if (!filter_function(transition)) {
+          continue;
+        }
 
-    // filter on the transitions, if possible
-    // NB this has great potential to improve performance, but you need to know what you're doing
-    //   e.g., if the heuristic is not consistent (or you don't know what that means), this is probably not for you
-    using std::begin, std::end;
-    auto end_transitions{end(transitions)};
-    if constexpr (detail::has_get_filter_v<PATH_CONSTRUCTION>) {
-      end_transitions = std::remove_if(begin(transitions), end_transitions, path_construction_.get_filter(marking));
-    }
+        auto marking_after_transition{petri_net_.fire(marking, transition)};
 
-    // expand the remaining transitions
-    for (auto it{begin(transitions)}; it != end_transitions; ++it) {
-      auto marking_after_transition{petri_net_.fire(marking, *it)};
-      const auto weight{heuristic_.get_weight(*it)};
-      const auto estimate{heuristic_.estimate(marking_after_transition)};
-      if (estimate.has_value() && cost + weight <= max_cost_) {
-        path_construction_.enqueue(*it, std::move(marking_after_transition), cost + weight, estimate.value());
+        const auto weight{heuristic_.get_weight(transition)};
+        const auto estimate{heuristic_.estimate(marking_after_transition)};
+        if (estimate.has_value() && cost + weight <= max_cost_) {
+          path_construction_.enqueue(transition, std::move(marking_after_transition), cost + weight, estimate.value());
+        }
       }
+    }};
+
+    if constexpr (detail::has_get_filter_v<PATH_CONSTRUCTION>) {
+      // filter on the transitions, if possible
+      // NB this has great potential to improve performance, but you need to know what you're doing
+      //   e.g., if the heuristic is not consistent (or you don't know what that means), this is probably not for you
+      do_explore(path_construction_.get_filter(marking));
+    } else {
+      do_explore([](const auto& /*transition*/) { return true; });
     }
   }
 };
@@ -121,17 +128,18 @@ template <typename PETRI_NET, typename HEURISTIC, typename PATH_CONSTRUCTION, ty
 std::variant<typename PETRI_NET::transition_list_type, nothing_found> a_star_search(
     const PETRI_NET& petri_net, const HEURISTIC& heuristic, const PATH_CONSTRUCTION& path_construction,
     const MARKING& initial_marking, MAX_COST max_cost, int max_iterations) {
-  if (max_iterations <= 0) {
-    return {nothing_found::YET};
-  }
   if (heuristic.is_target(initial_marking)) {
     return {typename PETRI_NET::transition_list_type{}};
   }
+  if (max_iterations <= 0) {
+    return {nothing_found::YET};
+  }
   iterative_a_star searcher{petri_net, heuristic, path_construction, initial_marking, max_cost};
   auto search_exit_code{searcher()};
+  --max_iterations;
   while (search_exit_code == exit_code::SEARCHING && max_iterations > 0) {
-    --max_iterations;
     search_exit_code = searcher();
+    --max_iterations;
   }
   if (search_exit_code != exit_code::FOUND_FIT) {
     return {search_exit_code == exit_code::DONE ? nothing_found::AT_ALL : nothing_found::YET};

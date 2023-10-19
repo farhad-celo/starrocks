@@ -8,7 +8,7 @@
 namespace celonis::accelerator::operators::process::alignment::petri_net {
 
 std::vector<petri_net_transition_id> petri_net_bfs::path_to_transition(
-    petri_net_accessor& pn_accessor, const marking_type& source_marking,
+    const petri_net_accessor& pn_accessor, const marking_type& source_marking,
     const petri_net_transition_id target_transition) {
   std::deque<marking_type> to_expand{source_marking};
   std::deque<marking_type> next_round{};
@@ -22,7 +22,7 @@ std::vector<petri_net_transition_id> petri_net_bfs::path_to_transition(
       const auto enabled_transitions{pn_accessor.get_enabled_transitions(marking_to_expand)};
 
       for (const auto& enabled_transition : enabled_transitions) {
-        const auto next_marking{pn_accessor.fire_transition(marking_to_expand, enabled_transition)};
+        const auto next_marking{pn_accessor.fire(marking_to_expand, enabled_transition)};
 
         if (enabled_transition == target_transition) {
           return get_enabling_path(marking_to_expand);
@@ -41,48 +41,6 @@ std::vector<petri_net_transition_id> petri_net_bfs::path_to_transition(
 
   if (!to_expand.empty()) {
     log::jwarn(fmt::format("{}: Couldn't reach target transition.", pn_accessor.get_user_visible_operator_name()),
-               {{"num_iterations", max_depth_}});
-  }
-  return {};
-}
-
-std::vector<petri_net_transition_id> petri_net_bfs::path_to_marking(petri_net_accessor& pn_accessor,
-                                                                    const marking_type& source_marking,
-                                                                    const marking_type& target_marking) {
-  std::deque<marking_type> to_expand{source_marking};
-  std::deque<marking_type> next_round{};
-
-  for (uint64_t current_depth{0}; current_depth != max_depth_; ++current_depth) {
-    if (to_expand.empty()) {
-      break;
-    }
-
-    for (const auto& marking_to_expand : to_expand) {
-      const auto enabled_transitions{pn_accessor.get_enabled_transitions(marking_to_expand)};
-
-      for (const auto& enabled_transition : enabled_transitions) {
-        const auto next_marking{pn_accessor.fire_transition(marking_to_expand, enabled_transition)};
-
-        if (next_marking == target_marking) {
-          auto ret{get_enabling_path(marking_to_expand)};
-          ret.push_back(enabled_transition);
-          return ret;
-        }
-
-        if (!already_visited_marking(next_marking) && next_marking != source_marking) {
-          next_round.push_back(next_marking);
-          paths_.insert({next_marking, {marking_to_expand, enabled_transition}});
-        }
-      }
-    }
-
-    std::swap(to_expand, next_round);
-    next_round.clear();
-  }
-
-  // Warn if terminated because max BFS depth was reached. In this case, try increasing BFS depth
-  if (!to_expand.empty()) {
-    log::jwarn(fmt::format("{}: Couldn't reach target marking.", pn_accessor.get_user_visible_operator_name()),
                {{"num_iterations", max_depth_}});
   }
   return {};

@@ -1,6 +1,7 @@
 #include "align_model.h"
 
 #include <algorithm>
+#include <optional>
 #include <string_view>
 #include <tuple>
 #include <unordered_set>
@@ -15,12 +16,10 @@
 #ifndef CELOSTAR
 #include "modules/common/hash_cache_key.h"
 #endif
-#include "modules/common/timer.h"
 #include "modules/cube/align_model_table_config.h"
 #ifndef CELOSTAR
 #include "modules/cube/event_table_config.h"
 #include "modules/cube/event_table_config_manager.h"
-#include "modules/cube/query_scope.h"
 #include "modules/cube/table_registry/input_dependencies.h"
 #endif
 #include "modules/memory/column_pointers.h"
@@ -35,7 +34,7 @@
 #include "modules/operators/process/alignment/alignment_operator.h"
 #endif
 #include "modules/operators/process/alignment/log_aligner.h"
-#include "modules/operators/process/alignment/rl_align_configs.h"
+#include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/bpmn_to_pn.h"
 #ifdef CELOSTAR
@@ -125,12 +124,14 @@ void write_alignment_statistics(align_model_statistics& stats, const alignment::
   stats.pruned_variants_computed_optimal = alignment_stats.pruned_variants_computed_optimal;
   stats.pruned_variants_computed_relaxation_labeling = alignment_stats.pruned_variants_computed_relaxation_labeling;
   stats.optimizations_solved = alignment_stats.optimizations_solved;
+  stats.successful_relaxation_labelings = alignment_stats.successful_relaxation_labelings;
   stats.alignment_cost = alignment_stats.total_cost_pruned_variants;
+  stats.successfully_computed_pruned_variants = alignment_stats.successfully_computed_pruned_variants;
   stats.time_optimal = alignment_stats.time_optimal;
   stats.time_relaxation_labeling = alignment_stats.time_relaxation_labeling;
 }
 
-std::pair<alignments_t, alignment::alignment_statistics> compute_pruned_alignments(
+std::tuple<alignments_t, alignment::alignment_statistics, parallel_vertex_pairs<>> compute_pruned_alignments(
     const memory::cache::variant_trace_cache_t& pruned_variants, const bpmn_to_petri_net_result_t& result,
     const align_model_config& config, const common::execution_context& context) {
   auto compute_pruned_alignments_context{context.create_sub_context("compute_pruned_alignments", {})};
@@ -145,9 +146,12 @@ std::pair<alignments_t, alignment::alignment_statistics> compute_pruned_alignmen
       keep_transitions.emplace(transition_str_id);
     }
   }
-  auto [alignments, stats, event_to_transition_mapping]{alignment::compute_alignments(
-      result.petri_net, keep_transitions, pruned_variants, std::nullopt, config.num_a_star_iterations, config.rl_config,
-      compute_pruned_alignments_context, std::string{OPERATOR_NAME})};
+  const std::string operator_name{OPERATOR_NAME};
+  auto aligner{alignment::log_aligner_wrapper::create(result.petri_net, keep_transitions, std::nullopt,
+                                                      config.log_aligner_cfg, compute_pruned_alignments_context,
+                                                      operator_name)};
+  auto [alignments,
+        event_to_transition_mapping]{aligner(pruned_variants, compute_pruned_alignments_context, operator_name)};
 
   petri_net_id_to_bpmn_mapping new_mapping{};
 
@@ -159,20 +163,36 @@ std::pair<alignments_t, alignment::alignment_statistics> compute_pruned_alignmen
     }
   }
 
+  parallel_vertex_pairs<> parallel_vertices{};
+  const auto& behavioral_relations{aligner.precomputation_result().behavioral_relations_tf};
+  for (auto it{begin(new_mapping)}; it != end(new_mapping); ++it) {
+    const auto [pn_i, bpmn_i]{*it};
+    for (auto jt{it}; jt != end(new_mapping); ++jt) {
+      const auto [pn_j, bpmn_j]{*jt};
+      if (behavioral_relations.get_relation(pn_i, pn_j) == alignment::petri_net::behavioral_relation::INTERLEAVED) {
+        parallel_vertices.add(bpmn_i, bpmn_j);
+      }
+    }
+  }
+
   alignments_t bpmn_alignments{};
   bpmn_alignments.reserve(alignments.size());
   for (const auto& alignment : alignments) {
-    alignment_t bpmn_alignment{};
-    bpmn_alignment.reserve(alignment.size());
-    for (const auto& move : alignment.data()) {
-      if (auto remapped_move{remap_move_type(move, new_mapping, result.log_label_to_bpmn)}; remapped_move) {
-        bpmn_alignment.push_back(remapped_move.value());
+    if (alignment) {
+      alignment_t bpmn_alignment{};
+      bpmn_alignment.reserve(alignment.value().size());
+      for (const auto& move : alignment.value().data()) {
+        if (auto remapped_move{remap_move_type(move, new_mapping, result.log_label_to_bpmn)}; remapped_move) {
+          bpmn_alignment.push_back(remapped_move.value());
+        }
       }
+      bpmn_alignments.push_back(bpmn_alignment);
+    } else {
+      bpmn_alignments.push_back(std::nullopt);
     }
-    bpmn_alignments.push_back(bpmn_alignment);
   }
 
-  return {bpmn_alignments, stats};
+  return {bpmn_alignments, aligner.statistics(), parallel_vertices};
 }
 
 constexpr bool is_gateway_move(const alignment_move& move) {
@@ -270,7 +290,7 @@ alignment_t pruned_to_full_variant(std::span<const alignment_move> pruned_alignm
   return result;
 }
 
-alignments_t map_pruned_to_full_variants(std::span<const alignment_t> pruned_alignments,
+alignments_t map_pruned_to_full_variants(std::span<const std::optional<alignment_t>> pruned_alignments,
                                          const memory::cache::variant_trace_cache_t& pruned_variants,
                                          const memory::cache::variant_trace_cache_t& full_variants,
                                          const common::execution_context& context) {
@@ -282,10 +302,12 @@ alignments_t map_pruned_to_full_variants(std::span<const alignment_t> pruned_ali
         const auto full_traces{full_variants->get_traces(context)};
         const auto full_lengths{full_variants->get_trace_lengths(context)};
         const auto num_full_traces{full_variants->get_num_traces()};
-        alignments_t result(num_full_traces);
+        alignments_t result(num_full_traces, std::nullopt);
         for (row_id idx{0}; idx != num_full_traces; ++idx) {
-          result[idx] = pruned_to_full_variant(pruned_alignments[map_accessor[idx]],
-                                               std::span{full_traces[idx], full_lengths[idx]});
+          if (const auto& pruned_alignment{pruned_alignments[map_accessor[idx]]}; pruned_alignment) {
+            result[idx] =
+                pruned_to_full_variant(pruned_alignment.value(), std::span{full_traces[idx], full_lengths[idx]});
+          }
         }
         return result;
       },
@@ -377,6 +399,7 @@ struct enum_to_buffer_mapper {
           edge_type_strings::SKIP,
           edge_type_strings::LOG,
           edge_type_strings::UNMAPPED,
+          edge_type_strings::L1_MISSING,
       },
       context);
 }
@@ -689,17 +712,22 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
                 if (case_table_row == VALUE_NOT_FOUND) {
                   return;
                 }
+                const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
+
+                const auto& optional_alignment_for_case{alignments.at(variant_trace_id)};
+                const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
+                debug_assert(optional_alignment_for_case.has_value() == optional_replay_result_for_case.has_value());
+                if (!optional_alignment_for_case) {
+                  return;
+                }
 #ifdef CELOSTAR
                 local_block.variant_table_size++;
 #else
-                const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
+                const auto& alignment_for_case{optional_alignment_for_case.value()};
+                const auto& replay_result_for_case{optional_replay_result_for_case.value()};
 
-                const auto& alignment_for_case{alignments.at(variant_trace_id)};
                 local_block.alignment_table_size += alignment_for_case.size();
-
-                const auto& replay_result_for_case{replay_results.at(variant_trace_id)};
                 local_block.association_table_size += replay_result_for_case.num_rows();
-
                 local_block.edge_class_table_size += replay_result_for_case.num_edge_components();
 #endif
               });
@@ -851,6 +879,16 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                     if (case_table_row == VALUE_NOT_FOUND) {
                       return;
                     }
+                    const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
+                    const auto& optional_alignment_for_case{alignments.at(variant_trace_id)};
+                    const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
+                    debug_assert(optional_alignment_for_case.has_value() ==
+                                 optional_replay_result_for_case.has_value());
+                    if (!optional_alignment_for_case) {
+                      return;
+                    }
+                    const auto& alignment_for_case{optional_alignment_for_case.value()};
+                    const auto& replay_result_for_case{optional_replay_result_for_case.value()};
 
 #ifndef CELOSTAR
                     auto& [inflated_alignment_bpmn_vertex_id, inflated_alignment_bpmn_vertex_id_nulls,
@@ -859,10 +897,6 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                            association_to_alignment_join, association_to_edge_class_join, edge_class_id,
                            inflated_edge_classes, edge_class_buffer_with_lookup]{storages};
 #endif
-
-                    const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
-                    const auto& alignment_for_case{alignments.at(variant_trace_id)};
-                    const replay_result_type& replay_result_for_case{replay_results.at(variant_trace_id)};
 
                     // 1. Fill the association table
 #ifdef CELOSTAR
@@ -992,16 +1026,26 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
 
 }  // anonymous namespace
 
-alignments_t align_model(const memory::cache::variant_trace_cache_t& variants, const bpmn_to_petri_net_result_t& result,
-                         const align_model_config& config, align_model_statistics& stats,
-                         const std::string& activity_table_name, const common::execution_context& context) {
+align_model_config align_model_config::make(std::string pruned_variant_cache_key,
+                                            cube::variant_trace_cache_manager* trace_cache_manager,
+                                            const std::optional<alignment::log_aligner_config>& aligner_cfg) {
+  return {ALIGN_MODEL_GRAIN_SIZE, std::move(pruned_variant_cache_key), trace_cache_manager,
+          aligner_cfg.value_or(alignment::log_aligner_config::make_default())};
+}
+
+std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache::variant_trace_cache_t& variants,
+                                                             const bpmn_to_petri_net_result_t& result,
+                                                             const align_model_config& config,
+                                                             align_model_statistics& stats,
+                                                             const std::string& activity_table_name,
+                                                             const common::execution_context& context) {
   auto align_variants_context{context.create_sub_context("align_model", {})};
   const auto [pruned_buffer, pruned_projection]{prune_variants(variants, result.petri_net, align_variants_context)};
   const auto pruned_variants{aggregation::compute_variant_row_ids(
       align_variants_context, config.pruned_variant_cache_key, activity_table_name, variants->get_num_traces(),
       pruned_projection, pruned_buffer, *config.variant_trace_cache_manager_instance, config.grain_size)};
-  const auto [pruned_alignments,
-              alignment_statistics]{compute_pruned_alignments(pruned_variants, result, config, align_variants_context)};
+  const auto [pruned_alignments, alignment_statistics,
+              parallel_vertices]{compute_pruned_alignments(pruned_variants, result, config, align_variants_context)};
   auto full_alignments{
       map_pruned_to_full_variants(std::span{pruned_alignments}, pruned_variants, variants, align_variants_context)};
 
@@ -1009,7 +1053,7 @@ alignments_t align_model(const memory::cache::variant_trace_cache_t& variants, c
   stats.variant_count = variants->get_num_traces();
   stats.pruned_variants_count = pruned_variants->get_num_traces();
 
-  return full_alignments;
+  return {full_alignments, parallel_vertices};
 }
 
 bpmn_to_petri_net_result_t bpmn_to_petri_net(const bpmn::bpmn_graph& graph) {
@@ -1054,14 +1098,20 @@ bpmn_to_petri_net_result_t bpmn_to_petri_net(const bpmn::bpmn_graph& graph) {
 }
 
 replay_results_t replay_aligned_variants(const bpmn::bpmn_graph& bpmn_graph, const alignments_t& alignments,
+                                         const parallel_vertex_pairs<>& parallel_vertices,
                                          const common::execution_context& context) {
   const auto replay_context{context.create_sub_context("replay_aligned_variants", {})};
   replay_results_t replay_results{};
 
-  std::ranges::transform(alignments, std::back_inserter(replay_results),
-                         [&bpmn_graph = std::as_const(bpmn_graph)](const auto& aligned_variant) -> replay_result_type {
-                           return replay_aligned_variant(bpmn_graph, aligned_variant);
-                         });
+  std::ranges::transform(
+      alignments, std::back_inserter(replay_results),
+      [&bpmn_graph = std::as_const(bpmn_graph), parallel_vertices = std::as_const(parallel_vertices)](
+          const auto& aligned_variant) -> std::optional<replay_result_type> {
+        if (aligned_variant) {
+          return replay_aligned_variant(bpmn_graph, aligned_variant.value(), parallel_vertices);
+        }
+        return std::nullopt;
+      });
 
   return replay_results;
 }

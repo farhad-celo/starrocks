@@ -45,6 +45,7 @@ class alignment_move {
   [[nodiscard]] constexpr bool is_tau() const noexcept {
     return label_ == string_to_int_mapper::get_tau_transition_id();
   }
+  [[nodiscard]] constexpr bool is_move_on_log() const noexcept { return is_sync() || is_log() || is_unmapped(); }
 
   [[nodiscard]] bool operator==(const alignment_move& rhs) const noexcept = default;
 
@@ -89,13 +90,21 @@ class trace_alignment {
   [[nodiscard]] uint64_t cost() const noexcept { return cost_; }
   [[nodiscard]] uint64_t visible_model_moves_count() const noexcept { return visible_model_moves_count_; }
 
+  // Returns the minimum cost assuming a highly successful LCS pruning
+  [[nodiscard]] uint64_t cost_optimistic_lcs_pruning() const noexcept {
+    const auto log_moves_count{cost_ - visible_model_moves_count_};
+    return cost_ - (2 * std::min(log_moves_count, visible_model_moves_count_));
+  }
+
  private:
   std::vector<alignment_move, ctl::resource_owning_allocator<alignment_move>> data_{};
   uint64_t cost_{0};
   uint64_t visible_model_moves_count_{0};
 };
 
-using trace_alignment_allocator_type = std::scoped_allocator_adaptor<ctl::resource_owning_allocator<trace_alignment>>;
-using vector_of_alignments = std::vector<trace_alignment, trace_alignment_allocator_type>;
+using trace_alignment_t = std::optional<trace_alignment>;
+
+using trace_alignment_allocator_type = std::scoped_allocator_adaptor<ctl::resource_owning_allocator<trace_alignment_t>>;
+using vector_of_alignments = std::vector<trace_alignment_t, trace_alignment_allocator_type>;
 
 }  // namespace celonis::accelerator::operators::process::alignment

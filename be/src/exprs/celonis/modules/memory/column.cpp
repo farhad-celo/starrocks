@@ -72,24 +72,28 @@ std::string column::get_user_visible_owner_name(const common::execution_context&
   return owner_->get_user_visible_name(context);
 }
 
-std::string column::get_string_value(row_id row, const common::execution_context& context) {
+std::optional<std::string> column::get_string_value_opt(row_id row, const common::execution_context& context) {
   // Created to get a non-const context. Can be removed if context parameter becomes non-const
-  auto get_value_context = context.create_sub_context("column::get_string_value", {{"row", row}});
+  auto get_value_context = context.create_sub_context("column::get_string_value_opt", {{"row", row}});
   const auto row_count = get_row_count(get_value_context);
   if (row < 0 || row >= row_count) {
     throw common::out_of_bounds_exception{"column::get_string_value", row_id{0}, (row_count - 1), row};
   }
 
-  std::string value;
+  std::optional<std::string> value;
 
   auto materialized_data{get_materialized_data(get_value_context)};
 
   if (materialized_data != nullptr) {
-    value = materialized_data->get_string_value(row, get_value_context);
+    value = materialized_data->get_string_value_opt(row, get_value_context);
   } else {
-    value = get_dict(get_value_context)->get_string_value(get_column_pointers(get_value_context).get_ptr_slow(row));
+    value = get_dict(get_value_context)->get_string_value_opt(get_column_pointers(get_value_context).get_ptr_slow(row));
   }
   return value;
+}
+
+std::string column::get_string_value(row_id row, const common::execution_context& context) {
+  return get_string_value_opt(row, context).value_or("NULL");
 }
 
 row_id column::get_row_count(const common::execution_context& context) {
@@ -144,7 +148,7 @@ void column::dictify_if_needed(const common::execution_context& context) {
     // We start the timer after the data is loaded, as we do not want to include the time of swap ins
     dictify_timer.restart();
     auto raw = transform::dictify(std::span{materialized_data.get(), static_cast<size_t>(config_.row_count)},
-                                  *null_flags_bitset, config_.description, context);
+                                  null_flags_bitset.get(), config_.description, dictify_context);
     auto [resulting_dict,
           resulting_column_pointers]{raw.to_swappable(config_.id, config_.swap_information, config_.description)};
 #ifndef CELOSTAR
@@ -292,7 +296,9 @@ column_t column::get_domain_column(common::execution_context& context) {
       .create_from_dictionary(domain_size, col_ptrs, get_dict(context), memory::column_processing_state());
 }
 
-row_id column::get_domain_count(const common::execution_context& context) {
+row_id column::get_domain_count(const common::execution_context& context,
+                                const no_dictify_request_t& no_dictify_request) {
+  check_implicit_dictification(no_dictify_request);
   dictify_if_needed(context);
   if (dict_ == nullptr) {
     return 0;
@@ -387,7 +393,7 @@ struct exec_project_null_flags {
     tbb::parallel_for(common::safe_aligned_blocked_range<row_id>{0, row_count}, [&](const auto r) {
       for (auto i = r.begin; i != r.end; ++i) {
         if (col_ptrs_ac[i] == 0) {
-          null_flags[i] = true;
+          null_flags.set(i);
         }
       }
     });
@@ -401,7 +407,8 @@ void column::project_null_flags(null_flags_bitset_t& null_flags, const common::e
   std::shared_lock lck(column_mutex_);
 
   if (is_materialized()) {
-    null_flags |= *plain_data_->get_null_flags()->get_const_data(projection_context);
+    ctl::bitset_mutable_view view{null_flags};
+    view |= plain_data_->get_null_flags()->get_const_data(projection_context).get();
     return;
   }
   const auto row_count = get_row_count();
@@ -493,6 +500,7 @@ column_t column::alias_column(const std::string& alias, const std::string& cache
     // those operators currently require dictified input in most cases - dictify is triggered in here to avoid
     // having to compute the dictified column twice: Once for the cloned alias column and once for the original
     // column which could e.g. reside in a cache. CPL-8699
+    check_implicit_dictification(operators::no_dictify_request{});
     dictify_if_needed(context);
   }
 
@@ -555,7 +563,7 @@ bool column::has_domain_null(const common::execution_context& context) {
   if (is_dictified()) {
     has_null_ = cast_execute_column_pointers(exec_has_domain_null(get_row_count()), *column_pointers_);
   } else if (is_materialized()) {
-    has_null_ = plain_data_->get_null_flags()->get_const_data(context)->any();
+    has_null_ = plain_data_->get_null_flags()->get_const_data(context).any();
   }
   debug_assert(has_null_.load().has_value());
   return has_null_.load().value();
@@ -656,10 +664,10 @@ ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column, const common::
 
 void column::check_consistency_for_testing(const std::unordered_set<table*>& tables) const {
   for (table* table : dependencies_) {
-    common::runtime_assert(tables.contains(table));
+    common::runtime_assert(tables.contains(table), "Runtime Assertion failed");
   }
   if (owner_ != nullptr) {
-    common::runtime_assert(tables.contains(owner_));
+    common::runtime_assert(tables.contains(owner_), "Runtime Assertion failed");
   }
 }
 

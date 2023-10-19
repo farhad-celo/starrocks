@@ -19,6 +19,12 @@ namespace celonis::accelerator::operators::process {
 class splittable_eventlog {
  public:
   splittable_eventlog() = default;
+
+  /**
+   * Creates a splittable_eventlog given an extraction_config.
+   *
+   * Note that this does not preserve the order of the original eventlog.
+   */
   [[nodiscard]] static splittable_eventlog extract(const splittable_eventlog_config_t& extraction_config,
                                                    const common::execution_context& context);
 #ifndef CELOSTAR

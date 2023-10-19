@@ -53,8 +53,8 @@ petri_net_place_id get_place_not_in_preset(const petri_net_transition& pn_transi
 
 }  // namespace
 
-unfolding_computation::unfolding_computation(petri_net_accessor&& pn_accessor) noexcept
-    : pn_accessor_{std::move(pn_accessor)} {}
+unfolding_computation::unfolding_computation(const petri_net_accessor& pn_accessor) noexcept
+    : pn_accessor_{pn_accessor} {}
 
 unfolding_representation unfolding_computation::compute_unfolding() {
   add_initial_conditions();
@@ -128,7 +128,7 @@ void unfolding_computation::add_initial_possible_extensions() {
 
 unfolding_event* unfolding_computation::get_minimal_event() const { return possible_extensions_.top(); }
 
-bool unfolding_computation::is_cutoff(unfolding_event* event) {
+bool unfolding_computation::is_cutoff(unfolding_event* event) const {
   for (auto* unf_event : unfolding_.get_unfolding_events()) {
     const auto& unf_marking{unf_event->get_marking(pn_accessor_)};
     const auto& marking{event->get_marking(pn_accessor_)};
@@ -228,7 +228,7 @@ std::unordered_set<petri_net_transition_id, hash_transition> unfolding_computati
   return transitions_to_extend;
 }
 
-std::vector<unfolding_condition*> unfolding_computation::concurrent_conditions_for_event(unfolding_event* event) {
+std::vector<unfolding_condition*> unfolding_computation::concurrent_conditions_for_event(unfolding_event* event) const {
   std::vector<unfolding_condition*> concurrent_conditions{};
 
   for (auto* condition : unfolding_.get_unfolding_conditions()) {

@@ -461,6 +461,8 @@ message LinkPathOperatorNode {
   optional LengthCondition length_condition = 6;
 
   required string link_path_tables_creation_cache_key = 7;
+
+  optional OperatorFilter all_constraint_objects_filter = 8;
 }
 
 message LinkPathSourceTargetOperatorNode {
@@ -838,10 +840,18 @@ message TableNode {
     message IncludedEventType {
       required string event_type = 1;
       optional string via_relationship = 2;
+      optional OperatorFilter event_filter = 3;
+    }
+
+    enum ProjectOnObjectOperatorAlias{
+      PROJECT_ON_OBJECT = 1;
+      CREATE_EVENTLOG = 2;
     }
 
     required string lead_object_name = 1;
     repeated IncludedEventType included_event_types = 2;
+    optional OperatorFilter lead_object_filter = 4;
+    optional ProjectOnObjectOperatorAlias project_on_object_operator_alias = 3;
   }
 
   message TableGroupMemberAccess {
@@ -859,6 +869,8 @@ message TableNode {
   message DomainTable { repeated OperatorRef columns = 1; }
 
   message LinkObjectsConfig { required OperatorRef input_column = 1; }
+
+  message CommonTable { repeated OperatorRef column_expressions = 1; }
 
   enum ReferenceTarget {
     ACTIVITY = 1;
@@ -880,6 +892,7 @@ message TableNode {
   optional ProjectOnObjectConfig project_on_object_config = 12;
   optional DomainTable domain_table = 13;
   optional LinkObjectsConfig link_objects_config = 15;
+  optional CommonTable common_table = 16;
 
   required int32 table_operator_id = 8;
   required string cache_key = 9;
@@ -1085,6 +1098,15 @@ message TableRef {
   optional string registered_table_ref_name = 2;
 }
 message TableGroupRef { required int32 table_group_operator_ref_id = 1; }
+
+message QuantityConvert {
+  required OperatorMetadata metadata = 1;
+  required OperatorRef amount_expression = 2;
+  required OperatorRef to_unit_expression = 3;
+  required OperatorRef from_unit_expression = 4;
+  optional OperatorRef identifier_expression = 5;
+  optional TableRef conversion_rates_table = 6;
+}
 
 message CurrencyConvert {
   required OperatorMetadata metadata = 1;

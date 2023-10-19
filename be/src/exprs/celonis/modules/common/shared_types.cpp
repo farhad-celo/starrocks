@@ -68,12 +68,4 @@ std::string convert_to_string(const data_type celonis_data_type) {
   return (value == std::trunc(value) && !std::isnan(value) && !std::isinf(value) && value >= cel_int_min &&
           value < cel_int_max);
 }
-
-[[nodiscard]] bool is_null_or_matching_data_type(std::optional<data_type> actual_type, data_type desired_type) {
-  if (!actual_type.has_value()) {
-    return false;
-  }
-  return actual_type.value() == desired_type || actual_type.value() == cel_null;
-}
-
 }  // namespace celonis::accelerator

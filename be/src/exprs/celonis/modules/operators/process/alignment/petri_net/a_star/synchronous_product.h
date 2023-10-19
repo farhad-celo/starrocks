@@ -30,6 +30,7 @@ class synchronous_product {
     [[nodiscard]] constexpr bool is_model_move() const { return !move_on_log && petri_net_transition.has_value(); }
     [[nodiscard]] constexpr bool is_synchronous_move() const { return move_on_log && petri_net_transition.has_value(); }
     [[nodiscard]] constexpr bool is_visible_model_move() const { return is_model_move() && is_visible_model; }
+    [[nodiscard]] constexpr bool is_tau_move() const { return is_model_move() && !is_visible_model; }
   };
 
   // NOLINTNEXTLINE(bugprone-exception-escape)
@@ -47,7 +48,7 @@ class synchronous_product {
   };
   using transition_list_type = transitions_container_t<transition_type>;
 
-  synchronous_product(petri_net_accessor& petri_net, std::span<const row_id> variant);
+  synchronous_product(const petri_net_accessor& petri_net, std::span<const row_id> variant);
 
   [[nodiscard]] transition_list_type get_enabled_transitions(const marking_type& marking) const;
 
@@ -58,8 +59,7 @@ class synchronous_product {
   [[nodiscard]] marking_type get_initial_marking() const { return {petri_net_.get_initial_marking(), {}}; }
 
  private:
-  petri_net_accessor& petri_net_;
-  using label_type = petri_net_accessor::label_type;
+  const petri_net_accessor& petri_net_;
   marking_type::variant_place_type variant_length_;
   using variant_transition_type =
       marking_type::variant_place_type;  // NB This is the index of the *transition*, whereas variant_place_type is the

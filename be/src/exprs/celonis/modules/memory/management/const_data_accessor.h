@@ -103,6 +103,12 @@ class const_data_accessor<
 
   [[nodiscard]] const storage_type_t* buffer_get() const noexcept { return buffer_begin(); }
 
+  [[nodiscard]] ctl::shared_static_array<const value_type_t> data_shared() const noexcept { return ptr_data_; }
+
+  [[nodiscard]] ctl::shared_static_array<const storage_type_t> buffer_shared() const noexcept {
+    return pointer_buffer_data_;
+  }
+
  private:
   ctl::shared_static_array<const storage_type_t> pointer_buffer_data_;
   ctl::shared_static_array<const value_type_t> ptr_data_;

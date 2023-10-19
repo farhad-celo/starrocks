@@ -91,6 +91,9 @@ class static_array_base final {
   static_array_base& operator=(static_array_base<U, SHARED_T_, ALLOCATOR_TYPE>&& other) noexcept(
       std::is_nothrow_constructible_v<static_array_base, static_array_base<T, SHARED_T_, ALLOCATOR_TYPE>&&>);
 
+  // TODO(l.karnowski) Can we make this private somehow?
+  static_array_base(size_type size, underlying_buffer_type data) : size_{size}, data_{std::move(data)} {}
+
   template <typename U, typename SHARED_T_, typename ALLOCATOR_TYPE_>
   [[nodiscard]] bool operator==(const static_array_base<U, SHARED_T_, ALLOCATOR_TYPE_>& rhs) const
       noexcept(noexcept(std::declval<const T&>() == std::declval<const U&>()));
@@ -155,8 +158,6 @@ class static_array_base final {
   [[nodiscard]] static_array_base sub_array(size_type offset, size_type size) const;
 
  private:
-  static_array_base(size_type size, underlying_buffer_type data) : size_{size}, data_{std::move(data)} {}
-
   static underlying_buffer_type make_default_array_internal() noexcept;
   static underlying_buffer_type make_array_internal(bool do_value_init, size_type size,
                                                     const utils::allocation_reason& reason, ALLOCATOR_TYPE allocator);

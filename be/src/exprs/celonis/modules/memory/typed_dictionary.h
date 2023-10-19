@@ -7,8 +7,9 @@
 #include "modules/common/shared_types_fwd.h"
 #include "modules/memory/dictionary.h"
 #include "modules/memory/dictionary_fwd.h"
+#include "modules/memory/management/const_data_accessor.h"
 #include "modules/memory/management/pointer_data_handler.h"
-#include "modules/memory/management/raw_data_handler_fwd.h"
+#include "modules/memory/management/raw_data_handler.h"
 #include "modules/memory/row_id.h"
 #include "modules/memory/types.h"
 #include "types/uuid/uuid_storage.h"
@@ -78,6 +79,7 @@ class typed_dictionary : public dictionary {
                                            const common::execution_context& context) override;
 
   [[nodiscard]] std::string get_string_value(row_id ptr) const override;
+  [[nodiscard]] std::optional<std::string> get_string_value_opt(row_id ptr) const override;
 
   [[nodiscard]] size_t get_size_in_memory() const override;
 
@@ -163,6 +165,7 @@ class typed_dictionary<cel_string_t> : public dictionary {
                                            const common::execution_context& context) override;
 
   [[nodiscard]] std::string get_string_value(row_id ptr) const override;
+  [[nodiscard]] std::optional<std::string> get_string_value_opt(row_id ptr) const override;
 
   [[nodiscard]] size_t get_size_in_memory() const override;
 
@@ -208,4 +211,35 @@ using int_dictionary = typed_dictionary<cel_int_t>;
 using string_dictionary = typed_dictionary<cel_string_t>;
 using uuid_dictionary = typed_dictionary<cel_uuid_t>;
 using null_dictionary = typed_dictionary<cel_null_t>;
+
+using typed_dict_variant_t =
+    std::variant<std::shared_ptr<boolean_dictionary>, std::shared_ptr<date_dictionary>,
+                 std::shared_ptr<float_dictionary>, std::shared_ptr<int_dictionary>, std::shared_ptr<string_dictionary>,
+                 std::shared_ptr<uuid_dictionary>, std::shared_ptr<null_dictionary>>;
+
+inline typed_dict_variant_t convert_to_typed_dict(const dictionary_t& dictionary) {
+  if (auto casted_dict{std::dynamic_pointer_cast<boolean_dictionary>(dictionary)}; casted_dict != nullptr) {
+    return casted_dict;
+  }
+  if (auto casted_dict{std::dynamic_pointer_cast<date_dictionary>(dictionary)}; casted_dict != nullptr) {
+    return casted_dict;
+  }
+  if (auto casted_dict{std::dynamic_pointer_cast<float_dictionary>(dictionary)}; casted_dict != nullptr) {
+    return casted_dict;
+  }
+  if (auto casted_dict{std::dynamic_pointer_cast<int_dictionary>(dictionary)}; casted_dict != nullptr) {
+    return casted_dict;
+  }
+  if (auto casted_dict{std::dynamic_pointer_cast<string_dictionary>(dictionary)}; casted_dict != nullptr) {
+    return casted_dict;
+  }
+  if (auto casted_dict{std::dynamic_pointer_cast<uuid_dictionary>(dictionary)}; casted_dict != nullptr) {
+    return casted_dict;
+  }
+  if (auto casted_dict{std::dynamic_pointer_cast<null_dictionary>(dictionary)}; casted_dict != nullptr) {
+    return casted_dict;
+  }
+  ctl::assert_unreachable();
+}
+
 }  // namespace celonis::accelerator::memory

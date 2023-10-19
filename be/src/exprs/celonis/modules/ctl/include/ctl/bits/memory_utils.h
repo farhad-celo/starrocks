@@ -12,7 +12,18 @@
 #include "ctl/utils/allocation_priority.h"
 #include "ctl/utils/allocation_reason.h"
 
-namespace celonis::accelerator::ctl::details {
+namespace celonis::accelerator::ctl {
+
+/**
+ * Build a string containing the n largest allocations which were not deallocated and information about the source files
+ * and lines of the respective allocations. Note that allocations are tracked using a circular buffer of size 2000, so
+ * any allocations older than the most recent 2000 are not considered.
+ * @param n Number of allocations to show (sort descending by size).
+ * @return A string containing the list of allocations with size and source.
+ */
+[[nodiscard]] std::string build_string_containing_n_largest_open_allocations(size_t n);
+
+namespace details {
 
 /**
  * @brief Used to validate that enough memory is available for the allocation request of 'bytes_to_allocate' bytes
@@ -113,4 +124,6 @@ template <typename T, typename ALLOCATOR_TYPE, bool DO_VALUE_INIT>
   }
 }
 
-}  // namespace celonis::accelerator::ctl::details
+}  // namespace details
+
+}  // namespace celonis::accelerator::ctl

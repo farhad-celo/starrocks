@@ -59,8 +59,7 @@ bool push_down_tau_count(process_tree& tree, process_tree::count_type tau_count)
  * Robust Process Mining with Guarantees by Sander J.J. Leemans (ISBN: 978-90-386-4257-4) Page 114
  */
 std::vector<reduction_rules::applicable_fn> get_rules() {
-  return {xor_nested_in_redo_applicable,
-          node_with_nested_exclusive_applicable,
+  return {node_with_nested_exclusive_applicable,
           node_with_nested_parallel_applicable,
           node_with_nested_sequence_applicable,
           nested_loop_in_do_part_applicable,
@@ -69,15 +68,13 @@ std::vector<reduction_rules::applicable_fn> get_rules() {
           tau_transition_in_xor_applicable,
           tau_transition_in_redo_applicable,
           multiple_tau_transitions_in_redo_applicable,
-          redo_nested_in_xor_applicable,
           empty_loop_applicable,
           single_child_applicable,
           redo_nested_in_parallel_applicable};
 }
 
 std::vector<reduction_rules::apply_fn> get_transformations() {
-  return {xor_nested_in_redo_apply_if_applicable,
-          node_with_nested_sequence_apply_if_applicable,
+  return {node_with_nested_sequence_apply_if_applicable,
           node_with_nested_parallel_apply_if_applicable,
           node_with_nested_exclusive_apply_if_applicable,
           nested_loop_in_do_part_apply_if_applicable,
@@ -86,7 +83,6 @@ std::vector<reduction_rules::apply_fn> get_transformations() {
           tau_transition_in_xor_apply_if_applicable,
           tau_transition_in_redo_apply_if_applicable,
           multiple_tau_transitions_in_redo_apply_if_applicable,
-          redo_nested_in_xor_apply_if_applicable,
           empty_loop_apply_if_applicable,
           single_child_apply_if_applicable,
           redo_nested_in_parallel_apply_if_applicable};
@@ -190,8 +186,10 @@ void xor_nested_in_redo_apply(process_tree& pt) {
   redo.children = std::move(new_children);
   redo.recalculate_counts();
 }
-
-bool xor_nested_in_redo_apply_if_applicable(process_tree& pt) {
+/*
+ * EML-2787 Has been disabled as we learned that using redo section to model choice was very hard understood by users.
+ */
+[[maybe_unused]] bool xor_nested_in_redo_apply_if_applicable(process_tree& pt) {
   if (xor_nested_in_redo_applicable(pt)) {
     xor_nested_in_redo_apply(pt);
     return true;
@@ -435,8 +433,10 @@ void redo_nested_in_xor_apply(process_tree& pt) {
   r.recalculate_counts();
   pt = new_pt;
 }
-
-bool redo_nested_in_xor_apply_if_applicable(process_tree& pt) {
+/*
+ * EML-2787 Has been disabled as we learned that using redo section to model choice was very hard understood by users.
+ */
+[[maybe_unused]] bool redo_nested_in_xor_apply_if_applicable(process_tree& pt) {
   if (redo_nested_in_xor_applicable(pt)) {
     redo_nested_in_xor_apply(pt);
     return true;

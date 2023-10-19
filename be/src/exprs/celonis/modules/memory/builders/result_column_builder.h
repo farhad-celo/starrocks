@@ -1,5 +1,6 @@
 #pragma once
 
+#include "modules/common/execution_context_fwd.h"
 #include "modules/memory/builders/result_column_builder_fwd.h"
 #include "modules/memory/cache/column_register_fwd.h"
 #include "modules/memory/column_fwd.h"
@@ -24,7 +25,8 @@ class result_column_builder {
    */
   virtual memory::column_t build_cache_column(const memory::cache::column_register& column_register,
                                               const memory::column_processing_state& processing_state,
-                                              table_row_limit_t table_row_limit) = 0;
+                                              table_row_limit_t table_row_limit,
+                                              const common::execution_context& context) = 0;
 
   /**
    * Builds a temporary column which is not added to any cache.

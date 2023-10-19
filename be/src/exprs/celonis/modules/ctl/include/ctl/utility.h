@@ -6,6 +6,7 @@
 #include <functional>
 #include <future>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <thread>
 #include <type_traits>
@@ -74,6 +75,12 @@ template <typename T>
   } catch (...) {
     return std::nullopt;
   }
+}
+
+template <typename T>
+[[nodiscard]] bool is_subspan(std::span<T> outer, std::span<T> inner) {
+  std::less_equal<T*> leq{};
+  return leq(outer.data(), inner.data()) && leq(inner.data() + inner.size(), outer.data() + outer.size());
 }
 
 }  // namespace celonis::accelerator::ctl

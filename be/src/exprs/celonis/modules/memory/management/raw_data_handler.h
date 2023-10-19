@@ -27,7 +27,7 @@
 namespace celonis::accelerator::memory::management {
 
 template <typename T>
-class raw_data_handler : public data_handler {
+class raw_data_handler final : public data_handler {
  public:
   static constexpr const char* RAW_DATA_HANDLER_SWAP_IN_KEY = "RAW_DATA_HANDLER_SWAP_IN";
   static constexpr const char* RAW_DATA_HANDLER_SWAP_OUT_KEY = "RAW_DATA_HANDLER_SWAP_OUT";

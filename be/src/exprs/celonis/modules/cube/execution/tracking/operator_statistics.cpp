@@ -14,6 +14,19 @@
 
 namespace celonis::accelerator::cube::execution::tracking {
 
+format::json::json_object_t serialize_data_points(const resource_usage_data_points& data_points) {
+  format::json::json_object_t json{};
+  auto& working_memory{json["working_memory"]};
+  working_memory["estimated"] = data_points.working_memory.estimated;
+  working_memory["actual"] = data_points.working_memory.actual;
+  working_memory["ratio"] = data_points.working_memory.ratio();
+  auto& output_column_size{json["output_column_size"]};
+  output_column_size["estimated"] = data_points.output_column_size.estimated;
+  output_column_size["actual"] = data_points.output_column_size.actual;
+  output_column_size["ratio"] = data_points.output_column_size.ratio();
+  return json;
+}
+
 namespace {
 
 template <typename T>
@@ -92,6 +105,37 @@ void log_operator_telemetry(const stats_map_t& stats_map) {
   }
 }
 
+void log_operator_resource_usage(const stats_map_t& stats_map) {
+  for (const auto& [operator_key, stat] : stats_map) {
+    format::json::json_object_t json{};
+    auto& resource_usage{json["Operator_Resource_Usage"]};
+    resource_usage["operator"] = operator_key;
+    resource_usage["all_avg"] = serialize_data_points(stat.resource_usage.all_avg.get());
+
+    resource_usage["underestimated_working_memory_avg"] =
+        serialize_data_points(stat.resource_usage.underestimated_working_memory_avg.get());
+    resource_usage["underestimated_output_column_size_avg"] =
+        serialize_data_points(stat.resource_usage.underestimated_output_column_size_avg.get());
+
+    resource_usage["overestimated_working_memory_avg"] =
+        serialize_data_points(stat.resource_usage.overestimated_working_memory_avg.get());
+    resource_usage["overestimated_output_column_size_avg"] =
+        serialize_data_points(stat.resource_usage.overestimated_output_column_size_avg.get());
+
+    resource_usage["underestimated_working_memory_max"] =
+        serialize_data_points(stat.resource_usage.underestimated_working_memory_max.get());
+    resource_usage["underestimated_output_column_size_max"] =
+        serialize_data_points(stat.resource_usage.underestimated_output_column_size_max.get());
+
+    resource_usage["overestimated_working_memory_max"] =
+        serialize_data_points(stat.resource_usage.overestimated_working_memory_max.get());
+    resource_usage["overestimated_output_column_size_max"] =
+        serialize_data_points(stat.resource_usage.overestimated_output_column_size_max.get());
+
+    log::jinfo("Operator Resource Usage", json);
+  }
+}
+
 #ifndef CELOSTAR
 bool cmp(std::pair<std::string, size_t>& a, std::pair<std::string, size_t>& b) { return a.second > b.second; }
 
@@ -108,6 +152,60 @@ std::vector<std::pair<std::string, size_t>> sort_descending(const memory_stats_m
 #endif
 
 }  // namespace
+
+resource_usage_data_points averaged_resource_usage_data_points::add_data_points(
+    const resource_usage_data_points& data_points) {
+  resource_usage_data_points historical{get()};
+  ++count;
+  bool overflow_occurred{false};
+  overflow_occurred |=
+      __builtin_uaddl_overflow(sum.input_column_size, data_points.input_column_size, &sum.input_column_size);
+  overflow_occurred |= __builtin_uaddl_overflow(sum.working_memory.estimated, data_points.working_memory.estimated,
+                                                &sum.working_memory.estimated);
+  overflow_occurred |= __builtin_uaddl_overflow(sum.working_memory.actual, data_points.working_memory.actual,
+                                                &sum.working_memory.actual);
+  overflow_occurred |= __builtin_uaddl_overflow(
+      sum.output_column_size.estimated, data_points.output_column_size.estimated, &sum.output_column_size.estimated);
+  overflow_occurred |= __builtin_uaddl_overflow(sum.output_column_size.actual, data_points.output_column_size.actual,
+                                                &sum.output_column_size.actual);
+  if (overflow_occurred) [[unlikely]] {
+    count = 1;
+    sum = data_points;
+  }
+  return historical;
+}
+
+resource_usage_data_points averaged_resource_usage_data_points::get() const {
+  auto non_zero_count{count + static_cast<size_t>(count == 0)};
+  return {sum.input_column_size / non_zero_count,
+          {sum.working_memory.estimated / non_zero_count, sum.working_memory.actual / non_zero_count},
+          {sum.output_column_size.estimated / non_zero_count, sum.output_column_size.actual / non_zero_count}};
+}
+
+void max_resource_usage_data_points::add_data_points(const resource_usage_data_points& data_points) {
+  if (data_points.working_memory.actual > max.working_memory.actual ||
+      data_points.output_column_size.actual > max.output_column_size.actual) {
+    max = data_points;
+  }
+}
+
+resource_usage_data_points resource_usage_stats::add_data_points(const resource_usage_data_points& data_points) {
+  if (data_points.working_memory.estimated < data_points.working_memory.actual) {
+    underestimated_working_memory_avg.add_data_points(data_points);
+    underestimated_working_memory_max.add_data_points(data_points);
+  } else if (data_points.working_memory.estimated > data_points.working_memory.actual) {
+    overestimated_working_memory_avg.add_data_points(data_points);
+    overestimated_working_memory_max.add_data_points(data_points);
+  }
+  if (data_points.output_column_size.estimated < data_points.output_column_size.actual) {
+    underestimated_output_column_size_avg.add_data_points(data_points);
+    underestimated_output_column_size_max.add_data_points(data_points);
+  } else if (data_points.output_column_size.estimated > data_points.output_column_size.actual) {
+    overestimated_output_column_size_avg.add_data_points(data_points);
+    overestimated_output_column_size_max.add_data_points(data_points);
+  }
+  return all_avg.add_data_points(data_points);
+}
 
 void operator_statistics::add_invocation(const std::string& operator_key, const std::chrono::milliseconds time,
                                          const size_t peak_memory) {
@@ -158,6 +256,15 @@ void operator_statistics::add_telemetry_counter(const std::string& operator_key,
   }
 }
 
+std::optional<resource_usage_data_points> operator_statistics::report_resource_usage(
+    const std::string& operator_key, const resource_usage_data_points& data_points) {
+  const std::scoped_lock lock{mutex_};
+  if (auto* stat{add_or_get(stats_map_, operator_key)}; stat != nullptr) {
+    return stat->resource_usage.add_data_points(data_points);
+  }
+  return std::nullopt;
+}
+
 void operator_statistics::log_statistics_and_reset() {
   stats_map_t new_stats{};
   {
@@ -169,6 +276,7 @@ void operator_statistics::log_statistics_and_reset() {
     log_operator_statistics(new_stats);
     log_statistics_drill_down(new_stats);
     log_operator_telemetry(new_stats);
+    log_operator_resource_usage(new_stats);
   }
 }
 

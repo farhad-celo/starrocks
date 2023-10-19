@@ -8,13 +8,31 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
-#include "modules/common/case_aligned_range.h"
-#include "modules/common/for_each_group.h"
+#ifdef CELOSTAR
+#include "ctl/assert.h"
+#endif
 #include "modules/operators/process/inductive_miner/cut_strategy.h"
 
 namespace celonis::accelerator::operators::process {
 
 namespace {
+
+struct equivalence_relation {
+  explicit equivalence_relation(size_t num_elements) : ids_(num_elements) {
+    std::iota(begin(ids_), end(ids_), size_t{0});
+  }
+  void add(size_t i, size_t j) {
+    if (i == j) {
+      return;
+    }
+    const auto [min, max]{std::minmax(ids_.at(i), ids_.at(j))};
+    std::ranges::replace(ids_, max, min);
+  }
+  [[nodiscard]] std::span<const int64_t> mapping() const { return std::span<const int64_t>{ids_}; }
+
+ private:
+  std::vector<int64_t> ids_{};
+};
 
 /**
  * This function iterates over the dfg components which were discovered by the find sequence cut method and finds
@@ -73,28 +91,24 @@ namespace {
  *      - final new_vertex_component_mapping = [0,1,2,2,3,4]
  */
 bool contains_skippable_components(const std::vector<int64_t>& min_from, const std::vector<int64_t>& max_to) {
-  const bool has_inversion_max_to{!std::is_sorted(std::cbegin(max_to), std::cend(max_to))};
-  const bool has_inversion_min_from{!std::is_sorted(std::cbegin(min_from), std::cend(min_from))};
+  const bool has_inversion_max_to{!std::ranges::is_sorted(max_to)};
+  const bool has_inversion_min_from{!std::ranges::is_sorted(min_from)};
 
   return has_inversion_max_to || has_inversion_min_from;
 }
 
-void merge_component_with_pivot(const std::vector<size_t>& vertex_component_mapping,
-                                std::vector<size_t>& new_vertex_component_mapping, int64_t component_id_to_merge,
-                                int64_t pivot) {
+void merge_component_with_pivot(const std::vector<size_t>& vertex_component_mapping, int64_t component_id_to_merge,
+                                int64_t pivot, equivalence_relation& equiv) {
   // merge components component_id_to_merge and pivot
-  debug_assert(vertex_component_mapping.size() == new_vertex_component_mapping.size());
-  // std::transform could be used. Also, not even sure if we need vertex_component_mapping
   for (size_t offset{0}; offset < vertex_component_mapping.size(); ++offset) {
     if (ctl::cast<int64_t>(vertex_component_mapping[offset]) == component_id_to_merge) {
-      new_vertex_component_mapping[offset] = pivot;
+      equiv.add(vertex_component_mapping[offset], pivot);
     }
   }
 }
 
-void find_backward_dependent_nodes(const std::vector<size_t>& vertex_component_mapping,
-                                   std::vector<size_t>& new_vertex_component_mapping, std::vector<int64_t>& max_to,
-                                   int64_t pivot) {
+void find_backward_dependent_nodes(const std::vector<size_t>& vertex_component_mapping, std::vector<int64_t>& max_to,
+                                   int64_t pivot, equivalence_relation& equiv) {
   debug_assert(pivot < ctl::cast<int64_t>(max_to.size()));
 
   int64_t start_component{pivot - 1};
@@ -103,13 +117,12 @@ void find_backward_dependent_nodes(const std::vector<size_t>& vertex_component_m
   }
   for (int64_t component{start_component + 1}; component < pivot; component++) {
     debug_assert(component != pivot);
-    merge_component_with_pivot(vertex_component_mapping, new_vertex_component_mapping, component, pivot);
+    merge_component_with_pivot(vertex_component_mapping, component, pivot, equiv);
   }
 }
 
-void find_forward_dependent_nodes(const std::vector<size_t>& vertex_component_mapping,
-                                  std::vector<size_t>& new_vertex_component_mapping, std::vector<int64_t>& min_from,
-                                  int64_t pivot, int64_t dfg_count) {
+void find_forward_dependent_nodes(const std::vector<size_t>& vertex_component_mapping, std::vector<int64_t>& min_from,
+                                  int64_t pivot, int64_t dfg_count, equivalence_relation& equiv) {
   debug_assert(dfg_count == ctl::cast<int64_t>(min_from.size()));
 
   // walk forward to find dependent nodes
@@ -120,14 +133,14 @@ void find_forward_dependent_nodes(const std::vector<size_t>& vertex_component_ma
   }
   for (int64_t component{pivot + 1}; component < end_component - 1; component++) {
     debug_assert(component != pivot);
-    merge_component_with_pivot(vertex_component_mapping, new_vertex_component_mapping, component, pivot);
+    merge_component_with_pivot(vertex_component_mapping, component, pivot, equiv);
   }
 }
 
 std::vector<size_t> search_and_process_pivots(std::vector<int64_t>& max_to, std::vector<int64_t>& min_from,
                                               std::vector<bool>& has_skipping_edges,
                                               const std::vector<size_t>& vertex_component_mapping, int64_t dfg_count) {
-  std::vector<size_t> new_vertex_component_mapping{vertex_component_mapping};
+  equivalence_relation equiv{ctl::cast<size_t>(dfg_count)};
 
   for (int64_t current_component{0}; current_component < dfg_count; current_component++) {
     /*
@@ -137,12 +150,12 @@ std::vector<size_t> search_and_process_pivots(std::vector<int64_t>& max_to, std:
      * find_backward_dependent_nodes. We keep both direction anyhow because we believe that there must have been good
      * reason to include it in ProM and the version described in Sander's thesis contains both directions
      */
-    auto prev_component{current_component - 1};
     // backward pivot
-    if (current_component >= 1 && has_skipping_edges[current_component] &&
-        max_to[prev_component] == current_component) {
+    if (const auto prev_component{current_component - 1}; current_component >= 1 &&
+                                                          has_skipping_edges[current_component] &&
+                                                          max_to[prev_component] == current_component) {
       // walk backward to find dependent nodes
-      find_backward_dependent_nodes(vertex_component_mapping, new_vertex_component_mapping, max_to, current_component);
+      find_backward_dependent_nodes(vertex_component_mapping, max_to, current_component, equiv);
     }
 
     // forward pivot
@@ -150,10 +163,12 @@ std::vector<size_t> search_and_process_pivots(std::vector<int64_t>& max_to, std:
     if (current_component < dfg_count - 1 && has_skipping_edges[current_component] &&
         min_from[next_component] == current_component) {
       // forward pivot found
-      find_forward_dependent_nodes(vertex_component_mapping, new_vertex_component_mapping, min_from, current_component,
-                                   dfg_count);
+      find_forward_dependent_nodes(vertex_component_mapping, min_from, current_component, dfg_count, equiv);
     }
   }
+  std::vector<size_t> new_vertex_component_mapping(vertex_component_mapping.size());
+  std::ranges::transform(vertex_component_mapping, begin(new_vertex_component_mapping),
+                         [map = equiv.mapping()](auto component) { return map[component]; });
   return new_vertex_component_mapping;
 }
 
@@ -235,10 +250,9 @@ std::vector<splittable_eventlog> compute_sub_eventlogs(inductive_miner_config& m
                                                        const directly_follows_graph& old_dfg, const cut_t& cut,
                                                        const common::execution_context& context) {
   auto sub_eventlog_context{context.create_sub_context("max_seq_cut: compute sub-eventlogs", {})};
-  auto merged_cut{merge_optional(old_dfg, cut)};
   const auto activity_count{miner_config.eventlog().activity_domain_count()};
 
-  const auto& [dfg_count, vertex_mapping]{merged_cut};
+  const auto& [dfg_count, vertex_mapping]{cut};
   // Initialize the sub-graphs and create mappings from activity id to dfg id.
   const auto activity_dfg_mapping{cut_strategy::to_activity_dfg_map(cut, old_dfg, activity_count)};
   auto sub_eventlogs{miner_config.eventlog().split(activity_dfg_mapping)};
@@ -360,6 +374,19 @@ max_seq_cut::apply_result max_seq_cut::apply(inductive_miner_config& miner_confi
                                              const cube::execution::tracking::stop_token& stop_token) {
   auto apply_context{context.create_sub_context("max_seq_cut::apply", {})};
   auto merged_cut{merge_optional(old_dfg, cut)};
+
+  /**
+   * CPL-10426
+   *
+   * We observed an issue in production where the IM is stuck in the max_seq_cut. It was found that the number of
+   * DFGs in the found cut was equal to one. Therefore we suspect we might be stuck in a loop where we merge the cut
+   * an can apply max_seq_cut on it again. The if statement below detects this case and uses the old cut rather than
+   * the merged cut with a single dfg in that case.
+   */
+  if (const auto& [dfg_count, _]{merged_cut}; dfg_count == 1) {
+    merged_cut = cut;
+  }
+
   stop_token.stop_execution_if_requested();
   auto sub_eventlogs{compute_sub_eventlogs(miner_config, old_dfg, merged_cut, context)};
   auto sub_dfgs{get_sub_dfs_from_old_dfg(old_dfg, merged_cut)};

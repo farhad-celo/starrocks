@@ -27,11 +27,6 @@ class source_location final {
    * @brief returns the pure file name (without absolute full path) for this instance
    */
   [[nodiscard]] constexpr const char* file_name_without_path() const noexcept;
-  /**
-   * @brief returns the hex-string representation of the FNV-1a hashed file name (without path)
-   * @note for a DEBUG build, the clear (user readable) file name is returned
-   */
-  [[nodiscard]] std::string hash_file_name() const;
 
  private:
   std::experimental::source_location source_location_;
@@ -67,6 +62,6 @@ struct fmt::formatter<celonis::accelerator::ctl::source_location> {
   /** Custom {fmt} formatter. Will output the source location in the format: [hashed file name]:[line number] */
   template <typename FormatContext>
   auto format(const celonis::accelerator::ctl::source_location& src, FormatContext& ctx) {
-    return fmt::format_to(ctx.out(), "{0}:{1}", src.hash_file_name(), src.line());
+    return fmt::format_to(ctx.out(), "{0}:{1}", src.file_name_without_path(), src.line());
   }
 };

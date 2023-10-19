@@ -6,6 +6,9 @@
 #include <span>
 
 #include <bytell_hash_map.hpp>
+#include <tbb/blocked_range.h>
+#include <tbb/combinable.h>
+#include <tbb/parallel_for.h>
 
 #include "ctl/assert.h"
 #include "ctl/interval.h"
@@ -65,6 +68,10 @@ class range_map {
 
   [[nodiscard]] std::tuple<offsets_t, elements_t> release_data() && {
     return std::make_tuple(std::move(offsets_), std::move(elements_));
+  }
+
+  [[nodiscard]] std::pair<offsets_allocator_type, elements_allocator_type> get_allocators() {
+    return {offsets_.get_allocator(), elements_.get_allocator()};
   }
 
  private:
@@ -202,10 +209,8 @@ class range_map_histogram {
       : values_{
             make_static_array_value_init<IDX_TYPE>(static_cast<std::size_t>(size) + 1, reason, std::move(allocator))} {}
 
- private:
   explicit range_map_histogram(static_array<IDX_TYPE> values) : values_{std::move(values)} {}
 
- public:
   range_map_histogram copy() { return range_map_histogram<IDX_TYPE>{values_.copy()}; }
 
   void inc(std::size_t idx) noexcept { ++values_[idx + 1]; }
@@ -370,51 +375,5 @@ class ordered_range_map_builder {
   IDX_TYPE curr_key_{0};
   IDX_TYPE curr_offset_{0};
 };
-
-/**
- * This method creates a transitive map, e.g. input [A->B, B->C, B->D] creates output A->C, A->D
- * It can throw std::runtime_error, if the size of the results exceeds numeric_limits
- * In case of
- *    ___ 1 ____
- *  /           \
- * A ---- 2 ---- A1
- * B ---- 3 ---- B1
- *  \____ 4 ____/
- *  which has the input [A->1, A->2, B->3, B->4 and 1->A1, 2->A1, 3-> B1, 4-> B1]
- *  and it produces the output [A->A1, B->B1]
- */
-template <typename IDX_TYPE>
-range_map<IDX_TYPE, IDX_TYPE> create_transitive_map(const range_map<IDX_TYPE, IDX_TYPE>& source_range_map,
-                                                    const range_map<IDX_TYPE, IDX_TYPE>& target_range_map) {
-  range_map_histogram<IDX_TYPE> histogram{source_range_map.index_count(), ALLOC_MSG(TEMPORARY_STORAGE_MSG)};
-  std::size_t total_result_size{0};
-  for (IDX_TYPE i{0}; i < source_range_map.index_count(); ++i) {
-    ska::bytell_hash_set<IDX_TYPE> distinct_values{};
-    for (IDX_TYPE j : source_range_map.get_span(i)) {
-      for (IDX_TYPE k : target_range_map.get_span(j)) {
-        distinct_values.insert(k);
-      }
-    }
-    histogram[i] += static_cast<IDX_TYPE>(distinct_values.size());
-    total_result_size += distinct_values.size();
-  }
-  if (total_result_size > std::numeric_limits<IDX_TYPE>::max()) {
-    throw std::range_error{fmt::format("The size [{}] of the transitive map exceeds maximum amount [{}].",
-                                       total_result_size, std::numeric_limits<IDX_TYPE>::max())};
-  }
-  range_map_builder<IDX_TYPE, IDX_TYPE> map_builder{std::move(histogram), ALLOC_MSG(TEMPORARY_STORAGE_MSG)};
-
-  for (IDX_TYPE i{0}; i < source_range_map.index_count(); ++i) {
-    ska::bytell_hash_set<IDX_TYPE> distinct_values{};
-    for (IDX_TYPE j : source_range_map.get_span(i)) {
-      for (IDX_TYPE k : target_range_map.get_span(j)) {
-        if (distinct_values.insert(k).second) {
-          map_builder.add_element(i, k);
-        }
-      }
-    }
-  }
-  return std::move(map_builder).to_range_map();
-}
 
 }  // namespace celonis::accelerator::ctl

@@ -3,7 +3,6 @@
 #include <string_view>
 #include <utility>
 
-#include "align_model.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context_fwd.h"
 #ifndef CELOSTAR
@@ -15,6 +14,7 @@
 #include "modules/memory/table_group.h"
 #include "modules/operators/framework/table_group_node.h"
 #endif
+#include "modules/operators/process/align_model/align_model.h"
 
 namespace celonis::accelerator {
 
@@ -70,13 +70,15 @@ public:
   create_align_model_tables(memory::column_t activity_column, memory::column_t case_column, memory::table_t case_table,
                             memory::join_projection_vector_t activity_to_case_join,
                             cube::variant_trace_cache_manager* variant_trace_cache_manager,
-                            const BpmnModelDescription& model_description)
+                            const BpmnModelDescription& model_description,
+                            std::optional<alignment::log_aligner_config> log_aligner_cfg = std::nullopt)
       : activity_column_{std::move(activity_column)},
         case_column_{std::move(case_column)},
         case_table_{std::move(case_table)},
         activity_to_case_join_{std::move(activity_to_case_join)},
         variant_trace_cache_manager_{variant_trace_cache_manager},
-        model_description_{model_description} {}
+        model_description_{model_description},
+        log_aligner_cfg_{std::move(log_aligner_cfg)} {}
 
   [[nodiscard]] memory::table_group_t operate(const common::execution_context& context);
 
@@ -87,16 +89,19 @@ private:
   memory::join_projection_vector_t activity_to_case_join_;
   cube::variant_trace_cache_manager* variant_trace_cache_manager_;
   const BpmnModelDescription& model_description_;
+  std::optional<alignment::log_aligner_config> log_aligner_cfg_;
 #else
  public:
   create_align_model_tables(cube::query_scope& scope, memory::column_t activity_column, memory::column_t case_column,
                             const BpmnModelDescription& model_description,
-                            cube::execution::tracking::add_telemetry_counter_fn add_telemetry_counter)
+                            cube::execution::tracking::add_telemetry_counter_fn add_telemetry_counter,
+                            std::optional<alignment::log_aligner_config> log_aligner_cfg = std::nullopt)
       : scope_{scope},
         activity_column_{std::move(activity_column)},
         case_column_{std::move(case_column)},
         model_description_{model_description},
-        add_telemetry_counter_{std::move(add_telemetry_counter)} {}
+        add_telemetry_counter_{std::move(add_telemetry_counter)},
+        log_aligner_cfg_{std::move(log_aligner_cfg)} {}
 
   [[nodiscard]] memory::table_group_t operator()([[maybe_unused]] cube::cube_data_model& data_model,
                                                  const memory::management::swap_info& sinfo,
@@ -108,6 +113,7 @@ private:
   memory::column_t case_column_;
   const BpmnModelDescription& model_description_;
   cube::execution::tracking::add_telemetry_counter_fn add_telemetry_counter_;
+  std::optional<alignment::log_aligner_config> log_aligner_cfg_;
 #endif
 };
 

@@ -30,13 +30,17 @@ class global_memory_consumption_tracker final {
    */
   [[nodiscard]] std::size_t cur_net_allocated() const noexcept;
   /**
+   * @brief Return the size of the currently allocated metatada
+   */
+  [[nodiscard]] std::size_t cur_metadata_allocated() const noexcept;
+  /**
    * @brief Register an allocation
    */
-  void register_allocation(std::size_t size) noexcept;
+  void register_allocation(std::size_t size, bool as_metadata = false) noexcept;
   /**
    * @brief Deregister an allocation
    */
-  void deregister_allocation(std::size_t size) noexcept;
+  void deregister_allocation(std::size_t size, bool as_metadata = false) noexcept;
   /**
    * @brief Register a batched tracker
    */
@@ -67,6 +71,7 @@ class global_memory_consumption_tracker final {
   global_memory_consumption_tracker() noexcept = default;
   std::mutex update_lock;
   std::atomic<std::size_t> net_allocated_{0};
+  std::atomic<std::size_t> metadata_allocated_{0};
   std::atomic<std::size_t> static_process_size_{0};
   std::atomic<std::size_t> active_query_count_{0};
   std::atomic<std::size_t> batched_tracker_count_{0};

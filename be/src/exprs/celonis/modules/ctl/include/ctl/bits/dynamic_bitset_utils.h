@@ -109,7 +109,7 @@ inline static constexpr bs_value_type bits_set_in_range(const bs_bit_index_in_bl
 /**
  * @brief utility function to calculate the block number based on the size of bits
  */
-inline static constexpr bs_block_index_type calc_number_of_blocks(size_t size) noexcept {
+inline static constexpr bs_block_index_type calc_number_of_bitset_blocks(size_t size) noexcept {
   if (size == 0) {
     return 0;
   }

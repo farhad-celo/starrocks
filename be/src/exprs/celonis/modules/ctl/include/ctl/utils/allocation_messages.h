@@ -64,4 +64,12 @@ static constexpr std::string_view NFA_TO_DFA_ALL_DFA_STATES_MSG{
 static constexpr std::string_view EXECUTE_LIKE_ON_ARRAY_MSG{
     "Allocation for execute like on array"};  // NOLINT(cert-err58-cpp)
 
+// Allocation reasons for the memory checked containers in the alignment
+static constexpr std::string_view ENABLED_TRANSITIONS_CACHE{
+    "Allocation for Petri net's enabled transitions cache"};  // NOLINT(cert-err58-cpp)
+static constexpr std::string_view PATHS_TO_TRANSITION_CACHE{
+    "Allocation for Petri net's marking to transition path cache"};  // NOLINT(cert-err58-cpp)
+static constexpr std::string_view PATHS_TO_MARKING_CACHE{
+    "Allocation for Petri net's marking to marking path cache"};  // NOLINT(cert-err58-cpp)
+
 }  // namespace celonis::accelerator::ctl

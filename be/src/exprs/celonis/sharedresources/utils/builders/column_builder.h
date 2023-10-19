@@ -9,6 +9,7 @@
 #include <bytell_hash_map.hpp>
 
 #include "modules/common/buffer_types.h"
+#include "modules/common/execution_context.h"
 #include "modules/memory/builders/temp_column_builder.h"
 #include "modules/memory/column.h"
 #include "modules/memory/table.h"
@@ -76,7 +77,7 @@ class column_builder {
     size(input.size());
     for (size_t i = 0; i < input.size(); ++i) {
       data_array_[i] = input[i].get_or_default();
-      (*null_flags_)[i] = input[i].is_null();
+      null_flags_->set(i, input[i].is_null());
     }
     data_set_ = true;
     return *this;
@@ -86,7 +87,7 @@ class column_builder {
     size(input.size());
     for (size_t i = 0; i < input.size(); ++i) {
       data_array_[i] = input[i];
-      (*null_flags_)[i] = false;
+      null_flags_->set(i, false);
     }
     data_set_ = true;
     return *this;
@@ -112,7 +113,7 @@ class column_builder {
       // Not using {}-init to allow narrowing conversion (for now, as it affects a lot of tests)
       utils::nullable_pql_value<T> value(f(i));
       data_array_[i] = value.get_or_default();
-      (*null_flags_)[i] = value.is_null();
+      null_flags_->set(i, value.is_null());
     }
     data_set_ = true;
     return *this;
@@ -168,6 +169,12 @@ class column_builder {
     return result;
   }
 
+  memory::column_t build_dictified() {
+    memory::column_t result{build()};
+    std::ignore = result->get_dict(common::execution_context{});  // force dictification
+    return result;
+  }
+
   memory::column_t build_and_add_to_owner() {
     if (owner_ == nullptr) {
       throw std::runtime_error{"owner is not set."};
@@ -176,6 +183,12 @@ class column_builder {
                                    memory::col_cache_key{cache_key_}, std::move(data_array_), null_flags_, state_,
                                    memory::MAX_TABLE_ROW_LIMIT)};
     reset();
+    return result;
+  }
+
+  memory::column_t build_dictified_and_add_to_owner() {
+    memory::column_t result{build_and_add_to_owner()};
+    std::ignore = result->get_dict(common::execution_context{});  // force dictification
     return result;
   }
 
@@ -249,7 +262,7 @@ class column_builder<cel_string_t> {
     size(input.size());
     for (size_t i = 0; i < input.size(); ++i) {
       const bool is_null{input[i].is_null()};
-      (*null_flags_)[i] = is_null;
+      null_flags_->set(i, is_null);
       if (!is_null) {
         data_array_[i] = input[i].get_or_throw();
       }
@@ -262,7 +275,7 @@ class column_builder<cel_string_t> {
     size(input.size());
     for (size_t i = 0; i < input.size(); ++i) {
       data_array_[i] = input[i];
-      (*null_flags_)[i] = false;
+      null_flags_->set(i, false);
     }
     data_set_ = true;
     return *this;
@@ -287,7 +300,7 @@ class column_builder<cel_string_t> {
     for (row_id i = 0; i < data_size_; ++i) {
       // Not using {}-init to allow narrowing conversion (for now, as it affects a lot of tests)
       utils::nullable_pql_value<cel_string_t> value(f(i));
-      (*null_flags_)[i] = value.is_null();
+      null_flags_->set(i, value.is_null());
       if (!value.is_null()) {
         data_array_[i] = value.get_or_throw();
       }
@@ -355,6 +368,12 @@ class column_builder<cel_string_t> {
     return result;
   }
 
+  memory::column_t build_dictified() {
+    memory::column_t result{build()};
+    std::ignore = result->get_dict(common::execution_context{});  // force dictification
+    return result;
+  }
+
   memory::column_t build_and_add_to_owner() {
     if (owner_ == nullptr) {
       throw std::runtime_error{"owner is not set."};
@@ -366,6 +385,12 @@ class column_builder<cel_string_t> {
                                           memory::col_cache_key{cache_key_}, std::move(buf_result.ptrs),
                                           std::move(buf_result.string_buf), null_flags_, memory::MAX_TABLE_ROW_LIMIT)};
     reset();
+    return result;
+  }
+
+  memory::column_t build_dictified_and_add_to_owner() {
+    memory::column_t result{build_and_add_to_owner()};
+    std::ignore = result->get_dict(common::execution_context{});  // force dictification
     return result;
   }
 

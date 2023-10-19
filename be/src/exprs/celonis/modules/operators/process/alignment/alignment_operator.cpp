@@ -2,13 +2,10 @@
 
 #include <algorithm>
 #include <memory>
-#include <numeric>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 
-#include <boost/iterator/zip_iterator.hpp>
-#include <boost/tuple/tuple.hpp>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
@@ -33,28 +30,11 @@
 #include "modules/memory/merge_dictionaries.h"
 #include "modules/memory/table.h"
 #include "modules/memory/tracking/static_array_with_context_tracking.h"
-#include "modules/operators/process/alignment/align_synchronous_product.h"
 #include "modules/operators/process/alignment/alignment_statistics.h"
-#include "modules/operators/process/alignment/compute_fitting_solution.h"
-#include "modules/operators/process/alignment/gap_filler.h"
-#include "modules/operators/process/alignment/input_output_mapper.h"
 #include "modules/operators/process/alignment/log_aligner.h"
 #include "modules/operators/process/alignment/log_alignment_result.h"
 #include "modules/operators/process/alignment/log_alignment_result_cache.h"
-#include "modules/operators/process/alignment/petri_net/a_star/inconsistent_path_construction.h"
-#include "modules/operators/process/alignment/petri_net/a_star/iterative_a_star.h"
-#include "modules/operators/process/alignment/petri_net/a_star/petri_net_wrapper.h"
-#include "modules/operators/process/alignment/petri_net/a_star/shortest_path_heuristic.h"
-#include "modules/operators/process/alignment/petri_net/a_star/synchronous_product.h"
-#include "modules/operators/process/alignment/petri_net/a_star/synchronous_product_heuristic.h"
-#include "modules/operators/process/alignment/petri_net/a_star/synchronous_product_path_construction.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_conversion.h"
-#include "modules/operators/process/alignment/petri_net_information.h"
-#include "modules/operators/process/alignment/relaxation_labeling.h"
-#include "modules/operators/process/alignment/rl_align_configs.h"
-#include "modules/operators/process/alignment/rl_statistics/optimal_alignment_set_cover.h"
-#include "modules/operators/process/alignment/rl_statistics/top_constraints.h"
 #include "modules/operators/process/alignment/trace_alignment.h"
 
 namespace celonis::accelerator::operators::process::alignment {
@@ -124,26 +104,6 @@ struct exec_compute_join_vector {
 
     row_id previous_projected_case{-1};
     size_t join_column_index{0};
-    row_id current_variant_id{0};
-
-    // Offset on the alignment itself
-    row_id current_alignment_offset{0};
-    auto current_alignment_size{static_cast<row_id>(alignments[current_variant_id].size())};
-
-    // TODO (goulart.e) the sequence of offsets w.r.t. the activity joins can be calculated per variant
-    auto add_subsequent_model_moves_lmb{[&](auto event_id, auto& join) {
-      while (current_alignment_offset < current_alignment_size) {
-        const auto& move{alignments[current_variant_id].data()[current_alignment_offset]};
-
-        if (move.is_model()) {
-          join[static_cast<std::ptrdiff_t>(join_column_index)] = event_id;
-          ++join_column_index;
-          ++current_alignment_offset;
-        } else {
-          break;
-        }
-      }
-    }};
 
     memory::cast_execute_join(
         [&](auto& join) {
@@ -153,30 +113,36 @@ struct exec_compute_join_vector {
             if (activity_column_ptrs_ac[i] == 0) {
               continue;
             }
-
-            // Add alignment rows joined to this activity
-            const auto event_id{static_cast<join_type_t>(i)};
-
             const auto current_projected_case{projection_vector[i]};
             if (current_projected_case == VALUE_NOT_FOUND) {
               continue;
             }
+
+            // TODO (goulart.e) the sequence of offsets w.r.t. the activity joins can be calculated per variant
             if (current_projected_case != previous_projected_case) {
-              // New case starts. Get the corresponding alignment and reset other infos
+              // New case starts. Get the corresponding alignment
               previous_projected_case = current_projected_case;
-              current_variant_id = variant_ids_ac[current_projected_case];
-              current_alignment_offset = 0;
-              current_alignment_size = static_cast<row_id>(alignments[current_variant_id].size());
+              auto current_variant_id{variant_ids_ac[current_projected_case]};
+              // If the current alignment is empty, we skip the output for this case
+              if (!alignments.at(current_variant_id).has_value()) {
+                continue;
+              }
 
-              // Add model moves at the start of variant (if any)
-              add_subsequent_model_moves_lmb(event_id, join);
+              bool has_passed_first_move_on_log{false};
+              for (const auto& move : alignments.at(current_variant_id).value().data()) {
+                // After the first move on log, we increment i for each move on log that we see
+                if (has_passed_first_move_on_log && !move.is_model()) {
+                  do {
+                    ++i;
+                  } while (activity_column_ptrs_ac[i] == 0);
+                }
+                has_passed_first_move_on_log = has_passed_first_move_on_log || move.is_move_on_log();
+
+                const auto event_id{static_cast<join_type_t>(i)};
+                join[static_cast<std::ptrdiff_t>(join_column_index)] = event_id;
+                ++join_column_index;
+              }
             }
-
-            // Add current activity plus subsequence model moves
-            join[static_cast<std::ptrdiff_t>(join_column_index)] = event_id;
-            ++join_column_index;
-            ++current_alignment_offset;
-            add_subsequent_model_moves_lmb(event_id, join);
           }
         },
         join_column);
@@ -200,10 +166,10 @@ struct exec_compute_join_vector {
 
       current_case = projection_vector[i];
       const auto variant_id{variant_ids_ac[current_case]};
-      if (variant_id == 0) {
+      if (variant_id == 0 || !alignments.at(variant_id).has_value()) {
         continue;
       }
-      alignment_table_count += alignments[variant_id].size();
+      alignment_table_count += alignments.at(variant_id).value().size();
     }
 
     if (alignment_table_count > static_cast<size_t>(ROW_ID_MAX)) {
@@ -274,7 +240,9 @@ class pruned_to_full_variant_mapper {
         const auto pruned_variant_id{variant_to_pruned_variant_map_[i]};
         const auto& pruned_alignment{pruned_alignments[pruned_variant_id]};
 
-        alignments.at(i) = fill_unmapped_log_moves(pruned_alignment, trace, trace_length);
+        if (pruned_alignment) {
+          alignments.at(i) = fill_unmapped_log_moves(pruned_alignment.value(), trace, trace_length);
+        }
       }
     });
 
@@ -355,7 +323,7 @@ alignment_operator::alignment_operator(memory::column_t activity_column, memory:
                                        const cube::event_table_config* event_config,
                                        operators::process::alignment::log_alignment_result_cache& log_alignment_cache,
                                        const RLAlignOperatorNode& node, cube::query_scope& scope,
-                                       common::execution_context& operator_context, int num_a_star_iterations,
+                                       common::execution_context& operator_context, log_aligner_config log_aligner_cfg,
                                        cube::execution::tracking::add_telemetry_counter_fn add_telemetry_counter)
     : activity_column_{std::move(activity_column)},
       pruned_activity_column_{std::move(pruned_activity_column)},
@@ -371,10 +339,9 @@ alignment_operator::alignment_operator(memory::column_t activity_column, memory:
       log_alignment_cache_{log_alignment_cache},
       event_config_{event_config},
       node_{node},
-      rl_align_cfg_{make_default_rl_align_config()},
+      log_aligner_cfg_{std::move(log_aligner_cfg)},
       scope_{scope},
       column_cache_key_{get_user_facing_name(node_)},
-      num_a_star_iterations_{num_a_star_iterations},
       add_telemetry_counter_{std::move(add_telemetry_counter)} {
   if (!this->variant_column_) {
     throw common::internal_exception{"ALIGN: Invalid variant column."};
@@ -455,10 +422,11 @@ log_alignment_result_t alignment_operator::calculate_log_alignment(const std::st
         keep_transitions.emplace(transition_str_id);
       }
     }
-    auto [pruned_alignments, stats,
-          _]{compute_alignments(pn_repr, keep_transitions, pruned_variant_cache_, pruned_dict_mapping,
-                                num_a_star_iterations_, rl_align_cfg_, operator_context, user_facing_name)};
+    auto aligner{log_aligner_wrapper::create(pn_repr, keep_transitions, pruned_dict_mapping, log_aligner_cfg_,
+                                             operator_context, user_facing_name)};
+    auto [pruned_alignments, _]{aligner(pruned_variant_cache_, operator_context, user_facing_name)};
     const auto distinct_variants_count{variant_cache_->get_num_traces()};
+    auto stats{aligner.statistics()};
     stats.variant_count = distinct_variants_count;
 
     auto variant_to_pruned_variant_map{memory::cast_execute_column_pointers(
@@ -491,15 +459,16 @@ alignment_operator_node::alignment_operator_node(
     operator_node* activity_column_operator_node, operator_node* pruned_activity_column_operator_node,
     operator_node* variant_column_operator_node, operator_node* pruned_variant_column_operator_node,
     log_alignment_result_cache& log_alignment_cache, const RLAlignOperatorNode& node, cube::query_scope& scope,
-    int num_a_star_iterations, std::optional<cube::execution::tracking::add_telemetry_counter_fn> add_telemetry_counter)
+    log_aligner_config log_aligner_cfg,
+    std::optional<cube::execution::tracking::add_telemetry_counter_fn> add_telemetry_counter)
     : activity_column_operator_node_{activity_column_operator_node},
       pruned_activity_column_operator_node_{pruned_activity_column_operator_node},
       variant_column_operator_node_{variant_column_operator_node},
       pruned_variant_column_operator_node_{pruned_variant_column_operator_node},
       log_alignment_cache_{log_alignment_cache},
-      num_a_star_iterations_{num_a_star_iterations},
       node_{node},
       scope_{scope},
+      log_aligner_cfg_{std::move(log_aligner_cfg)},
       add_telemetry_counter_{std::move(add_telemetry_counter)} {}
 
 memory::column_t alignment_operator_node::do_execute(cube::execution::tracking::operator_tracker& tracker,
@@ -530,7 +499,7 @@ memory::column_t alignment_operator_node::do_execute(cube::execution::tracking::
                                                          node_,
                                                          scope_,
                                                          operator_context,
-                                                         num_a_star_iterations_,
+                                                         log_aligner_cfg_,
                                                          std::move(add_telemetry_counter)};
   return executor.cached_execute(oper, operator_context);
 }

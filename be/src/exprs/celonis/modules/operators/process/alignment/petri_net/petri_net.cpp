@@ -8,7 +8,7 @@
 #include "ctl/algorithm.h"
 #include "ctl/assert.h"
 #include "log/log.h"
-#include "modules/operators/process/alignment/rl_align_configs.h"
+#include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net {
 
@@ -19,7 +19,7 @@ namespace {
  * Initially marks all output places from node, then performs BFS to find transition T s.t. *T = cur_marking
  * - Check original code for a faster algorithm to compute splits
  */
-petri_net_transition_id compute_closing_join(petri_net_accessor& pn_accessor,
+petri_net_transition_id compute_closing_join(const petri_net_accessor& pn_accessor,
                                              const petri_net_transition& fork_transition, size_t max_depth) {
   // Initial marking are the output places of split
   auto current_marking{pn_accessor.get_marking(fork_transition.out_places)};
@@ -47,7 +47,7 @@ petri_net_transition_id compute_closing_join(petri_net_accessor& pn_accessor,
           return enabled_transition;
         }
 
-        const auto next_marking{pn_accessor.fire_transition(marking_to_expand, enabled_transition)};
+        const auto next_marking{pn_accessor.fire(marking_to_expand, enabled_transition)};
         if (!already_visited_marking_lmb(next_marking) && next_marking != current_marking) {
           next_round.emplace_back(next_marking);
           visited.insert(next_marking);
@@ -127,7 +127,8 @@ std::pair<size_t, size_t> petri_net_representation::count_labels() const {
  *      If has_path, then is a loop. If add_loop_cutoffs, then reconnect
  *  Mark leaf to be removed
  */
-petri_net_representation reconnect_unfolding(const unfolding_representation& unf_repr, unfolding_config unf_config) {
+petri_net_representation reconnect_unfolding(const unfolding_representation& unf_repr,
+                                             rl_align::unfolding_config unf_config) {
   petri_net_representation reconnected_unfolding{unf_repr.petri_net_repr};
   std::unordered_multimap<std::string, std::string> to_redirect{};
 
@@ -205,13 +206,13 @@ bool petri_net_accessor::is_transition_enabled(const marking_type& marking, petr
                      [&marking](const auto& in_place) { return marking.test(in_place.id); });
 }
 
-marking_type petri_net_accessor::fire_transition(const marking_type& marking, petri_net_transition_id transition) {
+marking_type petri_net_accessor::fire(const marking_type& marking, petri_net_transition_id transition) const {
   auto ret{marking};
-  fire_transition_no_alloc(ret, transition);
+  fire_no_alloc(ret, transition);
   return ret;
 }
 
-void petri_net_accessor::fire_transition_no_alloc(marking_type& marking, petri_net_transition_id transition) {
+void petri_net_accessor::fire_no_alloc(marking_type& marking, petri_net_transition_id transition) const {
   const auto& pn_transition{pn_data_.pn_transitions[transition.id]};
 
   for (const auto& in_place : pn_transition.in_places) {
@@ -229,15 +230,13 @@ void petri_net_accessor::fire_transition_no_alloc(marking_type& marking, petri_n
   }
 }
 
-marking_type petri_net_accessor::fire_transition_inverse(const marking_type& marking,
-                                                         petri_net_transition_id transition) const {
+marking_type petri_net_accessor::fire_inverse(const marking_type& marking, petri_net_transition_id transition) const {
   auto ret{marking};
-  fire_transition_inverse_no_alloc(ret, transition);
+  fire_inverse_no_alloc(ret, transition);
   return ret;
 }
 
-void petri_net_accessor::fire_transition_inverse_no_alloc(marking_type& marking,
-                                                          petri_net_transition_id transition) const {
+void petri_net_accessor::fire_inverse_no_alloc(marking_type& marking, petri_net_transition_id transition) const {
   const auto& pn_transition{pn_data_.pn_transitions[transition.id]};
 
   for (const auto& out_place : pn_transition.out_places) {
@@ -274,16 +273,19 @@ petri_net_accessor::transition_list_type compute_enabled_transitions(
   return enabled_transitions;
 }
 
-petri_net_accessor::transition_list_type petri_net_accessor::get_enabled_transitions(const marking_type& marking) {
+petri_net_accessor::transition_span_type petri_net_accessor::get_enabled_transitions(
+    const marking_type& marking) const {
   const auto cached_result{enabled_transitions_cache_.find(marking)};
   if (cached_result != enabled_transitions_cache_.end()) {
-    return transition_list_type(begin(cached_result->second), end(cached_result->second));
+    return transition_span_type(begin(cached_result->second), end(cached_result->second));
   }
 
   auto enabled_transitions{compute_enabled_transitions(pn_data_.pn_transitions, marking)};
-  enabled_transitions_cache_.emplace(std::piecewise_construct, std::forward_as_tuple(marking),
-                                     std::tuple{std::cbegin(enabled_transitions), std::cend(enabled_transitions)});
-  return enabled_transitions;
+  auto [entry, _]{enabled_transitions_cache_.emplace(marking, tracked_transition_list_type{})};
+  entry->second.reserve(enabled_transitions.size());
+  entry->second.insert(std::begin(entry->second), std::begin(enabled_transitions), std::end(enabled_transitions));
+
+  return transition_span_type{std::begin(entry->second), std::end(entry->second)};
 }
 
 size_t petri_net_accessor::get_max_transition_id() const { return pn_data_.pn_transitions.size(); }
@@ -360,14 +362,16 @@ std::vector<petri_net_place_id> petri_net_accessor::get_marked_place_ids(const m
 }
 
 petri_net_accessor::transition_list_type petri_net_accessor::get_silent_enabled_transitions(
-    const marking_type& marking) {
+    const marking_type& marking) const {
   // TODO(a.swoboda) there's probably a faster low-level implementation, but at least this is simple
-  auto result{get_enabled_transitions(marking)};
-  result.erase(std::remove_if(std::begin(result), std::end(result),
-                              [this](auto transition_id) {
-                                return !string_to_int_mapper::is_tau_transition(get_label(transition_id));
-                              }),
-               std::end(result));
+  const auto enabled_transitions{get_enabled_transitions(marking)};
+
+  transition_list_type result{};
+  result.reserve(enabled_transitions.size());
+  std::copy_if(
+      std::begin(enabled_transitions), std::end(enabled_transitions), std::back_inserter(result),
+      [this](auto transition_id) { return !string_to_int_mapper::is_tau_transition(get_label(transition_id)); });
+
   return result;
 }
 
@@ -454,47 +458,8 @@ void safe_petri_net_data::build_label_to_transitions_map() {
   }
 }
 
-std::pair<bool, petri_net_path_cache::path_t> petri_net_path_cache::path_to_transition(
-    const marking_type& src_marking, petri_net_transition_id tgt_transition) {
-  const auto marking_data{marking_to_transition_path_.find({tgt_transition, src_marking})};
-  if (marking_data != marking_to_transition_path_.end()) {
-    return {std::piecewise_construct, std::tuple{true},
-            std::tuple{begin(marking_data->second), end(marking_data->second)}};
-  }
-  return {false, {}};
-}
-
-void petri_net_path_cache::insert_path_to_transition(const marking_type& src_marking,
-                                                     petri_net_transition_id tgt_transition,
-                                                     const path_t& path_transitions) {
-  const auto marking_data{marking_to_transition_path_.find({tgt_transition, src_marking})};
-  if (marking_data == marking_to_transition_path_.end()) {
-    marking_to_transition_path_.try_emplace({tgt_transition, src_marking}, std::cbegin(path_transitions),
-                                            std::cend(path_transitions));
-  }
-}
-
-std::pair<bool, petri_net_path_cache::path_t> petri_net_path_cache::path_to_marking(const marking_type& src_marking,
-                                                                                    const marking_type& tgt_marking) {
-  const auto marking_data{marking_to_marking_path_.find({src_marking, tgt_marking})};
-  if (marking_data != marking_to_marking_path_.end()) {
-    return {std::piecewise_construct, std::tuple{true},
-            std::tuple{begin(marking_data->second), end(marking_data->second)}};
-  }
-  return {false, {}};
-}
-
-void petri_net_path_cache::insert_path_to_marking(const marking_type& src_marking, const marking_type& tgt_marking,
-                                                  const path_t& path_transitions) {
-  const auto marking_data{marking_to_marking_path_.find({src_marking, tgt_marking})};
-  if (marking_data == marking_to_marking_path_.end()) {
-    marking_to_marking_path_.try_emplace({src_marking, tgt_marking}, std::cbegin(path_transitions),
-                                         std::cend(path_transitions));
-  }
-}
-
 petri_net_accessor_with_parallel_sections::petri_net_parallel_sections
-petri_net_accessor_with_parallel_sections::petri_net_parallel_sections::compute(petri_net_accessor& pn_accessor) {
+petri_net_accessor_with_parallel_sections::petri_net_parallel_sections::compute(const petri_net_accessor& pn_accessor) {
   petri_net_parallel_sections ret{};
 
   for (const auto& pn_transition : pn_accessor.get_transitions()) {

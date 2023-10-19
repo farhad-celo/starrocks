@@ -481,10 +481,10 @@ pointer_data_handler<T>::~pointer_data_handler() {
     }
 
     common::call_and_log_unsafe_callable(
-        [this]() { sinfo_.storage_manager().deregister_file(pointer_swap_file_, sinfo_); },
+        [this]() { sinfo_.storage_manager().deregister_file(pointer_swap_file_, sinfo_, description()); },
         fmt::format("Couldn't deregister file: {}", pointer_swap_file_));
     common::call_and_log_unsafe_callable(
-        [this]() { sinfo_.storage_manager().deregister_file(buffer_swap_file_, sinfo_); },
+        [this]() { sinfo_.storage_manager().deregister_file(buffer_swap_file_, sinfo_, description()); },
         fmt::format("Couldn't deregister file: {}", buffer_swap_file_));
   }
 #endif
@@ -792,8 +792,8 @@ loaded_data<TYPE> pointer_data_handler<T>::swap_in_impl(
     const std::string& swap_file, std::atomic<size_t>& size, std::atomic<size_t>& size_on_disk,
     std::atomic<bool>& broken_swap_file) requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>) {
   try {
-    if (sinfo_.storage_manager().supports_storage() && !data_handler::swap_file_exists(swap_file, sinfo_)) {
-      log::error("could not find swap file {} for {} ", swap_file, desc_);
+    if (!data_handler::swap_file_exists(swap_file, sinfo_)) {
+      log::jerror("Could not find swap file.", {{"swap_file", swap_file}, {"description", desc_}});
       throw common::file_exception{"Could not find swap file: {}.", swap_file};
     }
     auto read_result{sinfo_.storage_manager().read_compressed_mt<TYPE>(swap_file, sinfo_, size_on_disk)};

@@ -37,7 +37,7 @@ using data_handler_data = std::variant<loaded_data<T>, io::compressed_data, swap
  * Storage for a list of pointers and the data to which the data points to.
  */
 template <typename T>
-class pointer_data_handler : public data_handler {
+class pointer_data_handler final : public data_handler {
  private:
   using POINTER_T = T;
   using STORAGE_T = std::remove_const_t<std::remove_pointer_t<T>>;

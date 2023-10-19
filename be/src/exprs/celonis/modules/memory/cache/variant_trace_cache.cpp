@@ -20,7 +20,9 @@ variant_trace_cache::variant_trace_cache(std::shared_ptr<management::pointer_dat
 
 variant_trace_cache::variant_view_t variant_trace_cache::variant_view_for_id(
     const variant_id_t variant_id, const common::execution_context& ctx) const {
-  common::runtime_assert(variant_id.get() < get_num_traces());
+  common::runtime_assert(variant_id.get() < get_num_traces(),
+                         "The given variant ID [{}] is invalid. Max valid ID is [{}].", variant_id.get(),
+                         get_num_traces());
   return {get_traces(ctx)[variant_id], get_trace_lengths(ctx)[variant_id]};
 }
 

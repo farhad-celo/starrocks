@@ -14,6 +14,7 @@
 #include <tbb/parallel_sort.h>
 
 #include "ctl/assert.h"
+#include "ctl/bitset_view.h"
 #include "ctl/hash.h"
 #include "ctl/static_array.h"
 #include "ctl/utils/allocation_messages.h"
@@ -22,7 +23,6 @@
 #include "modules/common/execution_context.h"
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
-#include "modules/memory/null_flags.h"
 #include "modules/memory/tracking/static_array_with_context_tracking.h"
 #include "modules/memory/transform/dictifier_types.h"
 
@@ -159,8 +159,7 @@ class parallel_hash_table {
    * @brief inserts all input elements and returns an array that maps every element of the input to a unique hash_entry.
    * Elements with the same key point to the same hash_entry.
    */
-  ctl::static_array<hash_entry*> batch_insert_or_get(std::span<const KEY_T> keys,
-                                                     const memory::null_flags_bitset_t& null_flags,
+  ctl::static_array<hash_entry*> batch_insert_or_get(std::span<const KEY_T> keys, const ctl::bitset_view_t null_flags,
                                                      const uint64_t max_num_hash_collisions_per_bucket = 100) {
     auto associated_entries{memory::tracking::make_static_array_for_overwrite<hash_entry*>(
         keys.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context_)};

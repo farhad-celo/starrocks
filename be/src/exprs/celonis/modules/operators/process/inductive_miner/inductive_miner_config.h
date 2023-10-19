@@ -44,16 +44,7 @@ class inductive_miner_config final {
   // All member functions below will be removed in a follow-up (CPL-9267)
   [[nodiscard]] bool is_for_eventlog_based_approach() const;
   [[nodiscard]] bool is_for_variant_based_approach() const;
-  void set_replay_input(tmp_replay_input replay_input) {
-    tmp_activity_and_case_column_for_eventlog_replay_ = std::move(replay_input);
-  }
-  [[nodiscard]] const tmp_replay_input& replay_input() const {
-    return tmp_activity_and_case_column_for_eventlog_replay_.value();
-  }
-  [[nodiscard]] bool should_do_replay_to_fix_counts() const {
-    return is_for_variant_based_approach() && tmp_activity_and_case_column_for_eventlog_replay_.has_value();
-  }
-  #endif
+#endif
 
  private:
   splittable_eventlog_config_t splittable_eventlog_config_;
@@ -61,10 +52,6 @@ class inductive_miner_config final {
   const common::execution_context& execution_context_;
   size_t grain_size_;
   dfg_filter_config filter_config_{};
-  #ifndef CELOSTAR
-  // Workaround until we implemented a true variant based replay in the next follow up
-  std::optional<tmp_replay_input> tmp_activity_and_case_column_for_eventlog_replay_{std::nullopt};
-  #endif
 };
 
 #ifndef CELOSTAR

@@ -28,11 +28,14 @@ void log_warning_if_swap_in_too_long(
     common::timer& timer_with_lock, common::timer& timer_after_lock, const std::string& description,
     std::chrono::system_clock::duration max_timer_with_lock_duration = SWAP_IN_MAX_DURATION);
 
-const std::string FILE_FORMAT_VERSION_SUFFIX = "4";                                   // NOLINT(cert-err58-cpp)
-const std::string DICT_ENDING = ".dic" + FILE_FORMAT_VERSION_SUFFIX;                  // NOLINT(cert-err58-cpp)
-const std::string COLUMN_PTR_ENDING = ".cp" + FILE_FORMAT_VERSION_SUFFIX;             // NOLINT(cert-err58-cpp)
-const std::string NULL_FLAGS_ENDING = ".np" + FILE_FORMAT_VERSION_SUFFIX;             // NOLINT(cert-err58-cpp)
-const std::string NULL_FLAGS_NEW_ENDING = ".nf" + FILE_FORMAT_VERSION_SUFFIX;         // NOLINT(cert-err58-cpp)
+const std::string FILE_FORMAT_VERSION_SUFFIX = "4";                            // NOLINT(cert-err58-cpp)
+const std::string DICT_ENDING = ".dic" + FILE_FORMAT_VERSION_SUFFIX;           // NOLINT(cert-err58-cpp)
+const std::string COLUMN_PTR_ENDING = ".cp" + FILE_FORMAT_VERSION_SUFFIX;      // NOLINT(cert-err58-cpp)
+const std::string NULL_FLAGS_ENDING = ".np" + FILE_FORMAT_VERSION_SUFFIX;      // NOLINT(cert-err58-cpp)
+const std::string NULL_FLAGS_NEW_ENDING = ".nf" + FILE_FORMAT_VERSION_SUFFIX;  // NOLINT(cert-err58-cpp)
+// A replacement format for the NULL_FLAGS_ENDING and NULL_FLAGS_NEW_ENDING, in which bitset
+// is stored in uint64 dense array instead of boolean array
+const std::string BITSET_ENDING = ".bs" + FILE_FORMAT_VERSION_SUFFIX;                 // NOLINT(cert-err58-cpp)
 const std::string MATERIALIZED_DATA_ENDING = ".data" + FILE_FORMAT_VERSION_SUFFIX;    // NOLINT(cert-err58-cpp)
 const std::string MATERIALIZED_DATA_NEW_ENDING = ".ri" + FILE_FORMAT_VERSION_SUFFIX;  // NOLINT(cert-err58-cpp)
 const std::string STRING_BUFFER_ENDING = ".bfr" + FILE_FORMAT_VERSION_SUFFIX;         // NOLINT(cert-err58-cpp)

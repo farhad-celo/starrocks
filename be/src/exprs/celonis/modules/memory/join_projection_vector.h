@@ -10,10 +10,33 @@
 
 namespace celonis::accelerator::memory {
 
+class identity_join_projection {
+ public:
+  identity_join_projection() = default;
+  explicit identity_join_projection(size_t size) : size_{size} {}
+
+  [[nodiscard]] row_id operator[](row_id index) const {
+    debug_assert(std::cmp_less(index, size()));
+    return index;
+  }
+  [[nodiscard]] row_id at(row_id index) const {
+    if (static_cast<size_t>(index) >= size()) [[unlikely]] {
+      throw ctl::out_of_range{"Index [{}] is out of bounds for join projection vector of size [{}].", index, size()};
+    }
+    return operator[](index);
+  }
+
+  [[nodiscard]] size_t size() const noexcept { return size_; }
+
+ private:
+  size_t size_{0};
+};
+
 using join_projection32_t = ctl::shared_static_array<const join_32_t>;
 using join_projection64_t = ctl::shared_static_array<const join_64_t>;
 
 using join_projection_vector_t = std::variant<join_projection32_t, join_projection64_t>;
+using pull_up_vector_t = std::variant<identity_join_projection, join_projection32_t, join_projection64_t>;
 
 template <typename FUNCTION, typename... PROJECTION_VECTOR>
 [[nodiscard]] decltype(auto) cast_execute_projection_vector(FUNCTION&& f, PROJECTION_VECTOR&&... projections) {

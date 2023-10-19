@@ -3,8 +3,11 @@
 #include <mutex>
 
 #include "ctl/memory/memory_tracking_strategy.h"
+#include "ctl/named_type.h"
 
 namespace celonis::accelerator::ctl {
+
+using register_as_metadata_t = ctl::named_type<bool, struct register_as_metadata_tag>;
 
 /**
  * A memory tracking strategy that will register allocations and de-register deallocations in the global memory
@@ -12,7 +15,9 @@ namespace celonis::accelerator::ctl {
  */
 class global_memory_tracking_strategy final : public memory_tracking_strategy {
  public:
-  explicit global_memory_tracking_strategy(abstract_strategy_t downstream_strategy = nullptr) noexcept;
+  explicit global_memory_tracking_strategy(abstract_strategy_t downstream_strategy = nullptr,
+                                           register_as_metadata_t register_as_metadata = register_as_metadata_t{
+                                               false}) noexcept;
 
   void register_allocation(std::size_t bytes) override;
 
@@ -21,6 +26,9 @@ class global_memory_tracking_strategy final : public memory_tracking_strategy {
   [[nodiscard]] bool is_equal(const memory_tracking_strategy& other) const override;
 
   [[nodiscard]] static abstract_strategy_t get_global_memory_tracking_strategy() noexcept;
+
+ private:
+  const bool register_as_metadata_;
 };
 
 }  // namespace celonis::accelerator::ctl

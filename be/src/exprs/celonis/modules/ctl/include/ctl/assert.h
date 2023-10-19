@@ -1,6 +1,5 @@
 #pragma once
 
-#include <string>
 #include <string_view>
 #include <type_traits>
 
@@ -17,7 +16,7 @@ namespace details {
 
 [[noreturn]] void abort_assert_fail();
 
-[[noreturn]] void abort_assert_fail(const std::string& message);
+[[noreturn]] void abort_assert_fail(std::string_view message);
 
 [[noreturn]] void debug_assert_fail(source_location source_location, std::string_view message);
 
@@ -92,7 +91,7 @@ void abort_assert(bool condition);
  * See above for further information.
  * @example abort_assert((1 << 4) % 2 == 0, "The number is not even.");
  */
-void abort_assert(bool condition, const std::string& message);
+void abort_assert(bool condition, std::string_view message);
 
 /**
  * See above for further information.

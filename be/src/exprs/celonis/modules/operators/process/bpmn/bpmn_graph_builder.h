@@ -15,7 +15,7 @@ struct edge_config final {
   std::vector<operators::process::bpmn::vertex_id_type> to_vertex_ids;
 };
 
-class bpmn_graph_builder final {
+class bpmn_graph_builder {
  public:
   bpmn_graph_builder& vertices(const std::vector<operators::process::bpmn::vertex>& vertices);
   bpmn_graph_builder& vertex(operators::process::bpmn::vertex v);

@@ -20,9 +20,9 @@
 #ifndef CELOSTAR
 #include "modules/operators/framework/cached_operator_fwd.h"
 #endif
+#include "modules/operators/process/alignment/log_aligner.h"
 #include "modules/operators/process/alignment/petri_net/petri_net.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
-#include "modules/operators/process/alignment/rl_align_configs.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/bpmn_graph_fwd.h"
 #include "modules/operators/process/bpmn/vertex_types.h"
@@ -53,11 +53,16 @@ constexpr std::string_view EDGE_CLASS_ID{"ID"};
 constexpr std::string_view EDGE_CLASS_TYPE{"TYPE"};
 
 struct align_model_config {
+  static constexpr size_t ALIGN_MODEL_GRAIN_SIZE{1u << 15};
+
+  [[nodiscard]] static align_model_config make(
+      std::string pruned_variant_cache_key, cube::variant_trace_cache_manager* trace_cache_manager,
+      const std::optional<alignment::log_aligner_config>& aligner_cfg = std::nullopt);
+
   size_t grain_size{};
   std::string pruned_variant_cache_key;
   cube::variant_trace_cache_manager* variant_trace_cache_manager_instance;
-  alignment::rl_align_config rl_config{};
-  int num_a_star_iterations{};
+  alignment::log_aligner_config log_aligner_cfg;
 };
 
 // For now we reuse conformance petri net definition
@@ -89,10 +94,10 @@ struct alignment_move {
 };
 
 using alignment_t = std::vector<alignment_move>;
-using alignments_t = std::vector<alignment_t>;
+using alignments_t = std::vector<std::optional<alignment_t>>;
 
 using edge_class_id_t = row_id;
-enum class edge_type { SYNC, MODEL, SKIP, LOG, UNMAPPED };
+enum class edge_type { SYNC, MODEL, SKIP, LOG, UNMAPPED, L1_MISSING };
 
 struct alignment_move_type_strings {
   constexpr static std::string_view GATEWAY{"GATEWAY_MOVE"};
@@ -125,6 +130,7 @@ struct edge_type_strings {
   constexpr static std::string_view SKIP{"SKIP_EDGE"};
   constexpr static std::string_view LOG{"LOG_EDGE"};
   constexpr static std::string_view UNMAPPED{"UNMAPPED_EDGE"};
+  constexpr static std::string_view L1_MISSING{"L1_MISSING"};
 };
 
 [[nodiscard]] constexpr std::string_view edge_type_to_string(edge_type edge) {
@@ -139,12 +145,14 @@ struct edge_type_strings {
       return edge_type_strings::SKIP;
     case edge_type::UNMAPPED:
       return edge_type_strings::UNMAPPED;
+    case edge_type::L1_MISSING:
+      return edge_type_strings::L1_MISSING;
     default:
       ctl::assert_unreachable();
   }
 }
 
-using replay_results_t = std::vector<replay_result_type>;
+using replay_results_t = std::vector<std::optional<replay_result_type>>;
 
 /**
  * @brief Converts a BPMN graph into a semantically equivalent Petri net.
@@ -156,6 +164,47 @@ using replay_results_t = std::vector<replay_result_type>;
 bpmn_to_petri_net_result_t bpmn_to_petri_net(const bpmn::bpmn_graph& graph);
 
 /**
+ * @brief Encapsulates if two BPMN vertices are "parallel" (concurrent)
+ * @tparam ALLOCATOR
+ */
+template <typename ALLOCATOR = std::allocator<std::array<bpmn::vertex_id_type, 2>>>
+class parallel_vertex_pairs {
+ public:
+  parallel_vertex_pairs() = default;
+  explicit parallel_vertex_pairs(const ALLOCATOR& allocator) : data_(allocator) {}
+  /**
+   * @brief add a pair of mutually parallel vertices to the internal data structure
+   *
+   * @param i one BPMN vertex id
+   * @param j another BPMN vertex id
+   *
+   * Note that the order of the two arguments does not matter, as the "parallel" relation is symmetric
+   */
+  void add(bpmn::vertex_id_type i, bpmn::vertex_id_type j) {
+    data_.emplace(std::array{std::min(i, j), std::max(i, j)});
+  }
+
+  /**
+   * @brief test whether two BPMN vertex ids are parallel
+   *
+   * @param i a BPMN vertex id
+   * @param j another BPMN vertex id
+   * @return true if the two input BPMN vertex ids are parallel, else false
+   *
+   * Note that the order of the two arguments does not matter, as the "parallel" relation is symmetric
+   */
+  [[nodiscard]] bool test(bpmn::vertex_id_type i, bpmn::vertex_id_type j) const {
+    return data_.contains(std::array{std::min(i, j), std::max(i, j)});
+  }
+
+ private:
+  struct hash {
+    size_t operator()(const std::array<bpmn::vertex_id_type, 2>& v) const { return ctl::hash_range(v); }
+  };
+  std::unordered_set<std::array<bpmn::vertex_id_type, 2>, hash, std::ranges::equal_to, ALLOCATOR> data_{};
+};
+
+/**
  * @brief Aligns the variants in the variants log with the petri net model
  *
  * @param variants The variants to align
@@ -163,11 +212,16 @@ bpmn_to_petri_net_result_t bpmn_to_petri_net(const bpmn::bpmn_graph& graph);
  * @param mapper The mapper from Petri net labels to label ids. Needs to be initialized with the activity column dict.
  * @param config Configuration parameters of the align model algorithm
  * @param context The execution context we're running in
- * @return alignments_t The alignments of all variants
+ * @return alignments_t The alignments of all variants, and a binary relation of parallel activities
+ *
+ * Note: We compute the behavioral profile for the relaxation-labeling, and extract the parallel relation from there.
  */
-alignments_t align_model(const memory::cache::variant_trace_cache_t& variants, const bpmn_to_petri_net_result_t& result,
-                         const align_model_config& config, align_model_statistics& stats,
-                         const std::string& activity_table_name, const common::execution_context& context);
+std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache::variant_trace_cache_t& variants,
+                                                             const bpmn_to_petri_net_result_t& result,
+                                                             const align_model_config& config,
+                                                             align_model_statistics& stats,
+                                                             const std::string& activity_table_name,
+                                                             const common::execution_context& context);
 /**
  * @brief Replays the aligned variants on the model creating their partial execution orders.
  * Also creates joins for all synchronous and model moves to the alignments
@@ -178,6 +232,7 @@ alignments_t align_model(const memory::cache::variant_trace_cache_t& variants, c
  * @return replay_results_t The partial order executions of all variants as well as groupers and edge types
  */
 replay_results_t replay_aligned_variants(const bpmn::bpmn_graph& bpmn_graph, const alignments_t& alignments,
+                                         const parallel_vertex_pairs<>& parallel_vertices,
                                          const common::execution_context& context);
 /**
  * @brief Maps variants back to original traces and creates the table group both with internal joins between and

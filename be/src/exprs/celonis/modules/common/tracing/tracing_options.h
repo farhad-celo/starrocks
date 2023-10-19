@@ -102,6 +102,12 @@ struct remote_tracing_options {
    * Version of service being traced.
    */
   std::string service_version{DEFAULT_DATADOG_SERVICE_VERSION};
+
+  /**
+   * A list of key/value pairs which will be set as a tag on all spans of each trace.
+   * The attribute is initially empty and filled with the content of the DD_TAGS environment variable.
+   */
+  std::string tags{};
 };
 
 }  // namespace celonis::accelerator::common::tracing

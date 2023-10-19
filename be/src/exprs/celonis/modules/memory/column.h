@@ -7,9 +7,10 @@
 #include <unordered_set>
 #include <utility>
 
-#include "column_fwd.h"
+#include "column_fwd.h"  // IWYU pragma: export
 #include "concurrency/concurrency_utils.h"
 #include "ctl/assert.h"
+#include "ctl/named_type.h"
 #include "modules/common/execution_context.h"
 #ifndef CELOSTAR
 #include "modules/cube/query_scope_fwd.h"
@@ -27,6 +28,7 @@
 #include "modules/memory/typed_dictionary.h"
 #include "modules/memory/types.h"
 #include "modules/operators/framework/cached_operator_fwd.h"
+#include "modules/operators/framework/dictify_inputs.h"
 
 namespace celonis::accelerator::memory {
 namespace builders {
@@ -89,11 +91,14 @@ class column {
   friend class cache::data_table_cache;
   friend class cube::event_table_calculation;
 
+  using no_dictify_request_t = std::optional<operators::no_dictify_request>;
+
  public:
   struct column_data_missing {};
   static constexpr const char* COLUMN_DICTIFY_KEY = "COLUMN_DICTIFY";
 
   std::string get_string_value(row_id row, const common::execution_context& context = {});
+  std::optional<std::string> get_string_value_opt(row_id row, const common::execution_context& context = {});
 
   /* Type information about the column */
   data_type get_data_type() const { return config_.type; }
@@ -105,7 +110,9 @@ class column {
 
   row_id get_row_count(const common::execution_context& context = {});
 
-  std::shared_ptr<dictionary> get_dict(const common::execution_context& context) {
+  std::shared_ptr<dictionary> get_dict(const common::execution_context& context,
+                                       const no_dictify_request_t& no_dictify_request = std::nullopt) {
+    check_implicit_dictification(no_dictify_request);
     dictify_if_needed(context);
     return dict_;
   }
@@ -183,11 +190,11 @@ class column {
 
   template <typename ACCESSOR>
   decltype(auto) access_column_data_under_lock(ACCESSOR&& accessor) {
+    const std::shared_lock lck{column_mutex_};
     switch (status_.load()) {
       case column_loading::column_status::MISSING:
         return accessor(column_data_missing{});
       case column_loading::column_status::MATERIALIZED: {
-        const std::shared_lock lck{column_mutex_};
         switch (config_.type) {
           case data_type::cel_string:
             return accessor(std::static_pointer_cast<materialized_typed_data<cel_string_t>>(plain_data_));
@@ -209,7 +216,6 @@ class column {
 #endif
       }
       case column_loading::column_status::DICTIFIED: {
-        std::shared_lock lck(column_mutex_);
         switch (config_.type) {
           case data_type::cel_string:
             return accessor(column_pointers_, std::static_pointer_cast<string_dictionary>(dict_));
@@ -257,65 +263,76 @@ class column {
 
   /* Functions for dictified columns (If column is not dictified they will trigger change to dictified column) */
   template <typename T>
-  std::shared_ptr<typed_dictionary<T>> get_typed_dict(const common::execution_context& context) {
+  std::shared_ptr<typed_dictionary<T>> get_typed_dict(const common::execution_context& context,
+                                                      const no_dictify_request_t& no_dictify_request = std::nullopt) {
     if (config_.type != get_matching_data_type<T>()) {
       throw common::internal_exception{"Column [{}] does not have expected type. Expected [{}], but got [{}].",
                                        get_user_visible_name(context), convert_to_string(get_matching_data_type<T>()),
                                        convert_to_string(config_.type)};
     }
-    return std::static_pointer_cast<typed_dictionary<T>>(get_dict(context));
+    return std::static_pointer_cast<typed_dictionary<T>>(get_dict(context, no_dictify_request));
   }
 
-  std::shared_ptr<string_dictionary> get_string_dict(const common::execution_context& context) {
+  std::shared_ptr<string_dictionary> get_string_dict(const common::execution_context& context,
+                                                     const no_dictify_request_t& no_dictify_request = std::nullopt) {
     if (config_.type != data_type::cel_string) {
       throw common::internal_exception{"Column [{}] expected to be of type STRING, but got [{}].",
                                        get_user_visible_name(context), convert_to_string(config_.type)};
     }
-    return std::static_pointer_cast<string_dictionary>(get_dict(context));
+    return std::static_pointer_cast<string_dictionary>(get_dict(context, no_dictify_request));
   }
 
-  std::shared_ptr<int_dictionary> get_int_dict(const common::execution_context& context) {
+  std::shared_ptr<int_dictionary> get_int_dict(const common::execution_context& context,
+                                               const no_dictify_request_t& no_dictify_request = std::nullopt) {
     if (config_.type != data_type::cel_int) {
       throw common::internal_exception{"Column [{}] expected to be of type INT, but got [{}].",
                                        get_user_visible_name(context), convert_to_string(config_.type)};
     }
-    return std::static_pointer_cast<int_dictionary>(get_dict(context));
+    return std::static_pointer_cast<int_dictionary>(get_dict(context, no_dictify_request));
   }
 
-  std::shared_ptr<float_dictionary> get_float_dict(const common::execution_context& context) {
+  std::shared_ptr<float_dictionary> get_float_dict(const common::execution_context& context,
+                                                   const no_dictify_request_t& no_dictify_request = std::nullopt) {
     if (config_.type != data_type::cel_float) {
       throw common::internal_exception{"Column [{}] expected to be of type FLOAT, but got [{}].",
                                        get_user_visible_name(context), convert_to_string(config_.type)};
     }
-    return std::static_pointer_cast<float_dictionary>(get_dict(context));
+    return std::static_pointer_cast<float_dictionary>(get_dict(context, no_dictify_request));
   }
 
-  std::shared_ptr<date_dictionary> get_date_dict(const common::execution_context& context) {
+  std::shared_ptr<date_dictionary> get_date_dict(const common::execution_context& context,
+                                                 const no_dictify_request_t& no_dictify_request = std::nullopt) {
     if (config_.type != data_type::cel_date) {
       throw common::internal_exception{"Column [{}] expected to be of type DATE, but got [{}].",
                                        get_user_visible_name(context), convert_to_string(config_.type)};
     }
-    return std::static_pointer_cast<date_dictionary>(get_dict(context));
+    return std::static_pointer_cast<date_dictionary>(get_dict(context, no_dictify_request));
   }
 
-  std::shared_ptr<boolean_dictionary> get_boolean_dict(const common::execution_context& context) {
+  std::shared_ptr<boolean_dictionary> get_boolean_dict(const common::execution_context& context,
+                                                       const no_dictify_request_t& no_dictify_request = std::nullopt) {
     if (config_.type != data_type::cel_boolean) {
       throw common::internal_exception{"Column [{}] expected to be of type BOOLEAN, but got [{}].",
                                        get_user_visible_name(context), convert_to_string(config_.type)};
     }
-    return std::static_pointer_cast<boolean_dictionary>(get_dict(context));
+    return std::static_pointer_cast<boolean_dictionary>(get_dict(context, no_dictify_request));
   }
 
   /** Returns the dictionary's size (i.e., the number of distinct values in this column) */
-  row_id get_domain_count(const common::execution_context& context = {});
+  row_id get_domain_count(const common::execution_context& context = {},
+                          const no_dictify_request_t& no_dictify_request = std::nullopt);
 
-  const column_ptrs_abstract& get_column_pointers(const common::execution_context& context) {
+  const column_ptrs_abstract& get_column_pointers(const common::execution_context& context,
+                                                  const no_dictify_request_t& no_dictify_request = std::nullopt) {
+    check_implicit_dictification(no_dictify_request);
     dictify_if_needed(context);
     column_pointers_->get_abstract()->swap_in(context);
     return *column_pointers_.get();
   }
 
-  column_ptrs_t get_column_ptr_handle(common::execution_context& context) {
+  column_ptrs_t get_column_ptr_handle(const common::execution_context& context,
+                                      const no_dictify_request_t& no_dictify_request = std::nullopt) {
+    check_implicit_dictification(no_dictify_request);
     dictify_if_needed(context);
     return column_pointers_;
   }
@@ -370,6 +387,8 @@ class column {
     return no_owner;
   }
 
+  void load_if_missing(const common::execution_context& context);
+
   /**
    * For  full description see the cube version of this function
    *
@@ -389,7 +408,14 @@ class column {
  private:
   void dictify_if_needed(const common::execution_context& context);
 
-  void load_if_missing(const common::execution_context& context);
+  /** Check whether dictification is triggered implicitly */
+  void check_implicit_dictification(const no_dictify_request_t& no_dictify_request) const {
+    // enable/disable implicit dictification checking
+    if (constexpr bool enable_check{false}; enable_check && no_dictify_request) {
+      warning_assert(is_dictified(),
+                     fmt::format("Implicit dictification: {}", no_dictify_request->get_source_location()));
+    }
+  }
 
   column(column_loading::column_config config, table* owner, const table* owner_after_pull_up,
          column_ptrs_t column_pointers, std::shared_ptr<dictionary> dict, std::shared_ptr<materialized_data> plain_data,

@@ -25,10 +25,9 @@ class sequence_aligner {
    * @param max_iterations The maximum number of nodes to expand during search
    * @return The optimal alignment if the computation terminated, or a null optional if it timed out
    */
-  [[nodiscard]] static std::optional<trace_alignment> align_sequence_to_run(std::span<const row_id> trace,
-                                                                            const sequence_type& model_run,
-                                                                            int max_iterations,
-                                                                            const common::execution_context& context);
+  [[nodiscard]] static trace_alignment_t align_sequence_to_run(std::span<const row_id> trace,
+                                                               const sequence_type& model_run, int max_iterations,
+                                                               const common::execution_context& context);
 
   sequence_aligner(sequence_type optimal_run, int max_iterations) noexcept
       : baseline_{std::move(optimal_run)}, max_iterations_{max_iterations} {}

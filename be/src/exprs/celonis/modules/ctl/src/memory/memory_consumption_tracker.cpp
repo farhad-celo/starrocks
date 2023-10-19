@@ -24,9 +24,21 @@ size_t global_memory_consumption_tracker::static_process_size() const noexcept {
 
 size_t global_memory_consumption_tracker::cur_net_allocated() const noexcept { return net_allocated_; }
 
-void global_memory_consumption_tracker::register_allocation(std::size_t size) noexcept { net_allocated_ += size; }
+size_t global_memory_consumption_tracker::cur_metadata_allocated() const noexcept { return metadata_allocated_; }
 
-void global_memory_consumption_tracker::deregister_allocation(std::size_t size) noexcept { net_allocated_ -= size; }
+void global_memory_consumption_tracker::register_allocation(const std::size_t size, const bool as_metadata) noexcept {
+  net_allocated_ += size;
+  if (as_metadata) {
+    metadata_allocated_ += size;
+  }
+}
+
+void global_memory_consumption_tracker::deregister_allocation(const std::size_t size, const bool as_metadata) noexcept {
+  net_allocated_ -= size;
+  if (as_metadata) {
+    metadata_allocated_ -= size;
+  }
+}
 
 void global_memory_consumption_tracker::register_batched_tracker() noexcept {
   batched_tracker_count_.fetch_add(1, std::memory_order_relaxed);

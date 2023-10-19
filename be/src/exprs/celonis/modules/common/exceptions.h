@@ -244,7 +244,7 @@ template <class... ARGS>
 
 }  // namespace details
 
-inline void runtime_assert(bool condition, std::string_view message = "Runtime Assertion failed") {
+inline void runtime_assert(bool condition, std::string_view message) {
   if (!condition) [[unlikely]] {
     details::runtime_assert_fail(message);
   }

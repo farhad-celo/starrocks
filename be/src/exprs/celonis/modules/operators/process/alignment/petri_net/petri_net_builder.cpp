@@ -175,6 +175,18 @@ bool petri_net_builder::is_final_place(const node_id_type& node_id) const {
   return is_place(node_id) && at_place(node_id).is_final();
 }
 
+size_t petri_net_builder::in_degree(const node_id_type& node_id) const {
+  common::runtime_assert(is_node(node_id), "Checking In-Degree for non-existing node [{}]", node_id);
+  const auto& vertex_desc{get_vertex(node_id)};
+  return boost::in_degree(vertex_desc, graph_);
+}
+
+size_t petri_net_builder::out_degree(const node_id_type& node_id) const {
+  common::runtime_assert(is_node(node_id), "Checking Out-Degree for non-existing node [{}]", node_id);
+  const auto& vertex_desc{get_vertex(node_id)};
+  return boost::out_degree(vertex_desc, graph_);
+}
+
 const petri_net_builder_node& petri_net_builder::at_node(const node_id_type& node_id) const {
   common::runtime_assert(is_node(node_id), "Trying to access non-existing node [{}].", node_id);
   return graph_[get_vertex(node_id)];
@@ -198,7 +210,35 @@ petri_net_builder::arc_weight_type petri_net_builder::at_arc(const node_id_type&
   return graph_[edge];
 }
 
-const petri_net_builder::graph_type& petri_net_builder::graph() const { return graph_; }
+boost::iterator_range<petri_net_builder::id_map_type::const_iterator> petri_net_builder::get_nodes() const {
+  return boost::make_iterator_range(std::cbegin(id_map_), std::cend(id_map_));
+}
+
+size_t petri_net_builder::node_count() const { return boost::num_vertices(graph_); }
+
+std::unordered_set<petri_net_builder::node_id_type> petri_net_builder::pre_set(const node_id_type& node_id) const {
+  common::runtime_assert(is_node(node_id), "Can't compute pre-set for non-existing node [{}]", node_id);
+  std::unordered_set<node_id_type> ret{};
+
+  const auto& vertex_desc{get_vertex(node_id)};
+  for (const auto& in_arc : boost::make_iterator_range(boost::in_edges(vertex_desc, graph_))) {
+    ret.insert(graph_[boost::source(in_arc, graph_)].id());
+  }
+
+  return ret;
+}
+
+std::unordered_set<petri_net_builder::node_id_type> petri_net_builder::post_set(const node_id_type& node_id) const {
+  common::runtime_assert(is_node(node_id), "Can't compute post-set for non-existing node [{}]", node_id);
+  std::unordered_set<node_id_type> ret{};
+
+  const auto& vertex_desc{get_vertex(node_id)};
+  for (const auto& out_arc : boost::make_iterator_range(boost::out_edges(vertex_desc, graph_))) {
+    ret.insert(graph_[boost::target(out_arc, graph_)].id());
+  }
+
+  return ret;
+}
 
 petri_net_builder::vertex_descriptor petri_net_builder::get_vertex(const node_id_type& node_id) const {
   if (const auto it{id_map_.find(node_id)}; it != std::cend(id_map_)) {

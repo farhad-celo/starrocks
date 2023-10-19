@@ -17,7 +17,7 @@ void managed_memory_group::report_expired() const { log::info("skipping expired 
 // This function is already protected with a lock by the caller function
 managed_memory_group::handlers_t::iterator managed_memory_group::remove_and_report_expired(
     const handlers_t::iterator handler_it) {
-  log::warn("removing expired weak ptr for group {}", type);
+  log::jwarn("Removing expired weak ptr for memory group.", {{"group_description", type}});
   return handlers.erase(handler_it);
 }
 

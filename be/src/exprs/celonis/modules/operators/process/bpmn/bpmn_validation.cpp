@@ -75,7 +75,8 @@ problems_t validate_no_duplicate_activities(const bpmn_graph& graph, problems_t 
 }
 
 /** @brief Validates that the edge to add does refer to existing vertices */
-std::pair<problems_t, bool> validate_start_end_exist(const edge& e, const bpmn_graph& graph, problems_t problems) {
+std::pair<problems_t, bool> validate_edge_refers_to_valid_vertices(const edge& e, const bpmn_graph& graph,
+                                                                   problems_t problems) {
   bool result{true};
   if (!graph.get_vertices().contains(e.get_source_id())) {
     problems.emplace_back(fmt::format("Error for edge [{}->{}]. Vertex with ID [{}] does not exist.", e.get_source_id(),
@@ -217,6 +218,12 @@ problems_t validate_nodes_on_path(const bpmn_graph& bpmn_graph, problems_t probl
 }  // anonymous namespace
 
 void validate_bpmn_model_consistency(const bpmn_graph& bpmn_model) {
+  const auto report_problems_if_necessary{[](const problems_t& problems) {
+    if (!problems.empty()) {
+      throw common::cpm_exception{"BPMN model is invalid. Problems: {}", fmt::join(problems, " ")};
+    }
+  }};
+
   problems_t problems{};
 
   // Vertex validators
@@ -225,20 +232,23 @@ void validate_bpmn_model_consistency(const bpmn_graph& bpmn_model) {
   // Edge validators
   problems = validate_no_duplicate_edges(bpmn_model, std::move(problems));
   for (const auto& e : bpmn_model.get_edges()) {
-    auto pair{validate_start_end_exist(e, bpmn_model, std::move(problems))};
+    auto pair{validate_edge_refers_to_valid_vertices(e, bpmn_model, std::move(problems))};
     problems = std::move(pair.first);
     if (pair.second) {
       problems = validate_edge_conforms_to_bpmn_spec(e, bpmn_model, std::move(problems));
     };
   }
 
+  // if we have encountered problems, e.g. there are edges to non-existent vertices, we might not be able to check
+  // the rest
+  report_problems_if_necessary(problems);
+
   for (const auto& [_, v] : bpmn_model.get_vertices()) {
     problems = validate_start_single_outgoing(bpmn_model, v, std::move(problems));
     problems = validate_end_single_ingoing(bpmn_model, v, std::move(problems));
   }
-  if (!problems.empty()) {
-    throw common::cpm_exception{"BPMN model is invalid. Problems: {}", fmt::join(problems, " ")};
-  }
+
+  report_problems_if_necessary(problems);
 }
 
 void validate_bpmn_model_constraints(const bpmn_graph& bpmn_model) {

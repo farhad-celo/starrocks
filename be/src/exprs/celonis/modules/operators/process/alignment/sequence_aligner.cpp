@@ -121,17 +121,16 @@ struct sequence_product_path_construction
     }
     return [previously_model_move](const auto& transition) {
       const auto is_log_move{transition.move_first && !transition.move_second};
-      return previously_model_move && is_log_move;
+      return !(previously_model_move && is_log_move);
     };
   }
 };
 
 }  // namespace
 
-std::optional<trace_alignment> sequence_aligner::align_sequence_to_run(std::span<const row_id> trace,
-                                                                       const sequence_type& model_run,
-                                                                       int max_iterations,
-                                                                       const common::execution_context& context) {
+trace_alignment_t sequence_aligner::align_sequence_to_run(std::span<const row_id> trace, const sequence_type& model_run,
+                                                          int max_iterations,
+                                                          const common::execution_context& context) {
   sequence_product petri_net{trace, model_run};
   // search for shortest path
   auto path{petri_net::a_star::a_star_search(  // we could use a more specialized implementation of A*

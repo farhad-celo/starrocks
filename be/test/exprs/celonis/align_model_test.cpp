@@ -232,11 +232,11 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RES
                          "GATEWAY_MOVE"},
                         {0, 0, 0, 1, 0, 1, 1},
                         // association
-                        {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
-                        {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
+                        {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
+                        {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
                         // edge_class
-                        {0, 1, 2},
-                        {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
+                        {0, 1, 2, 3},
+                        {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "L1_MISSING"}
                 }
         },
         {
@@ -261,10 +261,10 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RES
                         {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
                          "GATEWAY_MOVE", "GATEWAY_MOVE"},
                         {0, 0, 0, 0, 1, 2, 1, 2},
-                        {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
-                        {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7},
-                        {0, 1, 2, 3, 4},
-                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE"}
+                        {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5},
+                        {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7, 0, 1, 3},
+                        {0, 1, 2, 3, 4, 5},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE", "L1_MISSING"}
                 }
         }
 };
@@ -362,10 +362,10 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::LOOP_MODEL_RESULTS
                         {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
                                 "GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
                         {0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2},
-                        {0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3},
-                        {0, 1, 2, 3, 4, 5, 6, 9, 10, 6, 7, 8, 9, 6, 9},
-                        {0, 1, 2, 3},
-                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
+                        {0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4},
+                        {0, 1, 2, 3, 4, 5, 6, 9, 10, 6, 7, 8, 9, 6, 9, 5, 7, 8, 10},
+                        {0, 1, 2, 3, 4},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "L1_MISSING"}
                 }
         },
         {
@@ -377,10 +377,10 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::LOOP_MODEL_RESULTS
                         {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE",
                                     "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
                         {0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3},
-                        {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3},
-                        {0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 4, 5, 6, 4, 6},
-                        {0, 1, 2, 3},
-                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
+                        {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
+                        {0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 4, 5, 6, 4, 6, 3, 5, 7},
+                        {0, 1, 2, 3, 4},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "L1_MISSING"}
                 }
         }
 };

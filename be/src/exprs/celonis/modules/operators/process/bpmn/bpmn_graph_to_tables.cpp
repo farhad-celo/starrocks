@@ -125,19 +125,6 @@ memory::table_t build_bpmn_activities(const bpmn_graph& graph, const memory::dic
   return bpmn_activities_table;
 }
 
-memory::table_t build_coverage(const std::vector<row_id>& coverage, memory::table_row_limit_t table_row_limit,
-                               const common::execution_context& operator_context) {
-  memory::table_t coverage_table{
-      memory::table::create_query_scope_table(ctl::cast<row_id>(coverage.size()), "bpmn_coverage")};
-  auto coverage_data{
-      ctl::make_static_array_for_overwrite<cel_int_t>(coverage.size(), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
-  std::copy(coverage.begin(), coverage.end(), coverage_data.get());
-  coverage_table->add_column<cel_int_t>(
-      memory::col_name{"OBJECT_COUNT"}, memory::col_id{"OBJECT_COUNT"}, std::move(coverage_data),
-      memory::create_null_flags(coverage.size(), operator_context), memory::column_processing_state{}, table_row_limit);
-  return coverage_table;
-}
-
 struct edges_and_unique_vertices {
   // We use sorted sets here such that the order in which vertices and edges appear in the model description is
   // consistent.
@@ -248,18 +235,140 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
   return descriptions_table;
 }
 
+[[nodiscard]] consteval auto MAKE_BLOCK_TYPE_STR_BUFFER_AND_OFFSETS() {
+  constexpr size_t BUFFER_SIZE{
+      std::accumulate(std::cbegin(BPMN_BLOCK_TYPE_STRINGS), std::cend(BPMN_BLOCK_TYPE_STRINGS), size_t{0},
+                      [](const size_t current_size, const std::string_view block_type_as_string) {
+                        return current_size + block_type_as_string.size() + 1;  // +1 for \0 terminator
+                      })};
+  std::array<char, BUFFER_SIZE> BUFFER{};  // raw buffer containing the (null terminated) string data
+  std::array<size_t, BPMN_BLOCK_TYPE_STRINGS.size()> OFFSETS{};  // offsets to the respective string data beginning
+  OFFSETS.at(0) = 0;
+  for (size_t idx{0}; const std::string_view BPMN_BLOCK_TYPE_AS_STRING : BPMN_BLOCK_TYPE_STRINGS) {
+    char* BUFFER_OUT_PTR{std::next(BUFFER.data(), ctl::cast_signed(OFFSETS.at(idx)))};
+    // copy the string to the buffer and add a null terminator at the end
+    *std::ranges::copy(BPMN_BLOCK_TYPE_AS_STRING, BUFFER_OUT_PTR).out = '\0';
+    if (++idx < BPMN_BLOCK_TYPE_STRINGS.size()) {
+      OFFSETS.at(idx) = OFFSETS.at(idx - 1) + BPMN_BLOCK_TYPE_AS_STRING.size() + 1;
+    }
+  }
+  return std::make_pair(BUFFER, OFFSETS);
+}
+
+constexpr auto BUFFER_AND_OFFSETS{MAKE_BLOCK_TYPE_STR_BUFFER_AND_OFFSETS()};
+static_assert(BPMN_BLOCK_TYPE_STRINGS.at(0) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(0)));
+static_assert(BPMN_BLOCK_TYPE_STRINGS.at(1) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(1)));
+static_assert(BPMN_BLOCK_TYPE_STRINGS.at(2) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(2)));
+static_assert(BPMN_BLOCK_TYPE_STRINGS.at(3) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(3)));
+static_assert(BPMN_BLOCK_TYPE_STRINGS.at(4) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(4)));
+static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(5)));
+
+[[nodiscard]] memory::table_t build_bpmn_blocks(const bpmn_graph_with_block_structure& graph,
+                                                const memory::table_row_limit_t table_row_limit,
+                                                const common::execution_context& operator_context) {
+  const auto& blocks{graph.blocks()};
+  const auto number_of_blocks{blocks.size()};
+
+  // column data containers
+  auto block_ids_column_data{
+      ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto parent_block_ids_column_data{
+      ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto object_ids_column_data{
+      ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+
+  static constexpr const auto& BUFFER{BUFFER_AND_OFFSETS.first};
+  static constexpr const auto& OFFSETS{BUFFER_AND_OFFSETS.second};
+  auto block_type_column_data_pointers{
+      ctl::make_static_array_for_overwrite<cel_string_t>(number_of_blocks, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto block_type_column_data_buffer{ctl::make_static_array<char>(BUFFER, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+
+  // fill column data
+  for (size_t idx{0}; const auto& block : blocks) {
+    block_ids_column_data.at(idx) = block.block_id;
+    parent_block_ids_column_data.at(idx) = block.parent_id;
+    object_ids_column_data.at(idx) = block.object_id;
+    const auto block_type_as_integer{to_column_value(block.block_type)};
+    const auto offset{OFFSETS.at(block_type_as_integer)};
+    block_type_column_data_pointers.at(idx) = &block_type_column_data_buffer.at(offset);
+    ++idx;
+  }
+
+  auto bpmn_blocks_table{memory::table::create_query_scope_table(ctl::cast_signed(number_of_blocks), "bpmn_blocks")};
+  bpmn_blocks_table->add_column<cel_int_t>(memory::col_name{"BLOCK_ID"}, memory::col_id{"BLOCK_ID"},
+                                           std::move(block_ids_column_data),
+                                           memory::create_null_flags(number_of_blocks, operator_context),
+                                           memory::column_processing_state{}, table_row_limit);
+  bpmn_blocks_table->add_column<cel_int_t>(memory::col_name{"PARENT_BLOCK_ID"}, memory::col_id{"PARENT_BLOCK_ID"},
+                                           std::move(parent_block_ids_column_data),
+                                           memory::create_null_flags(number_of_blocks, operator_context),
+                                           memory::column_processing_state{}, table_row_limit);
+  bpmn_blocks_table->add_column<cel_int_t>(memory::col_name{"OBJECT_ID"}, memory::col_id{"OBJECT_ID"},
+                                           std::move(object_ids_column_data),
+                                           memory::create_null_flags(number_of_blocks, operator_context),
+                                           memory::column_processing_state{}, table_row_limit);
+  bpmn_blocks_table->add_string_column(memory::col_name{"BLOCK_TYPE"}, memory::col_id{"BLOCK_TYPE"},
+                                       std::move(block_type_column_data_pointers),
+                                       std::move(block_type_column_data_buffer),
+                                       memory::create_null_flags(number_of_blocks, operator_context), table_row_limit);
+
+  return bpmn_blocks_table;
+}
+
+[[nodiscard]] memory::table_t build_bpmn_nodes_to_blocks(const bpmn_graph_with_block_structure& graph,
+                                                         const memory::table_row_limit_t table_row_limit,
+                                                         const common::execution_context& operator_context) {
+  const auto& vertex_id_to_block_ids_mapping{graph.vertex_id_to_block_id_mapping()};
+  const auto number_of_nodes_with_a_related_block{
+      std::accumulate(vertex_id_to_block_ids_mapping.begin(), vertex_id_to_block_ids_mapping.end(), size_t{},
+                      [](const size_t current_size, const auto& vertex_id_to_block_ids) {
+                        const bpmn_block_ids_t& block_ids_for_vertex_id{vertex_id_to_block_ids.second};
+                        return current_size + block_ids_for_vertex_id.size();
+                      })};
+
+  // column data containers
+  auto vertex_ids_column_data{ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
+                                                                              ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto block_ids_column_data{ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
+                                                                             ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  // fill column data
+  for (size_t idx{0}; const auto& [vertex_id, block_ids] : vertex_id_to_block_ids_mapping) {
+    for (const auto& block_id : block_ids) {
+      vertex_ids_column_data.at(idx) = ctl::cast<cel_int_t>(vertex_id);
+      block_ids_column_data.at(idx) = block_id;
+      ++idx;
+    }
+  }
+
+  // Create tables and add the corresponding columns to them
+  auto bpmn_nodes_to_blocks_table{memory::table::create_query_scope_table(
+      ctl::cast_signed(number_of_nodes_with_a_related_block), "bpmn_nodes_to_blocks")};
+
+  bpmn_nodes_to_blocks_table->add_column<cel_int_t>(
+      memory::col_name{"NODE_ID"}, memory::col_id{"NODE_ID"}, std::move(vertex_ids_column_data),
+      memory::create_null_flags(number_of_nodes_with_a_related_block, operator_context),
+      memory::column_processing_state{}, table_row_limit);
+  bpmn_nodes_to_blocks_table->add_column<cel_int_t>(
+      memory::col_name{"BLOCK_ID"}, memory::col_id{"BLOCK_ID"}, std::move(block_ids_column_data),
+      memory::create_null_flags(number_of_nodes_with_a_related_block, operator_context),
+      memory::column_processing_state{}, table_row_limit);
+
+  return bpmn_nodes_to_blocks_table;
+}
+
 }  // namespace
 
-bpmn_tables create_bpmn_tables_from_bpmn_graph(const bpmn_graph& graph, const memory::dictionary_t& activity_dict,
-                                               const std::vector<row_id>& coverage,
+bpmn_tables create_bpmn_tables_from_bpmn_graph(const bpmn_graph_with_block_structure& graph,
+                                               const memory::dictionary_t& activity_dict,
                                                const memory::table_row_limit_t table_row_limit,
                                                const common::execution_context& parent_context) {
-  const auto context{parent_context.create_sub_context("convert_to_tables", {})};
+  const auto context{parent_context.create_sub_context("convert_to_tables_with_block_structure", {})};
   return {build_bpmn_edges_table(graph, table_row_limit, context),
           build_bpmn_nodes_table(graph, table_row_limit, context),
           build_bpmn_activities(graph, activity_dict, table_row_limit, context),
-          build_coverage(coverage, table_row_limit, context),
-          build_bpmn_model_descriptions(graph, activity_dict, table_row_limit, context)};
+          build_bpmn_model_descriptions(graph, activity_dict, table_row_limit, context),
+          build_bpmn_blocks(graph, table_row_limit, context),
+          build_bpmn_nodes_to_blocks(graph, table_row_limit, context)};
 }
 
 }  // namespace celonis::accelerator::operators::process::bpmn

@@ -6,7 +6,7 @@
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::a_star {
 
-synchronous_product::synchronous_product(petri_net_accessor& petri_net, std::span<const row_id> variant)
+synchronous_product::synchronous_product(const petri_net_accessor& petri_net, std::span<const row_id> variant)
     : petri_net_{petri_net}, variant_length_{variant.size()} {
   // fill cross transitions
   for (variant_transition_type index{}; index != variant.size(); ++index) {
@@ -42,7 +42,7 @@ synchronous_product::marking_type synchronous_product::fire(
     marking.variant_place += 1;
   }
   if (transition.petri_net_transition.has_value()) {
-    petri_net_.fire_transition_no_alloc(marking.petri_net_marking, transition.petri_net_transition.value());
+    petri_net_.fire_no_alloc(marking.petri_net_marking, transition.petri_net_transition.value());
   }
   return marking;
 }
@@ -57,7 +57,7 @@ synchronous_product::marking_type synchronous_product::fire_inverse(
     marking.variant_place -= 1;
   }
   if (transition.petri_net_transition.has_value()) {
-    petri_net_.fire_transition_inverse_no_alloc(marking.petri_net_marking, transition.petri_net_transition.value());
+    petri_net_.fire_inverse_no_alloc(marking.petri_net_marking, transition.petri_net_transition.value());
   }
   return marking;
 }

@@ -105,7 +105,7 @@ class full_meminfo : private meminfo {
   using size_type = std::size_t;
 
   constexpr full_meminfo(size_type page_size, size_type total, size_type available, size_type in_use_by_process,
-                         size_type peak_consumption_by_process) noexcept;
+                         size_type peak_consumption_by_process, size_type current_estimate_in_bytes) noexcept;
 
   using meminfo::available;
   using meminfo::in_use_by_process;
@@ -120,8 +120,15 @@ class full_meminfo : private meminfo {
   template <byte_unit TARGET_BYTE_UNIT = byte_unit::KiB>
   [[nodiscard]] constexpr size_type peak_consumption_by_process() const noexcept;
 
+  /**
+   * @brief Returns the current estimate from the CTL memory tracker
+   */
+  template <byte_unit TARGET_BYTE_UNIT = byte_unit::KiB>
+  [[nodiscard]] constexpr size_type current_estimate() const noexcept;
+
  private:
   size_type peak_consumption_by_process_in_bytes_{0};
+  size_type current_estimate_in_bytes_{0};
 };
 
 constexpr meminfo::meminfo(const size_type page_size, const size_type total, const size_type available,
@@ -163,6 +170,11 @@ constexpr meminfo::size_type full_meminfo::peak_consumption_by_process() const n
   return convert_byte_size<byte_unit::B, TARGET_BYTE_UNIT>(peak_consumption_by_process_in_bytes_);
 }
 
+template <byte_unit TARGET_BYTE_UNIT>
+constexpr meminfo::size_type full_meminfo::current_estimate() const noexcept {
+  return convert_byte_size<byte_unit::B, TARGET_BYTE_UNIT>(current_estimate_in_bytes_);
+}
+
 constexpr std::optional<double> meminfo::in_use_global_percentage() const noexcept {
   constexpr auto almost_equals = [](const double x, const double y, const int precision_gap) noexcept -> bool {
     return std::abs(x - y) <= std::numeric_limits<double>::epsilon() * std::abs(x + y) * precision_gap ||
@@ -179,9 +191,10 @@ constexpr std::optional<double> meminfo::in_use_global_percentage() const noexce
 }
 
 constexpr full_meminfo::full_meminfo(const size_type page_size, const size_type total, const size_type available,
-                                     const size_type in_use_by_process,
-                                     const size_type peak_consumption_by_process) noexcept
+                                     const size_type in_use_by_process, const size_type peak_consumption_by_process,
+                                     const size_type current_estimate_in_bytes) noexcept
     : meminfo{page_size, total, available, in_use_by_process},
-      peak_consumption_by_process_in_bytes_{peak_consumption_by_process} {}
+      peak_consumption_by_process_in_bytes_{peak_consumption_by_process},
+      current_estimate_in_bytes_{current_estimate_in_bytes} {}
 
 }  // namespace celonis::accelerator::ctl

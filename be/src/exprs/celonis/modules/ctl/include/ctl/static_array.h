@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ctl/bits/static_array_base.h"  // IWYU pragma: export
-#include "ctl/memory/checked_memory_resource.h"
+#include "ctl/static_array_allocators.h"
 #include "ctl/static_array_fwd.h"  // IWYU pragma: export
 #include "ctl/utils/allocation_messages.h"
 
@@ -23,19 +23,6 @@
  * @see static_array_base for the implementation details
  */
 namespace celonis::accelerator::ctl {
-
-constexpr size_t STATIC_ARRAY_MIN_BYTES_FOR_MEM_CHECK{0};
-
-/** Construct and return default allocator using the default memory resource */
-template <typename T>
-[[nodiscard]] static_array_allocator_type<T> make_default_tracking_allocator(
-    const utils::allocation_reason& reason, utils::allocation_priority priority = utils::allocation_priority::LOW,
-    bool using_value_init = true) {
-  auto tracking_resource{tracking_memory_resource::get_global_tracking_resource()};
-  auto checked_resource{std::make_shared<checked_memory_resource>(
-      reason, priority, STATIC_ARRAY_MIN_BYTES_FOR_MEM_CHECK, using_value_init, std::move(tracking_resource))};
-  return static_array_allocator_type<T>{std::move(checked_resource)};
-}
 
 /**
  * @brief Factory to create a static array with the given number of elements (value initialized)

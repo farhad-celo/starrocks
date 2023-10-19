@@ -25,7 +25,7 @@
 #ifndef CELOSTAR
 #include "modules/operators/framework/cached_operator_fwd.h"
 #endif
-#include "modules/operators/process/alignment/rl_align_configs.h"
+#include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/query/operators.pb.h"
 #include "replay_aligned_variant.h"
@@ -144,41 +144,39 @@ memory::table_group_t create_align_model_tables::operator()([[maybe_unused]] cub
   const operator_input_columns_t input_columns{activity_column_, case_table->get_column_header(0)};
 #endif
 
-  constexpr size_t ALIGN_MODEL_GRAIN_SIZE{1u << 15};
-  constexpr int NUM_A_STAR_ITERATIONS{5'000};
-
   // TODO(j.kruska): CPL 8890 Clean all these different cache keys up
 #ifdef CELOSTAR
-  align_model::align_model_config config{
-      ALIGN_MODEL_GRAIN_SIZE, "CACHE_KEY_PRUNED_VARIANTS", variant_trace_cache_manager_,
-      alignment::make_small_rl_align_config(), NUM_A_STAR_ITERATIONS};
+  auto config{align_model_config::make("CACHE_KEY_PRUNED_VARIANTS", variant_trace_cache_manager_, log_aligner_cfg_)};
 #else
-  align_model::align_model_config config{
-      ALIGN_MODEL_GRAIN_SIZE,
+  const auto pruned_variant_cache_key{
       fmt::format("$${}$$PRUNED_VARIANTS$$", align_model_table_group_node::make_pruned_variant_cache_key(
-                                                 activity_column_, model_description_, align_model_op_context)),
-      std::addressof(scope_.get_variant_trace_cache_manager()), alignment::make_small_rl_align_config(),
-      NUM_A_STAR_ITERATIONS};
+                                                 activity_column_, model_description_, align_model_op_context))};
+  auto* trace_cache_manager{std::addressof(scope_.get_variant_trace_cache_manager())};
+  auto config{align_model_config::make(pruned_variant_cache_key, trace_cache_manager, log_aligner_cfg_)};
 #endif
+
   // per variant alignments and replay results
   // while the sub-spans/datadog traces contain this timing information, tracing is not always enabled
   common::timer alignment_timer{};
-  const auto alignments{align_model(variants, model_with_mapping, config, stats,
-                                    activity_column_->get_owner()->get_name(), align_model_op_context)};
+  const auto [alignments, parallel_vertices]{align_model(
+      variants, model_with_mapping, config, stats, activity_column_->get_owner()->get_name(), align_model_op_context)};
   alignment_timer.stop();
   stats.time_variant_alignment = alignment_timer.duration_us().count();
 
   common::timer replay_timer{};
-  const auto replay_results{replay_aligned_variants(bpmn_graph, alignments, align_model_op_context)};
+  const auto replay_results{replay_aligned_variants(bpmn_graph, alignments, parallel_vertices, align_model_op_context)};
   replay_timer.stop();
   stats.time_variant_replay = replay_timer.duration_us().count();
 
 #ifdef CELOSTAR
-  return  create_tables(alignments, replay_results, bpmn_to_string, variants, activity_column_, case_column_,
-                        activity_to_case_join_, align_model_op_context, CREATE_TABLE_GRAIN_SIZE);
+    return  create_tables(alignments, replay_results, bpmn_to_string, variants, activity_column_, case_column_,
+                          activity_to_case_join_, align_model_op_context, CREATE_TABLE_GRAIN_SIZE);
 #else
-  cube::registration_options options{
-      .sinfo = sinfo, .cache_key = cache_key, .scope = scope_, .schema_info = data_model.get_schema_info()};
+  cube::registration_options options{.sinfo = sinfo,
+                                     .cache_key = cache_key,
+                                     .user_visible_name = cache_key,
+                                     .scope = scope_,
+                                     .schema_info = data_model.get_schema_info()};
 
   common::timer inflation_timer{};
   auto tables{create_tables(alignments, replay_results, bpmn_to_string, variants, activity_column_, case_column_,

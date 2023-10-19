@@ -44,13 +44,8 @@ add_main_source(memory/transform)
 add_main_source(operators/aggregation)
 add_main_source(operators/process/align_model)
 list(APPEND SOURCES
-        modules/operators/process/alignment/align_synchronous_product.cpp
-        modules/operators/process/alignment/compute_fitting_solution.cpp
-        modules/operators/process/alignment/gap_filler.cpp
         modules/operators/process/alignment/input_output_mapper.cpp
         modules/operators/process/alignment/log_aligner.cpp
-        modules/operators/process/alignment/relaxation_labeling.cpp
-        modules/operators/process/alignment/rl_align_configs.cpp
         modules/operators/process/alignment/sequence_aligner.cpp
         modules/operators/process/alignment/trace_alignment.cpp
         modules/operators/process/bpmn/bpmn_graph.cpp
@@ -60,11 +55,15 @@ list(APPEND SOURCES
         modules/operators/process/bpmn/replay_types.cpp
         modules/operators/process/bpmn/replay_utils.cpp
 )
+add_main_source(operators/process/alignment/fallback)
+add_main_source(operators/process/alignment/fitting_prefix)
+add_main_source(operators/process/alignment/optimal)
 add_main_source(operators/process/alignment/petri_net)
 add_main_source(operators/process/alignment/petri_net/a_star)
 add_main_source(operators/process/alignment/petri_net/murata)
 add_main_source(operators/process/alignment/petri_net/unfolding)
-add_main_source(operators/process/alignment/rl_statistics)
+add_main_source(operators/process/alignment/rl_align)
+add_main_source(operators/process/alignment/rl_align/rl_statistics)
 add_main_source(operators/process/inductive_miner)
 add_main_source(operators/process/inductive_miner/base_case_strategies)
 add_main_source(operators/process/inductive_miner/cut_strategies)

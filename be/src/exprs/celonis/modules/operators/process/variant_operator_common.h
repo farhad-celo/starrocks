@@ -188,7 +188,7 @@ inline sort_mappers_result sort_and_string_mappers(common::execution_context& co
 
     string_sizes[i] = ctl::cast<decltype(string_sizes)::value_type>(activity_strings.back().str.size());
     if (activity_strings.back().str.find(delimiter) != std::string::npos) {
-      tainted[i] = true;
+      tainted.set(i);
     }
 
     // Store string with delimiter.

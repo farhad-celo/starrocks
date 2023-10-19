@@ -662,7 +662,7 @@ column_t table::add_column(column_t&& column, const table_row_limit_t table_row_
 void table::check_consistency_for_testing(const std::unordered_set<table*>& tables) const {
   for (const auto& col : headers) {
     col->check_consistency_for_testing(tables);
-    common::runtime_assert(col->get_owner() == this);
+    common::runtime_assert(col->get_owner() == this, "Runtime Assertion failed");
   }
 
 #ifndef CELOSTAR

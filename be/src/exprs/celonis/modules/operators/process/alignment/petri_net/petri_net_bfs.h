@@ -15,15 +15,9 @@ class petri_net_bfs {
       : max_depth_{max_depth},
         paths_{memory::management::checked_allocator<directed_edges_t>(context, ALLOC_MSG(ctl::MEMBER_INIT_MSG))} {}
 
-  /// Both methods differ only by their stop conditions,
-  ///  but merging them pollutes the code more than not merging
-  [[nodiscard]] std::vector<petri_net_transition_id> path_to_transition(petri_net_accessor& pn_accessor,
+  [[nodiscard]] std::vector<petri_net_transition_id> path_to_transition(const petri_net_accessor& pn_accessor,
                                                                         const marking_type& source_marking,
                                                                         petri_net_transition_id target_transition);
-
-  [[nodiscard]] std::vector<petri_net_transition_id> path_to_marking(petri_net_accessor& pn_accessor,
-                                                                     const marking_type& source_marking,
-                                                                     const marking_type& target_marking);
 
  private:
   uint64_t max_depth_;

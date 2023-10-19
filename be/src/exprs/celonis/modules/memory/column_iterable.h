@@ -15,6 +15,7 @@
 #include <tbb/parallel_for.h>
 
 #include "ctl/assert.h"
+#include "ctl/bitset_view.h"
 #include "ctl/dynamic_bitset.h"
 #include "ctl/interval.h"
 #include "ctl/math.h"
@@ -123,7 +124,7 @@ class bitset {
   static constexpr size_t BLOCK_COUNT{ctl::div_round_up(N, BLOCK_SIZE)};
 
   constexpr bitset() = default;
-  bitset(const ctl::dynamic_bitset_t& bitset, ctl::half_open_interval<row_id> range) {
+  bitset(const ctl::bitset_view_t bitset, ctl::half_open_interval<row_id> range) {
     debug_assert(range.begin() % BLOCK_SIZE == 0, "Begin of range must be aligned by {}.", BLOCK_SIZE);
     const auto block_offset{static_cast<size_t>(range.begin()) / BLOCK_SIZE};
     const auto block_count{ctl::div_round_up(static_cast<size_t>(range.size()), BLOCK_SIZE)};
@@ -150,8 +151,11 @@ class bitset {
 template <typename T>
 class chunk;
 
+template <typename T>
+class column_pointer_chunk;
+
 /**
- * A const iterable (and iterator) for materialized data. Example usage:
+ * A const value iterable (and iterator) for materialized data. Example usage:
  *
  * for (const std::optional<T> value : iterable) { ... }
  */
@@ -193,6 +197,7 @@ class materialized_iterable {
 
   [[nodiscard]] iterator begin() const noexcept { return iterator{*this, 0}; }
   [[nodiscard]] iterator end() const noexcept { return iterator{*this, static_cast<row_id>(value_accessor_.size())}; }
+  [[nodiscard]] row_id size() const noexcept { return static_cast<row_id>(value_accessor_.size()); }
 
  private:
   value_accessor_t value_accessor_;
@@ -200,7 +205,7 @@ class materialized_iterable {
 };
 
 /**
- * A const iterable (and iterator) for dictified data. Example usage:
+ * A const value iterable (and iterator) for dictified data. Example usage:
  *
  * for (const std::optional<T> value : iterable) { ... }
  */
@@ -244,9 +249,55 @@ class dictified_iterable {
   [[nodiscard]] iterator end() const noexcept {
     return iterator{*this, static_cast<row_id>(col_ptrs_accessor_.size())};
   }
+  [[nodiscard]] row_id size() const noexcept { return static_cast<row_id>(col_ptrs_accessor_.size()); }
 
  private:
   dict_accessor_t dict_accessor_;
+  col_ptrs_accessor_t col_ptrs_accessor_;
+};
+
+/**
+ * A const column pointer iterable (and iterator) for dictified data. Example usage:
+ *
+ * for (const memory::col_ptr_64_t pointer : iterable) { ... }
+ */
+template <typename T, typename COL_PTR_TYPE>
+class column_pointer_iterable {
+  friend class column_pointer_chunk<T>;
+
+ public:
+  using col_ptrs_accessor_t = typename memory::column_ptrs_impl<COL_PTR_TYPE>::const_data_accessor_t;
+
+  class iterator : public details::column_iterator_crtp_base<T, memory::col_ptr_64_t, iterator> {
+    using base = details::column_iterator_crtp_base<T, memory::col_ptr_64_t, iterator>;
+
+   public:
+    using typename base::difference_type;
+    using typename base::iterator_category;
+    using typename base::pointer;
+    using typename base::reference;
+    using typename base::value_type;
+
+    iterator(const column_pointer_iterable& parent, const row_id index) noexcept : base{index}, parent_{&parent} {}
+
+    [[nodiscard]] reference operator*() const noexcept {
+      return static_cast<reference>(parent_->col_ptrs_accessor_[this->current()]);
+    }
+
+   private:
+    const column_pointer_iterable* parent_{};
+  };
+
+  explicit column_pointer_iterable(col_ptrs_accessor_t col_ptrs_accessor) noexcept
+      : col_ptrs_accessor_{std::move(col_ptrs_accessor)} {}
+
+  [[nodiscard]] iterator begin() const noexcept { return iterator{*this, 0}; }
+  [[nodiscard]] iterator end() const noexcept {
+    return iterator{*this, static_cast<row_id>(col_ptrs_accessor_.size())};
+  }
+  [[nodiscard]] row_id size() const noexcept { return static_cast<row_id>(col_ptrs_accessor_.size()); }
+
+ private:
   col_ptrs_accessor_t col_ptrs_accessor_;
 };
 
@@ -262,8 +313,16 @@ using column_iterable_t = std::conditional_t<
     std::variant<materialized_iterable<T>, dictified_iterable<T, col_ptr_8_t>, dictified_iterable<T, col_ptr_16_t>,
                  dictified_iterable<T, col_ptr_32_t>>>;
 
+template <typename T>
+using column_pointer_iterable_t =
+    std::conditional_t<memory::COL_PTR_64_NEEDED,
+                       std::variant<column_pointer_iterable<T, col_ptr_8_t>, column_pointer_iterable<T, col_ptr_16_t>,
+                                    column_pointer_iterable<T, col_ptr_32_t>, column_pointer_iterable<T, col_ptr_64_t>>,
+                       std::variant<column_pointer_iterable<T, col_ptr_8_t>, column_pointer_iterable<T, col_ptr_16_t>,
+                                    column_pointer_iterable<T, col_ptr_32_t>>>;
+
 /**
- * Creates an iterable for a column.
+ * Creates a value iterable for a column.
  *
  * If the column is either materialized or dictified, the internal state is not changed. If the column is missing,
  * it will be loaded first. Depending on the internal state, either a materialized or a dictified iterable is
@@ -293,10 +352,34 @@ template <typename T>
   const auto& col_ptrs{column->get_column_pointers(context)};
 
   return memory::cast_execute_column_pointers(
-      [&](const auto& tuple) -> column_iterable_t<T> {
+      [&dict = std::as_const(dict), &context = std::as_const(context)](const auto& tuple) -> column_iterable_t<T> {
         const auto& col_ptrs{std::get<0>(tuple)};
         using col_ptr_type = typename std::decay_t<decltype(col_ptrs)>::value_type;
         return dictified_iterable<T, col_ptr_type>{dict->get_const_data(context), col_ptrs.get_const_accessor()};
+      },
+      col_ptrs);
+}
+
+/**
+ * Creates a column pointer iterable for a column. If the column is materialized, an internal exception
+ * will be thrown.
+ */
+template <typename T>
+[[nodiscard]] column_pointer_iterable_t<T> to_column_pointer_iterable(
+    const memory::column_t& column, const common::execution_context& parent_context = {}) {
+  auto context{parent_context.create_sub_context("memory::to_column_pointer_iterable", {})};
+
+  if (auto materialized{column->get_materialized_typed<T>(context)}; materialized != nullptr) {
+    throw common::internal_exception{"Cannot use column pointer iterable on the materialized column [{}].",
+                                     column->get_name()};
+  }
+
+  const auto& col_ptrs{column->get_column_pointers(context)};
+  return memory::cast_execute_column_pointers(
+      [](const auto& tuple) -> column_pointer_iterable_t<T> {
+        const auto& col_ptrs{std::get<0>(tuple)};
+        using col_ptr_type = typename std::decay_t<decltype(col_ptrs)>::value_type;
+        return column_pointer_iterable<T, col_ptr_type>{col_ptrs.get_const_accessor()};
       },
       col_ptrs);
 }
@@ -307,6 +390,7 @@ class chunk {
   static constexpr row_id MAX_CHUNK_SIZE{1024};
   using values_t = std::array<T, MAX_CHUNK_SIZE>;
   using null_flags_t = details::bitset<MAX_CHUNK_SIZE>;
+  using element_type_t = std::optional<T>;
 
   class iterator : public details::column_iterator_crtp_base<T, std::optional<T>, iterator> {
     using base = details::column_iterator_crtp_base<T, std::optional<T>, iterator>;
@@ -336,7 +420,7 @@ class chunk {
   chunk(const materialized_iterable<T>& iterable, ctl::half_open_interval<row_id> range)
       : chunk_size_{range.size()},
         values_{copy_from(iterable.value_accessor_.get(), range)},
-        null_flags_{*iterable.null_flags_accessor_.get(), range} {
+        null_flags_{iterable.null_flags_accessor_.get(), range} {
     if (chunk_size_ > MAX_CHUNK_SIZE) {
       throw common::internal_exception{"Cannot create chunk of size {}.", chunk_size_};
     }
@@ -385,12 +469,76 @@ class chunk {
 };
 
 template <typename T>
+class column_pointer_chunk {
+ public:
+  static constexpr row_id MAX_CHUNK_SIZE{1024};
+  using ptrs_t = std::array<memory::col_ptr_64_t, MAX_CHUNK_SIZE>;
+  using element_type_t = memory::col_ptr_64_t;
+
+  class iterator : public details::column_iterator_crtp_base<T, memory::col_ptr_64_t, iterator> {
+    using base = details::column_iterator_crtp_base<T, memory::col_ptr_64_t, iterator>;
+
+   public:
+    using typename base::difference_type;
+    using typename base::iterator_category;
+    using typename base::pointer;
+    using typename base::reference;
+    using typename base::value_type;
+
+    iterator(const column_pointer_chunk& parent, const row_id index) noexcept : base{index}, parent_{&parent} {}
+
+    [[nodiscard]] reference operator*() const noexcept {
+      debug_assert(0 <= this->current() && this->current() < parent_->chunk_size_);
+      return parent_->ptrs_[this->current()];
+    }
+
+   private:
+    const column_pointer_chunk* parent_{};
+  };
+
+  constexpr column_pointer_chunk() = default;
+
+  template <typename COL_PTR>
+  column_pointer_chunk(const column_pointer_iterable<T, COL_PTR>& iterable, ctl::half_open_interval<row_id> range)
+      : chunk_size_{range.size()}, ptrs_{copy_from(iterable.col_ptrs_accessor_.get(), range)} {
+    if (chunk_size_ > MAX_CHUNK_SIZE) {
+      throw common::internal_exception{"Cannot create chunk of size {}.", chunk_size_};
+    }
+  }
+
+  [[nodiscard]] iterator begin() const noexcept { return iterator{*this, 0}; }
+  [[nodiscard]] iterator end() const noexcept { return iterator{*this, chunk_size_}; }
+  [[nodiscard]] row_id size() const noexcept { return chunk_size_; }
+
+  [[nodiscard]] const ptrs_t& raw_pointers() const noexcept { return ptrs_; }
+
+ private:
+  template <typename COL_PTR>
+  [[nodiscard]] static ptrs_t copy_from(const COL_PTR* data, ctl::half_open_interval<row_id> range) {
+    ptrs_t result{};
+    debug_assert(static_cast<row_id>(result.size()) >= range.size());
+    std::copy_n(data + range.begin(), range.size(), result.data());
+    return result;
+  }
+
+  // N.B. no types which allocate should be used as members. This way, a chunk will always reside in the stack.
+  row_id chunk_size_{0};
+  ptrs_t ptrs_{};
+};
+
+static constexpr row_id DEFAULT_CHUNK_SIZE{1024};
+
+enum class iterable_type { VALUE, COLUMN_PTR };
+
+/**
+ * A value chunked_iterable implementation
+ */
+template <typename T, iterable_type ITER_TYPE = iterable_type::VALUE>
 class chunked_iterable {
  public:
-  static constexpr row_id DEFAULT_CHUNK_SIZE{1024};
-
-  class iterator : public details::column_iterator_crtp_base<T, chunk<T>, iterator> {
-    using base = details::column_iterator_crtp_base<T, chunk<T>, iterator>;
+  using chunk_type_t = chunk<T>;
+  class iterator : public details::column_iterator_crtp_base<T, chunk_type_t, iterator> {
+    using base = details::column_iterator_crtp_base<T, chunk_type_t, iterator>;
 
    public:
     using typename base::difference_type;
@@ -405,11 +553,10 @@ class chunked_iterable {
       return std::visit(
           [chunk_size = parent_->chunk_size_, chunk_index = this->current()](const auto& iterable) {
             const row_id begin_index{chunk_index * chunk_size};
-            const row_id end_index{
-                std::min(chunk_index * chunk_size + chunk_size, std::distance(iterable.begin(), iterable.end()))};
+            const row_id end_index{std::min(begin_index + chunk_size, iterable.size())};
             return chunk<T>{iterable, {begin_index, end_index}};
           },
-          parent_->upstream_);
+          parent_->value_upstream_);
     }
 
    private:
@@ -417,48 +564,139 @@ class chunked_iterable {
   };
 
   explicit chunked_iterable(column_iterable_t<T> upstream, row_id chunk_size = DEFAULT_CHUNK_SIZE)
-      : upstream_{std::move(upstream)}, chunk_size_{chunk_size} {
-    if (chunk_size <= 0 || chunk_size > chunk<T>::MAX_CHUNK_SIZE || chunk_size % 64 != 0) {
+      : value_upstream_{std::move(upstream)}, chunk_size_{chunk_size} {
+    if (chunk_size <= 0 || chunk_size > chunk_type_t::MAX_CHUNK_SIZE || chunk_size % 64 != 0) {
       throw common::internal_exception{"Invalid chunk size: {}.", chunk_size};
     }
   }
 
   [[nodiscard]] iterator begin() const noexcept { return iterator{*this, 0}; }
   [[nodiscard]] iterator end() const {
-    return iterator{*this, std::visit(
-                               [chunk_size = chunk_size_](const auto& iterable) {
-                                 return ctl::div_round_up(std::distance(iterable.begin(), iterable.end()), chunk_size);
-                               },
-                               upstream_)};
+    return iterator{*this,
+                    std::visit([chunk_size = chunk_size_](
+                                   const auto& iterable) { return ctl::div_round_up(iterable.size(), chunk_size); },
+                               value_upstream_)};
   }
 
   [[nodiscard]] row_id get_chunk_size() const noexcept { return chunk_size_; }
+  [[nodiscard]] row_id get_element_count() const {
+    return std::visit([](const auto& iterable) { return iterable.size(); }, value_upstream_);
+  }
 
  private:
-  column_iterable_t<T> upstream_;
+  column_iterable_t<T> value_upstream_;
   row_id chunk_size_;
 };
 
 /**
- * Creates a chunked iterable from a column. Passing a custom chunk size should be used for testing purposes only.
+ * A column pointer chunked_iterable implementation
  */
 template <typename T>
-[[nodiscard]] chunked_iterable<T> to_chunked_iterable(
-    const memory::column_t& column, const common::execution_context& parent_context,
-    const row_id chunk_size = chunked_iterable<T>::DEFAULT_CHUNK_SIZE) {
-  return chunked_iterable<T>{to_iterable<T>(column, parent_context), chunk_size};
+class chunked_iterable<T, iterable_type::COLUMN_PTR> {
+ public:
+  using chunk_type_t = column_pointer_chunk<T>;
+  class iterator : public details::column_iterator_crtp_base<T, chunk_type_t, iterator> {
+    using base = details::column_iterator_crtp_base<T, chunk_type_t, iterator>;
+
+   public:
+    using typename base::difference_type;
+    using typename base::iterator_category;
+    using typename base::pointer;
+    using typename base::reference;
+    using typename base::value_type;
+
+    iterator(const chunked_iterable& parent, const row_id index) noexcept : base{index}, parent_{&parent} {}
+
+    [[nodiscard]] reference operator*() const {
+      return std::visit(
+          [chunk_size = parent_->chunk_size_, chunk_index = this->current()](const auto& iterable) {
+            const row_id begin_index{chunk_index * chunk_size};
+            const row_id end_index{std::min(begin_index + chunk_size, iterable.size())};
+            return column_pointer_chunk{iterable, {begin_index, end_index}};
+          },
+          parent_->col_ptr_upstream_);
+    }
+
+   private:
+    const chunked_iterable* parent_{};
+  };
+
+  explicit chunked_iterable(column_pointer_iterable_t<T> upstream, row_id chunk_size = DEFAULT_CHUNK_SIZE)
+      : col_ptr_upstream_{std::move(upstream)}, chunk_size_{chunk_size} {
+    if (chunk_size <= 0 || chunk_size > chunk_type_t::MAX_CHUNK_SIZE || chunk_size % 64 != 0) {
+      throw common::internal_exception{"Invalid chunk size: {}.", chunk_size};
+    }
+  }
+
+  [[nodiscard]] iterator begin() const noexcept { return iterator{*this, 0}; }
+  [[nodiscard]] iterator end() const {
+    return iterator{*this,
+                    std::visit([chunk_size = chunk_size_](
+                                   const auto& iterable) { return ctl::div_round_up(iterable.size(), chunk_size); },
+                               col_ptr_upstream_)};
+  }
+
+  [[nodiscard]] row_id get_chunk_size() const noexcept { return chunk_size_; }
+
+  [[nodiscard]] row_id get_element_count() const {
+    return std::visit([](const auto& iterable) { return iterable.size(); }, col_ptr_upstream_);
+  }
+
+ private:
+  column_pointer_iterable_t<T> col_ptr_upstream_;
+  row_id chunk_size_;
+};
+
+template <typename T, iterable_type ITER_TYPE = iterable_type::VALUE>
+struct typed_column {
+  using element_type_t = std::optional<T>;
+  using chunk_type_t = chunk<T>;
+  column_t col;
+};
+
+template <typename T>
+struct typed_column<T, iterable_type::COLUMN_PTR> {
+  using element_type_t = memory::col_ptr_64_t;
+  using chunk_type_t = column_pointer_chunk<T>;
+  column_t col;
+};
+
+// helper class to overload to_chunked_iterable_impl with different ITER_TYPE
+template <iterable_type ITER_TYPE>
+struct iterable_helper {};
+
+template <typename T>
+[[nodiscard]] chunked_iterable<T, iterable_type::VALUE> to_chunked_iterable_impl(
+    iterable_helper<iterable_type::VALUE> /*helper*/, const memory::column_t& column,
+    const common::execution_context& parent_context, const row_id chunk_size) {
+  return chunked_iterable<T, iterable_type::VALUE>{to_iterable<T>(column, parent_context), chunk_size};
 }
 
-template <typename TYPE>
-using typed_column_t = column_t;
+template <typename T>
+[[nodiscard]] chunked_iterable<T, iterable_type::COLUMN_PTR> to_chunked_iterable_impl(
+    iterable_helper<iterable_type::COLUMN_PTR> /*helper*/, const memory::column_t& column,
+    const common::execution_context& parent_context, const row_id chunk_size) {
+  return chunked_iterable<T, iterable_type::COLUMN_PTR>{to_column_pointer_iterable<T>(column, parent_context),
+                                                        chunk_size};
+}
+
+/**
+ * Creates a chunked iterable from a column. Passing a custom chunk size should be used for testing purposes only.
+ */
+template <typename T, iterable_type ITER_TYPE = iterable_type::VALUE>
+[[nodiscard]] chunked_iterable<T, ITER_TYPE> to_chunked_iterable(const memory::column_t& column,
+                                                                 const common::execution_context& parent_context,
+                                                                 const row_id chunk_size = DEFAULT_CHUNK_SIZE) {
+  return to_chunked_iterable_impl<T>(iterable_helper<ITER_TYPE>{}, column, parent_context, chunk_size);
+}
 
 /**
  * Creates multiple chunked iterables at once using the default chunk size.
  */
-template <typename... TYPES>
-[[nodiscard]] std::tuple<chunked_iterable<TYPES>...> to_chunked_iterables(
-    const common::execution_context& parent_context, typed_column_t<TYPES>... columns) {
-  return std::make_tuple(to_chunked_iterable<TYPES>(columns, parent_context)...);
+template <typename... TS, iterable_type... ITER_TYPES>
+[[nodiscard]] std::tuple<chunked_iterable<TS, ITER_TYPES>...> to_chunked_iterables(
+    const common::execution_context& parent_context, typed_column<TS, ITER_TYPES>... columns) {
+  return std::make_tuple(to_chunked_iterable<TS, ITER_TYPES>(columns.col, parent_context)...);
 }
 
 namespace details {
@@ -467,9 +705,9 @@ namespace details {
  * Gets the amount of chunks that the iterables contain. If the amount of chunks does not match
  * across the iterables, an exception is thrown.
  */
-template <typename FIRST_TYPE, typename... TYPES>
-[[nodiscard]] row_id get_amount_of_chunks(const memory::chunked_iterable<FIRST_TYPE>& first,
-                                          const memory::chunked_iterable<TYPES>&... tail) {
+template <typename FIRST_T, iterable_type FIRST_ITER_TYPE, typename... TS, iterable_type... ITER_TYPES>
+[[nodiscard]] row_id get_amount_of_chunks(const memory::chunked_iterable<FIRST_T, FIRST_ITER_TYPE>& first,
+                                          const memory::chunked_iterable<TS, ITER_TYPES>&... tail) {
   const row_id num_chunks_first{std::distance(first.begin(), first.end())};
   if (((std::distance(tail.begin(), tail.end()) != num_chunks_first) || ...)) {
     throw common::internal_exception{
@@ -478,17 +716,18 @@ template <typename FIRST_TYPE, typename... TYPES>
   return num_chunks_first;
 }
 
-template <typename... TYPES>
-[[nodiscard]] row_id get_amount_of_chunks(const std::tuple<memory::chunked_iterable<TYPES>...>& iterables_tuple) {
+template <typename... TS, iterable_type... ITER_TYPES>
+[[nodiscard]] row_id get_amount_of_chunks(
+    const std::tuple<memory::chunked_iterable<TS, ITER_TYPES>...>& iterables_tuple) {
   return std::apply([](auto&&... iterables) { return get_amount_of_chunks(iterables...); }, iterables_tuple);
 }
 
 /*
  * Given iterables, returns the chunks of all iterables at position chunk_index. Does bounds checking.
  */
-template <typename... COLUMN_TYPE>
-[[nodiscard]] std::tuple<chunk<COLUMN_TYPE>...> get_chunks_at(
-    const row_id chunk_index, const memory::chunked_iterable<COLUMN_TYPE>&... iterables) {
+template <typename... TS, iterable_type... ITER_TYPES>
+[[nodiscard]] std::tuple<typename memory::chunked_iterable<TS, ITER_TYPES>::chunk_type_t...> get_chunks_at(
+    const row_id chunk_index, const memory::chunked_iterable<TS, ITER_TYPES>&... iterables) {
   const row_id amount_of_chunks{get_amount_of_chunks(iterables...)};
 
   if (chunk_index >= amount_of_chunks) {
@@ -499,14 +738,14 @@ template <typename... COLUMN_TYPE>
   return std::make_tuple(*std::next(iterables.begin(), chunk_index)...);
 }
 
-template <typename... TYPES>
-[[nodiscard]] std::tuple<chunk<TYPES>...> get_chunks_at(
-    const row_id chunk_index, const std::tuple<memory::chunked_iterable<TYPES>...>& iterables_tuple) {
+template <typename... TS, iterable_type... ITER_TYPES>
+[[nodiscard]] std::tuple<typename memory::chunked_iterable<TS, ITER_TYPES>::chunk_type_t...> get_chunks_at(
+    const row_id chunk_index, const std::tuple<memory::chunked_iterable<TS, ITER_TYPES>...>& iterables_tuple) {
   return std::apply([&chunk_index](auto&&... args) { return get_chunks_at(chunk_index, args...); }, iterables_tuple);
 }
 
-template <typename FIRST_TYPE, typename... TYPES>
-row_id check_and_get_chunk_size(const memory::chunk<FIRST_TYPE>& first, const memory::chunk<TYPES>&... tail) {
+template <typename FIRST_CHUNK, typename... CHUNKS>
+row_id check_and_get_chunk_size(const FIRST_CHUNK& first, const CHUNKS&... tail) {
   // Check for equal chunk sizes
   const row_id chunk_size_first{first.size()};
 
@@ -521,20 +760,19 @@ row_id check_and_get_chunk_size(const memory::chunk<FIRST_TYPE>& first, const me
 /**
  * Throws if chunk sizes of the given chunks do not match.
  */
-template <typename... TYPES>
-void check_chunk_sizes(const memory::chunk<TYPES>&... chunks) {
+template <typename... CHUNKS>
+void check_chunk_sizes(const CHUNKS&... chunks) {
   details::check_and_get_chunk_size(chunks...);
 }
 
-template <typename TYPE, typename... TYPES>
-void check_chunk_sizes(const memory::chunk<TYPE>& chunk,
-                       const std::tuple<memory::chunk<TYPES>...>& further_chunks_tuple) {
+template <typename CHUNK, typename... CHUNKS>
+void check_chunk_sizes(const CHUNK& chunk, const std::tuple<CHUNKS...>& further_chunks_tuple) {
   std::apply([&chunk](auto&&... further_chunks) { details::check_and_get_chunk_size(chunk, further_chunks...); },
              further_chunks_tuple);
 }
 
-template <typename FUNCTION, typename... TYPES>
-void for_each_value_in_chunk(FUNCTION&& function, const memory::chunk<TYPES>&... chunks) {
+template <typename FUNCTION, typename... CHUNKS>
+void for_each_value_in_chunk(FUNCTION&& function, const CHUNKS&... chunks) {
   if (sizeof...(chunks) == 0) {
     return;
   }
@@ -545,7 +783,7 @@ void for_each_value_in_chunk(FUNCTION&& function, const memory::chunk<TYPES>&...
   auto chunk_begin{boost::make_zip_iterator(boost::make_tuple(chunks.begin()...))};
   auto chunk_end{boost::make_zip_iterator(boost::make_tuple(chunks.end()...))};
 
-  std::for_each(chunk_begin, chunk_end, [&function](const boost::tuple<std::optional<TYPES>...>& values) {
+  std::for_each(chunk_begin, chunk_end, [&function](const boost::tuple<typename CHUNKS::element_type_t...>& values) {
     boost::fusion::invoke(function, values);
   });
 }
@@ -553,8 +791,8 @@ void for_each_value_in_chunk(FUNCTION&& function, const memory::chunk<TYPES>&...
 /**
  * Iterates over all given chunks simultaneously and calls the given function for each iteration.
  */
-template <typename FUNCTION, typename... TYPES>
-void for_each_chunk(FUNCTION&& function, const memory::chunked_iterable<TYPES>&... iterables) {
+template <typename FUNCTION, typename... TS, iterable_type... ITER_TYPES>
+void for_each_chunk(FUNCTION&& function, const memory::chunked_iterable<TS, ITER_TYPES>&... iterables) {
   if (sizeof...(iterables) == 0) {
     return;
   }
@@ -569,14 +807,15 @@ void for_each_chunk(FUNCTION&& function, const memory::chunked_iterable<TYPES>&.
   auto chunks_begin{boost::make_zip_iterator(boost::make_tuple(chunk_index_iterator_begin, iterables.begin()...))};
   auto chunks_end{boost::make_zip_iterator(boost::make_tuple(chunk_index_iterator_end, iterables.end()...))};
 
-  std::for_each(chunks_begin, chunks_end,
-                [&function](const boost::tuple<const row_id, memory::chunk<TYPES>...>& chunks) {
-                  boost::fusion::invoke(function, chunks);
-                });
+  std::for_each(
+      chunks_begin, chunks_end,
+      [&function](const boost::tuple<const row_id, typename memory::chunked_iterable<TS, ITER_TYPES>::chunk_type_t...>&
+                      chunks) { boost::fusion::invoke(function, chunks); });
 };
 
-template <typename FUNCTION, typename... TYPES>
-void for_each_chunk(FUNCTION&& function, const std::tuple<memory::chunked_iterable<TYPES>...>& iterables_tuple) {
+template <typename FUNCTION, typename... TS, iterable_type... ITER_TYPES>
+void for_each_chunk(FUNCTION&& function,
+                    const std::tuple<memory::chunked_iterable<TS, ITER_TYPES>...>& iterables_tuple) {
   std::apply([&function](auto&&... iterables) { for_each_chunk(std::forward<FUNCTION>(function), iterables...); },
              iterables_tuple);
 }
@@ -585,9 +824,9 @@ void for_each_chunk(FUNCTION&& function, const std::tuple<memory::chunked_iterab
  * Gets the maximum chunk size for the iterables. This is the maximum chunk size for the iterable, but the last chunk
  * may be of lesser size. Throws if the the amount does not match for all the iterables.
  */
-template <typename FIRST_TYPE, typename... TYPES>
-[[nodiscard]] row_id get_max_chunk_size(const memory::chunked_iterable<FIRST_TYPE>& first,
-                                        const memory::chunked_iterable<TYPES>&... tail) {
+template <typename FIRST_TYPE, iterable_type FIRST_ITER_TYPE, typename... TS, iterable_type... ITER_TYPES>
+[[nodiscard]] row_id get_max_chunk_size(const memory::chunked_iterable<FIRST_TYPE, FIRST_ITER_TYPE>& first,
+                                        const memory::chunked_iterable<TS, ITER_TYPES>&... tail) {
   const row_id max_chunk_size_first{first.get_chunk_size()};
 
   // Check for equal chunk sizes
@@ -599,8 +838,9 @@ template <typename FIRST_TYPE, typename... TYPES>
   return max_chunk_size_first;
 }
 
-template <typename... TYPES>
-[[nodiscard]] row_id get_max_chunk_size(const std::tuple<memory::chunked_iterable<TYPES>...>& iterables_tuple) {
+template <typename... TS, iterable_type... ITER_TYPES>
+[[nodiscard]] row_id get_max_chunk_size(
+    const std::tuple<memory::chunked_iterable<TS, ITER_TYPES>...>& iterables_tuple) {
   return std::apply([](auto&&... iterables) { return get_max_chunk_size(iterables...); }, iterables_tuple);
 }
 
@@ -610,9 +850,9 @@ template <typename... TYPES>
  * chunk size) to the function.
  * @param max_chunk_size The size that a chunk (of the iterable) can have at maximum.
  */
-template <typename FUNCTION, typename... TYPES>
+template <typename FUNCTION, typename... CHUNKS>
 void for_each_value_in_chunk_with_index(FUNCTION&& function, const row_id max_chunk_size, const row_id chunk_index,
-                                        const memory::chunk<TYPES>&... chunks) {
+                                        const CHUNKS&... chunks) {
   if (sizeof...(chunks) == 0) {
     return;
   }
@@ -632,15 +872,16 @@ void for_each_value_in_chunk_with_index(FUNCTION&& function, const row_id max_ch
   auto chunk_end{boost::make_zip_iterator(
       boost::make_tuple(local_index_iterator_end, global_index_iterator_end, chunks.end()...))};
 
-  std::for_each(chunk_begin, chunk_end,
-                [&function](const boost::tuple<const row_id, const row_id, std::optional<TYPES>...>& values) {
-                  boost::fusion::invoke(function, values);
-                });
+  std::for_each(
+      chunk_begin, chunk_end,
+      [&function](const boost::tuple<const row_id, const row_id, typename CHUNKS::element_type_t...>& values) {
+        boost::fusion::invoke(function, values);
+      });
 };
 
-template <typename FUNCTION, typename... TYPES>
+template <typename FUNCTION, typename... CHUNKS>
 void for_each_value_in_chunk_with_index(FUNCTION&& function, const row_id max_chunk_size, const row_id chunk_index,
-                                        const std::tuple<memory::chunk<TYPES>...>& chunks) {
+                                        const std::tuple<CHUNKS...>& chunks) {
   std::apply(
       [&function, &max_chunk_size, &chunk_index](auto&&... chunks) {
         for_each_value_in_chunk_with_index(function, max_chunk_size, chunk_index, chunks...);
@@ -654,15 +895,19 @@ void for_each_value_in_chunk_with_index(FUNCTION&& function, const row_id max_ch
  * Creates a chunked iterable for every column and iterates over all values of the columns simultaneously, calling the
  * supplied function.
  */
-template <typename... TYPES, std::invocable<std::optional<TYPES>...> FUNCTION>
+template <typename... TS, iterable_type... ITER_TYPES, typename FUNCTION>
+requires std::invocable<FUNCTION, typename typed_column<TS, ITER_TYPES>::element_type_t...>
 void for_each_value(FUNCTION&& function, const common::execution_context& context,
-                    const typed_column_t<TYPES>&... columns) {
-  const auto chunked_columns{memory::to_chunked_iterables<TYPES...>(context, columns...)};
+                    const typed_column<TS, ITER_TYPES>&... columns) {
+  const auto chunked_columns{memory::to_chunked_iterables(context, columns...)};
 
   details::for_each_chunk(
-      [&function](const row_id /* chunk_index */, const chunk<TYPES>... chunks) {
-        details::for_each_value_in_chunk([&function](const std::optional<TYPES>... values) { function(values...); },
-                                         chunks...);
+      [&function](const row_id /* chunk_index */, const typename typed_column<TS, ITER_TYPES>::chunk_type_t... chunks) {
+        details::for_each_value_in_chunk(
+            [&function](const typename typed_column<TS, ITER_TYPES>::element_type_t... values) {
+              std::forward<FUNCTION>(function)(values...);
+            },
+            chunks...);
       },
       chunked_columns);
 }
@@ -671,17 +916,19 @@ void for_each_value(FUNCTION&& function, const common::execution_context& contex
  * Creates a chunked iterable for every column and iterates over all values of the columns simultaneously, calling the
  * supplied function.
  */
-template <typename... TYPES, std::invocable<row_id, std::optional<TYPES>...> FUNCTION>
+template <typename... TS, iterable_type... ITER_TYPES, typename FUNCTION>
+requires std::invocable<FUNCTION, row_id, typename typed_column<TS, ITER_TYPES>::element_type_t...>
 void for_each_value_with_index(FUNCTION&& function, const common::execution_context& context,
-                               const typed_column_t<TYPES>&... columns) {
-  const auto chunked_columns{memory::to_chunked_iterables<TYPES...>(context, columns...)};
+                               const typed_column<TS, ITER_TYPES>&... columns) {
+  const auto chunked_columns{memory::to_chunked_iterables(context, columns...)};
 
   size_t global_index{0};
   details::for_each_chunk(
-      [&function, &global_index](const row_id /* chunk_index */, const chunk<TYPES>... chunks) {
+      [&function, &global_index](const row_id /* chunk_index */,
+                                 const typename typed_column<TS, ITER_TYPES>::chunk_type_t... chunks) {
         details::for_each_value_in_chunk(
-            [&function, &global_index](const std::optional<TYPES>... values) {
-              function(global_index, values...);
+            [&function, &global_index](const typename typed_column<TS, ITER_TYPES>::element_type_t... values) {
+              std::forward<FUNCTION>(function)(global_index, values...);
               ++global_index;
             },
             chunks...);
@@ -693,11 +940,12 @@ void for_each_value_with_index(FUNCTION&& function, const common::execution_cont
  * Similar to for_each_value, but also supplies an global index to the give function and parallelizes the iteration.
  * Therefore also needs a grain_size to be supplied.
  */
-template <typename... TYPES, std::invocable<row_id, std::optional<std::remove_cvref_t<TYPES>>...> FUNCTION>
+template <typename... TS, iterable_type... ITER_TYPES, typename FUNCTION>
+requires std::invocable<FUNCTION, row_id, typename typed_column<TS, ITER_TYPES>::element_type_t...>
 void parallel_for_each_value_with_index(FUNCTION&& function, const size_t grain_size,
                                         const common::execution_context& context,
-                                        const typed_column_t<TYPES>&... columns) {
-  const auto chunked_columns{memory::to_chunked_iterables<TYPES...>(context, columns...)};
+                                        const typed_column<TS, ITER_TYPES>&... columns) {
+  const auto chunked_columns{memory::to_chunked_iterables(context, columns...)};
   const row_id max_chunk_size{details::get_max_chunk_size(chunked_columns)};
   const row_id amount_of_chunks{details::get_amount_of_chunks(chunked_columns)};
 
@@ -708,7 +956,9 @@ void parallel_for_each_value_with_index(FUNCTION&& function, const size_t grain_
 
                         details::for_each_value_in_chunk_with_index(
                             [&function](const row_id /* local_index */, const row_id global_index,
-                                        const std::optional<TYPES>... values) { function(global_index, values...); },
+                                        const typename typed_column<TS, ITER_TYPES>::element_type_t... values) {
+                              std::forward<FUNCTION>(function)(global_index, values...);
+                            },
                             max_chunk_size, chunk_index, chunks);
                       }
                     });
@@ -717,19 +967,22 @@ void parallel_for_each_value_with_index(FUNCTION&& function, const size_t grain_
 /**
  * Similar to the other overload, but can also handle an optional column.
  */
-template <typename OPTIONAL_TYPE, typename... TYPES,
-          std::invocable<row_id, std::optional<OPTIONAL_TYPE>, std::optional<TYPES>...> FUNCTION>
-void parallel_for_each_value_with_index(FUNCTION&& function, const size_t grain_size,
-                                        const common::execution_context& context,
-                                        std::optional<const typed_column_t<OPTIONAL_TYPE>> optional_column,
-                                        const typed_column_t<TYPES>&... columns) {
-  const auto chunked_columns{to_chunked_iterables<TYPES...>(context, columns...)};
+template <typename OPTIONAL_T, iterable_type OPTIONAL_ITER_TYPE, typename... TS, iterable_type... ITER_TYPES,
+          typename FUNCTION>
+requires std::invocable < FUNCTION, row_id, typename typed_column<OPTIONAL_T, OPTIONAL_ITER_TYPE>::element_type_t,
+typename typed_column<TS, ITER_TYPES>::element_type_t... >
+    void parallel_for_each_value_with_index(
+        FUNCTION&& function, const size_t grain_size, const common::execution_context& context,
+        std::optional<const typed_column<OPTIONAL_T, OPTIONAL_ITER_TYPE>> optional_column,
+        const typed_column<TS, ITER_TYPES>&... columns) {
+  static_assert(OPTIONAL_ITER_TYPE == iterable_type::VALUE, "do not support optional column pointer typed column.");
+  const auto chunked_columns{to_chunked_iterables(context, columns...)};
   const row_id max_chunk_size{details::get_max_chunk_size(chunked_columns)};
   const row_id amount_of_chunks{details::get_amount_of_chunks(chunked_columns)};
 
-  std::optional<chunked_iterable<OPTIONAL_TYPE>> optional_chunked_column;
+  std::optional<chunked_iterable<OPTIONAL_T, OPTIONAL_ITER_TYPE>> optional_chunked_column;
   if (optional_column.has_value()) {
-    optional_chunked_column = to_chunked_iterable<OPTIONAL_TYPE>(optional_column.value(), context);
+    optional_chunked_column = to_chunked_iterable<OPTIONAL_T, OPTIONAL_ITER_TYPE>(optional_column->col, context);
     auto& optional_chunked_column_value{optional_chunked_column.value()};
 
     // For the optional column, we have to check if the 1) max chunk size is equal to the other iterables
@@ -749,36 +1002,38 @@ void parallel_for_each_value_with_index(FUNCTION&& function, const size_t grain_
     }
   }
 
-  tbb::parallel_for(tbb::blocked_range<row_id>{0, amount_of_chunks, grain_size / max_chunk_size},
-                    [&optional_chunked_column, &chunked_columns, &function, &max_chunk_size](const auto range) {
-                      for (row_id chunk_index{range.begin()}; chunk_index < range.end(); chunk_index++) {
-                        const auto chunks{details::get_chunks_at(chunk_index, chunked_columns)};
+  tbb::parallel_for(
+      tbb::blocked_range<row_id>{0, amount_of_chunks, grain_size / max_chunk_size},
+      [&optional_chunked_column, &chunked_columns, &function, &max_chunk_size](const auto range) {
+        for (row_id chunk_index{range.begin()}; chunk_index < range.end(); chunk_index++) {
+          const auto chunks{details::get_chunks_at(chunk_index, chunked_columns)};
 
-                        std::optional<chunk<OPTIONAL_TYPE>> optional_chunk{std::nullopt};
-                        if (optional_chunked_column.has_value()) {
-                          // Safe to access as we check for equal amount of chunks when creating the chunked iterable
-                          // for the optional column
-                          optional_chunk = *std::next(optional_chunked_column->begin(), chunk_index);
+          std::optional<typename chunked_iterable<OPTIONAL_T, OPTIONAL_ITER_TYPE>::chunk_type_t> optional_chunk{
+              std::nullopt};
+          if (optional_chunked_column.has_value()) {
+            // Safe to access as we check for equal amount of chunks when creating the chunked iterable
+            // for the optional column
+            optional_chunk = *std::next(optional_chunked_column->begin(), chunk_index);
 
-                          // Check if the size of the optional chunk and the other chunks matches
-                          details::check_chunk_sizes(optional_chunk.value(), chunks);
-                        }
+            // Check if the size of the optional chunk and the other chunks matches
+            details::check_chunk_sizes(optional_chunk.value(), chunks);
+          }
 
-                        details::for_each_value_in_chunk_with_index(
-                            [&function, &optional_chunk](const row_id local_index, const row_id global_index,
-                                                         const std::optional<TYPES>... values) {
-                              std::optional<OPTIONAL_TYPE> optional_chunk_value;
-                              if (optional_chunk.has_value()) {
-                                // Safe to access as we check for equal amount of chunks when creating the chunked
-                                // iterable for the optional column
-                                optional_chunk_value = *std::next(optional_chunk->begin(), local_index);
-                              }
+          details::for_each_value_in_chunk_with_index(
+              [&function, &optional_chunk](const row_id local_index, const row_id global_index,
+                                           const typename typed_column<TS, ITER_TYPES>::element_type_t... values) {
+                typename typed_column<OPTIONAL_T, OPTIONAL_ITER_TYPE>::element_type_t optional_chunk_value;
+                if (optional_chunk.has_value()) {
+                  // Safe to access as we check for equal amount of chunks when creating the chunked
+                  // iterable for the optional column
+                  optional_chunk_value = *std::next(optional_chunk->begin(), local_index);
+                }
 
-                              function(global_index, optional_chunk_value, values...);
-                            },
-                            max_chunk_size, chunk_index, chunks);
-                      }
-                    });
+                std::forward<FUNCTION>(function)(global_index, optional_chunk_value, values...);
+              },
+              max_chunk_size, chunk_index, chunks);
+        }
+      });
 }
 
 }  // namespace celonis::accelerator::memory

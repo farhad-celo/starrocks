@@ -111,7 +111,9 @@ class allocation_tracker final {
   circular_buffer<allocation_meta_data> tracked_deallocations_;
 };
 
-std::string build_n_largest_allocations_log_message(size_t n) {
+}  // namespace
+
+std::string build_string_containing_n_largest_open_allocations(size_t n) {
   n_largest n_largest_allocations_builder{n};
   const auto& tracked_allocations{allocation_tracker::instance().get_tracked_allocations()};
   const auto& tracked_deallocations{allocation_tracker::instance().get_tracked_deallocations()};
@@ -159,8 +161,6 @@ std::string build_n_largest_allocations_log_message(size_t n) {
   });
   return accumulated_msg;
 }
-
-}  // namespace
 
 namespace details {
 
@@ -238,7 +238,7 @@ void log_memory_tracking_state(size_t mem_available_kib, size_t mem_estimated_av
               {"in_use_by_process_in_B", in_use_by_process},
               {"estimated_net_allocated_in_B", memory_consumption_tracker.cur_net_allocated()},
               {"batched_tracker_count", memory_consumption_tracker.batched_tracker_count()},
-              {"top_5_allocations:", build_n_largest_allocations_log_message(5)}});
+              {"top_5_allocations:", build_string_containing_n_largest_open_allocations(5)}});
 }
 
 void log_large_allocation_warning(const std::size_t number_of_elements_to_allocate,

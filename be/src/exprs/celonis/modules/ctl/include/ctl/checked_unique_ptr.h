@@ -122,6 +122,11 @@ std::ostream& operator<<(std::ostream& os, const checked_unique_ptr<T>& ptr) {
   return os << ptr.get();
 }
 
+template <typename T, typename... ARGS>
+[[nodiscard]] checked_unique_ptr<T> make_checked_unique(ARGS&&... args) {
+  return ctl::checked_unique_ptr<T>{std::make_unique<T>(std::forward<ARGS>(args)...)};
+}
+
 };  // namespace celonis::accelerator::ctl
 
 namespace std {

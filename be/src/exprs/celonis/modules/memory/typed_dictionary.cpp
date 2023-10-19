@@ -156,15 +156,16 @@ dictionary_map typed_dictionary<T>::create_dictionary_mapping(const std::shared_
 
 template <typename T>
 std::string typed_dictionary<T>::get_string_value(row_id ptr) const {
-  const auto size = this->get_size();
-  if (ptr < 0 || ptr >= size) {
-    throw common::out_of_bounds_exception{"typed_dictionary::get_string_value", row_id{0}, (size - 1), ptr};
-  }
+  return get_string_value_opt(ptr).value_or("NULL");
+}
+
+template <typename T>
+std::optional<std::string> typed_dictionary<T>::get_string_value_opt(row_id ptr) const {
   if (ptr == 0) {
-    return "NULL";
+    return std::nullopt;
   }
 
-  const auto value = get_const_data()[ptr];
+  const auto value = get_const_data().at(ptr);
   std::ostringstream converter;
   converter << std::fixed << value;
   return converter.str();
@@ -180,36 +181,38 @@ usage_time_t typed_dictionary<T>::time_of_last_usage() const {
   return data_handler->get_last_usage();
 }
 
+template <>
+inline std::optional<std::string> typed_dictionary<cel_boolean_t>::get_string_value_opt(row_id ptr) const {
+  if (ptr == 0) {
+    return std::nullopt;
+  }
+
+  const cel_boolean_t bool_val = get_const_data().at(ptr);
+  return bool_val ? "TRUE" : "FALSE";
+}
+
 // Specialization of the get_string_value for boolean data_type
 template <>
 inline std::string typed_dictionary<cel_boolean_t>::get_string_value(row_id ptr) const {
-  const auto size = this->get_size();
-  if (ptr < 0 || ptr >= size) {
-    throw common::out_of_bounds_exception{"typed_dictionary::get_string_value", row_id{0}, (size - 1), ptr};
-  }
+  return get_string_value_opt(ptr).value_or("NULL");
+}
+
+template <>
+inline std::optional<std::string> typed_dictionary<cel_date_t>::get_string_value_opt(row_id ptr) const {
   if (ptr == 0) {
-    return "NULL";
+    return std::nullopt;
   }
 
-  const cel_boolean_t bool_val = get_const_data()[ptr];
-  return bool_val ? "TRUE" : "FALSE";
+  const cel_date_t date_val = get_const_data().at(ptr);
+  std::ostringstream converter;
+  converter << date_val.to_timestamp();
+  return converter.str();
 }
 
 // Specialization of the get_string_value for date data_type
 template <>
 inline std::string typed_dictionary<cel_date_t>::get_string_value(row_id ptr) const {
-  const auto size = this->get_size();
-  if (ptr < 0 || ptr >= size) {
-    throw common::out_of_bounds_exception{"typed_dictionary::get_string_value", row_id{0}, (size - 1), ptr};
-  }
-  if (ptr == 0) {
-    return "NULL";
-  }
-
-  const cel_date_t date_val = get_const_data()[ptr];
-  std::ostringstream converter;
-  converter << date_val.to_timestamp();
-  return converter.str();
+  return get_string_value_opt(ptr).value_or("NULL");
 }
 
 template <typename T>
@@ -386,16 +389,16 @@ dictionary_map typed_dictionary<cel_string_t>::create_dictionary_mapping(const s
   return dictionary_map::create(*this, *casted_other, context);
 }
 
-std::string typed_dictionary<cel_string_t>::get_string_value(row_id ptr) const {
-  const auto size = this->get_size();
-  if (ptr < 0 || ptr >= size) {
-    throw common::out_of_bounds_exception{"typed_dictionary::get_string_value", row_id{0}, (size - 1), ptr};
-  }
+std::optional<std::string> typed_dictionary<cel_string_t>::get_string_value_opt(row_id ptr) const {
   if (ptr == 0) {
-    return "NULL";
+    return std::nullopt;
   }
 
-  return std::string(get_const_data()[ptr]);
+  return std::string(get_const_data().at(ptr));
+}
+
+std::string typed_dictionary<cel_string_t>::get_string_value(row_id ptr) const {
+  return get_string_value_opt(ptr).value_or("NULL");
 }
 
 [[nodiscard]] dictionary_t typed_dictionary<cel_string_t>::create_dictionary(ctl::static_array<cel_string_t>&& ptr,

@@ -3,9 +3,11 @@
 #include <chrono>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
+#include "format/json/json_fwd.h"
 #include "modules/cube/execution/tracking/operator_statistics_fwd.h"
 
 #ifndef CELOSTAR
@@ -26,6 +28,66 @@ using drilled_stats_map_t = std::unordered_map<std::string /* operation_stage */
 
 using operator_telemetry_map_t = std::unordered_map<std::string /* counter name */, size_t /* counter */>;
 
+struct resource_usage_data_point {
+  std::size_t estimated{};
+  std::size_t actual{};
+  [[nodiscard]] double ratio() const { return static_cast<double>(estimated) / static_cast<double>(actual); }
+};
+
+struct resource_usage_data_points {
+  std::size_t input_column_size{};
+  resource_usage_data_point working_memory{};
+  resource_usage_data_point output_column_size{};
+};
+
+format::json::json_object_t serialize_data_points(const resource_usage_data_points& data_points);
+
+class averaged_resource_usage_data_points {
+ public:
+  /** Add data points to aggregates
+   *
+   * @return averaged data points
+   */
+  resource_usage_data_points add_data_points(const resource_usage_data_points& data_points);
+
+  /** Get averaged data points
+   *
+   * @return averaged data points
+   */
+  [[nodiscard]] resource_usage_data_points get() const;
+
+ private:
+  std::size_t count{};
+  resource_usage_data_points sum{};
+};
+
+class max_resource_usage_data_points {
+ public:
+  void add_data_points(const resource_usage_data_points& data_points);
+  [[nodiscard]] const resource_usage_data_points& get() const { return max; }
+
+ private:
+  resource_usage_data_points max{};
+};
+
+struct resource_usage_stats {
+  /** Add data points to aggregates
+   *
+   * @return averaged data points over all invocations
+   */
+  resource_usage_data_points add_data_points(const resource_usage_data_points& data_points);
+
+  averaged_resource_usage_data_points all_avg{};
+  averaged_resource_usage_data_points underestimated_working_memory_avg{};
+  averaged_resource_usage_data_points underestimated_output_column_size_avg{};
+  averaged_resource_usage_data_points overestimated_working_memory_avg{};
+  averaged_resource_usage_data_points overestimated_output_column_size_avg{};
+  max_resource_usage_data_points underestimated_working_memory_max{};
+  max_resource_usage_data_points underestimated_output_column_size_max{};
+  max_resource_usage_data_points overestimated_working_memory_max{};
+  max_resource_usage_data_points overestimated_output_column_size_max{};
+};
+
 struct operator_runtime_stats {
   // Total invocations/runtime, which might be cached or not cached, no further information is available
   int64_t total_invocations{};
@@ -40,6 +102,7 @@ struct operator_runtime_stats {
 
   drilled_stats_map_t drilled_down_statistics{};
   operator_telemetry_map_t operator_telemetry{};
+  resource_usage_stats resource_usage{};
 };
 
 using stats_map_t = std::unordered_map<std::string /* operator_key */, operator_runtime_stats>;
@@ -52,6 +115,9 @@ class operator_statistics {
   void add_sub_stage_invocation(const std::string& operator_key, const std::string& stage_name,
                                 std::chrono::milliseconds time);
   void add_telemetry_counter(const std::string& operator_key, const std::string& counter_name, size_t count);
+
+  std::optional<resource_usage_data_points> report_resource_usage(const std::string& operator_key,
+                                                                  const resource_usage_data_points& data_points);
 
   void log_statistics_and_reset();
 

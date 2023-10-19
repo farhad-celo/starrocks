@@ -12,7 +12,9 @@ struct align_model_statistics {
   size_t pruned_variants_computed_optimal{};
   size_t pruned_variants_computed_relaxation_labeling{};
   size_t optimizations_solved{};
+  size_t successful_relaxation_labelings{};
   size_t alignment_cost{};
+  size_t successfully_computed_pruned_variants{};
   size_t time_optimal{};
   size_t time_relaxation_labeling{};
   size_t time_variant_alignment{};

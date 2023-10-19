@@ -3,6 +3,8 @@
 #include <iterator>
 #include <variant>
 
+#include <boost/range/iterator_range_core.hpp>
+
 #include "modules/common/exceptions.h"
 #include "modules/memory/row_id.h"
 #include "modules/operators/process/alignment/petri_net/petri_net.h"
@@ -42,14 +44,24 @@ std::string get_source_place_id_string(const vertex& source, const vertex& targe
   return non_parallel_target_place_id_string(target.get_vertex_id());
 }
 
+template <typename MULTIMAP, typename KEY, typename VAL>
+void emplace_if_not_present_yet(MULTIMAP& map, KEY&& key, VAL&& val) {
+  using value_type = typename MULTIMAP::value_type;
+  const auto equal_range{boost::make_iterator_range(map.equal_range(key))};
+  if (std::ranges::empty(equal_range)) {
+    map.emplace(std::forward<KEY>(key), std::forward<VAL>(val));
+  } else if (const auto it{std::ranges::find(equal_range, val, &value_type::second)};
+             it == std::ranges::end(equal_range)) {
+    map.emplace_hint(it, std::forward<KEY>(key), std::forward<VAL>(val));
+  }
+}
+
 std::string get_source_place_id(const vertex& source, const vertex& target,
                                 alignment::petri_net::petri_net_representation& petri_net) {
   const auto [place_it, place_success]{petri_net.places.emplace(get_source_place_id_string(source, target))};
   const auto [transition_it, transition_success]{
       petri_net.transitions.try_emplace(transition_id_string(source.get_vertex_id()), source.get_vertex_id())};
-  if (place_success || transition_success) {
-    petri_net.transition_place_arcs.emplace(transition_it->first, *place_it);
-  }
+  emplace_if_not_present_yet(petri_net.transition_place_arcs, transition_it->first, *place_it);
   return *place_it;
 }
 
@@ -58,9 +70,7 @@ std::string get_target_place_id(const vertex& source, const vertex& target,
   const auto [place_it, place_success]{petri_net.places.emplace(get_target_place_id_string(source, target))};
   const auto [transition_it, transition_success]{
       petri_net.transitions.try_emplace(transition_id_string(target.get_vertex_id()), target.get_vertex_id())};
-  if (place_success || transition_success) {
-    petri_net.place_transition_arcs.emplace(*place_it, transition_it->first);
-  }
+  emplace_if_not_present_yet(petri_net.place_transition_arcs, *place_it, transition_it->first);
   return *place_it;
 }
 

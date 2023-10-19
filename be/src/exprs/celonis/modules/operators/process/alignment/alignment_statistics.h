@@ -4,7 +4,7 @@
 #ifndef CELOSTAR
 #include "modules/cube/execution/tracking/operator_tracker_fwd.h"
 #endif
-#include "rl_align_configs.h"
+#include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
 
 namespace celonis::accelerator::operators::process::alignment {
 
@@ -15,14 +15,16 @@ struct alignment_statistics {
   size_t pruned_variants_count{};
   size_t pruned_variants_computed_optimal{};
   size_t pruned_variants_computed_relaxation_labeling{};
-  size_t optimizations_solved{};  // Number of RL optimizations solved = #_RL_VARIANTS * AVG_#_CONFIGS
+  size_t optimizations_solved{};             // Number of RL optimizations solved = #_RL_VARIANTS * AVG_#_CONFIGS
+  size_t successful_relaxation_labelings{};  // Relaxation labeling might fail because of completion step
   size_t total_cost_pruned_variants{};
+  size_t successfully_computed_pruned_variants{};
   size_t time_unfolding{};
   size_t time_preprocess{};
   size_t time_optimal{};  // Might be too short to measure accurately
   size_t time_relaxation_labeling{};
 
-  std::vector<constraints_config> constraints{};
+  std::vector<rl_align::constraints_config> constraints{};
 
 #ifndef CELOSTAR
   void log_to_operator_statistics(

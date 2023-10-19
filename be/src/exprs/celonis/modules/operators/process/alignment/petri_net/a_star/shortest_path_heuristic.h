@@ -6,9 +6,9 @@
 
 #include "ctl/algorithm.h"
 #include "modules/operators/process/alignment/petri_net/a_star/petri_net_wrapper.h"
-#include "modules/operators/process/alignment/petri_net/compute_shortest_path.h"
 #include "modules/operators/process/alignment/petri_net/petri_net.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
+#include "modules/operators/process/alignment/petri_net/transition_distances.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::a_star {
 
@@ -18,8 +18,8 @@ class heuristic_to_transition {
   using marking_type = petri_net_wrapper::marking_type;
   using cost_type = int32_t;
 
-  heuristic_to_transition(petri_net_transition_id target, const shortest_paths_matrix& transition_metric,
-                          petri_net_accessor& petri_net)
+  heuristic_to_transition(petri_net_transition_id target, const transition_distances_matrix& transition_metric,
+                          const petri_net_accessor& petri_net)
       : target_{target}, transition_metric_{transition_metric}, petri_net_{petri_net} {}
 
   [[nodiscard]] cost_type get_weight(transition_type transition) const;
@@ -32,8 +32,8 @@ class heuristic_to_transition {
 
  private:
   petri_net_transition_id target_;
-  const shortest_paths_matrix& transition_metric_;
-  petri_net_accessor& petri_net_;
+  const transition_distances_matrix& transition_metric_;
+  const petri_net_accessor& petri_net_;
 };
 
 class heuristic_to_marking {
@@ -42,8 +42,8 @@ class heuristic_to_marking {
   using marking_type = petri_net_wrapper::marking_type;
   using cost_type = int32_t;
 
-  heuristic_to_marking(petri_net::marking_type target, const shortest_paths_matrix& transition_distances,
-                       petri_net_accessor& petri_net)
+  heuristic_to_marking(petri_net::marking_type target, const transition_distances_matrix& transition_distances,
+                       const petri_net_accessor& petri_net)
       : target_{std::move(target)},
         target_transitions_{petri_net.compatible_generating_transitions(target_)},
         transition_distances_{transition_distances},
@@ -58,8 +58,8 @@ class heuristic_to_marking {
  private:
   petri_net::marking_type target_;
   std::vector<petri_net_transition_id> target_transitions_;
-  const shortest_paths_matrix& transition_distances_;
-  petri_net_accessor& petri_net_;
+  const transition_distances_matrix& transition_distances_;
+  const petri_net_accessor& petri_net_;
 };
 
 class heuristic_to_markings {
@@ -68,8 +68,8 @@ class heuristic_to_markings {
   using marking_type = petri_net_wrapper::marking_type;
   using cost_type = int32_t;
 
-  heuristic_to_markings(std::vector<petri_net::marking_type> targets, const shortest_paths_matrix& transition_distances,
-                        petri_net_accessor& petri_net);
+  heuristic_to_markings(std::vector<petri_net::marking_type> targets,
+                        const transition_distances_matrix& transition_distances, const petri_net_accessor& petri_net);
 
   [[nodiscard]] cost_type get_weight(transition_type transition) const;
 
@@ -82,8 +82,8 @@ class heuristic_to_markings {
  private:
   std::vector<petri_net::marking_type> target_markings_;
   std::vector<petri_net_transition_id> target_transitions_;
-  const shortest_paths_matrix& metric_;
-  petri_net_accessor& petri_net_;
+  const transition_distances_matrix& metric_;
+  const petri_net_accessor& petri_net_;
 };
 
 }  // namespace celonis::accelerator::operators::process::alignment::petri_net::a_star

@@ -110,6 +110,7 @@ std::optional<process_tree> activity_concurrent::apply_if_applicable(
   using cut_impl = std::variant<max_xor_cut, max_seq_cut, max_par_cut, max_redo_cut>;
   const std::vector<cut_impl> cut_implementations{max_xor_cut{}, max_seq_cut{}, max_par_cut{}, max_redo_cut{}};
   stop_token.stop_execution_if_requested();
+  miner_statistics.insert_or_increment(inductive_miner_statistics::activity_concurrent_find_count_key());
   auto parallel_dfgs{compute_parallel_dfgs(miner_config, dfg, context, stop_token)};
 
   const auto compute_result{[&]<typename IMPL>(IMPL /**/, cut_t cut, auto split) {
@@ -145,6 +146,7 @@ std::optional<process_tree> activity_concurrent::apply_if_applicable(
     auto remainder_process_tree{std::visit(
         [&]<typename IMPL>(IMPL impl) -> std::optional<process_tree> {
           for (auto& split : parallel_dfgs) {
+            miner_statistics.insert_or_increment(inductive_miner_statistics::activity_concurrent_subfinds_count_key());
             if (auto cut{find_cut<IMPL>(split.dfgs.front())}; cut.first > 1) {
               miner_statistics.insert_or_increment(key<IMPL>);
               return compute_result(impl, cut, std::move(split));

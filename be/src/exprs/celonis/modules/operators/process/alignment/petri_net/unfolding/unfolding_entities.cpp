@@ -59,7 +59,7 @@ const foata_normal_form_t& unfolding_event::get_foata_normal_form() {
   return foata_normal_form_;
 }
 
-const marking_type& unfolding_event::get_marking(petri_net_accessor& pn_accessor) {
+const marking_type& unfolding_event::get_marking(const petri_net_accessor& pn_accessor) {
   // Marking is initialized to empty vector,
   //  therefore, checking if it's empty suffices to check if it was already computed
   if (marking_.empty()) {
@@ -134,7 +134,7 @@ void unfolding_event::compute_foata_normal_form() {
   }
 }
 
-void unfolding_event::compute_marking(petri_net_accessor& pn_accessor) {
+void unfolding_event::compute_marking(const petri_net_accessor& pn_accessor) {
   const auto& local_configuration{get_local_configuration()};
   auto current_marking{pn_accessor.get_initial_marking()};
 
@@ -148,7 +148,7 @@ void unfolding_event::compute_marking(petri_net_accessor& pn_accessor) {
   while (!transitions_to_fire.empty()) {
     for (const auto& transition : transitions_to_fire) {
       if (pn_accessor.is_transition_enabled(current_marking, transition)) {
-        pn_accessor.fire_transition_no_alloc(current_marking, transition);
+        pn_accessor.fire_no_alloc(current_marking, transition);
         transitions_to_fire.erase(transition);
         break;
       }

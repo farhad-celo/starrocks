@@ -74,6 +74,7 @@ class dictionary {
                                                    const common::execution_context& context) = 0;
 
   [[nodiscard]] virtual std::string get_string_value(row_id ptr) const = 0;
+  [[nodiscard]] virtual std::optional<std::string> get_string_value_opt(row_id ptr) const = 0;
 
   [[nodiscard]] virtual raw_dictionary_t copy_to_raw_dictionary(common::execution_context& context) = 0;
 

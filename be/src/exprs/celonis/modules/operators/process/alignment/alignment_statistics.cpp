@@ -14,7 +14,9 @@ void alignment_statistics::log_to_operator_statistics(
   add_telemetry_counter("pruned_variants_computed_optimal", pruned_variants_computed_optimal);
   add_telemetry_counter("pruned_variants_computed_relaxation_labeling", pruned_variants_computed_relaxation_labeling);
   add_telemetry_counter("optimizations_solved", optimizations_solved);
+  add_telemetry_counter("successful_relaxation_labelings", successful_relaxation_labelings);
   add_telemetry_counter("total_cost_pruned_variants", total_cost_pruned_variants);
+  add_telemetry_counter("successfully_computed_pruned_variants", successfully_computed_pruned_variants);
   add_telemetry_counter("time_unfolding", time_unfolding);
   add_telemetry_counter("time_preprocess", time_preprocess);
   add_telemetry_counter("time_optimal", time_optimal);

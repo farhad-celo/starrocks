@@ -8,12 +8,12 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
+#include "ctl/bitset_base.h"
 #include "ctl/source_location.h"
 #include "ctl/static_array.h"
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/memory/column_pointers.h"
-#include "modules/memory/null_flags.h"
 #include "modules/memory/row_id.h"
 #include "modules/memory/transform/dictifier_types.h"
 #include "modules/memory/transform/parallel_hash_table.h"
@@ -24,9 +24,8 @@ template <typename TYPE>
 class exec_dictify_step2 final {
  public:
   exec_dictify_step2(const std::vector<dictify_work_item>& work_items, ctl::static_array<TYPE>& distinct_values,
-                     const memory::null_flags_bitset_t& null_flags, const row_id size,
-                     const row_id non_null_value_count, std::pair<TYPE, row_id>* index_prepared,
-                     const common::execution_context& context)
+                     const ctl::bitset_view_t null_flags, const row_id size, const row_id non_null_value_count,
+                     std::pair<TYPE, row_id>* index_prepared, const common::execution_context& context)
       : work_items(work_items),
         distinct_values(distinct_values),
         null_flags(null_flags),
@@ -109,7 +108,7 @@ class exec_dictify_step2 final {
  private:
   const std::vector<dictify_work_item>& work_items;
   ctl::static_array<TYPE>& distinct_values;
-  const memory::null_flags_bitset_t& null_flags;
+  const ctl::bitset_view_t null_flags;
   row_id size;
   row_id non_null_value_count;
   std::pair<TYPE, row_id>* index_prepared;
@@ -153,7 +152,7 @@ class exec_dictify_sort_based_str_step2 final {
  public:
   exec_dictify_sort_based_str_step2(const row_id rows,
                                     const ctl::static_array<std::pair<cel_string_t, row_id>>& sorted_strings,
-                                    const memory::null_flags_bitset_t& null_flags,
+                                    const ctl::bitset_view_t null_flags,
                                     const std::vector<distinct_element_data::block_data>& blocks,
                                     const row_id block_size, const common::execution_context& context)
       : rows(rows),
@@ -195,7 +194,7 @@ class exec_dictify_sort_based_str_step2 final {
  private:
   row_id rows;
   const ctl::static_array<std::pair<cel_string_t, row_id>>& sorted_strings;
-  const memory::null_flags_bitset_t& null_flags;
+  const ctl::bitset_view_t null_flags;
   const std::vector<distinct_element_data::block_data>& blocks;
   const size_t block_size;
   const common::execution_context& context;

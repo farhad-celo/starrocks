@@ -69,7 +69,6 @@ data_type convert_from_string(const std::string& type);
 std::string convert_to_string(data_type celonis_data_type);
 
 [[nodiscard]] bool is_cel_int_value(cel_float_t value) noexcept;
-[[nodiscard]] bool is_null_or_matching_data_type(std::optional<data_type> actual_type, data_type desired_type);
 
 // Both NULL_STRING itself and calling size() on it includes null-termination
 static constexpr std::array<const char, 5> NULL_STRING{"NULL"};

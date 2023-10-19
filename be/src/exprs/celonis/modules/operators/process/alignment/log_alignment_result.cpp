@@ -100,10 +100,10 @@ class exec_execute_fill_output {
         // New case starts. Get the corresponding alignment
         previous_projected_case = current_projected_case;
         const auto variant_id{variant_column_ac[current_projected_case]};
-        if (variant_id == 0) {
+        if (variant_id == 0 || !alignments.at(variant_id).has_value()) {
           continue;
         }
-        const auto& variant_alignment{alignments[variant_id]};
+        const auto& variant_alignment{alignments.at(variant_id).value()};
 
         for (const auto& move : variant_alignment.data()) {
           debug_assert(output_col_index < static_cast<size_t>(output_table_size));

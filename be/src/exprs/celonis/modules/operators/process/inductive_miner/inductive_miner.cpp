@@ -2,9 +2,12 @@
 
 #include <optional>
 
+#include <boost/graph/graphviz.hpp>
 #include <fmt/format.h>
 
+#ifdef CELOSTAR
 #include "ctl/assert.h"
+#endif
 #include "ctl/conversion.h"
 #include "ctl/exception_traits.h"
 #include "log/log.h"
@@ -249,6 +252,34 @@ void timeout_protected_metric_logging(const process_tree& tree, const inductive_
 
 }  // namespace
 
+void log_inductive_miner_statistics_on_fail(std::string_view operator_name,
+                                            const inductive_miner_statistics& miner_statistics,
+                                            const inductive_miner_config& operator_config,
+                                            const directly_follows_graph& dfg) {
+  std::stringstream dfg_stream;
+  boost::write_graphviz(dfg_stream, dfg);
+  log::jwarn(fmt::format("{}: The inductive miner execution failed.", operator_name),
+             {{"miner_statistics", miner_statistics.to_json()},
+              {"num_distinct_activities", operator_config.eventlog().activity_domain_count().get()},
+              {"num_variants", operator_config.eventlog().trace_domain_count().get()},
+#ifndef CELOSTAR
+              {"miner_approach", operator_config.is_for_eventlog_based_approach() ? "eventlog" : "variants"},
+#endif
+              {"dfg", dfg_stream.str()}});
+}
+
+inductive_miner_result invoke_verbose_inductive_miner(inductive_miner_config& miner_config, directly_follows_graph& dfg,
+                                                      inductive_miner_statistics& miner_statistics,
+                                                      const cube::execution::tracking::stop_token& stop_token,
+                                                      const std::string_view operator_name, const cel_string_t* dict) {
+  try {
+    return inductive_miner(miner_config, dfg, miner_statistics, stop_token, dict);
+  } catch (...) {
+    log_inductive_miner_statistics_on_fail(operator_name, miner_statistics, miner_config, dfg);
+    throw;
+  }
+}
+
 process_tree inductive_miner_recurse(inductive_miner_config& miner_config, directly_follows_graph& dfg,
                                      const common::execution_context& context,
                                      inductive_miner_statistics& miner_statistics,
@@ -284,20 +315,6 @@ inductive_miner_result inductive_miner(inductive_miner_config& miner_config, dir
   stop_token.stop_execution_if_requested();
 #ifndef CELOSTAR
   timeout_protected_metric_logging(result, miner_config, miner_statistics, context);
-
-  // TODO(a.swoboda) also propagate the stop token into the replay
-  // TODO(n.weber): In a follow up, the config probably can't be used to decide this. Think about a proper design then.
-  if (miner_config.should_do_replay_to_fix_counts()) {
-    common::runtime_assert(is_valid, "Invalid tree produced in variant based IM.");
-    const auto& [activity_column, case_column]{miner_config.replay_input()};
-    const cube::filter_bitset_t filter_use_all{
-        ctl::cast_unsigned(activity_column->get_row_count(miner_config.execution_context())), true};
-    result = replay_eventlog_on_process_tree(result, activity_column, case_column, filter_use_all,
-                                             miner_config.execution_context());
-    warning_assert(is_valid_tree(result),
-                   "Invalid tree produced after replay");
-                   fmt::format("Invalid tree produced after replay: {}", pt2dot(result, nullptr)));
-  }
 #endif
 
   return {result, is_valid};

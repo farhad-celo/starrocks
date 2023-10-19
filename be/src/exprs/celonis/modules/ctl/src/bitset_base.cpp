@@ -247,7 +247,7 @@ bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::get_block_value_at_index(
 
 template <parallelism_settings_t PARALLELISM_SETTING, typename DERIVED>
 void bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::zero_unused_bits() noexcept {
-  debug_assert(num_blocks() == details::calc_number_of_blocks(size()));
+  debug_assert(num_blocks() == details::calc_number_of_bitset_blocks(size()));
 
   const auto [block_index, bit_index] = details::block_and_bit_index::get(size());
   auto mutable_span{static_cast<DERIVED*>(this)->to_mutable_block_span()};

@@ -129,18 +129,12 @@ class bitset_crtp_base {
    */
   DERIVED& flip() noexcept;
   /**
-   * @brief subscript operator; returns whether the bit at position 'index' is set
-   * @param index the bit position to check
-   * @return true if the bit at position 'index' is set, false otherwise
+   * @brief sets bit if it is unset to value
+   * @param index the position of the bit
+   * @param val the value it is set if it is unset
+   * @return the bitset (for chaining)
    */
-  [[nodiscard]] bool operator[](bit_index_type index) const noexcept;
-  /**
-   * @brief (non-const) subscript operator; returns a reference proxy to the requested bit
-   * @param index the bit position
-   * @return proxy bit reference
-   * @note the returned bit_reference object should never be captured by a reference as it is returned by value
-   */
-  [[nodiscard]] bit_reference operator[](bit_index_type index) noexcept;
+  DERIVED& set_if_unset(bit_index_type index, bool val = true) noexcept;
   /**
    * @brief same as the subscript operator but with bounds checking (throws if index out of bounds)
    */
@@ -241,6 +235,19 @@ class bitset_crtp_base {
   template <bool DO_FLIP, typename CALLABLE>
   void apply_in_range_impl(CALLABLE&& callable, bit_index_type idx_from, bit_index_type idx_to) const
       noexcept(std::is_nothrow_invocable_v<CALLABLE, bit_index_type>);
+  /**
+   * @brief subscript operator; returns whether the bit at position 'index' is set
+   * @param index the bit position to check
+   * @return true if the bit at position 'index' is set, false otherwise
+   */
+  [[nodiscard]] bool operator[](bit_index_type index) const noexcept;
+  /**
+   * @brief (non-const) subscript operator; returns a reference proxy to the requested bit
+   * @param index the bit position
+   * @return proxy bit reference
+   * @note the returned bit_reference object should never be captured by a reference as it is returned by value
+   */
+  [[nodiscard]] bit_reference operator[](bit_index_type index) noexcept;
 
  public:
   /**
@@ -370,6 +377,16 @@ inline DERIVED& bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::flip(const bit_i
   auto mutable_span{static_cast<DERIVED*>(this)->to_mutable_block_span()};
   mutable_span[block_index] ^= details::BIT_MASK(bit_index);
   return static_cast<DERIVED&>(*this);
+}
+
+template <parallelism_settings_t PARALLELISM_SETTING, typename DERIVED>
+inline DERIVED& bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::set_if_unset(const bit_index_type index,
+                                                                             bool val) noexcept {
+  debug_assert(index < size());
+  if (!val) {
+    return static_cast<DERIVED&>(*this);
+  }
+  return set(index);
 }
 
 template <parallelism_settings_t PARALLELISM_SETTING, typename DERIVED>

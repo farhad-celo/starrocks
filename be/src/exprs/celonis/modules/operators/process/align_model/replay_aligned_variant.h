@@ -112,13 +112,14 @@ class replay_result_type {
  * timestamp of last non-model activity.
  *
  * @param input_bpmn_graph bpmn graph
- * @param input_petri_net_to_bpmn mapping from petri-net labels to bpmn vertex ids
  * @param aligned_variant a variant from the eventlog, aligned to the petri-net/bpmn
+ * @param parallel_vertices BPMN nodes that should be considered parallel; relevant for log edges
  * @return replay_result_type containing the different edge components and the 'timestamps'. Note that the integers in
  * the produced result components refer to offsets into the provided 'aligned_variant' and do not refer to the indices
  * of the bpmn_graph.
  */
 [[nodiscard]] replay_result_type replay_aligned_variant(const bpmn::bpmn_graph& input_bpmn_graph,
-                                                        const alignment_t& aligned_variant);
+                                                        const alignment_t& aligned_variant,
+                                                        const parallel_vertex_pairs<>& parallel_vertices);
 
 }  // namespace celonis::accelerator::operators::process::align_model

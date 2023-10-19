@@ -1,5 +1,7 @@
 #include "inductive_miner_statistics.h"
 
+#include "format/json/json.h"
+
 namespace celonis::accelerator::operators::process {
 
 #ifndef CELOSTAR
@@ -16,5 +18,13 @@ void inductive_miner_statistics::insert_or_assign(const std::string& key, size_t
 }
 
 void inductive_miner_statistics::insert_or_increment(const std::string& key) { data_[key] += 1; }
+
+format::json::json_object_t inductive_miner_statistics::to_json() const {
+  format::json::json_object_t result{};
+  for (const auto& [key, value] : data_) {
+    result.emplace(key, value);
+  }
+  return result;
+}
 
 }  // namespace celonis::accelerator::operators::process

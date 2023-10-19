@@ -136,6 +136,11 @@ std::ostream& operator<<(std::ostream& os, const checked_shared_ptr<T>& ptr) {
   return os << ptr.get();
 }
 
+template <typename T, typename... ARGS>
+[[nodiscard]] checked_shared_ptr<T> make_checked_shared(ARGS&&... args) {
+  return ctl::checked_shared_ptr<T>{std::make_shared<T>(std::forward<ARGS>(args)...)};
+}
+
 };  // namespace celonis::accelerator::ctl
 
 namespace std {

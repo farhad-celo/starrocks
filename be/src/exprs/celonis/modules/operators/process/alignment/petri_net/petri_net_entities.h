@@ -67,9 +67,7 @@ class static_bitset {
   static_assert(sizeof(bitset_type) + sizeof(size_type) == SIZE_IN_BYTES);
 
   static_bitset() = default;
-  explicit static_bitset(std::size_t s) : bitset_{}, size_{s} {
-    ctl::abort_assert(s <= NUM_BITS * 8, "STATIC BITSET: out of memory initialisation");
-  }
+  explicit static_bitset(std::size_t s) : bitset_{}, size_{s} { ctl::abort_assert(s <= NUM_BITS * 8); }
   [[nodiscard]] constexpr std::size_t hash_value() const {
     size_t hash_value{0};
     ctl::hash_combine(hash_value, size_);
@@ -78,15 +76,15 @@ class static_bitset {
   }
   [[nodiscard]] constexpr std::size_t size() const { return size_; }
   [[nodiscard]] bool test(std::size_t pos) const {
-    ctl::abort_assert(pos < size_, "STATIC BITSET: accessing element out of bounds");
+    ctl::abort_assert(pos < size_);
     return bitset_.test(pos);
   }
   void set(std::size_t pos) {
-    ctl::abort_assert(pos < size_, "STATIC BITSET: accessing element out of bounds");
+    ctl::abort_assert(pos < size_);
     bitset_[pos] = true;
   }
   void reset(std::size_t pos) {
-    ctl::abort_assert(pos < size_, "STATIC BITSET: accessing element out of bounds");
+    ctl::abort_assert(pos < size_);
     bitset_[pos] = false;
   }
   [[nodiscard]] bool operator==(const static_bitset& other) const { return bitset_ == other.bitset_; }
@@ -112,7 +110,8 @@ class static_bitset {
  * clang-tidy incorrectly deduces the implicitly defaulted move assignment operator to be noexcept and throws a false
  * positive error: an exception may be thrown in function 'operator=' which should not throw exceptions
  * [bugprone-exception-escape,-warnings-as-errors]
- * TODO (i.angelucci) check whether this is still needed with next clang update
+ * TODO (i.angelucci) check whether this is still needed with next clang-tidy update
+ *  (bugprone-exception-escape was also added to other parts of the code that use marking_type, so check there too)
  */
 // NOLINTNEXTLINE(bugprone-exception-escape)
 class marking_type {
@@ -154,11 +153,11 @@ class marking_type {
   }
 
   [[nodiscard]] bool operator==(const marking_type& other) const {
-    ctl::abort_assert(size() == other.size(), "MARKING_TYPE: attempting comparison of markings with different sizes");
+    ctl::abort_assert(size() == other.size());
     return bitset_ == other.bitset_;
   }
   [[nodiscard]] bool operator<(const marking_type& other) const {
-    ctl::abort_assert(size() == other.size(), "MARKING_TYPE: attempting comparison of markings with different sizes");
+    ctl::abort_assert(size() == other.size());
     return bitset_ < other.bitset_;
   }
 

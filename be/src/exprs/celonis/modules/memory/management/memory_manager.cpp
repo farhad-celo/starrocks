@@ -20,6 +20,8 @@
 
 namespace celonis::accelerator::memory::management {
 
+static constexpr std::chrono::seconds WARNING_UPPER_BOUND{10};
+
 memory_manager::memory_manager(std::shared_ptr<cube::execution::tracking::operator_statistics> op_statistics)
     : meminfo_fetcher_([]() { return ctl::fetch_current_full_meminfo(); }), op_statistics_(std::move(op_statistics)) {}
 
@@ -57,6 +59,8 @@ std::vector<std::pair<data_handler_t, mem_time_t>> memory_manager::unsafe_get_gr
 std::pair<std::vector<volatile_group_t>, std::vector<managed_group_t>> memory_manager::get_groups(
     std::chrono::seconds wait_time, ctl::source_location source_location) const {
   const auto set_lock{concurrency::lock_shared_validated(data_mutex_, wait_time, source_location)};
+  common::timer timer;
+
   std::vector<volatile_group_t> volatile_groups_copy{};
   volatile_groups_copy.reserve(volatile_groups_.size());
   for (const volatile_group_t& group : volatile_groups_) {
@@ -67,6 +71,15 @@ std::pair<std::vector<volatile_group_t>, std::vector<managed_group_t>> memory_ma
   for (const managed_group_t& group : persistent_groups_) {
     managed_group_copy.emplace_back(group);
   }
+
+  timer.stop();
+  const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(timer.duration())};
+  if (seconds >= WARNING_UPPER_BOUND) {
+    log::jwarn(
+        fmt::format("Memory Manager: get_groups takes {}s.", seconds.count()),
+        {{"volatile_groups_size", volatile_groups_.size()}, {"persistent_groups_size", persistent_groups_.size()}});
+  }
+
   return std::make_pair(std::move(volatile_groups_copy), std::move(managed_group_copy));
 }
 
@@ -82,12 +95,21 @@ bool memory_manager::evict_cache_if_needed(const memory_threshold& threshold, co
   std::vector<std::pair<std::shared_ptr<data_handler>, mem_time_t>> sorted_data_handlers{};
   {
     std::shared_lock<std::shared_timed_mutex> set_lock(data_mutex_, std::chrono::seconds(1));
+
     if (!set_lock.owns_lock()) {
       log::warn("Eviction attempt was not successful. Could not acquire lock!");
       return false;
     }
 
+    common::timer timer;
     sorted_data_handlers = unsafe_get_groups_with_time();
+
+    timer.stop();
+    const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(timer.duration())};
+    if (seconds >= WARNING_UPPER_BOUND) {
+      log::jwarn(fmt::format("Memory Manager: unsafe_get_groups_with_time takes {}s.", seconds.count()),
+                 {{"data_handler_count", sorted_data_handlers.size()}});
+    }
   }
   auto partition_point =
       std::partition(std::begin(sorted_data_handlers), std::end(sorted_data_handlers),
@@ -205,10 +227,20 @@ void memory_manager::force_compress() const {
 
 void memory_manager::force_clean_up() {
   const auto set_lock{concurrency::lock_validated(data_mutex_, std::chrono::seconds{60})};
+  common::timer timer;
+
+  const size_t volatile_groups_size{volatile_groups_.size()};
   for (const volatile_group_t& group : volatile_groups_) {
     group->erase();
   }
   volatile_groups_.clear();
+
+  timer.stop();
+  const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(timer.duration())};
+  if (seconds >= WARNING_UPPER_BOUND) {
+    log::jwarn(fmt::format("Memory Manager: force_clean_up takes {}s.", seconds.count()),
+               {{"erased_volatile_groups_size", volatile_groups_size}});
+  }
 }
 
 struct collect_garbage_mem_groups_result {
@@ -387,6 +419,10 @@ void memory_manager::register_volatile_group(const std::shared_ptr<volatile_mana
 void memory_manager::deregister_all() {
   const auto set_lock{concurrency::lock_validated(data_mutex_, std::chrono::seconds{60})};
 
+  common::timer timer;
+  const size_t volatile_groups_size{volatile_groups_.size()};
+  const size_t persistent_groups_size{persistent_groups_.size()};
+
   for (const auto& group : volatile_groups_) {
     common::call_and_log_unsafe_callable([&group]() { group->erase(); },
                                          "Memory Manager: erase called by deregister_all failed");
@@ -396,10 +432,19 @@ void memory_manager::deregister_all() {
     common::call_and_log_unsafe_callable([&group]() { group->clear_group(); },
                                          "Memory Manager: clear_group called by deregister_all failed");
   }
+
+  timer.stop();
+  const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(timer.duration())};
+  if (seconds >= WARNING_UPPER_BOUND) {
+    log::jwarn(fmt::format("Memory Manager: deregister_all takes {}s.", seconds.count()),
+               {{"deregistered_volatile_groups_size", volatile_groups_size},
+                {"deregistered_persistent_groups_size", persistent_groups_size}});
+  }
 }
 
 void memory_manager::erase_persistent(const managed_group_t& managed_group) {
   const auto set_lock{concurrency::lock_validated(data_mutex_, std::chrono::seconds{60})};
+  common::timer timer;
 
   managed_group->clear_group();
   auto removed_count = persistent_groups_.erase(managed_group);
@@ -407,15 +452,29 @@ void memory_manager::erase_persistent(const managed_group_t& managed_group) {
     log::error("Tried to remove a non-registered persistent managed_group: {}",
                managed_group->dump_header().description);
   }
+
+  timer.stop();
+  const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(timer.duration())};
+  if (seconds >= WARNING_UPPER_BOUND) {
+    log::jwarn(fmt::format("Memory Manager: erase_persistent takes {}s.", seconds.count()));
+  }
 }
 
 void memory_manager::erase_volatile(const volatile_group_t& volatile_group, bool log_failure) {
   const auto lck{concurrency::lock_validated(data_mutex_, std::chrono::seconds{60})};
+  common::timer timer;
+
   volatile_group->clear_group();
   const auto removed_count{volatile_groups_.erase(volatile_group)};
   if (log_failure && removed_count == 0) {
     log::error("Tried to remove a non-registered volatile managed group: {}",
                volatile_group->dump_header().description);
+  }
+
+  timer.stop();
+  const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(timer.duration())};
+  if (seconds >= WARNING_UPPER_BOUND) {
+    log::jwarn(fmt::format("Memory Manager: erase_volatile takes {}s.", seconds.count()));
   }
 }
 

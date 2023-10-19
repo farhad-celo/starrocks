@@ -95,15 +95,6 @@ class bpmn_graph {
 };
 
 /**
- * Converts a process tree into a BPMN graph by applying the transformations steps outlined in this publication,
- * http://bpmcenter.org/wp-content/uploads/reports/2015/BPM-15-01.pdf.
- *
- * @param process_tree The process tree to be converted.
- * @return Converted BPMN model consisting of start and end, tasks, exclusive choice and parallel gateways.
- */
-[[nodiscard]] bpmn_graph convert_to_bpmn_graph(const process_tree& process_tree, object_id object = {});
-
-/**
  * Extracts the single object BPMN subgraph of a given object id from a multi object BPMN graph. Does not leave isolated
  * vertices, i.e. the resulting graph only contains tasks and gateways that are actually used in the flow of the object
  * in question.
@@ -119,21 +110,6 @@ class bpmn_graph {
  */
 [[nodiscard]] cel_int_t convert_vertex_type_to_int(const vertex_type& type);
 [[nodiscard]] vertex_type convert_int_to_vertex_type(cel_int_t type_int);
-
-[[nodiscard]] bpmn_graph remap_task_ids(const bpmn_graph& graph, const ctl::static_array<row_id>& mapping_vector);
-
-/**
- * Overlays the rhs BPMN graph with the lhs BPMN graph. The lhs BPMN graph is used as a base and the rhs BPMN graph is
- * overlaid. All edges added from the rhs BPMN graph to the lhs BPMN graph get the rhs_object_id assigned. The overlay
- * happens on task level if a task of lhs BPMN graph is equivalent with a task in the rhs BPMN graph. Equivalency is
- * defined on an activity id level (not to be confused with event id, which is on instance level).
- *
- * @param lhs BPMN graph used as base.
- * @param rhs BPMN graph to be overlaid on top of lhs.
- * @param rhs_object_id All edges which are overlaid from rhs BPMN graph to lhs BPMN graph get the object id assigned.
- * @return Overlaid BPMN graph.
- */
-[[nodiscard]] bpmn_graph overlay_bpmn_graphs(const bpmn_graph& lhs, const bpmn_graph& rhs, object_id rhs_object_id = 0);
 
 /**
  * Creates a bpmn_graph from a protobuf message
