@@ -26,6 +26,10 @@ namespace starrocks {
 void AggregateFuncResolver::register_celonis() {
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_inductive_miner");
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
+    add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_DOUBLE, PercentileState<TYPE_BIGINT>>(
+            "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, PercentileState<TYPE_DOUBLE>>(
+            "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_DOUBLE>());
 }
 
 struct PercentileDiscDispatcher {

@@ -304,9 +304,9 @@ public class FunctionSet {
     public static final String FLAT_JSON_META = "flat_json_meta";
     public static final String MANN_WHITNEY_U_TEST = "mann_whitney_u_test";
 
-    // Aggregate celonis functions
-
+    // Aggregate celonis functions:
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
+    public static final String CELONIS_TRIMMED_MEAN = "celonis_trimmed_mean";
     public static final String CELONIS_VARIANT_STATS = "celonis_variant_stats";
 
     // Bitmap functions:
@@ -629,6 +629,7 @@ public class FunctionSet {
             ImmutableSet.<String>builder()
                     .add(FunctionSet.CELONIS_ALIGN_MODEL)
                     .add(FunctionSet.CELONIS_INDUCTIVE_MINER)
+                    .add(FunctionSet.CELONIS_TRIMMED_MEAN)
                     .add(FunctionSet.CELONIS_VARIANT_STATS)
                     .build();
 
@@ -1084,6 +1085,25 @@ public class FunctionSet {
         // celonis_variant_stats
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS,
                 Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT), Type.VARCHAR, Type.VARCHAR,
+                false, false, false));
+        // celonis_trimmed_mean
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_TRIMMED_MEAN,
+                Lists.newArrayList(Type.BIGINT, Type.INT, Type.INT), Type.DOUBLE, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_TRIMMED_MEAN,
+                Lists.newArrayList(Type.BIGINT, Type.INT), Type.DOUBLE, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_TRIMMED_MEAN,
+                Lists.newArrayList(Type.BIGINT), Type.DOUBLE, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_TRIMMED_MEAN,
+                Lists.newArrayList(Type.DOUBLE, Type.INT, Type.INT), Type.DOUBLE, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_TRIMMED_MEAN,
+                Lists.newArrayList(Type.DOUBLE, Type.INT), Type.DOUBLE, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_TRIMMED_MEAN,
+                Lists.newArrayList(Type.DOUBLE), Type.DOUBLE, Type.VARBINARY,
                 false, false, false));
     }
 

@@ -158,6 +158,7 @@ set(EXEC_FILES
         ./exprs/celonis/source_target_test.cpp
         ./exprs/celonis/string_function_test.cpp
         ./exprs/celonis/time_functions_test.cpp
+        ./exprs/celonis/trimmed_mean_test.cpp
         ./exprs/celonis/util.cpp
         ./exprs/celonis/variant_agg_test.cpp
         ./exprs/celonis/variant_stats_test.cpp
