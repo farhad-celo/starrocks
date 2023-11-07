@@ -15,8 +15,7 @@ using starrocks::celonis::ResultTable;
 
 namespace celonis::accelerator::operators::process {
 
-InductiveMinerHelper::InductiveMinerHelper(const starrocks::VariantHashMap& variant_map,
-                                           double imfd_frequency_threshold) {
+InductiveMinerHelper::InductiveMinerHelper(const starrocks::Variants& variants, double imfd_frequency_threshold) {
     dfg_filter_config filter_config;
     // TODO(j.kim): Return an error if the threshold is invalid.
     if (imfd_frequency_threshold > 0.0 && imfd_frequency_threshold <= 1.0) {
@@ -25,7 +24,7 @@ InductiveMinerHelper::InductiveMinerHelper(const starrocks::VariantHashMap& vari
     }
     common::execution_context dummy_context;
     size_t grain_size{1024};
-    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variant_map, grain_size), dummy_context,
+    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variants, grain_size), dummy_context,
                                                grain_size, filter_config};
     auto dfg{dfg::initialize_dfg(miner_config.eventlog(), dummy_context, miner_config.grain_size())};
 

@@ -11,7 +11,7 @@ namespace celonis::accelerator::operators::process {
 
 class InductiveMinerHelper {
 public:
-    InductiveMinerHelper(const starrocks::VariantHashMap& variant_map, double imfd_frequency_threshold);
+    InductiveMinerHelper(const starrocks::Variants& variants, double imfd_frequency_threshold);
 
     const ResultTable& vertex_table() { return *vertex_table_; }
     const ResultTable& edge_table() { return *edge_table_; }

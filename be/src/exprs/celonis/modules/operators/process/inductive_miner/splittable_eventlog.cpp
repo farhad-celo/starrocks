@@ -283,11 +283,11 @@ splittable_eventlog::splittable_eventlog(const activity_domain_count_t activity_
 #ifdef CELOSTAR
 splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_config_for_using_variant_map& config,
                                                  const common::execution_context& context) {
-  const auto& [variant_map, grain_size]{config};
-  const auto variant_count{static_cast<trace_domain_count_t>(variant_map.size())};
+  const auto& [variants, grain_size]{config};
+  const auto variant_count{static_cast<trace_domain_count_t>(variants.size())};
   size_t size = 0;
-  for (const auto& [variant, count] : variant_map) {
-    size += variant.data.size();
+  for (const auto& variant_count : variants) {
+    size += variant_count.variant.size();
   }
 
   // TODO(j.kim): Check if we need to use memory management.
@@ -301,9 +301,9 @@ splittable_eventlog splittable_eventlog::extract(const splittable_eventlog_confi
 
   // Fetch all variants, materialize its elements (i.e., activity IDs) together with the variant ID.
   int index = 0;
-  for (const auto& [variant, count] : variant_map) {
-    auto trace_id = result.variant_multiplicities->add_variant(count);
-    for (const auto& activity_id : variant.data) {
+  for (const auto& variant_count : variants) {
+    auto trace_id = result.variant_multiplicities->add_variant(variant_count.count);
+    for (const auto& activity_id : variant_count.variant) {
       max_activity_domain_count = std::max(max_activity_domain_count, activity_id);
       result.buffer[index++] = {activity_id, trace_id};
     }

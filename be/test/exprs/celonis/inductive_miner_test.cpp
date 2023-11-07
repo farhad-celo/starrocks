@@ -208,6 +208,63 @@ TEST_F(CelonisInductiveMinerTest, Q1) {
     Run(variants, expected);
 }
 
+TEST_F(CelonisInductiveMinerTest, Q1_consistency) {
+    // Different variants' order with the same expected.
+    VariantRows variants = {{"A", "B", "F"},
+                            {"A", "B", "E"}};
+    std::string expected =
+            R"json({
+            "vertex_properties": [
+                {
+                    "process_tree_type": 3,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "A"
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "B"
+                },
+                {
+                    "process_tree_type": 2,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "E"
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "F"
+                }
+            ],
+            "edge_properties": [
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 1
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 2
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 3
+                },
+                {
+                    "edge_source_id": 3,
+                    "edge_target_id": 4
+                },
+                {
+                    "edge_source_id": 3,
+                    "edge_target_id": 5
+                }
+            ]
+        })json";
+    Run(variants, expected);
+}
 TEST_F(CelonisInductiveMinerTest, Q2) {
     VariantRows variants = {{"A", "C", "D"},
                             {"A", "D", "C"},

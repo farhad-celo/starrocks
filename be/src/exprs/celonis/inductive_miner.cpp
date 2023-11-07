@@ -1,5 +1,8 @@
 #include "exprs/celonis/inductive_miner.h"
 
+#include <algorithm>
+#include <execution>
+
 #include "column/column_helper.h"
 #include "exprs/celonis/modules/operators/process/inductive_miner/inductive_miner_helper.h"
 #include "exprs/celonis/result_table.h"
@@ -15,44 +18,48 @@ using cel_int_t = int64_t;
 namespace starrocks {
 namespace {
 
-SliceHashMap increment_id(const SliceHashMap& input_activity_map) {
-    SliceHashMap activity_map;
-    for (auto it = input_activity_map.begin(); it != input_activity_map.end(); it++) {
-        activity_map.insert(std::pair<SliceWithHash, int32_t>(it->first, it->second + 1));
-    }
-    return activity_map;
-}
-
-VariantHashMap increment_id(const VariantHashMap& input_variant_map) {
-    VariantHashMap variant_map;
-    for (auto it = input_variant_map.begin(); it != input_variant_map.end(); it++) {
-        Variant variant = it->first;
-        for (auto& id : variant.data) {
-            id++;
+std::pair<std::vector<Slice>, Variants> sort_activities_and_variants(const SliceHashMap& activity_map,
+                                                                     const VariantHashMap& variant_map) {
+    // Sorts activities so that it matches Saola dictionary.
+    std::map<Slice, int32_t> ordered_activity_map(activity_map.begin(), activity_map.end());
+    std::vector<int32_t> activity_remap(ordered_activity_map.size()); // index: old id -> value: new id
+    std::vector<Slice> activities;
+    // Activity ID 0 is reserved for NULL in Saola and implementations depend on it.
+    activities.reserve(ordered_activity_map.size() + 1);
+    activities.push_back({});
+    int index = 1;
+    for (auto it = ordered_activity_map.begin() ; it != ordered_activity_map.end(); ++it, ++index) {
+        if (it->second >= activity_remap.size()) {
+            activity_remap.resize(it->second + 1);
         }
-        variant_map.insert(std::pair(variant, it->second));
+        activity_remap[it->second] = index;
+        activities.push_back(it->first);
     }
-    return variant_map;
+
+    // Sorts variants so that it matches Saola variant_trace_cache.
+    Variants variants;
+    for (const auto& [variant, count] : variant_map) {
+        std::vector<int32_t> ids;
+        ids.reserve(variant.data.size());
+        for (auto& id : variant.data) {
+            ids.push_back(activity_remap[id]);
+        }
+        variants.emplace_back(std::move(ids), count);
+    }
+    std::sort(std::execution::par_unseq, variants.begin(), variants.end());
+
+    return {activities, variants};
 }
 
 } // namespace
 
-std::string InductiveMinerFinalizer::json_string(const SliceHashMap& activity_map,
+std::string InductiveMinerFinalizer::json_string(const std::vector<Slice>& activities,
                                                  const celonis::ResultTable& vertex_table,
                                                  const celonis::ResultTable& edge_table,
                                                  const std::unordered_map<std::string, size_t>& statistics_map) {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
-
-    std::vector<Slice> activities;
-    activities.reserve(activity_map.size() + 1);
-    for (auto it = activity_map.begin(); it != activity_map.end(); it++) {
-        if (it->second >= activities.size()) {
-            activities.resize(it->second + 1);
-        }
-        activities[it->second] = it->first;
-    }
 
     rapidjson::Value vertex_properties(rapidjson::kArrayType);
     const auto& process_tree_type = vertex_table.column<cel_int_t>("process_tree_type");
@@ -106,17 +113,16 @@ std::string InductiveMinerFinalizer::json_string(const SliceHashMap& activity_ma
 }
 
 std::string InductiveMinerFinalizer::finalize() {
-    // Activity ID 0 is reserved for NULL in Saola and implementations depend on it.
-    auto activity_map = increment_id(activity_map_);
-    auto variant_map = increment_id(variant_map_);
+    // Matches activity ids and variant order to Saola.
+    const auto& [activities, variants] = sort_activities_and_variants(activity_map_, variant_map_);
 
     double imfd_frequency_threshold = 0.0;
     if (ctx_->is_constant_column(2)) {
         imfd_frequency_threshold = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx_->get_constant_column(2));
     }
 
-    InductiveMinerHelper helper(variant_map, imfd_frequency_threshold);
-    return json_string(activity_map, helper.vertex_table(), helper.edge_table(), helper.statistics());
+    InductiveMinerHelper helper(variants, imfd_frequency_threshold);
+    return json_string(activities, helper.vertex_table(), helper.edge_table(), helper.statistics());
 }
 
 } // namespace starrocks

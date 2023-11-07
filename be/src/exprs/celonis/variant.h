@@ -39,4 +39,15 @@ struct HashOnVariant {
 using SliceHashMap = phmap::flat_hash_map<SliceWithHash, int32_t, HashOnSliceWithHash, EqualOnSliceWithHash>;
 using VariantHashMap = phmap::flat_hash_map<Variant, int32_t, HashOnVariant, EqualOnVariant>;
 
+struct VariantCount {
+    VariantCount(std::vector<int32_t> v, int32_t c) : variant(std::move(v)), count(c) {}
+
+    std::vector<int32_t> variant;
+    int32_t count;
+
+    bool operator<(const VariantCount& other) const { return variant < other.variant; }
+};
+
+using Variants = std::vector<VariantCount>;
+
 } // namespace starrocks

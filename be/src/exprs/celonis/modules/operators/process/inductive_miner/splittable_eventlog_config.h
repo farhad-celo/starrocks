@@ -18,7 +18,7 @@ namespace celonis::accelerator::operators::process {
 #ifdef CELOSTAR
 /** Config with all the necessary data to extract the variant map */
 struct splittable_eventlog_config_for_using_variant_map {
-  const starrocks::VariantHashMap& variant_map;
+  const starrocks::Variants& variants;
   const size_t grain_size;
 };
 
@@ -53,7 +53,7 @@ using splittable_eventlog_config_t =
 #ifdef CELOSTAR
 /** Factory for the Celostar 'variant_map' case */
 [[nodiscard]] splittable_eventlog_config_t make_splittable_eventlog_config(
-    const starrocks::VariantHashMap& variant_map, const size_t grain_size);
+    const starrocks::Variants& variants, const size_t grain_size);
 #else
 /** Factory for the 'entire eventlog' case */
 [[nodiscard]] splittable_eventlog_config_t make_splittable_eventlog_config(

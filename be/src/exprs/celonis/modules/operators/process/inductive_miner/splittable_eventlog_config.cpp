@@ -13,8 +13,8 @@ size_t grain_size_from_splittable_eventlog_config(const splittable_eventlog_conf
 
 #ifdef CELOSTAR
 splittable_eventlog_config_t make_splittable_eventlog_config(
-        const starrocks::VariantHashMap& variant_map, const size_t grain_size) {
-  return splittable_eventlog_config_for_using_variant_map{.variant_map = variant_map, .grain_size = grain_size};
+        const starrocks::Variants& variants, const size_t grain_size) {
+  return splittable_eventlog_config_for_using_variant_map{.variants = variants, .grain_size = grain_size};
 }
 #else
 splittable_eventlog_config_t make_splittable_eventlog_config(memory::column_t activities, memory::column_t cases,
