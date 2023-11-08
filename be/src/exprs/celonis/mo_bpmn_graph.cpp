@@ -14,11 +14,17 @@ StatusOr<ColumnPtr> CelonisMoBpmnGraph::mo_bpmn_graph(FunctionContext* context, 
     ColumnBuilder<TYPE_VARCHAR> results(num_rows);
     for (int row = 0; row < num_rows; row++) {
         std::vector<std::string> process_trees;
+        bool has_null = false;
         for (auto column: columns) {
             if (column->is_null(row)) {
-                return Status::InvalidArgument("input should not be null.");
+                has_null = true;
+                break;
             }
             process_trees.push_back(column->get(row).get_slice().to_string());
+        }
+        if (has_null) {
+            results.append_null();
+            continue;
         }
         MoBpmnGraphHelper helper;
         ASSIGN_OR_RETURN(auto result, helper.execute(process_trees));

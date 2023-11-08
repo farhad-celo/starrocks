@@ -592,4 +592,18 @@ TEST_F(CelonisMoBpmnGraphTest, invalid_json_spec) {
     EXPECT_THAT(result.status().message().to_string(), testing::HasSubstr("does not contain 'statistics'."));
 }
 
+TEST_F(CelonisMoBpmnGraphTest, null_input) {
+    Columns input_columns;
+    auto input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
+    input_column->append_nulls(1);
+    input_columns.push_back(std::move(input_column));
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    auto result = CelonisMoBpmnGraph::mo_bpmn_graph(ctx.get(), input_columns);
+
+    ASSERT_TRUE(result.ok());
+    EXPECT_EQ(result.value()->size(), 1);
+    EXPECT_TRUE(result.value()->get(0).is_null());
+}
+
 } // namespace starrocks

@@ -1179,6 +1179,9 @@ TEST_F(CelonisInductiveMinerTest, L11) {
     Run(variants, expected);
 }
 
+/*
+ * When input is nullable but empty or only null, NullableAggregateFunctionVariadic will return NULL without
+ * executing inductive miner. So the test result here is not relevant.
 TEST_F(CelonisInductiveMinerTest, EmptyLogBaseCase) {
     VariantRows variants = {};
     std::string expected =
@@ -1193,6 +1196,7 @@ TEST_F(CelonisInductiveMinerTest, EmptyLogBaseCase) {
         })json";
     Run(variants, expected);
 }
+ */
 
 TEST_F(CelonisInductiveMinerTest, SequenceWithSkippedActivities) {
     VariantRows variants = {{"A", "B", "C"},
