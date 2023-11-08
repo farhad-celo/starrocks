@@ -2,15 +2,12 @@
 #include <gtest/gtest.h>
 
 #include "exprs/celonis/variant.h"
-#include "exprs/celonis/variant_stats.h"
 #include "modules/common/execution_context.h"
 #include "modules/operators/process/inductive_miner/directly_follows_graph.h"
 #include "modules/operators/process/inductive_miner/inductive_miner.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog_config.h"
-#include "runtime/mem_pool.h"
 #include "util/slice.h"
 
-using starrocks::Slice;
 using testing::ElementsAre;
 using testing::Pair;
 using testing::UnorderedElementsAre;
@@ -62,33 +59,31 @@ public:
     CelonisDirectlyFollowsGraphTest() = default;
 
     enum id {
-        A, B, C, D, E
+        RESERVED_FOR_NULL, A, B, C, D, E
     };
 
     void SetUp() override {
         // Assign IDs in advance so that they are consistent across data sets.
-        size_t memory = 0;
         std::vector<std::string> activities = {"A", "B", "C", "D", "E"};
+        int index = 1;
         for (const auto& activity: activities) {
-            state_.maybe_add_activity(&mem_pool_, Slice(activity), &memory);
+            activity_id_map_[activity] = index++;
         }
     }
     void TearDown() override {}
 
     void add_variant(std::vector<std::string> activities, int count) {
-        size_t memory = 0;
-        starrocks::Variant variant(activities.size());
+        std::vector<int32_t> variant;
+        variant.reserve(activities.size());
         for (const auto& activity: activities) {
-            auto idx_hash = state_.maybe_add_activity(&mem_pool_, Slice(activity), &memory);
-            variant.add(idx_hash.first, idx_hash.second);
+            variant.push_back(activity_id_map_[activity]);
         }
-        variant_map_[variant] = count;
+        variants_.emplace_back(std::move(variant), count);
     }
 
 private:
-    starrocks::MemPool mem_pool_;
-    starrocks::VariantHashMap variant_map_;
-    starrocks::VariantAggregateState state_;
+    starrocks::Variants variants_;
+    std::unordered_map<std::string, int32_t> activity_id_map_;
 };
 
 TEST_F(CelonisDirectlyFollowsGraphTest, FilteringNoise) {
@@ -98,7 +93,7 @@ TEST_F(CelonisDirectlyFollowsGraphTest, FilteringNoise) {
     dfg_filter_config filter_config;
     common::execution_context dummy_context;
     size_t grain_size{1024};
-    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variant_map_, grain_size), dummy_context,
+    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variants_, grain_size), dummy_context,
                                                grain_size, filter_config};
     auto dfg{dfg::initialize_dfg(miner_config.eventlog(), dummy_context, miner_config.grain_size())};
 
@@ -133,7 +128,7 @@ TEST_F(CelonisDirectlyFollowsGraphTest, FilterInfrequentBehaviorFromInductiveMin
     dfg_filter_config filter_config;
     common::execution_context dummy_context;
     size_t grain_size{1024};
-    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variant_map_, grain_size), dummy_context,
+    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variants_, grain_size), dummy_context,
                                                grain_size, filter_config};
     auto dfg{dfg::initialize_dfg(miner_config.eventlog(), dummy_context, miner_config.grain_size())};
 
@@ -167,7 +162,7 @@ TEST_F(CelonisDirectlyFollowsGraphTest, SimpleFromNoisyXorCutTest) {
     dfg_filter_config filter_config;
     common::execution_context dummy_context;
     size_t grain_size{1024};
-    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variant_map_, grain_size), dummy_context,
+    auto miner_config = inductive_miner_config{make_splittable_eventlog_config(variants_, grain_size), dummy_context,
                                                grain_size, filter_config};
     auto dfg{dfg::initialize_dfg(miner_config.eventlog(), dummy_context, miner_config.grain_size())};
 
