@@ -1,7 +1,8 @@
 #include "align_model_helper.h"
 
+#include <google/protobuf/util/json_util.h>
+
 #include "common/status.h"
-#include "common/statusor.h"
 #include "exprs/celonis/result_table.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types_fwd.h"
@@ -15,9 +16,6 @@
 #include "utils/builders/column_builder.h"
 #include "utils/nullable_pql_value.h"
 
-using starrocks::celonis::ResultColumn;
-using starrocks::StatusOr;
-
 namespace celonis::accelerator::operators::process::align_model {
 
 struct eventlog_params {
@@ -29,64 +27,15 @@ struct eventlog_params {
     bool is_default_eventlog{true};
 };
 
-namespace bpmn_builder {
-
-StatusOr<BpmnModelDescription> build(const std::string& json_bpmn_model_description) {
-    BpmnModelDescription bpmn;
-
-    rapidjson::Document document;
-    document.Parse(json_bpmn_model_description.c_str());
-    if (document.HasParseError()) {
-        std::stringstream error;
-        error << "celonis_align_model: Can't parse JSON bpmn model description.";
-        return Status::InvalidArgument(error.str());
-    }
-
-    if (!document.HasMember("nodes")) {
-        std::stringstream error;
-        error << "celonis_align_model: Your model does not contain 'nodes'.";
-        return Status::InvalidArgument(error.str());
-    }
-    const rapidjson::Value& nodes_values = document["nodes"];
-    for (rapidjson::SizeType i = 0; i < nodes_values.Size(); ++i) {
-        auto node = bpmn.add_nodes();
-        node->set_node_id(std::stoll(nodes_values[i]["node_id"].GetString()));
-        node->set_node_type(
-                static_cast<BpmnModelDescription_BpmnNode_BpmnNodeType>(nodes_values[i]["node_type"].GetInt()));
-        if (node->node_type() == BpmnModelDescription_BpmnNode_BpmnNodeType_TASK) {
-            node->set_task_name(nodes_values[i]["task_name"].GetString());
-        }
-    }
-
-    if (!document.HasMember("edges")) {
-        std::stringstream error;
-        error << "celonis_align_model: Your model does not contain 'edges'.";
-        return Status::InvalidArgument(error.str());
-    }
-    const rapidjson::Value& edges_values = document["edges"];
-    for (rapidjson::SizeType i = 0; i < edges_values.Size(); ++i) {
-        auto node = bpmn.add_edges();
-        node->set_from(std::stoll(edges_values[i]["from"].GetString()));
-        node->set_to(std::stoll(edges_values[i]["to"].GetString()));
-    }
-
-    if (!document.HasMember("cache_key")) {
-        std::stringstream error;
-        error << "celonis_align_model: Your model does not contain 'cache_key'.";
-        return Status::InvalidArgument(error.str());
-    }
-    bpmn.set_cache_key(document["cache_key"].GetString());
-
-    return bpmn;
-}
-
-} // namespace bpmn_builder
-
 Status AlignModelHelper::execute(const std::vector<std::vector<std::string>>& variants,
                                  const std::string& json_bpmn_model_description) {
     // Convert json bpmn model description to BpmnModelDescription protobuf.
-    // TODO(j.kim): Use https://protobuf.dev/reference/cpp/api-docs/google.protobuf.util.json_util/.
-    ASSIGN_OR_RETURN(auto bpmn_model_description, bpmn_builder::build(json_bpmn_model_description));
+    BpmnModelDescription bpmn_model_description;
+    auto status = google::protobuf::util::JsonStringToMessage(json_bpmn_model_description, &bpmn_model_description);
+    if (!status.ok()) {
+        return Status::InvalidArgument(fmt::format("celonis_align_model: Invalid JSON bpmn model description. {}",
+                                                   status.error_message()));
+    }
 
     // Convert variant_map and activitity_map to Saola event_table, case_table and activity_to_case_join.
     utils::nullable_vec_t<cel_int_t> case_column_data;

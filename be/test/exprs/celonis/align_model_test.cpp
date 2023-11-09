@@ -18,7 +18,20 @@ namespace starrocks {
 
 class CelonisAlignModelTest : public testing::Test {
 protected:
-    CelonisAlignModelTest() = default;
+    CelonisAlignModelTest() :
+            arg_types_{{AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
+                        AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))}},
+            return_type_{
+                    .type = TYPE_STRUCT,
+                    .children = {
+                            TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_VARCHAR, TYPEDESC_ARRAY_VARCHAR, TYPEDESC_ARRAY_BIGINT,
+                            TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_VARCHAR
+                    },
+                    .field_names = {
+                            "alignment_model_vertex_id", "alignment_vertex_label", "alignment_move_type",
+                            "alignment_activity_index", "association_edge_class", "association_alignment_index",
+                            "edge_class_id", "edge_class_type"
+                    }} {}
 
     void SetUp() override {}
 
@@ -112,23 +125,6 @@ private:
 
     void Run(const VariantRows& variant_rows, const std::string& bpmn_model_description_json,
              const std::vector<Result>& expected) {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-        FunctionContext::TypeDesc return_type{
-                .type = TYPE_STRUCT,
-                .children = {
-                        TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_VARCHAR, TYPEDESC_ARRAY_VARCHAR, TYPEDESC_ARRAY_BIGINT,
-                        TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_VARCHAR
-                },
-                .field_names = {
-                        "alignment_model_vertex_id", "alignment_vertex_label", "alignment_move_type",
-                        "alignment_activity_index", "association_edge_class", "association_alignment_index",
-                        "edge_class_id", "edge_class_type"
-                }
-        };
-        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
-
         auto variants = build_variant_column(variant_rows);
         auto model_column =
                 ColumnHelper::create_const_column<TYPE_VARCHAR>(bpmn_model_description_json, variant_rows.size());
@@ -136,6 +132,8 @@ private:
         Columns columns;
         columns.push_back(variants);
         columns.push_back(model_column);
+
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types_), return_type_));
         ctx->set_constant_columns(columns);
 
         ASSERT_OK(CelonisAlignModel::align_model_prepare(
@@ -145,12 +143,15 @@ private:
         const auto result = CelonisAlignModel::align_model(ctx.get(), columns).value();
         ASSERT_TRUE(result->is_struct());
         StructColumn* st = down_cast<StructColumn*>(result.get());
-        Evaluator evaluator(*st, expected, return_type);
+        Evaluator evaluator(*st, expected, return_type_);
         evaluator.evaluate();
 
         ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
         ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
     }
+
+    std::vector<FunctionContext::TypeDesc> arg_types_;
+    FunctionContext::TypeDesc return_type_;
 };
 
 const std::string CelonisAlignModelTest::PARALLEL_MODEL =
@@ -451,6 +452,26 @@ TEST_F(CelonisAlignModelTest, Parallel_ONLYNULL) {
             {}
     };
     Run(variants, PARALLEL_MODEL, expected);
+}
+
+TEST_F(CelonisAlignModelTest, InvalidModel) {
+    auto variants = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), /*nullable=*/true);
+    variants->append_nulls(1);
+    auto model_column = ColumnHelper::create_const_column<TYPE_VARCHAR>("Invalid JSON", 1);
+
+    Columns columns;
+    columns.push_back(variants);
+    columns.push_back(model_column);
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types_), return_type_));
+    ctx->set_constant_columns(columns);
+
+    ASSERT_OK(CelonisAlignModel::align_model_prepare(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+    ASSERT_OK(CelonisAlignModel::align_model_prepare(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+
+    const auto result = CelonisAlignModel::align_model(ctx.get(), columns);
+    ASSERT_FALSE(result.ok());
+    EXPECT_TRUE(result.status().is_invalid_argument());
 }
 
 TEST_F(CelonisAlignModelTest, Concurrency) {
