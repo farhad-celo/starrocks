@@ -1,8 +1,9 @@
 
 ### Build
 
+You may need to comment out some broken SR benchmarks in ../CMakeLists.txt.
 ``` 
-CMAKE_BUILD_TYPE=Release WITH_BLOCK_CACHE=OFF  ./build.sh --be -j1
+CMAKE_BUILD_TYPE=Release ./build.sh --be --with-bench
 ```
 ### Run
 
