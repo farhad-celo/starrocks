@@ -625,14 +625,6 @@ public class FunctionSet {
                     SUBSTRING, SUBSTRING_INDEX,
                     TRIM, UPPER, IF);
 
-    public static final Set<String> celonisAlwaysReturnNonNullableFunctions =
-            ImmutableSet.<String>builder()
-                    .add(FunctionSet.CELONIS_ALIGN_MODEL)
-                    .add(FunctionSet.CELONIS_INDUCTIVE_MINER)
-                    .add(FunctionSet.CELONIS_TRIMMED_MEAN)
-                    .add(FunctionSet.CELONIS_VARIANT_STATS)
-                    .build();
-
     public static final Set<String> alwaysReturnNonNullableFunctions =
             ImmutableSet.<String>builder()
                     .add(FunctionSet.COUNT)
@@ -901,8 +893,7 @@ public class FunctionSet {
 
     public boolean isNotAlwaysNullResultWithNullParamFunctions(String funcName) {
         return notAlwaysNullResultWithNullParamFunctions.contains(funcName)
-                || alwaysReturnNonNullableFunctions.contains(funcName)
-                || celonisAlwaysReturnNonNullableFunctions.contains(funcName);
+                || alwaysReturnNonNullableFunctions.contains(funcName);
     }
 
     private Function matchFuncCandidates(Function desc, Function.CompareMode mode, List<Function> fns) {
@@ -1015,9 +1006,7 @@ public class FunctionSet {
         if (!fn.isPolymorphic() && getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE) != null) {
             return;
         }
-        fn.setIsNullable(
-                !alwaysReturnNonNullableFunctions.contains(fn.functionName()) ||
-                        celonisAlwaysReturnNonNullableFunctions.contains(fn.functionName()));
+        fn.setIsNullable(!(alwaysReturnNonNullableFunctions.contains(fn.functionName())));
         List<Function> fns = vectorizedFunctions.computeIfAbsent(fn.functionName(), k -> Lists.newArrayList());
         fns.add(fn);
     }
@@ -1037,8 +1026,7 @@ public class FunctionSet {
 
     private void addVectorizedBuiltin(Function fn) {
         fn.setCouldApplyDictOptimize(couldApplyDictOptimizationFunctions.contains(fn.functionName()));
-        fn.setIsNullable(!alwaysReturnNonNullableFunctions.contains(fn.functionName()) ||
-                celonisAlwaysReturnNonNullableFunctions.contains(fn.functionName()));
+        fn.setIsNullable(!(alwaysReturnNonNullableFunctions.contains(fn.functionName())));
         List<Function> fns = vectorizedFunctions.computeIfAbsent(fn.functionName(), k -> Lists.newArrayList());
         fns.add(fn);
     }
