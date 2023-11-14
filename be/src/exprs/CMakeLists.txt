@@ -121,6 +121,7 @@ set(CELONIS_FILES
   celonis/calc_throughput.cpp
   celonis/conformance.cpp
   celonis/count_edges.cpp
+  celonis/greatest_least.cpp
   celonis/in.cpp
   celonis/index_activity.cpp
   celonis/inductive_miner.cpp

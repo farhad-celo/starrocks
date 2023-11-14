@@ -74,6 +74,7 @@ ${license}
 #include "exprs/celonis/array_functions.h"
 #include "exprs/celonis/calc_throughput.h"
 #include "exprs/celonis/conformance.h"
+#include "exprs/celonis/greatest_least.h"
 #include "exprs/celonis/in.h"
 #include "exprs/celonis/index_activity.h"
 #include "exprs/celonis/like.h"
