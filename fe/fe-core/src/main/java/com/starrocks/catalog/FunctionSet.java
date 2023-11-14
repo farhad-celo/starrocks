@@ -509,6 +509,8 @@ public class FunctionSet {
 
     // Celonis functions:
     public static final String CELONIS_ALIGN_MODEL = "celonis_align_model";
+    public static final String CELONIS_GREATEST = "celonis_greatest";
+    public static final String CELONIS_LEAST = "celonis_least";
 
     // JSON functions
     public static final Function JSON_QUERY_FUNC = new Function(
@@ -624,6 +626,12 @@ public class FunctionSet {
                     REGEXP_EXTRACT, REGEXP_REPLACE, REPEAT, REPLACE, REVERSE, RIGHT, RPAD, RTRIM, SPLIT_PART, SUBSTR,
                     SUBSTRING, SUBSTRING_INDEX,
                     TRIM, UPPER, IF);
+
+    public static final Set<String> celonisAlwaysReturnNonNullableFunctions =
+            ImmutableSet.<String>builder()
+                    .add(FunctionSet.CELONIS_GREATEST)
+                    .add(FunctionSet.CELONIS_LEAST)
+                    .build();
 
     public static final Set<String> alwaysReturnNonNullableFunctions =
             ImmutableSet.<String>builder()
@@ -893,7 +901,8 @@ public class FunctionSet {
 
     public boolean isNotAlwaysNullResultWithNullParamFunctions(String funcName) {
         return notAlwaysNullResultWithNullParamFunctions.contains(funcName)
-                || alwaysReturnNonNullableFunctions.contains(funcName);
+                || alwaysReturnNonNullableFunctions.contains(funcName)
+                || celonisAlwaysReturnNonNullableFunctions.contains(funcName);
     }
 
     private Function matchFuncCandidates(Function desc, Function.CompareMode mode, List<Function> fns) {
@@ -1006,7 +1015,9 @@ public class FunctionSet {
         if (!fn.isPolymorphic() && getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE) != null) {
             return;
         }
-        fn.setIsNullable(!(alwaysReturnNonNullableFunctions.contains(fn.functionName())));
+        fn.setIsNullable(
+                !(alwaysReturnNonNullableFunctions.contains(fn.functionName()) ||
+                        celonisAlwaysReturnNonNullableFunctions.contains(fn.functionName())));
         List<Function> fns = vectorizedFunctions.computeIfAbsent(fn.functionName(), k -> Lists.newArrayList());
         fns.add(fn);
     }
@@ -1026,7 +1037,8 @@ public class FunctionSet {
 
     private void addVectorizedBuiltin(Function fn) {
         fn.setCouldApplyDictOptimize(couldApplyDictOptimizationFunctions.contains(fn.functionName()));
-        fn.setIsNullable(!(alwaysReturnNonNullableFunctions.contains(fn.functionName())));
+        fn.setIsNullable(!(alwaysReturnNonNullableFunctions.contains(fn.functionName()) ||
+                celonisAlwaysReturnNonNullableFunctions.contains(fn.functionName())));
         List<Function> fns = vectorizedFunctions.computeIfAbsent(fn.functionName(), k -> Lists.newArrayList());
         fns.add(fn);
     }
