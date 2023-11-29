@@ -30,6 +30,15 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_BIGINT>());
     add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, PercentileState<TYPE_DOUBLE>>(
             "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_DOUBLE>());
+
+    add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_BIGINT, CelonisModeState<TYPE_BIGINT>>(
+            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, CelonisModeState<TYPE_DOUBLE>>(
+            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_DOUBLE>());
+    add_aggregate_mapping_variadic<TYPE_DATETIME, TYPE_DATETIME, CelonisModeState<TYPE_DATETIME>>(
+            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_DATETIME>());
+    add_aggregate_mapping_variadic<TYPE_VARCHAR, TYPE_VARCHAR, CelonisModeState<TYPE_VARCHAR>>(
+            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_VARCHAR>());
 }
 
 struct PercentileDiscDispatcher {

@@ -129,7 +129,9 @@ set(CELONIS_FILES
   celonis/match_activities.cpp
   celonis/match_process.cpp
   celonis/mo_bpmn_graph.cpp
+  celonis/mode_agg.cpp
   celonis/remap_timestamp_weekday.cpp
+  celonis/serialization_utils.cpp
   celonis/shortened_variant.cpp
   celonis/source_target.cpp
   celonis/string_functions.cpp

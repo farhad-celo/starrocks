@@ -55,6 +55,7 @@
 #include "exprs/agg/window.h"
 #include "exprs/agg/window_funnel.h"
 #include "exprs/celonis/inductive_miner.h"
+#include "exprs/celonis/mode_agg.h"
 #include "exprs/celonis/trimmed_mean.h"
 #include "exprs/celonis/variant_stats.h"
 #include "types/logical_type.h"
@@ -203,6 +204,9 @@ public:
     static AggregateFunctionPtr MakeHllRawAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisInductiveMinerAggregateFunction();
+
+    template <LogicalType LT>
+    static AggregateFunctionPtr MakeCelonisModeAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisVariantStatsAggregateFunction();
 
@@ -424,6 +428,11 @@ AggregateFunctionPtr AggregateFactory::MakeThetaSketchAggregateFunction() {
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeHllRawAggregateFunction() {
     return std::make_shared<HllNdvAggregateFunction<LT, true>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisModeAggregateFunction() {
+    return std::make_shared<CelonisModeAggregateFunction<LT>>();
 }
 
 template <LogicalType LT>
