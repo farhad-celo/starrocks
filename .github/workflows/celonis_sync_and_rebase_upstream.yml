@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  LATEST_UPSTREAM_BRANCH: branch-3.1
+  LATEST_UPSTREAM_BRANCH: branch-3.1-cs
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 permissions:

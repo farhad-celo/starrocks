@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LATEST_UPSTREAM_BRANCH: branch-3.1
+  LATEST_UPSTREAM_BRANCH: branch-3.1-cs
   BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-e862a8f9
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}

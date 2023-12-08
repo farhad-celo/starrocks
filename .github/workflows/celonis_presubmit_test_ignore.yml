@@ -7,6 +7,7 @@ on:
       - '**.md'
       - '**.png'
       - 'celonis/assets/**'
+      - '.github/**'
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 

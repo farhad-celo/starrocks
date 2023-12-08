@@ -7,6 +7,8 @@ on:
       - '**.md'
       - '**.png'
       - 'celonis/assets/**'
+      - '.github/**'
+      - '!.github/workflows/celonis_presubmit_test.yml'
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 
