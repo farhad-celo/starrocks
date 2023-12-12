@@ -56,6 +56,7 @@
 #include "exprs/agg/window_funnel.h"
 #include "exprs/celonis/inductive_miner.h"
 #include "exprs/celonis/mode_agg.h"
+#include "exprs/celonis/sorted_first_last.h"
 #include "exprs/celonis/trimmed_mean.h"
 #include "exprs/celonis/variant_stats.h"
 #include "types/logical_type.h"
@@ -208,10 +209,13 @@ public:
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisModeAggregateFunction();
 
-    static AggregateFunctionPtr MakeCelonisVariantStatsAggregateFunction();
+    static AggregateFunctionPtr MakeCelonisSortedFirstAggregateFunction();
+    static AggregateFunctionPtr MakeCelonisSortedLastAggregateFunction();
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisTrimmedMeanAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisVariantStatsAggregateFunction();
 
     static AggregateFunctionPtr MakePercentileApproxAggregateFunction();
 

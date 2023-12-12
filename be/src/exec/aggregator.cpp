@@ -173,6 +173,14 @@ void AggregatorParams::init() {
                 if (fn.aggregate_fn.__isset.is_distinct) {
                     agg_fn_types[i].is_distinct = fn.aggregate_fn.is_distinct;
                 }
+            } else if (fn.name.function_name == "celonis_sorted_first" ||
+                       fn.name.function_name == "celonis_sorted_last") {
+                // set order by info
+                if (fn.aggregate_fn.__isset.is_asc_order && fn.aggregate_fn.__isset.nulls_first &&
+                    !fn.aggregate_fn.is_asc_order.empty()) {
+                    agg_fn_types[i].is_asc_order = fn.aggregate_fn.is_asc_order;
+                    agg_fn_types[i].nulls_first = fn.aggregate_fn.nulls_first;
+                }
             }
         }
     }

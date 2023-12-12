@@ -39,6 +39,10 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_DATETIME>());
     add_aggregate_mapping_variadic<TYPE_VARCHAR, TYPE_VARCHAR, CelonisModeState<TYPE_VARCHAR>>(
             "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_VARCHAR>());
+    add_general_mapping_notnull("celonis_sorted_first", false,
+                                AggregateFactory::MakeCelonisSortedFirstAggregateFunction());
+    add_general_mapping_notnull("celonis_sorted_last", false,
+                                AggregateFactory::MakeCelonisSortedLastAggregateFunction());
 }
 
 struct PercentileDiscDispatcher {

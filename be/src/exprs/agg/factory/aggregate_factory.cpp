@@ -78,6 +78,14 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisInductiveMinerAggregateFunctio
     return std::make_shared<InductiveMinerAggregateFunction>();
 }
 
+AggregateFunctionPtr AggregateFactory::MakeCelonisSortedFirstAggregateFunction() {
+    return std::make_shared<CelonisSortedFirstLastAggregateFunction</*is_first=*/true>>();
+}
+
+AggregateFunctionPtr AggregateFactory::MakeCelonisSortedLastAggregateFunction() {
+    return std::make_shared<CelonisSortedFirstLastAggregateFunction</*is_first=*/false>>();
+}
+
 AggregateFunctionPtr AggregateFactory::MakeCelonisVariantStatsAggregateFunction() {
     return std::make_shared<VariantStatsAggregateFunction>();
 }

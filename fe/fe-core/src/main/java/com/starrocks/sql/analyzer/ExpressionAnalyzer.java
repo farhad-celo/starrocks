@@ -1077,6 +1077,24 @@ public class ExpressionAnalyzer {
 
         private void checkFunction(String fnName, FunctionCallExpr node, Type[] argumentTypes) {
             switch (fnName) {
+                case FunctionSet.CELONIS_SORTED_FIRST:
+                case FunctionSet.CELONIS_SORTED_LAST: {
+                    if (node.getChildren().size() == 0) {
+                        throw new SemanticException(fnName + " should have at least one input", node.getPos());
+                    }
+                    int start = argumentTypes.length - node.getParams().getOrderByElemNum();
+                    if (start != 1) {
+                        throw new SemanticException(fnName + " should have exact one output expressions before" +
+                                " [ORDER BY]", node.getPos());
+                    }
+                    for (int i = start; i < argumentTypes.length; ++i) {
+                        if (!argumentTypes[i].canOrderBy()) {
+                            throw new SemanticException(fnName + " can't support order by the " + i +
+                                    "-th input with type of " + argumentTypes[i].toSql(), node.getPos());
+                        }
+                    }
+                    break;
+                }
                 case FunctionSet.TIME_SLICE:
                 case FunctionSet.DATE_SLICE:
                     if (!(node.getChild(1) instanceof IntLiteral)) {

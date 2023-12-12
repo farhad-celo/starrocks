@@ -2608,6 +2608,8 @@ aggregationFunction
     | SUM '(' setQuantifier? expression ')'
     | ARRAY_AGG '(' setQuantifier? expression (ORDER BY sortItem (',' sortItem)*)? ')'
     | ARRAY_AGG_DISTINCT '(' expression (ORDER BY sortItem (',' sortItem)*)? ')'
+    | CELONIS_SORTED_FIRST '(' setQuantifier? expression (ORDER BY sortItem (',' sortItem)*)? ')'
+    | CELONIS_SORTED_LAST '(' setQuantifier? expression (ORDER BY sortItem (',' sortItem)*)? ')'
     | GROUP_CONCAT '(' setQuantifier? expression (',' expression)* (ORDER BY sortItem (',' sortItem)*)? (SEPARATOR expression)? ')'
     ;
 
@@ -3076,6 +3078,7 @@ nonReserved
     | ARRAY_AGG | ARRAY_AGG_DISTINCT
     | BACKEND | BACKENDS | BACKUP | BEGIN | BITMAP_UNION | BLACKLIST | BLACKHOLE | BINARY | BODY | BOOLEAN | BRANCH | BROKER | BUCKETS
     | BUILTIN | BASE | BEFORE | BASELINE
+    | CELONIS_SORTED_FIRST | CELONIS_SORTED_LAST
     | CACHE | CAST | CANCEL | CATALOG | CATALOGS | CEIL | CHAIN | CHARSET | CLEAN | CLEAR | CLUSTER | CLUSTERS | CURRENT | COLLATION | COLUMNS
     | CUME_DIST | CUMULATIVE | COMMENT | COMMIT | COMMITTED | COMPUTE | CONNECTION | CONSISTENT | COSTS | COUNT
     | CONFIG | COMPACT

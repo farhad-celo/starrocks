@@ -1210,7 +1210,9 @@ public class AstToStringBuilder {
                 StringLiteral boundary = (StringLiteral) node.getChild(3);
                 sb.append(", ").append(boundary.getValue());
                 sb.append(")");
-            } else if (functionName.equals(FunctionSet.ARRAY_AGG) || functionName.equals(FunctionSet.GROUP_CONCAT)) {
+            } else if (functionName.equals(FunctionSet.ARRAY_AGG) || functionName.equals(FunctionSet.GROUP_CONCAT) ||
+                       functionName.equals(FunctionSet.CELONIS_SORTED_FIRST) ||
+                       functionName.equals(FunctionSet.CELONIS_SORTED_LAST)) {
                 int end = 1;
                 if (functionName.equals(FunctionSet.GROUP_CONCAT)) {
                     end = fnParams.exprs().size() - fnParams.getOrderByElemNum() - 1;

@@ -861,7 +861,35 @@ public class FunctionAnalyzer {
             sf.add(new StructField("edge_class_id", Type.ARRAY_BIGINT));
             sf.add(new StructField("edge_class_type", Type.ARRAY_VARCHAR));
             fn.setRetType(new StructType(sf));
-        } else if (FunctionSet.STR_TO_DATE.equals(fnName)) {
+        } else if (fnName.equals(FunctionSet.CELONIS_SORTED_FIRST) ||
+                fnName.equals(FunctionSet.CELONIS_SORTED_LAST)) {
+            // move order by expr to node child, and extract is_asc and null_first information.
+            fn = Expr.getBuiltinFunction(fnName, new Type[] {argumentTypes[0]},
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            List<OrderByElement> orderByElements = node.getParams().getOrderByElements();
+            List<Boolean> isAscOrder = new ArrayList<>();
+            List<Boolean> nullsFirst = new ArrayList<>();
+            if (orderByElements != null) {
+                for (OrderByElement elem : orderByElements) {
+                    isAscOrder.add(elem.getIsAsc());
+                    nullsFirst.add(elem.getNullsFirstParam());
+                }
+            }
+            Type[] argsTypes = new Type[argumentTypes.length];
+            for (int i = 0; i < argumentTypes.length; ++i) {
+                argsTypes[i] = argumentTypes[i] == Type.NULL ? Type.BOOLEAN : argumentTypes[i];
+            }
+            fn.setArgsType(argsTypes); // as accepting various types
+            ArrayList<Type> structFields = new ArrayList<>(argsTypes.length);
+            for (Type t : argsTypes) {
+                structFields.add(t);
+            }
+            ((AggregateFunction) fn).setIntermediateType(new StructType(structFields));
+            ((AggregateFunction) fn).setIsAscOrder(isAscOrder);
+            ((AggregateFunction) fn).setNullsFirst(nullsFirst);
+            fn.setRetType(argsTypes[0]);     // return null if scalar agg with empty input
+        }  else if (FunctionSet.STR_TO_DATE.equals(fnName)) {
             fn = getStrToDateFunction(node, argumentTypes);
         } else if (FunctionSet.ARRAY_GENERATE.equals(fnName)) {
             fn = getArrayGenerateFunction(node);
