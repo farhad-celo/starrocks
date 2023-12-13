@@ -112,6 +112,101 @@ protected:
     }
 };
 
+TEST_F(CelonisSortedFirstLastTest, null_value) {
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}};
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{"A", 4});
+    input.emplace_back(DatumStruct{"B", 3});
+    input.emplace_back(DatumStruct{"C", 2});
+    input.emplace_back(DatumStruct{kNullDatum, 1});
+
+    Run<TYPE_VARCHAR>(sort_column_types, input, "C", "A");
+}
+
+TEST_F(CelonisSortedFirstLastTest, null_value_only) {
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}};
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{kNullDatum, 1});
+    input.emplace_back(DatumStruct{kNullDatum, 2});
+
+    Run<TYPE_VARCHAR>(sort_column_types, input, kNullDatum, kNullDatum);
+}
+
+TEST_F(CelonisSortedFirstLastTest, no_sort) {
+    std::vector<SortColumnType> sort_column_types;
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{"A"});
+    input.emplace_back(DatumStruct{"B"});
+    input.emplace_back(DatumStruct{"C"});
+
+    Run<TYPE_VARCHAR>(sort_column_types, input, "A", "A");
+}
+
+TEST_F(CelonisSortedFirstLastTest, multiple_sort) {
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
+                                                     {TYPE_INT, true, true}};
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{"A", 2, 2});
+    input.emplace_back(DatumStruct{"B", 2, 1});
+    input.emplace_back(DatumStruct{"C", 1, 1});
+    input.emplace_back(DatumStruct{"D", 1, 2});
+
+    Run<TYPE_VARCHAR>(sort_column_types, input, "C", "A");
+}
+
+TEST_F(CelonisSortedFirstLastTest, varchar_int_desc_sort) {
+    std::vector<SortColumnType> sort_column_types = {{TYPE_VARCHAR, true, true},
+                                                     {TYPE_INT, false, true}};
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{1, "A", 1});
+    input.emplace_back(DatumStruct{2, "B", 2});
+    input.emplace_back(DatumStruct{3, "A", 2});
+    input.emplace_back(DatumStruct{4, "A", 0});
+
+    Run<TYPE_INT>(sort_column_types, input, 3, 2);
+}
+
+TEST_F(CelonisSortedFirstLastTest, nulls_first) {
+    std::vector<SortColumnType> sort_column_types = {{TYPE_DOUBLE, true, true}};
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{1, 10.0});
+    input.emplace_back(DatumStruct{2, kNullDatum});
+    input.emplace_back(DatumStruct{3, 20.0});
+    input.emplace_back(DatumStruct{4, 30.0});
+
+    Run<TYPE_INT>(sort_column_types, input, 2, 4);
+}
+
+TEST_F(CelonisSortedFirstLastTest, nulls_last) {
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, false}};
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{1, 10});
+    input.emplace_back(DatumStruct{2, kNullDatum});
+    input.emplace_back(DatumStruct{3, 20});
+    input.emplace_back(DatumStruct{4, 30});
+
+    Run<TYPE_INT>(sort_column_types, input, 1, 2);
+}
+
+TEST_F(CelonisSortedFirstLastTest, desc_nulls_last) {
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, false, false}};
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{1, 10});
+    input.emplace_back(DatumStruct{2, kNullDatum});
+    input.emplace_back(DatumStruct{3, 20});
+    input.emplace_back(DatumStruct{4, 30});
+
+    Run<TYPE_INT>(sort_column_types, input, 4, 2);
+}
+
 TEST_F(CelonisSortedFirstLastTest, serialize_and_merge) {
     std::vector<FunctionContext::TypeDesc> arg_types1 = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
@@ -206,99 +301,65 @@ TEST_F(CelonisSortedFirstLastTest, serialize_and_merge) {
     EXPECT_EQ(result->get(0).get_slice(), "B");
 }
 
-TEST_F(CelonisSortedFirstLastTest, null_value) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}};
+TEST_F(CelonisSortedFirstLastTest, serialize_and_merge_null) {
+    std::vector<FunctionContext::TypeDesc> arg_types1 = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto arg_types2 = arg_types1;
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT));
+    std::vector<bool> is_asc_order{};
+    std::vector<bool> nulls_first{};
 
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{"A", 4});
-    input.emplace_back(DatumStruct{"B", 3});
-    input.emplace_back(DatumStruct{"C", 2});
-    input.emplace_back(DatumStruct{kNullDatum, 1});
+    std::unique_ptr<FunctionContext> local_ctx1(FunctionContext::create_test_context(std::move(arg_types1), return_type));
+    local_ctx1->set_is_asc_order(is_asc_order);
+    local_ctx1->set_nulls_first(nulls_first);
+    std::unique_ptr<FunctionContext> local_ctx2(FunctionContext::create_test_context(std::move(arg_types2), return_type));
+    local_ctx2->set_is_asc_order(is_asc_order);
+    local_ctx2->set_nulls_first(nulls_first);
 
-    Run<TYPE_VARCHAR>(sort_column_types, input, "C", "A");
-}
+    const AggregateFunction* func = get_aggregate_function("celonis_sorted_first", TYPE_INT, TYPE_INT, false);
 
-TEST_F(CelonisSortedFirstLastTest, null_value_only) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}};
+    auto col1 = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);
+    col1->append_datum(kNullDatum);
 
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{kNullDatum, 1});
-    input.emplace_back(DatumStruct{kNullDatum, 2});
+    std::vector<const Column*> raw_columns1;
+    raw_columns1.push_back(col1.get());
 
-    Run<TYPE_VARCHAR>(sort_column_types, input, kNullDatum, kNullDatum);
-}
+    auto col2 = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);
+    col2->append_datum(kNullDatum);
 
-TEST_F(CelonisSortedFirstLastTest, no_sort) {
-    std::vector<SortColumnType> sort_column_types;
+    std::vector<const Column*> raw_columns2;
+    raw_columns2.push_back(col2.get());
 
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{"A"});
-    input.emplace_back(DatumStruct{"B"});
-    input.emplace_back(DatumStruct{"C"});
+    auto state1 = ManagedAggrState::create(local_ctx1.get(), func);
+    func->update_batch_single_state(local_ctx1.get(), col1->size(), raw_columns1.data(), state1->state());
 
-    Run<TYPE_VARCHAR>(sort_column_types, input, "A", "A");
-}
+    auto state2 = ManagedAggrState::create(local_ctx2.get(), func);
+    func->update_batch_single_state(local_ctx2.get(), col2->size(), raw_columns2.data(), state2->state());
 
-TEST_F(CelonisSortedFirstLastTest, multiple_sort) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
-                                                     {TYPE_INT, true, true}};
+    // Serialize
+    TypeDescriptor serde_type;
+    serde_type.type = LogicalType::TYPE_STRUCT;
+    serde_type.children.emplace_back(TypeDescriptor(LogicalType::TYPE_INT));
+    serde_type.field_names.emplace_back("col1");
+    auto serde_col = ColumnHelper::create_column(serde_type, true);
+    func->serialize_to_column(local_ctx2.get(), state2->state(), serde_col.get());
 
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{"A", 2, 2});
-    input.emplace_back(DatumStruct{"B", 2, 1});
-    input.emplace_back(DatumStruct{"C", 1, 1});
-    input.emplace_back(DatumStruct{"D", 1, 2});
+    EXPECT_TRUE(serde_col->is_null(0));
+    auto& serde_fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(serde_col.get()))->fields();
+    EXPECT_EQ(serde_fields.size(), 1);
 
-    Run<TYPE_VARCHAR>(sort_column_types, input, "C", "A");
-}
+    // Merge
+    func->merge(local_ctx1.get(), serde_col.get(), state1->state(), 0);
 
-TEST_F(CelonisSortedFirstLastTest, varchar_int_desc_sort) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_VARCHAR, true, true},
-                                                     {TYPE_INT, false, true}};
+    auto& state = *reinterpret_cast<const CelonisSortedFirstLastAggregateState<true>*>(state1->state());
+    EXPECT_EQ(state.data_columns->size(), 1);
 
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{1, "A", 1});
-    input.emplace_back(DatumStruct{2, "B", 2});
-    input.emplace_back(DatumStruct{3, "A", 2});
-    input.emplace_back(DatumStruct{4, "A", 0});
+    // Get the result
+    auto result = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);
+    func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
-    Run<TYPE_INT>(sort_column_types, input, 3, 2);
-}
-
-TEST_F(CelonisSortedFirstLastTest, nulls_first) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_DOUBLE, true, true}};
-
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{1, 10.0});
-    input.emplace_back(DatumStruct{2, kNullDatum});
-    input.emplace_back(DatumStruct{3, 20.0});
-    input.emplace_back(DatumStruct{4, 30.0});
-
-    Run<TYPE_INT>(sort_column_types, input, 2, 4);
-}
-
-TEST_F(CelonisSortedFirstLastTest, nulls_last) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, false}};
-
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{1, 10});
-    input.emplace_back(DatumStruct{2, kNullDatum});
-    input.emplace_back(DatumStruct{3, 20});
-    input.emplace_back(DatumStruct{4, 30});
-
-    Run<TYPE_INT>(sort_column_types, input, 1, 2);
-}
-
-TEST_F(CelonisSortedFirstLastTest, desc_nulls_last) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, false, false}};
-
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{1, 10});
-    input.emplace_back(DatumStruct{2, kNullDatum});
-    input.emplace_back(DatumStruct{3, 20});
-    input.emplace_back(DatumStruct{4, 30});
-
-    Run<TYPE_INT>(sort_column_types, input, 4, 2);
+    ASSERT_EQ(result->size(), 1);
+    EXPECT_TRUE(result->is_null(0));
 }
 
 } // namespace starrocks

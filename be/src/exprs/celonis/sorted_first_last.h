@@ -103,6 +103,9 @@ public:
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
+        if (column->is_null(row_num)) {
+            return;
+        }
         auto& input_columns = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column))->fields();
         std::vector<const Column*> columns;
         for (auto i = 0; i < input_columns.size(); ++i) {
