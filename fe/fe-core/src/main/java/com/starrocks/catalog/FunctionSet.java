@@ -305,6 +305,7 @@ public class FunctionSet {
     public static final String MANN_WHITNEY_U_TEST = "mann_whitney_u_test";
 
     // Aggregate celonis functions:
+    public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
     public static final String CELONIS_MODE = "celonis_mode";
     public static final String CELONIS_SORTED_FIRST = "celonis_sorted_first";
@@ -607,6 +608,15 @@ public class FunctionSet {
             ImmutableSet.<Type>builder()
                     .addAll(Type.INTEGER_TYPES)
                     .build();
+
+    private static final Set<Type> CELONIS_TYPES =
+            ImmutableSet.<Type>builder()
+                    .add(Type.BIGINT)
+                    .add(Type.DOUBLE)
+                    .add(Type.DATETIME)
+                    .add(Type.VARCHAR)
+                    .build();
+
     /**
      * Use for vectorized engine, but we can't use vectorized function directly, because we
      * need to check whether the expression tree can use vectorized function from bottom to
@@ -1129,6 +1139,16 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_SORTED_LAST,
                 Lists.newArrayList(Type.ANY_ELEMENT), Type.ANY_ELEMENT, Type.ANY_STRUCT, true,
                 false, false, false));
+        // celonis_histogram_boundaries
+        for (Type type : CELONIS_TYPES) {
+            ArrayList<StructField> sf = Lists.newArrayList();
+            sf.add(new StructField("class_bounds_lower", new ArrayType(type)));
+            sf.add(new StructField("class_bounds_upper", new ArrayType(type)));
+            sf.add(new StructField("class_count", Type.ARRAY_BIGINT));
+            addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_HISTOGRAM_BOUNDARIES,
+                    Lists.newArrayList(Type.BIGINT, Type.BOOLEAN, Type.BOOLEAN, new ArrayType(type)),
+                    new StructType(sf), Type.VARBINARY, false, false, false));
+        }
     }
 
     // Populate all the aggregate builtins in the globalStateMgr.

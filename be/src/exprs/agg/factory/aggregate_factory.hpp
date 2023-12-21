@@ -54,6 +54,7 @@
 #include "exprs/agg/variance.h"
 #include "exprs/agg/window.h"
 #include "exprs/agg/window_funnel.h"
+#include "exprs/celonis/histogram_boundaries.h"
 #include "exprs/celonis/inductive_miner.h"
 #include "exprs/celonis/mode_agg.h"
 #include "exprs/celonis/sorted_first_last.h"
@@ -203,6 +204,10 @@ public:
 
     template <LogicalType T>
     static AggregateFunctionPtr MakeHllRawAggregateFunction();
+
+    // Celonis functions
+    template <LogicalType LT>
+    static AggregateFunctionPtr MakeCelonisHistogramBoundariesAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisInductiveMinerAggregateFunction();
 
@@ -432,6 +437,11 @@ AggregateFunctionPtr AggregateFactory::MakeThetaSketchAggregateFunction() {
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeHllRawAggregateFunction() {
     return std::make_shared<HllNdvAggregateFunction<LT, true>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction() {
+    return std::make_shared<CelonisHistogramBoundariesAggregationFunction<LT>>();
 }
 
 template <LogicalType LT>

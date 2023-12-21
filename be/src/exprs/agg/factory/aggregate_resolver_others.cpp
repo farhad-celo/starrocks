@@ -43,6 +43,18 @@ void AggregateFuncResolver::register_celonis() {
                                 AggregateFactory::MakeCelonisSortedFirstAggregateFunction());
     add_general_mapping_notnull("celonis_sorted_last", false,
                                 AggregateFactory::MakeCelonisSortedLastAggregateFunction());
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_STRUCT>(
+            "celonis_histogram_boundaries", false,
+            AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_STRUCT>(
+            "celonis_histogram_boundaries", false,
+            AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_DOUBLE>());
+    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_STRUCT>(
+            "celonis_histogram_boundaries", false,
+            AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_DATETIME>());
+    add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_STRUCT>(
+            "celonis_histogram_boundaries", false,
+            AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_VARCHAR>());
 }
 
 struct PercentileDiscDispatcher {

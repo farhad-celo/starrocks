@@ -148,6 +148,7 @@ set(EXEC_FILES
         ./exprs/celonis/conformance_test.cpp
         ./exprs/celonis/count_edges_test.cpp
         ./exprs/celonis/greatest_least_test.cpp
+        ./exprs/celonis/histogram_boundaries_test.cpp
         ./exprs/celonis/in_test.cpp
         ./exprs/celonis/index_activity_test.cpp
         ./exprs/celonis/inductive_miner_test.cpp
