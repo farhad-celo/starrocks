@@ -1146,7 +1146,7 @@ public class FunctionSet {
             sf.add(new StructField("class_bounds_upper", new ArrayType(type)));
             sf.add(new StructField("class_count", Type.ARRAY_BIGINT));
             addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_HISTOGRAM_BOUNDARIES,
-                    Lists.newArrayList(Type.BIGINT, Type.BOOLEAN, Type.BOOLEAN, new ArrayType(type)),
+                    Lists.newArrayList(type, Type.BOOLEAN, Type.BOOLEAN, new ArrayType(type)),
                     new StructType(sf), Type.VARBINARY, false, false, false));
         }
     }
