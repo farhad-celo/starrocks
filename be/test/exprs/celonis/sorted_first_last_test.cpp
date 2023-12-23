@@ -290,7 +290,7 @@ TEST_F(CelonisSortedFirstLastTest, serialize_and_merge) {
     func->merge(local_ctx1.get(), serde_col.get(), state1->state(), 0);
 
     auto& state = *reinterpret_cast<const CelonisSortedFirstLastAggregateState<true>*>(state1->state());
-    EXPECT_EQ(state.data_columns->size(), 3);
+    EXPECT_EQ(state.data.size(), 3);
 
     // Get the result
     auto result = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
@@ -352,7 +352,7 @@ TEST_F(CelonisSortedFirstLastTest, serialize_and_merge_null) {
     func->merge(local_ctx1.get(), serde_col.get(), state1->state(), 0);
 
     auto& state = *reinterpret_cast<const CelonisSortedFirstLastAggregateState<true>*>(state1->state());
-    EXPECT_EQ(state.data_columns->size(), 1);
+    EXPECT_TRUE(state.data.empty());
 
     // Get the result
     auto result = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);
