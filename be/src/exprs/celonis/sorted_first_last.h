@@ -19,7 +19,7 @@ public:
     virtual ~RowAccessor() = default;
 
     // Seeks to the next column and returns true if it is NULL.
-    virtual bool seek_and_is_null() const = 0;
+    virtual bool seek_and_is_null() = 0;
 
     // This must be called once after seek_and_is_null() returns false;
     virtual Datum get() const = 0;
@@ -44,10 +44,11 @@ public:
             if (seek_and_is_null()) {
                 continue;
             }
+            Datum datum = get(); // This must be called once if not null.
             auto logical_type = ctx_->get_arg_type(i)->type;
             switch (logical_type) {
                 case TYPE_VARCHAR:
-                    result += sizeof(SliceSizeType) + get().get_slice().size;
+                    result += sizeof(SliceSizeType) + datum.get_slice().size;
                     break;
 #define M(type) \
                 case type: \
@@ -75,10 +76,11 @@ public:
             if (is_null) {
                 continue;
             }
+            Datum datum = get(); // This must be called once if not null.
             auto logical_type = ctx_->get_arg_type(i)->type;
             switch (logical_type) {
                 case TYPE_VARCHAR: {
-                    auto slice = get().get_slice();
+                    auto slice = datum.get_slice();
                     SliceSizeType size = slice.size;
                     memcpy(dst, &size, sizeof(SliceSizeType));
                     dst += sizeof(SliceSizeType);
@@ -88,7 +90,7 @@ public:
                 }
 #define M(type) \
                 case type: {\
-                    RunTimeCppType<type> value = get().get<RunTimeCppType<type>>(); \
+                    RunTimeCppType<type> value = datum.get<RunTimeCppType<type>>(); \
                     memcpy(dst, &value, sizeof(RunTimeCppType<type>)); \
                     dst += sizeof(RunTimeCppType<type>); \
                     break; \
@@ -107,12 +109,12 @@ protected:
     FunctionContext* ctx_;
 };
 
-class ColumnsRowAccessor : public RowAccessor {
+class ColumnPointersRowAccessor : public RowAccessor {
 public:
-    ColumnsRowAccessor(FunctionContext* ctx, const Column **columns, size_t row_num)
+    ColumnPointersRowAccessor(FunctionContext* ctx, const Column** columns, size_t row_num)
             : RowAccessor(ctx), columns_(columns), row_num_(row_num), index_(-1) {}
 
-    bool seek_and_is_null() const override {
+    bool seek_and_is_null() override {
         index_++;
         return columns_[index_]->is_null(row_num_);
     }
@@ -124,15 +126,35 @@ public:
 private:
     const Column **columns_;
     size_t row_num_;
-    mutable int index_;
+    int index_;
+};
+
+class ColumnsRowAccessor : public RowAccessor {
+public:
+    ColumnsRowAccessor(FunctionContext* ctx, const Columns& columns, size_t row_num)
+            : RowAccessor(ctx), columns_(columns), row_num_(row_num), index_(-1) {}
+
+    bool seek_and_is_null() override {
+        index_++;
+        return columns_[index_]->is_null(row_num_);
+    }
+
+    Datum get() const override { return columns_[index_]->get(row_num_); }
+
+    void rewind() override { index_ = -1; }
+
+private:
+    const Columns& columns_;
+    size_t row_num_;
+    int index_;
 };
 
 class SerializedRowAccessor : public RowAccessor {
 public:
     explicit SerializedRowAccessor(FunctionContext* ctx, const uint8_t* row, size_t length)
-            : RowAccessor(ctx), row_(row), size_(length), current_(row), index_(-1) {}
+            : RowAccessor(ctx), row_(row), size_(length), index_(-1), current_(row) {}
 
-    bool seek_and_is_null() const override {
+    bool seek_and_is_null() override {
         index_++;
         uint8_t is_null;
         memcpy(&is_null, current_, sizeof(uint8_t));
@@ -180,8 +202,8 @@ public:
 private:
     const uint8_t* row_;
     size_t size_;
+    int index_;
     mutable const uint8_t* current_;
-    mutable int index_;
 };
 } // namespace celonis
 
@@ -224,6 +246,7 @@ struct CelonisSortedFirstLastAggregateState {
                 }
                 return;
             }
+            Datum datum = row_accessor.get(); // This must be called once if not null.
             if (new_row_accessor.seek_and_is_null()) {
                 if (null_firsts[order_index]) {
                     if constexpr (is_first) {
@@ -236,14 +259,14 @@ struct CelonisSortedFirstLastAggregateState {
                 }
                 return;
             }
+            Datum new_datum = new_row_accessor.get(); // This must be called once if not null.
             int cmp = 0;
             auto logical_type = ctx->get_arg_type(i)->type;
             switch (logical_type) {
 #define M(type) \
                 case type: {\
                     cmp = SorterComparator<RunTimeCppType<type>>::compare( \
-                            row_accessor.get().get<RunTimeCppType<type>>(), \
-                            new_row_accessor.get().get<RunTimeCppType<type>>()); \
+                            datum.get<RunTimeCppType<type>>(), new_datum.get<RunTimeCppType<type>>()); \
                     break; \
                 }
 
@@ -268,17 +291,6 @@ struct CelonisSortedFirstLastAggregateState {
                 return;
             }
         }
-    }
-
-    size_t serialized_size() const {
-        return buffer.size();
-    }
-
-    void serialize(FunctionContext* ctx, uint8_t* dst) const {
-        if (buffer.empty()) {
-          return;
-        }
-        memcpy(dst, buffer.data(), buffer.size());
     }
 
     void deserialize_and_merge(FunctionContext* ctx, const uint8_t* src, size_t len) {
@@ -319,24 +331,73 @@ public:
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
                 size_t row_num) const override {
         if (columns[0]->is_null(row_num)) return;
-        auto row_accessor = celonis::ColumnsRowAccessor(ctx, columns, row_num);
+        auto row_accessor = celonis::ColumnPointersRowAccessor(ctx, columns, row_num);
         this->data(state).update(ctx, row_accessor);
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
-        DCHECK(column->is_binary());
-        const auto* input_column = down_cast<const BinaryColumn*>(column);
+        if (column->is_null(row_num)) {
+            return;
+        }
+        const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
         auto slice = input_column->get_slice(row_num);
         this->data(state).deserialize_and_merge(ctx, (const uint8_t*)slice.data, slice.size);
     }
 
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
-        auto* column = down_cast<BinaryColumn*>(to);
-        size_t old_size = column->get_bytes().size();
-        size_t new_size = old_size + this->data(state).serialized_size();
-        column->get_bytes().resize(new_size);
-        this->data(state).serialize(ctx, column->get_bytes().data() + old_size);
-        column->get_offset().emplace_back(new_size);
+        auto& state_impl = this->data(state);
+        BinaryColumn* binary_column = nullptr;
+        if (to->is_nullable()) {
+            auto* nullable_column = down_cast<NullableColumn*>(to);
+            if (state_impl.buffer.empty()) {
+                nullable_column->append_default();
+                return;
+            }
+            nullable_column->null_column_data().push_back(0);
+            binary_column = down_cast<BinaryColumn*>(nullable_column->data_column().get());
+        } else {
+            binary_column = down_cast<BinaryColumn*>(to);
+        }
+        binary_column->append(Slice(state_impl.buffer.data(), state_impl.buffer.size()));
+    }
+
+    void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
+                                     ColumnPtr* dst) const final {
+        BinaryColumn* binary_column = nullptr;
+        if ((*dst)->is_nullable()) {
+            auto* dst_nullable_column = down_cast<NullableColumn*>((*dst).get());
+            binary_column = down_cast<BinaryColumn*>(dst_nullable_column->data_column().get());
+
+            if (src[0]->is_nullable()) {
+                dst_nullable_column->null_column_data() =
+                        down_cast<const NullableColumn*>(src[0].get())->immutable_null_column_data();
+            } else {
+                dst_nullable_column->null_column_data().resize(chunk_size, 0);
+            }
+        } else {
+            binary_column = down_cast<BinaryColumn*>((*dst).get());
+        }
+
+        Bytes& bytes = binary_column->get_bytes();
+        binary_column->get_offset().resize(chunk_size + 1);
+        size_t bytes_size = bytes.size();
+        bool has_null = false;
+        for (size_t i = 0; i < chunk_size; ++i) {
+            if (src[0]->is_null(i)) {
+                has_null = true;
+            } else {
+                auto row_accessor = celonis::ColumnsRowAccessor(ctx, src, i);
+                size_t new_bytes_size = bytes_size + row_accessor.serialized_size();
+                bytes.resize(new_bytes_size);
+                row_accessor.serialize(bytes.data() + bytes_size);
+                bytes_size = new_bytes_size;
+            }
+            binary_column->get_offset()[i + 1] = bytes_size;
+        }
+        if (has_null && (*dst)->is_nullable()) {
+            auto* dst_nullable_column = down_cast<NullableColumn*>((*dst).get());
+            dst_nullable_column->set_has_null(true);
+        }
     }
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
@@ -347,16 +408,10 @@ public:
         }
         auto row_accessor = celonis::SerializedRowAccessor{ctx, state_impl.buffer.data(), state_impl.buffer.size()};
         if (row_accessor.seek_and_is_null()) {
-            to->append_nulls(1);
+            to->append_default();
             return;
         }
         to->append_datum(row_accessor.get());
-    }
-
-    void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
-                                     ColumnPtr* dst) const final {
-        // Used for streaming aggregation. Not implemented.
-        DCHECK(false) << "convert_to_serialize_format is not supported";
     }
 
     std::string get_name() const override {

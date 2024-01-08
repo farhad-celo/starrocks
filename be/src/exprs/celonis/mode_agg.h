@@ -70,7 +70,7 @@ public:
     void convert_to_serialize_format([[maybe_unused]] FunctionContext* ctx, [[maybe_unused]] const Columns& src,
                                      [[maybe_unused]] size_t chunk_size, [[maybe_unused]] ColumnPtr* dst) const override {
         // Used for streaming aggregation. Not implemented.
-        DCHECK(false) << "convert_to_serialize_format is not supported";
+        throw std::runtime_error("celonis_mode: convert_to_serialize_format not supported");
     }
 
     [[nodiscard]] std::string get_name() const { return "celonis_mode"; }

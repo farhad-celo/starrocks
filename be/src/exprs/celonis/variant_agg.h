@@ -72,7 +72,7 @@ public:
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const final {
         // Used for streaming aggregation. Not implemented.
-        DCHECK(false) << "convert_to_serialize_format is not supported";
+        throw std::runtime_error("variant aggregate: convert_to_serialize_format not supported");
     }
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const final;

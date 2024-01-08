@@ -224,7 +224,7 @@ public:
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const override {
         // Used for streaming aggregation. Not implemented.
-        DCHECK(false) << "convert_to_serialize_format is not supported";
+        throw std::runtime_error("celonis_histogram_boundaries: convert_to_serialize_format not supported");
     }
 
     void finalize_to_column(FunctionContext* ctx __attribute__((unused)), ConstAggDataPtr __restrict state,
