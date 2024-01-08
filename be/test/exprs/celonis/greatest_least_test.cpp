@@ -101,7 +101,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_int_data_mixed_nulls) {
         EXPECT_EQ(expected_is_null, actual_is_null);
         if (!actual_is_null) {
             const auto& expected_value{expected_values.at(row_idx)};
-            const auto& actual_value{result->get(row_idx).get<T>()};
+            const auto actual_value{result->get(row_idx).get<T>()};
             EXPECT_EQ(expected_value, actual_value);
         }
     }
@@ -132,7 +132,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_double_data_mixed_nulls) {
         EXPECT_EQ(expected_is_null, actual_is_null);
         if (!actual_is_null) {
             const auto& expected_value{expected_values.at(row_idx)};
-            const auto& actual_value{result->get(row_idx).get<T>()};
+            const auto actual_value{result->get(row_idx).get<T>()};
             EXPECT_EQ(expected_value, actual_value);
         }
     }
@@ -167,7 +167,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_datetime_data_mixed_nulls) {
         EXPECT_EQ(expected_is_null, actual_is_null);
         if (!actual_is_null) {
             const auto& expected_value{expected_values.at(row_idx)};
-            const auto& actual_value{result->get(row_idx).get<T>()};
+            const auto actual_value{result->get(row_idx).get<T>()};
             EXPECT_EQ(expected_value, actual_value);
         }
     }
@@ -198,7 +198,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_varchar_data_mixed_nulls) {
         EXPECT_EQ(expected_is_null, actual_is_null);
         if (!actual_is_null) {
             const auto& expected_value{expected_values.at(row_idx)};
-            const auto& actual_value{result->get(row_idx).get<T>()};
+            const auto actual_value{result->get(row_idx).get<T>()};
             EXPECT_EQ(expected_value, actual_value);
         }
     }
@@ -229,7 +229,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_int_data_mixed_nulls) {
         EXPECT_EQ(expected_is_null, actual_is_null);
         if (!actual_is_null) {
             const auto& expected_value{expected_values.at(row_idx)};
-            const auto& actual_value{result->get(row_idx).get<T>()};
+            const auto actual_value{result->get(row_idx).get<T>()};
             EXPECT_EQ(expected_value, actual_value);
         }
     }
@@ -260,7 +260,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_double_data_mixed_nulls) {
         EXPECT_EQ(expected_is_null, actual_is_null);
         if (!actual_is_null) {
             const auto& expected_value{expected_values.at(row_idx)};
-            const auto& actual_value{result->get(row_idx).get<T>()};
+            const auto actual_value{result->get(row_idx).get<T>()};
             EXPECT_EQ(expected_value, actual_value);
         }
     }
@@ -291,7 +291,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_datetime_data_mixed_nulls) {
         EXPECT_EQ(expected_is_null, actual_is_null);
         if (!actual_is_null) {
             const auto& expected_value{expected_values.at(row_idx)};
-            const auto& actual_value{result->get(row_idx).get<T>()};
+            const auto actual_value{result->get(row_idx).get<T>()};
             EXPECT_EQ(expected_value, actual_value);
         }
     }
@@ -322,7 +322,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_varchar_data_mixed_nulls) {
         EXPECT_EQ(expected_is_null, actual_is_null);
         if (!actual_is_null) {
             const auto& expected_value{expected_values.at(row_idx)};
-            const auto& actual_value{result->get(row_idx).get<T>()};
+            const auto actual_value{result->get(row_idx).get<T>()};
             EXPECT_EQ(expected_value, actual_value);
         }
     }
