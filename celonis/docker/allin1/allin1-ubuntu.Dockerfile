@@ -14,6 +14,9 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends binutils-dev default-jdk python2 \
            mysql-client curl vim tree net-tools less
 
+# Install locales and generate en_US.UTF-8, which is required by CELONIS_STRING_TO_DOUBLE.
+RUN apt-get install -y locales && locale-gen en_US.UTF-8
+
 # Install timezone data. This is needed by Starrocks broker load.
 RUN apt-get install -yq tzdata && \
     ln -fs /usr/share/zoneinfo/UTC /etc/localtime && \
