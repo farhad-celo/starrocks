@@ -339,11 +339,28 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
     return res.build(ColumnHelper::is_all_const(columns));
 }
 
-static std::optional<double> to_double(const std::string& input_string) {
+// Trims leading and trailing spaces from a string
+static std::string trim(const std::string &input) {
+    std::string result = input;
+
+    // Left trim
+    result.erase(result.begin(), std::find_if(result.begin(), result.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }));
+
+    // Right trim
+    result.erase(std::find_if(result.rbegin(), result.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }).base(), result.end());
+
+    return result;
+}
+
+static std::optional<double> to_double(const std::string &input_string) {
     // Set the numeric locale to "en_US.UTF-8" for proper parsing
     std::locale::global(std::locale("en_US.UTF-8"));
     // std::istringstream is about 2.5x faster than atof on large inputs
-    std::istringstream iss(input_string);
+    std::istringstream iss(trim(input_string));
     double result;
 
     // Attempt to convert the input string to a double
@@ -366,7 +383,8 @@ static std::optional<double> to_double(const std::string& input_string) {
  * @paramType: [BinaryColumn]
  * @return: DoubleColumn
  */
-StatusOr<ColumnPtr> CelonisStringFunctions::string_to_double(FunctionContext* context, const starrocks::Columns& columns) {
+StatusOr<ColumnPtr>
+CelonisStringFunctions::string_to_double(FunctionContext *context, const starrocks::Columns &columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);

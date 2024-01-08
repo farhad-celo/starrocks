@@ -341,50 +341,61 @@ TEST(CelonisStringFunctionsStringSplitTest, All) {
 }
 
 TEST(CelonisStringFunctionsStringToDoubleTest, All) {
-    auto string  = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    auto string = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     auto expected_double = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), true);
 
     std::vector<DatumStruct> test_input = {
-        // Fixed point notation
-        {"123",                        123.0},
-        {"+123456",                    123456.0},
-        {"-123456",                    -123456.0},
-        {"+00003",                     3.0},
-        {"3.",                         3.0},
-        {"1.11",                       1.11},
-        {"-9.99",                      -9.99},
-        {"2,500.10",                   2500.1},
-        {"-2,500.10",                  -2500.1},
-        {"1.02",                       1.02},
-        {"-2.1",                       -2.1},
-        {"45.2",                       45.2},
-        // Scientific E notation
-        {"4,000.0e2",                  400000.0},
-        {"4000.0e2",                   400000.0},
-        {"-5.93E-2",                   -0.0593},
-        {"-5.93e-2",                   -0.0593},
-        {"2e0",                        2.0},
-        {"2e+00",                      2.0},
-        // Invalid string inputs
-        {kNullDatum,                   kNullDatum},
-        {"",                           kNullDatum},
-        {"F10.0",                      kNullDatum},
-        {"10.F0",                      kNullDatum},
-        {"10.0F",                      kNullDatum},
-        {"3 21",                       kNullDatum},
-        {"1E650",                      kNullDatum},
-        {"++1",                        kNullDatum},
-        {"--1",                        kNullDatum},
-        {"1E",                         kNullDatum},
-        {"1EA",                        kNullDatum},
-        {"1.0.0",                      kNullDatum},
-        {"10,00,000",                  kNullDatum},
-        {"10,0000,000",                kNullDatum},
-        {"1.234,5",                    kNullDatum},
-        {"INF",                        kNullDatum},
-        {"NaN",                        kNullDatum},
+            // Fixed point notation
+            {"123",           123.0},
+            {"  123   ",      123.0},
+            {" \t 123 \n  ",  123.0},
+            {"+123456",       123456.0},
+            {" +123456",      123456.0},
+            {" +123456 \n",   123456.0},
+            {"-123456",       -123456.0},
+            {"+00003",        3.0},
+            {"3.",            3.0},
+            {"1.11",          1.11},
+            {"-9.99",         -9.99},
+            {"2,500.10",      2500.1},
+            {"-2,500.10",     -2500.1},
+            {"1.02",          1.02},
+            {"-2.1",          -2.1},
+            {"45.2",          45.2},
+            {"   45.2   ",    45.2},
+            {"\t\t45.2   ",   45.2},
+            {"\t\t45.2 \n ",  45.2},
+            // Scientific E notation
+            {"4,000.0e2",     400000.0},
+            {"  4,000.0e2  ", 400000.0},
+            {"\t4,000.0e2  ", 400000.0},
+            {"4000.0e2",      400000.0},
+            {"-5.93E-2",      -0.0593},
+            {"-5.93e-2",      -0.0593},
+            {"  -5.93e-2  ",  -0.0593},
+            {"2e0",           2.0},
+            {"2e+00",         2.0},
+            {"\n2e+00\n",     2.0},
+            // Invalid string inputs
+            {kNullDatum,      kNullDatum},
+            {"",              kNullDatum},
+            {"F10.0",         kNullDatum},
+            {"10.F0",         kNullDatum},
+            {"10.0F",         kNullDatum},
+            {"3 21",          kNullDatum},
+            {"1E650",         kNullDatum},
+            {"++1",           kNullDatum},
+            {"--1",           kNullDatum},
+            {"1E",            kNullDatum},
+            {"1EA",           kNullDatum},
+            {"1.0.0",         kNullDatum},
+            {"10,00,000",     kNullDatum},
+            {"10,0000,000",   kNullDatum},
+            {"1.234,5",       kNullDatum},
+            {"INF",           kNullDatum},
+            {"NaN",           kNullDatum},
     };
-    for (const auto& st : test_input) {
+    for (const auto &st: test_input) {
         if (st[0].is_null()) {
             string->append_nulls(1);
         } else {
