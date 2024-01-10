@@ -409,7 +409,12 @@ TEST(CelonisStringFunctionsStringToDoubleTest, All) {
     }
 
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    // Get the global locale
+    std::locale pre_locale;
     const auto result = CelonisStringFunctions::string_to_double(ctx.get(), {string}).value();
+    std::locale post_locale;
+    // Verify that global locale is not changed by string_to_double.
+    EXPECT_EQ(pre_locale, post_locale);
     ASSERT_EQ(test_input.size(), result->size());
     const auto v = ColumnHelper::as_column<NullableColumn>(result);
     for (int i = 0; i < v->size(); ++i) {

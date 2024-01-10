@@ -1,7 +1,6 @@
 #include "exprs/celonis/string_functions.h"
 
 #include <boost/locale/utf.hpp>
-#include <cfloat>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -356,18 +355,40 @@ static std::string trim(const std::string &input) {
     return result;
 }
 
-static std::optional<double> to_double(const std::string &input_string) {
-    // Set the numeric locale to "en_US.UTF-8" for proper parsing
-    std::locale::global(std::locale("en_US.UTF-8"));
-    // std::istringstream is about 2.5x faster than atof on large inputs
-    std::istringstream iss(trim(input_string));
-    double result;
+struct comma_separator_facet : std::numpunct<char> {
+    char do_thousands_sep() const override { return ','; }
 
+    std::string do_grouping() const override { return "\3"; }
+};
+
+static const std::locale& get_locale() {
+    static std::optional<std::locale> locale;
+    static std::once_flag once_flag;
+
+    // Thread-safe lazy initialization of a single locale instance which is used multiple times
+    std::call_once(once_flag, []() { locale = std::locale("en_US.UTF-8"); });
+    return *locale;
+}
+
+
+static std::optional<double> to_double(const std::string& input_string) {
+    // std::stringstream is about 2.5x faster than atof on large inputs
+    std::stringstream ss{};
+    const std::locale& en_us_utf8_locale = get_locale();
+    std::locale loc_with_thousands_sep{en_us_utf8_locale, new comma_separator_facet};
+    // Set the numeric locale to "en_US.UTF-8" for proper parsing
+    ss.imbue(loc_with_thousands_sep);
+
+    std::string trimmed_input_string = trim(input_string);
+    // Leading whitespaces should already be trimmed.
+    ss << std::noskipws << trimmed_input_string;
+
+    double result;
     // Attempt to convert the input string to a double
-    iss >> result;
+    ss >> result;
 
     // Check if the conversion was successful and the entire input was consumed
-    if (iss.eof() && !iss.fail()) {
+    if (ss.eof() && !ss.fail()) {
         if (std::isnan(result) || std::isinf(result)) {
             // Conversion result is NaN or infinity, return nullopt;
             return std::nullopt;
