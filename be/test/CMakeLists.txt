@@ -146,7 +146,6 @@ set(EXEC_FILES
         ./exprs/celonis/array_functions_test.cpp
         ./exprs/celonis/calc_throughput_test.cpp
         ./exprs/celonis/conformance_test.cpp
-        ./exprs/celonis/count_edges_test.cpp
         ./exprs/celonis/greatest_least_test.cpp
         ./exprs/celonis/histogram_boundaries_test.cpp
         ./exprs/celonis/in_test.cpp
@@ -163,6 +162,7 @@ set(EXEC_FILES
         ./exprs/celonis/sorted_first_last_test.cpp
         ./exprs/celonis/source_target_test.cpp
         ./exprs/celonis/string_function_test.cpp
+        ./exprs/celonis/table_function/count_edges_test.cpp
         ./exprs/celonis/time_functions_test.cpp
         ./exprs/celonis/trimmed_mean_test.cpp
         ./exprs/celonis/util.cpp

@@ -1,9 +1,9 @@
-#include "exprs/celonis/count_edges.h"
+#include "exprs/celonis/table_function/count_edges.h"
 
+#include "../util.h"
 #include "column/column_helper.h"
 #include "exprs/function_context.h"
 #include "testutil/assert.h"
-#include "util.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -35,6 +35,8 @@ TEST_F(CelonisCountEdgesTest, count_edges) {
     ASSERT_OK(function->prepare(table_state));
 
     auto [result, offset] = function->process(table_state);
+
+    EXPECT_EQ(4, table_state->processed_rows());
 
     // result[0] is source, result[1] is target, result[2] is count
     ASSERT_EQ(6, result[0]->size());
@@ -89,6 +91,9 @@ TEST_F(CelonisCountEdgesTest, count_edges_null) {
     ASSERT_OK(function->prepare(table_state));
 
     auto [result, offset] = function->process(table_state);
+
+    EXPECT_EQ(3, table_state->processed_rows());
+
     // result[0] is source, result[1] is target, result[2] is count
     ASSERT_EQ(3, result[0]->size());
     ASSERT_EQ(3, result[1]->size());

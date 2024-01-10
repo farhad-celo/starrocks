@@ -1,4 +1,4 @@
-#include "exprs/celonis/count_edges.h"
+#include "count_edges.h"
 
 #include "column/array_column.h"
 #include "column/column_helper.h"
@@ -119,6 +119,7 @@ std::pair<Columns, UInt32Column::Ptr> CountEdges::process(TableFunctionState* st
         return {};
     }
     Column* activity_array = state->get_columns()[0].get();
+    state->set_processed_rows(activity_array->size());
 
     const NullableColumn* nullable_activity_array = nullptr;
     const NullColumn::Container* activity_array_nulls = nullptr;

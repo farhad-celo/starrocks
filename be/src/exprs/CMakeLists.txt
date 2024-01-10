@@ -120,7 +120,6 @@ set(CELONIS_FILES
   celonis/array_functions.cpp
   celonis/calc_throughput.cpp
   celonis/conformance.cpp
-  celonis/count_edges.cpp
   celonis/greatest_least.cpp
   celonis/in.cpp
   celonis/index_activity.cpp
@@ -135,6 +134,7 @@ set(CELONIS_FILES
   celonis/shortened_variant.cpp
   celonis/source_target.cpp
   celonis/string_functions.cpp
+  celonis/table_function/count_edges.cpp
   celonis/time_functions.cpp
   celonis/util.cpp
   celonis/variant_agg.cpp

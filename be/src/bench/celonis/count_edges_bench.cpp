@@ -5,7 +5,7 @@
 #include "column/column_helper.h"
 #include "column/datum_tuple.h"
 #include "exprs/table_function/table_function.h"
-#include "exprs/celonis/count_edges.h"
+#include "exprs/celonis/table_function/count_edges.h"
 #include "runtime/types.h"
 #include "types/logical_type.h"
 
