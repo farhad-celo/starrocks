@@ -37,4 +37,7 @@ COPY --from=udf-builder /build/starrocks/celonis/udf/duplicate-invoice-checker/t
 COPY celonis/docker/artifact/core-site.xml /release/fe_artifacts/fe/conf/
 COPY celonis/docker/artifact/core-site.xml /release/be_artifacts/be/conf/
 
+# download the latest dd-java-agent
+ADD 'https://dtdg.co/latest-java-tracer' /release/fe_artifacts/datadog/dd-java-agent.jar
+
 WORKDIR /release
