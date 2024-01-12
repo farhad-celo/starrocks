@@ -418,17 +418,20 @@ public:
         ColumnPtr output_column = input_column->clone_empty();
 
         if (input_column->is_nullable()) {
-            if (input_column->has_null()) {
-                return Status::InvalidArgument("input_array should not be null.");
-            }
             const auto* input_nullable_column = down_cast<const NullableColumn*>(input_column.get());
             const auto& input_data_column = input_nullable_column->data_column_ref();
+            const auto& input_null_column = input_nullable_column->null_column_ref();
 
             auto* output_nullable_column = down_cast<NullableColumn*>(output_column.get());
             auto* output_data_column = output_nullable_column->mutable_data_column();
             auto* output_null_column = output_nullable_column->mutable_null_column();
-            output_null_column->get_data().resize(chunk_size, 0);
-            output_nullable_column->set_has_null(false);
+            if (input_column->has_null()) {
+                output_null_column->get_data().assign(input_null_column.get_data().begin(),
+                                                      input_null_column.get_data().end());
+            } else {
+                output_null_column->get_data().resize(chunk_size, 0);
+            }
+            output_nullable_column->set_has_null(input_nullable_column->has_null());
             RETURN_IF_ERROR(_array_lag(output_data_column, input_data_column, offset_viewer));
         } else {
             RETURN_IF_ERROR(_array_lag(output_column.get(), *input_column, offset_viewer));
@@ -500,17 +503,20 @@ public:
         ColumnPtr output_column = input_column->clone_empty();
 
         if (input_column->is_nullable()) {
-            if (input_column->has_null()) {
-                return Status::InvalidArgument("input_array should not be null.");
-            }
             const auto* input_nullable_column = down_cast<const NullableColumn*>(input_column.get());
             const auto& input_data_column = input_nullable_column->data_column_ref();
+            const auto& input_null_column = input_nullable_column->null_column_ref();
 
             auto* output_nullable_column = down_cast<NullableColumn*>(output_column.get());
             auto* output_data_column = output_nullable_column->mutable_data_column();
             auto* output_null_column = output_nullable_column->mutable_null_column();
-            output_null_column->get_data().resize(chunk_size, 0);
-            output_nullable_column->set_has_null(false);
+            if (input_column->has_null()) {
+                output_null_column->get_data().assign(input_null_column.get_data().begin(),
+                                                      input_null_column.get_data().end());
+            } else {
+                output_null_column->get_data().resize(chunk_size, 0);
+            }
+            output_nullable_column->set_has_null(input_nullable_column->has_null());
             RETURN_IF_ERROR(_array_lead(output_data_column, input_data_column, offset_viewer));
         } else {
             RETURN_IF_ERROR(_array_lead(output_column.get(), *input_column, offset_viewer));
