@@ -163,6 +163,7 @@ set(EXEC_FILES
         ./exprs/celonis/source_target_test.cpp
         ./exprs/celonis/string_function_test.cpp
         ./exprs/celonis/table_function/count_edges_test.cpp
+        ./exprs/celonis/table_function/generate_range_test.cpp
         ./exprs/celonis/time_functions_test.cpp
         ./exprs/celonis/trimmed_mean_test.cpp
         ./exprs/celonis/util.cpp

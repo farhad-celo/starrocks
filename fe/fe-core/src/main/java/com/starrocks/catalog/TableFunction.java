@@ -144,6 +144,17 @@ public class TableFunction extends Function {
                 new TableFunction(new FunctionName("celonis_count_edges"), Lists.newArrayList("source", "target", "edge_count"),
                         Lists.newArrayList(Type.ARRAY_VARCHAR), Lists.newArrayList(Type.VARCHAR, Type.VARCHAR, Type.BIGINT));
         functionSet.addBuiltin(countEdgesFunction);
+
+        TableFunction generateRangeFunction = new TableFunction(new FunctionName("celonis_generate_range"),
+                Lists.newArrayList("celonis_generate_range"),
+                Lists.newArrayList(Type.BIGINT, Type.BIGINT, Type.BIGINT),
+                Lists.newArrayList(Type.BIGINT));
+        functionSet.addBuiltin(generateRangeFunction);
+        generateRangeFunction = new TableFunction(new FunctionName("celonis_generate_range"),
+                Lists.newArrayList("celonis_generate_range"),
+                Lists.newArrayList(Type.VARCHAR, Type.DATETIME, Type.DATETIME),
+                Lists.newArrayList(Type.DATETIME));
+        functionSet.addBuiltin(generateRangeFunction);
     }
 
     public List<Type> getTableFnReturnTypes() {
