@@ -310,21 +310,81 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_datetime) {
 
 TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_array) {
     {
-        // input_array has NULL.
+        // input_array has NULL and the corresponding key_array is not NULL and non-empty.
         auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
         input_array->append_datum(Datum{});
         input_array->append_datum(DatumArray{1, 2, 3, 4});
 
         auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-        key_array->append_datum(DatumArray{""});
-        key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
+        key_array->append_datum(DatumArray{"e1", "e2"});
+        key_array->append_datum(DatumArray{"e1", "e2", "e2", "e4"});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array});
-        ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "input_array should not be null.");
+        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_TRUE(result->is_null(0));
+        ASSERT_EQ(3, result->get(1).get_array().size());
+        EXPECT_EQ(1, result->get(1).get_array()[0].get_int32());
+        EXPECT_EQ(2, result->get(1).get_array()[1].get_int32());
+        EXPECT_EQ(4, result->get(1).get_array()[2].get_int32());
     }
     {
-        // key_array has NULL.
+        // input_array has NULL and the corresponding key_array is not NULL and empty.
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        input_array->append_datum(Datum{});
+        input_array->append_datum(DatumArray{1, 2, 3, 4});
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        key_array->append_datum(DatumArray{});
+        key_array->append_datum(DatumArray{"e1", "e2", "e2", "e4"});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_TRUE(result->is_null(0));
+        ASSERT_EQ(3, result->get(1).get_array().size());
+        EXPECT_EQ(1, result->get(1).get_array()[0].get_int32());
+        EXPECT_EQ(2, result->get(1).get_array()[1].get_int32());
+        EXPECT_EQ(4, result->get(1).get_array()[2].get_int32());
+    }
+    {
+        // key_array has NULL and corresponding input_array is NULL.
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        input_array->append_datum(DatumArray{1, 2, 3, 4});
+        input_array->append_datum(Datum{});
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
+        key_array->append_datum(Datum{});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_EQ(4, result->get(0).get_array().size());
+        EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
+        EXPECT_EQ(2, result->get(0).get_array()[1].get_int32());
+        EXPECT_EQ(3, result->get(0).get_array()[2].get_int32());
+        EXPECT_EQ(4, result->get(0).get_array()[3].get_int32());
+        ASSERT_TRUE(result->is_null(1));
+    }
+    {
+        // key_array has NULL and corresponding input_array is empty.
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        input_array->append_datum(DatumArray{1, 2, 3, 4});
+        input_array->append_datum(DatumArray{});
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
+        key_array->append_datum(Datum{});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_EQ(4, result->get(0).get_array().size());
+        EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
+        EXPECT_EQ(2, result->get(0).get_array()[1].get_int32());
+        EXPECT_EQ(3, result->get(0).get_array()[2].get_int32());
+        EXPECT_EQ(4, result->get(0).get_array()[3].get_int32());
+        ASSERT_EQ(0, result->get(1).get_array().size());
+    }
+    {
+        // key_array has NULL and corresponding input_array is non-empty.
         auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
         input_array->append_datum(DatumArray{1, 2, 3, 4});
         input_array->append_datum(DatumArray{1, 2, 3, 4});
@@ -335,8 +395,27 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_array) {
 
         const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "key_array should not be null.");
+        EXPECT_EQ(result.status().get_error_msg(), "The size of input_array and key_array should not be different.");
     }
+}
+
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_empty_input_array) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    input_array->append_datum(DatumArray{1, 2, 3, 4});
+    input_array->append_datum(DatumArray{});
+
+    auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
+    key_array->append_datum(DatumArray{});
+
+    const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+    ASSERT_EQ(2, result->size());
+    ASSERT_EQ(4, result->get(0).get_array().size());
+    EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
+    EXPECT_EQ(2, result->get(0).get_array()[1].get_int32());
+    EXPECT_EQ(3, result->get(0).get_array()[2].get_int32());
+    EXPECT_EQ(4, result->get(0).get_array()[3].get_int32());
+    ASSERT_EQ(0, result->get(1).get_array().size());
 }
 
 TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_elements) {

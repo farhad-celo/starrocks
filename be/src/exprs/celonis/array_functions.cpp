@@ -317,17 +317,20 @@ public:
         ColumnPtr key_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[1]);
 
         if (src_column->is_nullable()) {
-            if (src_column->has_null()) {
-                return Status::InvalidArgument("input_array should not be null.");
-            }
             const auto* src_nullable_column = down_cast<const NullableColumn*>(src_column.get());
             const auto& src_data_column = src_nullable_column->data_column_ref();
+            const auto& src_null_column = src_nullable_column->null_column_ref();
 
             auto* dest_nullable_column = down_cast<NullableColumn*>(dest_column.get());
             auto* dest_data_column = dest_nullable_column->mutable_data_column();
             auto* dest_null_column = dest_nullable_column->mutable_null_column();
-            dest_null_column->get_data().resize(chunk_size, 0);
-            dest_nullable_column->set_has_null(false);
+            if (src_column->has_null()) {
+                dest_null_column->get_data().assign(src_null_column.get_data().begin(),
+                                                    src_null_column.get_data().end());
+            } else {
+                dest_null_column->get_data().resize(chunk_size, 0);
+            }
+            dest_nullable_column->set_has_null(src_nullable_column->has_null());
             RETURN_IF_ERROR(_dedup_array_column(dest_data_column, src_data_column, key_column));
         } else {
             RETURN_IF_ERROR(_dedup_array_column(dest_column.get(), *src_column, key_column));
@@ -340,9 +343,6 @@ private:
                                       const ColumnPtr key_array_ptr) {
         ColumnPtr key_array_data = key_array_ptr;
         if (key_array_ptr->is_nullable()) { // Nullable(array(Nullable(element), offsets), null_map)
-            if (key_array_ptr->has_null()) {
-                return Status::InvalidArgument("key_array should not be null.");
-            }
             key_array_data = down_cast<const NullableColumn*>(key_array_ptr.get())->data_column();
         }
         // key_array_data is of array(Nullable(element), offsets)
@@ -371,12 +371,19 @@ private:
             Slice prev;
             size_t start = src_offsets[i];
             size_t end = src_offsets[i + 1];
-            if (end != key_offsets[i + 1]) {
+            if (end == start) {
+                dest_offsets_column->get_data().push_back(new_offset);
+                continue;
+            }
+            size_t key_start = key_offsets[i];
+            size_t key_end = key_offsets[i + 1];
+            // if input_array is not empty, key_array must have the same length.
+            if (key_end - key_start != end - start) {
                 return Status::InvalidArgument("The size of input_array and key_array should not be different.");
             }
-            for (auto id = start; id < end; ++id) {
-                if (id == start || prev != key_data[id]) {
-                    src_index.push_back(id);
+            for (auto id = key_start; id < key_end; ++id) {
+                if (id == key_start || prev != key_data[id]) {
+                    src_index.push_back(id - key_start + start);
                     new_offset++;
                     prev = key_data[id];
                 }
