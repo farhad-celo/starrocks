@@ -188,7 +188,7 @@ private:
     std::function<TimestampValue(const TimestampValue&)> get_increase_timestamp_func(
             const TimestampValue& range_start, Slice step_slice, MyState* state) const {
         char* endptr;
-        int64_t step = strtol(step_slice.to_string().c_str(), &endptr, 10);
+        int64_t step = strtol(step_slice.get_data(), &endptr, 10);
         if (step <= 0) {
             state->set_status(Status::InternalError("step size must be positive"));
             return nullptr;
