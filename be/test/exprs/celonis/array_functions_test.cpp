@@ -1607,4 +1607,26 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_varchar) {
     ASSERT_EQ(0, result->get(2).get_array().size());
 }
 
+TEST_F(CelonisArrayFunctionsTest, null_to_empty_null_elements_in_array) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{"1", "2"});
+    input_array->append_datum(DatumArray{kNullDatum, kNullDatum});
+    input_array->append_datum(DatumArray{kNullDatum, "HELLO"});
+    input_array->append_datum(DatumArray{kNullDatum});
+
+    const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    ASSERT_EQ(4, result->size());
+    ASSERT_EQ(2, result->get(0).get_array().size());
+    EXPECT_EQ("1", result->get(0).get_array()[0].get_slice());
+    EXPECT_EQ("2", result->get(0).get_array()[1].get_slice());
+    ASSERT_EQ(2, result->get(1).get_array().size());
+    EXPECT_TRUE(result->get(1).get_array()[0].is_null());
+    EXPECT_TRUE(result->get(1).get_array()[1].is_null());
+    ASSERT_EQ(2, result->get(2).get_array().size());
+    EXPECT_TRUE(result->get(2).get_array()[0].is_null());
+    EXPECT_EQ("HELLO", result->get(2).get_array()[1].get_slice());
+    ASSERT_EQ(1, result->get(3).get_array().size());
+    EXPECT_TRUE(result->get(3).get_array()[0].is_null());
+}
+
 } // namespace starrocks
