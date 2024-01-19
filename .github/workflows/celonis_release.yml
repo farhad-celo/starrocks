@@ -125,27 +125,25 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: push allin1 docker image to prod ECR
+      - name: push images to prod ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          # push to the prod ECR
-          docker tag starrocks-allin1:${IMAGE_TAG} 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${IMAGE_TAG}
-          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-allin1:${IMAGE_TAG}
-      - name: push fe docker image to prod ECR
-        run: |
-          # push to the prod ECR
-          docker tag starrocks-fe:${IMAGE_TAG} 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-fe:${IMAGE_TAG}
-          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-fe:${IMAGE_TAG}
-      - name: push be docker image to prod ECR
-        run: |
-          # push to the prod ECR
-          docker tag starrocks-be:${IMAGE_TAG} 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${IMAGE_TAG}
-          docker push 652406827250.dkr.ecr.eu-central-1.amazonaws.com/celostar/starrocks-be:${IMAGE_TAG}
+          # push allin1 to the prod ECR
+          docker tag starrocks-allin1:${IMAGE_TAG} ${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${IMAGE_TAG}
+          docker push ${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${IMAGE_TAG}
 
-      - name: Clean up and Amazon ECR logout
+          # push fe to the prod ECR
+          docker tag starrocks-fe:${IMAGE_TAG} ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${IMAGE_TAG}
+          docker push ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${IMAGE_TAG}
+
+          # push be to the prod ECR
+          docker tag starrocks-be:${IMAGE_TAG} ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${IMAGE_TAG}
+          docker push ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${IMAGE_TAG}
+
+      - name: Clean up
         if: ${{ always() }}
         run: |
-          docker logout ${{ steps.login-ecr.outputs.registry }}
-          
           # Delete the built docker image from the runner.
           docker rmi -f $(docker images -q starrocks-allin1:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-fe:${IMAGE_TAG})
