@@ -272,6 +272,10 @@ public:
                             "The size of input_array and timestamp_array should not be different than the sum of "
                             "size_array.");
                 }
+                if (start == next) {
+                    // Skip empty arrays.
+                    continue;
+                }
                 pq.emplace(start, next, timestamps + start, priorities[i]);
                 start = next;
             }
