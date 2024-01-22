@@ -184,6 +184,34 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_weekday_calendar) {
         auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 8, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                // [8:00 am, 9:00 am] = 1h
+                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 32400000} }, )",
+                // [8:00 am, 10:00 am] = 2h
+                R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 36000000} }, )",
+                // [8:00 am, 11:00 am] = 3h
+                R"("wednesday": {"use_day": true, "shift": {"begin": 28800000, "end": 39600000} }, )",
+                // [8:00 am, 12:00 pm] = 4h
+                R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 43200000} }, )",
+                R"("friday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
+                R"("saturday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
+                // [9:00 am, 12:00 pm] = 3h
+                R"("sunday": {"use_day": true, "shift": {"begin": 32400000, "end": 43200000} } )",
+                R"(} })"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(13L, result->get(0).get_int64());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         // Tuesday
         timestamps->append_datum(TimestampValue::create(1970, 1, 13, 10, 0, 0));
         time_units->append_datum("MILLISECONDS");

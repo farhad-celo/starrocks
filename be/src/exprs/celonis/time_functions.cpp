@@ -67,42 +67,59 @@ CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
-struct PeriodicTimeRange {
-    int64_t begin_ms;
-    int64_t end_ms;
-    int64_t period_ms;
-};
-
 struct TimeRange {
     int64_t begin_ms;
     int64_t end_ms;
+
+    TimeRange(int64_t begin_ms, int64_t end_ms) : begin_ms(begin_ms), end_ms(end_ms) {}
+
+    virtual ~TimeRange() = default;
+
+    // Computes the overlap in milliseconds with another TimeRange object.
+    virtual int64_t compute_overlap(const TimeRange& other) const {
+        int64_t start = std::max(begin_ms, other.begin_ms);
+        int64_t end = std::min(end_ms, other.end_ms);
+        return (end > start) ? end - start : 0;
+    }
 };
 
-static int64_t compute_time_range_overlap(const PeriodicTimeRange& periodic_time_range, const TimeRange& time_range) {
-    int64_t begin = time_range.begin_ms;
-    int64_t end = time_range.end_ms;
-    int64_t period = periodic_time_range.period_ms;
-    int64_t cur_begin = periodic_time_range.begin_ms;
-    int64_t cur_end = periodic_time_range.end_ms;
-    DCHECK(period != 0);
-    int64_t rv = 0L;
-    while (true) {
-        if ((period > 0 && cur_begin >= end) || (period < 0 && cur_end <= begin)) {
-            break;
-        }
-        int64_t left = std::max(cur_begin, begin);
-        int64_t right = std::min(cur_end, end);
-        rv += (right > left) ? (right - left) : 0L;
-        cur_begin += period;
-        cur_end += period;
-    }
-    return rv;
-}
+struct PeriodicTimeRange : public TimeRange {
+    int64_t period_ms;
 
-bool json_string_to_calendar(const std::string& calendar_json_string, celonis::accelerator::Calendar& calendar) {
-    auto status = google::protobuf::util::JsonStringToMessage(calendar_json_string, &calendar);
-    return status.ok();
-}
+    PeriodicTimeRange(int64_t begin_ms, int64_t end_ms, int64_t period_ms) : TimeRange(begin_ms, end_ms),
+                                                                             period_ms(period_ms) {}
+
+    ~PeriodicTimeRange() override = default;
+
+    // Computes the overlap in milliseconds with a TimeRange object.
+    int64_t compute_overlap(const TimeRange& time_range) const override {
+        const int64_t begin = time_range.begin_ms;
+        const int64_t end = time_range.end_ms;
+        int64_t cur_begin = begin_ms;
+        int64_t cur_end = end_ms;
+        int64_t abs_period = std::abs(period_ms);
+        // move [cur_begin, cur_end) to the left of [begin, end)
+        if (cur_end > begin) {
+            int64_t n_periods = (cur_end - begin + abs_period - 1) / abs_period;
+            cur_begin -= n_periods * abs_period;
+            cur_end -= n_periods * abs_period;
+        }
+        DCHECK(abs_period > 0);
+        int64_t rv = 0L;
+        // move [cur_begin, cur_end) to right to pass [begin, end)
+        while (true) {
+            if (cur_begin >= end) {
+                break;
+            }
+            int64_t left = std::max(cur_begin, begin);
+            int64_t right = std::min(cur_end, end);
+            rv += (right > left) ? (right - left) : 0L;
+            cur_begin += abs_period;
+            cur_end += abs_period;
+        }
+        return rv;
+    }
+};
 
 static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
     TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
@@ -118,17 +135,57 @@ static TimeRange get_time_range(const TimestampValue& timestamp) {
     }
 }
 
-static StatusOr<int64_t>
-remap_timestamp_weekday_ms(const celonis::accelerator::WeekdayCalendarEntry& entry, int index,
-                           const TimeRange& time_range,
-                           bool before_epoch) {
-    if (!entry.use_day() || entry.shift().begin() == entry.shift().end()) {
-        return 0L;
+class Calendar {
+public:
+    Calendar(const celonis::accelerator::Calendar& calendar_proto) {
+        if (calendar_proto.has_weekday_calendar()) {
+            handle_weekday_calendar(calendar_proto.weekday_calendar());
+        }
     }
-    int64_t period = NUM_DAYS_PER_WEEK * NUM_MILLISECONDS_PER_DAY;
-    if (before_epoch) {
-        period = -period;
+
+    int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
+        const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
+        const bool before_epoch = timestamp < epoch;
+        const TimeRange time_range = get_time_range(timestamp);
+        int64_t rv = 0L;
+        for (const auto& cur_time_range: time_ranges_) {
+            rv += cur_time_range->compute_overlap(time_range);
+        }
+        return before_epoch ? -rv : rv;
     }
+
+private:
+    void handle_weekday_calendar(const celonis::accelerator::WeekdayCalendar& weekday_calendar) {
+        handle_weekday_calendar_entry(weekday_calendar.monday(), 0);
+        handle_weekday_calendar_entry(weekday_calendar.tuesday(), 1);
+        handle_weekday_calendar_entry(weekday_calendar.wednesday(), 2);
+        handle_weekday_calendar_entry(weekday_calendar.thursday(), 3);
+        handle_weekday_calendar_entry(weekday_calendar.friday(), 4);
+        handle_weekday_calendar_entry(weekday_calendar.saturday(), 5);
+        handle_weekday_calendar_entry(weekday_calendar.sunday(), 6);
+    }
+
+    void handle_weekday_calendar_entry(const celonis::accelerator::WeekdayCalendarEntry& entry, int index) {
+        int64_t begin = entry.shift().begin();
+        int64_t end = entry.shift().end();
+        if (entry.use_day() && begin < end) {
+            int64_t period = NUM_DAYS_PER_WEEK * NUM_MILLISECONDS_PER_DAY;
+            std::vector<int> add_days = {4, 5, 6, 0, 1, 2, 3};
+            begin += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
+            end += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
+            time_ranges_.push_back(std::make_shared<PeriodicTimeRange>(begin, end, period));
+        }
+    }
+
+    std::vector<std::shared_ptr<TimeRange>> time_ranges_;
+};
+
+bool json_string_to_calendar(const std::string& calendar_json_string, celonis::accelerator::Calendar& calendar) {
+    auto status = google::protobuf::util::JsonStringToMessage(calendar_json_string, &calendar);
+    return status.ok();
+}
+
+Status validate_weekday_calendar_entry(const celonis::accelerator::WeekdayCalendarEntry& entry) {
     int64_t begin = entry.shift().begin();
     int64_t end = entry.shift().end();
     if (end < begin) {
@@ -141,34 +198,22 @@ remap_timestamp_weekday_ms(const celonis::accelerator::WeekdayCalendarEntry& ent
         return Status::InvalidArgument("shift end is greater than " + std::to_string(NUM_MILLISECONDS_PER_DAY) +
                                        " milliseconds in weekday calendar.");
     }
-    std::vector<int> add_days = {4, 5, 6, 0, 1, 2, 3};
-    begin += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
-    end += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
-    return compute_time_range_overlap(PeriodicTimeRange{begin, end, period}, time_range);
+    return Status::OK();
 }
 
-static StatusOr<int64_t> remap_timestamp_weekday_calendar_ms(const TimestampValue& timestamp,
-                                                             const celonis::accelerator::WeekdayCalendar& weekday_calendar) {
-    const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
-    const bool before_epoch = timestamp < epoch;
-    int64_t rv = 0L;
-    const TimeRange time_range = get_time_range(timestamp);
-    int64_t overlap = 0L;
-    ASSIGN_OR_RETURN(overlap, remap_timestamp_weekday_ms(weekday_calendar.monday(), 0, time_range, before_epoch));
-    rv += overlap;
-    ASSIGN_OR_RETURN(overlap, remap_timestamp_weekday_ms(weekday_calendar.tuesday(), 1, time_range, before_epoch));
-    rv += overlap;
-    ASSIGN_OR_RETURN(overlap, remap_timestamp_weekday_ms(weekday_calendar.wednesday(), 2, time_range, before_epoch));
-    rv += overlap;
-    ASSIGN_OR_RETURN(overlap, remap_timestamp_weekday_ms(weekday_calendar.thursday(), 3, time_range, before_epoch));
-    rv += overlap;
-    ASSIGN_OR_RETURN(overlap, remap_timestamp_weekday_ms(weekday_calendar.friday(), 4, time_range, before_epoch));
-    rv += overlap;
-    ASSIGN_OR_RETURN(overlap, remap_timestamp_weekday_ms(weekday_calendar.saturday(), 5, time_range, before_epoch));
-    rv += overlap;
-    ASSIGN_OR_RETURN(overlap, remap_timestamp_weekday_ms(weekday_calendar.sunday(), 6, time_range, before_epoch));
-    rv += overlap;
-    return before_epoch ? -rv : rv;
+Status validate_calendar(const celonis::accelerator::Calendar& calendar) {
+    if (!calendar.has_weekday_calendar()) {
+        return Status::InvalidArgument("Non weekday calendar is not supported.");
+    }
+    const celonis::accelerator::WeekdayCalendar& weekday_calendar = calendar.weekday_calendar();
+    RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.monday()));
+    RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.tuesday()));
+    RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.wednesday()));
+    RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.thursday()));
+    RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.friday()));
+    RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.saturday()));
+    RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.sunday()));
+    return Status::OK();
 }
 
 static StatusOr<int64_t> convert_time_unit(const std::string& time_unit, int64_t milliseconds) {
@@ -185,7 +230,7 @@ remap_timestamp_calendar(const TimestampValue& timestamp, const std::string& tim
                          const std::string& calendar_json_string,
                          const std::optional<std::string>& calendar_id_column) {
     int64_t milliseconds = 0L;
-    celonis::accelerator::Calendar calendar;
+    celonis::accelerator::Calendar calendar_proto;
     if (calendar_json_string.empty()) {
         if (calendar_id_column.has_value()) {
             return Status::InvalidArgument(
@@ -194,16 +239,15 @@ remap_timestamp_calendar(const TimestampValue& timestamp, const std::string& tim
         milliseconds = remap_timestamp_ms(timestamp);
     } else {
         // parse calendar_json_string
-        if (!json_string_to_calendar(calendar_json_string, calendar)) {
+        if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
             return Status::InvalidArgument("Calendar specification column is malformed.");
         }
-        if (!calendar.has_weekday_calendar()) {
-            return Status::InvalidArgument("Non weekday calendar is not supported.");
-        }
+        RETURN_IF_ERROR(validate_calendar(calendar_proto));
         if (calendar_id_column.has_value()) {
             return Status::InvalidArgument("Calendar ID column should not be set for weekday calendar.");
         }
-        ASSIGN_OR_RETURN(milliseconds, remap_timestamp_weekday_calendar_ms(timestamp, calendar.weekday_calendar()));
+        Calendar calendar(calendar_proto);
+        milliseconds = calendar.remap_timestamp_ms(timestamp);
     }
     return convert_time_unit(time_unit, milliseconds);
 }
