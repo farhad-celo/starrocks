@@ -73,6 +73,16 @@ struct TimeRange {
 
     TimeRange(int64_t begin_ms, int64_t end_ms) : begin_ms(begin_ms), end_ms(end_ms) {}
 
+    TimeRange(const TimeRange& other) : begin_ms(other.begin_ms), end_ms(other.end_ms) {}
+
+    TimeRange& operator=(const TimeRange& other) {
+        if (this != &other) {
+            begin_ms = other.begin_ms;
+            end_ms = other.end_ms;
+        }
+        return *this;
+    }
+
     virtual ~TimeRange() = default;
 
     // Computes the overlap in milliseconds with another TimeRange object.
@@ -88,6 +98,17 @@ struct PeriodicTimeRange : public TimeRange {
 
     PeriodicTimeRange(int64_t begin_ms, int64_t end_ms, int64_t period_ms) : TimeRange(begin_ms, end_ms),
                                                                              period_ms(period_ms) {}
+
+    PeriodicTimeRange(const PeriodicTimeRange& other)
+            : TimeRange(other), period_ms(other.period_ms) {}
+
+    PeriodicTimeRange& operator=(const PeriodicTimeRange& other) {
+        if (this != &other) {
+            TimeRange::operator=(other); // Call base class assignment operator
+            period_ms = other.period_ms;
+        }
+        return *this;
+    }
 
     ~PeriodicTimeRange() override = default;
 
@@ -135,21 +156,47 @@ static TimeRange get_time_range(const TimestampValue& timestamp) {
     }
 }
 
+static void merge_time_ranges(std::vector<TimeRange>& time_ranges) {
+    std::sort(time_ranges.begin(), time_ranges.end(),
+              [](const TimeRange& a, const TimeRange& b) { return a.begin_ms < b.begin_ms; });
+    std::vector<TimeRange> merged;
+    for (const auto& time_range: time_ranges) {
+        if (merged.empty() || time_range.begin_ms > merged.back().end_ms) {
+            merged.push_back(time_range);
+        } else {
+            merged.back().end_ms = std::max(time_range.end_ms, merged.back().end_ms);
+        }
+    }
+    time_ranges = merged;
+}
+
 class Calendar {
 public:
     Calendar(const celonis::accelerator::Calendar& calendar_proto) {
         if (calendar_proto.has_weekday_calendar()) {
             handle_weekday_calendar(calendar_proto.weekday_calendar());
         }
+        if (calendar_proto.has_factory_calendar()) {
+            handle_factory_calendar(calendar_proto.factory_calendar());
+        }
     }
 
-    int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
+    int64_t remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id_column) {
         const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
         const bool before_epoch = timestamp < epoch;
         const TimeRange time_range = get_time_range(timestamp);
         int64_t rv = 0L;
-        for (const auto& cur_time_range: time_ranges_) {
-            rv += cur_time_range->compute_overlap(time_range);
+        if (!calendar_id_column.has_value()) {
+            for (const auto& cur_time_range: time_ranges_) {
+                rv += cur_time_range->compute_overlap(time_range);
+            }
+        } else {
+            auto itr = id_to_time_ranges_.find(calendar_id_column.value());
+            if (itr != id_to_time_ranges_.end()) {
+                for (const auto& cur_time_range: itr->second) {
+                    rv += cur_time_range.compute_overlap(time_range);
+                }
+            }
         }
         return before_epoch ? -rv : rv;
     }
@@ -177,7 +224,30 @@ private:
         }
     }
 
+    void handle_factory_calendar(const celonis::accelerator::FactoryCalendar& factory_calendar) {
+        std::vector<TimeRange> time_ranges;
+        std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges;
+        for (const auto& entry: factory_calendar.entries()) {
+            if (entry.has_calendar_id()) {
+                id_to_time_ranges[entry.calendar_id()].emplace_back(entry.start_date(), entry.end_date());
+            } else {
+                time_ranges.emplace_back(entry.start_date(), entry.end_date());
+            }
+        }
+        merge_time_ranges(time_ranges);
+        for (auto& kv: id_to_time_ranges) {
+            merge_time_ranges(kv.second);
+        }
+        for (const auto& time_range: time_ranges) {
+            time_ranges_.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
+        }
+        for (const auto& kv: id_to_time_ranges) {
+            id_to_time_ranges_[kv.first].insert(id_to_time_ranges_[kv.first].end(), kv.second.begin(), kv.second.end());
+        }
+    }
+
     std::vector<std::shared_ptr<TimeRange>> time_ranges_;
+    std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges_;
 };
 
 bool json_string_to_calendar(const std::string& calendar_json_string, celonis::accelerator::Calendar& calendar) {
@@ -201,11 +271,7 @@ Status validate_weekday_calendar_entry(const celonis::accelerator::WeekdayCalend
     return Status::OK();
 }
 
-Status validate_calendar(const celonis::accelerator::Calendar& calendar) {
-    if (!calendar.has_weekday_calendar()) {
-        return Status::InvalidArgument("Non weekday calendar is not supported.");
-    }
-    const celonis::accelerator::WeekdayCalendar& weekday_calendar = calendar.weekday_calendar();
+Status validate_weekday_calendar(const celonis::accelerator::WeekdayCalendar& weekday_calendar) {
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.monday()));
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.tuesday()));
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.wednesday()));
@@ -213,6 +279,51 @@ Status validate_calendar(const celonis::accelerator::Calendar& calendar) {
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.friday()));
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.saturday()));
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.sunday()));
+    return Status::OK();
+}
+
+Status validate_factory_calendar(const celonis::accelerator::FactoryCalendar& factory_calendar) {
+    for (const auto& entry: factory_calendar.entries()) {
+        if (entry.start_date() > entry.end_date()) {
+            return Status::InvalidArgument("start_date is greater than end_date in a factory calendar entry.");
+        }
+    }
+    return Status::OK();
+}
+
+Status validate_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
+    return Status::OK();
+}
+
+Status validate_calendar(const celonis::accelerator::Calendar& calendar,
+                         const std::optional<std::string>& calendar_id_column) {
+    if (calendar.has_weekday_calendar()) {
+        if (calendar_id_column.has_value()) {
+            return Status::InvalidArgument("Calendar ID column should not be set for weekday calendar.");
+        }
+        RETURN_IF_ERROR(validate_weekday_calendar(calendar.weekday_calendar()));
+    }
+    if (calendar.has_factory_calendar()) {
+        RETURN_IF_ERROR(validate_factory_calendar(calendar.factory_calendar()));
+    }
+    if (calendar.has_workday_calendar()) {
+        RETURN_IF_ERROR(validate_workday_calendar(calendar.workday_calendar()));
+    }
+    if (calendar.has_intersect_calendar()) {
+        const celonis::accelerator::IntersectCalendar& intersect_calendar = calendar.intersect_calendar();
+        if (!intersect_calendar.has_calendar1() && !intersect_calendar.has_calendar2()) {
+            return Status::InvalidArgument("Neither calendar1 nor calendar2 is set in intersect_calendar.");
+        }
+        if (intersect_calendar.has_calendar1()) {
+            RETURN_IF_ERROR(validate_calendar(intersect_calendar.calendar1(), calendar_id_column));
+        }
+        if (intersect_calendar.has_calendar2()) {
+            RETURN_IF_ERROR(validate_calendar(intersect_calendar.calendar2(), calendar_id_column));
+        }
+    }
+    if (!calendar.has_weekday_calendar() && !calendar.has_factory_calendar()) {
+        return Status::InvalidArgument("Workday and intersect calendars are not supported.");
+    }
     return Status::OK();
 }
 
@@ -242,12 +353,9 @@ remap_timestamp_calendar(const TimestampValue& timestamp, const std::string& tim
         if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
             return Status::InvalidArgument("Calendar specification column is malformed.");
         }
-        RETURN_IF_ERROR(validate_calendar(calendar_proto));
-        if (calendar_id_column.has_value()) {
-            return Status::InvalidArgument("Calendar ID column should not be set for weekday calendar.");
-        }
+        RETURN_IF_ERROR(validate_calendar(calendar_proto, calendar_id_column));
         Calendar calendar(calendar_proto);
-        milliseconds = calendar.remap_timestamp_ms(timestamp);
+        milliseconds = calendar.remap_timestamp_ms(timestamp, calendar_id_column);
     }
     return convert_time_unit(time_unit, milliseconds);
 }

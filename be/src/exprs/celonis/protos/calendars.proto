@@ -32,7 +32,6 @@ message FactoryCalendar {
   repeated FactoryCalendarEntry entries = 1;
 }
 
-// TODO: do we actually need this or can it be converted to a WeekdayCalendar?
 message WorkdayCalendarEntry {
   optional int64 year = 1;
   repeated bool is_workday = 2;
