@@ -472,6 +472,9 @@ TEST_F(CelonisAlignModelTest, InvalidModel) {
     const auto result = CelonisAlignModel::align_model(ctx.get(), columns);
     ASSERT_FALSE(result.ok());
     EXPECT_TRUE(result.status().is_invalid_argument());
+    
+    ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+    ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
 }
 
 TEST_F(CelonisAlignModelTest, Concurrency) {

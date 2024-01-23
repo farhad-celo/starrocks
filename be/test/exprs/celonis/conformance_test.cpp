@@ -8,6 +8,7 @@
 #include "column/vectorized_fwd.h"
 #include "exprs/function_context.h"
 #include "util.h"
+#include "util/defer_op.h"
 
 namespace starrocks::vectorized {
 
@@ -42,14 +43,18 @@ protected:
         auto context = ctx.get();
         context->set_constant_columns(columns);
 
+        DeferOp close_fragment_local([&context] {
+            CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([&context] {
+            CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
 
         const auto result = CelonisConformance::conformance(context, columns).value();
         evaluate(result.get(), expected);
 
-        RETURN_IF_ERROR(CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL));
-        RETURN_IF_ERROR(CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
         return Status::OK();
     }
 };

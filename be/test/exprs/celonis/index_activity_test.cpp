@@ -4,6 +4,7 @@
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
+#include "util/defer_op.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -37,11 +38,14 @@ private:
         };
         ctx->set_constant_columns(columns);
 
+        DeferOp op([&ctx] {
+            CelonisIndexActivity::celonis_index_activity_close(
+                    ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        });
+
         RETURN_IF_ERROR(CelonisIndexActivity::celonis_index_activity_prepare(
                 ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
         ASSIGN_OR_RETURN(auto result, CelonisIndexActivity::celonis_index_activity(ctx.get(), columns));
-        RETURN_IF_ERROR(CelonisIndexActivity::celonis_index_activity_close(
-                ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
         return result;
     }
 

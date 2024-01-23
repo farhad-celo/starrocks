@@ -285,8 +285,8 @@ Status CelonisConformance::conformance_prepare(FunctionContext* context, Functio
     std::string json = ColumnHelper::get_const_value<TYPE_VARCHAR>(json_input).to_string();
 
     auto* state = new ConformanceState();
-    ASSIGN_OR_RETURN(state->petri_net, petri_net_builder::build(json, context));
     context->set_function_state(scope, state);
+    ASSIGN_OR_RETURN(state->petri_net, petri_net_builder::build(json, context));
 
     return Status::OK();
 }
