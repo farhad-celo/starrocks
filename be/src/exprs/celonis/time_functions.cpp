@@ -7,6 +7,7 @@
 #include "google/protobuf/util/json_util.h"
 #include "modules/query/calendars.pb.h"
 
+#include <bitset>
 
 namespace starrocks {
 
@@ -21,11 +22,11 @@ static const std::unordered_map<std::string, int64_t> TIME_UNIT_TO_MS = {
         {"MILLISECONDS", 1L}
 };
 
-static const int NUM_DAYS_PER_WEEK = 7;
+static const int64_t NUM_DAYS_PER_WEEK = 7L;
 
-static const int NUM_MILLISECONDS_PER_DAY = 86400000;
+static const int64_t NUM_MILLISECONDS_PER_DAY = 86400000L;
 
-static const int NUM_MICROSECONDS_PER_MILLISECONDS = 1000;
+static const int64_t NUM_MICROSECONDS_PER_MILLISECONDS = 1000L;
 }
 
 StatusOr<ColumnPtr>
@@ -179,6 +180,9 @@ public:
         if (calendar_proto.has_factory_calendar()) {
             handle_factory_calendar(calendar_proto.factory_calendar());
         }
+        if (calendar_proto.has_workday_calendar()) {
+            handle_workday_calendar(calendar_proto.workday_calendar());
+        }
     }
 
     int64_t remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id_column) {
@@ -246,16 +250,79 @@ private:
         }
     }
 
+    std::bitset<366> to_bitset(const celonis::accelerator::WorkdayCalendarEntry& entry) {
+        std::bitset<366> bit_set;
+        for (int i = 0; i < entry.is_workday_size(); ++i) {
+            if (entry.is_workday(i)) {
+                bit_set.set(i, true);
+            }
+        }
+        return bit_set;
+    }
+
+    std::vector<TimeRange> to_time_ranges(int64_t year, const std::bitset<366>& bit_set) {
+        const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
+        const TimestampValue timestamp = TimestampValue::create(year, 1, 1, 0, 0, 0);
+        const int64_t year_begin_ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        std::vector<TimeRange> time_ranges;
+        for (int i = 0; i < bit_set.size(); ++i) {
+            if (bit_set.test(i)) {
+                int64_t begin = year_begin_ms + NUM_MILLISECONDS_PER_DAY * i;
+                time_ranges.emplace_back(begin, begin + NUM_MILLISECONDS_PER_DAY);
+            }
+        }
+        return time_ranges;
+    }
+
+    void handle_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
+        std::map<int, std::bitset<366>> year_to_bitset;
+        std::unordered_map<std::string, std::map<int, std::bitset<366>>> year_to_bitset_by_id;
+        for (const auto& entry: workday_calendar.entries()) {
+            auto year = entry.year();
+            if (entry.has_calendar_id()) {
+                year_to_bitset_by_id[entry.calendar_id()][year] |= to_bitset(entry);
+            } else {
+                year_to_bitset[year] |= to_bitset(entry);
+            }
+        }
+        std::vector<TimeRange> time_ranges;
+        std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges;
+        for (const auto& kv: year_to_bitset) {
+            for (const auto& time_range: to_time_ranges(kv.first, kv.second)) {
+                time_ranges.push_back(time_range);
+            }
+        }
+        for (const auto& kv: year_to_bitset_by_id) {
+            std::string id = kv.first;
+            auto& cur_time_ranges = id_to_time_ranges_[id];
+            for (const auto& bitset_by_year: kv.second) {
+                for (const auto& time_range: to_time_ranges(bitset_by_year.first, bitset_by_year.second)) {
+                    cur_time_ranges.push_back(time_range);
+                }
+            }
+        }
+        merge_time_ranges(time_ranges);
+        for (auto& kv: id_to_time_ranges) {
+            merge_time_ranges(kv.second);
+        }
+        for (const auto& time_range: time_ranges) {
+            time_ranges_.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
+        }
+        for (const auto& kv: id_to_time_ranges) {
+            id_to_time_ranges_[kv.first].insert(id_to_time_ranges_[kv.first].end(), kv.second.begin(), kv.second.end());
+        }
+    }
+
     std::vector<std::shared_ptr<TimeRange>> time_ranges_;
     std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges_;
 };
 
-bool json_string_to_calendar(const std::string& calendar_json_string, celonis::accelerator::Calendar& calendar) {
+static bool json_string_to_calendar(const std::string& calendar_json_string, celonis::accelerator::Calendar& calendar) {
     auto status = google::protobuf::util::JsonStringToMessage(calendar_json_string, &calendar);
     return status.ok();
 }
 
-Status validate_weekday_calendar_entry(const celonis::accelerator::WeekdayCalendarEntry& entry) {
+static Status validate_weekday_calendar_entry(const celonis::accelerator::WeekdayCalendarEntry& entry) {
     int64_t begin = entry.shift().begin();
     int64_t end = entry.shift().end();
     if (end < begin) {
@@ -271,7 +338,7 @@ Status validate_weekday_calendar_entry(const celonis::accelerator::WeekdayCalend
     return Status::OK();
 }
 
-Status validate_weekday_calendar(const celonis::accelerator::WeekdayCalendar& weekday_calendar) {
+static Status validate_weekday_calendar(const celonis::accelerator::WeekdayCalendar& weekday_calendar) {
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.monday()));
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.tuesday()));
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.wednesday()));
@@ -282,7 +349,7 @@ Status validate_weekday_calendar(const celonis::accelerator::WeekdayCalendar& we
     return Status::OK();
 }
 
-Status validate_factory_calendar(const celonis::accelerator::FactoryCalendar& factory_calendar) {
+static Status validate_factory_calendar(const celonis::accelerator::FactoryCalendar& factory_calendar) {
     for (const auto& entry: factory_calendar.entries()) {
         if (entry.start_date() > entry.end_date()) {
             return Status::InvalidArgument("start_date is greater than end_date in a factory calendar entry.");
@@ -291,12 +358,27 @@ Status validate_factory_calendar(const celonis::accelerator::FactoryCalendar& fa
     return Status::OK();
 }
 
-Status validate_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
+static int get_days_in_year(int64_t year) {
+    return ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) ? 366 : 365;
+}
+
+static Status validate_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
+    for (const auto& entry: workday_calendar.entries()) {
+        if (!entry.has_year()) {
+            return Status::InvalidArgument("year is not set in a workday calendar entry.");
+        }
+        auto required_n_days = get_days_in_year(entry.year());
+        if (required_n_days != entry.is_workday_size()) {
+            return Status::InvalidArgument(
+                    fmt::format("{} should have {} days, however the workday calendar contains {} is_workday.",
+                                entry.year(), required_n_days, entry.is_workday_size()));
+        }
+    }
     return Status::OK();
 }
 
-Status validate_calendar(const celonis::accelerator::Calendar& calendar,
-                         const std::optional<std::string>& calendar_id_column) {
+static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
+                                const std::optional<std::string>& calendar_id_column) {
     if (calendar.has_weekday_calendar()) {
         if (calendar_id_column.has_value()) {
             return Status::InvalidArgument("Calendar ID column should not be set for weekday calendar.");
@@ -321,8 +403,8 @@ Status validate_calendar(const celonis::accelerator::Calendar& calendar,
             RETURN_IF_ERROR(validate_calendar(intersect_calendar.calendar2(), calendar_id_column));
         }
     }
-    if (!calendar.has_weekday_calendar() && !calendar.has_factory_calendar()) {
-        return Status::InvalidArgument("Workday and intersect calendars are not supported.");
+    if (calendar.has_intersect_calendar()) {
+        return Status::InvalidArgument("Intersect calendar is not supported.");
     }
     return Status::OK();
 }
