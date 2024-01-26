@@ -232,6 +232,9 @@ private:
         std::vector<TimeRange> time_ranges;
         std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges;
         for (const auto& entry: factory_calendar.entries()) {
+            if (!entry.has_start_date() || !entry.has_end_date() || entry.start_date() > entry.end_date()) {
+                continue;
+            }
             if (entry.has_calendar_id()) {
                 id_to_time_ranges[entry.calendar_id()].emplace_back(entry.start_date(), entry.end_date());
             } else {
@@ -350,11 +353,6 @@ static Status validate_weekday_calendar(const celonis::accelerator::WeekdayCalen
 }
 
 static Status validate_factory_calendar(const celonis::accelerator::FactoryCalendar& factory_calendar) {
-    for (const auto& entry: factory_calendar.entries()) {
-        if (entry.start_date() > entry.end_date()) {
-            return Status::InvalidArgument("start_date is greater than end_date in a factory calendar entry.");
-        }
-    }
     return Status::OK();
 }
 

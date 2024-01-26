@@ -1069,22 +1069,29 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_intersect_c
     }
 }
 
-TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_factory_calendar) {
+TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_invalid_factory_calendar_entries_are_ignored) {
     auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
     auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
     auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-    time_units->append_datum("HOURS");
+    time_units->append_datum("MILLISECONDS");
 
     calendars->append_datum(
-            DatumArray{
-                    R"({"factory_calendar": { "entries": {"start_date": 61500000, "end_date": 61200000, "calendar_id": "id"} }})"});
-    calendar_ids->append_datum("id");
+            DatumArray{R"({"factory_calendar": {)",
+                    // missing start_date
+                       R"("entries": {"end_date": 2000, "calendar_id": "id1"}, )",
+                    // missing end_date
+                       R"("entries": {"start_date": 3000,"calendar_id": "id1"}, )",
+                    // start_date >end_date
+                       R"("entries": {"start_date": 8000, "end_date": 6000, "calendar_id": "id1"}, )",
+                       R"("entries": {"start_date": 1000, "end_date": 6000, "calendar_id": "id1"}, )",
+                       R"( }})"});
+    calendar_ids->append_datum("id1");
     const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
-                                                                                  calendar_ids});
-    ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "start_date is greater than end_date in a factory calendar entry.");
+                                                                                  calendar_ids}).value();
+    ASSERT_EQ(timestamps->size(), result->size());
+    EXPECT_EQ(5000L, result->get(0).get_int64());
 }
 
 TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_workday_calendar) {
