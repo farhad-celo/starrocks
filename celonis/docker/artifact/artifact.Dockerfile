@@ -38,6 +38,10 @@ COPY celonis/docker/artifact/core-site.xml /release/fe_artifacts/fe/conf/
 COPY celonis/docker/artifact/core-site.xml /release/be_artifacts/be/conf/
 
 # download the latest dd-java-agent
-ADD 'https://dtdg.co/latest-java-tracer' /release/fe_artifacts/datadog/dd-java-agent.jar
+ADD 'https://dtdg.co/latest-java-tracer' /release/fe_artifacts/fe/datadog/dd-java-agent.jar
+
+# Get ddprof for BE profiling
+RUN wget https://github.com/DataDog/ddprof/releases/download/v0.15.3/ddprof-0.15.3-amd64-linux.tar.xz -O ddprof-linux.tar.xz && \
+    tar xvf ddprof-linux.tar.xz && mkdir -p /release/be_artifacts/be/datadog/ && mv ddprof/bin/ddprof /release/be_artifacts/be/datadog/
 
 WORKDIR /release
