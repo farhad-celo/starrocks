@@ -305,6 +305,7 @@ public class FunctionSet {
     public static final String MANN_WHITNEY_U_TEST = "mann_whitney_u_test";
 
     // Aggregate celonis functions:
+    public static final String CELONIS_CALC_BUCKET_COUNT_BOUNDARIES = "celonis_calc_bucket_count_boundaries";
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
     public static final String CELONIS_MODE = "celonis_mode";
@@ -1149,6 +1150,25 @@ public class FunctionSet {
                     Lists.newArrayList(type, Type.BOOLEAN, Type.BOOLEAN, new ArrayType(type)),
                     new StructType(sf), Type.VARBINARY, false, false, false));
         }
+        // celonis_calc_bucket_count_boundaries
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.BIGINT), Type.ARRAY_BIGINT, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.BIGINT, Type.BIGINT), Type.ARRAY_BIGINT, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.DOUBLE), Type.ARRAY_DOUBLE, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.DOUBLE, Type.BIGINT), Type.ARRAY_DOUBLE, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.DATETIME), Type.ARRAY_DATETIME, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.DATETIME, Type.BIGINT), Type.ARRAY_DATETIME, Type.VARBINARY,
+                false, false, false));
     }
 
     // Populate all the aggregate builtins in the globalStateMgr.

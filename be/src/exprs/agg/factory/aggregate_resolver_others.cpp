@@ -55,6 +55,15 @@ void AggregateFuncResolver::register_celonis() {
     add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_STRUCT>(
             "celonis_histogram_boundaries", false,
             AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_VARCHAR>());
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_ARRAY>(
+            "celonis_calc_bucket_count_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_ARRAY>(
+            "celonis_calc_bucket_count_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_DOUBLE>());
+    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_ARRAY>(
+            "celonis_calc_bucket_count_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_DATETIME>());
 }
 
 struct PercentileDiscDispatcher {

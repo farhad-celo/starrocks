@@ -145,10 +145,9 @@ struct CelonisHistogramBoundariesAggregateState {
     CounterType last_bucket_counter = 0;
 };
 
-
 /**
  * @param: [col, no_lower_bound, no_upper_bound, boundaries]
- * @paramType: [BIGINT | DOUBLE | DATETIME | VARCHAR, CONST BOOLEAN, CONST BOOLEAN, CONST ARRAY of col type]
+ * @paramType: [BIGINT | DOUBLE | DATETIME | VARCHAR, CONST BOOLEAN, CONST BOOLEAN, ARRAY of col type]
  * @return: STRUCT {
  *      class_bounds_lower: ARRAY of col type
  *      class_bounds_upper: ARRAY of col type
@@ -167,15 +166,20 @@ class CelonisHistogramBoundariesAggregationFunction final
 public:
     using ColumnType = RunTimeColumnType<LT>;
 
-    void create_impl(FunctionContext* ctx, CelonisHistogramBoundariesAggregateState<LT>& state) const {
+    void create_impl(FunctionContext* ctx, const Column** columns,
+                     CelonisHistogramBoundariesAggregateState<LT>& state) const {
         DCHECK_EQ(ctx->get_num_args(), 4);
         state.initialized = true;
         state.no_lower_bound = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(1));
         state.no_upper_bound = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(2));
-        UnnestedArrayData boundaries_array_data = prepare_array_input(ctx->get_constant_column(3).get());
-        if (boundaries_array_data.null_arrays != nullptr && (*boundaries_array_data.null_arrays)[0]) {
+        const auto* boundary_column = ctx->get_constant_column(3).get();
+        if (boundary_column == nullptr) {
+            boundary_column = columns[3];
+        }
+        if (boundary_column->is_null(0)) {
             return;
         }
+        UnnestedArrayData boundaries_array_data = prepare_array_input(boundary_column);
         const auto& elements = down_cast<const ColumnType*>(boundaries_array_data.elements)->get_data().data();
         auto start = boundaries_array_data.offsets->get(0).get_uint32();
         auto end = boundaries_array_data.offsets->get(1).get_uint32();
@@ -191,7 +195,7 @@ public:
                 size_t row_num) const override {
         auto& state_impl = this->data(state);
         if (!state_impl.initialized) {
-            create_impl(ctx, state_impl);
+            create_impl(ctx, columns, state_impl);
         }
         if (columns[0]->is_nullable() && columns[0]->is_null(row_num)) {
           return;
@@ -203,6 +207,9 @@ public:
         // merge internal state with column[row_num]
         // the column type is binary
         const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
+        if (input_column->is_null(row_num)) {
+            return;
+        }
         Slice slice = input_column->get_slice(row_num);
         this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size);
     }
@@ -223,7 +230,7 @@ public:
 
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const override {
-        // Used for streaming aggregation. Not implemented.
+        // Used for streaming aggregation passthrough. Not implemented.
         throw std::runtime_error("celonis_histogram_boundaries: convert_to_serialize_format not supported");
     }
 

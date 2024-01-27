@@ -144,6 +144,7 @@ set(EXEC_FILES
         ./exprs/unary_function_test.cpp
         ./exprs/celonis/align_model_test.cpp
         ./exprs/celonis/array_functions_test.cpp
+        ./exprs/celonis/calc_bucket_boundaries_test.cpp
         ./exprs/celonis/calc_throughput_test.cpp
         ./exprs/celonis/conformance_test.cpp
         ./exprs/celonis/greatest_least_test.cpp
