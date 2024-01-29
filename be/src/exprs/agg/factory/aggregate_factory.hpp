@@ -34,6 +34,7 @@
 #include "exprs/agg/ds_hll_count_distinct.h"
 #include "exprs/agg/ds_theta_count_distinct.h"
 #include "exprs/agg/exchange_perf.h"
+#include "exprs/agg/factory_calendar.h"
 #include "exprs/agg/group_concat.h"
 #include "exprs/agg/histogram.h"
 #include "exprs/agg/hll_ndv.h"
@@ -118,6 +119,10 @@ public:
     template <AggExchangePerfType PerfType>
     static AggregateFunctionPtr MakeExchangePerfAggregateFunction() {
         return std::make_shared<ExchangePerfAggregateFunction<PerfType>>();
+    }
+
+    static AggregateFunctionPtr MakeCelonisMakeFactoryCalendarAggregateFunction() {
+        return std::make_shared<FactoryCalendarAggregateFunction>();
     }
 
     static AggregateFunctionPtr MakeArrayAggAggregateFunctionV2() {
