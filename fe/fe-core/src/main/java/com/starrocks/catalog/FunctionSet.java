@@ -1157,22 +1157,24 @@ public class FunctionSet {
         }
         // celonis_calc_bucket_count_boundaries
         addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.DATETIME), Type.ARRAY_DATETIME, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
                 Lists.newArrayList(Type.BIGINT), Type.ARRAY_BIGINT, Type.VARBINARY,
+                false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.DOUBLE), Type.ARRAY_DOUBLE, Type.VARBINARY,
+                false, false, false));
+        // (Type.DATETIME, Type.BIGINT) must before (Type.BIGINT, Type.BIGINT), because (Type.DATETIME, Type.TINYINT)
+        // could be considered as (Type.BIGINT, Type.BIGINT).
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                Lists.newArrayList(Type.DATETIME, Type.BIGINT), Type.ARRAY_DATETIME, Type.VARBINARY,
                 false, false, false));
         addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
                 Lists.newArrayList(Type.BIGINT, Type.BIGINT), Type.ARRAY_BIGINT, Type.VARBINARY,
                 false, false, false));
         addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
-                Lists.newArrayList(Type.DOUBLE), Type.ARRAY_DOUBLE, Type.VARBINARY,
-                false, false, false));
-        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
                 Lists.newArrayList(Type.DOUBLE, Type.BIGINT), Type.ARRAY_DOUBLE, Type.VARBINARY,
-                false, false, false));
-        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
-                Lists.newArrayList(Type.DATETIME), Type.ARRAY_DATETIME, Type.VARBINARY,
-                false, false, false));
-        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
-                Lists.newArrayList(Type.DATETIME, Type.BIGINT), Type.ARRAY_DATETIME, Type.VARBINARY,
                 false, false, false));
     }
 
