@@ -42,6 +42,8 @@ ADD 'https://dtdg.co/latest-java-tracer' /release/fe_artifacts/fe/datadog/dd-jav
 
 # Get ddprof for BE profiling
 RUN wget https://github.com/DataDog/ddprof/releases/download/v0.15.3/ddprof-0.15.3-amd64-linux.tar.xz -O ddprof-linux.tar.xz && \
-    tar xvf ddprof-linux.tar.xz && mkdir -p /release/be_artifacts/be/datadog/ && mv ddprof/bin/ddprof /release/be_artifacts/be/datadog/
+    tar xvf ddprof-linux.tar.xz && mkdir -p /release/be_artifacts/be/datadog/  \
+    && mv ddprof/bin/ddprof /release/be_artifacts/be/datadog/ \
+    && chmod 755 /release/be_artifacts/be/datadog/ddprof
 
 WORKDIR /release
