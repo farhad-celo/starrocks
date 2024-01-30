@@ -158,7 +158,7 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     DCHECK(state_impl.end_timestamp->size() == n_rows);
     DCHECK(state_impl.calendar_id->size() == n_rows);
     DCHECK(state_impl.is_calendar_id_null->size() == n_rows);
-    celonis::accelerator::FactoryCalendar calendar_proto;
+    celonis::accelerator::Calendar calendar_proto;
     for (int i = 0; i < n_rows; ++i) {
         celonis::accelerator::FactoryCalendarEntry entry;
         const int64_t start_date = state_impl.start_timestamp->get(i).get_timestamp().diff_microsecond(epoch) / 1000L;
@@ -170,7 +170,7 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         if (!is_calendar_id_null) {
             entry.set_calendar_id(calendar_id);
         }
-        *calendar_proto.add_entries() = entry;
+        *calendar_proto.mutable_factory_calendar()->add_entries() = entry;
     }
     std::string calendar_json;
     google::protobuf::util::MessageToJsonString(calendar_proto, &calendar_json);
@@ -180,8 +180,8 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         calendar_pieces.emplace_back(calendar_json.substr(i, MAX_STRING_SIZE));
     }
     DatumArray array;
-    for (const auto& calendar_piece : calendar_pieces) {
-       array.emplace_back(calendar_piece.c_str());
+    for (const auto& calendar_piece: calendar_pieces) {
+        array.emplace_back(calendar_piece.c_str());
     }
     to->append_datum(array);
 }

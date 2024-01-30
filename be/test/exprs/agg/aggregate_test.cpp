@@ -1997,7 +1997,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
     local_ctx->set_runtime_state(runtime_state.get());
 
     const AggregateFunction* agg_func = get_aggregate_function("celonis_make_factory_calendar", TYPE_BIGINT, TYPE_ARRAY,
-                                                                     false);
+                                                               false);
     TypeDescriptor type_timestamp;
     type_timestamp.type = LogicalType::TYPE_DATETIME;
     TypeDescriptor type_varchar;
@@ -2043,7 +2043,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
 
         // test update
         agg_func->update_batch_single_state(local_ctx.get(), start_timestamp_column->size(), raw_columns.data(),
-                                                  state->state());
+                                            state->state());
         auto agg_state = (FactoryCalendarAggregateState*) (state->state());
         EXPECT_EQ(2, agg_state->start_timestamp->size());
         EXPECT_EQ(2, agg_state->end_timestamp->size());
@@ -2068,7 +2068,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         columns.push_back(end_timestamp_column);
         columns.push_back(calendar_id_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
-                                                    &res_struct_col);
+                                              &res_struct_col);
         EXPECT_EQ(
                 R"([{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'',is_calendar_id_null:1}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'',is_calendar_id_null:1}])",
                 res_struct_col->debug_string());
@@ -2077,7 +2077,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}'])",
+                R"(['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}}'])",
                 res_array_col->debug_string());
     }
     // mixed NULL and non-NULL start/end, NULL calendar_id
@@ -2113,7 +2113,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         // test update
         ASSERT_TRUE(start_timestamp_column->size() == 4);
         agg_func->update_batch_single_state(local_ctx.get(), start_timestamp_column->size(), raw_columns.data(),
-                                                  state->state());
+                                            state->state());
         auto agg_state = (FactoryCalendarAggregateState*) (state->state());
         EXPECT_EQ(2, agg_state->start_timestamp->size());
         EXPECT_EQ(2, agg_state->end_timestamp->size());
@@ -2138,7 +2138,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         columns.push_back(end_timestamp_column);
         columns.push_back(calendar_id_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
-                                                    &res_struct_col);
+                                              &res_struct_col);
         EXPECT_EQ(
                 R"([{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'',is_calendar_id_null:1}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'',is_calendar_id_null:1}])",
                 res_struct_col->debug_string());
@@ -2147,7 +2147,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}'])",
+                R"(['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}}'])",
                 res_array_col->debug_string());
     }
     // non-NULL calendar_id
@@ -2174,7 +2174,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
 
         // test update
         agg_func->update_batch_single_state(local_ctx.get(), start_timestamp_column->size(), raw_columns.data(),
-                                                  state->state());
+                                            state->state());
         auto agg_state = (FactoryCalendarAggregateState*) (state->state());
         EXPECT_EQ(2, agg_state->start_timestamp->size());
         EXPECT_EQ(2, agg_state->end_timestamp->size());
@@ -2199,7 +2199,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         columns.push_back(end_timestamp_column);
         columns.push_back(calendar_id_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
-                                                    &res_struct_col);
+                                              &res_struct_col);
         EXPECT_EQ(
                 R"([{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'id1',is_calendar_id_null:0}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'id2',is_calendar_id_null:0}])",
                 res_struct_col->debug_string());
@@ -2208,7 +2208,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"entries":[{"startDate":"0","endDate":"3600000","calendarId":"id1"},{"startDate":"0","endDate":"7200000","calendarId":"id2"}]}'])",
+                R"(['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000","calendarId":"id1"},{"startDate":"0","endDate":"7200000","calendarId":"id2"}]}}'])",
                 res_array_col->debug_string());
     }
     // empty input
@@ -2229,7 +2229,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
 
         // test update
         agg_func->update_batch_single_state(local_ctx.get(), start_timestamp_column->size(), raw_columns.data(),
-                                                  state->state());
+                                            state->state());
         auto agg_state = (FactoryCalendarAggregateState*) (state->state());
         EXPECT_EQ(0, agg_state->start_timestamp->size());
         EXPECT_EQ(0, agg_state->end_timestamp->size());
@@ -2248,7 +2248,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         columns.push_back(end_timestamp_column);
         columns.push_back(calendar_id_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
-                                                    &res_struct_col);
+                                              &res_struct_col);
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
@@ -2283,7 +2283,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
 
         // test update
         agg_func->update_batch_single_state(local_ctx.get(), start_timestamp_column->size(), raw_columns.data(),
-                                                  state->state());
+                                            state->state());
         auto agg_state = (FactoryCalendarAggregateState*) (state->state());
         EXPECT_EQ(0, agg_state->start_timestamp->size());
         EXPECT_EQ(0, agg_state->end_timestamp->size());
@@ -2302,7 +2302,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         columns.push_back(end_timestamp_column);
         columns.push_back(calendar_id_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
-                                                    &res_struct_col);
+                                              &res_struct_col);
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
@@ -2337,7 +2337,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
 
         // test update
         agg_func->update_batch_single_state(local_ctx.get(), start_timestamp_column->size(), raw_columns.data(),
-                                                  state->state());
+                                            state->state());
         auto agg_state = (FactoryCalendarAggregateState*) (state->state());
         EXPECT_EQ(0, agg_state->start_timestamp->size());
         EXPECT_EQ(0, agg_state->end_timestamp->size());
@@ -2356,7 +2356,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         columns.push_back(end_timestamp_column);
         columns.push_back(calendar_id_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
-                                                    &res_struct_col);
+                                              &res_struct_col);
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
@@ -2391,7 +2391,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
 
         // test update
         agg_func->update_batch_single_state(local_ctx.get(), start_timestamp_column->size(), raw_columns.data(),
-                                                  state->state());
+                                            state->state());
         auto agg_state = (FactoryCalendarAggregateState*) (state->state());
         EXPECT_EQ(2, agg_state->start_timestamp->size());
         EXPECT_EQ(2, agg_state->end_timestamp->size());
@@ -2416,7 +2416,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         columns.push_back(end_timestamp_column);
         columns.push_back(calendar_id_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
-                                                    &res_struct_col);
+                                              &res_struct_col);
         EXPECT_EQ(
                 "[{start_timestamp:1969-12-31 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'id1',is_calendar_id_null:0}, {start_timestamp:1969-12-30 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'id2',is_calendar_id_null:0}]",
                 res_struct_col->debug_string());
@@ -2426,7 +2426,7 @@ TEST_F(AggregateTest, test_celonis_make_factory_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(
-                R"(['{"entries":[{"startDate":"-86400000","endDate":"3600000","calendarId":"id1"},{"startDate":"-172800000","endDate":"7200000","calendarId":"id2"}]}'])",
+                R"(['{"factoryCalendar":{"entries":[{"startDate":"-86400000","endDate":"3600000","calendarId":"id1"},{"startDate":"-172800000","endDate":"7200000","calendarId":"id2"}]}}'])",
                 res_array_col->debug_string());
     }
     // resultant calendar is longer than 1M.
