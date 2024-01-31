@@ -118,7 +118,10 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
         switch (match_type) {
         case CONSTANT:
             match_column->append_datum(gen_rand_array(match_size));
-            match_column = ConstColumn::create(match_column, num_rows);
+            // Array Literal is not wrapped with ConstColumn.
+            // As of 2024-01-30, it has one row in FunctionContext::constant_column_ and it is evaluated and unfolded to
+            // multiple rows in /be/src/exprs/array_expr.cpp before it is passed to celonis_in().
+            // In this benchmark, we don't unfold the column when we call the function as the function doesn't read it.
             ctx->set_constant_columns({nullptr, match_column});
             break;
         case NON_CONSTANT:

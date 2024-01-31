@@ -45,13 +45,16 @@ Status CelonisIn<LT>::prepare(FunctionContext* context, FunctionContext::Functio
     auto state = new InStateThreadLocal<LT>();
     context->set_function_state(scope, state);
 
-    if (!context->is_constant_column(1)) {
+    auto match_column = context->get_constant_column(1);
+    // context->is_constant_column(1) must not be used to determine if the argument is Array Literal because as of
+    // 2024-01-30 it returns false for Array Literal while get_constant_column(1) returns non nullptr.
+    // For the same reason, columns[1]->is_constant() must not be used in celonis_in().
+    if (match_column == nullptr) {
         state->function = in_non_constant_match;
         return Status::OK();
     }
     state->function = in_constant_match;
 
-    auto match_column = context->get_constant_column(1);
     if (match_column->is_null(0)) {
         return Status::OK();
     }

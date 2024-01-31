@@ -26,6 +26,10 @@ private:
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         value_column_ = ColumnHelper::create_column(TypeDescriptor(LT), true);
+        // Array Literal is not wrapped with ConstColumn.
+        // As of 2024-01-30, it has one row in FunctionContext::constant_column_ and it is evaluated and unfolded to
+        // multiple rows in /be/src/exprs/array_expr.cpp before it is passed to celonis_in().
+        // In this test, we don't unfold the column when we call the function as the function doesn't read it.
         match_array_column_ = ColumnHelper::create_column(celonis::array_type(LT), false);
     }
 
@@ -48,7 +52,7 @@ private:
     StatusOr<ColumnPtr> RunConstantMatch(DatumArray match_array) {
         EXPECT_FALSE(match_array_column_->is_constant());
         match_array_column_->append_datum(match_array);
-        match_array_column_ = ConstColumn::create(match_array_column_, value_column_->size());
+        ctx_->set_constant_columns({nullptr, match_array_column_});
         return Run<LT>();
     }
 
