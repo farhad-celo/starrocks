@@ -35,6 +35,9 @@ FactoryCalendarAggregateState::~FactoryCalendarAggregateState() {
     if (calendar_id != nullptr) {
         calendar_id.reset(nullptr);
     }
+    if (is_calendar_id_null != nullptr) {
+        is_calendar_id_null.reset(nullptr);
+    }
 }
 
 void FactoryCalendarAggregateFunction::create(FunctionContext* ctx, AggDataPtr __restrict ptr) const {
@@ -83,12 +86,12 @@ void FactoryCalendarAggregateFunction::update(FunctionContext* ctx, const Column
     auto& state_impl = this->data(state);
     state_impl.start_timestamp->append_datum(columns[0]->get(row_num));
     state_impl.end_timestamp->append_datum(columns[1]->get(row_num));
-    if (!columns[2]->get(row_num).is_null()) {
-        state_impl.calendar_id->append_datum(columns[2]->get(row_num));
-        state_impl.is_calendar_id_null->append_datum(false);
-    } else {
+    if (columns[2]->get(row_num).is_null()) {
         state_impl.calendar_id->append_default();
         state_impl.is_calendar_id_null->append_datum(true);
+    } else {
+        state_impl.calendar_id->append_datum(columns[2]->get(row_num));
+        state_impl.is_calendar_id_null->append_datum(false);
     }
 }
 
@@ -98,13 +101,8 @@ void FactoryCalendarAggregateFunction::merge(FunctionContext* ctx, const Column*
     auto& state_impl = this->data(state);
     state_impl.start_timestamp->append_datum(input_columns.at(0)->get(row_num));
     state_impl.end_timestamp->append_datum(input_columns.at(1)->get(row_num));
-    if (!input_columns.at(2)->get(row_num).is_null()) {
-        state_impl.calendar_id->append_datum(input_columns.at(2)->get(row_num));
-        state_impl.is_calendar_id_null->append_datum(false);
-    } else {
-        state_impl.calendar_id->append_default();
-        state_impl.is_calendar_id_null->append_datum(true);
-    }
+    state_impl.calendar_id->append_datum(input_columns.at(2)->get(row_num));
+    state_impl.is_calendar_id_null->append_datum(input_columns.at(3)->get(row_num));
 }
 
 void FactoryCalendarAggregateFunction::serialize_to_column(starrocks::FunctionContext* ctx,
@@ -121,19 +119,19 @@ void FactoryCalendarAggregateFunction::serialize_to_column(starrocks::FunctionCo
     down_cast<NullableColumn*>(columns[2].get())->mutable_null_column()->get_data().resize(size, 0);
     down_cast<NullableColumn*>(columns[3].get())->mutable_null_column()->get_data().resize(size, 0);
     auto start_timestamp = down_cast<TimestampColumn*>(ColumnHelper::get_data_column(columns[0].get()));
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
         start_timestamp->append(state_impl.start_timestamp->get(i).get_timestamp());
     }
     auto end_timestamp = down_cast<TimestampColumn*>(ColumnHelper::get_data_column(columns[1].get()));
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
         end_timestamp->append(state_impl.end_timestamp->get(i).get_timestamp());
     }
     auto calendar_id = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(columns[2].get()));
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
         calendar_id->append(state_impl.calendar_id->get(i).get_slice());
     }
     auto is_calendar_id_null = down_cast<BooleanColumn*>(ColumnHelper::get_data_column(columns[3].get()));
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
         is_calendar_id_null->append(state_impl.is_calendar_id_null->get(i).get_uint8());
     }
 }
@@ -164,10 +162,10 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         const int64_t start_date = state_impl.start_timestamp->get(i).get_timestamp().diff_microsecond(epoch) / 1000L;
         const int64_t end_date = state_impl.end_timestamp->get(i).get_timestamp().diff_microsecond(epoch) / 1000L;
         const std::string calendar_id = state_impl.calendar_id->get(i).get_slice().to_string();
-        const bool is_calendar_id_null = state_impl.is_calendar_id_null->get(i).get_uint8() != 0;
+        const bool calendar_id_not_null = !static_cast<bool>(state_impl.is_calendar_id_null->get(i).get_uint8());
         entry.set_start_date(start_date);
         entry.set_end_date(end_date);
-        if (!is_calendar_id_null) {
+        if (calendar_id_not_null) {
             entry.set_calendar_id(calendar_id);
         }
         *calendar_proto.mutable_factory_calendar()->add_entries() = entry;
@@ -223,7 +221,7 @@ void FactoryCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
     auto calendar_id = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(columns[2].get()));
     auto is_calendar_id_null = down_cast<BooleanColumn*>(ColumnHelper::get_data_column(columns[3].get()));
     for (auto i: valid_indexes) {
-        if (src[2]->get(i).is_null()) {
+        if (src[2]->is_null(i)) {
             calendar_id->append_default();
             is_calendar_id_null->append(true);
         } else {
