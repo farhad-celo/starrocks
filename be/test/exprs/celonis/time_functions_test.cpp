@@ -485,23 +485,6 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_factory_calendar_with
         auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_units->append_datum("HOURS");
-        // 01/01/1970 [8:00 am, 5:00 pm]
-        calendars->append_datum(
-                DatumArray{
-                        R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"});
-        calendar_ids->append_datum(kNullDatum);
-        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
-                                                                                      calendar_ids}).value();
-        ASSERT_EQ(timestamps->size(), result->size());
-        EXPECT_EQ(0L, result->get(0).get_int64());
-    }
-    {
-        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
-        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
-        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
         time_units->append_datum("MILLISECONDS");
         calendars->append_datum(
@@ -753,32 +736,6 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_workday_calendar_with
         auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        timestamps->append_datum(TimestampValue::create(1971, 2, 1, 0, 0, 0));
-        time_units->append_datum("SECONDS");
-        calendars->append_datum(
-                DatumArray{
-                        R"({"workday_calendar": {)",
-                        R"("entries": { "year": 1970, )",
-                        get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
-                        R"(, calendar_id: "id1"},)",
-                        R"("entries": { "year": 1970, )",
-                        get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
-                        R"(, calendar_id: "id2"},)",
-                        R"("entries": { "year": 1971, )",
-                        get_is_workdays_str(365, {5, 7}).c_str(),
-                        R"(, calendar_id: "id1"},)",
-                        R"( }})"});
-        calendar_ids->append_datum(kNullDatum);
-        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
-                                                                                      calendar_ids}).value();
-        ASSERT_EQ(timestamps->size(), result->size());
-        EXPECT_EQ(0L, result->get(0).get_int64());
-    }
-    {
-        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
-        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
-        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(1990, 2, 1, 0, 0, 0));
         time_units->append_datum("SECONDS");
         calendars->append_datum(
@@ -896,6 +853,45 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_null_columns) {
     }
 }
 
+TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_calendar_id_is_ignored) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        // 01/01/1970 [8:00 am, 5:00 pm]
+        calendars->append_datum(
+                DatumArray{R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"});
+        calendar_ids->append_datum("id1");
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(9L, result->get(0).get_int64());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        // Set 01/01/1970 as workday
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": )",
+                        R"({ "entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0}).c_str(),
+                        R"( } }})"});
+        calendar_ids->append_datum("id1");
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(24L, result->get(0).get_int64());
+    }
+}
+
 TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_invalid_time_unit) {
     auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
     auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
@@ -946,6 +942,100 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_calendar) {
                                                                                       calendar_ids});
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().get_error_msg(), "Calendar specification column is malformed.");
+    }
+    // mixed calendar_id entry and no-calendar_id entry
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        calendars->append_datum(
+                DatumArray{R"({"factory_calendar": {)",
+                           R"("entries": {"start_date": -11, "end_date": -1, "calendar_id": "id1"}, )",
+                           R"("entries": {"start_date": -40, "end_date": -20, "calendar_id": "id2"}, )",
+                           R"("entries": {"start_date": -300, "end_date": -20}, )",
+                           R"( }})"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(),
+                  "In FactoryCalendar, ensure that the calendar_id is either set or not set in all entries.");
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1971, 2, 1, 0, 0, 0));
+        time_units->append_datum("DAYS");
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": {)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                        R"(, calendar_id: "id2"},)",
+                        R"("entries": { "year": 1971, )",
+                        get_is_workdays_str(365, {5, 7}).c_str(),
+                        R"(},)",
+                        R"( }})"});
+        calendar_ids->append_datum("id1");
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(),
+                  "In WorkdayCalendar, ensure that the calendar_id is either set or not set in all entries.");
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_calendar_id_not_provided) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        // 01/01/1970 [8:00 am, 5:00 pm]
+        calendars->append_datum(
+                DatumArray{
+                        R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "Calendar ID column not provided.");
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1971, 2, 1, 0, 0, 0));
+        time_units->append_datum("SECONDS");
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": {)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                        R"(, calendar_id: "id2"},)",
+                        R"("entries": { "year": 1971, )",
+                        get_is_workdays_str(365, {5, 7}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"( }})"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "Calendar ID column not provided.");
     }
 }
 
