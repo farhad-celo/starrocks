@@ -1049,6 +1049,23 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_invalid_weekday_calen
         time_units->append_datum("HOURS");
         calendars->append_datum(DatumArray{
                 R"({"weekday_calendar": {)",
+                R"("monday": {"use_day": true, "shift": {"begin": 0, "end": 1000} }, "calendar_id": "id" )",
+                R"(} })"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "calendar_id should not be set in WeekdayCalendar.");
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
                 R"("monday": {"use_day": true, "shift": {"begin": -1, "end": 1000} })",
                 R"(} })"});
         calendar_ids->append_datum(kNullDatum);
@@ -1129,19 +1146,35 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_calendar_id_provided)
     }
 }
 
-TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_intersect_calendar_not_supported) {
-    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
-    auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
-    auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-    auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-    timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-    time_units->append_datum("HOURS");
-    calendars->append_datum(DatumArray{R"({"intersect_calendar": {"calendar1":  { "weekday_calendar": {} }} })"});
-    calendar_ids->append_datum(kNullDatum);
-    const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
-                                                                                  calendar_ids});
-    ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "Intersect calendar is not supported.");
+TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_unsupported_calendar) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray{R"({"intersect_calendar": {"calendar1":  { "weekday_calendar": {} }} })"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "Intersect calendar is not supported.");
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("SECONDS");
+        calendars->append_datum(DatumArray{R"({"multi_weekday_calendar": {"calendars":  {}} })"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "MultiWeekday calendar is not supported.");
+    }
 }
 
 TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_intersect_calendar) {

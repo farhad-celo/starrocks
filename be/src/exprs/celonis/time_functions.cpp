@@ -445,6 +445,9 @@ static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
         if (calendar_id.has_value()) {
             return Status::InvalidArgument("Calendar ID column should not be set for weekday calendar.");
         }
+        if (calendar.weekday_calendar().has_calendar_id()) {
+            return Status::InvalidArgument("calendar_id should not be set in WeekdayCalendar.");
+        }
         RETURN_IF_ERROR(validate_weekday_calendar(calendar.weekday_calendar()));
     }
     if (calendar.has_factory_calendar()) {
@@ -467,6 +470,9 @@ static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
     }
     if (calendar.has_intersect_calendar()) {
         return Status::InvalidArgument("Intersect calendar is not supported.");
+    }
+    if (calendar.has_multi_weekday_calendar()) {
+        return Status::InvalidArgument("MultiWeekday calendar is not supported.");
     }
     return Status::OK();
 }

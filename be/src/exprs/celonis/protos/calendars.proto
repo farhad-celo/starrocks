@@ -19,8 +19,12 @@ message WeekdayCalendar {
   optional WeekdayCalendarEntry friday = 5;
   optional WeekdayCalendarEntry saturday = 6;
   optional WeekdayCalendarEntry sunday = 7;
+  optional string calendar_id = 8;
 }
 
+message MultiWeekdayCalendar {
+  repeated WeekdayCalendar calendars = 1;
+}
 
 message FactoryCalendarEntry {
   optional int64 start_date = 1;
@@ -53,6 +57,7 @@ message Calendar {
     WeekdayCalendar weekday_calendar = 2;
     FactoryCalendar factory_calendar = 3;
     WorkdayCalendar workday_calendar = 4;
+    MultiWeekdayCalendar multi_weekday_calendar = 5;
   }
 }
 
