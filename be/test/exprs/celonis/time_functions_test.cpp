@@ -2579,4 +2579,212 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_malformed_calendar) {
     }
 }
 
+TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_without_calendar) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+        add_values->append_datum(26L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(1970, 1, 2, 4, 0, 0), result->get(0).get_timestamp());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+        add_values->append_datum(365L);
+        time_units->append_datum("DAYS");
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(1971, 1, 1, 2, 0, 0), result->get(0).get_timestamp());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 10, 10, 1, 2));
+        add_values->append_datum(-5L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(1970, 1, 10, 5, 1, 2), result->get(0).get_timestamp());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 10, 10, 1, 2));
+        add_values->append_datum(120L);
+        time_units->append_datum("MINUTES");
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(1970, 1, 10, 12, 1, 2), result->get(0).get_timestamp());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 10, 10, 1, 2));
+        add_values->append_datum(-3662L);
+        time_units->append_datum("SECONDS");
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(1970, 1, 10, 9, 0, 0), result->get(0).get_timestamp());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_null_input) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(kNullDatum);
+        add_values->append_datum(26L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+        add_values->append_datum(kNullDatum);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+        add_values->append_datum(26L);
+        time_units->append_datum(kNullDatum);
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+        add_values->append_datum(26L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(kNullDatum);
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_invalid_input) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+        add_values->append_datum(26L);
+        time_units->append_datum("UNKNOWN");
+        calendars->append_datum(DatumArray());
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(),
+                  "time unit must be one of DAYS/WORKDAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+        add_values->append_datum(26L);
+        time_units->append_datum("DAYS");
+        calendars->append_datum(DatumArray{kNullDatum});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "Calendar array should not have null elements.");
+    }
+}
+
 } // namespace starrocks

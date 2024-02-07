@@ -38,12 +38,19 @@ public:
      */
     DEFINE_VECTORIZED_FN(make_intersect_calendar);
 
+    /**
+     * @param: [timestamp, add_value, time_unit, calendar_specification, calendar_id_column]
+     * @paramType: [DATETIME, BIGINT, VARCHAR, ARRAY_VARCHAR, VARCHAR]
+     * @return: DATETIME
+     */
+    DEFINE_VECTORIZED_FN(add_timeunits_calendar);
+
     static Status in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status in_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
-
-    static Status remap_timestamps_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status
+    remap_timestamps_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status remap_timestamps_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
