@@ -13,7 +13,7 @@ template<bool element_has_null>
 ColumnPtr _celonis_match_activities_impl(FunctionContext* context, const Column& elements, const UInt32Column& offsets,
                                          const NullColumn::Container* null_offsets,
                                          const NullColumn::Container* activity_array_nulls,
-                                         const SliceHashSet& nodes) {
+                                         const SliceHashSet& nodes, const SliceHashSet& excluding_nodes) {
     const size_t num_array = offsets.size() - 1;
     auto offsets_ptr = offsets.get_data().data();
 
@@ -21,7 +21,7 @@ ColumnPtr _celonis_match_activities_impl(FunctionContext* context, const Column&
     result.reserve(num_array);
 
     using ValueType = RunTimeCppType<TYPE_VARCHAR>;
-    auto elements_ptr = (const ValueType *) (elements.raw_data());
+    auto elements_ptr = (const ValueType*) (elements.raw_data());
     // Collects the nodes that pass any of the 'NODES' filter.
     SliceHashSet passing_nodes;
     passing_nodes.reserve(nodes.size());
@@ -35,7 +35,8 @@ ColumnPtr _celonis_match_activities_impl(FunctionContext* context, const Column&
         size_t offset = offsets_ptr[i];
         size_t array_size = offsets_ptr[i + 1] - offsets_ptr[i];
         passing_nodes.clear();
-
+        bool has_exclude_node = false;
+        bool has_non_null = false;
         for (size_t index = 0; index < array_size; ++index) {
             if constexpr (element_has_null) {
                 // Nulls are ignored
@@ -43,17 +44,18 @@ ColumnPtr _celonis_match_activities_impl(FunctionContext* context, const Column&
                     continue;
                 }
             }
-            const auto &value = elements_ptr[offset + index];
+            const auto& value = elements_ptr[offset + index];
+            has_non_null = true;
             if (nodes.count(value)) {
                 passing_nodes.insert(value);
-                if (passing_nodes.size() == nodes.size()) {
-                    // All nodes in the filter have been matched.
-                    break;
-                }
+            }
+            if (excluding_nodes.count(value)) {
+                has_exclude_node = true;
+                break;
             }
         }
 
-        if (passing_nodes.size() == nodes.size()) {
+        if (passing_nodes.size() == nodes.size() && !has_exclude_node && has_non_null) {
             result.append(1L);
         } else {
             result.append(0L);
@@ -63,8 +65,9 @@ ColumnPtr _celonis_match_activities_impl(FunctionContext* context, const Column&
 }
 } // namespace
 
-StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities(FunctionContext* context, const Columns& columns) {
-    const Column* activity_array =  columns[0].get();
+StatusOr<ColumnPtr>
+CelonisMatchActivitiesFunctions::celonis_match_activities(FunctionContext* context, const Columns& columns) {
+    const Column* activity_array = columns[0].get();
     const NullableColumn* nullable_activity_array = nullptr;
     const NullColumn::Container* activity_array_nulls = nullptr;
 
@@ -93,10 +96,9 @@ StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities(Fu
     // columns[5] -- excluding any of specified activities
     // columns[6] -- NODES_ANY
 
-    // TODO(a.gubichev): for now, only support flowing activities.
+    // TODO(y.zhang): for now, only support flowing activities and excluding activities
     if (columns[1]->get(0).get_array().size() != 0 ||
         columns[3]->get(0).get_array().size() != 0 ||
-        columns[4]->get(0).get_array().size() != 0 ||
         columns[5]->get(0).get_array().size() != 0 ||
         columns[6]->get(0).get_array().size() != 0) {
         std::stringstream error;
@@ -104,16 +106,23 @@ StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities(Fu
         throw std::runtime_error(error.str());
     }
 
-    auto node_array_col =  columns[2]->get(0).get_array();
+    auto node_array_col = columns[2]->get(0).get_array();
     SliceHashSet nodes;
     for (size_t i = 0; i < node_array_col.size(); ++i) {
         nodes.insert(node_array_col[i].get_slice());
     }
 
-    if (activity_nulls != nullptr) {
-        _celonis_match_activities_impl<true>(context, *activity_elements, activity_offsets, activity_nulls, activity_array_nulls, nodes);
+    auto excluding_node_array = columns[4]->get(0).get_array();
+    SliceHashSet excluding_nodes;
+    for (size_t i = 0; i < excluding_node_array.size(); ++i) {
+        excluding_nodes.insert(excluding_node_array[i].get_slice());
     }
-    return _celonis_match_activities_impl<false>(context, *activity_elements, activity_offsets, activity_nulls, activity_array_nulls, nodes);
+    if (activity_nulls != nullptr) {
+        return _celonis_match_activities_impl<true>(context, *activity_elements, activity_offsets, activity_nulls,
+                                                    activity_array_nulls, nodes, excluding_nodes);
+    }
+    return _celonis_match_activities_impl<false>(context, *activity_elements, activity_offsets, activity_nulls,
+                                                 activity_array_nulls, nodes, excluding_nodes);
 }
 
 } // namespace starrocks
