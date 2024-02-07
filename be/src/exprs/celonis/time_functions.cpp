@@ -17,6 +17,7 @@ static const int64_t NANOS_PER_MILLIS = 1000000;
 
 static const std::unordered_map<std::string, int64_t> TIME_UNIT_TO_MS = {
         {"DAYS",         86400000L},
+        {"WORKDAYS",     86400000L},
         {"HOURS",        3600000L},
         {"MINUTES",      60000L},
         {"SECONDS",      1000L},
@@ -31,6 +32,78 @@ static const int64_t NUM_MICROSECONDS_PER_MILLISECONDS = 1000L;
 
 // SR places an upper limit of 1M of STRING. We use 900K which is less than 1M.
 static const size_t MAX_STRING_SIZE = 900000;
+}
+
+static void truncate_timestamp(const std::string& time_unit, TimestampValue& timestamp) {
+    if (time_unit == "DAYS" || time_unit == "WORKDAYS") {
+        timestamp.trunc_to_day();
+    } else if (time_unit == "HOURS") {
+        timestamp.trunc_to_hour();
+    } else if (time_unit == "MINUTES") {
+        timestamp.trunc_to_minute();
+    } else if (time_unit == "SECONDS") {
+        timestamp.trunc_to_second();
+    }
+}
+
+static int64_t floor_to_nearest_multiple(int64_t num, int64_t multiple) {
+    if (multiple == 0) {
+        return num;
+    }
+    int64_t floored_num = (num / multiple) * multiple;
+    if (num < 0 && num % multiple != 0) {
+        floored_num -= multiple;
+    }
+    return floored_num;
+}
+
+static int64_t ceil_to_nearest_multiple(int64_t num, int64_t multiple) {
+    if (multiple == 0) {
+        return num;
+    }
+    int64_t ceiled_num = (num / multiple) * multiple;
+    if (num > 0 && num % multiple != 0) {
+        ceiled_num += multiple;
+    }
+    return ceiled_num;
+}
+
+static void round_weekday_calendar_entry(celonis::accelerator::WeekdayCalendarEntry* entry, int64_t multiple) {
+    if (entry->use_day() && entry->shift().begin() <= entry->shift().end()) {
+        entry->mutable_shift()->set_begin(floor_to_nearest_multiple(entry->shift().begin(), multiple));
+        entry->mutable_shift()->set_end(ceil_to_nearest_multiple(entry->shift().end(), multiple));
+    }
+}
+
+static void round_weekday_calendar(celonis::accelerator::WeekdayCalendar& weekday_calendar, int64_t multiple) {
+    round_weekday_calendar_entry(weekday_calendar.mutable_monday(), multiple);
+    round_weekday_calendar_entry(weekday_calendar.mutable_tuesday(), multiple);
+    round_weekday_calendar_entry(weekday_calendar.mutable_wednesday(), multiple);
+    round_weekday_calendar_entry(weekday_calendar.mutable_thursday(), multiple);
+    round_weekday_calendar_entry(weekday_calendar.mutable_friday(), multiple);
+    round_weekday_calendar_entry(weekday_calendar.mutable_saturday(), multiple);
+    round_weekday_calendar_entry(weekday_calendar.mutable_sunday(), multiple);
+}
+
+static void round_calendar(celonis::accelerator::Calendar& calendar_proto, int64_t multiple) {
+    if (calendar_proto.has_weekday_calendar()) {
+        round_weekday_calendar(*calendar_proto.mutable_weekday_calendar(), multiple);
+    } else if (calendar_proto.has_multi_weekday_calendar()) {
+        auto* multi_weekday_calendar = calendar_proto.mutable_multi_weekday_calendar();
+        for (auto& weekday_calendar: *multi_weekday_calendar->mutable_calendars()) {
+            round_weekday_calendar(weekday_calendar, multiple);
+        }
+    } else if (calendar_proto.has_factory_calendar()) {
+        auto* factory_calendar = calendar_proto.mutable_factory_calendar();
+        for (auto& entry: *factory_calendar->mutable_entries()) {
+            entry.set_start_date(floor_to_nearest_multiple(entry.start_date(), multiple));
+            entry.set_end_date(ceil_to_nearest_multiple(entry.end_date(), multiple));
+        }
+    } else if (calendar_proto.has_intersect_calendar()) {
+        auto* intersect_calendar = calendar_proto.mutable_intersect_calendar();
+        round_calendar(*intersect_calendar->mutable_calendar1(), multiple);
+        round_calendar(*intersect_calendar->mutable_calendar2(), multiple);
+    }
 }
 
 StatusOr<ColumnPtr>
@@ -546,9 +619,11 @@ static StatusOr<int64_t> convert_time_unit(const std::string& time_unit, int64_t
 }
 
 static StatusOr<std::optional<int64_t>>
-remap_timestamp_calendar(const TimestampValue& timestamp, const std::string& time_unit,
+remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::string& time_unit,
                          const std::string& calendar_json_string,
-                         std::optional<std::string>& calendar_id) {
+                         std::optional<std::string>& calendar_id, bool round_time = false) {
+    TimestampValue timestamp = input_timestamp;
+    truncate_timestamp(time_unit, timestamp);
     int64_t milliseconds = 0L;
     celonis::accelerator::Calendar calendar_proto;
     if (calendar_json_string.empty()) {
@@ -563,6 +638,10 @@ remap_timestamp_calendar(const TimestampValue& timestamp, const std::string& tim
             return Status::InvalidArgument("Calendar specification column is malformed.");
         }
         RETURN_IF_ERROR(validate_calendar(calendar_proto, calendar_id));
+        if (round_time) {
+            int64_t multiplier = TIME_UNIT_TO_MS.at(time_unit);
+            round_calendar(calendar_proto, multiplier);
+        }
         Calendar calendar(calendar_proto);
         if (calendar.requires_calendar_id() && !calendar_id.has_value()) {
             return Status::InvalidArgument("Calendar ID column not provided.");
@@ -613,6 +692,61 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionCon
         }
         ASSIGN_OR_RETURN(const int64_t value, convert_time_unit(time_unit, milliseconds));
         result.append(value);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::timeunits_between_calendar([[maybe_unused]] FunctionContext* context,
+                                                                     const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 5);
+    size_t n_rows = columns[0]->size();
+    ColumnViewer from_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnViewer to_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
+    ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
+    ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
+    UnnestedArrayData calendar_array_data = prepare_array_input(columns[3].get());
+    if (calendar_array_data.null_elements != nullptr) {
+        return Status::InvalidArgument("Calendar array should not have null elements.");
+    }
+    DCHECK(calendar_array_data.elements->is_binary());
+    const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *calendar_array_data.elements).get_data().data();
+    const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
+
+    ColumnBuilder<TYPE_DOUBLE> result(n_rows);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (from_timestamp_viewer.is_null(row) || to_timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
+            columns[3]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        std::string time_unit = time_unit_viewer.value(row).to_string();
+        if (TIME_UNIT_TO_MS.find(time_unit) == TIME_UNIT_TO_MS.end()) {
+            return Status::InvalidArgument(
+                    "time unit must be one of DAYS/WORKDAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
+        }
+        auto from_timestamp = from_timestamp_viewer.value(row);
+        auto to_timestamp = to_timestamp_viewer.value(row);
+        size_t start = calendar_offsets[row];
+        size_t end = calendar_offsets[row + 1];
+        std::string calendar_json_string;
+        std::optional<std::string> calendar_id = std::nullopt;
+        if (!calendar_id_viewer.is_null(row)) {
+            calendar_id = calendar_id_viewer.value(row).to_string();
+        }
+        for (size_t id = start; id < end; ++id) {
+            calendar_json_string += calendars[id].to_string();
+        }
+        ASSIGN_OR_RETURN(const std::optional<int64_t> from_time,
+                         remap_timestamp_calendar(from_timestamp, time_unit, calendar_json_string, calendar_id, true));
+        ASSIGN_OR_RETURN(const std::optional<int64_t> to_time,
+                         remap_timestamp_calendar(to_timestamp, time_unit, calendar_json_string, calendar_id, true));
+        if (from_time.has_value() && to_time.has_value()) {
+            double diff = to_time.value() - from_time.value();
+            result.append(diff);
+        } else {
+            result.append_null();
+        }
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
@@ -907,7 +1041,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
         return Status::InvalidArgument("calendar1 array must not contain null values.");
     }
     DCHECK(calendar1_array_data.elements->is_binary());
-    const auto& calendars1 = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+    const auto& calendars1 = down_cast<const RunTimeColumnType <TYPE_VARCHAR>&>(
             *calendar1_array_data.elements).get_data().data();
     const auto& calendar1_offsets = calendar1_array_data.offsets->get_data().data();
 
@@ -916,7 +1050,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
         return Status::InvalidArgument("calendar2 array must not contain null values.");
     }
     DCHECK(calendar2_array_data.elements->is_binary());
-    const auto& calendars2 = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+    const auto& calendars2 = down_cast<const RunTimeColumnType <TYPE_VARCHAR>&>(
             *calendar2_array_data.elements).get_data().data();
     const auto& calendar2_offsets = calendar2_array_data.offsets->get_data().data();
 
@@ -927,8 +1061,10 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
             output_column->append_nulls(1);
             continue;
         }
-        StatusOr<celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(calendars1, calendar1_offsets, row);
-        StatusOr<celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(calendars2, calendar2_offsets, row);
+        StatusOr <celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(calendars1, calendar1_offsets,
+                                                                                     row);
+        StatusOr <celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(calendars2, calendar2_offsets,
+                                                                                     row);
         if (!status_or_calendar1.ok() || !status_or_calendar2.ok()) {
             output_column->append_nulls(1);
             continue;

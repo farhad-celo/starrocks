@@ -17,6 +17,13 @@ public:
     DEFINE_VECTORIZED_FN(remap_timestamps_calendar);
 
     /**
+     * @param: [from_timestamp, to_timestamp, time_unit, calendar_specification, calendar_id_column]
+     * @paramType: [DATETIME, DATETIME, VARCHAR, ARRAY_VARCHAR, VARCHAR]
+     * @return: DOUBLE
+     */
+    DEFINE_VECTORIZED_FN(timeunits_between_calendar);
+
+    /**
      * @param: [timestamp, calendar_specification, calendar_id_column]
      * @paramType: [DATETIME, ARRAY_VARCHAR, VARCHAR]
      * @return: BIGINT
