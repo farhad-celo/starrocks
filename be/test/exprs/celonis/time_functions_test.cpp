@@ -1969,8 +1969,7 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_prepare) {
                         R"( }})"});
         calendar_ids->append_datum("id1");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
-        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->set_constant_columns({nullptr, calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
@@ -2007,8 +2006,7 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_prepare) {
         calendar_ids->append_datum("id1");
         calendar_ids->append_datum("id2");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 2);
-        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->set_constant_columns({nullptr, calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
@@ -2034,8 +2032,7 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_prepare) {
         calendars->append_datum(DatumArray{});
         calendar_ids->append_datum("id1");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
-        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->set_constant_columns({nullptr, calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
@@ -2060,8 +2057,7 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_prepare) {
         calendars->append_datum(kNullDatum);
         calendar_ids->append_datum("id1");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
-        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->set_constant_columns({nullptr, calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
@@ -2086,8 +2082,7 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_prepare) {
         calendars->append_datum(DatumArray{"Unknown"});
         calendar_ids->append_datum("id1");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
-        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->set_constant_columns({nullptr, calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
@@ -2106,8 +2101,7 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_prepare) {
         calendars->append_datum(DatumArray{kNullDatum});
         calendar_ids->append_datum("id1");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
-        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->set_constant_columns({nullptr, calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});

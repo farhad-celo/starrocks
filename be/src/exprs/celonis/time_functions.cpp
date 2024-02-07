@@ -875,15 +875,16 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
 }
 
 StatusOr<ColumnPtr> in_calendar_const([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns,
-                                      const Calendar* calendar) {
+                                      const CalendarState* calendar_state) {
     DCHECK_EQ(columns.size(), 3);
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
 
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    const Calendar& calendar = calendar_state->calendar;
     for (size_t row = 0; row < n_rows; ++row) {
-        if (timestamp_viewer.is_null(row) || columns[1]->is_null(row)) {
+        if (calendar_state->is_null || calendar_state->is_empty || timestamp_viewer.is_null(row)) {
             result.append_null();
             continue;
         }
@@ -892,7 +893,7 @@ StatusOr<ColumnPtr> in_calendar_const([[maybe_unused]] FunctionContext* context,
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
-        const bool is_in = calendar->is_timestamp_in_calendar(timestamp, calendar_id);
+        const bool is_in = calendar.is_timestamp_in_calendar(timestamp, calendar_id);
         result.append(is_in ? 1L : 0L);
     }
     return result.build(ColumnHelper::is_all_const(columns));
@@ -903,11 +904,12 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar([[maybe_unused]] FunctionC
     if (context == nullptr) {
         return in_calendar_general(context, columns);
     }
-    auto* calendar = reinterpret_cast<Calendar*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    if (calendar == nullptr) {
+    auto* calendar_state = reinterpret_cast<CalendarState*>(context->get_function_state(
+            FunctionContext::FRAGMENT_LOCAL));
+    if (calendar_state == nullptr) {
         return in_calendar_general(context, columns);
     }
-    return in_calendar_const(context, columns, calendar);
+    return in_calendar_const(context, columns, calendar_state);
 }
 
 Status CelonisTimeFunctions::in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
@@ -923,6 +925,8 @@ Status CelonisTimeFunctions::in_calendar_prepare(FunctionContext* context, Funct
     }
 
     if (calendar_column->is_null(0)) {
+        auto* calendar_state = new CalendarState{Calendar(), true, false};
+        context->set_function_state(scope, calendar_state);
         return Status::OK();
     }
 
@@ -936,6 +940,8 @@ Status CelonisTimeFunctions::in_calendar_prepare(FunctionContext* context, Funct
         }
     }
     if (calendar_json_string.empty()) {
+        auto* calendar_state = new CalendarState{Calendar(), false, true};
+        context->set_function_state(scope, calendar_state);
         return Status::OK();
     }
     celonis::accelerator::Calendar calendar_proto;
@@ -944,16 +950,17 @@ Status CelonisTimeFunctions::in_calendar_prepare(FunctionContext* context, Funct
         return Status::InvalidArgument("[prepare] Calendar specification column is malformed.");
     }
     RETURN_IF_ERROR(validate_calendar(calendar_proto));
-    auto* calendar = new Calendar(calendar_proto);
-    context->set_function_state(scope, calendar);
+    auto* calendar_state = new CalendarState{Calendar(calendar_proto), false, false};
+    context->set_function_state(scope, calendar_state);
     return Status::OK();
 }
 
 Status CelonisTimeFunctions::in_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
-        auto* calendar = reinterpret_cast<Calendar*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-        if (calendar != nullptr) {
-            delete calendar;
+        auto* calendar_state = reinterpret_cast<CalendarState*>(context->get_function_state(
+                FunctionContext::FRAGMENT_LOCAL));
+        if (calendar_state != nullptr) {
+            delete calendar_state;
         }
     }
     return Status::OK();
