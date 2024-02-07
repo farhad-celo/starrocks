@@ -676,6 +676,25 @@ public class ScalarOperatorFunctions {
     }
 
     @ConstantFunction.List(list = {
+            @ConstantFunction(name = "celonis_timestamp_millis", argTypes = {INT}, returnType = DATETIME, isMonotonic = true),
+            @ConstantFunction(name = "celonis_timestamp_millis", argTypes = {BIGINT}, returnType = DATETIME, isMonotonic = true)
+    })
+    public static ConstantOperator celonisTimestampMillis(ConstantOperator unixTimeMillis) throws AnalysisException {
+        long value = 0;
+        if (unixTimeMillis.getType().isInt()) {
+            value = unixTimeMillis.getInt();
+        } else {
+            value = unixTimeMillis.getBigint();
+        }
+        if (value < 0 || value > TimeUtils.MAX_UNIX_TIMESTAMP * 1000) {
+            throw new AnalysisException(
+                    "unixtime_millis should larger than zero and less than " + TimeUtils.MAX_UNIX_TIMESTAMP * 1000);
+        }
+        return ConstantOperator.createDatetime(
+                LocalDateTime.ofInstant(Instant.ofEpochMilli(value), TimeUtils.getTimeZone().toZoneId()));
+    }
+
+    @ConstantFunction.List(list = {
             @ConstantFunction(name = "from_unixtime", argTypes = {INT}, returnType = VARCHAR, isMonotonic = true),
             @ConstantFunction(name = "from_unixtime", argTypes = {BIGINT}, returnType = VARCHAR, isMonotonic = true)
     })
