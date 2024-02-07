@@ -193,6 +193,9 @@ public:
     Calendar() = default;
 
     Calendar(const celonis::accelerator::Calendar& calendar_proto) {
+        if (calendar_proto.has_multi_weekday_calendar()) {
+            handle_multi_weekday_calendar(calendar_proto.multi_weekday_calendar());
+        }
         if (calendar_proto.has_weekday_calendar()) {
             handle_weekday_calendar(calendar_proto.weekday_calendar());
         }
@@ -222,7 +225,7 @@ public:
             auto itr = id_to_time_ranges_.find(calendar_id.value());
             if (itr != id_to_time_ranges_.end()) {
                 for (const auto& cur_time_range: itr->second) {
-                    rv += cur_time_range.compute_overlap(time_range);
+                    rv += cur_time_range->compute_overlap(time_range);
                 }
             }
         }
@@ -245,7 +248,7 @@ public:
             auto itr = id_to_time_ranges_.find(calendar_id.value());
             if (itr != id_to_time_ranges_.end()) {
                 for (const auto& cur_time_range: itr->second) {
-                    if (cur_time_range.is_ms_in(ms)) {
+                    if (cur_time_range->is_ms_in(ms)) {
                         return true;
                     }
                 }
@@ -255,17 +258,28 @@ public:
     }
 
 private:
-    void handle_weekday_calendar(const celonis::accelerator::WeekdayCalendar& weekday_calendar) {
-        handle_weekday_calendar_entry(weekday_calendar.monday(), 0);
-        handle_weekday_calendar_entry(weekday_calendar.tuesday(), 1);
-        handle_weekday_calendar_entry(weekday_calendar.wednesday(), 2);
-        handle_weekday_calendar_entry(weekday_calendar.thursday(), 3);
-        handle_weekday_calendar_entry(weekday_calendar.friday(), 4);
-        handle_weekday_calendar_entry(weekday_calendar.saturday(), 5);
-        handle_weekday_calendar_entry(weekday_calendar.sunday(), 6);
+    void handle_multi_weekday_calendar(const celonis::accelerator::MultiWeekdayCalendar& multi_weekday_calendar) {
+        for (const auto& calendar: multi_weekday_calendar.calendars()) {
+            handle_weekday_calendar(calendar);
+        }
     }
 
-    void handle_weekday_calendar_entry(const celonis::accelerator::WeekdayCalendarEntry& entry, int index) {
+    void handle_weekday_calendar(const celonis::accelerator::WeekdayCalendar& weekday_calendar) {
+        std::optional<std::string> calendar_id = std::nullopt;
+        if (weekday_calendar.has_calendar_id()) {
+            calendar_id = weekday_calendar.calendar_id();
+        }
+        handle_weekday_calendar_entry(weekday_calendar.monday(), 0, calendar_id);
+        handle_weekday_calendar_entry(weekday_calendar.tuesday(), 1, calendar_id);
+        handle_weekday_calendar_entry(weekday_calendar.wednesday(), 2, calendar_id);
+        handle_weekday_calendar_entry(weekday_calendar.thursday(), 3, calendar_id);
+        handle_weekday_calendar_entry(weekday_calendar.friday(), 4, calendar_id);
+        handle_weekday_calendar_entry(weekday_calendar.saturday(), 5, calendar_id);
+        handle_weekday_calendar_entry(weekday_calendar.sunday(), 6, calendar_id);
+    }
+
+    void handle_weekday_calendar_entry(const celonis::accelerator::WeekdayCalendarEntry& entry, int index,
+                                       std::optional<std::string> calendar_id) {
         int64_t begin = entry.shift().begin();
         int64_t end = entry.shift().end();
         if (entry.use_day() && begin < end) {
@@ -273,7 +287,12 @@ private:
             std::vector<int> add_days = {4, 5, 6, 0, 1, 2, 3};
             begin += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
             end += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
-            time_ranges_.push_back(std::make_shared<PeriodicTimeRange>(begin, end, period));
+            if (calendar_id.has_value()) {
+                id_to_time_ranges_[calendar_id.value()].push_back(
+                        std::make_shared<PeriodicTimeRange>(begin, end, period));
+            } else {
+                time_ranges_.push_back(std::make_shared<PeriodicTimeRange>(begin, end, period));
+            }
         }
     }
 
@@ -298,7 +317,10 @@ private:
             time_ranges_.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
         }
         for (const auto& kv: id_to_time_ranges) {
-            id_to_time_ranges_[kv.first].insert(id_to_time_ranges_[kv.first].end(), kv.second.begin(), kv.second.end());
+            auto& cur_time_ranges = id_to_time_ranges_[kv.first];
+            for (const auto& time_range: kv.second) {
+                cur_time_ranges.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
+            }
         }
     }
 
@@ -346,7 +368,7 @@ private:
         }
         for (const auto& kv: year_to_bitset_by_id) {
             std::string id = kv.first;
-            auto& cur_time_ranges = id_to_time_ranges_[id];
+            auto& cur_time_ranges = id_to_time_ranges[id];
             for (const auto& bitset_by_year: kv.second) {
                 for (const auto& time_range: to_time_ranges(bitset_by_year.first, bitset_by_year.second)) {
                     cur_time_ranges.push_back(time_range);
@@ -361,12 +383,15 @@ private:
             time_ranges_.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
         }
         for (const auto& kv: id_to_time_ranges) {
-            id_to_time_ranges_[kv.first].insert(id_to_time_ranges_[kv.first].end(), kv.second.begin(), kv.second.end());
+            auto& cur_time_ranges = id_to_time_ranges_[kv.first];
+            for (const auto& time_range: kv.second) {
+                cur_time_ranges.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
+            }
         }
     }
 
     std::vector<std::shared_ptr<TimeRange>> time_ranges_;
-    std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges_;
+    std::unordered_map<std::string, std::vector<std::shared_ptr<TimeRange>>> id_to_time_ranges_;
 };
 
 struct CalendarState {
@@ -404,6 +429,29 @@ static Status validate_weekday_calendar(const celonis::accelerator::WeekdayCalen
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.friday()));
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.saturday()));
     RETURN_IF_ERROR(validate_weekday_calendar_entry(weekday_calendar.sunday()));
+    return Status::OK();
+}
+
+static Status
+validate_multi_weekday_calendar(const celonis::accelerator::MultiWeekdayCalendar& multi_weekday_calendar) {
+    std::unordered_set<std::string> calendar_ids;
+    int has_calendar_id = -1;
+    for (const auto& weekday_calendar: multi_weekday_calendar.calendars()) {
+        if (has_calendar_id == -1) {
+            has_calendar_id = weekday_calendar.has_calendar_id();
+        } else {
+            if (has_calendar_id != weekday_calendar.has_calendar_id()) {
+                return Status::InvalidArgument(
+                        "In MultiWeekdayCalendar, ensure that the calendar_id is either set or not set in all calendars.");
+            }
+        }
+        auto result = calendar_ids.insert(weekday_calendar.calendar_id());
+        if (!result.second) {
+            return Status::InvalidArgument(
+                    "In MultiWeekdayCalendar, two calendars must not share the same calendar_id.");
+        }
+        RETURN_IF_ERROR(validate_weekday_calendar(weekday_calendar));
+    }
     return Status::OK();
 }
 
@@ -461,6 +509,9 @@ static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
         }
         RETURN_IF_ERROR(validate_weekday_calendar(calendar.weekday_calendar()));
     }
+    if (calendar.has_multi_weekday_calendar()) {
+        RETURN_IF_ERROR(validate_multi_weekday_calendar(calendar.multi_weekday_calendar()));
+    }
     if (calendar.has_factory_calendar()) {
         RETURN_IF_ERROR(validate_factory_calendar(calendar.factory_calendar()));
     }
@@ -481,9 +532,6 @@ static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
     }
     if (calendar.has_intersect_calendar()) {
         return Status::InvalidArgument("Intersect calendar is not supported.");
-    }
-    if (calendar.has_multi_weekday_calendar()) {
-        return Status::InvalidArgument("MultiWeekday calendar is not supported.");
     }
     return Status::OK();
 }
