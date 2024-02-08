@@ -16,7 +16,7 @@ public:
     }
 
 private:
-    template <bool NullableElement, typename ElementColumn>
+    template<bool NullableElement, typename ElementColumn>
     static ColumnPtr _process(const ElementColumn& elements, const UInt32Column& offsets,
                               const NullColumn::Container* null_map_elements) {
         const size_t num_array = offsets.size() - 1;
@@ -26,7 +26,7 @@ private:
         auto* result_ptr = result->get_data().data();
 
         auto offsets_ptr = offsets.get_data().data();
-        [[maybe_unused]] auto elements_ptr = (const typename ElementColumn::ValueType*)(elements.raw_data());
+        [[maybe_unused]] auto elements_ptr = (const typename ElementColumn::ValueType*) (elements.raw_data());
 
         [[maybe_unused]] auto is_null = [](const NullColumn::Container* null_map, size_t idx) -> bool {
             return (*null_map)[idx] != 0;
@@ -72,7 +72,7 @@ private:
         return result;
     }
 
-    template <bool NullableElement>
+    template<bool NullableElement>
     static ColumnPtr _array_is_sorted(const Column& array_elements, const UInt32Column& array_offsets) {
         const Column* elements_ptr = &array_elements;
 
@@ -84,7 +84,7 @@ private:
             null_map_elements = &(nullable.null_column()->get_data());
         }
 
-        // Using typeid instead of dynamic_cast, as typeid is much faster than dynamic_cast
+            // Using typeid instead of dynamic_cast, as typeid is much faster than dynamic_cast
 #define HANDLE_ELEMENT_TYPE(ElementType)                                                         \
 do {                                                                                             \
     if (typeid(*elements_ptr) == typeid(ElementType)) {                                          \
@@ -158,7 +158,8 @@ do {                                                                            
 };
 
 
-StatusOr<ColumnPtr> CelonisArrayFunctions::array_is_sorted([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr>
+CelonisArrayFunctions::array_is_sorted([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     const ColumnPtr& arg0 = columns[0]; // array
 
     return CelonisArrayIsSortedImpl::evaluate(*arg0);
@@ -251,6 +252,7 @@ public:
             struct Array {
                 Array(size_t start, size_t end, const TimestampValue* timestamp, int priority)
                         : index(start), end(end), timestamp(timestamp), priority(priority) {}
+
                 size_t index;
                 size_t end;
                 const TimestampValue* timestamp;
@@ -616,6 +618,106 @@ public:
 StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] FunctionContext* context,
                                                          const Columns& columns) {
     return CelonisNullToEmpty::process(columns);
+}
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionContext* context,
+                                                     const Columns& columns) {
+    DCHECK_EQ(columns.size(), 5);
+    TypeDescriptor type_array_bigint;
+    type_array_bigint.type = TYPE_ARRAY;
+    type_array_bigint.children.resize(1);
+    type_array_bigint.children[0].type = TYPE_BIGINT;
+    type_array_bigint.children[0].len = -1;
+    auto result = ColumnHelper::create_column(type_array_bigint, true);
+
+    UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
+    DCHECK(activity_array_data.elements->is_binary());
+    const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *activity_array_data.elements).get_data().data();
+    const auto& activity_offsets = activity_array_data.offsets->get_data().data();
+
+    ColumnViewer begin_activity_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
+    ColumnViewer begin_mode_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
+    ColumnViewer end_activity_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
+    ColumnViewer end_mode_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
+
+    size_t n_rows = columns[0]->size();
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row) || begin_activity_viewer.is_null(row) || begin_mode_viewer.is_null(row) ||
+            end_activity_viewer.is_null(row) || end_mode_viewer.is_null(row)) {
+            result->append_nulls(1);
+            continue;
+        }
+        const std::string begin_activity = begin_activity_viewer.value(row).to_string();
+        const std::string begin_mode = begin_mode_viewer.value(row).to_string();
+        const std::string end_activity = end_activity_viewer.value(row).to_string();
+        const std::string end_mode = end_mode_viewer.value(row).to_string();
+        if (begin_mode != "FIRST" && begin_mode != "LAST") {
+            return Status::InvalidArgument("begin range mode must be either FIRST or LAST.");
+        }
+        if (end_mode != "FIRST" && end_mode != "LAST") {
+            return Status::InvalidArgument("end range mode must be either FIRST or LAST.");
+        }
+        const size_t start = activity_offsets[row];
+        const size_t end = activity_offsets[row + 1];
+        DCHECK(end >= start);
+        const auto size = end - start;
+        std::optional<size_t> first_begin_index = std::nullopt;
+        std::optional<size_t> last_begin_index = std::nullopt;
+        std::optional<size_t> first_end_index = std::nullopt;
+        std::optional<size_t> last_end_index = std::nullopt;
+        for (size_t i = start; i < end; ++i) {
+            if (activity_array_data.null_elements != nullptr && (*activity_array_data.null_elements)[i] != 0) {
+                continue;
+            }
+            const std::string activity = activities[i].to_string();
+            if (activity == begin_activity) {
+                last_begin_index = i;
+                if (!first_begin_index.has_value()) {
+                    first_begin_index = i;
+                }
+            }
+            if (activity == end_activity) {
+                last_end_index = i;
+                if (!first_end_index.has_value()) {
+                    first_end_index = i;
+                }
+            }
+        }
+        std::optional<size_t> begin_index = std::nullopt;
+        std::optional<size_t> end_index = std::nullopt;
+        if (begin_mode == "FIRST") {
+            begin_index = first_begin_index;
+        } else {
+            DCHECK(begin_mode == "LAST");
+            begin_index = last_begin_index;
+        }
+        if (end_mode == "FIRST") {
+            end_index = first_end_index;
+        } else {
+            DCHECK(end_mode == "LAST");
+            end_index = last_end_index;
+        }
+        DatumArray array;
+        array.reserve(size);
+        if (!begin_index.has_value() || !end_index.has_value() || begin_index.value() > end_index.value()) {
+            for (size_t j = 0; j < size; ++j) {
+                array.push_back(kNullDatum);
+            }
+        } else {
+            for (size_t j = start; j < begin_index.value(); ++j) {
+                array.push_back(kNullDatum);
+            }
+            for (size_t j = begin_index.value(); j <= end_index.value(); ++j) {
+                array.emplace_back(1L);
+            }
+            for (size_t j = end_index.value() + 1; j < end; ++j) {
+                array.push_back(kNullDatum);
+            }
+        }
+        result->append_datum(array);
+    }
+    return result;
 }
 
 } // namespace starrocks

@@ -55,6 +55,14 @@ public:
      * Returns a new column based on the input column where NULL elements are replaced with empty arrays.
      */
     DEFINE_VECTORIZED_FN(null_to_empty);
+
+    /**
+     * @param: [activities, begin_range_activity, begin_range_mode, end_range_activity, end_range_mode]
+     * @paramType: [ARRAY_VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR]
+     * @return: ARRAY_BIGINT
+     * Implements PQL CALC_CROP: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245578/CALC+CROP
+     */
+    DEFINE_VECTORIZED_FN(calc_crop);
 };
 
 } // namespace starrocks

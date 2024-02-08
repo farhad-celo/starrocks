@@ -1450,6 +1450,7 @@ celostar_functions = [
     [2000130, 'celonis_array_lag', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'BIGINT'], 'CelonisArrayFunctions::array_lag'],
     [2000140, 'celonis_array_lead', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'BIGINT'], 'CelonisArrayFunctions::array_lead'],
     [2000150, 'celonis_null_to_empty', True, False, 'ANY_ARRAY', ['ANY_ARRAY'], 'CelonisArrayFunctions::null_to_empty'],
+    [2000160, 'celonis_calc_crop', True, False, 'ARRAY_BIGINT', ['ARRAY_VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisArrayFunctions::calc_crop'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],
