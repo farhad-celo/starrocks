@@ -9,120 +9,179 @@ namespace starrocks {
 
 namespace {
 
-template<bool element_has_null>
-ColumnPtr _celonis_match_activities_impl(FunctionContext* context, const Column& elements, const UInt32Column& offsets,
-                                         const NullColumn::Container* null_offsets,
-                                         const NullColumn::Container* activity_array_nulls,
-                                         const SliceHashSet& nodes, const SliceHashSet& excluding_nodes) {
-    const size_t num_array = offsets.size() - 1;
-    auto offsets_ptr = offsets.get_data().data();
+int64_t
+_match_activities(size_t row, const UnnestedArrayData& activity_array_data,
+                  const Slice* activities,
+                  const unsigned int* offsets,
+                  const SliceHashSet& start_nodes,
+                  const SliceHashSet& nodes, const SliceHashSet& end_nodes,
+                  const SliceHashSet& excluding_nodes) {
+    const auto& null_elements = activity_array_data.null_elements;
+    SliceHashSet nodes_seen;
+    nodes_seen.reserve(nodes.size());
+    bool has_exclude_node = false;
+    bool has_non_null = false;
+    size_t start = offsets[row];
+    size_t end = offsets[row + 1];
+    std::optional<size_t> start_index = std::nullopt;
+    std::optional<size_t> end_index = std::nullopt;
+    for (size_t index = start; index < end; ++index) {
+        // Nulls are ignored
+        if (null_elements != nullptr && (*null_elements)[index] != 0) {
+            continue;
+        }
+        if (!start_index.has_value()) {
+            start_index = index;
+        }
+        end_index = index;
+        const auto& value = activities[index];
+        has_non_null = true;
+        if (nodes.count(value)) {
+            nodes_seen.insert(value);
+        }
+        if (excluding_nodes.count(value)) {
+            has_exclude_node = true;
+            break;
+        }
+    }
+    if (!start_nodes.empty() &&
+        (!start_index.has_value() || !start_nodes.count(activities[start_index.value()]))) {
+        return 0L;
+    }
+    if (!end_nodes.empty() &&
+        (!end_index.has_value() || !end_nodes.count(activities[end_index.value()]))) {
+        return 0L;
+    }
+    if (nodes_seen.size() == nodes.size() && !has_exclude_node && (excluding_nodes.empty() || has_non_null)) {
+        return 1L;
+    }
+    return 0L;
+}
 
-    ColumnBuilder<TYPE_BIGINT> result(num_array);
-    result.reserve(num_array);
-
-    using ValueType = RunTimeCppType<TYPE_VARCHAR>;
-    auto elements_ptr = (const ValueType*) (elements.raw_data());
-    // Collects the nodes that pass any of the 'NODES' filter.
-    SliceHashSet passing_nodes;
-    passing_nodes.reserve(nodes.size());
-
-    for (size_t i = 0; i < num_array; i++) {
-        if (activity_array_nulls != nullptr && (*activity_array_nulls)[i]) {
+StatusOr<ColumnPtr>
+_match_activities_general(const Columns& columns) {
+    UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
+    DCHECK(activity_array_data.elements->is_binary());
+    const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *activity_array_data.elements).get_data().data();
+    const auto& activity_offsets = activity_array_data.offsets->get_data().data();
+    size_t n_rows = columns[0]->size();
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (columns[5]->get(row).get_array().size() != 0 || columns[6]->get(row).get_array().size() != 0) {
+            std::stringstream error;
+            error << "unsupported filter in celonis_match_activities" << std::endl;
+            throw std::runtime_error(error.str());
+        }
+        if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
         }
 
-        size_t offset = offsets_ptr[i];
-        size_t array_size = offsets_ptr[i + 1] - offsets_ptr[i];
-        passing_nodes.clear();
-        bool has_exclude_node = false;
-        bool has_non_null = false;
-        for (size_t index = 0; index < array_size; ++index) {
-            if constexpr (element_has_null) {
-                // Nulls are ignored
-                if ((*null_offsets)[offset + index] != 0) {
-                    continue;
-                }
-            }
-            const auto& value = elements_ptr[offset + index];
-            has_non_null = true;
-            if (nodes.count(value)) {
-                passing_nodes.insert(value);
-            }
-            if (excluding_nodes.count(value)) {
-                has_exclude_node = true;
-                break;
-            }
+        auto start_node_array = columns[1]->get(row).get_array();
+        SliceHashSet start_nodes;
+        for (const auto& value: start_node_array) {
+            start_nodes.insert(value.get_slice());
         }
 
-        if (passing_nodes.size() == nodes.size() && !has_exclude_node && has_non_null) {
-            result.append(1L);
-        } else {
-            result.append(0L);
+        auto node_array = columns[2]->get(row).get_array();
+        SliceHashSet nodes;
+        for (const auto& value: node_array) {
+            nodes.insert(value.get_slice());
         }
+
+        auto end_node_array = columns[3]->get(row).get_array();
+        SliceHashSet end_nodes;
+        for (const auto& value: end_node_array) {
+            end_nodes.insert(value.get_slice());
+        }
+
+        auto excluding_node_array = columns[4]->get(row).get_array();
+        SliceHashSet excluding_nodes;
+        for (const auto& value: excluding_node_array) {
+            excluding_nodes.insert(value.get_slice());
+        }
+        result.append(
+                _match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes, end_nodes,
+                                  excluding_nodes));
     }
-    return result.build(/*is_const=*/false);
+
+    return result.build(ColumnHelper::is_all_const(columns));
 }
-} // namespace
 
 StatusOr<ColumnPtr>
-CelonisMatchActivitiesFunctions::celonis_match_activities(FunctionContext* context, const Columns& columns) {
-    const Column* activity_array = columns[0].get();
-    const NullableColumn* nullable_activity_array = nullptr;
-    const NullColumn::Container* activity_array_nulls = nullptr;
-
-    if (activity_array->is_nullable()) {
-        nullable_activity_array = down_cast<const NullableColumn*>(activity_array);
-        activity_array = nullable_activity_array->data_column().get();
-        activity_array_nulls = &(nullable_activity_array->null_column()->get_data());
+_match_activities_const(const Columns& columns) {
+    UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
+    DCHECK(activity_array_data.elements->is_binary());
+    const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *activity_array_data.elements).get_data().data();
+    const auto& activity_offsets = activity_array_data.offsets->get_data().data();
+    size_t n_rows = columns[0]->size();
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    if (n_rows == 0) {
+        return result.build(ColumnHelper::is_all_const(columns));
+    }
+    auto start_node_array = columns[1]->get(0).get_array();
+    SliceHashSet start_nodes;
+    for (const auto& value: start_node_array) {
+        start_nodes.insert(value.get_slice());
     }
 
-    const auto& activity_array_column = extract_array_column(activity_array);
-    const UInt32Column& activity_offsets = activity_array_column.offsets();
-    const Column* activity_elements = &activity_array_column.elements();
-    const NullColumn::Container* activity_nulls = nullptr;
-    if (activity_elements->has_null()) {
-        activity_nulls = &(down_cast<const NullableColumn*>(activity_elements)->null_column()->get_data());
-    }
-    if (auto nullable = dynamic_cast<const NullableColumn*>(activity_elements); nullable != nullptr) {
-        activity_elements = nullable->data_column().get();
-    }
-
-    // schema:
-    // columns[1] -- starting activities
-    // columns[2] -- NODES
-    // columns[3] -- ending activities
-    // columns[4] -- exclude activities
-    // columns[5] -- excluding any of specified activities
-    // columns[6] -- NODES_ANY
-
-    // TODO(y.zhang): for now, only support flowing activities and excluding activities
-    if (columns[1]->get(0).get_array().size() != 0 ||
-        columns[3]->get(0).get_array().size() != 0 ||
-        columns[5]->get(0).get_array().size() != 0 ||
-        columns[6]->get(0).get_array().size() != 0) {
-        std::stringstream error;
-        error << "unsupported filter in celonis_match_activities" << std::endl;
-        throw std::runtime_error(error.str());
-    }
-
-    auto node_array_col = columns[2]->get(0).get_array();
+    auto node_array = columns[2]->get(0).get_array();
     SliceHashSet nodes;
-    for (size_t i = 0; i < node_array_col.size(); ++i) {
-        nodes.insert(node_array_col[i].get_slice());
+    for (const auto& value: node_array) {
+        nodes.insert(value.get_slice());
+    }
+
+    auto end_node_array = columns[3]->get(0).get_array();
+    SliceHashSet end_nodes;
+    for (const auto& value: end_node_array) {
+        end_nodes.insert(value.get_slice());
     }
 
     auto excluding_node_array = columns[4]->get(0).get_array();
     SliceHashSet excluding_nodes;
-    for (size_t i = 0; i < excluding_node_array.size(); ++i) {
-        excluding_nodes.insert(excluding_node_array[i].get_slice());
+    for (const auto& value: excluding_node_array) {
+        excluding_nodes.insert(value.get_slice());
     }
-    if (activity_nulls != nullptr) {
-        return _celonis_match_activities_impl<true>(context, *activity_elements, activity_offsets, activity_nulls,
-                                                    activity_array_nulls, nodes, excluding_nodes);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (columns[5]->get(row).get_array().size() != 0 || columns[6]->get(row).get_array().size() != 0) {
+            std::stringstream error;
+            error << "unsupported filter in celonis_match_activities" << std::endl;
+            throw std::runtime_error(error.str());
+        }
+        if (columns[0]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        result.append(
+                _match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes, end_nodes,
+                                  excluding_nodes));
     }
-    return _celonis_match_activities_impl<false>(context, *activity_elements, activity_offsets, activity_nulls,
-                                                 activity_array_nulls, nodes, excluding_nodes);
+
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+} // namespace
+
+StatusOr<ColumnPtr>
+CelonisMatchActivitiesFunctions::celonis_match_activities(FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(columns.size(), 7);
+    // schema:
+    // columns[1] -- STARTING: case has to start with specified activity
+    // columns[2] -- NODE: case has to have the specified activities
+    // columns[3] -- ENDING: case has to end with specific activity
+    // columns[4] -- EXCLUDING: case must not have the specified activities (and must have at least one non-NULL activity)
+    // columns[5] -- EXCLUDING_ALL: case must not have any of the specified activities (and must have at least one non-NULL activity)
+    // columns[6] -- NODES_ANY: case has to have at least one of the specified activities
+    // TODO(y.zhang): for now, it does not support NODES_ANY and EXCLUDING_ALL.
+    if (context->get_constant_column(1) != nullptr && context->get_constant_column(2) != nullptr &&
+        context->get_constant_column(3) != nullptr && context->get_constant_column(4) != nullptr &&
+        context->get_constant_column(5) != nullptr && context->get_constant_column(6) != nullptr) {
+        return _match_activities_const(columns);
+    } else {
+        return _match_activities_general(columns);
+    }
 }
 
 } // namespace starrocks
