@@ -620,16 +620,8 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] Functi
     return CelonisNullToEmpty::process(columns);
 }
 
-StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionContext* context,
-                                                     const Columns& columns) {
+Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
     DCHECK_EQ(columns.size(), 5);
-    TypeDescriptor type_array_bigint;
-    type_array_bigint.type = TYPE_ARRAY;
-    type_array_bigint.children.resize(1);
-    type_array_bigint.children[0].type = TYPE_BIGINT;
-    type_array_bigint.children[0].len = -1;
-    auto result = ColumnHelper::create_column(type_array_bigint, true);
-
     UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
@@ -709,7 +701,15 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionCo
                 array.push_back(kNullDatum);
             }
             for (size_t j = begin_index.value(); j <= end_index.value(); ++j) {
-                array.emplace_back(1L);
+                if (fill_one) {
+                    array.emplace_back(1L);
+                } else {
+                    if (activity_array_data.null_elements != nullptr && (*activity_array_data.null_elements)[j] != 0) {
+                        array.push_back(kNullDatum);
+                    } else {
+                        array.emplace_back(activities[j]);
+                    }
+                }
             }
             for (size_t j = end_index.value() + 1; j < end; ++j) {
                 array.push_back(kNullDatum);
@@ -717,6 +717,26 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionCo
         }
         result->append_datum(array);
     }
+    return Status::OK();
+}
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionContext* context,
+                                                     const Columns& columns) {
+    TypeDescriptor type_array_bigint;
+    type_array_bigint.type = TYPE_ARRAY;
+    type_array_bigint.children.resize(1);
+    type_array_bigint.children[0].type = TYPE_BIGINT;
+    type_array_bigint.children[0].len = -1;
+    auto result = ColumnHelper::create_column(type_array_bigint, true);
+    RETURN_IF_ERROR(calc_crop_impl(columns, true, result));
+    return result;
+}
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] FunctionContext* context,
+                                                             const Columns& columns) {
+    DCHECK(columns.size() == 5);
+    auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
+    RETURN_IF_ERROR(calc_crop_impl(columns, false, result));
     return result;
 }
 

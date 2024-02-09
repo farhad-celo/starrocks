@@ -1926,4 +1926,319 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_invalid_input) {
     }
 }
 
+TEST_F(CelonisArrayFunctionsTest, calc_crop_to_null_normal_cases) {
+    // empty input
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        EXPECT_EQ(0, result->size());
+    }
+    // empty activity array
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{});
+        begin_activity->append_datum("B");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum("C");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ(0, result->get(0).get_array().size());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(
+                DatumArray{kNullDatum, "B", kNullDatum, "C", kNullDatum, "C", "L", "C", "D", kNullDatum});
+        begin_activity->append_datum("B");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum("C");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_EQ("B", result->get(0).get_array()[1].get_slice());
+        EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+        EXPECT_EQ("C", result->get(0).get_array()[3].get_slice());
+        EXPECT_TRUE(result->get(0).get_array()[4].is_null());
+        EXPECT_EQ("C", result->get(0).get_array()[5].get_slice());
+        EXPECT_EQ("L", result->get(0).get_array()[6].get_slice());
+        EXPECT_EQ("C", result->get(0).get_array()[7].get_slice());
+        EXPECT_TRUE(result->get(0).get_array()[8].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[9].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"A", "B", "C", "D"});
+        activity->append_datum(DatumArray{"A", "B", "D", "E"});
+        begin_activity->append_datum("B");
+        begin_activity->append_datum("B");
+        begin_mode->append_datum("FIRST");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum("C");
+        end_activity->append_datum("C");
+        end_mode->append_datum("LAST");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_EQ("B", result->get(0).get_array()[1].get_slice());
+        EXPECT_EQ("C", result->get(0).get_array()[2].get_slice());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+        EXPECT_TRUE(result->get(1).get_array()[0].is_null());
+        EXPECT_TRUE(result->get(1).get_array()[1].is_null());
+        EXPECT_TRUE(result->get(1).get_array()[2].is_null());
+        EXPECT_TRUE(result->get(1).get_array()[3].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"A", "B", "C", "D"});
+        begin_activity->append_datum("C");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum("B");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"A", "A", "B", "B"});
+        begin_activity->append_datum("A");
+        begin_mode->append_datum("LAST");
+        end_activity->append_datum("B");
+        end_mode->append_datum("FIRST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_EQ("A", result->get(0).get_array()[1].get_slice());
+        EXPECT_EQ("B", result->get(0).get_array()[2].get_slice());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"A", "A", "B", "B"});
+        begin_activity->append_datum("A");
+        begin_mode->append_datum("LAST");
+        end_activity->append_datum("X");
+        end_mode->append_datum("FIRST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, calc_crop_to_null_null_input) {
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(kNullDatum);
+        begin_activity->append_datum("B");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum("C");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"B", "C"});
+        begin_activity->append_datum(kNullDatum);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum("C");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"B", "C"});
+        begin_activity->append_datum("B");
+        begin_mode->append_datum(kNullDatum);
+        end_activity->append_datum("C");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"B", "C"});
+        begin_activity->append_datum("B");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+
+        activity->append_datum(DatumArray{"B", "C"});
+        begin_activity->append_datum("B");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum("C");
+        end_mode->append_datum(kNullDatum);
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, calc_crop_to_null_invalid_input) {
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"B", "C"});
+        begin_activity->append_datum("B");
+        begin_mode->append_datum("ALL");
+        end_activity->append_datum("C");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "begin range mode must be either FIRST or LAST.");
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{"B", "C"});
+        begin_activity->append_datum("B");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum("C");
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "end range mode must be either FIRST or LAST.");
+    }
+}
+
 } // namespace starrocks
