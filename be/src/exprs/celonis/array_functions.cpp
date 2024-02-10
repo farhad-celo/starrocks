@@ -635,30 +635,33 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
 
     size_t n_rows = columns[0]->size();
     for (size_t row = 0; row < n_rows; ++row) {
-        if (columns[0]->is_null(row) || begin_activity_viewer.is_null(row) || begin_mode_viewer.is_null(row) ||
-            end_activity_viewer.is_null(row) || end_mode_viewer.is_null(row)) {
+        if (columns[0]->is_null(row) || begin_mode_viewer.is_null(row) ||
+            (begin_mode_viewer.value(row).to_string() != "ALL" && begin_activity_viewer.is_null(row)) ||
+            end_mode_viewer.is_null(row) ||
+            (end_mode_viewer.value(row).to_string() != "ALL" && end_activity_viewer.is_null(row))) {
             result->append_nulls(1);
             continue;
         }
-        const std::string begin_activity = begin_activity_viewer.value(row).to_string();
         const std::string begin_mode = begin_mode_viewer.value(row).to_string();
-        const std::string end_activity = end_activity_viewer.value(row).to_string();
         const std::string end_mode = end_mode_viewer.value(row).to_string();
-        if (begin_mode != "FIRST" && begin_mode != "LAST") {
-            return Status::InvalidArgument("begin range mode must be either FIRST or LAST.");
+        if (begin_mode != "FIRST" && begin_mode != "LAST" && begin_mode != "ALL") {
+            return Status::InvalidArgument("begin range mode must be FIRST/LAST/ALL.");
         }
-        if (end_mode != "FIRST" && end_mode != "LAST") {
-            return Status::InvalidArgument("end range mode must be either FIRST or LAST.");
+        if (end_mode != "FIRST" && end_mode != "LAST" && end_mode != "ALL") {
+            return Status::InvalidArgument("end range mode must be FIRST/LAST/ALL.");
         }
-        const size_t start = activity_offsets[row];
-        const size_t end = activity_offsets[row + 1];
+        const std::string begin_activity = begin_mode == "ALL" ? "" : begin_activity_viewer.value(row).to_string();
+        const std::string end_activity = end_mode == "ALL" ? "" : end_activity_viewer.value(row).to_string();
+
+        const int64_t start = static_cast<int64_t>(activity_offsets[row]);
+        const int64_t end = static_cast<int64_t>(activity_offsets[row + 1]);
         DCHECK(end >= start);
         const auto size = end - start;
-        std::optional<size_t> first_begin_index = std::nullopt;
-        std::optional<size_t> last_begin_index = std::nullopt;
-        std::optional<size_t> first_end_index = std::nullopt;
-        std::optional<size_t> last_end_index = std::nullopt;
-        for (size_t i = start; i < end; ++i) {
+        std::optional<int64_t> first_begin_index = std::nullopt;
+        std::optional<int64_t> last_begin_index = std::nullopt;
+        std::optional<int64_t> first_end_index = std::nullopt;
+        std::optional<int64_t> last_end_index = std::nullopt;
+        for (int64_t i = start; i < end; ++i) {
             if (activity_array_data.null_elements != nullptr && (*activity_array_data.null_elements)[i] != 0) {
                 continue;
             }
@@ -676,31 +679,35 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
                 }
             }
         }
-        std::optional<size_t> begin_index = std::nullopt;
-        std::optional<size_t> end_index = std::nullopt;
+        std::optional<int64_t> begin_index = std::nullopt;
+        std::optional<int64_t> end_index = std::nullopt;
         if (begin_mode == "FIRST") {
             begin_index = first_begin_index;
-        } else {
-            DCHECK(begin_mode == "LAST");
+        } else if (begin_mode == "LAST") {
             begin_index = last_begin_index;
+        } else {
+            DCHECK(begin_mode == "ALL");
+            begin_index = start;
         }
         if (end_mode == "FIRST") {
             end_index = first_end_index;
-        } else {
-            DCHECK(end_mode == "LAST");
+        } else if (end_mode == "LAST") {
             end_index = last_end_index;
+        } else {
+            DCHECK(end_mode == "ALL");
+            end_index = end - 1;
         }
         DatumArray array;
         array.reserve(size);
         if (!begin_index.has_value() || !end_index.has_value() || begin_index.value() > end_index.value()) {
-            for (size_t j = 0; j < size; ++j) {
+            for (int64_t j = 0; j < size; ++j) {
                 array.push_back(kNullDatum);
             }
         } else {
-            for (size_t j = start; j < begin_index.value(); ++j) {
+            for (int64_t j = start; j < begin_index.value(); ++j) {
                 array.push_back(kNullDatum);
             }
-            for (size_t j = begin_index.value(); j <= end_index.value(); ++j) {
+            for (int64_t j = begin_index.value(); j <= end_index.value(); ++j) {
                 if (fill_one) {
                     array.emplace_back(1L);
                 } else {
@@ -711,7 +718,7 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
                     }
                 }
             }
-            for (size_t j = end_index.value() + 1; j < end; ++j) {
+            for (int64_t j = end_index.value() + 1; j < end; ++j) {
                 array.push_back(kNullDatum);
             }
         }
