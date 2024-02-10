@@ -144,6 +144,7 @@ set(EXEC_FILES
         ./exprs/unary_function_test.cpp
         ./exprs/celonis/agg/aggregate_test.cpp
         ./exprs/celonis/agg/calc_bucket_boundaries_test.cpp
+        ./exprs/celonis/agg/enumerate_node_paths_test.cpp
         ./exprs/celonis/agg/histogram_boundaries_test.cpp
         ./exprs/celonis/agg/inductive_miner_test.cpp
         ./exprs/celonis/agg/sorted_first_last_test.cpp

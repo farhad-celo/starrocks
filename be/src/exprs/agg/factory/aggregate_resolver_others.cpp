@@ -34,6 +34,9 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_calc_bucket_count_boundaries", false,
             AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_DATETIME>());
 
+    add_aggregate_mapping_notnull<TYPE_STRUCT, TYPE_STRUCT>(
+            "celonis_enumerate_node_paths", false, AggregateFactory::MakeCelonisEnumerateNodePathsAggregateFunction());
+
     add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_STRUCT>(
             "celonis_histogram_boundaries", false,
             AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_BIGINT>());

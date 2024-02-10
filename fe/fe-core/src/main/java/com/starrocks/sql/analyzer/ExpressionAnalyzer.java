@@ -1095,6 +1095,49 @@ public class ExpressionAnalyzer {
                     }
                     break;
                 }
+                case FunctionSet.CELONIS_ENUMERATE_NODE_PATHS:
+                    if (node.getChildren().size() != 12) {
+                        throw new SemanticException(fnName + " should have 12 inputs, but really have "
+                                + node.getChildren().size() + " inputs. 12 inputs are STRUCT outColumns, "
+                                + "STRUCT inColumns, STRUCT pkColumns, BOOLEAN outStart, BOOLEAN outEnd, "
+                                + "BOOLEAN inStart, BOOLEAN inEnd, BOOLEAN outAll, BOOLEAN inALL, BOOLEAN allowCycles, "
+                                + "VARCHAR lengthComparison(LESS, LESS_EQUAL, EQUAL, GREATER, GREATER_EQUAL, NOT_EQUAL)"
+                                + ", and BIGINT length", node.getPos());
+                    }
+                    if (!node.getChild(0).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s first input outColumns " + node.getChild(0).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(0).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(1).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s second input inColumns " + node.getChild(1).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(1).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(0).getType().matchesType(node.getChild(1).getType())) {
+                        throw new SemanticException(fnName + "'s first input " + node.getChild(0).toSql() +
+                                " and second input " + node.getChild(1).toSql() +
+                                " should be the same struct types, but real types are " +
+                                node.getChild(0).getType().toSql() + " and " +
+                                node.getChild(1).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(2).getType().isStructType() && !node.getChild(2).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s third input pkColumns " + node.getChild(2).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(2).getType().toSql(), node.getPos());
+                    }
+                    if (node.getChild(9).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 10th input allowCycles should not be NULL",
+                                node.getPos());
+                    }
+                    if (node.getChild(10).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 11th input lengthComparison should not be NULL",
+                                node.getPos());
+                    }
+                    if (node.getChild(11).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 12th input length should not be NULL", node.getPos());
+                    }
+                    break;
                 case FunctionSet.TIME_SLICE:
                 case FunctionSet.DATE_SLICE:
                     if (!(node.getChild(1) instanceof IntLiteral)) {

@@ -904,7 +904,33 @@ public class FunctionAnalyzer {
             ((AggregateFunction) fn).setIsAscOrder(isAscOrder);
             ((AggregateFunction) fn).setNullsFirst(nullsFirst);
             fn.setRetType(argsTypes[0]);     // return null if scalar agg with empty input
-        }  else if (FunctionSet.STR_TO_DATE.equals(fnName)) {
+        }  else if (FunctionSet.CELONIS_ENUMERATE_NODE_PATHS.equals(fnName)) {
+            fn = Expr.getBuiltinFunction(fnName, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            // Input: ST<o0, o1, ...>, ST<i0, i1, ...>, ST<p0, p1, ...>, boolean, boolean, ...
+            // Intermediate : ST<ARRAY<o0>, ARRAY<o1>, ..., ARRAY<i0>, ..., Array<p0>, ...,
+            //                   Array<boolean>, ..., ARRAY<boolean>, VARBINARY>
+            //                VARBINARY is to pass null info, allow_cycles, length_comparison and length.
+            ArrayList<Type> fieldTypes = new ArrayList<>(argumentTypes.length);
+            for (int i = 0; i < 3; ++i) {
+                if (!argumentTypes[i].isNull()) {
+                    assert argumentTypes[i].isStructType();
+                    StructType structType = (StructType) argumentTypes[i];
+                    for (StructField structField : structType.getFields()) {
+                        fieldTypes.add(new ArrayType(structField.getType()));
+                    }
+                }
+            }
+            for (int i = 3; i < 9; ++i) {
+                if (!argumentTypes[i].isNull()) {
+                    fieldTypes.add(new ArrayType(argumentTypes[i]));
+                }
+            }
+            fieldTypes.add(Type.VARBINARY);
+            ((AggregateFunction) fn).setIntermediateType(new StructType(fieldTypes));
+            // RetType was set by deduce.
+        } else if (FunctionSet.STR_TO_DATE.equals(fnName)) {
             fn = getStrToDateFunction(node, argumentTypes);
         } else if (FunctionSet.ARRAY_GENERATE.equals(fnName)) {
             fn = getArrayGenerateFunction(node);

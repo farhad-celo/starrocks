@@ -55,6 +55,7 @@
 #include "exprs/agg/window.h"
 #include "exprs/agg/window_funnel.h"
 #include "exprs/celonis/agg/calc_bucket_boundaries.h"
+#include "exprs/celonis/agg/enumerate_node_paths.h"
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/celonis/agg/inductive_miner.h"
@@ -211,6 +212,8 @@ public:
     // Celonis functions
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisCalcBucketBoundariesAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisEnumerateNodePathsAggregateFunction();
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisHistogramBoundariesAggregateFunction();

@@ -305,6 +305,7 @@ public class FunctionSet {
     public static final String MANN_WHITNEY_U_TEST = "mann_whitney_u_test";
 
     // Aggregate celonis functions:
+    public static final String CELONIS_ENUMERATE_NODE_PATHS = "celonis_enumerate_node_paths";
     public static final String CELONIS_CALC_BUCKET_COUNT_BOUNDARIES = "celonis_calc_bucket_count_boundaries";
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
@@ -1498,6 +1499,24 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(MANN_WHITNEY_U_TEST,
                 Lists.newArrayList(Type.DOUBLE, Type.BOOLEAN), Type.JSON,
                 Type.VARBINARY, false, false, false));
+        // celonis_enumerate_node_paths
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_ENUMERATE_NODE_PATHS,
+                Lists.newArrayList(
+                        Type.ANY_STRUCT,  // outColumns
+                        Type.ANY_STRUCT,  // inColumns
+                        Type.ANY_STRUCT,  // pkColumns
+                        Type.BOOLEAN,     // outStart
+                        Type.BOOLEAN,     // outEnd
+                        Type.BOOLEAN,     // inStart
+                        Type.BOOLEAN,     // inEnd
+                        Type.BOOLEAN,     // outAll
+                        Type.BOOLEAN,     // inAll
+                        Type.BOOLEAN,     // allowCycles
+                        Type.VARCHAR,     // lengthComparison LESS, LESS_EQUAL, EQUAL, GREATER, GREATER_EQUAL, NOT_EQUAL
+                        Type.BIGINT),     // length
+                /*returnType=*/Type.ANY_STRUCT,
+                /*intermediateType=*/Type.ANY_STRUCT,
+                false, false, false));
     }
 
     private void registerBuiltinSumAggFunction(String name) {

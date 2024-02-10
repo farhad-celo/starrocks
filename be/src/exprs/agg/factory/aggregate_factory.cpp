@@ -75,6 +75,10 @@ AggregateFunctionPtr AggregateFactory::MakeHllUnionCountAggregateFunction() {
 }
 
 // Celonis functions
+AggregateFunctionPtr AggregateFactory::MakeCelonisEnumerateNodePathsAggregateFunction() {
+    return std::make_shared<CelonisEnumerateNodePathsAggregateFunction>();
+}
+
 AggregateFunctionPtr AggregateFactory::MakeCelonisInductiveMinerAggregateFunction() {
     return std::make_shared<InductiveMinerAggregateFunction>();
 }

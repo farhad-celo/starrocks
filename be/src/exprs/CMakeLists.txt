@@ -132,6 +132,7 @@ add_custom_command(
 add_library(celonis_calendars_protos ${PROTO_GENERATED_SRCS} ${PROTO_GENERATED_HDRS})
 
 set(CELONIS_FILES
+  celonis/agg/enumerate_node_paths.cpp
   celonis/agg/factory_calendar.cpp
   celonis/agg/workday_calendar.cpp
   celonis/agg/inductive_miner.cpp

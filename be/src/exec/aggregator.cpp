@@ -910,6 +910,10 @@ Status Aggregator::_evaluate_const_columns(int i) {
     return Status::OK();
 }
 
+bool celonis_is_returning_multiple_rows(const std::string& function_name) {
+    return function_name == "celonis_enumerate_node_paths";
+}
+
 Status Aggregator::convert_to_chunk_no_groupby(ChunkPtr* chunk) {
     SCOPED_TIMER(_agg_stat->get_results_timer);
     // TODO(kks): we should approve memory allocate here
@@ -938,6 +942,14 @@ Status Aggregator::convert_to_chunk_no_groupby(ChunkPtr* chunk) {
     ChunkPtr result_chunk = std::make_shared<Chunk>();
     for (size_t i = 0; i < agg_result_column.size(); i++) {
         result_chunk->append_column(std::move(agg_result_column[i]), tuple_desc->slots()[i]->id());
+    }
+    if (!use_intermediate && celonis_is_returning_multiple_rows(_agg_functions[0]->get_name())) {
+        auto result_rows = result_chunk->num_rows();
+        _num_rows_returned += result_rows;
+        _num_rows_processed += result_rows;
+        *chunk = std::move(result_chunk);
+        _is_ht_eos = (result_rows <= 1); // This would be equivalent to results_rows < config::vector_chunk_size.
+        return Status::OK();
     }
     ++_num_rows_returned;
     ++_num_rows_processed;
