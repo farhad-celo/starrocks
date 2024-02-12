@@ -148,6 +148,66 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_with_start_and_end_n
     EXPECT_EQ(1L, result->get(6).get_int64());
 }
 
+TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_with_excluding_all_nodes) {
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    array->append_datum(DatumArray{"B", "A"});
+    array->append_datum(DatumArray{"B", "D"});
+    array->append_datum(DatumArray{"B", "C", "E"});
+    array->append_datum(DatumArray{"A", "C"});
+    array->append_datum(DatumArray{kNullDatum});
+    array->append_datum(DatumArray{"C", kNullDatum, "A"});
+    array->append_datum(DatumArray{kNullDatum, "A"});
+    array->append_datum(DatumArray{});
+    array->append_datum(DatumArray{"D"});
+
+    auto excluding_all_nodes_filter = create_const_filter(DatumArray{"A", "C"}, 9);
+    auto empty_filter = create_const_filter(DatumArray{}, 9);
+    const auto result = CelonisMatchActivitiesFunctions::celonis_match_activities(
+            ctx.get(),
+            {array, empty_filter, empty_filter, empty_filter, empty_filter, excluding_all_nodes_filter,
+             empty_filter}).value();
+    EXPECT_EQ(9, result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+    EXPECT_EQ(0L, result->get(4).get_int64());
+    EXPECT_EQ(0L, result->get(5).get_int64());
+    EXPECT_EQ(1L, result->get(6).get_int64());
+    EXPECT_EQ(0L, result->get(7).get_int64());
+    EXPECT_EQ(1L, result->get(8).get_int64());
+}
+
+TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_with_nodes_any) {
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    array->append_datum(DatumArray{"B", "A"});
+    array->append_datum(DatumArray{"B", "D"});
+    array->append_datum(DatumArray{"B", "C", "E"});
+    array->append_datum(DatumArray{"A", "C"});
+    array->append_datum(DatumArray{kNullDatum});
+    array->append_datum(DatumArray{"C", kNullDatum});
+    array->append_datum(DatumArray{kNullDatum, "A"});
+    array->append_datum(DatumArray{});
+
+    auto nodes_any_filter = create_const_filter(DatumArray{"A", "C"}, 8);
+    auto empty_filter = create_const_filter(DatumArray{}, 8);
+    const auto result = CelonisMatchActivitiesFunctions::celonis_match_activities(
+            ctx.get(),
+            {array, empty_filter, empty_filter, empty_filter, empty_filter, empty_filter,
+             nodes_any_filter}).value();
+    EXPECT_EQ(8, result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(0L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+    EXPECT_EQ(1L, result->get(3).get_int64());
+    EXPECT_EQ(0L, result->get(4).get_int64());
+    EXPECT_EQ(1L, result->get(5).get_int64());
+    EXPECT_EQ(1L, result->get(6).get_int64());
+    EXPECT_EQ(0L, result->get(7).get_int64());
+}
+
 TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_empty_input) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
     auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
@@ -191,27 +251,5 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_with_non_const_filte
     EXPECT_EQ(1L, result->get(2).get_int64());
     EXPECT_EQ(0L, result->get(3).get_int64());
 }
-
-#if !defined(__SANITIZE_ADDRESS__)
-TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_unsupported_filter) {
-    // Similar to above, but provides node information in one of the filters that is not supported for now ("starting"
-    // nodes).
-    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
-    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-    // Input data:
-    //  row 0 ["string1", "string2"]
-    //  row 1 [NULL, "string1", NULL, "string2", "string3"]
-    array->append_datum(DatumArray{"string1", "string2"});
-    array->append_datum(DatumArray{Datum(), "string1", Datum(), "string2", "string3"});
-    auto nodes_filter = create_const_filter(DatumArray{"string1", "string2"}, 2);
-    auto empty_filter = create_const_filter(DatumArray{}, 2);
-    EXPECT_THROW(CelonisMatchActivitiesFunctions::celonis_match_activities(ctx.get(),
-                                                                           {array, nodes_filter, nodes_filter,
-                                                                            empty_filter, empty_filter,
-                                                                            empty_filter, nodes_filter}),
-                 std::runtime_error);
-}
-
-#endif
 
 } // namespace starrocks

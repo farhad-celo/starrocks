@@ -14,12 +14,18 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
                   const Slice* activities,
                   const unsigned int* offsets,
                   const SliceHashSet& start_nodes,
-                  const SliceHashSet& nodes, const SliceHashSet& end_nodes,
-                  const SliceHashSet& excluding_nodes) {
+                  const SliceHashSet& nodes,
+                  const SliceHashSet& end_nodes,
+                  const SliceHashSet& excluding_nodes,
+                  const SliceHashSet& excluding_all_nodes,
+                  const SliceHashSet& any_nodes) {
     const auto& null_elements = activity_array_data.null_elements;
     SliceHashSet nodes_seen;
     nodes_seen.reserve(nodes.size());
+    SliceHashSet excluding_nodes_seen;
     bool has_exclude_node = false;
+    // contain node in any_nodes
+    bool has_any_node = false;
     bool has_non_null = false;
     size_t start = offsets[row];
     size_t end = offsets[row + 1];
@@ -39,6 +45,12 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         if (nodes.count(value)) {
             nodes_seen.insert(value);
         }
+        if (excluding_all_nodes.count(value)) {
+            excluding_nodes_seen.insert(value);
+        }
+        if (any_nodes.count(value)) {
+            has_any_node = true;
+        }
         if (excluding_nodes.count(value)) {
             has_exclude_node = true;
             break;
@@ -52,7 +64,17 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         (!end_index.has_value() || !end_nodes.count(activities[end_index.value()]))) {
         return 0L;
     }
-    if (nodes_seen.size() == nodes.size() && !has_exclude_node && (excluding_nodes.empty() || has_non_null)) {
+    if (!any_nodes.empty() && !has_any_node) {
+        return 0L;
+    }
+    if (has_exclude_node) {
+        return 0L;
+    }
+    if (!excluding_all_nodes.empty() && excluding_nodes_seen.size() == excluding_all_nodes.size()) {
+        return 0L;
+    }
+    if (nodes_seen.size() == nodes.size() && (excluding_nodes.empty() || has_non_null) &&
+        (excluding_all_nodes.empty() || has_non_null)) {
         return 1L;
     }
     return 0L;
@@ -68,11 +90,6 @@ _match_activities_general(const Columns& columns) {
     size_t n_rows = columns[0]->size();
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
     for (size_t row = 0; row < n_rows; ++row) {
-        if (columns[5]->get(row).get_array().size() != 0 || columns[6]->get(row).get_array().size() != 0) {
-            std::stringstream error;
-            error << "unsupported filter in celonis_match_activities" << std::endl;
-            throw std::runtime_error(error.str());
-        }
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
@@ -101,9 +118,19 @@ _match_activities_general(const Columns& columns) {
         for (const auto& value: excluding_node_array) {
             excluding_nodes.insert(value.get_slice());
         }
+        auto excluding_all_node_array = columns[5]->get(row).get_array();
+        SliceHashSet excluding_all_nodes;
+        for (const auto& value: excluding_all_node_array) {
+            excluding_all_nodes.insert(value.get_slice());
+        }
+        auto any_node_array = columns[6]->get(row).get_array();
+        SliceHashSet any_nodes;
+        for (const auto& value: any_node_array) {
+            any_nodes.insert(value.get_slice());
+        }
         result.append(
                 _match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes, end_nodes,
-                                  excluding_nodes));
+                                  excluding_nodes, excluding_all_nodes, any_nodes));
     }
 
     return result.build(ColumnHelper::is_all_const(columns));
@@ -126,37 +153,39 @@ _match_activities_const(const Columns& columns) {
     for (const auto& value: start_node_array) {
         start_nodes.insert(value.get_slice());
     }
-
     auto node_array = columns[2]->get(0).get_array();
     SliceHashSet nodes;
     for (const auto& value: node_array) {
         nodes.insert(value.get_slice());
     }
-
     auto end_node_array = columns[3]->get(0).get_array();
     SliceHashSet end_nodes;
     for (const auto& value: end_node_array) {
         end_nodes.insert(value.get_slice());
     }
-
     auto excluding_node_array = columns[4]->get(0).get_array();
     SliceHashSet excluding_nodes;
     for (const auto& value: excluding_node_array) {
         excluding_nodes.insert(value.get_slice());
     }
+    auto excluding_all_node_array = columns[5]->get(0).get_array();
+    SliceHashSet excluding_all_nodes;
+    for (const auto& value: excluding_all_node_array) {
+        excluding_all_nodes.insert(value.get_slice());
+    }
+    auto any_node_array = columns[6]->get(0).get_array();
+    SliceHashSet any_nodes;
+    for (const auto& value: any_node_array) {
+        any_nodes.insert(value.get_slice());
+    }
     for (size_t row = 0; row < n_rows; ++row) {
-        if (columns[5]->get(row).get_array().size() != 0 || columns[6]->get(row).get_array().size() != 0) {
-            std::stringstream error;
-            error << "unsupported filter in celonis_match_activities" << std::endl;
-            throw std::runtime_error(error.str());
-        }
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
         }
         result.append(
                 _match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes, end_nodes,
-                                  excluding_nodes));
+                                  excluding_nodes, excluding_all_nodes, any_nodes));
     }
 
     return result.build(ColumnHelper::is_all_const(columns));
