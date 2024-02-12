@@ -151,6 +151,7 @@ set(CELONIS_FILES
   celonis/mo_bpmn_graph.cpp
   celonis/mode_agg.cpp
   celonis/remap_timestamp_weekday.cpp
+  celonis/remap_values.cpp
   celonis/serialization_utils.cpp
   celonis/shortened_variant.cpp
   celonis/source_target.cpp

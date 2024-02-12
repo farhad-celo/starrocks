@@ -1443,6 +1443,11 @@ celostar_functions = [
     [1000812, 'celonis_least', True, False, 'DATETIME', ['DATETIME', 'DATETIME', '...'], 'CelonisGreatestLeast::celonis_least'],
     [1000813, 'celonis_least', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', '...'], 'CelonisGreatestLeast::celonis_least'],
 
+    [1000901, 'celonis_remap_values', 'BIGINT', ['BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT'], 'CelonisRemapValues<TYPE_BIGINT>::remap_values', 'CelonisRemapValues<TYPE_BIGINT>::prepare', 'CelonisRemapValues<TYPE_BIGINT>::close'],
+    [1000902, 'celonis_remap_values', 'VARCHAR', ['VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisRemapValues<TYPE_VARCHAR>::remap_values', 'CelonisRemapValues<TYPE_VARCHAR>::prepare', 'CelonisRemapValues<TYPE_VARCHAR>::close'],
+    [1000911, 'celonis_remap_values', 'BIGINT', ['BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT'], 'CelonisRemapValues<TYPE_BIGINT>::remap_values', 'CelonisRemapValues<TYPE_BIGINT>::prepare', 'CelonisRemapValues<TYPE_BIGINT>::close'],
+    [1000912, 'celonis_remap_values', 'VARCHAR', ['VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisRemapValues<TYPE_VARCHAR>::remap_values', 'CelonisRemapValues<TYPE_VARCHAR>::prepare', 'CelonisRemapValues<TYPE_VARCHAR>::close'],
+
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
     [2000110, 'celonis_merge_sorted_arrays', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
