@@ -568,13 +568,16 @@ std::vector<RunTimeCppType<TYPE_BIGINT>> ConformanceCaseChecker::check() {
 
             // Step 2. Explores all valid transitions.
             if (valid_states.empty()) {
-                // Result: Not conforming. No valid states.
-                DCHECK(invalid_state_found);
-                petri_net_search.current_state() = invalid_state;
-                temporary_result[index] = invalid_state_result;
-                // Saola implementation throws an exception here if invalid_state_result is less than 1000. It looks like no-op. Removed.
-                last_read_activity = activity_rid;
-                stack.emplace(false, number_of_violations + 1, index + 1);
+                if (invalid_state_found) {
+                    // Result: Not conforming. No valid states.
+                    petri_net_search.current_state() = invalid_state;
+                    temporary_result[index] = invalid_state_result;
+                    // Saola implementation throws an exception here if invalid_state_result is less than 1000. It looks like no-op. Removed.
+                    last_read_activity = activity_rid;
+                    stack.emplace(false, number_of_violations + 1, index + 1);
+                } else {
+                    // All transitions have been examined. Nothing to do.
+                }
             } else if (valid_states.size() == 1) {
                 // Result: Conforming. One valid state.
                 petri_net_search.current_state() = valid_states[0];
