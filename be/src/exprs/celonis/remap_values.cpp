@@ -148,4 +148,10 @@ class CelonisRemapValues<TYPE_BIGINT>;
 template
 class CelonisRemapValues<TYPE_VARCHAR>;
 
+template
+class CelonisRemapValues<TYPE_DOUBLE>;
+
+template
+class CelonisRemapValues<TYPE_DATETIME>;
+
 } // namespace starrocks

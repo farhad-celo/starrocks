@@ -9,7 +9,7 @@ class CelonisRemapValues {
 public:
     /**
      * @param: [input_value, old_value_array, new_value_array, default_value (optional)]
-     * @paramType columns: [VARCHAR | BIGINT, ARRAY of input_value type, ARRAY of input_value type, input_value type]
+     * @paramType columns: [VARCHAR | BIGINT | DOUBLE | DATETIME, ARRAY of input_value type, ARRAY of input_value type, input_value type]
      * @return: input_value type column
      * Supports PQL REMAP_VALUES: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245301/REMAP+VALUES
      * REMAP_INTS: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11247859/REMAP+INTS

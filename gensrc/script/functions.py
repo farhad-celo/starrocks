@@ -1445,8 +1445,12 @@ celostar_functions = [
 
     [1000901, 'celonis_remap_values', 'BIGINT', ['BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT'], 'CelonisRemapValues<TYPE_BIGINT>::remap_values', 'CelonisRemapValues<TYPE_BIGINT>::prepare', 'CelonisRemapValues<TYPE_BIGINT>::close'],
     [1000902, 'celonis_remap_values', 'VARCHAR', ['VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisRemapValues<TYPE_VARCHAR>::remap_values', 'CelonisRemapValues<TYPE_VARCHAR>::prepare', 'CelonisRemapValues<TYPE_VARCHAR>::close'],
+    [1000903, 'celonis_remap_values', 'DOUBLE', ['DOUBLE', 'ARRAY_DOUBLE', 'ARRAY_DOUBLE'], 'CelonisRemapValues<TYPE_DOUBLE>::remap_values', 'CelonisRemapValues<TYPE_DOUBLE>::prepare', 'CelonisRemapValues<TYPE_DOUBLE>::close'],
+    [1000904, 'celonis_remap_values', 'DATETIME', ['DATETIME', 'ARRAY_DATETIME', 'ARRAY_DATETIME'], 'CelonisRemapValues<TYPE_DATETIME>::remap_values', 'CelonisRemapValues<TYPE_DATETIME>::prepare', 'CelonisRemapValues<TYPE_DATETIME>::close'],
     [1000911, 'celonis_remap_values', 'BIGINT', ['BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT'], 'CelonisRemapValues<TYPE_BIGINT>::remap_values', 'CelonisRemapValues<TYPE_BIGINT>::prepare', 'CelonisRemapValues<TYPE_BIGINT>::close'],
     [1000912, 'celonis_remap_values', 'VARCHAR', ['VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisRemapValues<TYPE_VARCHAR>::remap_values', 'CelonisRemapValues<TYPE_VARCHAR>::prepare', 'CelonisRemapValues<TYPE_VARCHAR>::close'],
+    [1000913, 'celonis_remap_values', 'DOUBLE', ['DOUBLE', 'ARRAY_DOUBLE', 'ARRAY_DOUBLE', 'DOUBLE'], 'CelonisRemapValues<TYPE_DOUBLE>::remap_values', 'CelonisRemapValues<TYPE_DOUBLE>::prepare', 'CelonisRemapValues<TYPE_DOUBLE>::close'],
+    [1000914, 'celonis_remap_values', 'DATETIME', ['DATETIME', 'ARRAY_DATETIME', 'ARRAY_DATETIME', 'DATETIME'], 'CelonisRemapValues<TYPE_DATETIME>::remap_values', 'CelonisRemapValues<TYPE_DATETIME>::prepare', 'CelonisRemapValues<TYPE_DATETIME>::close'],
 
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],

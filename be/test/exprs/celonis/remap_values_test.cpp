@@ -385,4 +385,103 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_bigint) {
     }
 }
 
+TEST_F(CelonisRemapValuesTest, celonis_remap_values_double) {
+    const LogicalType LT = TYPE_DOUBLE;
+    Prepare<LT>();
+
+    value_column_->append_datum(1.0);
+    value_column_->append_datum(2.0);
+    value_column_->append_datum(3.0);
+    value_column_->append_datum(4.0);
+    value_column_->append_datum(kNullDatum);
+
+    default_column_->append_datum(kNullDatum);
+    default_column_->append_datum(kNullDatum);
+    default_column_->append_datum(kNullDatum);
+    default_column_->append_datum(kNullDatum);
+    default_column_->append_datum(0.0);
+
+    auto old_array = DatumArray{1.0, 2.0};
+    auto new_array = DatumArray{100.0, 200.0};
+
+    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    ASSERT_EQ(5, result->size());
+    EXPECT_EQ(100.0, result->get(0).get_double());
+    EXPECT_EQ(200.0, result->get(1).get_double());
+    EXPECT_TRUE(result->get(2).is_null());
+    EXPECT_TRUE(result->get(3).is_null());
+    EXPECT_EQ(0.0, result->get(4).get_double());
+}
+
+TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_double) {
+    {
+        const LogicalType LT = TYPE_DOUBLE;
+        Prepare<LT>();
+
+        AddRow(2.0, DatumArray{1.0, 2.0, 1.0}, DatumArray{2.0, 5.0, 10.0}, 0.0);
+        AddRow(kNullDatum, DatumArray{1.0, 2.0}, DatumArray{3.0, 4.0}, 0.0);
+
+        const auto result = Run<LT>(true).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ(5.0, result->get(0).get_double());
+        EXPECT_EQ(0.0, result->get(1).get_double());
+    }
+    {
+        const LogicalType LT = TYPE_DOUBLE;
+        Prepare<LT>();
+
+        AddRow(1.0, DatumArray{1.0, 2.0, 1.0}, DatumArray{2.0, 5.0, 10.5}, 0.0);
+        AddRow(kNullDatum, DatumArray{1.0, 2.0, kNullDatum}, DatumArray{3.0, 4.0, 5.5}, 0.0);
+
+        const auto result = Run<LT>(true).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ(10.5, result->get(0).get_double());
+        EXPECT_EQ(5.5, result->get(1).get_double());
+    }
+}
+
+TEST_F(CelonisRemapValuesTest, celonis_remap_values_datetime) {
+    const LogicalType LT = TYPE_DATETIME;
+    Prepare<LT>();
+
+    value_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    value_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+    value_column_->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
+    value_column_->append_datum(TimestampValue::create(1970, 1, 4, 0, 0, 0));
+    value_column_->append_datum(kNullDatum);
+
+    default_column_->append_datum(kNullDatum);
+    default_column_->append_datum(kNullDatum);
+    default_column_->append_datum(kNullDatum);
+    default_column_->append_datum(kNullDatum);
+    default_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+
+    auto old_array = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0),
+                                TimestampValue::create(1970, 1, 2, 0, 0, 0)};
+    auto new_array = DatumArray{TimestampValue::create(1970, 1, 10, 0, 0, 0),
+                                TimestampValue::create(1970, 1, 20, 0, 0, 0)};
+
+    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    ASSERT_EQ(5, result->size());
+    EXPECT_EQ(TimestampValue::create(1970, 1, 10, 0, 0, 0), result->get(0).get_timestamp());
+    EXPECT_EQ(TimestampValue::create(1970, 1, 20, 0, 0, 0), result->get(1).get_timestamp());
+    EXPECT_TRUE(result->get(2).is_null());
+    EXPECT_TRUE(result->get(3).is_null());
+    EXPECT_EQ(TimestampValue::create(1970, 1, 1, 0, 0, 0), result->get(4).get_timestamp());
+}
+
+TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_datetime) {
+    const LogicalType LT = TYPE_DATETIME;
+    Prepare<LT>();
+
+    AddRow(TimestampValue::create(1970, 1, 2, 0, 0, 0), DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0)},
+           DatumArray{TimestampValue::create(1970, 1, 20, 0, 0, 0)}, TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    AddRow(kNullDatum, DatumArray{}, DatumArray{}, TimestampValue::create(1970, 1, 1, 0, 0, 0));
+
+    const auto result = Run<LT>(true).value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_EQ(TimestampValue::create(1970, 1, 20, 0, 0, 0), result->get(0).get_timestamp());
+    EXPECT_EQ(TimestampValue::create(1970, 1, 1, 0, 0, 0), result->get(1).get_timestamp());
+}
+
 } // namespace starrocks
