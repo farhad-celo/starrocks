@@ -1365,6 +1365,77 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_workday_cal
     }
 }
 
+TEST_F(CelonisTimeFunctionsTest, date_between) {
+    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+    auto begin_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+    auto end_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+    timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+    timestamps->append_datum(TimestampValue::create(1970, 1, 2, 1, 0, 0));
+    timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
+    timestamps->append_datum(TimestampValue::create(1970, 1, 3, 1, 0, 0));
+    for (auto i = 0; i < timestamps->size(); ++i) {
+        begin_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        end_timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
+    }
+    const auto result = CelonisTimeFunctions::date_between(nullptr,
+                                                           {timestamps, begin_timestamps, end_timestamps}).value();
+    ASSERT_EQ(timestamps->size(), result->size());
+    EXPECT_EQ(0L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+}
+
+TEST_F(CelonisTimeFunctionsTest, date_between_null_input) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        auto begin_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto end_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        timestamps->append_datum(kNullDatum);
+        begin_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        end_timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
+        const auto result = CelonisTimeFunctions::date_between(nullptr,
+                                                               {timestamps, begin_timestamps, end_timestamps}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto begin_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        auto end_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        begin_timestamps->append_datum(kNullDatum);
+        end_timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
+        const auto result = CelonisTimeFunctions::date_between(nullptr,
+                                                               {timestamps, begin_timestamps, end_timestamps}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto begin_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto end_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        begin_timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
+        end_timestamps->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::date_between(nullptr,
+                                                               {timestamps, begin_timestamps, end_timestamps}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, date_between_empty_input) {
+    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+    auto begin_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+    auto end_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+    const auto result = CelonisTimeFunctions::date_between(nullptr,
+                                                           {timestamps, begin_timestamps, end_timestamps}).value();
+    EXPECT_EQ(0, result->size());
+}
+
 TEST_F(CelonisTimeFunctionsTest, in_calendar_multi_weekday_calendar) {
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);

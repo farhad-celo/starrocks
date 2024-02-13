@@ -24,6 +24,15 @@ public:
     DEFINE_VECTORIZED_FN(timeunits_between_calendar);
 
     /**
+     * @param: [first_date, second_date, third_date]
+     * @paramType: [DATETIME, DATETIME, DATETIME]
+     * @return: BIGINT
+     * This function returns 1 if first_date is in range [second_date, third_date), and 0 otherwise.
+     * Implements PQL DATE_BETWEEN https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245340/DATE+BETWEEN
+     */
+    DEFINE_VECTORIZED_FN(date_between);
+
+    /**
      * @param: [timestamp, calendar_specification, calendar_id_column]
      * @paramType: [DATETIME, ARRAY_VARCHAR, VARCHAR]
      * @return: BIGINT

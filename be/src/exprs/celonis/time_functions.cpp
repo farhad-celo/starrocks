@@ -812,6 +812,32 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unus
     return remap_timestamps_calendar_const(context, columns, calendar_state);
 }
 
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::date_between([[maybe_unused]] FunctionContext* context,
+                                                       const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 3);
+    const size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnViewer begin_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
+    ColumnViewer end_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[2]);
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (auto row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        auto timestamp = timestamp_viewer.value(row);
+        auto begin_timestamp = begin_timestamp_viewer.value(row);
+        auto end_timestamp = end_timestamp_viewer.value(row);
+        if (timestamp >= begin_timestamp && timestamp < end_timestamp) {
+            result.append(1L);
+        } else {
+            result.append(0L);
+        }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
 static StatusOr<std::optional<bool>>
 timestamp_in_calendar(const TimestampValue& timestamp,
                       const std::string& calendar_json_string,
@@ -1048,7 +1074,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
         return Status::InvalidArgument("calendar1 array must not contain null values.");
     }
     DCHECK(calendar1_array_data.elements->is_binary());
-    const auto& calendars1 = down_cast<const RunTimeColumnType <TYPE_VARCHAR>&>(
+    const auto& calendars1 = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *calendar1_array_data.elements).get_data().data();
     const auto& calendar1_offsets = calendar1_array_data.offsets->get_data().data();
 
@@ -1057,7 +1083,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
         return Status::InvalidArgument("calendar2 array must not contain null values.");
     }
     DCHECK(calendar2_array_data.elements->is_binary());
-    const auto& calendars2 = down_cast<const RunTimeColumnType <TYPE_VARCHAR>&>(
+    const auto& calendars2 = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *calendar2_array_data.elements).get_data().data();
     const auto& calendar2_offsets = calendar2_array_data.offsets->get_data().data();
 
@@ -1068,10 +1094,10 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
             output_column->append_nulls(1);
             continue;
         }
-        StatusOr <celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(calendars1, calendar1_offsets,
-                                                                                     row);
-        StatusOr <celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(calendars2, calendar2_offsets,
-                                                                                     row);
+        StatusOr<celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(calendars1, calendar1_offsets,
+                                                                                    row);
+        StatusOr<celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(calendars2, calendar2_offsets,
+                                                                                    row);
         if (!status_or_calendar1.ok() || !status_or_calendar2.ok()) {
             output_column->append_nulls(1);
             continue;
@@ -1148,7 +1174,8 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::add_timeunits_calendar([[maybe_unused]
         }
         std::string time_unit = time_unit_viewer.value(row).to_string();
         if (TIME_UNIT_TO_MS.find(time_unit) == TIME_UNIT_TO_MS.end()) {
-            return Status::InvalidArgument("time unit must be one of DAYS/WORKDAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
+            return Status::InvalidArgument(
+                    "time unit must be one of DAYS/WORKDAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
         }
         auto timestamp = timestamp_viewer.value(row);
         auto add_value = add_value_viewer.value(row);
