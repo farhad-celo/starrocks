@@ -1466,6 +1466,7 @@ celostar_functions = [
     [3000140, 'celonis_timeunits_between_calendar', True, False, 'DOUBLE', ['DATETIME', 'DATETIME', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::timeunits_between_calendar'],
     [3000150, 'celonis_add_timeunits_calendar', True, False, 'DATETIME', ['DATETIME', 'BIGINT', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::add_timeunits_calendar'],
     [3000160, 'celonis_date_between', True, False, 'BIGINT', ['DATETIME', 'DATETIME', 'DATETIME'], 'CelonisTimeFunctions::date_between'],
+    [3000170, 'celonis_millis_timestamp', True, False, 'BIGINT', ['DATETIME'], 'CelonisTimeFunctions::millis_timestamp'],
 
     # String functions
     [4000100, 'celonis_translate', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisStringFunctions::translate', 'CelonisStringFunctions::translate_prepare', 'CelonisStringFunctions::translate_close' ],

@@ -6,6 +6,15 @@ namespace starrocks {
 
 class CelonisTimeFunctions {
 public:
+
+    /**
+     * @param: [timestamp]
+     * @paramType: [DATETIME]
+     * @return: BIGINT
+     * Returns milliseconds since epoch of the timestamp
+     */
+    DEFINE_VECTORIZED_FN(millis_timestamp);
+
     DEFINE_VECTORIZED_FN(timestamp_millis);
 
     /**

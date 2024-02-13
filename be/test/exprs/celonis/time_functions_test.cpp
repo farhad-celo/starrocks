@@ -32,6 +32,28 @@ protected:
 
 };
 
+TEST_F(CelonisTimeFunctionsTest, millis_timestamp) {
+    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+    timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0, 123000));
+    timestamps->append_datum(kNullDatum);
+    timestamps->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
+    timestamps->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
+    const auto result = CelonisTimeFunctions::millis_timestamp(nullptr, {timestamps}).value();
+    ASSERT_EQ(timestamps->size(), result->size());
+    EXPECT_EQ(0L, result->get(0).get_int64());
+    EXPECT_EQ(123L, result->get(1).get_int64());
+    EXPECT_TRUE(result->get(2).is_null());
+    EXPECT_EQ(3600000L, result->get(3).get_int64());
+    EXPECT_EQ(-86400000L, result->get(4).get_int64());
+}
+
+TEST_F(CelonisTimeFunctionsTest, millis_timestamp_empty_input) {
+    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+    const auto result = CelonisTimeFunctions::millis_timestamp(nullptr, {timestamps}).value();
+    ASSERT_EQ(timestamps->size(), result->size());
+}
+
 TEST_F(CelonisTimeFunctionsTest, timestamp_millis) {
     auto col = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
     col->append_datum(0L);  // 1970-01-01 00:00:00.000 UTC

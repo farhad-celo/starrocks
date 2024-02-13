@@ -106,6 +106,27 @@ static void round_calendar(celonis::accelerator::Calendar& calendar_proto, int64
     }
 }
 
+static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
+    TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
+    return timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+}
+
+StatusOr<ColumnPtr>
+CelonisTimeFunctions::millis_timestamp([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    const size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (auto row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        result.append(remap_timestamp_ms(timestamp_viewer.value(row)));
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
 StatusOr<ColumnPtr>
 CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
@@ -232,11 +253,6 @@ struct PeriodicTimeRange : public TimeRange {
         return begin_ms <= adjusted_ms && adjusted_ms <= end_ms;
     }
 };
-
-static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
-    TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
-    return timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
-}
 
 static TimeRange get_time_range(const TimestampValue& timestamp) {
     int64_t milliseconds = remap_timestamp_ms(timestamp);
