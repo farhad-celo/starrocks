@@ -10,7 +10,7 @@ public:
 
     /**
      * @param: [input_array, timestamp_array, size_array, priority_array]
-     * @paramType columns: [ANY_ARRAY, ARRAY_TIMESTAMP, ARRAY_INT, ARRAY_INT]
+     * @paramType: [ANY_ARRAY, ARRAY_TIMESTAMP, ARRAY_INT, ARRAY_INT]
      * @return: input_arrays type
      * input_array and timestamp_array should have the same number of elements which is equal to the sum of size_array.
      * size_array and priority_array should have the same number of elements.
@@ -20,7 +20,7 @@ public:
 
     /**
      * @param: [input_array, key_array]
-     * @paramType columns: [ANY_ARRAY, ARRAY_VARCHAR]
+     * @paramType: [ANY_ARRAY, ARRAY_VARCHAR]
      * @return: input_array type
      * Returns first elements of input_array that correspond to unique elements of key_array.
      * input_array and key_array should have the same number of elements.
@@ -30,7 +30,7 @@ public:
 
     /**
      * @param: [input_array, offset]
-     * @paramType columns: [ANY_ARRAY, BIGINT]
+     * @paramType: [ANY_ARRAY, BIGINT]
      * @return: input_array type
      * Returns the element that precedes the current element by offset number of elements.
      * The lagging value for a NULL value is the same value as the lagging value of the next non-NULL value.
@@ -40,7 +40,7 @@ public:
 
     /**
      * @param: [input_array, offset]
-     * @paramType columns: [ANY_ARRAY, BIGINT]
+     * @paramType: [ANY_ARRAY, BIGINT]
      * @return: input_array type
      * Returns the element that follows the current element by offset number of elements.
      * The leading value for a NULL value is the same value as the leading value of the last non-NULL value.
@@ -50,7 +50,7 @@ public:
 
     /**
      * @param: [input_array]
-     * @paramType columns: [ANY_ARRAY]
+     * @paramType: [ANY_ARRAY]
      * @return: input_array type
      * Returns a new column based on the input column where NULL elements are replaced with empty arrays.
      */
@@ -71,6 +71,14 @@ public:
      * Implements PQL CALC_CROP_TO_NULL: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245581/CALC+CROP+TO+NULL
      */
     DEFINE_VECTORIZED_FN(calc_crop_to_null);
+
+    /**
+     * @param: [input_array]
+     * @paramType: [ARRAY_VARCHAR | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_DATETIME]
+     * @return: BIGINT
+     * It counts number of non-NULL elements in the array
+     */
+    DEFINE_VECTORIZED_FN(array_count);
 };
 
 } // namespace starrocks

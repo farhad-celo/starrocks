@@ -5,6 +5,7 @@
 
 #include "column/array_column.h"
 #include "exprs/celonis/util.h"
+#include "column/column_builder.h"
 #include "column/column_viewer.h"
 
 namespace starrocks {
@@ -653,8 +654,8 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
         const std::string begin_activity = begin_mode == "ALL" ? "" : begin_activity_viewer.value(row).to_string();
         const std::string end_activity = end_mode == "ALL" ? "" : end_activity_viewer.value(row).to_string();
 
-        const int64_t start = static_cast<int64_t>(activity_offsets[row]);
-        const int64_t end = static_cast<int64_t>(activity_offsets[row + 1]);
+        const auto start = static_cast<int64_t>(activity_offsets[row]);
+        const auto end = static_cast<int64_t>(activity_offsets[row + 1]);
         DCHECK(end >= start);
         const auto size = end - start;
         std::optional<int64_t> first_begin_index = std::nullopt;
@@ -745,6 +746,33 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] Fu
     auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
     RETURN_IF_ERROR(calc_crop_impl(columns, false, result));
     return result;
+}
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::array_count([[maybe_unused]] FunctionContext* context,
+                                                       const Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    UnnestedArrayData array_data = prepare_array_input(columns[0].get());
+    const auto& offsets = array_data.offsets->get_data().data();
+
+    const size_t n_rows = columns[0]->size();
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (auto row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        const auto start = offsets[row];
+        const auto end = offsets[row + 1];
+        int64_t cnt = 0;
+        for (auto i = start; i < end; ++i) {
+            if (array_data.null_elements != nullptr && (*array_data.null_elements)[i] != 0) {
+                continue;
+            }
+            ++cnt;
+        }
+        result.append(cnt);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
 }
 
 } // namespace starrocks
