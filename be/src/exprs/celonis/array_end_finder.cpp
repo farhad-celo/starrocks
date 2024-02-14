@@ -40,6 +40,39 @@ CelonisArrayEndFinder<LT>::array_first([[maybe_unused]] FunctionContext* context
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
+template<LogicalType LT>
+StatusOr<ColumnPtr>
+CelonisArrayEndFinder<LT>::array_last([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(1, columns.size());
+    UnnestedArrayData array_data = prepare_array_input(columns[0].get());
+    const auto& elements = down_cast<const RunTimeColumnType<LT>&>(*array_data.elements).get_data().data();
+    const auto& offsets = array_data.offsets->get_data().data();
+    const auto num_rows = columns[0]->size();
+    ColumnBuilder<LT> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
+        if (columns[0]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        const auto start = static_cast<int64_t>(offsets[row]);
+        const auto end = static_cast<int64_t>(offsets[row + 1]);
+        DCHECK(end >= start);
+        bool found = false;
+        for (auto i = end - 1; i >= start; --i) {
+            if (array_data.null_elements != nullptr && (*array_data.null_elements)[i] != 0) {
+                continue;
+            }
+            found = true;
+            result.append(elements[i]);
+            break;
+        }
+        if (not found) {
+            result.append_null();
+        }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
 template
 class CelonisArrayEndFinder<TYPE_INT>;
 
