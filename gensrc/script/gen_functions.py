@@ -71,6 +71,7 @@ ${license}
 #include "exprs/builtin_functions.h"
 #include "exprs/dict_functions.h"
 #include "exprs/celonis/align_model.h"
+#include "exprs/celonis/array_count_distinct.h"
 #include "exprs/celonis/array_end_finder.h"
 #include "exprs/celonis/array_functions.h"
 #include "exprs/celonis/calc_throughput.h"
