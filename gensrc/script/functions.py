@@ -1465,6 +1465,11 @@ celostar_functions = [
     [2000182, 'celonis_array_count', True, False, 'BIGINT', ['ARRAY_BIGINT'], 'CelonisArrayFunctions::array_count'],
     [2000183, 'celonis_array_count', True, False, 'BIGINT', ['ARRAY_DOUBLE'], 'CelonisArrayFunctions::array_count'],
     [2000184, 'celonis_array_count', True, False, 'BIGINT', ['ARRAY_DATETIME'], 'CelonisArrayFunctions::array_count'],
+    [2000201, 'celonis_array_first', True, False, 'VARCHAR', ['ARRAY_VARCHAR'], 'CelonisArrayEndFinder<TYPE_VARCHAR>::array_first'],
+    [2000202, 'celonis_array_first', True, False, 'BIGINT', ['ARRAY_BIGINT'], 'CelonisArrayEndFinder<TYPE_BIGINT>::array_first'],
+    [2000203, 'celonis_array_first', True, False, 'INT', ['ARRAY_INT'], 'CelonisArrayEndFinder<TYPE_INT>::array_first'],
+    [2000204, 'celonis_array_first', True, False, 'DOUBLE', ['ARRAY_DOUBLE'], 'CelonisArrayEndFinder<TYPE_DOUBLE>::array_first'],
+    [2000205, 'celonis_array_first', True, False, 'DATETIME', ['ARRAY_DATETIME'], 'CelonisArrayEndFinder<TYPE_DATETIME>::array_first'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],
