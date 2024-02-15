@@ -2645,18 +2645,38 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
         arrays->append_datum(DatumArray{});
         arrays->append_datum(kNullDatum);
         arrays->append_datum(DatumArray{kNullDatum, "A", kNullDatum, "B"});
-        arrays->append_datum(DatumArray{kNullDatum, "A", kNullDatum, "B", kNullDatum});
+        arrays->append_datum(DatumArray{kNullDatum, "A", kNullDatum, "B", kNullDatum, "A"});
         arrays->append_datum(DatumArray{kNullDatum});
-        arrays->append_datum(DatumArray{"A"});
+        arrays->append_datum(DatumArray{"A", "A"});
         arrays->append_datum(DatumArray{"A", "C", "D"});
         const auto result = CelonisArrayFunctions::array_count(nullptr, {arrays}).value();
         EXPECT_EQ(7, result->size());
         EXPECT_EQ(0L, result->get(0).get_int64());
         EXPECT_TRUE(result->get(1).is_null());
         EXPECT_EQ(2L, result->get(2).get_int64());
-        EXPECT_EQ(2L, result->get(3).get_int64());
+        EXPECT_EQ(3L, result->get(3).get_int64());
         EXPECT_EQ(0L, result->get(4).get_int64());
-        EXPECT_EQ(1L, result->get(5).get_int64());
+        EXPECT_EQ(2L, result->get(5).get_int64());
+        EXPECT_EQ(3L, result->get(6).get_int64());
+    }
+    // INT
+    {
+        auto arrays = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        arrays->append_datum(DatumArray{});
+        arrays->append_datum(kNullDatum);
+        arrays->append_datum(DatumArray{kNullDatum, 1, kNullDatum, 2});
+        arrays->append_datum(DatumArray{kNullDatum, 1, kNullDatum, 2, kNullDatum, 2});
+        arrays->append_datum(DatumArray{kNullDatum});
+        arrays->append_datum(DatumArray{1, 2, 1, 2});
+        arrays->append_datum(DatumArray{1, 3, 4});
+        const auto result = CelonisArrayFunctions::array_count(nullptr, {arrays}).value();
+        EXPECT_EQ(7, result->size());
+        EXPECT_EQ(0L, result->get(0).get_int64());
+        EXPECT_TRUE(result->get(1).is_null());
+        EXPECT_EQ(2L, result->get(2).get_int64());
+        EXPECT_EQ(3L, result->get(3).get_int64());
+        EXPECT_EQ(0L, result->get(4).get_int64());
+        EXPECT_EQ(4L, result->get(5).get_int64());
         EXPECT_EQ(3L, result->get(6).get_int64());
     }
     // BIGINT
@@ -2667,7 +2687,7 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
         arrays->append_datum(DatumArray{kNullDatum, 1L, kNullDatum, 2L});
         arrays->append_datum(DatumArray{kNullDatum, 1L, kNullDatum, 2L, kNullDatum});
         arrays->append_datum(DatumArray{kNullDatum});
-        arrays->append_datum(DatumArray{1L});
+        arrays->append_datum(DatumArray{1L, 2L, 1L, 2L});
         arrays->append_datum(DatumArray{1L, 3L, 4L});
         const auto result = CelonisArrayFunctions::array_count(nullptr, {arrays}).value();
         EXPECT_EQ(7, result->size());
@@ -2676,7 +2696,7 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
         EXPECT_EQ(2L, result->get(2).get_int64());
         EXPECT_EQ(2L, result->get(3).get_int64());
         EXPECT_EQ(0L, result->get(4).get_int64());
-        EXPECT_EQ(1L, result->get(5).get_int64());
+        EXPECT_EQ(4L, result->get(5).get_int64());
         EXPECT_EQ(3L, result->get(6).get_int64());
     }
     // DOUBLE
@@ -2684,19 +2704,19 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
         auto arrays = ColumnHelper::create_column(TYPE_ARRAY_DOUBLE, true);
         arrays->append_datum(DatumArray{});
         arrays->append_datum(kNullDatum);
-        arrays->append_datum(DatumArray{kNullDatum, 1.5, kNullDatum, 2.5});
+        arrays->append_datum(DatumArray{kNullDatum, 1.5, kNullDatum, 2.5, 1.5});
         arrays->append_datum(DatumArray{kNullDatum, 1.5, kNullDatum, 2.5, kNullDatum});
         arrays->append_datum(DatumArray{kNullDatum});
-        arrays->append_datum(DatumArray{1.5});
+        arrays->append_datum(DatumArray{1.5, 1.5});
         arrays->append_datum(DatumArray{1.5, 3.5, 4.5});
         const auto result = CelonisArrayFunctions::array_count(nullptr, {arrays}).value();
         EXPECT_EQ(7, result->size());
         EXPECT_EQ(0L, result->get(0).get_int64());
         EXPECT_TRUE(result->get(1).is_null());
-        EXPECT_EQ(2L, result->get(2).get_int64());
+        EXPECT_EQ(3L, result->get(2).get_int64());
         EXPECT_EQ(2L, result->get(3).get_int64());
         EXPECT_EQ(0L, result->get(4).get_int64());
-        EXPECT_EQ(1L, result->get(5).get_int64());
+        EXPECT_EQ(2L, result->get(5).get_int64());
         EXPECT_EQ(3L, result->get(6).get_int64());
     }
     // DATETIME
@@ -2709,20 +2729,23 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
         arrays->append_datum(DatumArray{kNullDatum, TimestampValue::create(1970, 1, 1, 0, 0, 0), kNullDatum,
                                         TimestampValue::create(1971, 1, 1, 0, 0, 0), kNullDatum});
         arrays->append_datum(DatumArray{kNullDatum});
-        arrays->append_datum(DatumArray{TimestampValue::create(1971, 1, 1, 0, 0, 0)});
         arrays->append_datum(
-                DatumArray{TimestampValue::create(1973, 1, 1, 0, 0, 0), TimestampValue::create(1975, 1, 1, 0, 0, 0),
-                           TimestampValue::create(1977, 1, 1, 0, 0, 0)});
-        const auto result = CelonisArrayFunctions::array_count(nullptr, {arrays}).value();
-        EXPECT_EQ(7, result->size());
-        EXPECT_EQ(0L, result->get(0).get_int64());
-        EXPECT_TRUE(result->get(1).is_null());
-        EXPECT_EQ(2L, result->get(2).get_int64());
-        EXPECT_EQ(2L, result->get(3).get_int64());
-        EXPECT_EQ(0L, result->get(4).get_int64());
-        EXPECT_EQ(1L, result->get(5).get_int64());
-        EXPECT_EQ(3L, result->get(6).get_int64());
+                DatumArray{TimestampValue::create(1971, 1, 1, 0, 0, 0), {TimestampValue::create(1971, 1, 1, 0, 0, 0)});
+                arrays->append_datum(
+                DatumArray{
+                    TimestampValue::create(1973, 1, 1, 0, 0, 0), TimestampValue::create(1975, 1, 1, 0, 0, 0),
+                            TimestampValue::create(1977, 1, 1, 0, 0, 0)
+                });
+                const auto result = CelonisArrayFunctions::array_count(nullptr, { arrays }).value();
+                EXPECT_EQ(7, result->size());
+                EXPECT_EQ(0L, result->get(0).get_int64());
+                EXPECT_TRUE(result->get(1).is_null());
+                EXPECT_EQ(2L, result->get(2).get_int64());
+                EXPECT_EQ(2L, result->get(3).get_int64());
+                EXPECT_EQ(0L, result->get(4).get_int64());
+                EXPECT_EQ(2L, result->get(5).get_int64());
+                EXPECT_EQ(3L, result->get(6).get_int64());
+                }
     }
-}
 
 } // namespace starrocks

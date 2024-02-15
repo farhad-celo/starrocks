@@ -1465,6 +1465,7 @@ celostar_functions = [
     [2000182, 'celonis_array_count', True, False, 'BIGINT', ['ARRAY_BIGINT'], 'CelonisArrayFunctions::array_count'],
     [2000183, 'celonis_array_count', True, False, 'BIGINT', ['ARRAY_DOUBLE'], 'CelonisArrayFunctions::array_count'],
     [2000184, 'celonis_array_count', True, False, 'BIGINT', ['ARRAY_DATETIME'], 'CelonisArrayFunctions::array_count'],
+    [2000185, 'celonis_array_count', True, False, 'BIGINT', ['ARRAY_INT'], 'CelonisArrayFunctions::array_count'],
     [2000191, 'celonis_array_count_distinct', True, False, 'BIGINT', ['ARRAY_VARCHAR'], 'CelonisArrayCountDistinct<TYPE_VARCHAR>::array_count_distinct'],
     [2000192, 'celonis_array_count_distinct', True, False, 'BIGINT', ['ARRAY_INT'], 'CelonisArrayCountDistinct<TYPE_INT>::array_count_distinct'],
     [2000193, 'celonis_array_count_distinct', True, False, 'BIGINT', ['ARRAY_BIGINT'], 'CelonisArrayCountDistinct<TYPE_BIGINT>::array_count_distinct'],
