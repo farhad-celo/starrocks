@@ -16,6 +16,7 @@ protected:
     void TearDown() override {}
 
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
+    TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
 
     std::string get_is_workdays_str(int n_days, const std::unordered_set<int>& one_indexes) {
         std::string sep = "";
@@ -2871,6 +2872,206 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_invalid_input) {
                                                                           calendar_ids});
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().get_error_msg(), "Calendar array should not have null elements.");
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, date_match_normal_cases) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(TimestampValue::create(2008, 1, 1, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 2, 8, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 3, 15, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 5, 22, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2007, 1, 1, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 3, 8, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 3, 16, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2009, 6, 22, 0, 0, 0));
+        for (int i = 0; i < 8; ++i) {
+            years->append_datum(DatumArray{2008L});
+            quarters->append_datum(DatumArray{1L, 2L});
+            months->append_datum(DatumArray{1L, 2L, 3L, 5L});
+            weeks->append_datum(DatumArray{1L, 6L, 11L, 21L});
+            days->append_datum(DatumArray{1L, 8L, 15L, 22L});
+        }
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(8, result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+        EXPECT_EQ(1L, result->get(2).get_int64());
+        EXPECT_EQ(1L, result->get(3).get_int64());
+        EXPECT_EQ(0L, result->get(4).get_int64());
+        EXPECT_EQ(0L, result->get(5).get_int64());
+        EXPECT_EQ(0L, result->get(6).get_int64());
+        EXPECT_EQ(0L, result->get(7).get_int64());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(TimestampValue::create(2007, 1, 1, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 2, 5, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 3, 10, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2009, 5, 15, 0, 0, 0));
+        for (int i = 0; i < 4; ++i) {
+            years->append_datum(DatumArray{2008L});
+            quarters->append_datum(DatumArray{});
+            months->append_datum(DatumArray{});
+            weeks->append_datum(DatumArray{});
+            days->append_datum(DatumArray{1L, 2L, 3L, 4L});
+        }
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(4, result->size());
+        EXPECT_EQ(0L, result->get(0).get_int64());
+        EXPECT_EQ(0L, result->get(1).get_int64());
+        EXPECT_EQ(0L, result->get(2).get_int64());
+        EXPECT_EQ(0L, result->get(3).get_int64());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(TimestampValue::create(2008, 1, 1, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 2, 8, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 3, 15, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 5, 22, 0, 0, 0));
+        for (int i = 0; i < 4; ++i) {
+            years->append_datum(DatumArray{2008L});
+            quarters->append_datum(DatumArray{});
+            months->append_datum(DatumArray{1L, 2L, 3L, 5L});
+            weeks->append_datum(DatumArray{});
+            days->append_datum(DatumArray{1L, 8L, 15L, 22L});
+        }
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(4, result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+        EXPECT_EQ(1L, result->get(2).get_int64());
+        EXPECT_EQ(1L, result->get(3).get_int64());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, date_match_null_input) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(kNullDatum);
+        years->append_datum(DatumArray{2008L});
+        quarters->append_datum(DatumArray{1L, 2L});
+        months->append_datum(DatumArray{1L, 2L, 3L, 5L});
+        weeks->append_datum(DatumArray{1L, 6L, 11L, 21L});
+        days->append_datum(DatumArray{1L, 8L, 15L, 22L});
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(TimestampValue::create(2008, 1, 1, 0, 0, 0));
+        years->append_datum(kNullDatum);
+        quarters->append_datum(DatumArray{1L, 2L});
+        months->append_datum(DatumArray{1L, 2L, 3L, 5L});
+        weeks->append_datum(DatumArray{1L, 6L, 11L, 21L});
+        days->append_datum(DatumArray{1L, 8L, 15L, 22L});
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(TimestampValue::create(2008, 1, 1, 0, 0, 0));
+        years->append_datum(DatumArray{2008L});
+        quarters->append_datum(kNullDatum);
+        months->append_datum(DatumArray{1L, 2L, 3L, 5L});
+        weeks->append_datum(DatumArray{1L, 6L, 11L, 21L});
+        days->append_datum(DatumArray{1L, 8L, 15L, 22L});
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(TimestampValue::create(2008, 1, 1, 0, 0, 0));
+        years->append_datum(DatumArray{2008L});
+        quarters->append_datum(DatumArray{1L, 2L});
+        months->append_datum(kNullDatum);
+        weeks->append_datum(DatumArray{1L, 6L, 11L, 21L});
+        days->append_datum(DatumArray{1L, 8L, 15L, 22L});
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(TimestampValue::create(2008, 1, 1, 0, 0, 0));
+        years->append_datum(DatumArray{2008L});
+        quarters->append_datum(DatumArray{1L, 2L});
+        months->append_datum(DatumArray{1L, 2L, 3L, 5L});
+        weeks->append_datum(kNullDatum);
+        days->append_datum(DatumArray{1L, 8L, 15L, 22L});
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+        timestamps->append_datum(TimestampValue::create(2008, 1, 1, 0, 0, 0));
+        years->append_datum(DatumArray{2008L});
+        quarters->append_datum(DatumArray{1L, 2L});
+        months->append_datum(DatumArray{1L, 2L, 3L, 5L});
+        weeks->append_datum(DatumArray{1L, 6L, 11L, 21L});
+        days->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
     }
 }
 

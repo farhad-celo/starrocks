@@ -63,6 +63,14 @@ public:
      */
     DEFINE_VECTORIZED_FN(add_timeunits_calendar);
 
+    /**
+     * @param: [timestamp, years, quarters, months, weeks, days]
+     * @paramType: [DATETIME, ARRAY_BIGINT, ARRAY_BIGINT, ARRAY_BIGINT, ARRAY_BIGINT, ARRAY_BIGINT]
+     * @return: BIGINT
+     * Implements PQL DATE_MATCH: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245405/DATE+MATCH
+     */
+    DEFINE_VECTORIZED_FN(date_match);
+
     static Status in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status in_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);

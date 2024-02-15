@@ -32,6 +32,39 @@ static const int64_t NUM_MICROSECONDS_PER_MILLISECONDS = 1000L;
 
 // SR places an upper limit of 1M of STRING. We use 900K which is less than 1M.
 static const size_t MAX_STRING_SIZE = 900000;
+
+static const int MONTH_TO_QUARTER[13] = {0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4};
+}
+
+static int get_week_number(int year, int month, int day) {
+    struct tm date = {};
+    date.tm_year = year - 1900; // Year since 1900
+    date.tm_mon = month - 1;    // 0-11
+    date.tm_mday = day;
+
+    // Normalize tm structure (mktime adjusts the tm_wday and tm_yday)
+    mktime(&date);
+
+    struct tm start_of_year = {};
+    start_of_year.tm_year = year - 1900;
+    start_of_year.tm_mon = 0; // January
+    start_of_year.tm_mday = 1;
+    mktime(&start_of_year);
+
+    // Calculate the number of days from the start of the year
+    int day_of_year = date.tm_yday; // tm_yday is 0-based
+    // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    int start_day_of_week = start_of_year.tm_wday;
+
+    // Adjust if the start of the year is not Monday
+    int week_number = (day_of_year + start_day_of_week) / 7;
+
+    // ISO 8601: First week is the one with the first Thursday
+    if (start_day_of_week > 1 && start_day_of_week <= 4) {
+        week_number++;
+    }
+
+    return week_number;
 }
 
 static void truncate_timestamp(const std::string& time_unit, TimestampValue& timestamp) {
@@ -1212,6 +1245,87 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::add_timeunits_calendar([[maybe_unused]
         } else {
             result.append_null();
         }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+class DateFilters {
+public:
+    DateFilters(size_t row, ColumnPtr years_column, ColumnPtr quarters_column, ColumnPtr months_column,
+                ColumnPtr weeks_column, ColumnPtr days_column) {
+        populate_filters(years_, row, years_column);
+        populate_filters(quarters_, row, quarters_column);
+        populate_filters(months_, row, months_column);
+        populate_filters(weeks_, row, weeks_column);
+        populate_filters(days_, row, days_column);
+    }
+
+    bool matches(const TimestampValue& timestamp) {
+        int year, month, day, hour, minute, second, usec;
+        timestamp.to_timestamp(&year, &month, &day, &hour, &minute, &second, &usec);
+        if (!years_.empty() && !years_.count(year)) {
+            return false;
+        }
+        if (!quarters_.empty()) {
+            const int quarter = MONTH_TO_QUARTER[month];
+            if (!quarters_.count(quarter)) {
+                return false;
+            }
+        }
+        if (!months_.empty() && !months_.count(month)) {
+            return false;
+        }
+        if (!weeks_.empty()) {
+            const int week = get_week_number(year, month, day);
+            if (!weeks_.count(week)) {
+                return false;
+            }
+        }
+        if (!days_.empty() && !days_.count(day)) {
+            return false;
+        }
+        return true;
+    }
+
+private:
+
+    void populate_filters(std::unordered_set<int64_t>& filters, size_t row, ColumnPtr column) {
+        DCHECK(row < column->size());
+        UnnestedArrayData array_data = prepare_array_input(column.get());
+        const auto& elements = down_cast<const RunTimeColumnType<TYPE_BIGINT>&>(*array_data.elements).get_data().data();
+        const auto& offsets = array_data.offsets->get_data().data();
+        const size_t start = offsets[row];
+        const size_t end = offsets[row + 1];
+        for (auto i = start; i < end; ++i) {
+            if (array_data.null_elements != nullptr && (*array_data.null_elements)[i] != 0) {
+                continue;
+            }
+            filters.insert(elements[i]);
+        }
+    }
+
+    std::unordered_set<int64_t> years_;
+    std::unordered_set<int64_t> quarters_;
+    std::unordered_set<int64_t> months_;
+    std::unordered_set<int64_t> weeks_;
+    std::unordered_set<int64_t> days_;
+};
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::date_match([[maybe_unused]] FunctionContext* context,
+                                                     const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 6);
+    const size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (auto row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
+            columns[3]->is_null(row) || columns[4]->is_null(row) || columns[5]->is_null(row)) {
+            result.append_null();
+            break;
+        }
+        DateFilters date_filters(row, columns[1], columns[2], columns[3], columns[4], columns[5]);
+        auto timestamp = timestamp_viewer.value(row);
+        result.append(date_filters.matches(timestamp) ? 1L : 0L);
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
