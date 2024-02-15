@@ -139,6 +139,7 @@ set(CELONIS_FILES
   celonis/agg/variant_agg.cpp
   celonis/agg/variant_stats.cpp
   celonis/align_model.cpp
+  celonis/array_avg.cpp
   celonis/array_count_distinct.cpp
   celonis/array_end_finder.cpp
   celonis/array_functions.cpp

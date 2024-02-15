@@ -152,6 +152,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/variant_agg_test.cpp
         ./exprs/celonis/agg/variant_stats_test.cpp
         ./exprs/celonis/align_model_test.cpp
+        ./exprs/celonis/array_avg_test.cpp
         ./exprs/celonis/array_count_distinct_test.cpp
         ./exprs/celonis/array_end_finder_test.cpp
         ./exprs/celonis/array_functions_test.cpp
