@@ -79,6 +79,14 @@ public:
      * It counts number of non-NULL elements in the array
      */
     DEFINE_VECTORIZED_FN(array_count);
+
+    /**
+     * @param: [bool_array]
+     * @paramType: [ARRAY_BOOLEAN]
+     * @return: BOOLEAN
+     * It replaces SELECT COUNT(CASE WHEN BOOLEAN_COL THEN 1 ELSE NULL) > 0
+     */
+    DEFINE_VECTORIZED_FN(array_bool_or);
 };
 
 } // namespace starrocks

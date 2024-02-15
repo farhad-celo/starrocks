@@ -2748,4 +2748,26 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
     }
 }
 
+TEST_F(CelonisArrayFunctionsTest, array_bool_or_normal_case) {
+    auto arrays = ColumnHelper::create_column(TYPE_ARRAY_BOOLEAN, true);
+    arrays->append_datum(DatumArray{});
+    arrays->append_datum(kNullDatum);
+    arrays->append_datum(DatumArray{kNullDatum, false, kNullDatum, false});
+    arrays->append_datum(DatumArray{kNullDatum, false, kNullDatum, true, kNullDatum, true});
+    arrays->append_datum(DatumArray{kNullDatum});
+    arrays->append_datum(DatumArray{false, false, true});
+    arrays->append_datum(DatumArray{true, true});
+    arrays->append_datum(DatumArray{false});
+    const auto result = CelonisArrayFunctions::array_bool_or(nullptr, {arrays}).value();
+    EXPECT_EQ(8, result->size());
+    EXPECT_EQ(0, result->get(0).get_uint8());
+    EXPECT_TRUE(result->get(1).is_null());
+    EXPECT_EQ(0, result->get(2).get_uint8());
+    EXPECT_EQ(1, result->get(3).get_uint8());
+    EXPECT_EQ(0, result->get(4).get_uint8());
+    EXPECT_EQ(1, result->get(5).get_uint8());
+    EXPECT_EQ(1, result->get(6).get_uint8());
+    EXPECT_EQ(0, result->get(7).get_uint8());
+}
+
 } // namespace starrocks

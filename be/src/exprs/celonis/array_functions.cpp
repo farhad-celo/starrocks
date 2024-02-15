@@ -775,4 +775,36 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_count([[maybe_unused]] Function
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
+StatusOr<ColumnPtr> CelonisArrayFunctions::array_bool_or([[maybe_unused]] FunctionContext* context,
+                                                         const Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    UnnestedArrayData boolean_array_data = prepare_array_input(columns[0].get());
+    const auto& booleans =
+            down_cast<const RunTimeColumnType<TYPE_BOOLEAN>&>(*boolean_array_data.elements).get_data().data();
+    const auto& offsets = boolean_array_data.offsets->get_data().data();
+
+    const size_t n_rows = columns[0]->size();
+    ColumnBuilder<TYPE_BOOLEAN> result(n_rows);
+    for (auto row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        const auto start = offsets[row];
+        const auto end = offsets[row + 1];
+        bool is_true = false;
+        for (auto i = start; i < end; ++i) {
+            if (boolean_array_data.null_elements != nullptr && (*boolean_array_data.null_elements)[i] != 0) {
+                continue;
+            }
+            if (booleans[i]) {
+                is_true = true;
+                break;
+            }
+        }
+        result.append(is_true);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
 } // namespace starrocks

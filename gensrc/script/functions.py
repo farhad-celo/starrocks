@@ -1484,7 +1484,7 @@ celostar_functions = [
     [2000221, 'celonis_array_avg', True, False, 'DOUBLE', ['ARRAY_INT'], 'CelonisArrayAvg<TYPE_INT>::array_avg'],
     [2000222, 'celonis_array_avg', True, False, 'DOUBLE', ['ARRAY_BIGINT'], 'CelonisArrayAvg<TYPE_BIGINT>::array_avg'],
     [2000223, 'celonis_array_avg', True, False, 'DOUBLE', ['ARRAY_DOUBLE'], 'CelonisArrayAvg<TYPE_DOUBLE>::array_avg'],
-
+    [2000230, 'celonis_array_bool_or', True, False, 'BOOLEAN', ['ARRAY_BOOLEAN'], 'CelonisArrayFunctions::array_bool_or'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],
