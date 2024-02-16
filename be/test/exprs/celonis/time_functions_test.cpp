@@ -2962,6 +2962,38 @@ TEST_F(CelonisTimeFunctionsTest, date_match_normal_cases) {
         EXPECT_EQ(1L, result->get(2).get_int64());
         EXPECT_EQ(1L, result->get(3).get_int64());
     }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(kNullDatum);
+        timestamps->append_datum(TimestampValue::create(2008, 1, 1, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 2, 8, 0, 0, 0));
+        timestamps->append_datum(kNullDatum);
+        timestamps->append_datum(TimestampValue::create(2008, 3, 15, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2008, 5, 22, 0, 0, 0));
+        timestamps->append_datum(kNullDatum);
+        for (int i = 0; i < 7; ++i) {
+            years->append_datum(DatumArray{2008L});
+            quarters->append_datum(DatumArray{});
+            months->append_datum(DatumArray{1L, 2L, 3L, 5L});
+            weeks->append_datum(DatumArray{});
+            days->append_datum(DatumArray{1L, 8L, 15L, 22L});
+        }
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(7, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+        EXPECT_EQ(1L, result->get(2).get_int64());
+        EXPECT_TRUE(result->get(3).is_null());
+        EXPECT_EQ(1L, result->get(4).get_int64());
+        EXPECT_EQ(1L, result->get(5).get_int64());
+        EXPECT_TRUE(result->get(6).is_null());
+    }
 }
 
 TEST_F(CelonisTimeFunctionsTest, date_match_null_input) {

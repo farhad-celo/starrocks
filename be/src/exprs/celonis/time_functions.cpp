@@ -1321,7 +1321,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match([[maybe_unused]] FunctionCo
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
             columns[3]->is_null(row) || columns[4]->is_null(row) || columns[5]->is_null(row)) {
             result.append_null();
-            break;
+            continue;
         }
         DateFilters date_filters(row, columns[1], columns[2], columns[3], columns[4], columns[5]);
         auto timestamp = timestamp_viewer.value(row);
