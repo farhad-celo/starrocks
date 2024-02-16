@@ -164,6 +164,7 @@ set(EXEC_FILES
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/match_activities_test.cpp
         ./exprs/celonis/match_process_test.cpp
+        ./exprs/celonis/math_functions_test.cpp
         ./exprs/celonis/mo_bpmn_graph_test.cpp
         ./exprs/celonis/mode_agg_test.cpp
         ./exprs/celonis/remap_values_test.cpp

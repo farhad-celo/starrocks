@@ -151,6 +151,7 @@ set(CELONIS_FILES
   celonis/like.cpp
   celonis/match_activities.cpp
   celonis/match_process.cpp
+  celonis/math_functions.cpp
   celonis/mo_bpmn_graph.cpp
   celonis/mode_agg.cpp
   celonis/remap_timestamp_weekday.cpp

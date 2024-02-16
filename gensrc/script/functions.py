@@ -1502,6 +1502,11 @@ celostar_functions = [
     [4000200, 'celonis_sanitize_invalid_utf8', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::sanitize_invalid_utf8'],
     [4000300, 'celonis_string_split', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', 'INT'], 'CelonisStringFunctions::string_split'],
     [4000400, 'celonis_string_to_double', True, False, 'DOUBLE', ['VARCHAR'], 'CelonisStringFunctions::string_to_double'],
+
+    # Math functions
+    [5000101, 'celonis_square', True, False, 'INT', ['INT'], 'CelonisMathFunctions<TYPE_INT>::square'],
+    [5000102, 'celonis_square', True, False, 'BIGINT', ['BIGINT'], 'CelonisMathFunctions<TYPE_BIGINT>::square'],
+    [5000103, 'celonis_square', True, False, 'DOUBLE', ['DOUBLE'], 'CelonisMathFunctions<TYPE_DOUBLE>::square'],
 ]
 
 vectorized_functions.extend(celostar_functions)
