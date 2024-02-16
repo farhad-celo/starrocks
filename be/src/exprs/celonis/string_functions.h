@@ -39,6 +39,14 @@ public:
      */
     DEFINE_VECTORIZED_FN(string_to_double);
 
+    /**
+     * @param: [input_string, patterns]
+     * @paramType: [VARCHAR, TYPE_VARCHAR]
+     * @return: BIGINT
+     * Implements PQL IN_LIKE https://docs.celonis.com/en/in_like.html
+     */
+    DEFINE_VECTORIZED_FN(in_like);
+
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };

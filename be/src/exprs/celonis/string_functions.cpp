@@ -12,12 +12,14 @@
 #include "column/column_viewer.h"
 #include "util/phmap/phmap.h"
 #include "util/utf8.h"
+#include "exprs/celonis/util.h"
 
 namespace starrocks {
 
 struct CelonisTranslateState {
     CelonisTranslateState(Slice pattern, Slice replace)
             : pattern_chars(pattern.to_string()), replace_chars(replace.to_string()) {}
+
     std::string pattern_chars;
     std::string replace_chars;
     phmap::flat_hash_map<Slice, Slice, SliceHashWithSeed<PhmapSeed1>, SliceEqual> translate_mapping;
@@ -58,19 +60,20 @@ Status CelonisStringFunctions::translate_prepare(FunctionContext* context, Funct
         return Status::InvalidArgument("The third parameter should not be empty string");
     }
 
-    auto *state = new CelonisTranslateState(pattern, replace);
+    auto* state = new CelonisTranslateState(pattern, replace);
     context->set_function_state(scope, state);
 
     Slice pattern_chars{state->pattern_chars};
     Slice replace_chars{state->replace_chars};
 
-    const char *replace_p = replace_chars.get_data();
-    const char *replace_end = replace_p + replace_chars.get_size();
+    const char* replace_p = replace_chars.get_data();
+    const char* replace_end = replace_p + replace_chars.get_size();
 
-    const char *pattern_p = pattern_chars.get_data();
-    const char *pattern_end = pattern_p + pattern_chars.get_size();
+    const char* pattern_p = pattern_chars.get_data();
+    const char* pattern_end = pattern_p + pattern_chars.get_size();
 
-    for (int replace_char_size = 0, pattern_char_size = 0; replace_p < replace_end && pattern_p < pattern_end; replace_p += replace_char_size, pattern_p += pattern_char_size) {
+    for (int replace_char_size = 0, pattern_char_size = 0; replace_p < replace_end && pattern_p <
+                                                                                      pattern_end; replace_p += replace_char_size, pattern_p += pattern_char_size) {
         replace_char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*replace_p)];
         pattern_char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*pattern_p)];
 
@@ -97,7 +100,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
     const auto* state = reinterpret_cast<const CelonisTranslateState*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     DCHECK(state != nullptr);
-    const auto & translate_mapping = state->translate_mapping;
+    const auto& translate_mapping = state->translate_mapping;
 
     auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
 
@@ -114,7 +117,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
         result_str.reserve(str_value.get_size());
 
         int char_size = 0;
-        for (const char *str_p = str_value.get_data(), *str_end = str_p + str_value.get_size(); str_p < str_end; str_p += char_size) {
+        for (const char* str_p = str_value.get_data(), * str_end = str_p + str_value.get_size();
+             str_p < str_end; str_p += char_size) {
             char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
 
             const auto cit = translate_mapping.find(Slice(str_p, char_size));
@@ -130,8 +134,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
-StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::FunctionContext *context,
-                                                                  const starrocks::Columns &columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::FunctionContext* context,
+                                                                  const starrocks::Columns& columns) {
     auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
 
     auto size = columns[0]->size();
@@ -232,7 +236,7 @@ static bool split_index(const Slice& haystack, const Slice& delimiter, int32_t p
         int32_t num = 1;
         auto substr = haystack_str;
         while (num <= part_number && offset >= 0) {
-            offset = (int)substr.rfind(delimiter, offset);
+            offset = (int) substr.rfind(delimiter, offset);
             if (offset != -1) {
                 if (num == part_number) {
                     break;
@@ -264,7 +268,7 @@ static bool split_index(const Slice& haystack, const Slice& delimiter, int32_t p
  * @paramType: [BinaryColumn, BinaryColumn, IntColumn]
  * @return: BinaryColumn
  */
- // The implementation is based on StringFunctions::split_part() and modified to match PQL behaviors.
+// The implementation is based on StringFunctions::split_part() and modified to match PQL behaviors.
 StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 3);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
@@ -313,7 +317,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
                 part_number = -part_number;
                 std::vector<int> utf8_char_offsets;
                 int char_size = 0;
-                for (int h = 0; h < haystack.size ; h += char_size) {
+                for (int h = 0; h < haystack.size; h += char_size) {
                     utf8_char_offsets.push_back(h);
                     char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[h])];
                 }
@@ -339,7 +343,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
 }
 
 // Trims leading and trailing spaces from a string
-static std::string trim(const std::string &input) {
+static std::string trim(const std::string& input) {
     std::string result = input;
 
     // Left trim
@@ -405,7 +409,7 @@ static std::optional<double> to_double(const std::string& input_string) {
  * @return: DoubleColumn
  */
 StatusOr<ColumnPtr>
-CelonisStringFunctions::string_to_double(FunctionContext *context, const starrocks::Columns &columns) {
+CelonisStringFunctions::string_to_double(FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
@@ -426,6 +430,91 @@ CelonisStringFunctions::string_to_double(FunctionContext *context, const starroc
 
     }
     return res.build(ColumnHelper::is_all_const(columns));
+}
+
+static bool match_helper(const std::string& input, const std::string& pattern, int i, int j, bool case_insensitive) {
+    if (j == pattern.length()) { // End of pattern
+        return i == input.length(); // True if also end of input
+    }
+
+    // Handling escaped wildcards
+    if (pattern[j] == '\\' && j + 1 < pattern.length() && (pattern[j + 1] == '%' || pattern[j + 1] == '_')) {
+        if (i < input.length() && ((case_insensitive && tolower(input[i]) == tolower(pattern[j + 1])) ||
+                                   (!case_insensitive && input[i] == pattern[j + 1]))) {
+            return match_helper(input, pattern, i + 1, j + 2, case_insensitive);
+        }
+        return false;
+    }
+
+    if (pattern[j] == '%') {
+        for (int k = i; k <= input.length(); ++k) {
+            if (match_helper(input, pattern, k, j + 1, case_insensitive)) {
+                return true;
+            }
+        }
+    } else if (pattern[j] == '_') {
+        if (i < input.length()) {
+            return match_helper(input, pattern, i + 1, j + 1, case_insensitive);
+        }
+    } else {
+        if (i < input.length() && ((case_insensitive && tolower(input[i]) == tolower(pattern[j])) ||
+                                   (!case_insensitive && input[i] == pattern[j]))) {
+            return match_helper(input, pattern, i + 1, j + 1, case_insensitive);
+        }
+    }
+    return false;
+}
+
+static bool string_match(const std::string& input, const std::string& pattern) {
+    bool has_wildcard = pattern.find_first_of("%_") != std::string::npos;
+    bool case_insensitive = !has_wildcard;
+    std::string modified_pattern = has_wildcard ? pattern : "%" + pattern + "%";
+    return match_helper(input, modified_pattern, 0, 0, case_insensitive);
+}
+
+StatusOr<ColumnPtr>
+CelonisStringFunctions::in_like([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 2);
+    ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+    UnnestedArrayData pattern_data = prepare_array_input(columns[1].get());
+    const auto& patterns = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*pattern_data.elements).get_data().data();
+    const auto& offsets = pattern_data.offsets->get_data().data();
+    size_t n_rows = columns[0]->size();
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (size_t row = 0; row < n_rows; ++row) {
+        // patterns is NULL
+        if (columns[1]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        const auto start = offsets[row];
+        const auto end = offsets[row + 1];
+        if (input_string_viewer.is_null(row)) {
+            int64_t found_null = 0L;
+            for (auto i = start; i < end; ++i) {
+                if (pattern_data.null_elements != nullptr && (*pattern_data.null_elements)[i] != 0) {
+                    found_null = 1L;
+                    break;
+                }
+            }
+            result.append(found_null);
+            continue;
+        }
+        const std::string input_string = input_string_viewer.value(row).to_string();
+        int64_t found_match = 0L;
+        for (auto i = start; i < end; ++i) {
+            if (pattern_data.null_elements != nullptr && (*pattern_data.null_elements)[i] != 0) {
+                continue;
+            }
+            const std::string pattern = patterns[i].to_string();
+            if (string_match(input_string, pattern)) {
+                found_match = 1L;
+                break;
+            }
+        }
+        result.append(found_match);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
 }
 
 } // namespace starrocks
