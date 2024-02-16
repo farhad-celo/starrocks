@@ -8,7 +8,10 @@
 
 namespace starrocks {
 
-class CelonisStringFunctionsTranslateTest : public testing::Test {
+class CelonisStringFunctionsTest : public testing::Test {
+
+    TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
+
 protected:
     void translate(Columns columns, const std::vector<std::string>& res) {
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
@@ -33,7 +36,7 @@ protected:
     }
 };
 
-TEST_F(CelonisStringFunctionsTranslateTest, nullTest) {
+TEST_F(CelonisStringFunctionsTest, null_input) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -71,7 +74,7 @@ TEST_F(CelonisStringFunctionsTranslateTest, nullTest) {
                     .ok());
 }
 
-TEST_F(CelonisStringFunctionsTranslateTest, singleCharTest) {
+TEST_F(CelonisStringFunctionsTest, single_char) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -86,7 +89,7 @@ TEST_F(CelonisStringFunctionsTranslateTest, singleCharTest) {
     translate(columns, {"a", "äaaäaz"});
 }
 
-TEST_F(CelonisStringFunctionsTranslateTest, singleCharUtf8Test) {
+TEST_F(CelonisStringFunctionsTest, single_char_utf8) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -101,7 +104,7 @@ TEST_F(CelonisStringFunctionsTranslateTest, singleCharUtf8Test) {
     translate(columns, {"Ä", "Aa Zz ÄÄÄ Öö Üü", "ÄÄÄÄ öÖ üÜ"});
 }
 
-TEST_F(CelonisStringFunctionsTranslateTest, multiCharSymbolTest) {
+TEST_F(CelonisStringFunctionsTest, multi_char_symbol) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -116,7 +119,7 @@ TEST_F(CelonisStringFunctionsTranslateTest, multiCharSymbolTest) {
     translate(columns, {",.", ".,", "33,333.33"});
 }
 
-TEST_F(CelonisStringFunctionsTranslateTest, multiCharCharSymbolCombinationTest) {
+TEST_F(CelonisStringFunctionsTest, multi_char_char_symbol_combination) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -131,7 +134,7 @@ TEST_F(CelonisStringFunctionsTranslateTest, multiCharCharSymbolCombinationTest) 
     translate(columns, {"Z+", "+Z", "ZOO+BAR"});
 }
 
-TEST_F(CelonisStringFunctionsTranslateTest, multiCharSymbolCharCombinationTest) {
+TEST_F(CelonisStringFunctionsTest, multi_char_symbol_char_combination) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -146,7 +149,7 @@ TEST_F(CelonisStringFunctionsTranslateTest, multiCharSymbolCharCombinationTest) 
     translate(columns, {"Z+", "+Z", "ZOO+BAR"});
 }
 
-TEST_F(CelonisStringFunctionsTranslateTest, multiCharDigit2CharTest) {
+TEST_F(CelonisStringFunctionsTest, multi_char_digit_2_char) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -161,7 +164,7 @@ TEST_F(CelonisStringFunctionsTranslateTest, multiCharDigit2CharTest) {
     translate(columns, {"ABCDEFGHIJ", "JIHGFEDCBA", "AA.AAA,AA", "BB.BBB,BB", "JJ.JJJ,JJ"});
 }
 
-TEST_F(CelonisStringFunctionsTranslateTest, lowerUtf8Test) {
+TEST_F(CelonisStringFunctionsTest, lower_utf8) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -176,7 +179,7 @@ TEST_F(CelonisStringFunctionsTranslateTest, lowerUtf8Test) {
     translate(columns, {"aouzäöü", "ü ö ä a o u z", "0ääa 0ööo 0üüu zz"});
 }
 
-TEST_F(CelonisStringFunctionsTranslateTest, upperUtf8Test) {
+TEST_F(CelonisStringFunctionsTest, upper_utf8) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -437,10 +440,10 @@ TEST(CelonisStringFunctionsStringToDoubleTest, All) {
     }
 }
 
-TEST(CelonisStringFunctionsInLikeTest, normal_cases) {
+TEST_F(CelonisStringFunctionsTest, normal_cases) {
     {
         auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        auto patterns = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
         input_strings->append_datum("asddqqW_A_W");
         input_strings->append_datum(kNullDatum);
         input_strings->append_datum("fdsn_B");
@@ -463,7 +466,7 @@ TEST(CelonisStringFunctionsInLikeTest, normal_cases) {
     }
     {
         auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        auto patterns = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
         input_strings->append_datum("hallo IN_LIKE");
         input_strings->append_datum("Axyz");
         input_strings->append_datum("vamos a la playa");
@@ -486,7 +489,7 @@ TEST(CelonisStringFunctionsInLikeTest, normal_cases) {
     }
     {
         auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        auto patterns = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
         input_strings->append_datum("hallo IN_LIKE test");
         input_strings->append_datum("Axyz");
         input_strings->append_datum("vamos a la playa");
@@ -509,16 +512,16 @@ TEST(CelonisStringFunctionsInLikeTest, normal_cases) {
     }
 }
 
-TEST(CelonisStringFunctionsInLikeTest, empty_input) {
+TEST_F(CelonisStringFunctionsTest, empty_input) {
     auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-    auto patterns = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+    auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     const auto result = CelonisStringFunctions::in_like(nullptr, {input_strings, patterns}).value();
     ASSERT_EQ(input_strings->size(), result->size());
 }
 
-TEST(CelonisStringFunctionsInLikeTest, null_in_pattern) {
+TEST_F(CelonisStringFunctionsTest, null_in_pattern) {
     auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-    auto patterns = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+    auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     input_strings->append_datum("asddqqW_A_W");
     input_strings->append_datum(kNullDatum);
     input_strings->append_datum("fdsn_B");
@@ -542,9 +545,9 @@ TEST(CelonisStringFunctionsInLikeTest, null_in_pattern) {
     EXPECT_EQ(0L, result->get(7).get_int64());
 }
 
-TEST(CelonisStringFunctionsInLikeTest, null_pattern) {
+TEST_F(CelonisStringFunctionsTest, null_pattern) {
     auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-    auto patterns = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+    auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     input_strings->append_datum("asddqqW_A_W");
     input_strings->append_datum(kNullDatum);
     input_strings->append_datum("fdsn_B");
