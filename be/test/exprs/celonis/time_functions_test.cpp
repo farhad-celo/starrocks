@@ -2994,6 +2994,24 @@ TEST_F(CelonisTimeFunctionsTest, date_match_normal_cases) {
         EXPECT_EQ(1L, result->get(5).get_int64());
         EXPECT_TRUE(result->get(6).is_null());
     }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto years = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto quarters = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto months = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto weeks = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        auto days = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+        timestamps->append_datum(TimestampValue::create(2001, 1, 1, 0, 0, 0));
+        years->append_datum(DatumArray{});
+        quarters->append_datum(DatumArray{});
+        months->append_datum(DatumArray{});
+        weeks->append_datum(DatumArray{1L});
+        days->append_datum(DatumArray{});
+        const auto result = CelonisTimeFunctions::date_match(nullptr, {timestamps, years, quarters, months, weeks,
+                                                                       days}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+    }
 }
 
 TEST_F(CelonisTimeFunctionsTest, date_match_null_input) {

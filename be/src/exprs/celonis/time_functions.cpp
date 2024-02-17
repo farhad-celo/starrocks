@@ -7,6 +7,7 @@
 #include "exprs/celonis/util.h"
 #include "google/protobuf/util/json_util.h"
 #include "modules/query/calendars.pb.h"
+#include "types/date_value.h"
 
 #include <bitset>
 
@@ -37,34 +38,7 @@ static const int MONTH_TO_QUARTER[13] = {0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4};
 }
 
 static int get_week_number(int year, int month, int day) {
-    struct tm date = {};
-    date.tm_year = year - 1900; // Year since 1900
-    date.tm_mon = month - 1;    // 0-11
-    date.tm_mday = day;
-
-    // Normalize tm structure (mktime adjusts the tm_wday and tm_yday)
-    mktime(&date);
-
-    struct tm start_of_year = {};
-    start_of_year.tm_year = year - 1900;
-    start_of_year.tm_mon = 0; // January
-    start_of_year.tm_mday = 1;
-    mktime(&start_of_year);
-
-    // Calculate the number of days from the start of the year
-    int day_of_year = date.tm_yday; // tm_yday is 0-based
-    // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    int start_day_of_week = start_of_year.tm_wday;
-
-    // Adjust if the start of the year is not Monday
-    int week_number = (day_of_year + start_day_of_week) / 7;
-
-    // ISO 8601: First week is the one with the first Thursday
-    if (start_day_of_week > 1 && start_day_of_week <= 4) {
-        week_number++;
-    }
-
-    return week_number;
+    return DateValue::create(year, month, day).get_week_of_year();
 }
 
 static void truncate_timestamp(const std::string& time_unit, TimestampValue& timestamp) {
