@@ -29,12 +29,18 @@ static const int64_t NUM_DAYS_PER_WEEK = 7L;
 
 static const int64_t NUM_MILLISECONDS_PER_DAY = 86400000L;
 
+static const int64_t NUM_MILLISECONDS_PER_WEEK = NUM_MILLISECONDS_PER_DAY * NUM_DAYS_PER_WEEK;
+
 static const int64_t NUM_MICROSECONDS_PER_MILLISECONDS = 1000L;
 
 // SR places an upper limit of 1M of STRING. We use 900K which is less than 1M.
 static const size_t MAX_STRING_SIZE = 900000;
 
 static const int MONTH_TO_QUARTER[13] = {0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4};
+
+static const TimestampValue MAX_YEAR = TimestampValue::create(10000, 1, 1, 0, 0, 0);
+
+static const TimestampValue MIN_YEAR = TimestampValue::create(1400, 1, 1, 0, 0, 0);
 }
 
 static int get_week_number(int year, int month, int day) {
@@ -118,6 +124,38 @@ static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
     return timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
 }
 
+TimestampValue add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
+    std::vector<int> adds;
+    const int64_t max_int = std::numeric_limits<int>::max();
+    const int64_t min_int = std::numeric_limits<int>::min();
+    while (add_value > max_int) {
+        adds.push_back(max_int);
+        add_value -= max_int;
+    }
+    while (add_value < min_int) {
+        adds.push_back(min_int);
+        add_value -= min_int;
+    }
+    if (add_value != 0) {
+        adds.push_back(add_value);
+    }
+    TimestampValue rv = timestamp;
+    for (auto add: adds) {
+        if (time_unit == "DAYS" || time_unit == "WORKDAYS") {
+            rv = rv.add<TimeUnit::DAY>(add);
+        } else if (time_unit == "HOURS") {
+            rv = rv.add<TimeUnit::HOUR>(add);
+        } else if (time_unit == "MINUTES") {
+            rv = rv.add<TimeUnit::MINUTE>(add);
+        } else if (time_unit == "SECONDS") {
+            rv = rv.add<TimeUnit::SECOND>(add);
+        } else {
+            rv = rv.add<TimeUnit::MILLISECOND>(add);
+        }
+    }
+    return rv;
+}
+
 StatusOr<ColumnPtr>
 CelonisTimeFunctions::millis_timestamp([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
@@ -176,66 +214,44 @@ CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context
 struct TimeRange {
     int64_t begin_ms;
     int64_t end_ms;
+    bool is_weekly;
 
-    TimeRange(int64_t begin_ms, int64_t end_ms) : begin_ms(begin_ms), end_ms(end_ms) {}
+    TimeRange(int64_t begin_ms, int64_t end_ms) : begin_ms(begin_ms), end_ms(end_ms), is_weekly(false) {}
 
-    TimeRange(const TimeRange& other) : begin_ms(other.begin_ms), end_ms(other.end_ms) {}
+    TimeRange(int64_t begin_ms, int64_t end_ms, bool is_weekly) : begin_ms(begin_ms), end_ms(end_ms),
+                                                                  is_weekly(is_weekly) {}
+
+    TimeRange(const TimeRange& other) : begin_ms(other.begin_ms), end_ms(other.end_ms), is_weekly(other.is_weekly) {}
 
     TimeRange& operator=(const TimeRange& other) {
         if (this != &other) {
             begin_ms = other.begin_ms;
             end_ms = other.end_ms;
+            is_weekly = other.is_weekly;
         }
         return *this;
     }
 
     virtual ~TimeRange() = default;
 
-    // Computes the overlap in milliseconds with another TimeRange object.
-    virtual int64_t compute_overlap(const TimeRange& other) const {
-        int64_t start = std::max(begin_ms, other.begin_ms);
-        int64_t end = std::min(end_ms, other.end_ms);
-        return (end > start) ? end - start : 0;
-    }
-
-    virtual bool is_ms_in(int64_t ms) const {
-        return ms >= begin_ms && ms <= end_ms;
-    }
-};
-
-struct PeriodicTimeRange : public TimeRange {
-    int64_t period_ms;
-
-    PeriodicTimeRange(int64_t begin_ms, int64_t end_ms, int64_t period_ms) : TimeRange(begin_ms, end_ms),
-                                                                             period_ms(period_ms) {}
-
-    PeriodicTimeRange(const PeriodicTimeRange& other)
-            : TimeRange(other), period_ms(other.period_ms) {}
-
-    PeriodicTimeRange& operator=(const PeriodicTimeRange& other) {
-        if (this != &other) {
-            TimeRange::operator=(other); // Call base class assignment operator
-            period_ms = other.period_ms;
+    // Computes the overlap in milliseconds with [left_ms, right_ms)
+    int64_t compute_overlap(int64_t left_ms, int64_t right_ms) const {
+        if (!is_weekly) {
+            int64_t start = std::max(begin_ms, left_ms);
+            int64_t end = std::min(end_ms, right_ms);
+            return (end > start) ? end - start : 0;
         }
-        return *this;
-    }
-
-    ~PeriodicTimeRange() override = default;
-
-    // Computes the overlap in milliseconds with a TimeRange object.
-    int64_t compute_overlap(const TimeRange& time_range) const override {
-        const int64_t begin = time_range.begin_ms;
-        const int64_t end = time_range.end_ms;
+        const int64_t begin = left_ms;
+        const int64_t end = right_ms;
         int64_t cur_begin = begin_ms;
         int64_t cur_end = end_ms;
-        int64_t abs_period = std::abs(period_ms);
+        int64_t period = NUM_MILLISECONDS_PER_WEEK;
         // move [cur_begin, cur_end) to the left of [begin, end)
         if (cur_end > begin) {
-            int64_t n_periods = (cur_end - begin + abs_period - 1) / abs_period;
-            cur_begin -= n_periods * abs_period;
-            cur_end -= n_periods * abs_period;
+            int64_t n_periods = (cur_end - begin + period - 1) / period;
+            cur_begin -= n_periods * period;
+            cur_end -= n_periods * period;
         }
-        DCHECK(abs_period > 0);
         int64_t rv = 0L;
         // move [cur_begin, cur_end) to right to pass [begin, end)
         while (true) {
@@ -245,32 +261,26 @@ struct PeriodicTimeRange : public TimeRange {
             int64_t left = std::max(cur_begin, begin);
             int64_t right = std::min(cur_end, end);
             rv += (right > left) ? (right - left) : 0L;
-            cur_begin += abs_period;
-            cur_end += abs_period;
+            cur_begin += period;
+            cur_end += period;
         }
         return rv;
     }
 
-    bool is_ms_in(int64_t ms) const override {
-        int64_t diff_mod = (ms - begin_ms) % period_ms;
+    bool is_ms_in(int64_t ms) const {
+        if (!is_weekly) {
+            return ms >= begin_ms && ms <= end_ms;
+        }
+        int64_t diff_mod = (ms - begin_ms) % NUM_MILLISECONDS_PER_WEEK;
         if (diff_mod < 0) {
-            diff_mod += period_ms;
+            diff_mod += NUM_MILLISECONDS_PER_WEEK;
         }
         int64_t adjusted_ms = begin_ms + diff_mod;
         return begin_ms <= adjusted_ms && adjusted_ms <= end_ms;
     }
 };
 
-static TimeRange get_time_range(const TimestampValue& timestamp) {
-    int64_t milliseconds = remap_timestamp_ms(timestamp);
-    if (milliseconds >= 0) {
-        return TimeRange{0L, milliseconds};
-    } else {
-        return TimeRange{milliseconds, 0L};
-    }
-}
-
-static void merge_time_ranges(std::vector<TimeRange>& time_ranges) {
+static void merge_non_weekly_time_ranges(std::vector<TimeRange>& time_ranges) {
     std::sort(time_ranges.begin(), time_ranges.end(),
               [](const TimeRange& a, const TimeRange& b) { return a.begin_ms < b.begin_ms; });
     std::vector<TimeRange> merged;
@@ -310,22 +320,108 @@ public:
     int64_t
     remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id) const {
         const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
-        const bool before_epoch = timestamp < epoch;
-        const TimeRange time_range = get_time_range(timestamp);
-        int64_t rv = 0L;
+        int64 ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        int64_t left_ms = ms < 0 ? ms : 0L;
+        int64_t right_ms = ms < 0 ? 0L : ms;
+        int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id);
+        return ms < 0 ? -overlap : overlap;
+    }
+
+    struct CompareTimeRange {
+        bool left_to_right;
+
+        CompareTimeRange(const bool& left_to_right = false) : left_to_right(left_to_right) {}
+
+        bool operator()(const TimeRange& lhs, const TimeRange& rhs) const {
+            if (left_to_right) {
+                return lhs.begin_ms > rhs.begin_ms;
+            }
+            return lhs.end_ms < rhs.end_ms;
+        }
+    };
+
+    std::optional<TimestampValue>
+    add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value,
+                  const std::optional<std::string>& calendar_id) {
+        bool left_to_right = add_value >= 0;
+        std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
+        std::vector<TimeRange> time_ranges;
         if (!calendar_id.has_value()) {
             for (const auto& cur_time_range: time_ranges_) {
-                rv += cur_time_range->compute_overlap(time_range);
+                time_ranges.push_back(cur_time_range);
             }
         } else {
             auto itr = id_to_time_ranges_.find(calendar_id.value());
             if (itr != id_to_time_ranges_.end()) {
                 for (const auto& cur_time_range: itr->second) {
-                    rv += cur_time_range->compute_overlap(time_range);
+                    time_ranges.push_back(cur_time_range);
                 }
             }
         }
-        return before_epoch ? -rv : rv;
+        const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
+        int64_t ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        for (auto& time_range: time_ranges) {
+            if (!time_range.is_weekly) {
+                pq.push(time_range);
+            } else {
+                int64_t a = time_range.begin_ms;
+                int64_t b = time_range.end_ms;
+                // move [a, b) to the left of ms
+                if (left_to_right && a - ms >= NUM_MILLISECONDS_PER_WEEK) {
+                    int64_t nperiods = (a - ms + NUM_MILLISECONDS_PER_WEEK - 1) / NUM_MILLISECONDS_PER_WEEK;
+                    a -= nperiods * NUM_MILLISECONDS_PER_WEEK;
+                    b -= nperiods * NUM_MILLISECONDS_PER_WEEK;
+                }
+                // move [a, b) to the right of ms
+                if (!left_to_right && ms - b >= NUM_MILLISECONDS_PER_WEEK) {
+                    int64_t nperiods = (ms - b + NUM_MILLISECONDS_PER_WEEK - 1) / NUM_MILLISECONDS_PER_WEEK;
+                    a += nperiods * NUM_MILLISECONDS_PER_WEEK;
+                    b += nperiods * NUM_MILLISECONDS_PER_WEEK;
+                }
+                pq.emplace(a, b, true);
+            }
+        }
+        auto iter = TIME_UNIT_TO_MS.find(time_unit);
+        DCHECK(iter != TIME_UNIT_TO_MS.end());
+        int64_t ms_left = std::abs(add_value * iter->second);
+        int64_t max_ms = MAX_YEAR.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        int64_t min_ms = MIN_YEAR.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        // [begin_ms, end_ms)
+        int64_t begin_ms = left_to_right ? ms : min_ms;
+        int64_t end_ms = left_to_right ? max_ms : ms;
+        std::optional<int64_t> rv = std::nullopt;
+        int64_t period = left_to_right ? NUM_MILLISECONDS_PER_WEEK : -NUM_MILLISECONDS_PER_WEEK;
+        while (!pq.empty()) {
+            auto top = pq.top();
+            pq.pop();
+            int64_t left = std::max(top.begin_ms, begin_ms);
+            int64_t right = std::min(top.end_ms, end_ms);
+            if (right > left) {
+                if (ms_left >= right - left) {
+                    ms_left -= right - left;
+                } else {
+                    // ms_left < (right - left)
+                    if (left_to_right) {
+                        rv = left + ms_left;
+                    } else {
+                        rv = right - ms_left;
+                    }
+                    ms_left = 0;
+                    break;
+                }
+            }
+            if (top.is_weekly) {
+                int64_t new_begin_ms = top.begin_ms + period;
+                int64_t new_end_ms = top.end_ms + period;
+                if (!((left_to_right && new_begin_ms >= max_ms) || (!left_to_right && new_end_ms < min_ms))) {
+                    pq.emplace(new_begin_ms, new_end_ms, true);
+                }
+            }
+        }
+        if (rv.has_value()) {
+            return add_timeunits_helper(epoch, "MILLISECONDS", rv.value());
+        }
+        return std::nullopt;
     }
 
     bool
@@ -336,7 +432,7 @@ public:
 
         if (!calendar_id.has_value()) {
             for (const auto& cur_time_range: time_ranges_) {
-                if (cur_time_range->is_ms_in(ms)) {
+                if (cur_time_range.is_ms_in(ms)) {
                     return true;
                 }
             }
@@ -344,7 +440,7 @@ public:
             auto itr = id_to_time_ranges_.find(calendar_id.value());
             if (itr != id_to_time_ranges_.end()) {
                 for (const auto& cur_time_range: itr->second) {
-                    if (cur_time_range->is_ms_in(ms)) {
+                    if (cur_time_range.is_ms_in(ms)) {
                         return true;
                     }
                 }
@@ -379,15 +475,13 @@ private:
         int64_t begin = entry.shift().begin();
         int64_t end = entry.shift().end();
         if (entry.use_day() && begin < end) {
-            int64_t period = NUM_DAYS_PER_WEEK * NUM_MILLISECONDS_PER_DAY;
             std::vector<int> add_days = {4, 5, 6, 0, 1, 2, 3};
             begin += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
             end += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
             if (calendar_id.has_value()) {
-                id_to_time_ranges_[calendar_id.value()].push_back(
-                        std::make_shared<PeriodicTimeRange>(begin, end, period));
+                id_to_time_ranges_[calendar_id.value()].emplace_back(begin, end, true);
             } else {
-                time_ranges_.push_back(std::make_shared<PeriodicTimeRange>(begin, end, period));
+                time_ranges_.emplace_back(begin, end, true);
             }
         }
     }
@@ -405,17 +499,17 @@ private:
                 time_ranges.emplace_back(entry.start_date(), entry.end_date());
             }
         }
-        merge_time_ranges(time_ranges);
+        merge_non_weekly_time_ranges(time_ranges);
         for (auto& kv: id_to_time_ranges) {
-            merge_time_ranges(kv.second);
+            merge_non_weekly_time_ranges(kv.second);
         }
         for (const auto& time_range: time_ranges) {
-            time_ranges_.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
+            time_ranges_.emplace_back(time_range.begin_ms, time_range.end_ms);
         }
         for (const auto& kv: id_to_time_ranges) {
             auto& cur_time_ranges = id_to_time_ranges_[kv.first];
             for (const auto& time_range: kv.second) {
-                cur_time_ranges.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
+                cur_time_ranges.emplace_back(time_range.begin_ms, time_range.end_ms);
             }
         }
     }
@@ -471,23 +565,40 @@ private:
                 }
             }
         }
-        merge_time_ranges(time_ranges);
+        merge_non_weekly_time_ranges(time_ranges);
         for (auto& kv: id_to_time_ranges) {
-            merge_time_ranges(kv.second);
+            merge_non_weekly_time_ranges(kv.second);
         }
         for (const auto& time_range: time_ranges) {
-            time_ranges_.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
+            time_ranges_.emplace_back(time_range.begin_ms, time_range.end_ms);
         }
         for (const auto& kv: id_to_time_ranges) {
             auto& cur_time_ranges = id_to_time_ranges_[kv.first];
             for (const auto& time_range: kv.second) {
-                cur_time_ranges.push_back(std::make_shared<TimeRange>(time_range.begin_ms, time_range.end_ms));
+                cur_time_ranges.emplace_back(time_range.begin_ms, time_range.end_ms);
             }
         }
     }
 
-    std::vector<std::shared_ptr<TimeRange>> time_ranges_;
-    std::unordered_map<std::string, std::vector<std::shared_ptr<TimeRange>>> id_to_time_ranges_;
+    int64_t compute_overlap(int64_t left_ms, int64_t right_ms, const std::optional<std::string>& calendar_id) const {
+        int64_t rv = 0L;
+        if (!calendar_id.has_value()) {
+            for (const auto& cur_time_range: time_ranges_) {
+                rv += cur_time_range.compute_overlap(left_ms, right_ms);
+            }
+        } else {
+            auto itr = id_to_time_ranges_.find(calendar_id.value());
+            if (itr != id_to_time_ranges_.end()) {
+                for (const auto& cur_time_range: itr->second) {
+                    rv += cur_time_range.compute_overlap(left_ms, right_ms);
+                }
+            }
+        }
+        return rv;
+    }
+
+    std::vector<TimeRange> time_ranges_;
+    std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges_;
 };
 
 struct CalendarState {
@@ -1146,7 +1257,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
     return output_column;
 }
 
-static StatusOr<TimestampValue>
+static StatusOr<std::optional<TimestampValue>>
 add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value,
               const std::string& calendar_json_string,
               std::optional<std::string>& calendar_id) {
@@ -1155,19 +1266,16 @@ add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int
             return Status::InvalidArgument(
                     "Calendar ID column should not be set when calendar specification is not set.");
         }
-        if (time_unit == "DAYS" || time_unit == "WORKDAYS") {
-            return timestamp.add<TimeUnit::DAY>(add_value);
-        } else if (time_unit == "HOURS") {
-            return timestamp.add<TimeUnit::HOUR>(add_value);
-        } else if (time_unit == "MINUTES") {
-            return timestamp.add<TimeUnit::MINUTE>(add_value);
-        } else if (time_unit == "SECONDS") {
-            return timestamp.add<TimeUnit::SECOND>(add_value);
-        } else {
-            return timestamp.add<TimeUnit::MILLISECOND>(add_value);
-        }
+        return add_timeunits_helper(timestamp, time_unit, add_value);
     } else {
-        return Status::InvalidArgument("add_timeunits_calendar with Calendar is not supported yet.");
+        celonis::accelerator::Calendar calendar_proto;
+        // parse calendar_json_string
+        if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
+            return Status::InvalidArgument("Calendar specification column is malformed.");
+        }
+        RETURN_IF_ERROR(validate_calendar(calendar_proto, calendar_id));
+        Calendar calendar(calendar_proto);
+        return calendar.add_timeunits(timestamp, time_unit, add_value, calendar_id);
     }
 }
 
