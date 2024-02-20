@@ -55,6 +55,9 @@ void AggregateFuncResolver::register_celonis() {
     add_general_mapping_notnull("celonis_make_factory_calendar", false,
                                 AggregateFactory::MakeCelonisMakeFactoryCalendarAggregateFunction());
 
+    add_general_mapping_notnull("celonis_make_weekday_calendar", false,
+                                AggregateFactory::MakeCelonisMakeWeekdayCalendarAggregateFunction());
+
     add_general_mapping_notnull("celonis_make_workday_calendar", false,
                                 AggregateFactory::MakeCelonisMakeWorkdayCalendarAggregateFunction());
 

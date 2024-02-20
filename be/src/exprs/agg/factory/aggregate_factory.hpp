@@ -59,6 +59,7 @@
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/celonis/agg/inductive_miner.h"
+#include "exprs/celonis/agg/weekday_calendar.h"
 #include "exprs/celonis/agg/workday_calendar.h"
 #include "exprs/celonis/mode_agg.h"
 #include "exprs/celonis/agg/sorted_first_last.h"
@@ -221,6 +222,8 @@ public:
     static AggregateFunctionPtr MakeCelonisInductiveMinerAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisMakeFactoryCalendarAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisMakeWeekdayCalendarAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisMakeWorkdayCalendarAggregateFunction();
 

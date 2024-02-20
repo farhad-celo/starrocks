@@ -87,6 +87,10 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisMakeFactoryCalendarAggregateFu
     return std::make_shared<FactoryCalendarAggregateFunction>();
 }
 
+AggregateFunctionPtr AggregateFactory::MakeCelonisMakeWeekdayCalendarAggregateFunction() {
+    return std::make_shared<WeekdayCalendarAggregateFunction>();
+}
+
 AggregateFunctionPtr AggregateFactory::MakeCelonisMakeWorkdayCalendarAggregateFunction() {
     return std::make_shared<WorkdayCalendarAggregateFunction>();
 }
