@@ -1227,21 +1227,6 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_calendar_id_provided)
     }
 }
 
-TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_unsupported_calendar) {
-    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
-    auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
-    auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-    auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-    timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-    time_units->append_datum("HOURS");
-    calendars->append_datum(DatumArray{R"({"intersect_calendar": {"calendar1":  { "weekday_calendar": {} }} })"});
-    calendar_ids->append_datum(kNullDatum);
-    const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
-                                                                                  calendar_ids});
-    ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "Intersect calendar is not supported.");
-}
-
 TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_multi_weekday_calendar) {
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
@@ -1315,7 +1300,7 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_intersect_c
         const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
                                                                                       calendar_ids});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Neither calendar1 nor calendar2 is set in intersect_calendar.");
+        EXPECT_EQ(result.status().get_error_msg(), "Intersect calendar must set both calendar1 and calendar2.");
     }
 }
 
@@ -1503,6 +1488,44 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_multi_weekday_calendar) {
         const auto result = CelonisTimeFunctions::in_calendar(nullptr, {timestamps, calendars, calendar_ids}).value();
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, in_calendar_intersect_calendar) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 2, 11, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 5, 16, 10, 0));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 3, 12, 5, 0));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 3, 11, 0, 0));
+        for (auto i = 0; i < timestamps->size(); ++i) {
+            calendars->append_datum(
+                    DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                               R"("entries": {"start_date": 1514883600000, "end_date": 1514894400000}, )",
+                               R"("entries": {"start_date": 1514898000000, "end_date": 1514908800000}, )",
+                               R"("entries": {"start_date": 1514970000000, "end_date": 1514980800000}, )",
+                               R"("entries": {"start_date": 1514984400000, "end_date": 1514995200000}, )",
+                               R"("entries": {"start_date": 1515142800000, "end_date": 1515153600000}, )",
+                               R"("entries": {"start_date": 1515157200000, "end_date": 1515168000000}, )",
+                               R"( }}, )",
+                               R"("calendar2": {"weekday_calendar": {)",
+                               R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("wednesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"(}})",
+                               R"(}})"});
+            calendar_ids->append_datum(kNullDatum);
+        }
+        const auto result = CelonisTimeFunctions::in_calendar(nullptr, {timestamps, calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(0L, result->get(1).get_int64());
+        EXPECT_EQ(0L, result->get(2).get_int64());
+        EXPECT_EQ(1L, result->get(3).get_int64());
     }
 }
 
@@ -2968,6 +2991,87 @@ TEST_F(CelonisTimeFunctionsTest, add_hours_with_calendar) {
         EXPECT_EQ(TimestampValue::create(2018, 1, 5, 10, 0, 0), result->get(0).get_timestamp());
         EXPECT_EQ(TimestampValue::create(2018, 1, 8, 16, 0, 0), result->get(1).get_timestamp());
     }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 2, 11, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 5, 16, 10, 0));
+        add_values->append_datum(3L);
+        add_values->append_datum(-16L);
+        calendar_ids->append_datum(kNullDatum);
+        calendar_ids->append_datum(kNullDatum);
+        for (auto i = 0; i < timestamps->size(); ++i) {
+            time_units->append_datum("HOURS");
+            calendars->append_datum(
+                    DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                               R"("entries": {"start_date": 1514883600000, "end_date": 1514894400000}, )",
+                               R"("entries": {"start_date": 1514898000000, "end_date": 1514908800000}, )",
+                               R"("entries": {"start_date": 1514970000000, "end_date": 1514980800000}, )",
+                               R"("entries": {"start_date": 1514984400000, "end_date": 1514995200000}, )",
+                               R"("entries": {"start_date": 1515142800000, "end_date": 1515153600000}, )",
+                               R"("entries": {"start_date": 1515157200000, "end_date": 1515168000000}, )",
+                               R"( }}, )",
+                               R"("calendar2": {"weekday_calendar": {)",
+                               R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("wednesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"(}})",
+                               R"(}})"});
+        }
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 15, 0, 0), result->get(0).get_timestamp());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 11, 0, 0), result->get(1).get_timestamp());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+        add_values->append_datum(20L);
+        add_values->append_datum(20L);
+        calendar_ids->append_datum("JP");
+        calendar_ids->append_datum("US");
+        for (auto i = 0; i < timestamps->size(); ++i) {
+            time_units->append_datum("HOURS");
+            calendars->append_datum(
+                    DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                               R"("entries": {"start_date": 1514880000000, "end_date": 1514912400000, "calendar_id": "DE"}, )",
+                               R"("entries": {"start_date": 1514966400000, "end_date": 1514998800000, "calendar_id": "DE"}, )",
+                               R"("entries": {"start_date": 1515139200000, "end_date": 1515171600000, "calendar_id": "DE"}, )",
+                               R"("entries": {"start_date": 1515247200000, "end_date": 1515279600000, "calendar_id": "US"}, )",
+                               R"("entries": {"start_date": 1515333600000, "end_date": 1515366000000, "calendar_id": "US"}, )",
+                               R"("entries": {"start_date": 1515420000000, "end_date": 1515452400000, "calendar_id": "US"}, )",
+                               R"( }}, )",
+                               R"("calendar2": {"factory_calendar": {)",
+                               R"("entries": {"start_date": 1514880000000, "end_date": 1514912400000, "calendar_id": "JP"}, )",
+                               R"("entries": {"start_date": 1514966400000, "end_date": 1514998800000, "calendar_id": "JP"}, )",
+                               R"("entries": {"start_date": 1515139200000, "end_date": 1515171600000, "calendar_id": "JP"}, )",
+                               R"("entries": {"start_date": 1515247200000, "end_date": 1515279600000, "calendar_id": "US"}, )",
+                               R"("entries": {"start_date": 1515333600000, "end_date": 1515366000000, "calendar_id": "US"}, )",
+                               R"("entries": {"start_date": 1515420000000, "end_date": 1515452400000, "calendar_id": "US"}, )",
+                               R"(}})",
+                               R"(}})"});
+        }
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 8, 16, 0, 0), result->get(1).get_timestamp());
+    }
 }
 
 TEST_F(CelonisTimeFunctionsTest, add_minutes_with_calendar) {
@@ -3058,6 +3162,44 @@ TEST_F(CelonisTimeFunctionsTest, add_minutes_with_calendar) {
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_EQ(TimestampValue::create(2018, 1, 2, 9, 1, 0), result->get(0).get_timestamp());
         EXPECT_EQ(TimestampValue::create(2018, 1, 2, 15, 2, 0), result->get(1).get_timestamp());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 2, 11, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 3, 9, 10, 0));
+        add_values->append_datum(62L);
+        add_values->append_datum(-20L);
+        calendar_ids->append_datum(kNullDatum);
+        calendar_ids->append_datum(kNullDatum);
+        for (auto i = 0; i < timestamps->size(); ++i) {
+            time_units->append_datum("MINUTES");
+            calendars->append_datum(
+                    DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                               R"("entries": {"start_date": 1514883600000, "end_date": 1514894400000}, )",
+                               R"("entries": {"start_date": 1514898000000, "end_date": 1514908800000}, )",
+                               R"("entries": {"start_date": 1514970000000, "end_date": 1514980800000}, )",
+                               R"("entries": {"start_date": 1514984400000, "end_date": 1514995200000}, )",
+                               R"( }}, )",
+                               R"("calendar2": {"weekday_calendar": {)",
+                               R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("wednesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"(}})",
+                               R"(}})"});
+        }
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 13, 2, 0), result->get(0).get_timestamp());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 15, 50, 0), result->get(1).get_timestamp());
     }
 }
 
@@ -3151,6 +3293,44 @@ TEST_F(CelonisTimeFunctionsTest, add_seconds_with_calendar) {
         EXPECT_EQ(TimestampValue::create(2018, 1, 2, 8, 1, 1), result->get(0).get_timestamp());
         EXPECT_EQ(TimestampValue::create(2018, 1, 2, 14, 1, 2), result->get(1).get_timestamp());
     }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 2, 11, 58, 0));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 3, 9, 0, 10));
+        add_values->append_datum(122L);
+        add_values->append_datum(-20L);
+        calendar_ids->append_datum(kNullDatum);
+        calendar_ids->append_datum(kNullDatum);
+        for (auto i = 0; i < timestamps->size(); ++i) {
+            time_units->append_datum("SECONDS");
+            calendars->append_datum(
+                    DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                               R"("entries": {"start_date": 1514883600000, "end_date": 1514894400000}, )",
+                               R"("entries": {"start_date": 1514898000000, "end_date": 1514908800000}, )",
+                               R"("entries": {"start_date": 1514970000000, "end_date": 1514980800000}, )",
+                               R"("entries": {"start_date": 1514984400000, "end_date": 1514995200000}, )",
+                               R"( }}, )",
+                               R"("calendar2": {"weekday_calendar": {)",
+                               R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("wednesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"(}})",
+                               R"(}})"});
+        }
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 13, 0, 2), result->get(0).get_timestamp());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 15, 59, 50), result->get(1).get_timestamp());
+    }
 }
 
 TEST_F(CelonisTimeFunctionsTest, add_millis_with_calendar) {
@@ -3241,6 +3421,44 @@ TEST_F(CelonisTimeFunctionsTest, add_millis_with_calendar) {
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_EQ(TimestampValue::create(2018, 1, 2, 8, 0, 1, 1000), result->get(0).get_timestamp());
         EXPECT_EQ(TimestampValue::create(2018, 1, 2, 14, 0, 1, 2000), result->get(1).get_timestamp());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 2, 11, 59, 59, 900000));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 3, 9, 0, 0, 10000));
+        add_values->append_datum(100L);
+        add_values->append_datum(-20L);
+        calendar_ids->append_datum(kNullDatum);
+        calendar_ids->append_datum(kNullDatum);
+        for (auto i = 0; i < timestamps->size(); ++i) {
+            time_units->append_datum("MILLISECONDS");
+            calendars->append_datum(
+                    DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                               R"("entries": {"start_date": 1514883600000, "end_date": 1514894400000}, )",
+                               R"("entries": {"start_date": 1514898000000, "end_date": 1514908800000}, )",
+                               R"("entries": {"start_date": 1514970000000, "end_date": 1514980800000}, )",
+                               R"("entries": {"start_date": 1514984400000, "end_date": 1514995200000}, )",
+                               R"( }}, )",
+                               R"("calendar2": {"weekday_calendar": {)",
+                               R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("wednesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                               R"(}})",
+                               R"(}})"});
+        }
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(nullptr,
+                                                                         {timestamps, add_values,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 13, 0, 0), result->get(0).get_timestamp());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 15, 59, 59, 990000), result->get(1).get_timestamp());
     }
 }
 

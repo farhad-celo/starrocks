@@ -10,6 +10,7 @@
 #include "types/date_value.h"
 
 #include <bitset>
+#include <stack>
 
 namespace starrocks {
 
@@ -234,6 +235,44 @@ struct TimeRange {
 
     virtual ~TimeRange() = default;
 
+    // Computes the intersection with [left_ms, right_ms)
+    std::vector<TimeRange> intersect(int64_t left_ms, int64_t right_ms) const {
+        std::vector<TimeRange> rv;
+        if (!is_weekly) {
+            int64_t start = std::max(begin_ms, left_ms);
+            int64_t end = std::min(end_ms, right_ms);
+            if (end > start) {
+                rv.emplace_back(start, end);
+            }
+            return rv;
+        }
+        const int64_t begin = left_ms;
+        const int64_t end = right_ms;
+        int64_t cur_begin = begin_ms;
+        int64_t cur_end = end_ms;
+        int64_t period = NUM_MILLISECONDS_PER_WEEK;
+        // move [cur_begin, cur_end) to the left of [begin, end)
+        if (cur_end > begin) {
+            int64_t n_periods = (cur_end - begin + period - 1) / period;
+            cur_begin -= n_periods * period;
+            cur_end -= n_periods * period;
+        }
+        // move [cur_begin, cur_end) to right to pass [begin, end)
+        while (true) {
+            if (cur_begin >= end) {
+                break;
+            }
+            int64_t left = std::max(cur_begin, begin);
+            int64_t right = std::min(cur_end, end);
+            if (right > left) {
+                rv.emplace_back(left, right);
+            }
+            cur_begin += period;
+            cur_end += period;
+        }
+        return rv;
+    }
+
     // Computes the overlap in milliseconds with [left_ms, right_ms)
     int64_t compute_overlap(int64_t left_ms, int64_t right_ms) const {
         if (!is_weekly) {
@@ -311,10 +350,17 @@ public:
         if (calendar_proto.has_workday_calendar()) {
             handle_workday_calendar(calendar_proto.workday_calendar());
         }
+        if (calendar_proto.has_intersect_calendar()) {
+            handle_intersect_calendar(calendar_proto.intersect_calendar());
+        }
     }
 
     bool requires_calendar_id() const {
-        return !id_to_time_ranges_.empty();
+        auto iter = id_to_time_ranges_.find(std::nullopt);
+        if (iter == id_to_time_ranges_.end()) {
+            return !id_to_time_ranges_.empty();
+        }
+        return id_to_time_ranges_.size() > 1;
     }
 
     int64_t
@@ -346,16 +392,10 @@ public:
         bool left_to_right = add_value >= 0;
         std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
         std::vector<TimeRange> time_ranges;
-        if (!calendar_id.has_value()) {
-            for (const auto& cur_time_range: time_ranges_) {
+        auto itr = id_to_time_ranges_.find(calendar_id);
+        if (itr != id_to_time_ranges_.end()) {
+            for (const auto& cur_time_range: itr->second) {
                 time_ranges.push_back(cur_time_range);
-            }
-        } else {
-            auto itr = id_to_time_ranges_.find(calendar_id.value());
-            if (itr != id_to_time_ranges_.end()) {
-                for (const auto& cur_time_range: itr->second) {
-                    time_ranges.push_back(cur_time_range);
-                }
             }
         }
         const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
@@ -429,20 +469,11 @@ public:
                              const std::optional<std::string>& calendar_id) const {
         const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
         const int64_t ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
-
-        if (!calendar_id.has_value()) {
-            for (const auto& cur_time_range: time_ranges_) {
+        auto itr = id_to_time_ranges_.find(calendar_id);
+        if (itr != id_to_time_ranges_.end()) {
+            for (const auto& cur_time_range: itr->second) {
                 if (cur_time_range.is_ms_in(ms)) {
                     return true;
-                }
-            }
-        } else {
-            auto itr = id_to_time_ranges_.find(calendar_id.value());
-            if (itr != id_to_time_ranges_.end()) {
-                for (const auto& cur_time_range: itr->second) {
-                    if (cur_time_range.is_ms_in(ms)) {
-                        return true;
-                    }
                 }
             }
         }
@@ -450,6 +481,9 @@ public:
     }
 
 private:
+    using IdToTimeRangesMap = std::unordered_map<std::optional<std::string>, std::vector<TimeRange>>;
+    using IdToWeekdayMap = std::unordered_map<std::optional<std::string>, std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry>>;
+
     void handle_multi_weekday_calendar(const celonis::accelerator::MultiWeekdayCalendar& multi_weekday_calendar) {
         for (const auto& calendar: multi_weekday_calendar.calendars()) {
             handle_weekday_calendar(calendar);
@@ -481,14 +515,13 @@ private:
             if (calendar_id.has_value()) {
                 id_to_time_ranges_[calendar_id.value()].emplace_back(begin, end, true);
             } else {
-                time_ranges_.emplace_back(begin, end, true);
+                id_to_time_ranges_[std::nullopt].emplace_back(begin, end, true);
             }
         }
     }
 
-    void handle_factory_calendar(const celonis::accelerator::FactoryCalendar& factory_calendar) {
-        std::vector<TimeRange> time_ranges;
-        std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges;
+    IdToTimeRangesMap to_time_ranges(const celonis::accelerator::FactoryCalendar& factory_calendar) {
+        IdToTimeRangesMap id_to_time_ranges;
         for (const auto& entry: factory_calendar.entries()) {
             if (!entry.has_start_date() || !entry.has_end_date() || entry.start_date() > entry.end_date()) {
                 continue;
@@ -496,21 +529,198 @@ private:
             if (entry.has_calendar_id()) {
                 id_to_time_ranges[entry.calendar_id()].emplace_back(entry.start_date(), entry.end_date());
             } else {
-                time_ranges.emplace_back(entry.start_date(), entry.end_date());
+                id_to_time_ranges[std::nullopt].emplace_back(entry.start_date(), entry.end_date());
             }
         }
-        merge_non_weekly_time_ranges(time_ranges);
         for (auto& kv: id_to_time_ranges) {
             merge_non_weekly_time_ranges(kv.second);
         }
-        for (const auto& time_range: time_ranges) {
-            time_ranges_.emplace_back(time_range.begin_ms, time_range.end_ms);
-        }
+        return id_to_time_ranges;
+    }
+
+    void populate_id_to_time_ranges(const IdToTimeRangesMap& id_to_time_ranges) {
         for (const auto& kv: id_to_time_ranges) {
             auto& cur_time_ranges = id_to_time_ranges_[kv.first];
             for (const auto& time_range: kv.second) {
-                cur_time_ranges.emplace_back(time_range.begin_ms, time_range.end_ms);
+                cur_time_ranges.push_back(time_range);
             }
+        }
+    }
+
+    void handle_factory_calendar(const celonis::accelerator::FactoryCalendar& factory_calendar) {
+        populate_id_to_time_ranges(to_time_ranges(factory_calendar));
+    }
+
+    // m2 does not contain any weekly TimeRanges
+    IdToTimeRangesMap intersect_id_to_time_ranges(const IdToTimeRangesMap& m1, const IdToTimeRangesMap& m2) {
+        IdToTimeRangesMap m;
+        for (const auto& [id, time_ranges_1]: m1) {
+            auto iter = m2.find(id);
+            if (iter == m2.end()) {
+                continue;
+            }
+            std::vector<TimeRange> new_time_ranges;
+            const auto& time_ranges_2 = iter->second;
+            for (const auto& time_range_1: time_ranges_1) {
+                for (const auto& time_range_2: time_ranges_2) {
+                    DCHECK(!time_range_2.is_weekly);
+                    int64_t left_ms = time_range_2.begin_ms;
+                    int64_t right_ms = time_range_2.end_ms;
+                    const auto inter_time_ranges = time_range_1.intersect(left_ms, right_ms);
+                    new_time_ranges.insert(new_time_ranges.end(), inter_time_ranges.begin(), inter_time_ranges.end());
+                }
+            }
+            m[id] = new_time_ranges;
+        }
+        return m;
+    }
+
+    IdToWeekdayMap intersect_id_to_weekday(const IdToWeekdayMap& m1, const IdToWeekdayMap& m2) {
+        IdToWeekdayMap m;
+        for (const auto& [id, index_to_weekday_1]: m1) {
+            auto iter = m2.find(id);
+            if (iter == m2.end()) {
+                continue;
+            }
+            const auto& index_to_weekday_2 = iter->second;
+            // both m1 and m2 have id
+            std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry> new_index_to_weekday;
+            for (const auto& [index, weekday_1]: index_to_weekday_1) {
+                auto it = index_to_weekday_2.find(index);
+                if (it == index_to_weekday_2.end()) {
+                    continue;
+                }
+                const auto& weekday_2 = it->second;
+                // intersect weekday_1 and weekday_2
+                if (!weekday_1.use_day() || !weekday_2.use_day()) {
+                    continue;
+                }
+                celonis::accelerator::WeekdayCalendarEntry weekday;
+                int64_t s1 = weekday_1.shift().begin();
+                int64_t e1 = weekday_1.shift().end();
+                int64_t s2 = weekday_2.shift().begin();
+                int64_t e2 = weekday_2.shift().end();
+                int64_t s = std::max(s1, s2);
+                int64_t e = std::min(e1, e2);
+                if (e > s) {
+                    weekday.set_use_day(true);
+                    weekday.mutable_shift()->set_begin(s);
+                    weekday.mutable_shift()->set_end(e);
+                    new_index_to_weekday[index] = weekday;
+                }
+            }
+            if (!new_index_to_weekday.empty()) {
+                m[id] = new_index_to_weekday;
+            }
+        }
+        return m;
+    }
+
+    void handle_weekday_calendar(const celonis::accelerator::WeekdayCalendar& weekday_calendar,
+                                 IdToWeekdayMap& id_to_weekday) {
+        std::optional<std::string> id = std::nullopt;
+        if (weekday_calendar.has_calendar_id()) {
+            id = weekday_calendar.calendar_id();
+        }
+        if (weekday_calendar.has_monday() && weekday_calendar.monday().use_day()) {
+            id_to_weekday[id][0] = weekday_calendar.monday();
+        }
+        if (weekday_calendar.has_tuesday() && weekday_calendar.tuesday().use_day()) {
+            id_to_weekday[id][1] = weekday_calendar.tuesday();
+        }
+        if (weekday_calendar.has_wednesday() && weekday_calendar.wednesday().use_day()) {
+            id_to_weekday[id][2] = weekday_calendar.wednesday();
+        }
+        if (weekday_calendar.has_thursday() && weekday_calendar.thursday().use_day()) {
+            id_to_weekday[id][3] = weekday_calendar.thursday();
+        }
+        if (weekday_calendar.has_friday() && weekday_calendar.friday().use_day()) {
+            id_to_weekday[id][4] = weekday_calendar.friday();
+        }
+        if (weekday_calendar.has_saturday() && weekday_calendar.saturday().use_day()) {
+            id_to_weekday[id][5] = weekday_calendar.saturday();
+        }
+        if (weekday_calendar.has_sunday() && weekday_calendar.sunday().use_day()) {
+            id_to_weekday[id][6] = weekday_calendar.sunday();
+        }
+    }
+
+    IdToTimeRangesMap to_time_ranges(const IdToWeekdayMap& id_to_weekday) {
+        IdToTimeRangesMap id_to_time_ranges;
+        std::vector<int> add_days = {4, 5, 6, 0, 1, 2, 3};
+        for (const auto& [id, index_to_weekday]: id_to_weekday) {
+            for (const auto& [index, weekday]: index_to_weekday) {
+                int64_t begin = weekday.shift().begin();
+                int64_t end = weekday.shift().end();
+                if (weekday.use_day() && end > begin) {
+                    begin += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
+                    end += NUM_MILLISECONDS_PER_DAY * add_days.at(index);
+                    id_to_time_ranges[id].emplace_back(begin, end, true);
+                }
+            }
+        }
+        return id_to_time_ranges;
+    }
+
+    void handle_intersect_calendar(const celonis::accelerator::IntersectCalendar& intersect_calendar) {
+        // collect all the calendars
+        std::stack<celonis::accelerator::Calendar> calendars;
+        if (intersect_calendar.has_calendar1()) {
+            calendars.push(intersect_calendar.calendar1());
+        }
+        if (intersect_calendar.has_calendar2()) {
+            calendars.push(intersect_calendar.calendar2());
+        }
+        std::optional<IdToTimeRangesMap> id_to_time_ranges = std::nullopt;
+        std::optional<IdToWeekdayMap> id_to_weekday;
+        while (!calendars.empty()) {
+            const auto calendar = calendars.top();
+            calendars.pop();
+            std::optional<IdToTimeRangesMap> cur_id_to_time_ranges;
+            std::optional<IdToWeekdayMap> cur_id_to_weekday;
+            if (calendar.has_factory_calendar()) {
+                cur_id_to_time_ranges = to_time_ranges(calendar.factory_calendar());
+            } else if (calendar.has_workday_calendar()) {
+                cur_id_to_time_ranges = to_time_ranges(calendar.workday_calendar());
+            } else if (calendar.has_weekday_calendar()) {
+                cur_id_to_weekday = IdToWeekdayMap();
+                handle_weekday_calendar(calendar.weekday_calendar(), cur_id_to_weekday.value());
+            } else if (calendar.has_multi_weekday_calendar()) {
+                cur_id_to_weekday = IdToWeekdayMap();
+                for (const auto& weekday_calendar: calendar.multi_weekday_calendar().calendars()) {
+                    handle_weekday_calendar(weekday_calendar, cur_id_to_weekday.value());
+                }
+            } else if (calendar.has_intersect_calendar()) {
+                if (calendar.intersect_calendar().has_calendar1()) {
+                    calendars.push(calendar.intersect_calendar().calendar1());
+                }
+                if (calendar.intersect_calendar().has_calendar2()) {
+                    calendars.push(calendar.intersect_calendar().calendar2());
+                }
+            }
+            if (cur_id_to_time_ranges.has_value()) {
+                if (id_to_time_ranges.has_value()) {
+                    id_to_time_ranges = intersect_id_to_time_ranges(id_to_time_ranges.value(),
+                                                                    cur_id_to_time_ranges.value());
+                } else {
+                    id_to_time_ranges = cur_id_to_time_ranges.value();
+                }
+            }
+            if (cur_id_to_weekday) {
+                if (id_to_weekday.has_value()) {
+                    id_to_weekday = intersect_id_to_weekday(id_to_weekday.value(), cur_id_to_weekday.value());
+                } else {
+                    id_to_weekday = cur_id_to_weekday.value();
+                }
+            }
+        }
+        if (id_to_weekday.has_value() && id_to_time_ranges.has_value()) {
+            populate_id_to_time_ranges(
+                    intersect_id_to_time_ranges(to_time_ranges(id_to_weekday.value()), id_to_time_ranges.value()));
+        } else if (id_to_weekday.has_value()) {
+            populate_id_to_time_ranges(to_time_ranges(id_to_weekday.value()));
+        } else if (id_to_time_ranges.has_value()) {
+            populate_id_to_time_ranges(id_to_time_ranges.value());
         }
     }
 
@@ -538,67 +748,47 @@ private:
         return time_ranges;
     }
 
-    void handle_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
-        std::map<int, std::bitset<366>> year_to_bitset;
-        std::unordered_map<std::string, std::map<int, std::bitset<366>>> year_to_bitset_by_id;
+    IdToTimeRangesMap to_time_ranges(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
+        std::unordered_map<std::optional<std::string>, std::map<int, std::bitset<366>>> year_to_bitset_by_id;
         for (const auto& entry: workday_calendar.entries()) {
             auto year = entry.year();
             if (entry.has_calendar_id()) {
                 year_to_bitset_by_id[entry.calendar_id()][year] |= to_bitset(entry);
             } else {
-                year_to_bitset[year] |= to_bitset(entry);
+                year_to_bitset_by_id[std::nullopt][year] |= to_bitset(entry);
             }
         }
-        std::vector<TimeRange> time_ranges;
-        std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges;
-        for (const auto& kv: year_to_bitset) {
-            for (const auto& time_range: to_time_ranges(kv.first, kv.second)) {
-                time_ranges.push_back(time_range);
-            }
-        }
-        for (const auto& kv: year_to_bitset_by_id) {
-            std::string id = kv.first;
+        IdToTimeRangesMap id_to_time_ranges;
+        for (const auto& [id, bitset_by_year]: year_to_bitset_by_id) {
             auto& cur_time_ranges = id_to_time_ranges[id];
-            for (const auto& bitset_by_year: kv.second) {
-                for (const auto& time_range: to_time_ranges(bitset_by_year.first, bitset_by_year.second)) {
+            for (const auto& [year, bit_set]: bitset_by_year) {
+                for (const auto& time_range: to_time_ranges(year, bit_set)) {
                     cur_time_ranges.push_back(time_range);
                 }
             }
         }
-        merge_non_weekly_time_ranges(time_ranges);
         for (auto& kv: id_to_time_ranges) {
             merge_non_weekly_time_ranges(kv.second);
         }
-        for (const auto& time_range: time_ranges) {
-            time_ranges_.emplace_back(time_range.begin_ms, time_range.end_ms);
-        }
-        for (const auto& kv: id_to_time_ranges) {
-            auto& cur_time_ranges = id_to_time_ranges_[kv.first];
-            for (const auto& time_range: kv.second) {
-                cur_time_ranges.emplace_back(time_range.begin_ms, time_range.end_ms);
-            }
-        }
+        return id_to_time_ranges;
+    }
+
+    void handle_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
+        populate_id_to_time_ranges(to_time_ranges(workday_calendar));
     }
 
     int64_t compute_overlap(int64_t left_ms, int64_t right_ms, const std::optional<std::string>& calendar_id) const {
         int64_t rv = 0L;
-        if (!calendar_id.has_value()) {
-            for (const auto& cur_time_range: time_ranges_) {
+        auto itr = id_to_time_ranges_.find(calendar_id);
+        if (itr != id_to_time_ranges_.end()) {
+            for (const auto& cur_time_range: itr->second) {
                 rv += cur_time_range.compute_overlap(left_ms, right_ms);
-            }
-        } else {
-            auto itr = id_to_time_ranges_.find(calendar_id.value());
-            if (itr != id_to_time_ranges_.end()) {
-                for (const auto& cur_time_range: itr->second) {
-                    rv += cur_time_range.compute_overlap(left_ms, right_ms);
-                }
             }
         }
         return rv;
     }
 
-    std::vector<TimeRange> time_ranges_;
-    std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges_;
+    IdToTimeRangesMap id_to_time_ranges_;
 };
 
 struct CalendarState {
@@ -727,8 +917,8 @@ static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
     }
     if (calendar.has_intersect_calendar()) {
         const celonis::accelerator::IntersectCalendar& intersect_calendar = calendar.intersect_calendar();
-        if (!intersect_calendar.has_calendar1() && !intersect_calendar.has_calendar2()) {
-            return Status::InvalidArgument("Neither calendar1 nor calendar2 is set in intersect_calendar.");
+        if (!intersect_calendar.has_calendar1() || !intersect_calendar.has_calendar2()) {
+            return Status::InvalidArgument("Intersect calendar must set both calendar1 and calendar2.");
         }
         if (intersect_calendar.has_calendar1()) {
             RETURN_IF_ERROR(validate_calendar(intersect_calendar.calendar1(), calendar_id));
@@ -736,9 +926,6 @@ static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
         if (intersect_calendar.has_calendar2()) {
             RETURN_IF_ERROR(validate_calendar(intersect_calendar.calendar2(), calendar_id));
         }
-    }
-    if (calendar.has_intersect_calendar()) {
-        return Status::InvalidArgument("Intersect calendar is not supported.");
     }
     return Status::OK();
 }
