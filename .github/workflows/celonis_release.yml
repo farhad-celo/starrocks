@@ -25,12 +25,12 @@ concurrency:
 
 env:
   RELEASE_VERSION: ${{ github.ref_name }}
-  IMAGE_TAG: "${{ github.ref_name }}-ubuntu"
+  IMAGE_TAG: ${{ github.ref_name }}
   BUILD_TYPE: Release
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 jobs:
-  release-ubuntu-image:
+  build-image:
     runs-on: [self-hosted, celostar]
     env:
       BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-e862a8f9
