@@ -39,6 +39,8 @@ static const size_t MAX_STRING_SIZE = 900000;
 
 static const int MONTH_TO_QUARTER[13] = {0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4};
 
+static const TimestampValue EPOCH = TimestampValue::create(1970, 1, 1, 0, 0, 0);
+
 static const TimestampValue MAX_YEAR = TimestampValue::create(10000, 1, 1, 0, 0, 0);
 
 static const TimestampValue MIN_YEAR = TimestampValue::create(1400, 1, 1, 0, 0, 0);
@@ -121,8 +123,11 @@ static void round_calendar(celonis::accelerator::Calendar& calendar_proto, int64
 }
 
 static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
-    TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
-    return timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+    return timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+}
+
+static int64_t millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp) {
+    return remap_timestamp_ms(to_timestamp) - remap_timestamp_ms(from_timestamp);
 }
 
 TimestampValue add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
@@ -365,12 +370,22 @@ public:
 
     int64_t
     remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id) const {
-        const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
-        int64 ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        int64 ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64_t left_ms = ms < 0 ? ms : 0L;
         int64_t right_ms = ms < 0 ? 0L : ms;
         int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id);
         return ms < 0 ? -overlap : overlap;
+    }
+
+    int64_t
+    millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp,
+                   const std::optional<std::string>& calendar_id) const {
+        int64 from_ms = from_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        int64 to_ms = to_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        int64_t left_ms = to_ms >= from_ms ? from_ms : to_ms;
+        int64_t right_ms = to_ms >= from_ms ? to_ms : from_ms;
+        int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id);
+        return (to_ms >= from_ms) ? overlap : -overlap;
     }
 
     struct CompareTimeRange {
@@ -398,8 +413,7 @@ public:
                 time_ranges.push_back(cur_time_range);
             }
         }
-        const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
-        int64_t ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         for (auto& time_range: time_ranges) {
             if (!time_range.is_weekly) {
                 pq.push(time_range);
@@ -424,8 +438,8 @@ public:
         auto iter = TIME_UNIT_TO_MS.find(time_unit);
         DCHECK(iter != TIME_UNIT_TO_MS.end());
         int64_t ms_left = std::abs(add_value * iter->second);
-        int64_t max_ms = MAX_YEAR.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
-        int64_t min_ms = MIN_YEAR.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        int64_t max_ms = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        int64_t min_ms = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         // [begin_ms, end_ms)
         int64_t begin_ms = left_to_right ? ms : min_ms;
         int64_t end_ms = left_to_right ? max_ms : ms;
@@ -459,7 +473,7 @@ public:
             }
         }
         if (rv.has_value()) {
-            return add_timeunits_helper(epoch, "MILLISECONDS", rv.value());
+            return add_timeunits_helper(EPOCH, "MILLISECONDS", rv.value());
         }
         return std::nullopt;
     }
@@ -467,8 +481,7 @@ public:
     bool
     is_timestamp_in_calendar(const TimestampValue& timestamp,
                              const std::optional<std::string>& calendar_id) const {
-        const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
-        const int64_t ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        const int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         auto itr = id_to_time_ranges_.find(calendar_id);
         if (itr != id_to_time_ranges_.end()) {
             for (const auto& cur_time_range: itr->second) {
@@ -735,9 +748,8 @@ private:
     }
 
     std::vector<TimeRange> to_time_ranges(int64_t year, const std::bitset<366>& bit_set) {
-        const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
         const TimestampValue timestamp = TimestampValue::create(year, 1, 1, 0, 0, 0);
-        const int64_t year_begin_ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        const int64_t year_begin_ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         std::vector<TimeRange> time_ranges;
         for (int i = 0; i < bit_set.size(); ++i) {
             if (bit_set.test(i)) {
@@ -871,8 +883,10 @@ static int get_days_in_year(int64_t year) {
     return ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) ? 366 : 365;
 }
 
-static Status validate_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
+static Status
+validate_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar, bool reject_year_gap = false) {
     int has_calendar_id = -1; // not set
+    std::unordered_map<std::optional<std::string>, std::vector<int64_t>> id_to_years;
     for (const auto& entry: workday_calendar.entries()) {
         if (!entry.has_year()) {
             return Status::InvalidArgument("year is not set in a workday calendar entry.");
@@ -891,12 +905,28 @@ static Status validate_workday_calendar(const celonis::accelerator::WorkdayCalen
                         "In WorkdayCalendar, ensure that the calendar_id is either set or not set in all entries.");
             }
         }
+        std::optional<std::string> id = std::nullopt;
+        if (entry.has_calendar_id()) {
+            id = entry.calendar_id();
+        }
+        id_to_years[id].push_back(entry.year());
+    }
+    if (reject_year_gap) {
+        for (auto& [id, years]: id_to_years) {
+            std::sort(years.begin(), years.end());
+            for (size_t i = 1; i < years.size(); ++i) {
+                if (years[i] - years[i - 1] > 1) {
+                    return Status::InvalidArgument("Year gaps are found in the workday calendar configuration.");
+                }
+            }
+        }
     }
     return Status::OK();
 }
 
 static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
-                                const std::optional<std::string>& calendar_id = std::nullopt) {
+                                const std::optional<std::string>& calendar_id = std::nullopt,
+                                bool reject_year_gap_in_workday_calendar = false) {
     if (calendar.has_weekday_calendar()) {
         if (calendar_id.has_value()) {
             return Status::InvalidArgument("Calendar ID column should not be set for weekday calendar.");
@@ -913,7 +943,7 @@ static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
         RETURN_IF_ERROR(validate_factory_calendar(calendar.factory_calendar()));
     }
     if (calendar.has_workday_calendar()) {
-        RETURN_IF_ERROR(validate_workday_calendar(calendar.workday_calendar()));
+        RETURN_IF_ERROR(validate_workday_calendar(calendar.workday_calendar(), reject_year_gap_in_workday_calendar));
     }
     if (calendar.has_intersect_calendar()) {
         const celonis::accelerator::IntersectCalendar& intersect_calendar = calendar.intersect_calendar();
@@ -939,12 +969,48 @@ static StatusOr<int64_t> convert_time_unit(const std::string& time_unit, int64_t
     }
 }
 
+static StatusOr<int64_t>
+timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue& to_timestamp_raw,
+                  const std::string& time_unit,
+                  const std::string& calendar_json_string,
+                  std::optional<std::string>& calendar_id) {
+    TimestampValue from_timestamp = from_timestamp_raw;
+    TimestampValue to_timestamp = to_timestamp_raw;
+    truncate_timestamp(time_unit, from_timestamp);
+    truncate_timestamp(time_unit, to_timestamp);
+    int64_t milliseconds = 0L;
+    celonis::accelerator::Calendar calendar_proto;
+    if (calendar_json_string.empty()) {
+        if (calendar_id.has_value()) {
+            return Status::InvalidArgument(
+                    "Calendar ID column should not be set when calendar specification is not set.");
+        }
+        milliseconds = millis_between(from_timestamp, to_timestamp);
+    } else {
+        // parse calendar_json_string
+        if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
+            return Status::InvalidArgument("Calendar specification column is malformed.");
+        }
+        RETURN_IF_ERROR(validate_calendar(calendar_proto, calendar_id, true));
+        int64_t multiplier = TIME_UNIT_TO_MS.at(time_unit);
+        round_calendar(calendar_proto, multiplier);
+        Calendar calendar(calendar_proto);
+        if (calendar.requires_calendar_id() && !calendar_id.has_value()) {
+            return Status::InvalidArgument("Calendar ID column not provided.");
+        }
+        if (!calendar.requires_calendar_id()) {
+            calendar_id = std::nullopt;
+        }
+        milliseconds = calendar.millis_between(from_timestamp, to_timestamp, calendar_id);
+    }
+    return convert_time_unit(time_unit, milliseconds);
+}
+
 static StatusOr<std::optional<int64_t>>
 remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::string& time_unit,
                          const std::string& calendar_json_string,
-                         std::optional<std::string>& calendar_id, bool round_time = false) {
+                         std::optional<std::string>& calendar_id) {
     TimestampValue timestamp = input_timestamp;
-    truncate_timestamp(time_unit, timestamp);
     int64_t milliseconds = 0L;
     celonis::accelerator::Calendar calendar_proto;
     if (calendar_json_string.empty()) {
@@ -959,10 +1025,6 @@ remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::strin
             return Status::InvalidArgument("Calendar specification column is malformed.");
         }
         RETURN_IF_ERROR(validate_calendar(calendar_proto, calendar_id));
-        if (round_time) {
-            int64_t multiplier = TIME_UNIT_TO_MS.at(time_unit);
-            round_calendar(calendar_proto, multiplier);
-        }
         Calendar calendar(calendar_proto);
         if (calendar.requires_calendar_id() && !calendar_id.has_value()) {
             return Status::InvalidArgument("Calendar ID column not provided.");
@@ -1058,16 +1120,9 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::timeunits_between_calendar([[maybe_unu
         for (size_t id = start; id < end; ++id) {
             calendar_json_string += calendars[id].to_string();
         }
-        ASSIGN_OR_RETURN(const std::optional<int64_t> from_time,
-                         remap_timestamp_calendar(from_timestamp, time_unit, calendar_json_string, calendar_id, true));
-        ASSIGN_OR_RETURN(const std::optional<int64_t> to_time,
-                         remap_timestamp_calendar(to_timestamp, time_unit, calendar_json_string, calendar_id, true));
-        if (from_time.has_value() && to_time.has_value()) {
-            double diff = to_time.value() - from_time.value();
-            result.append(diff);
-        } else {
-            result.append_null();
-        }
+        ASSIGN_OR_RETURN(const int64_t diff,
+                         timeunits_between(from_timestamp, to_timestamp, time_unit, calendar_json_string, calendar_id));
+        result.append(diff);
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }

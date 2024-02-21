@@ -1787,6 +1787,62 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_invalid_input) {
     }
 }
 
+TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_year_gaps_in_workday_calendar) {
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 6, 1, 0, 0));
+        time_units->append_datum("DAYS");
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": {)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 10, 15}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"("entries": { "year": 1972, )",
+                        get_is_workdays_str(366, {11}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"( }})"});
+        calendar_ids->append_datum("id1");
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
+                                                                             {from_timestamps, to_timestamps,
+                                                                              time_units, calendars,
+                                                                              calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "Year gaps are found in the workday calendar configuration.");
+    }
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 6, 1, 0, 0));
+        time_units->append_datum("DAYS");
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": {)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 10, 15}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"("entries": { "year": 1972, )",
+                        get_is_workdays_str(366, {11}).c_str(),
+                        R"(, calendar_id: "id2"},)",
+                        R"( }})"});
+        calendar_ids->append_datum("id1");
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
+                                                                             {from_timestamps, to_timestamps,
+                                                                              time_units, calendars,
+                                                                              calendar_ids});
+        ASSERT_TRUE(result.status().ok());
+    }
+}
+
 TEST_F(CelonisTimeFunctionsTest, in_calendar_weekday_calendar) {
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
