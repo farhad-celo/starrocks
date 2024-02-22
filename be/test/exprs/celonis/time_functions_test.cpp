@@ -2154,15 +2154,19 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_weekday_calendar) {
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
-        calendars->append_datum(DatumArray{
-                R"({"weekday_calendar": {)",
-                // [8:00 am, 5:00 pm]
-                R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"(} })"});
-        calendar_ids->append_datum(kNullDatum);
+        timestamps->append_datum(TimestampValue::create(1969, 12, 25, 16, 59, 59, 999000));
+        for (auto i = 0; i < timestamps->size(); ++i) {
+            calendars->append_datum(DatumArray{
+                    R"({"weekday_calendar": {)",
+                    // [8:00 am, 5:00 pm]
+                    R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"(} })"});
+            calendar_ids->append_datum(kNullDatum);
+        }
         const auto result = CelonisTimeFunctions::in_calendar(nullptr, {timestamps, calendars, calendar_ids}).value();
         ASSERT_EQ(timestamps->size(), result->size());
-        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(0L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
     }
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
@@ -2199,15 +2203,22 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_weekday_calendar) {
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
+        timestamps->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
+        calendars->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200001} }, )",
+                R"(} })"});
         calendars->append_datum(DatumArray{
                 R"({"weekday_calendar": {)",
                 // [8:00 am, 5:00 pm]
                 R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
                 R"(} })"});
         calendar_ids->append_datum(kNullDatum);
+        calendar_ids->append_datum(kNullDatum);
         const auto result = CelonisTimeFunctions::in_calendar(nullptr, {timestamps, calendars, calendar_ids}).value();
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(0L, result->get(1).get_int64());
     }
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);

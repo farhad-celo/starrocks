@@ -270,14 +270,14 @@ struct TimeRange {
 
     bool is_ms_in(int64_t ms) const {
         if (!is_weekly) {
-            return ms >= begin_ms && ms <= end_ms;
+            return ms >= begin_ms && ms < end_ms;
         }
         int64_t diff_mod = (ms - begin_ms) % NUM_MILLISECONDS_PER_WEEK;
         if (diff_mod < 0) {
             diff_mod += NUM_MILLISECONDS_PER_WEEK;
         }
         int64_t adjusted_ms = begin_ms + diff_mod;
-        return begin_ms <= adjusted_ms && adjusted_ms <= end_ms;
+        return begin_ms <= adjusted_ms && adjusted_ms < end_ms;
     }
 };
 
