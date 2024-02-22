@@ -310,6 +310,7 @@ public class FunctionSet {
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
     public static final String CELONIS_MODE = "celonis_mode";
+    public static final String CELONIS_PRODUCT = "celonis_product";
     public static final String CELONIS_SORTED_FIRST = "celonis_sorted_first";
     public static final String CELONIS_SORTED_LAST = "celonis_sorted_last";
     public static final String CELONIS_TRIMMED_MEAN = "celonis_trimmed_mean";
@@ -621,6 +622,12 @@ public class FunctionSet {
                     .add(Type.DOUBLE)
                     .add(Type.DATETIME)
                     .add(Type.VARCHAR)
+                    .build();
+
+    private static final Set<Type> CELONIS_NUMERIC_TYPES =
+            ImmutableSet.<Type>builder()
+                    .add(Type.BIGINT)
+                    .add(Type.DOUBLE)
                     .build();
 
     /**
@@ -1188,6 +1195,15 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
                 Lists.newArrayList(Type.DOUBLE, Type.BIGINT), Type.ARRAY_DOUBLE, Type.VARBINARY,
                 false, false, false));
+        // celonis_product
+        for (Type type : CELONIS_NUMERIC_TYPES) {
+            ArrayList<StructField> sf = Lists.newArrayList();
+            sf.add(new StructField("stage", Type.TINYINT));
+            sf.add(new StructField("product", type));
+            addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_PRODUCT,
+                    Lists.newArrayList(type), type, new StructType(sf),
+                            false, false, false));
+        }
     }
 
     // Populate all the aggregate builtins in the globalStateMgr.

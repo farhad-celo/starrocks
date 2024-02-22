@@ -59,12 +59,13 @@
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/celonis/agg/inductive_miner.h"
-#include "exprs/celonis/agg/weekday_calendar.h"
-#include "exprs/celonis/agg/workday_calendar.h"
-#include "exprs/celonis/mode_agg.h"
+#include "exprs/celonis/agg/product.h"
 #include "exprs/celonis/agg/sorted_first_last.h"
 #include "exprs/celonis/agg/trimmed_mean.h"
 #include "exprs/celonis/agg/variant_stats.h"
+#include "exprs/celonis/agg/weekday_calendar.h"
+#include "exprs/celonis/agg/workday_calendar.h"
+#include "exprs/celonis/mode_agg.h"
 #include "types/logical_type.h"
 #include "types/logical_type_infra.h"
 #include "udf/java/java_function_fwd.h"
@@ -229,6 +230,9 @@ public:
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisModeAggregateFunction();
+
+    template <LogicalType LT>
+    static AggregateFunctionPtr MakeProductAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisSortedFirstAggregateFunction();
     static AggregateFunctionPtr MakeCelonisSortedLastAggregateFunction();
@@ -468,6 +472,11 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisHistogramBoundariesAggregateFu
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeCelonisModeAggregateFunction() {
     return std::make_shared<CelonisModeAggregateFunction<LT>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeProductAggregateFunction() {
+    return std::make_shared<ProductAggregateFunction<LT>>();
 }
 
 template <LogicalType LT>

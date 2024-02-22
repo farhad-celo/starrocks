@@ -81,6 +81,14 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_DOUBLE>());
 
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
+
+    auto add_product_aggregate_mapping{[this]<LogicalType LT>() {
+        add_aggregate_mapping_notnull<LT, ProductResultLT<LT>>("celonis_product", false,
+                                                               AggregateFactory::MakeProductAggregateFunction<LT>());
+    }};
+
+    add_product_aggregate_mapping.template operator()<TYPE_BIGINT>();
+    add_product_aggregate_mapping.template operator()<TYPE_DOUBLE>();
 }
 
 struct PercentileDiscDispatcher {

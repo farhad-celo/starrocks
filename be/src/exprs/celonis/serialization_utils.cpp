@@ -115,18 +115,21 @@ T deserialize(ByteBuffer& src) {
     return deserialized_value;
 }
 
+template ByteSize serialization_size<Byte>(const Byte&);
 template ByteSize serialization_size<std::int64_t>(const std::int64_t&);
 template ByteSize serialization_size<double>(const double&);
 template ByteSize serialization_size<Slice>(const Slice&);
 template ByteSize serialization_size<TimestampValue>(const TimestampValue&);
 template ByteSize serialization_size<std::size_t>(const std::size_t&);
 
+template ByteSize serialize<Byte>(MutableByteBuffer& dst, const Byte& value);
 template ByteSize serialize<std::int64_t>(MutableByteBuffer& dst, const std::int64_t& value);
 template ByteSize serialize<double>(MutableByteBuffer& dst, const double& value);
 template ByteSize serialize<Slice>(MutableByteBuffer& dst, const Slice& value);
 template ByteSize serialize<TimestampValue>(MutableByteBuffer& dst, const TimestampValue& value);
 template ByteSize serialize<std::size_t>(MutableByteBuffer& dst, const std::size_t& value);
 
+template Byte deserialize<Byte>(ByteBuffer& src);
 template std::int64_t deserialize<std::int64_t>(ByteBuffer& src);
 template double deserialize<double>(ByteBuffer& src);
 template Slice deserialize<Slice>(ByteBuffer& src);
