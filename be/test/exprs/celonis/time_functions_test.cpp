@@ -1536,9 +1536,9 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_without_calendar) {
         auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        from_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 1, 10, 0));
-        to_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 5, 20, 0));
-        time_units->append_datum("HOURS");
+        from_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 0, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(2018, 1, 2, 12, 0, 0));
+        time_units->append_datum("WORKDAYS");
         calendars->append_datum(DatumArray());
         calendar_ids->append_datum(kNullDatum);
         const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
@@ -1546,7 +1546,7 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_without_calendar) {
                                                                               time_units, calendars,
                                                                               calendar_ids}).value();
         ASSERT_EQ(from_timestamps->size(), result->size());
-        EXPECT_EQ(4.0, result->get(0).get_double());
+        EXPECT_EQ(1.0, result->get(0).get_double());
     }
     {
         auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
@@ -1554,9 +1554,9 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_without_calendar) {
         auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        from_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 1, 10, 15));
-        to_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 2, 20, 20));
-        time_units->append_datum("MINUTES");
+        from_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 0, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(2018, 1, 2, 12, 0, 0));
+        time_units->append_datum("DAYS");
         calendars->append_datum(DatumArray());
         calendar_ids->append_datum(kNullDatum);
         const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
@@ -1564,7 +1564,99 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_without_calendar) {
                                                                               time_units, calendars,
                                                                               calendar_ids}).value();
         ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_EQ(1.5, result->get(0).get_double());
+    }
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        from_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 5, 0, 0));
+        from_timestamps->append_datum(TimestampValue::create(2000, 1, 1, 23, 29, 59, 999000));
+        to_timestamps->append_datum(TimestampValue::create(1999, 12, 31, 23, 59, 59, 999000));
+        for (auto i = 0; i < from_timestamps->size(); ++i) {
+            time_units->append_datum("HOURS");
+            calendars->append_datum(DatumArray());
+            calendar_ids->append_datum(kNullDatum);
+        }
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
+                                                                             {from_timestamps, to_timestamps,
+                                                                              time_units, calendars,
+                                                                              calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_EQ(4.0, result->get(0).get_double());
+        EXPECT_EQ(-23.5, result->get(1).get_double());
+    }
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        from_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 1, 10, 0));
+        to_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 2, 20, 0));
+        from_timestamps->append_datum(TimestampValue::create(2000, 1, 1, 1, 0, 29, 999000));
+        to_timestamps->append_datum(TimestampValue::create(1999, 12, 31, 23, 59, 59, 999000));
+        for (auto i = 0; i < from_timestamps->size(); ++i) {
+            time_units->append_datum("MINUTES");
+            calendars->append_datum(DatumArray());
+            calendar_ids->append_datum(kNullDatum);
+        }
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
+                                                                             {from_timestamps, to_timestamps,
+                                                                              time_units, calendars,
+                                                                              calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
         EXPECT_EQ(70.0, result->get(0).get_double());
+        EXPECT_EQ(-60.5, result->get(1).get_double());
+    }
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        from_timestamps->append_datum(TimestampValue::create(2000, 1, 1, 0, 0, 59, 999000));
+        to_timestamps->append_datum(TimestampValue::create(1999, 12, 31, 23, 59, 59, 999000));
+        from_timestamps->append_datum(TimestampValue::create(2005, 5, 9, 12, 1, 10));
+        to_timestamps->append_datum(TimestampValue::create(2005, 5, 9, 12, 1, 11, 500000));
+        for (auto i = 0; i < from_timestamps->size(); ++i) {
+            time_units->append_datum("SECONDS");
+            calendars->append_datum(DatumArray());
+            calendar_ids->append_datum(kNullDatum);
+        }
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
+                                                                             {from_timestamps, to_timestamps,
+                                                                              time_units, calendars,
+                                                                              calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_EQ(-60.0, result->get(0).get_double());
+        EXPECT_EQ(1.5, result->get(1).get_double());
+    }
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        from_timestamps->append_datum(TimestampValue::create(2000, 1, 1, 0, 0, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1999, 12, 31, 23, 59, 59, 999000));
+        from_timestamps->append_datum(TimestampValue::create(2005, 5, 9, 12, 1, 10));
+        to_timestamps->append_datum(TimestampValue::create(2005, 5, 9, 12, 1, 11, 0));
+        for (auto i = 0; i < from_timestamps->size(); ++i) {
+            time_units->append_datum("MILLISECONDS");
+            calendars->append_datum(DatumArray());
+            calendar_ids->append_datum(kNullDatum);
+        }
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
+                                                                             {from_timestamps, to_timestamps,
+                                                                              time_units, calendars,
+                                                                              calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_EQ(-1.0, result->get(0).get_double());
+        EXPECT_EQ(1000.0, result->get(1).get_double());
     }
 }
 
@@ -1606,8 +1698,8 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_weekday_calendar) {
                                                                               time_units, calendars,
                                                                               calendar_ids}).value();
         ASSERT_EQ(from_timestamps->size(), result->size());
-        EXPECT_EQ(3.0, result->get(0).get_double());
-        EXPECT_EQ(-5.0, result->get(1).get_double());
+        EXPECT_EQ(1.125, result->get(0).get_double());
+        EXPECT_EQ(-1.875, result->get(1).get_double());
     }
     {
         auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
@@ -1649,6 +1741,50 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_weekday_calendar) {
         EXPECT_EQ(3.0, result->get(0).get_double());
         EXPECT_EQ(-5.0, result->get(1).get_double());
     }
+}
+
+TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_intersect_calendar) {
+
+    auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+    auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+    auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+    auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    from_timestamps->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+    to_timestamps->append_datum(TimestampValue::create(2018, 1, 6, 0, 0, 0));
+    from_timestamps->append_datum(TimestampValue::create(2018, 1, 9, 0, 0, 0));
+    to_timestamps->append_datum(TimestampValue::create(2018, 1, 6, 0, 0, 0));
+    for (auto i = 0; i < from_timestamps->size(); ++i) {
+        time_units->append_datum("WORKDAYS");
+        calendars->append_datum(
+                DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                           R"("entries": {"start_date": 1514880000000, "end_date": 1514912400000}, )",
+                           R"("entries": {"start_date": 1514966400000, "end_date": 1514998800000}, )",
+                           R"("entries": {"start_date": 1515052800000, "end_date": 1515085200000}, )",
+                           R"("entries": {"start_date": 1515225600000, "end_date": 1515258000000}, )",
+                           R"("entries": {"start_date": 1515312000000, "end_date": 1515326400000}, )",
+                           R"("entries": {"start_date": 1515398400000, "end_date": 1515430800000}, )",
+                           R"("entries": {"start_date": 1515484800000, "end_date": 1515517200000}, )",
+                           R"( }}, )",
+                           R"("calendar2": {"weekday_calendar": {)",
+                           R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                           R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                           R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                           R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                           R"("saturday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                           R"("sunday": {"use_day": true, "shift": {"begin": 46800000, "end": 54000000} }, )",
+                           R"(}})",
+                           R"(}})"});
+        calendar_ids->append_datum(kNullDatum);
+        calendar_ids->append_datum(kNullDatum);
+    }
+    const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
+                                                                         {from_timestamps, to_timestamps,
+                                                                          time_units, calendars,
+                                                                          calendar_ids}).value();
+    ASSERT_EQ(from_timestamps->size(), result->size());
+    EXPECT_EQ(2.0, result->get(0).get_double());
+    EXPECT_EQ(-2.0, result->get(1).get_double());
 }
 
 TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_null_input) {

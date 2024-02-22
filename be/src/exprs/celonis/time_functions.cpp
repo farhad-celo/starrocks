@@ -50,18 +50,6 @@ static int get_week_number(int year, int month, int day) {
     return DateValue::create(year, month, day).get_week_of_year();
 }
 
-static void truncate_timestamp(const std::string& time_unit, TimestampValue& timestamp) {
-    if (time_unit == "DAYS" || time_unit == "WORKDAYS") {
-        timestamp.trunc_to_day();
-    } else if (time_unit == "HOURS") {
-        timestamp.trunc_to_hour();
-    } else if (time_unit == "MINUTES") {
-        timestamp.trunc_to_minute();
-    } else if (time_unit == "SECONDS") {
-        timestamp.trunc_to_second();
-    }
-}
-
 static int64_t floor_to_nearest_multiple(int64_t num, int64_t multiple) {
     if (multiple == 0) {
         return num;
@@ -82,44 +70,6 @@ static int64_t ceil_to_nearest_multiple(int64_t num, int64_t multiple) {
         ceiled_num += multiple;
     }
     return ceiled_num;
-}
-
-static void round_weekday_calendar_entry(celonis::accelerator::WeekdayCalendarEntry* entry, int64_t multiple) {
-    if (entry->use_day() && entry->shift().begin() <= entry->shift().end()) {
-        entry->mutable_shift()->set_begin(floor_to_nearest_multiple(entry->shift().begin(), multiple));
-        entry->mutable_shift()->set_end(ceil_to_nearest_multiple(entry->shift().end(), multiple));
-    }
-}
-
-static void round_weekday_calendar(celonis::accelerator::WeekdayCalendar& weekday_calendar, int64_t multiple) {
-    round_weekday_calendar_entry(weekday_calendar.mutable_monday(), multiple);
-    round_weekday_calendar_entry(weekday_calendar.mutable_tuesday(), multiple);
-    round_weekday_calendar_entry(weekday_calendar.mutable_wednesday(), multiple);
-    round_weekday_calendar_entry(weekday_calendar.mutable_thursday(), multiple);
-    round_weekday_calendar_entry(weekday_calendar.mutable_friday(), multiple);
-    round_weekday_calendar_entry(weekday_calendar.mutable_saturday(), multiple);
-    round_weekday_calendar_entry(weekday_calendar.mutable_sunday(), multiple);
-}
-
-static void round_calendar(celonis::accelerator::Calendar& calendar_proto, int64_t multiple) {
-    if (calendar_proto.has_weekday_calendar()) {
-        round_weekday_calendar(*calendar_proto.mutable_weekday_calendar(), multiple);
-    } else if (calendar_proto.has_multi_weekday_calendar()) {
-        auto* multi_weekday_calendar = calendar_proto.mutable_multi_weekday_calendar();
-        for (auto& weekday_calendar: *multi_weekday_calendar->mutable_calendars()) {
-            round_weekday_calendar(weekday_calendar, multiple);
-        }
-    } else if (calendar_proto.has_factory_calendar()) {
-        auto* factory_calendar = calendar_proto.mutable_factory_calendar();
-        for (auto& entry: *factory_calendar->mutable_entries()) {
-            entry.set_start_date(floor_to_nearest_multiple(entry.start_date(), multiple));
-            entry.set_end_date(ceil_to_nearest_multiple(entry.end_date(), multiple));
-        }
-    } else if (calendar_proto.has_intersect_calendar()) {
-        auto* intersect_calendar = calendar_proto.mutable_intersect_calendar();
-        round_calendar(*intersect_calendar->mutable_calendar1(), multiple);
-        round_calendar(*intersect_calendar->mutable_calendar2(), multiple);
-    }
 }
 
 static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
@@ -379,12 +329,12 @@ public:
 
     int64_t
     millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp,
-                   const std::optional<std::string>& calendar_id) const {
+                   const std::optional<std::string>& calendar_id, bool round_to_day = false) const {
         int64 from_ms = from_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64 to_ms = to_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64_t left_ms = to_ms >= from_ms ? from_ms : to_ms;
         int64_t right_ms = to_ms >= from_ms ? to_ms : from_ms;
-        int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id);
+        int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id, round_to_day);
         return (to_ms >= from_ms) ? overlap : -overlap;
     }
 
@@ -789,12 +739,21 @@ private:
         populate_id_to_time_ranges(to_time_ranges(workday_calendar));
     }
 
-    int64_t compute_overlap(int64_t left_ms, int64_t right_ms, const std::optional<std::string>& calendar_id) const {
+    int64_t compute_overlap(int64_t left_ms, int64_t right_ms, const std::optional<std::string>& calendar_id,
+                            bool round_to_day = false) const {
         int64_t rv = 0L;
         auto itr = id_to_time_ranges_.find(calendar_id);
         if (itr != id_to_time_ranges_.end()) {
             for (const auto& cur_time_range: itr->second) {
-                rv += cur_time_range.compute_overlap(left_ms, right_ms);
+                if (!round_to_day) {
+                    rv += cur_time_range.compute_overlap(left_ms, right_ms);
+                } else {
+                    auto time_range_copy = cur_time_range;
+                    time_range_copy.begin_ms = floor_to_nearest_multiple(cur_time_range.begin_ms,
+                                                                         NUM_MILLISECONDS_PER_DAY);
+                    time_range_copy.end_ms = ceil_to_nearest_multiple(cur_time_range.end_ms, NUM_MILLISECONDS_PER_DAY);
+                    rv += time_range_copy.compute_overlap(left_ms, right_ms);
+                }
             }
         }
         return rv;
@@ -969,15 +928,27 @@ static StatusOr<int64_t> convert_time_unit(const std::string& time_unit, int64_t
     }
 }
 
-static StatusOr<int64_t>
+static StatusOr<double> convert_time_unit_float(const std::string& time_unit, int64_t milliseconds) {
+    auto iter = TIME_UNIT_TO_MS.find(time_unit);
+    if (iter != TIME_UNIT_TO_MS.end()) {
+        return static_cast<double>(milliseconds) / iter->second;
+    } else {
+        return Status::InvalidArgument("Unknown time_unit: " + time_unit);
+    }
+}
+
+static StatusOr<double>
 timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue& to_timestamp_raw,
                   const std::string& time_unit,
                   const std::string& calendar_json_string,
                   std::optional<std::string>& calendar_id) {
+    const bool round_to_day = time_unit == "WORKDAYS";
     TimestampValue from_timestamp = from_timestamp_raw;
     TimestampValue to_timestamp = to_timestamp_raw;
-    truncate_timestamp(time_unit, from_timestamp);
-    truncate_timestamp(time_unit, to_timestamp);
+    if (round_to_day) {
+        from_timestamp.trunc_to_day();
+        to_timestamp.trunc_to_day();
+    }
     int64_t milliseconds = 0L;
     celonis::accelerator::Calendar calendar_proto;
     if (calendar_json_string.empty()) {
@@ -992,8 +963,6 @@ timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue
             return Status::InvalidArgument("Calendar specification column is malformed.");
         }
         RETURN_IF_ERROR(validate_calendar(calendar_proto, calendar_id, true));
-        int64_t multiplier = TIME_UNIT_TO_MS.at(time_unit);
-        round_calendar(calendar_proto, multiplier);
         Calendar calendar(calendar_proto);
         if (calendar.requires_calendar_id() && !calendar_id.has_value()) {
             return Status::InvalidArgument("Calendar ID column not provided.");
@@ -1001,9 +970,9 @@ timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue
         if (!calendar.requires_calendar_id()) {
             calendar_id = std::nullopt;
         }
-        milliseconds = calendar.millis_between(from_timestamp, to_timestamp, calendar_id);
+        milliseconds = calendar.millis_between(from_timestamp, to_timestamp, calendar_id, round_to_day);
     }
-    return convert_time_unit(time_unit, milliseconds);
+    return convert_time_unit_float(time_unit, milliseconds);
 }
 
 static StatusOr<std::optional<int64_t>>
@@ -1120,7 +1089,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::timeunits_between_calendar([[maybe_unu
         for (size_t id = start; id < end; ++id) {
             calendar_json_string += calendars[id].to_string();
         }
-        ASSIGN_OR_RETURN(const int64_t diff,
+        ASSIGN_OR_RETURN(const double diff,
                          timeunits_between(from_timestamp, to_timestamp, time_unit, calendar_json_string, calendar_id));
         result.append(diff);
     }
