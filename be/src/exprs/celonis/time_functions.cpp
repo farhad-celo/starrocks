@@ -46,40 +46,6 @@ static const TimestampValue MAX_YEAR = TimestampValue::create(10000, 1, 1, 0, 0,
 static const TimestampValue MIN_YEAR = TimestampValue::create(1400, 1, 1, 0, 0, 0);
 }
 
-static int get_week_number(int year, int month, int day) {
-    return DateValue::create(year, month, day).get_week_of_year();
-}
-
-static int64_t floor_to_nearest_multiple(int64_t num, int64_t multiple) {
-    if (multiple == 0) {
-        return num;
-    }
-    int64_t floored_num = (num / multiple) * multiple;
-    if (num < 0 && num % multiple != 0) {
-        floored_num -= multiple;
-    }
-    return floored_num;
-}
-
-static int64_t ceil_to_nearest_multiple(int64_t num, int64_t multiple) {
-    if (multiple == 0) {
-        return num;
-    }
-    int64_t ceiled_num = (num / multiple) * multiple;
-    if (num > 0 && num % multiple != 0) {
-        ceiled_num += multiple;
-    }
-    return ceiled_num;
-}
-
-static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
-    return timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
-}
-
-static int64_t millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp) {
-    return remap_timestamp_ms(to_timestamp) - remap_timestamp_ms(from_timestamp);
-}
-
 TimestampValue add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
     std::vector<int> adds;
     const int64_t max_int = std::numeric_limits<int>::max();
@@ -110,6 +76,47 @@ TimestampValue add_timeunits_helper(const TimestampValue& timestamp, const std::
         }
     }
     return rv;
+}
+
+static int get_year(const TimestampValue& value) {
+    int year, month, day, hour, minute, second, usec;
+    value.to_timestamp(&year, &month, &day, &hour, &minute, &second, &usec);
+    return year;
+}
+
+static int get_year(int64_t millis) {
+    TimestampValue t = add_timeunits_helper(EPOCH, "MILLISECONDS", millis);
+    return get_year(t);
+}
+
+static int get_week_number(int year, int month, int day) {
+    return DateValue::create(year, month, day).get_week_of_year();
+}
+
+static int64_t floor_to_nearest_multiple(int64_t num, int64_t multiple) {
+    DCHECK(multiple > 0);
+    int64_t floored_num = (num / multiple) * multiple;
+    if (num < 0 && num % multiple != 0) {
+        floored_num -= multiple;
+    }
+    return floored_num;
+}
+
+static int64_t ceil_to_nearest_multiple(int64_t num, int64_t multiple) {
+    DCHECK(multiple > 0);
+    int64_t ceiled_num = (num / multiple) * multiple;
+    if (num > 0 && num % multiple != 0) {
+        ceiled_num += multiple;
+    }
+    return ceiled_num;
+}
+
+static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
+    return timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+}
+
+static int64_t millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp) {
+    return remap_timestamp_ms(to_timestamp) - remap_timestamp_ms(from_timestamp);
 }
 
 StatusOr<ColumnPtr>
@@ -308,6 +315,7 @@ public:
         if (calendar_proto.has_intersect_calendar()) {
             handle_intersect_calendar(calendar_proto.intersect_calendar());
         }
+        set_scope();
     }
 
     bool requires_calendar_id() const {
@@ -327,13 +335,23 @@ public:
         return ms < 0 ? -overlap : overlap;
     }
 
-    int64_t
+    std::optional<int64_t>
     millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp,
                    const std::optional<std::string>& calendar_id, bool round_to_day = false) const {
         int64 from_ms = from_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64 to_ms = to_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64_t left_ms = to_ms >= from_ms ? from_ms : to_ms;
         int64_t right_ms = to_ms >= from_ms ? to_ms : from_ms;
+        // check if left_ms and right_ms is outside of the scope of the calendar
+        auto iter = id_to_scope_.find(calendar_id);
+        if (iter != id_to_scope_.end()) {
+            const auto& scope = iter->second;
+            if (scope.has_value()) {
+                if (get_year(left_ms) < scope->min_year || get_year(right_ms) > scope->max_year) {
+                    return std::nullopt;
+                }
+            }
+        }
         int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id, round_to_day);
         return (to_ms >= from_ms) ? overlap : -overlap;
     }
@@ -446,6 +464,31 @@ public:
 private:
     using IdToTimeRangesMap = std::unordered_map<std::optional<std::string>, std::vector<TimeRange>>;
     using IdToWeekdayMap = std::unordered_map<std::optional<std::string>, std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry>>;
+
+    void set_scope() {
+        for (const auto& [id, time_ranges]: id_to_time_ranges_) {
+            if (time_ranges.empty()) {
+                id_to_scope_[id] = std::nullopt;
+                continue;
+            }
+            int64 min_begin = time_ranges[0].begin_ms;
+            int64 max_end = time_ranges[0].end_ms;
+            bool has_weekly_range = false;
+            for (const auto& time_range: time_ranges) {
+                if (time_range.is_weekly) {
+                    has_weekly_range = true;
+                    break;
+                }
+                min_begin = std::min(min_begin, time_range.begin_ms);
+                max_end = std::max(max_end, time_range.end_ms);
+            }
+            if (has_weekly_range) {
+                id_to_scope_[id] = std::nullopt;
+            } else {
+                id_to_scope_[id] = Scope{get_year(min_begin), get_year(max_end)};
+            }
+        }
+    }
 
     void handle_multi_weekday_calendar(const celonis::accelerator::MultiWeekdayCalendar& multi_weekday_calendar) {
         for (const auto& calendar: multi_weekday_calendar.calendars()) {
@@ -759,7 +802,13 @@ private:
         return rv;
     }
 
+    struct Scope {
+        int min_year;
+        int max_year;
+    };
+
     IdToTimeRangesMap id_to_time_ranges_;
+    std::unordered_map<std::optional<std::string>, std::optional<Scope>> id_to_scope_;
 };
 
 struct CalendarState {
@@ -937,7 +986,7 @@ static StatusOr<double> convert_time_unit_float(const std::string& time_unit, in
     }
 }
 
-static StatusOr<double>
+static StatusOr<std::optional<double>>
 timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue& to_timestamp_raw,
                   const std::string& time_unit,
                   const std::string& calendar_json_string,
@@ -949,7 +998,7 @@ timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue
         from_timestamp.trunc_to_day();
         to_timestamp.trunc_to_day();
     }
-    int64_t milliseconds = 0L;
+    std::optional<int64_t> milliseconds;
     celonis::accelerator::Calendar calendar_proto;
     if (calendar_json_string.empty()) {
         if (calendar_id.has_value()) {
@@ -972,7 +1021,10 @@ timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue
         }
         milliseconds = calendar.millis_between(from_timestamp, to_timestamp, calendar_id, round_to_day);
     }
-    return convert_time_unit_float(time_unit, milliseconds);
+    if (milliseconds.has_value()) {
+        return convert_time_unit_float(time_unit, milliseconds.value());
+    }
+    return std::nullopt;
 }
 
 static StatusOr<std::optional<int64_t>>
@@ -1089,9 +1141,13 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::timeunits_between_calendar([[maybe_unu
         for (size_t id = start; id < end; ++id) {
             calendar_json_string += calendars[id].to_string();
         }
-        ASSIGN_OR_RETURN(const double diff,
+        ASSIGN_OR_RETURN(const std::optional<double> diff,
                          timeunits_between(from_timestamp, to_timestamp, time_unit, calendar_json_string, calendar_id));
-        result.append(diff);
+        if (diff.has_value()) {
+            result.append(diff.value());
+        } else {
+            result.append_null();
+        }
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
