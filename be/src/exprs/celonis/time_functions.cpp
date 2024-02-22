@@ -338,20 +338,13 @@ public:
     std::optional<int64_t>
     millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp,
                    const std::optional<std::string>& calendar_id, bool round_to_day = false) const {
+        if (is_out_scope(from_timestamp, calendar_id) || is_out_scope(to_timestamp, calendar_id)) {
+            return std::nullopt;
+        }
         int64 from_ms = from_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64 to_ms = to_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64_t left_ms = to_ms >= from_ms ? from_ms : to_ms;
         int64_t right_ms = to_ms >= from_ms ? to_ms : from_ms;
-        // check if left_ms and right_ms is outside of the scope of the calendar
-        auto iter = id_to_scope_.find(calendar_id);
-        if (iter != id_to_scope_.end()) {
-            const auto& scope = iter->second;
-            if (scope.has_value()) {
-                if (get_year(left_ms) < scope->min_year || get_year(right_ms) > scope->max_year) {
-                    return std::nullopt;
-                }
-            }
-        }
         int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id, round_to_day);
         return (to_ms >= from_ms) ? overlap : -overlap;
     }
@@ -371,7 +364,7 @@ public:
 
     std::optional<TimestampValue>
     add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value,
-                  const std::optional<std::string>& calendar_id) {
+                  const std::optional<std::string>& calendar_id) const {
         bool left_to_right = add_value >= 0;
         std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
         std::vector<TimeRange> time_ranges;
@@ -446,9 +439,12 @@ public:
         return std::nullopt;
     }
 
-    bool
-    is_timestamp_in_calendar(const TimestampValue& timestamp,
+    std::optional<bool>
+    is_timestamp_in(const TimestampValue& timestamp,
                              const std::optional<std::string>& calendar_id) const {
+        if (is_out_scope(timestamp, calendar_id)) {
+            return std::nullopt;
+        }
         const int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         auto itr = id_to_time_ranges_.find(calendar_id);
         if (itr != id_to_time_ranges_.end()) {
@@ -488,6 +484,20 @@ private:
                 id_to_scope_[id] = Scope{get_year(min_begin), get_year(max_end)};
             }
         }
+    }
+
+    bool is_out_scope(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id) const {
+        auto iter = id_to_scope_.find(calendar_id);
+        if (iter != id_to_scope_.end()) {
+            const auto& scope = iter->second;
+            if (scope.has_value()) {
+                const int year = get_year(timestamp);
+                if (year < scope->min_year || year > scope->max_year) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     void handle_multi_weekday_calendar(const celonis::accelerator::MultiWeekdayCalendar& multi_weekday_calendar) {
@@ -1253,7 +1263,7 @@ timestamp_in_calendar(const TimestampValue& timestamp,
         }
         RETURN_IF_ERROR(validate_calendar(calendar_proto, calendar_id));
         Calendar calendar(calendar_proto);
-        return calendar.is_timestamp_in_calendar(timestamp, calendar_id);
+        return calendar.is_timestamp_in(timestamp, calendar_id);
     }
 }
 
@@ -1320,8 +1330,12 @@ StatusOr<ColumnPtr> in_calendar_const([[maybe_unused]] FunctionContext* context,
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
-        const bool is_in = calendar.is_timestamp_in_calendar(timestamp, calendar_id);
-        result.append(is_in ? 1L : 0L);
+        const std::optional<bool> is_in = calendar.is_timestamp_in(timestamp, calendar_id);
+        if (is_in.has_value()) {
+            result.append(is_in.value() ? 1L : 0L);
+        } else {
+            result.append_null();
+        }
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }

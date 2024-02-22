@@ -1500,6 +1500,8 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_intersect_calendar) {
         timestamps->append_datum(TimestampValue::create(2018, 1, 5, 16, 10, 0));
         timestamps->append_datum(TimestampValue::create(2018, 1, 3, 12, 5, 0));
         timestamps->append_datum(TimestampValue::create(2018, 1, 3, 11, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2017, 1, 3, 11, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2019, 1, 4, 11, 0, 0));
         for (auto i = 0; i < timestamps->size(); ++i) {
             calendars->append_datum(
                     DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
@@ -1526,6 +1528,8 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_intersect_calendar) {
         EXPECT_EQ(0L, result->get(1).get_int64());
         EXPECT_EQ(0L, result->get(2).get_int64());
         EXPECT_EQ(1L, result->get(3).get_int64());
+        EXPECT_TRUE(result->get(4).is_null());
+        EXPECT_TRUE(result->get(5).is_null());
     }
 }
 
