@@ -157,6 +157,7 @@ set(CELONIS_FILES
   celonis/mo_bpmn_graph.cpp
   celonis/mode_agg.cpp
   celonis/multi_in.cpp
+  celonis/qnorm.cpp
   celonis/remap_timestamp_weekday.cpp
   celonis/remap_values.cpp
   celonis/serialization_utils.cpp

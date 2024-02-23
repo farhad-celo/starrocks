@@ -86,6 +86,7 @@ ${license}
 #include "exprs/celonis/math_functions.h"
 #include "exprs/celonis/mo_bpmn_graph.h"
 #include "exprs/celonis/multi_in.h"
+#include "exprs/celonis/qnorm.h"
 #include "exprs/celonis/remap_timestamp_weekday.h"
 #include "exprs/celonis/remap_values.h"
 #include "exprs/celonis/shortened_variant.h"

@@ -1511,6 +1511,7 @@ celostar_functions = [
     [5000101, 'celonis_square', True, False, 'INT', ['INT'], 'CelonisMathFunctions<TYPE_INT>::square'],
     [5000102, 'celonis_square', True, False, 'BIGINT', ['BIGINT'], 'CelonisMathFunctions<TYPE_BIGINT>::square'],
     [5000103, 'celonis_square', True, False, 'DOUBLE', ['DOUBLE'], 'CelonisMathFunctions<TYPE_DOUBLE>::square'],
+    [5000200, 'celonis_qnorm', True, False, 'DOUBLE', ['DOUBLE'], 'CelonisQnorm::qnorm'],
 ]
 
 vectorized_functions.extend(celostar_functions)

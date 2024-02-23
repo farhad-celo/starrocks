@@ -169,6 +169,7 @@ set(EXEC_FILES
         ./exprs/celonis/mo_bpmn_graph_test.cpp
         ./exprs/celonis/mode_agg_test.cpp
         ./exprs/celonis/multi_in_test.cpp
+        ./exprs/celonis/qnorm_test.cpp
         ./exprs/celonis/remap_values_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/serialization_utils_test.cpp
