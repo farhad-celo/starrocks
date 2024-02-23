@@ -1,0 +1,22 @@
+name: "Push docker image to a registry"
+description: "Tag a local build image and push it to a registry"
+inputs:
+  local_image:
+    required: true
+  remote_image:
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Tag and push
+      shell: bash
+      run: |
+        docker tag ${{inputs.local_image}} ${{inputs.remote_image}}
+
+        # If pushing to ECR, we could directly run `docker push <image>`
+        # When pushing to GHCR, it could fail with "unknown blob" errors. The "fix" suggested by GitHub is looping.
+        # The "fix" also works on ECR.
+        until docker push ${{inputs.remote_image}}
+        do
+          echo "Could not push ${{inputs.remote_image}} trying again."
+        done

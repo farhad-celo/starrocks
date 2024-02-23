@@ -54,6 +54,9 @@ COPY --from=artifacts --chown=starrocks:starrocks /release/be_artifacts/ $STARRO
 # Copy be k8s scripts to the runtime container image
 COPY --chown=starrocks:starrocks docker/dockerfiles/be/*.sh $STARROCKS_ROOT/
 
+# Copy core dump related scripts
+COPY --chown=starrocks:starrocks celonis/tools/coredump/*.sh $STARROCKS_ROOT/be/bin
+
 # Create directory for BE storage, create cn symbolic link to be
 RUN mkdir -p $STARROCKS_ROOT/be/storage && ln -sfT be $STARROCKS_ROOT/cn
 

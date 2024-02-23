@@ -1,9 +1,5 @@
 name: 'celostar-starrocks release'
 
-# **What it does**: Renders the content of every page and check all internal links.
-# **Why we have it**: To make sure all links connect correctly.
-# **Who does it impact**: Docs content.
-
 on:
   release:
     types: [published]
@@ -26,6 +22,7 @@ concurrency:
 env:
   RELEASE_VERSION: ${{ github.ref_name }}
   IMAGE_TAG: ${{ github.ref_name }}
+  CORE_DUMP_IMAGE_TAG: "${{ github.ref_name }}-coredump"
   BUILD_TYPE: Release
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
@@ -40,74 +37,80 @@ jobs:
         run: |
           RELEASE_VERSION=${{inputs.asan_release_version}}
           IMAGE_TAG="${{inputs.asan_release_version}}-asan"
+          CORE_DUMP_IMAGE_TAG="${{inputs.asan_release_version}}-asan-coredump"
           BUILD_TYPE=ASAN
           
           # Write to env
           echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+          echo "CORE_DUMP_IMAGE_TAG=${CORE_DUMP_IMAGE_TAG}" >> $GITHUB_ENV
           echo "BUILD_TYPE=${BUILD_TYPE}" >> $GITHUB_ENV
 
       - name: checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: GitHub Docker login
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+
       - name: Pull dev env image
         run: |
           docker pull ${BUILDER}
-      - name: build artifact docker image
+
+      - name: Build artifact image
         run: |
           echo "The build type is ${BUILD_TYPE}"
           echo "The release version is ${RELEASE_VERSION}"
           echo "The image tag is ${IMAGE_TAG}"
-          
+
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${IMAGE_TAG} .
 
-      - name: package allin1 docker image
+      - name: Build allin1 image
         run: |
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${IMAGE_TAG} celonis/docker/allin1
 
-      - name: package fe docker image
+      - name: Build FE image
         run: |
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${IMAGE_TAG} .
 
-      - name: package be docker image
+      - name: Build BE image
         run: |
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${IMAGE_TAG} .
 
+      - name: Build BE core dump image
+        run: |
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f celonis/tools/coredump/be-ubuntu.Dockerfile -t starrocks-be:${CORE_DUMP_IMAGE_TAG} .
 
-      - name: push allin1 docker image to GHCR
-        run: |
-          docker tag starrocks-allin1:${IMAGE_TAG} ghcr.io/celonis/celostar/starrocks-allin1:${IMAGE_TAG}
-          
-          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${IMAGE_TAG}
-          do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${IMAGE_TAG} trying again."
-          done
-      - name: push fe docker image to GHCR
-        run: |
-          docker tag starrocks-fe:${IMAGE_TAG} ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG}
-          
-          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG}
-          do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG} trying again."
-          done
-      - name: push be docker image to GHCR
-        run: |
-          docker tag starrocks-be:${IMAGE_TAG} ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
-
-          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
-          do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG} trying again."
-          done
+      - name: Push allin1 image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-allin1:${IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${IMAGE_TAG}
+      - name: Push FE image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-fe:${IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG}
+      - name: Push BE docker image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-be:${IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
+      - name: Push FE core dump image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-fe:${IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-fe:${CORE_DUMP_IMAGE_TAG}
+      - name: Push BE core dump image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-be:${CORE_DUMP_IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-be:${CORE_DUMP_IMAGE_TAG}
 
       - name: GitHub Docker logout
         if: ${{ always() }}
@@ -125,21 +128,45 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: push images to prod ECR
+      - name: Push allin1 image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          # push allin1 to the prod ECR
-          docker tag starrocks-allin1:${IMAGE_TAG} ${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${IMAGE_TAG}
-          docker push ${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${IMAGE_TAG}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-allin1:${IMAGE_TAG}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${IMAGE_TAG}
 
-          # push fe to the prod ECR
-          docker tag starrocks-fe:${IMAGE_TAG} ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${IMAGE_TAG}
-          docker push ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${IMAGE_TAG}
+      - name: Push FE image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-fe:${IMAGE_TAG}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${IMAGE_TAG}
 
-          # push be to the prod ECR
-          docker tag starrocks-be:${IMAGE_TAG} ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${IMAGE_TAG}
-          docker push ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${IMAGE_TAG}
+      - name: Push BE image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-be:${IMAGE_TAG}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${IMAGE_TAG}
+
+      - name: Push FE core dump image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-fe:${IMAGE_TAG}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${CORE_DUMP_IMAGE_TAG}
+
+      - name: Push BE core dump image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-be:${CORE_DUMP_IMAGE_TAG}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${CORE_DUMP_IMAGE_TAG}
 
       - name: Clean up
         if: ${{ always() }}
@@ -148,6 +175,7 @@ jobs:
           docker rmi -f $(docker images -q starrocks-allin1:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-fe:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-be:${IMAGE_TAG})
+          docker rmi -f $(docker images -q starrocks-be:${CORE_DUMP_IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-artifacts:${IMAGE_TAG})
           
           # Delete stopped containers, dangling images, dangling build cache, etc.
