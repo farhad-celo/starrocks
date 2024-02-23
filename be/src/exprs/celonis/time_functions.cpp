@@ -364,7 +364,10 @@ public:
 
     std::optional<TimestampValue>
     add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value,
-                  const std::optional<std::string>& calendar_id) {
+                  const std::optional<std::string>& calendar_id) const {
+        if (is_out_scope(timestamp, calendar_id)) {
+            return std::nullopt;
+        }
         const bool is_workdays = (time_unit == "WORKDAYS");
         const bool left_to_right = add_value >= 0;
         std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
@@ -445,6 +448,9 @@ public:
         }
         if (rv.has_value()) {
             auto res_timestamp = add_timeunits_helper(EPOCH, "MILLISECONDS", rv.value());
+            if (is_out_scope(res_timestamp, calendar_id)) {
+                return std::nullopt;
+            }
             if (!is_workdays) {
                 return res_timestamp;
             }

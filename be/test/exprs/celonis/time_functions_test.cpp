@@ -3292,8 +3292,10 @@ TEST_F(CelonisTimeFunctionsTest, add_workdays_with_calendar) {
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(2018, 1, 1, 0, 0, 0));
         timestamps->append_datum(TimestampValue::create(2018, 1, 9, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2023, 1, 1, 0, 0, 0));
         add_values->append_datum(2L);
         add_values->append_datum(-2L);
+        add_values->append_datum(1L);
         for (auto i = 0; i < timestamps->size(); ++i) {
             time_units->append_datum("WORKDAYS");
             calendars->append_datum(
@@ -3323,7 +3325,8 @@ TEST_F(CelonisTimeFunctionsTest, add_workdays_with_calendar) {
                                                                           calendar_ids}).value();
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_EQ(TimestampValue::create(2018, 1, 6, 0, 0, 0), result->get(0).get_timestamp());
-        EXPECT_EQ(TimestampValue::create(2018, 1, 6, 0, 0, 0), result->get(0).get_timestamp());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 6, 0, 0, 0), result->get(1).get_timestamp());
+        EXPECT_TRUE(result->get(2).is_null());
     }
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
@@ -3428,9 +3431,12 @@ TEST_F(CelonisTimeFunctionsTest, add_hours_with_calendar) {
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         timestamps->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
         timestamps->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2023, 1, 2, 0, 0, 0));
+        add_values->append_datum(20L);
         add_values->append_datum(20L);
         add_values->append_datum(20L);
         calendar_ids->append_datum("DE");
+        calendar_ids->append_datum("US");
         calendar_ids->append_datum("US");
         for (auto i = 0; i < timestamps->size(); ++i) {
             time_units->append_datum("HOURS");
@@ -3451,6 +3457,7 @@ TEST_F(CelonisTimeFunctionsTest, add_hours_with_calendar) {
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_EQ(TimestampValue::create(2018, 1, 5, 10, 0, 0), result->get(0).get_timestamp());
         EXPECT_EQ(TimestampValue::create(2018, 1, 8, 16, 0, 0), result->get(1).get_timestamp());
+        EXPECT_TRUE(result->get(2).is_null());
     }
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
