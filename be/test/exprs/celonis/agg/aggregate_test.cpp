@@ -959,7 +959,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     }
 }
 
-TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar) {
+TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
@@ -1381,7 +1381,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":-123,"end":-123000}}},{"sunday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}}'])",
+                R"(['{"multiWeekdayCalendar":{"calendars":[{"sunday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}}'])",
                 res_array_col->debug_string());
     }
     // resultant calendar is longer than 1M.
@@ -1423,6 +1423,260 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar) {
         EXPECT_EQ(2, res_array_col->get(0).get_array().size());
         EXPECT_LT(res_array_col->get(0).get_array()[0].get_slice().to_string().size(), 1000000);
         EXPECT_LT(res_array_col->get(0).get_array()[1].get_slice().to_string().size(), 1000000);
+    }
+}
+
+TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    local_ctx->set_runtime_state(runtime_state.get());
+
+    const AggregateFunction* agg_func = get_aggregate_function("celonis_make_weekday_calendar", TYPE_BIGINT, TYPE_ARRAY,
+                                                               false);
+    TypeDescriptor type_bigint;
+    type_bigint.type = LogicalType::TYPE_BIGINT;
+    TypeDescriptor type_varchar;
+    type_varchar.type = LogicalType::TYPE_VARCHAR;
+    TypeDescriptor type_boolean;
+    type_boolean.type = LogicalType::TYPE_BOOLEAN;
+    TypeDescriptor type_struct;
+    type_struct.type = LogicalType::TYPE_STRUCT;
+    type_struct.children.emplace_back(type_varchar);
+    type_struct.children.emplace_back(type_bigint);
+    type_struct.children.emplace_back(type_bigint);
+    type_struct.children.emplace_back(type_varchar);
+    type_struct.children.emplace_back(type_boolean);
+    type_struct.field_names.emplace_back("weekday");
+    type_struct.field_names.emplace_back("shift_begin");
+    type_struct.field_names.emplace_back("shift_end");
+    type_struct.field_names.emplace_back("calendar_id");
+    type_struct.field_names.emplace_back("is_calendar_id_null");
+
+    TypeDescriptor type_array_char;
+    type_array_char.type = LogicalType::TYPE_ARRAY;
+    type_array_char.children.emplace_back(LogicalType::TYPE_VARCHAR);
+
+    auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    // NULL calendar_id
+    {
+        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        weekday_column->append_datum("MONDAY");
+        weekday_column->append_datum("FRIDAY");
+
+        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        shift_begin_column->append_datum("09:00");
+        shift_begin_column->append_datum("08:00");
+
+        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        shift_end_column->append_datum("17:00");
+        shift_end_column->append_datum("16:00");
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        calendar_id_column->append_datum(kNullDatum);
+        calendar_id_column->append_datum(kNullDatum);
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(4);
+        raw_columns[0] = weekday_column.get();
+        raw_columns[1] = shift_begin_column.get();
+        raw_columns[2] = shift_end_column.get();
+        raw_columns[3] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), weekday_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WeekdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(2, agg_state->weekday->size());
+        EXPECT_EQ(2, agg_state->shift_begin->size());
+        EXPECT_EQ(2, agg_state->shift_end->size());
+        EXPECT_EQ(2, agg_state->calendar_id->size());
+        EXPECT_EQ(2, agg_state->is_calendar_id_null->size());
+        EXPECT_EQ(weekday_column->debug_string(), agg_state->weekday->debug_string());
+        EXPECT_EQ("[32400000, 28800000]", agg_state->shift_begin->debug_string());
+        EXPECT_EQ("[61200000, 57600000]", agg_state->shift_end->debug_string());
+        EXPECT_EQ("['', '']", agg_state->calendar_id->debug_string());
+        EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{weekday:'MONDAY',shift_begin:32400000,shift_end:61200000,calendar_id:'',is_calendar_id_null:1}, {weekday:'FRIDAY',shift_begin:28800000,shift_end:57600000,calendar_id:'',is_calendar_id_null:1}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(weekday_column);
+        columns.push_back(shift_begin_column);
+        columns.push_back(shift_end_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{weekday:'MONDAY',shift_begin:32400000,shift_end:61200000,calendar_id:'',is_calendar_id_null:1}, {weekday:'FRIDAY',shift_begin:28800000,shift_end:57600000,calendar_id:'',is_calendar_id_null:1}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(
+                R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":32400000,"end":61200000}}},{"friday":{"useDay":true,"shift":{"begin":28800000,"end":57600000}}}]}}'])",
+                res_array_col->debug_string());
+    }
+    // Non-NULL calendar_id
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        weekday_column->append_datum("MONDAY");
+        weekday_column->append_datum("FRIDAY");
+
+        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        shift_begin_column->append_datum("00:00");
+        shift_begin_column->append_datum("00:00");
+
+        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        shift_end_column->append_datum("24:00");
+        shift_end_column->append_datum("24:00");
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        calendar_id_column->append_datum("DE");
+        calendar_id_column->append_datum("US");
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(4);
+        raw_columns[0] = weekday_column.get();
+        raw_columns[1] = shift_begin_column.get();
+        raw_columns[2] = shift_end_column.get();
+        raw_columns[3] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), weekday_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WeekdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(2, agg_state->weekday->size());
+        EXPECT_EQ(2, agg_state->shift_begin->size());
+        EXPECT_EQ(2, agg_state->shift_end->size());
+        EXPECT_EQ(2, agg_state->calendar_id->size());
+        EXPECT_EQ(2, agg_state->is_calendar_id_null->size());
+        EXPECT_EQ(weekday_column->debug_string(), agg_state->weekday->debug_string());
+        EXPECT_EQ("[0, 0]", agg_state->shift_begin->debug_string());
+        EXPECT_EQ("[86400000, 86400000]", agg_state->shift_end->debug_string());
+        EXPECT_EQ("['DE', 'US']", agg_state->calendar_id->debug_string());
+        EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{weekday:'MONDAY',shift_begin:0,shift_end:86400000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'FRIDAY',shift_begin:0,shift_end:86400000,calendar_id:'US',is_calendar_id_null:0}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(weekday_column);
+        columns.push_back(shift_begin_column);
+        columns.push_back(shift_end_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{weekday:'MONDAY',shift_begin:0,shift_end:86400000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'FRIDAY',shift_begin:0,shift_end:86400000,calendar_id:'US',is_calendar_id_null:0}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(
+                R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"DE"},{"friday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"US"}]}}'])",
+                res_array_col->debug_string());
+    }
+    // Non-NULL calendar_id with some invalid rows
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        weekday_column->append_datum("MONDAY");
+        weekday_column->append_datum("FRIDAY");
+        weekday_column->append_datum("TUESDAY");
+        weekday_column->append_datum("THURSDAY");
+
+        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        shift_begin_column->append_datum("00:00");
+        shift_begin_column->append_datum("00:00");
+        shift_begin_column->append_datum("HELLO");
+        shift_begin_column->append_datum("00:15");
+
+        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        shift_end_column->append_datum("24:00");
+        shift_end_column->append_datum("24:00");
+        shift_end_column->append_datum("23:15");
+        shift_end_column->append_datum("75:15");
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        calendar_id_column->append_datum("DE");
+        calendar_id_column->append_datum("US");
+        calendar_id_column->append_datum("DE");
+        calendar_id_column->append_datum("US");
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(4);
+        raw_columns[0] = weekday_column.get();
+        raw_columns[1] = shift_begin_column.get();
+        raw_columns[2] = shift_end_column.get();
+        raw_columns[3] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), weekday_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WeekdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(4, agg_state->weekday->size());
+        EXPECT_EQ(4, agg_state->shift_begin->size());
+        EXPECT_EQ(4, agg_state->shift_end->size());
+        EXPECT_EQ(4, agg_state->calendar_id->size());
+        EXPECT_EQ(4, agg_state->is_calendar_id_null->size());
+        EXPECT_EQ(weekday_column->debug_string(), agg_state->weekday->debug_string());
+        EXPECT_EQ("[0, 0, -1, 900000]", agg_state->shift_begin->debug_string());
+        EXPECT_EQ("[86400000, 86400000, 83700000, -1]", agg_state->shift_end->debug_string());
+        EXPECT_EQ("['DE', 'US', 'DE', 'US']", agg_state->calendar_id->debug_string());
+        EXPECT_EQ("[0, 0, 0, 0]", agg_state->is_calendar_id_null->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{weekday:'MONDAY',shift_begin:0,shift_end:86400000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'FRIDAY',shift_begin:0,shift_end:86400000,calendar_id:'US',is_calendar_id_null:0}, {weekday:'TUESDAY',shift_begin:-1,shift_end:83700000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'THURSDAY',shift_begin:900000,shift_end:-1,calendar_id:'US',is_calendar_id_null:0}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(weekday_column);
+        columns.push_back(shift_begin_column);
+        columns.push_back(shift_end_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{weekday:'MONDAY',shift_begin:0,shift_end:86400000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'FRIDAY',shift_begin:0,shift_end:86400000,calendar_id:'US',is_calendar_id_null:0}, {weekday:'TUESDAY',shift_begin:-1,shift_end:83700000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'THURSDAY',shift_begin:900000,shift_end:-1,calendar_id:'US',is_calendar_id_null:0}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(
+                R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"DE"},{"friday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"US"}]}}'])",
+                res_array_col->debug_string());
     }
 }
 

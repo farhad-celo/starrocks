@@ -22,6 +22,22 @@ namespace {
 
 // SR places an upper limit of 1M of STRING. We use 900K which is less than 1M.
 static const size_t MAX_STRING_SIZE = 900000;
+
+static const int64_t NUM_MILLISECONDS_PER_DAY = 86400000L;
+
+int64_t to_millis(const std::string& hhmm) {
+    std::istringstream iss(hhmm);
+    int hours, minutes;
+    char delim;
+    // note that we allow hours = 24 or minutes = 60
+    if (!(iss >> hours >> delim >> minutes) || delim != ':' || hours < 0 || hours > 24 || minutes < 0 ||
+        minutes > 60) {
+        return -1;
+    }
+    int64_t total_minutes = hours * 60 + minutes;
+    return total_minutes * 60 * 1000;
+}
+
 }
 
 WeekdayCalendarAggregateState::~WeekdayCalendarAggregateState() {
@@ -91,8 +107,16 @@ void WeekdayCalendarAggregateFunction::update(FunctionContext* ctx, const Column
 
     auto& state_impl = this->data(state);
     state_impl.weekday->append_datum(columns[0]->get(row_num));
-    state_impl.shift_begin->append_datum(columns[1]->get(row_num));
-    state_impl.shift_end->append_datum(columns[2]->get(row_num));
+    if (columns[1]->is_binary()) {
+        state_impl.shift_begin->append_datum(to_millis(columns[1]->get(row_num).get_slice().to_string()));
+    } else {
+        state_impl.shift_begin->append_datum(columns[1]->get(row_num));
+    }
+    if (columns[2]->is_binary()) {
+        state_impl.shift_end->append_datum(to_millis(columns[2]->get(row_num).get_slice().to_string()));
+    } else {
+        state_impl.shift_end->append_datum(columns[2]->get(row_num));
+    }
     if (columns[3]->get(row_num).is_null()) {
         state_impl.calendar_id->append_default();
         state_impl.is_calendar_id_null->append_datum(true);
@@ -107,8 +131,16 @@ void WeekdayCalendarAggregateFunction::merge(FunctionContext* ctx, const Column*
     auto& input_columns = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column))->fields();
     auto& state_impl = this->data(state);
     state_impl.weekday->append_datum(input_columns.at(0)->get(row_num));
-    state_impl.shift_begin->append_datum(input_columns.at(1)->get(row_num));
-    state_impl.shift_end->append_datum(input_columns.at(2)->get(row_num));
+    if (input_columns.at(1)->is_binary()) {
+        state_impl.shift_begin->append_datum(to_millis(input_columns.at(1)->get(row_num).get_slice().to_string()));
+    } else {
+        state_impl.shift_begin->append_datum(input_columns.at(1)->get(row_num));
+    }
+    if (input_columns.at(2)->is_binary()) {
+        state_impl.shift_end->append_datum(to_millis(input_columns.at(2)->get(row_num).get_slice().to_string()));
+    } else {
+        state_impl.shift_end->append_datum(input_columns.at(2)->get(row_num));
+    }
     state_impl.calendar_id->append_datum(input_columns.at(3)->get(row_num));
     state_impl.is_calendar_id_null->append_datum(input_columns.at(4)->get(row_num));
 }
@@ -179,6 +211,10 @@ void WeekdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         }
         const int64_t shift_begin = state_impl.shift_begin->get(i).get_int64();
         const int64_t shift_end = state_impl.shift_end->get(i).get_int64();
+        if (shift_begin < 0 || shift_begin > NUM_MILLISECONDS_PER_DAY || shift_end < 0 ||
+            shift_end > NUM_MILLISECONDS_PER_DAY) {
+            continue;
+        }
         std::optional<std::string> calendar_id = std::nullopt;
         if (!static_cast<bool>(state_impl.is_calendar_id_null->get(i).get_uint8())) {
             calendar_id = state_impl.calendar_id->get(i).get_slice().to_string();
@@ -277,12 +313,24 @@ void WeekdayCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
         weekday->append_datum(src[0]->get(i));
     }
     auto shift_begin = down_cast<Int64Column*>(ColumnHelper::get_data_column(columns[1].get()));
-    for (auto i: valid_indexes) {
-        shift_begin->append_datum(src[1]->get(i));
+    if (src[1]->is_binary()) {
+        for (auto i: valid_indexes) {
+            shift_begin->append_datum(to_millis(src[1]->get(i).get_slice().to_string()));
+        }
+    } else {
+        for (auto i: valid_indexes) {
+            shift_begin->append_datum(src[1]->get(i));
+        }
     }
     auto shift_end = down_cast<Int64Column*>(ColumnHelper::get_data_column(columns[2].get()));
-    for (auto i: valid_indexes) {
-        shift_end->append_datum(src[2]->get(i));
+    if (src[2]->is_binary()) {
+        for (auto i: valid_indexes) {
+            shift_end->append_datum(to_millis(src[2]->get(i).get_slice().to_string()));
+        }
+    } else {
+        for (auto i: valid_indexes) {
+            shift_end->append_datum(src[2]->get(i));
+        }
     }
     auto calendar_id = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(columns[3].get()));
     auto is_calendar_id_null = down_cast<BooleanColumn*>(ColumnHelper::get_data_column(columns[4].get()));

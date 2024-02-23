@@ -1108,9 +1108,13 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR,
                     Lists.newArrayList(Type.DATETIME, Type.DATETIME, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
                     true, false, true));
-        // celonis_make_weekday_calendar
+        // celonis_make_weekday_calendar (bigint shifts)
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_WEEKDAY_CALENDAR,
                     Lists.newArrayList(Type.VARCHAR, Type.BIGINT, Type.BIGINT, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
+                    true, false, true));
+        // celonis_make_weekday_calendar (string shifts)
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_WEEKDAY_CALENDAR,
+                    Lists.newArrayList(Type.VARCHAR, Type.VARCHAR, Type.VARCHAR, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
                     true, false, true));
         // celonis_make_workday_calendar
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_WORKDAY_CALENDAR,
