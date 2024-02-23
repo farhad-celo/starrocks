@@ -364,14 +364,23 @@ public:
 
     std::optional<TimestampValue>
     add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value,
-                  const std::optional<std::string>& calendar_id) const {
-        bool left_to_right = add_value >= 0;
+                  const std::optional<std::string>& calendar_id) {
+        const bool is_workdays = (time_unit == "WORKDAYS");
+        const bool left_to_right = add_value >= 0;
         std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
         std::vector<TimeRange> time_ranges;
         auto itr = id_to_time_ranges_.find(calendar_id);
         if (itr != id_to_time_ranges_.end()) {
             for (const auto& cur_time_range: itr->second) {
-                time_ranges.push_back(cur_time_range);
+                if (is_workdays) {
+                    auto time_range_copy = cur_time_range;
+                    time_range_copy.begin_ms = floor_to_nearest_multiple(cur_time_range.begin_ms,
+                                                                         NUM_MILLISECONDS_PER_DAY);
+                    time_range_copy.end_ms = ceil_to_nearest_multiple(cur_time_range.end_ms, NUM_MILLISECONDS_PER_DAY);
+                    time_ranges.push_back(time_range_copy);
+                } else {
+                    time_ranges.push_back(cur_time_range);
+                }
             }
         }
         int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
@@ -412,7 +421,8 @@ public:
             int64_t left = std::max(top.begin_ms, begin_ms);
             int64_t right = std::min(top.end_ms, end_ms);
             if (right > left) {
-                if (ms_left >= right - left) {
+                // note that [left, right) is half inclusive
+                if ((left_to_right && ms_left >= right - left) || (!left_to_right && ms_left > right - left)) {
                     ms_left -= right - left;
                 } else {
                     // ms_left < (right - left)
@@ -434,14 +444,24 @@ public:
             }
         }
         if (rv.has_value()) {
-            return add_timeunits_helper(EPOCH, "MILLISECONDS", rv.value());
+            auto res_timestamp = add_timeunits_helper(EPOCH, "MILLISECONDS", rv.value());
+            if (!is_workdays) {
+                return res_timestamp;
+            }
+            // For WORKDAYS, keep the time of the day unchanged.
+            int new_year, new_month, new_day, new_hour, new_minute, new_second, new_usec;
+            res_timestamp.to_timestamp(&new_year, &new_month, &new_day, &new_hour, &new_minute, &new_second, &new_usec);
+            int old_year, old_month, old_day, old_hour, old_minute, old_second, old_usec;
+            timestamp.to_timestamp(&old_year, &old_month, &old_day, &old_hour, &old_minute, &old_second, &old_usec);
+            res_timestamp.from_timestamp(new_year, new_month, new_day, old_hour, old_minute, old_second, old_usec);
+            return res_timestamp;
         }
         return std::nullopt;
     }
 
     std::optional<bool>
     is_timestamp_in(const TimestampValue& timestamp,
-                             const std::optional<std::string>& calendar_id) const {
+                    const std::optional<std::string>& calendar_id) const {
         if (is_out_scope(timestamp, calendar_id)) {
             return std::nullopt;
         }
