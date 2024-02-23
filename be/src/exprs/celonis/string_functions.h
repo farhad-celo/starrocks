@@ -40,6 +40,13 @@ public:
     DEFINE_VECTORIZED_FN(string_to_double);
 
     /**
+     * @param: [string_value]
+     * @paramType: [BinaryColumn]
+     * @return: BigintColumn
+     */
+    DEFINE_VECTORIZED_FN(string_to_int);
+
+    /**
      * @param: [input_string, patterns]
      * @paramType: [VARCHAR, ARRAY_VARCHAR]
      * @return: BIGINT

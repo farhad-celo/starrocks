@@ -348,6 +348,62 @@ TEST(CelonisStringFunctionsStringSplitTest, All) {
     }
 }
 
+TEST(CelonisStringFunctionsStringToIntTest, All) {
+    auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    auto expected_int = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+
+    std::vector<DatumStruct> test_input = {
+            {"  123456  ",           123456L},
+            {"123 ",                 123L},
+            {"123456",               123456L},
+            {"-123456.11",           -123456L},
+            {"123456.11",            123456L},
+            {"123456.99",            123456L},
+            {"12345699",             12345699L},
+            {"9223372036854775807",  9223372036854775807L},
+            {"-9223372036854775808", INT64_MIN},
+            // Invalid string inputs
+            {kNullDatum,             kNullDatum},
+            {"9223372036854775908",  kNullDatum},
+            {"-9223372036854775809", kNullDatum},
+            {"4.70E+2",              kNullDatum},
+            {"-5.93E-2",             kNullDatum},
+            {"4.70e+2",              kNullDatum},
+            {"-5.93e-2",             kNullDatum},
+            {"HELLO",                kNullDatum},
+    };
+    for (const auto& st: test_input) {
+        if (st[0].is_null()) {
+            strings->append_nulls(1);
+        } else {
+            strings->append_datum(st[0]);
+        }
+        if (st[1].is_null()) {
+            expected_int->append_nulls(1);
+        } else {
+            expected_int->append_datum(st[1]);
+        }
+    }
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    const auto result = CelonisStringFunctions::string_to_int(ctx.get(), {strings}).value();
+    ASSERT_EQ(test_input.size(), result->size());
+    const auto v = ColumnHelper::as_column<NullableColumn>(result);
+    for (int i = 0; i < v->size(); ++i) {
+        auto debug_string = [&]() {
+            return fmt::format("case: {}, string: '{}'", i,
+                               test_input[i][0].is_null() ? "NULL" : test_input[i][0].get_slice());
+        };
+        if (test_input[i][1].is_null()) {
+            EXPECT_TRUE(v->is_null(i)) << debug_string();
+        } else if (v->is_null(i)) {
+            EXPECT_FALSE(v->is_null(i)) << debug_string();
+        } else {
+            EXPECT_EQ(v->get(i).get_int64(), test_input[i][1].get_int64()) << debug_string();
+        }
+    }
+}
+
 TEST(CelonisStringFunctionsStringToDoubleTest, All) {
     auto string = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     auto expected_double = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), true);

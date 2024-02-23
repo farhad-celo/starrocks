@@ -403,11 +403,43 @@ static std::optional<double> to_double(const std::string& input_string) {
     }
 }
 
-/**
- * @param: [haystack]
- * @paramType: [BinaryColumn]
- * @return: DoubleColumn
- */
+std::optional<int64_t> to_int64(const std::string& str) {
+    try {
+        int64_t value = std::stoll(trim(str));
+        return value;
+    } catch (const std::exception&) {
+        // catch std::invalid_argument, std::out_of_range, and other std::exception-based exceptions
+        return std::nullopt;
+    }
+}
+
+StatusOr<ColumnPtr>
+CelonisStringFunctions::string_to_int([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+    ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+    size_t size = columns[0]->size();
+    ColumnBuilder<TYPE_BIGINT> res(size);
+    for (int i = 0; i < size; ++i) {
+        if (input_string_viewer.is_null(i)) {
+            res.append_null();
+            continue;
+        }
+        std::string input_string = input_string_viewer.value(i).to_string();
+        if (input_string.find_first_of("eE") != std::string::npos) {
+            res.append_null();
+            continue;
+        }
+        std::optional<int64_t> result = to_int64(input_string);
+        if (result.has_value()) {
+            res.append(result.value());
+        } else {
+            res.append_null();
+        }
+    }
+    return res.build(ColumnHelper::is_all_const(columns));
+}
+
 StatusOr<ColumnPtr>
 CelonisStringFunctions::string_to_double(FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
