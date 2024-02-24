@@ -186,7 +186,7 @@ public:
                 down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*timestamp_array_data.elements).get_data().data();
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
 
-        int64_t secondary_orders[timestamp_offsets[chunk_size]];
+        std::vector<int64_t> secondary_orders(timestamp_offsets[chunk_size], 0);
         const bool has_secondary_order = columns.size() == 5;
         if (has_secondary_order) {
             ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
@@ -294,8 +294,8 @@ public:
                     if (*lhs.timestamp != *rhs.timestamp) {
                         return *lhs.timestamp > *rhs.timestamp;
                     }
-                    const int64_t lhs_order = (lhs.secondary_order != nullptr) ? -(*lhs.secondary_order) : 0;
-                    const int64_t rhs_order = (rhs.secondary_order != nullptr) ? -(*rhs.secondary_order) : 0;
+                    const int64_t lhs_order = -(*lhs.secondary_order);
+                    const int64_t rhs_order = -(*rhs.secondary_order);
                     return std::tie(lhs_order, lhs.priority) < std::tie(rhs_order, rhs.priority);
                 }
             };
@@ -313,8 +313,7 @@ public:
                     // Skip empty arrays.
                     continue;
                 }
-                pq.emplace(start, next, timestamps + start, has_secondary_order ? secondary_orders + start : nullptr,
-                           priorities[i]);
+                pq.emplace(start, next, timestamps + start, secondary_orders.data() + start, priorities[i]);
                 start = next;
             }
             if (next != src_timestamp_end) {
@@ -329,9 +328,7 @@ public:
                 new_offset++;
                 if (++curr.index < curr.end) {
                     curr.timestamp++;
-                    if (curr.secondary_order != nullptr) {
-                        curr.secondary_order++;
-                    }
+                    curr.secondary_order++;
                     pq.push(curr);
                 }
             }
