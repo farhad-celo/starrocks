@@ -1106,6 +1106,66 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_varchar) {
     EXPECT_EQ("0eight", result->get(1).get_array()[3].get_slice());
 }
 
+TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_secondary_order) {
+    auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), false);
+    input_array->append_datum(DatumArray{110, 120, 215, 225, 310, 315, 320});
+    input_array->append_datum(DatumArray{1010, 1020, 2010, 2020});
+
+    auto timestamp_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)),
+                                                       false);
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+            TimestampValue::create(2023, 1, 1, 0, 0, 15),
+            TimestampValue::create(2023, 1, 1, 0, 0, 25),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 15),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+    });
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+    });
+
+    auto secondary_order_array = ColumnHelper::create_column(
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BIGINT)),
+            false);
+    secondary_order_array->append_datum(DatumArray{1L, 1L, 3L, 3L, 2L, 2L, 2L});
+    secondary_order_array->append_datum(DatumArray{2L, 2L, 1L, 1L});
+
+    auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                  false);
+    size_array->append_datum(DatumArray{2, 2, 3});
+    size_array->append_datum(DatumArray{2, 2});
+
+    auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+    priority_array->append_datum(DatumArray{1, 1, 1});
+    priority_array->append_datum(DatumArray{1, 1});
+
+    const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
+            nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
+    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    const auto& result = rs.value();
+    ASSERT_EQ(2, result->size());
+    ASSERT_EQ(7, result->get(0).get_array().size());
+    EXPECT_EQ(110, result->get(0).get_array()[0].get_int32());
+    EXPECT_EQ(310, result->get(0).get_array()[1].get_int32());
+
+    EXPECT_EQ(315, result->get(0).get_array()[2].get_int32());
+    EXPECT_EQ(215, result->get(0).get_array()[3].get_int32());
+    EXPECT_EQ(120, result->get(0).get_array()[4].get_int32());
+    EXPECT_EQ(320, result->get(0).get_array()[5].get_int32());
+    EXPECT_EQ(225, result->get(0).get_array()[6].get_int32());
+    ASSERT_EQ(4, result->get(1).get_array().size());
+    EXPECT_EQ(2010, result->get(1).get_array()[0].get_int32());
+    EXPECT_EQ(1010, result->get(1).get_array()[1].get_int32());
+    EXPECT_EQ(2020, result->get(1).get_array()[2].get_int32());
+    EXPECT_EQ(1020, result->get(1).get_array()[3].get_int32());
+}
+
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_priority) {
     auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), false);
     input_array->append_datum(DatumArray{110, 120, 215, 225, 310, 315, 320});
@@ -1161,7 +1221,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_priority) {
 
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_array) {
     {
-        // timestamp_array has NULL.
+        // timestamp_array is NULL.
         auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
                                                        false);
         input_array->append_datum(DatumArray{110, 120, 310, 315, 320});
@@ -1193,7 +1253,50 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_array) {
         EXPECT_EQ(result.status().get_error_msg(), "timestamp_array should not be NULL.");
     }
     {
-        // priority_array has NULL.
+        // secondary_order_array is null
+        auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                       false);
+        input_array->append_datum(DatumArray{110, 120, 310, 315, 320});
+        input_array->append_datum(DatumArray{1010, 1020, 2010, 2020});
+
+        auto timestamp_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)), true);
+        timestamp_array->append_datum(DatumArray{
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                TimestampValue::create(2023, 1, 1, 0, 0, 30),
+                TimestampValue::create(2023, 1, 1, 0, 0, 40),
+                TimestampValue::create(2023, 1, 1, 0, 0, 50),
+        });
+        timestamp_array->append_datum(DatumArray{
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+        });
+
+        auto secondary_order_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BIGINT)), true);
+        secondary_order_array->append_datum(DatumArray{1L, 2L, 3L, 4L, 5L});
+        secondary_order_array->append_datum(kNullDatum);
+
+        auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+        size_array->append_datum(DatumArray{2, 3});
+        size_array->append_datum(DatumArray{2, 2});
+
+        auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                          false);
+        priority_array->append_datum(DatumArray{2, 1});
+        priority_array->append_datum(DatumArray{1, 2});
+
+        const auto result = CelonisArrayFunctions::merge_sorted_arrays(
+                nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "If provided, secondary_order_array should not be NULL.");
+    }
+    {
+        // priority_array is NULL.
         auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
                                                        false);
         input_array->append_datum(DatumArray{1010, 1020, 2010, 2020});
@@ -1308,6 +1411,49 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_elements) {
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().get_error_msg(), "priority_array should not have NULL elements.");
     }
+    {
+        // secondary_order_array has NULL elements
+        auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                       false);
+        input_array->append_datum(DatumArray{110, 120, 310, 315, 320});
+        input_array->append_datum(DatumArray{1010, 1020, 2010, 2020});
+
+        auto timestamp_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)), true);
+        timestamp_array->append_datum(DatumArray{
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                TimestampValue::create(2023, 1, 1, 0, 0, 30),
+                TimestampValue::create(2023, 1, 1, 0, 0, 40),
+                TimestampValue::create(2023, 1, 1, 0, 0, 50),
+        });
+        timestamp_array->append_datum(DatumArray{
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+        });
+
+        auto secondary_order_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BIGINT)), true);
+        secondary_order_array->append_datum(DatumArray{1L, 2L, 3L, 4L, 5L});
+        secondary_order_array->append_datum(DatumArray{1L, 2L, kNullDatum, 4L});
+
+        auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+        size_array->append_datum(DatumArray{2, 3});
+        size_array->append_datum(DatumArray{2, 2});
+
+        auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                          false);
+        priority_array->append_datum(DatumArray{2, 1});
+        priority_array->append_datum(DatumArray{1, 2});
+
+        const auto result = CelonisArrayFunctions::merge_sorted_arrays(
+                nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "If provided, secondary_order_array should not have NULL elements.");
+    }
 }
 
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_array_size_mismatch) {
@@ -1339,6 +1485,50 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_array_size_mismatch) {
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().get_error_msg(),
                   "The size of input_array and timestamp_array should not be different.");
+    }
+    {
+        // secondary_order_array has a different size than input_array.
+        auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                       false);
+        input_array->append_datum(DatumArray{110, 120, 310, 315, 320});
+        input_array->append_datum(DatumArray{1010, 1020, 2010, 2020});
+
+        auto timestamp_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)), true);
+        timestamp_array->append_datum(DatumArray{
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                TimestampValue::create(2023, 1, 1, 0, 0, 30),
+                TimestampValue::create(2023, 1, 1, 0, 0, 40),
+                TimestampValue::create(2023, 1, 1, 0, 0, 50),
+        });
+        timestamp_array->append_datum(DatumArray{
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                TimestampValue::create(2023, 1, 1, 0, 0, 20),
+        });
+
+        auto secondary_order_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BIGINT)), true);
+        secondary_order_array->append_datum(DatumArray{1L, 2L, 3L, 4L, 5L});
+        secondary_order_array->append_datum(DatumArray{1L, 2L, 4L});
+
+        auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+        size_array->append_datum(DatumArray{2, 3});
+        size_array->append_datum(DatumArray{2, 2});
+
+        auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                          false);
+        priority_array->append_datum(DatumArray{2, 1});
+        priority_array->append_datum(DatumArray{1, 2});
+
+        const auto result = CelonisArrayFunctions::merge_sorted_arrays(
+                nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(),
+                  "If provided, the size of secondary_order_array and timestamp_array should not be different.");
     }
     {
         // timestamp_array and input_array has a different size than the sum of size_array.

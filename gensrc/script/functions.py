@@ -1456,6 +1456,7 @@ celostar_functions = [
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
     [2000110, 'celonis_merge_sorted_arrays', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000111, 'celonis_merge_sorted_arrays', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
     [2000120, 'celonis_dedup_sorted_by', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_VARCHAR'], 'CelonisArrayFunctions::dedup_sorted_by'],
     [2000130, 'celonis_array_lag', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'BIGINT'], 'CelonisArrayFunctions::array_lag'],
     [2000140, 'celonis_array_lead', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'BIGINT'], 'CelonisArrayFunctions::array_lead'],
@@ -1485,7 +1486,7 @@ celostar_functions = [
     [2000221, 'celonis_array_avg', True, False, 'DOUBLE', ['ARRAY_INT'], 'CelonisArrayAvg<TYPE_INT>::array_avg'],
     [2000222, 'celonis_array_avg', True, False, 'DOUBLE', ['ARRAY_BIGINT'], 'CelonisArrayAvg<TYPE_BIGINT>::array_avg'],
     [2000223, 'celonis_array_avg', True, False, 'DOUBLE', ['ARRAY_DOUBLE'], 'CelonisArrayAvg<TYPE_DOUBLE>::array_avg'],
-    [2000230, 'celonis_array_bool_or', True, False,  'BOOLEAN', ['ARRAY_BOOLEAN'], 'CelonisArrayFunctions::array_bool_or'],
+    [2000230, 'celonis_array_bool_or', True, False, 'BOOLEAN', ['ARRAY_BOOLEAN'], 'CelonisArrayFunctions::array_bool_or'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],

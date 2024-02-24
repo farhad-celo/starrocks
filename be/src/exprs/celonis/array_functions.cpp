@@ -169,7 +169,7 @@ CelonisArrayFunctions::array_is_sorted([[maybe_unused]] FunctionContext* context
 class CelonisMergeSortedArrays {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
-        DCHECK_EQ(columns.size(), 4);
+        DCHECK(columns.size() == 4 || columns.size() == 5);
 
         size_t chunk_size = columns[0]->size();
 
@@ -185,6 +185,33 @@ public:
         const auto& timestamps =
                 down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*timestamp_array_data.elements).get_data().data();
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
+
+        int64_t secondary_orders[timestamp_offsets[chunk_size]];
+        const bool has_secondary_order = columns.size() == 5;
+        if (has_secondary_order) {
+            ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
+            if (secondary_order_column->has_null()) {
+                return Status::InvalidArgument("If provided, secondary_order_array should not be NULL.");
+            }
+            UnnestedArrayData secondary_order_array_data = prepare_array_input(secondary_order_column.get());
+            if (secondary_order_array_data.null_elements != nullptr) {
+                return Status::InvalidArgument("If provided, secondary_order_array should not have NULL elements.");
+            }
+            const auto& secondary_orders_raw = down_cast<const RunTimeColumnType<TYPE_BIGINT>&>(
+                    *secondary_order_array_data.elements).get_data().data();
+            const auto& secondary_order_offsets = secondary_order_array_data.offsets->get_data().data();
+            for (auto row = 0; row < chunk_size; ++row) {
+                const auto start = timestamp_offsets[row];
+                const auto end = timestamp_offsets[row + 1];
+                if (secondary_order_offsets[row + 1] != end) {
+                    return Status::InvalidArgument(
+                            "If provided, the size of secondary_order_array and timestamp_array should not be different.");
+                }
+                for (auto i = start; i < end; ++i) {
+                    secondary_orders[i] = secondary_orders_raw[i];
+                }
+            }
+        }
 
         ColumnPtr size_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[2]);
         if (size_column->has_null()) {
@@ -251,18 +278,25 @@ public:
             }
 
             struct Array {
-                Array(size_t start, size_t end, const TimestampValue* timestamp, int priority)
-                        : index(start), end(end), timestamp(timestamp), priority(priority) {}
+                Array(size_t start, size_t end, const TimestampValue* timestamp, const int64_t* secondary_order,
+                      int priority)
+                        : index(start), end(end), timestamp(timestamp), secondary_order(secondary_order),
+                          priority(priority) {}
 
                 size_t index;
                 size_t end;
                 const TimestampValue* timestamp;
+                const int64_t* secondary_order;
                 int priority;
             };
             struct CompareArrayElement {
                 bool operator()(const Array& lhs, const Array& rhs) {
-                    return *lhs.timestamp > *rhs.timestamp ||
-                           (*lhs.timestamp == *rhs.timestamp && lhs.priority < rhs.priority);
+                    if (*lhs.timestamp != *rhs.timestamp) {
+                        return *lhs.timestamp > *rhs.timestamp;
+                    }
+                    const int64_t lhs_order = (lhs.secondary_order != nullptr) ? -(*lhs.secondary_order) : 0;
+                    const int64_t rhs_order = (rhs.secondary_order != nullptr) ? -(*rhs.secondary_order) : 0;
+                    return std::tie(lhs_order, lhs.priority) < std::tie(rhs_order, rhs.priority);
                 }
             };
             std::priority_queue<Array, std::vector<Array>, CompareArrayElement> pq;
@@ -279,7 +313,8 @@ public:
                     // Skip empty arrays.
                     continue;
                 }
-                pq.emplace(start, next, timestamps + start, priorities[i]);
+                pq.emplace(start, next, timestamps + start, has_secondary_order ? secondary_orders + start : nullptr,
+                           priorities[i]);
                 start = next;
             }
             if (next != src_timestamp_end) {
@@ -294,6 +329,9 @@ public:
                 new_offset++;
                 if (++curr.index < curr.end) {
                     curr.timestamp++;
+                    if (curr.secondary_order != nullptr) {
+                        curr.secondary_order++;
+                    }
                     pq.push(curr);
                 }
             }
