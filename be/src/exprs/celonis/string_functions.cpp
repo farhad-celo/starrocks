@@ -404,8 +404,11 @@ static std::optional<double> to_double(const std::string& input_string) {
 }
 
 std::optional<int64_t> to_int64(const std::string& str) {
+    if (str.empty() || std::isspace(str.front()) || std::isspace(str.back())) {
+        return std::nullopt;
+    }
     try {
-        int64_t value = std::stoll(trim(str));
+        int64_t value = std::stoll(str);
         return value;
     } catch (const std::exception&) {
         // catch std::invalid_argument, std::out_of_range, and other std::exception-based exceptions

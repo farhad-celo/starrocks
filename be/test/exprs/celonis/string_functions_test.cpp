@@ -353,8 +353,6 @@ TEST(CelonisStringFunctionsStringToIntTest, All) {
     auto expected_int = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
 
     std::vector<DatumStruct> test_input = {
-            {"  123456  ",           123456L},
-            {"123 ",                 123L},
             {"123456",               123456L},
             {"-123456.11",           -123456L},
             {"123456.11",            123456L},
@@ -364,6 +362,9 @@ TEST(CelonisStringFunctionsStringToIntTest, All) {
             {"-9223372036854775808", INT64_MIN},
             // Invalid string inputs
             {kNullDatum,             kNullDatum},
+            {"  123456  ",           kNullDatum},
+            {"123 ",                 kNullDatum},
+            {" 123",                 kNullDatum},
             {"9223372036854775908",  kNullDatum},
             {"-9223372036854775809", kNullDatum},
             {"4.70E+2",              kNullDatum},
