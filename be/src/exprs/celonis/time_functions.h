@@ -21,7 +21,7 @@ public:
      * @param: [timestamp, time_unit, calendar_specification, calendar_id_column]
      * @paramType: [DATETIME, VARCHAR, ARRAY_VARCHAR, VARCHAR]
      * @return: BIGINT
-     * Implements PQL REMAP_TIMESTAMPS https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245429/REMAP+TIMESTAMPS
+     * Implements PQL REMAP_TIMESTAMPS: https://docs.celonis.com/en/remap_timestamps.html
      */
     DEFINE_VECTORIZED_FN(remap_timestamps_calendar);
 
@@ -37,7 +37,7 @@ public:
      * @paramType: [DATETIME, DATETIME, DATETIME]
      * @return: BIGINT
      * This function returns 1 if first_date is in range [second_date, third_date), and 0 otherwise.
-     * Implements PQL DATE_BETWEEN https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245340/DATE+BETWEEN
+     * Implements PQL DATE_BETWEEN: https://docs.celonis.com/en/date_between.html
      */
     DEFINE_VECTORIZED_FN(date_between);
 
@@ -45,7 +45,7 @@ public:
      * @param: [timestamp, calendar_specification, calendar_id_column]
      * @paramType: [DATETIME, ARRAY_VARCHAR, VARCHAR]
      * @return: BIGINT
-     * Implements PQL IN_CALENDAR https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11248959/IN+CALENDAR
+     * Implements PQL IN_CALENDAR: https://docs.celonis.com/en/in_calendar.html
      */
     DEFINE_VECTORIZED_FN(in_calendar);
 
@@ -67,7 +67,7 @@ public:
      * @param: [timestamp, years, quarters, months, weeks, days]
      * @paramType: [DATETIME, ARRAY_BIGINT, ARRAY_BIGINT, ARRAY_BIGINT, ARRAY_BIGINT, ARRAY_BIGINT]
      * @return: BIGINT
-     * Implements PQL DATE_MATCH: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245405/DATE+MATCH
+     * Implements PQL DATE_MATCH: https://docs.celonis.com/en/date_match.html
      */
     DEFINE_VECTORIZED_FN(date_match);
 

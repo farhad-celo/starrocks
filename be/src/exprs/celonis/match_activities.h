@@ -11,7 +11,7 @@ public:
      * @param: [activity_list, STARTING, NODE, ENDING, EXCLUDING, EXCLUDING_ALL, NODES_ANY]
      * @paramType: [ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR]
      * @return: BIGINT
-     * Implements PQL MATCH_ACTIVITIES: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245607/MATCH+ACTIVITIES
+     * Implements PQL MATCH_ACTIVITIES: https://docs.celonis.com/en/match_activities.html
      */
     DEFINE_VECTORIZED_FN(celonis_match_activities);
 };

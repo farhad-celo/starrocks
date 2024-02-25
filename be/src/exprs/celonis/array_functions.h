@@ -61,7 +61,7 @@ public:
      * @param: [activities, begin_range_activity, begin_range_mode, end_range_activity, end_range_mode]
      * @paramType: [ARRAY_VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR]
      * @return: ARRAY_BIGINT
-     * Implements PQL CALC_CROP: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245578/CALC+CROP
+     * Implements PQL CALC_CROP: https://docs.celonis.com/en/calc_crop.html
      */
     DEFINE_VECTORIZED_FN(calc_crop);
 
@@ -69,7 +69,7 @@ public:
      * @param: [activities, begin_range_activity, begin_range_mode, end_range_activity, end_range_mode]
      * @paramType: [ARRAY_VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR]
      * @return: ARRAY_VARCHAR
-     * Implements PQL CALC_CROP_TO_NULL: https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245581/CALC+CROP+TO+NULL
+     * Implements PQL CALC_CROP_TO_NULL: https://docs.celonis.com/en/calc_crop_to_null.html
      */
     DEFINE_VECTORIZED_FN(calc_crop_to_null);
 
