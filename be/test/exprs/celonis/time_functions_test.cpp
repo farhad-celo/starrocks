@@ -171,6 +171,97 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_multi_weekday_calenda
     }
 }
 
+TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_intersect_calendar) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        calendars->append_datum(
+                DatumArray{R"({"intersect_calendar": {"calendar1": {"multi_weekday_calendar": {)",
+                           R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
+                           R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 0, "end": 61200000}}, "calendar_id": "id2"},)",
+                           R"( }}, )",
+                           R"("calendar2": {"multi_weekday_calendar": {)",
+                           R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
+                           R"(}})",
+                           R"(}})"});
+        calendar_ids->append_datum("id2");
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(9L, result->get(0).get_int64());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        calendars->append_datum(
+                DatumArray{R"({"intersect_calendar": {"calendar1": {"multi_weekday_calendar": {)",
+                           R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
+                           R"( }}, )",
+                           R"("calendar2": {"multi_weekday_calendar": {)",
+                           R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
+                           R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 0, "end": 61200000}}, "calendar_id": "id2"},)",
+                           R"(}})",
+                           R"(}})"});
+        calendar_ids->append_datum("id2");
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(9L, result->get(0).get_int64());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        calendars->append_datum(
+                DatumArray{R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                           R"("entries": {"start_date": 10000000, "end_date": 61200000, "calendar_id": "id1"}, )",
+                           R"("entries": {"start_date": 0, "end_date": 61200000, "calendar_id": "id2"}, )",
+                           R"( }}, )",
+                           R"("calendar2": {"multi_weekday_calendar": {)",
+                           R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
+                           R"(}})",
+                           R"(}})"});
+        calendar_ids->append_datum("id2");
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(9L, result->get(0).get_int64());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        calendars->append_datum(
+                DatumArray{R"({"intersect_calendar": {"calendar1": {"multi_weekday_calendar": {)",
+                           R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
+                           R"( }}, )",
+                           R"("calendar2": {"factory_calendar": {)",
+                           R"("entries": {"start_date": 10000000, "end_date": 61200000, "calendar_id": "id1"}, )",
+                           R"("entries": {"start_date": 0, "end_date": 61200000, "calendar_id": "id2"}, )",
+                           R"(}})",
+                           R"(}})"});
+        calendar_ids->append_datum("id2");
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(9L, result->get(0).get_int64());
+    }
+}
+
 TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_weekday_calendar) {
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);

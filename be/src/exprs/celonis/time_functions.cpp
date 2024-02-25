@@ -596,63 +596,84 @@ private:
     // m2 does not contain any weekly TimeRanges
     IdToTimeRangesMap intersect_id_to_time_ranges(const IdToTimeRangesMap& m1, const IdToTimeRangesMap& m2) {
         IdToTimeRangesMap m;
-        for (const auto& [id, time_ranges_1]: m1) {
-            auto iter = m2.find(id);
-            if (iter == m2.end()) {
-                continue;
+        std::vector<std::optional<std::string>> m2_keys;
+        for (const auto& p: m2) {
+            m2_keys.push_back(p.first);
+        }
+        for (const auto& [id1, time_ranges_1]: m1) {
+            std::vector<std::optional<std::string>> ids = {id1, std::nullopt}; // assuming id1 is not nullopt
+            if (!id1.has_value()) {
+                ids = m2_keys;
             }
-            std::vector<TimeRange> new_time_ranges;
-            const auto& time_ranges_2 = iter->second;
-            for (const auto& time_range_1: time_ranges_1) {
-                for (const auto& time_range_2: time_ranges_2) {
-                    DCHECK(!time_range_2.is_weekly);
-                    int64_t left_ms = time_range_2.begin_ms;
-                    int64_t right_ms = time_range_2.end_ms;
-                    const auto inter_time_ranges = time_range_1.intersect(left_ms, right_ms);
-                    new_time_ranges.insert(new_time_ranges.end(), inter_time_ranges.begin(), inter_time_ranges.end());
+            for (const auto& id: ids) {
+                auto iter = m2.find(id);
+                if (iter == m2.end()) {
+                    continue;
                 }
+                std::vector<TimeRange> new_time_ranges;
+                const auto& time_ranges_2 = iter->second;
+                for (const auto& time_range_1: time_ranges_1) {
+                    for (const auto& time_range_2: time_ranges_2) {
+                        DCHECK(!time_range_2.is_weekly);
+                        int64_t left_ms = time_range_2.begin_ms;
+                        int64_t right_ms = time_range_2.end_ms;
+                        const auto inter_time_ranges = time_range_1.intersect(left_ms, right_ms);
+                        new_time_ranges.insert(new_time_ranges.end(), inter_time_ranges.begin(),
+                                               inter_time_ranges.end());
+                    }
+                }
+                m[id1.has_value() ? id1 : id] = new_time_ranges;
             }
-            m[id] = new_time_ranges;
         }
         return m;
     }
 
     IdToWeekdayMap intersect_id_to_weekday(const IdToWeekdayMap& m1, const IdToWeekdayMap& m2) {
         IdToWeekdayMap m;
-        for (const auto& [id, index_to_weekday_1]: m1) {
-            auto iter = m2.find(id);
-            if (iter == m2.end()) {
-                continue;
+        std::vector<std::optional<std::string>> m2_keys;
+        for (const auto& p: m2) {
+            m2_keys.push_back(p.first);
+        }
+        for (const auto& [id1, index_to_weekday_1]: m1) {
+            std::vector<std::optional<std::string>> ids = {id1, std::nullopt}; // assuming id1 is not nullopt
+            if (!id1.has_value()) {
+                ids = m2_keys;
             }
-            const auto& index_to_weekday_2 = iter->second;
-            // both m1 and m2 have id
-            std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry> new_index_to_weekday;
-            for (const auto& [index, weekday_1]: index_to_weekday_1) {
-                auto it = index_to_weekday_2.find(index);
-                if (it == index_to_weekday_2.end()) {
+            for (const auto& id: ids) {
+                auto iter = m2.find(id);
+                if (iter == m2.end()) {
                     continue;
                 }
-                const auto& weekday_2 = it->second;
-                // intersect weekday_1 and weekday_2
-                if (!weekday_1.use_day() || !weekday_2.use_day()) {
-                    continue;
+                const auto& index_to_weekday_2 = iter->second;
+                // both m1 and m2 have id
+                std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry> new_index_to_weekday;
+                for (const auto& [index, weekday_1]: index_to_weekday_1) {
+                    auto it = index_to_weekday_2.find(index);
+                    if (it == index_to_weekday_2.end()) {
+                        continue;
+                    }
+                    const auto& weekday_2 = it->second;
+                    // intersect weekday_1 and weekday_2
+                    if (!weekday_1.use_day() || !weekday_2.use_day()) {
+                        continue;
+                    }
+                    celonis::accelerator::WeekdayCalendarEntry weekday;
+                    int64_t s1 = weekday_1.shift().begin();
+                    int64_t e1 = weekday_1.shift().end();
+                    int64_t s2 = weekday_2.shift().begin();
+                    int64_t e2 = weekday_2.shift().end();
+                    int64_t s = std::max(s1, s2);
+                    int64_t e = std::min(e1, e2);
+                    if (e > s) {
+                        weekday.set_use_day(true);
+                        weekday.mutable_shift()->set_begin(s);
+                        weekday.mutable_shift()->set_end(e);
+                        new_index_to_weekday[index] = weekday;
+                    }
                 }
-                celonis::accelerator::WeekdayCalendarEntry weekday;
-                int64_t s1 = weekday_1.shift().begin();
-                int64_t e1 = weekday_1.shift().end();
-                int64_t s2 = weekday_2.shift().begin();
-                int64_t e2 = weekday_2.shift().end();
-                int64_t s = std::max(s1, s2);
-                int64_t e = std::min(e1, e2);
-                if (e > s) {
-                    weekday.set_use_day(true);
-                    weekday.mutable_shift()->set_begin(s);
-                    weekday.mutable_shift()->set_end(e);
-                    new_index_to_weekday[index] = weekday;
+                if (!new_index_to_weekday.empty()) {
+                    m[id1.has_value() ? id1 : id] = new_index_to_weekday;
                 }
-            }
-            if (!new_index_to_weekday.empty()) {
-                m[id] = new_index_to_weekday;
             }
         }
         return m;
