@@ -1513,6 +1513,7 @@ celostar_functions = [
     [5000102, 'celonis_square', True, False, 'BIGINT', ['BIGINT'], 'CelonisMathFunctions<TYPE_BIGINT>::square'],
     [5000103, 'celonis_square', True, False, 'DOUBLE', ['DOUBLE'], 'CelonisMathFunctions<TYPE_DOUBLE>::square'],
     [5000200, 'celonis_qnorm', True, False, 'DOUBLE', ['DOUBLE'], 'CelonisQnorm::qnorm'],
+    [5000300, 'celonis_predict_linear_regression', True, False, 'DOUBLE', ['DOUBLE', 'VARCHAR'], 'CelonisLinearRegression::predict_linear_regression', 'CelonisLinearRegression::predict_prepare', 'CelonisLinearRegression::predict_close'],
 ]
 
 vectorized_functions.extend(celostar_functions)

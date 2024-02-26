@@ -163,6 +163,7 @@ set(EXEC_FILES
         ./exprs/celonis/in_test.cpp
         ./exprs/celonis/index_activity_test.cpp
         ./exprs/celonis/like_test.cpp
+        ./exprs/celonis/linear_regression_test.cpp
         ./exprs/celonis/match_activities_test.cpp
         ./exprs/celonis/match_process_test.cpp
         ./exprs/celonis/math_functions_test.cpp

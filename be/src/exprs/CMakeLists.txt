@@ -151,6 +151,7 @@ set(CELONIS_FILES
   celonis/in.cpp
   celonis/index_activity.cpp
   celonis/like.cpp
+  celonis/linear_regression.cpp
   celonis/match_activities.cpp
   celonis/match_process.cpp
   celonis/math_functions.cpp
