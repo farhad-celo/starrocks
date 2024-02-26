@@ -44,9 +44,9 @@ static const TimestampValue EPOCH = TimestampValue::create(1970, 1, 1, 0, 0, 0);
 static const TimestampValue MAX_YEAR = TimestampValue::create(10000, 1, 1, 0, 0, 0);
 
 static const TimestampValue MIN_YEAR = TimestampValue::create(1400, 1, 1, 0, 0, 0);
-}
 
-TimestampValue add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
+static TimestampValue
+add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
     std::vector<int> adds;
     const int64_t max_int = std::numeric_limits<int>::max();
     const int64_t min_int = std::numeric_limits<int>::min();
@@ -117,61 +117,6 @@ static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
 
 static int64_t millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp) {
     return remap_timestamp_ms(to_timestamp) - remap_timestamp_ms(from_timestamp);
-}
-
-StatusOr<ColumnPtr>
-CelonisTimeFunctions::millis_timestamp([[maybe_unused]] FunctionContext* context, const Columns& columns) {
-    DCHECK_EQ(columns.size(), 1);
-    const size_t n_rows = columns[0]->size();
-    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    for (auto row = 0; row < n_rows; ++row) {
-        if (columns[0]->is_null(row)) {
-            result.append_null();
-            continue;
-        }
-        result.append(remap_timestamp_ms(timestamp_viewer.value(row)));
-    }
-    return result.build(ColumnHelper::is_all_const(columns));
-}
-
-StatusOr<ColumnPtr>
-CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context, const Columns& columns) {
-    DCHECK_EQ(columns.size(), 1);
-
-    RETURN_IF_COLUMNS_ONLY_NULL(columns);
-
-    ColumnViewer<TYPE_BIGINT> data_column(columns[0]);
-
-    auto size = columns[0]->size();
-    ColumnBuilder<TYPE_DATETIME> result(size);
-    for (int row = 0; row < size; ++row) {
-        if (data_column.is_null(row)) {
-            result.append_null();
-            continue;
-        }
-
-        auto unix_millis = data_column.value(row);
-        if (unix_millis < 0) {
-            result.append_null();
-            continue;
-        }
-
-        int64 seconds = unix_millis / 1000;
-        int64 millis = unix_millis % 1000;
-        int64 nanoseconds = millis * NANOS_PER_MILLIS;
-
-        Timestamp t;
-        int days = seconds / SECS_PER_DAY;
-        JulianDate jd = days + date::UNIX_EPOCH_JULIAN;
-        t = timestamp::from_julian_and_time(jd,
-                                            seconds % SECS_PER_DAY * USECS_PER_SEC + nanoseconds / NANOSECS_PER_USEC);
-        TimestampValue ts;
-        ts.set_timestamp(t);
-        result.append(ts);
-    }
-
-    return result.build(ColumnHelper::is_all_const(columns));
 }
 
 struct TimeRange {
@@ -1113,6 +1058,63 @@ remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::strin
         milliseconds = calendar.remap_timestamp_ms(timestamp, calendar_id);
     }
     return convert_time_unit(time_unit, milliseconds);
+}
+
+} // namespace
+
+StatusOr<ColumnPtr>
+CelonisTimeFunctions::millis_timestamp([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    const size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (auto row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        result.append(remap_timestamp_ms(timestamp_viewer.value(row)));
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr>
+CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+
+    ColumnViewer<TYPE_BIGINT> data_column(columns[0]);
+
+    auto size = columns[0]->size();
+    ColumnBuilder<TYPE_DATETIME> result(size);
+    for (int row = 0; row < size; ++row) {
+        if (data_column.is_null(row)) {
+            result.append_null();
+            continue;
+        }
+
+        auto unix_millis = data_column.value(row);
+        if (unix_millis < 0) {
+            result.append_null();
+            continue;
+        }
+
+        int64 seconds = unix_millis / 1000;
+        int64 millis = unix_millis % 1000;
+        int64 nanoseconds = millis * NANOS_PER_MILLIS;
+
+        Timestamp t;
+        int days = seconds / SECS_PER_DAY;
+        JulianDate jd = days + date::UNIX_EPOCH_JULIAN;
+        t = timestamp::from_julian_and_time(jd,
+                                            seconds % SECS_PER_DAY * USECS_PER_SEC + nanoseconds / NANOSECS_PER_USEC);
+        TimestampValue ts;
+        ts.set_timestamp(t);
+        result.append(ts);
+    }
+
+    return result.build(ColumnHelper::is_all_const(columns));
 }
 
 StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionContext* context,
