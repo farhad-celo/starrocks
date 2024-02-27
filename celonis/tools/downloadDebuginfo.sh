@@ -15,6 +15,8 @@ container_id=$(docker run -d --name my_container ghcr.io/celonis/celostar/starro
 # Copy the file from the container to the local disk
 docker cp my_container:/data/deploy/starrocks/be/lib/starrocks_be.debuginfo ./starrocks_be.debuginfo.${image_tag}
 
+docker cp my_container:/data/deploy/starrocks/be/lib/starrocks_be ./starrocks_be.${image_tag}
+
 # Stop and remove the container
 docker stop my_container
 docker rm my_container
