@@ -79,6 +79,12 @@ public:
     remap_timestamps_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status remap_timestamps_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status
+    timeunits_between_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status timeunits_between_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
 };
 
 } // namespace starrocks

@@ -1076,7 +1076,8 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_invalid_time_unit) {
     const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
                                                                                   calendar_ids});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "time unit must be one of DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
+    EXPECT_EQ(result.status().get_error_msg(),
+              "time unit must be one of WORKDAYS/DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
 }
 
 TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_malformed_calendar) {
@@ -1621,6 +1622,222 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_intersect_calendar) {
         EXPECT_EQ(1L, result->get(3).get_int64());
         EXPECT_TRUE(result->get(4).is_null());
         EXPECT_TRUE(result->get(5).is_null());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_prepare) {
+    // Single row
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto timeunits = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 10, 0, 0));
+        timeunits->append_datum("HOURS");
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": {)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 10, 15}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {11}).c_str(),
+                        R"(, calendar_id: "id2"},)",
+                        R"( }})"});
+        calendar_ids->append_datum("id1");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::timeunits_between_calendar_prepare(utils->get_fn_ctx(),
+                                                                             FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(utils->get_fn_ctx(),
+                                                                             {from_timestamps, to_timestamps, timeunits,
+                                                                              calendars, calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_EQ(9.0, result->get(0).get_double());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::timeunits_between_calendar_close(utils->get_fn_ctx(),
+                                                                           FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // Multiple rows
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto timeunits = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 10, 0, 0));
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 10, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
+        timeunits->append_datum("HOURS");
+        timeunits->append_datum("HOURS");
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": {)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 10, 15}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {11}).c_str(),
+                        R"(, calendar_id: "id2"},)",
+                        R"( }})"});
+        calendar_ids->append_datum("id1");
+        calendar_ids->append_datum("id1");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::timeunits_between_calendar_prepare(utils->get_fn_ctx(),
+                                                                             FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(utils->get_fn_ctx(),
+                                                                             {from_timestamps, to_timestamps, timeunits,
+                                                                              calendars, calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_EQ(9.0, result->get(0).get_double());
+        EXPECT_EQ(14.0, result->get(1).get_double());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::timeunits_between_calendar_close(utils->get_fn_ctx(),
+                                                                           FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // NULL calendar
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto timeunits = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 10, 0, 0));
+        timeunits->append_datum("HOURS");
+        calendars->append_datum(kNullDatum);
+        calendar_ids->append_datum("id1");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::timeunits_between_calendar_prepare(utils->get_fn_ctx(),
+                                                                             FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(utils->get_fn_ctx(),
+                                                                             {from_timestamps, to_timestamps, timeunits,
+                                                                              calendars, calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::timeunits_between_calendar_close(utils->get_fn_ctx(),
+                                                                           FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // Empty calendar
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto timeunits = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
+        timeunits->append_datum("HOURS");
+        calendars->append_datum(DatumArray{});
+        calendar_ids->append_datum(kNullDatum);
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::timeunits_between_calendar_prepare(utils->get_fn_ctx(),
+                                                                             FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(utils->get_fn_ctx(),
+                                                                             {from_timestamps, to_timestamps, timeunits,
+                                                                              calendars, calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_EQ(33.0, result->get(0).get_double());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::timeunits_between_calendar_close(utils->get_fn_ctx(),
+                                                                           FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // Malformed calendar
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto timeunits = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
+        timeunits->append_datum("HOURS");
+        calendars->append_datum(DatumArray{"Unknown"});
+        calendar_ids->append_datum(kNullDatum);
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar_prepare(utils->get_fn_ctx(),
+                                                                                     FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result.is_invalid_argument());
+        EXPECT_EQ(result.get_error_msg(), "[prepare] Calendar specification column is malformed.");
+    }
+    // NULL in Calendar json string array
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto timeunits = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        from_timestamps->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
+        timeunits->append_datum("HOURS");
+        calendars->append_datum(DatumArray{kNullDatum});
+        calendar_ids->append_datum(kNullDatum);
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar_prepare(utils->get_fn_ctx(),
+                                                                                     FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result.is_invalid_argument());
+        EXPECT_EQ(result.get_error_msg(), "[prepare] Calendar array can not contain null values.");
     }
 }
 
@@ -3298,7 +3515,7 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_invalid_input) {
                                                                           calendar_ids});
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().get_error_msg(),
-                  "time unit must be one of DAYS/WORKDAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
+                  "time unit must be one of WORKDAYS/DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
     }
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
