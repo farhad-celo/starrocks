@@ -1515,55 +1515,6 @@ add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int
     }
 }
 
-StatusOr<ColumnPtr> CelonisTimeFunctions::add_timeunits_calendar([[maybe_unused]] FunctionContext* context,
-                                                                 const starrocks::Columns& columns) {
-    DCHECK_EQ(columns.size(), 5);
-    size_t n_rows = columns[0]->size();
-    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
-    ColumnViewer add_value_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
-    ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
-    ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
-    UnnestedArrayData calendar_array_data = prepare_array_input(columns[3].get());
-    if (calendar_array_data.null_elements != nullptr) {
-        return Status::InvalidArgument("Calendar array should not have null elements.");
-    }
-    DCHECK(calendar_array_data.elements->is_binary());
-    const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *calendar_array_data.elements).get_data().data();
-    const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
-
-    ColumnBuilder<TYPE_DATETIME> result(n_rows);
-    for (size_t row = 0; row < n_rows; ++row) {
-        if (timestamp_viewer.is_null(row) || add_value_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
-            columns[3]->is_null(row)) {
-            result.append_null();
-            continue;
-        }
-        std::string time_unit = time_unit_viewer.value(row).to_string();
-        RETURN_IF_ERROR(validate_time_unit(time_unit));
-        const auto timestamp = timestamp_viewer.value(row);
-        auto add_value = add_value_viewer.value(row);
-        size_t start = calendar_offsets[row];
-        size_t end = calendar_offsets[row + 1];
-        std::string calendar_json_string;
-        std::optional<std::string> calendar_id = std::nullopt;
-        if (!calendar_id_viewer.is_null(row)) {
-            calendar_id = calendar_id_viewer.value(row).to_string();
-        }
-        for (size_t id = start; id < end; ++id) {
-            calendar_json_string += calendars[id].to_string();
-        }
-        ASSIGN_OR_RETURN(const std::optional<TimestampValue> new_timestamp,
-                         add_timeunits(timestamp, time_unit, add_value, calendar_json_string, calendar_id));
-        if (new_timestamp.has_value()) {
-            result.append(new_timestamp.value());
-        } else {
-            result.append_null();
-        }
-    }
-    return result.build(ColumnHelper::is_all_const(columns));
-}
-
 class DateFilters {
 public:
     DateFilters(size_t row, ColumnPtr years_column, ColumnPtr quarters_column, ColumnPtr months_column,
@@ -1728,7 +1679,7 @@ StatusOr<ColumnPtr> timeunits_between_calendar_const([[maybe_unused]] FunctionCo
     const Calendar& calendar = calendar_state->calendar;
     for (size_t row = 0; row < n_rows; ++row) {
         if (from_timestamp_viewer.is_null(row) || to_timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
-            columns[3]->is_null(row)) {
+            calendar_state->is_null) {
             result.append_null();
             continue;
         }
@@ -1759,6 +1710,115 @@ StatusOr<ColumnPtr> timeunits_between_calendar_const([[maybe_unused]] FunctionCo
 StatusOr<ColumnPtr> CelonisTimeFunctions::timeunits_between_calendar(FunctionContext* context,
                                                                      const starrocks::Columns& columns) {
     return func(context, columns, timeunits_between_calendar_const, timeunits_between_calendar_general);
+}
+
+Status CelonisTimeFunctions::add_timeunits_calendar_prepare(FunctionContext* context,
+                                                            FunctionContext::FunctionStateScope scope) {
+    RETURN_IF_ERROR(prepare(context, scope, 5, 3));
+    return Status::OK();
+}
+
+Status CelonisTimeFunctions::add_timeunits_calendar_close(FunctionContext* context,
+                                                          FunctionContext::FunctionStateScope scope) {
+    return close(context, scope);
+}
+
+static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] FunctionContext* context,
+                                                          const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 5);
+    size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnViewer add_value_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
+    ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
+    ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
+    UnnestedArrayData calendar_array_data = prepare_array_input(columns[3].get());
+    if (calendar_array_data.null_elements != nullptr) {
+        return Status::InvalidArgument("Calendar array should not have null elements.");
+    }
+    DCHECK(calendar_array_data.elements->is_binary());
+    const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *calendar_array_data.elements).get_data().data();
+    const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
+
+    ColumnBuilder<TYPE_DATETIME> result(n_rows);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (timestamp_viewer.is_null(row) || add_value_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
+            columns[3]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        std::string time_unit = time_unit_viewer.value(row).to_string();
+        RETURN_IF_ERROR(validate_time_unit(time_unit));
+        const auto timestamp = timestamp_viewer.value(row);
+        auto add_value = add_value_viewer.value(row);
+        size_t start = calendar_offsets[row];
+        size_t end = calendar_offsets[row + 1];
+        std::string calendar_json_string;
+        std::optional<std::string> calendar_id = std::nullopt;
+        if (!calendar_id_viewer.is_null(row)) {
+            calendar_id = calendar_id_viewer.value(row).to_string();
+        }
+        for (size_t id = start; id < end; ++id) {
+            calendar_json_string += calendars[id].to_string();
+        }
+        ASSIGN_OR_RETURN(const std::optional<TimestampValue> new_timestamp,
+                         add_timeunits(timestamp, time_unit, add_value, calendar_json_string, calendar_id));
+        if (new_timestamp.has_value()) {
+            result.append(new_timestamp.value());
+        } else {
+            result.append_null();
+        }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+static StatusOr<ColumnPtr> add_timeunits_calendar_const([[maybe_unused]] FunctionContext* context,
+                                                        const starrocks::Columns& columns,
+                                                        const CalendarState* calendar_state) {
+    DCHECK_EQ(columns.size(), 5);
+    size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnViewer add_value_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
+    ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
+    ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
+    ColumnBuilder<TYPE_DATETIME> result(n_rows);
+    const Calendar& calendar = calendar_state->calendar;
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (timestamp_viewer.is_null(row) || add_value_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
+            calendar_state->is_null) {
+            result.append_null();
+            continue;
+        }
+        std::string time_unit = time_unit_viewer.value(row).to_string();
+        RETURN_IF_ERROR(validate_time_unit(time_unit));
+        const auto timestamp = timestamp_viewer.value(row);
+        auto add_value = add_value_viewer.value(row);
+        std::optional<std::string> calendar_id = std::nullopt;
+        if (!calendar_id_viewer.is_null(row)) {
+            calendar_id = calendar_id_viewer.value(row).to_string();
+        }
+        if (calendar_state->is_empty) {
+            if (calendar_id.has_value()) {
+                return Status::InvalidArgument(
+                        "Calendar ID column should not be set when calendar specification is not set.");
+            }
+            result.append(add_timeunits_helper(timestamp, time_unit, add_value));
+            continue;
+        }
+        const std::optional<TimestampValue> new_timestamp = calendar.add_timeunits(timestamp, time_unit, add_value,
+                                                                                   calendar_id);
+        if (new_timestamp.has_value()) {
+            result.append(new_timestamp.value());
+        } else {
+            result.append_null();
+        }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::add_timeunits_calendar([[maybe_unused]] FunctionContext* context,
+                                                                 const starrocks::Columns& columns) {
+    return func(context, columns, add_timeunits_calendar_const, add_timeunits_calendar_general);
 }
 
 } // namespace starrocks

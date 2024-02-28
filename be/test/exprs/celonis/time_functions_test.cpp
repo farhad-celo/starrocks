@@ -3478,6 +3478,216 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_null_input) {
     }
 }
 
+TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_prepare) {
+    // Single row
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+        add_values->append_datum(17L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                R"("saturday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                R"(} })"});
+        calendar_ids->append_datum(kNullDatum);
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::add_timeunits_calendar_prepare(utils->get_fn_ctx(),
+                                                                         FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(utils->get_fn_ctx(),
+                                                                         {timestamps, add_values, time_units,
+                                                                          calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 4, 11, 0, 0), result->get(0).get_timestamp());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::add_timeunits_calendar_close(utils->get_fn_ctx(),
+                                                                       FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // Multiple rows
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+        timestamps->append_datum(TimestampValue::create(2018, 1, 8, 9, 0, 0));
+        add_values->append_datum(17L);
+        add_values->append_datum(-5L);
+        for (auto i = 0; i < timestamps->size(); ++i) {
+            time_units->append_datum("HOURS");
+            calendars->append_datum(DatumArray{
+                    R"({"weekday_calendar": {)",
+                    R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                    R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                    R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                    R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                    R"("saturday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                    R"(} })"});
+            calendar_ids->append_datum(kNullDatum);
+        }
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::add_timeunits_calendar_prepare(utils->get_fn_ctx(),
+                                                                         FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(utils->get_fn_ctx(),
+                                                                         {timestamps, add_values, time_units,
+                                                                          calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 4, 11, 0, 0), result->get(0).get_timestamp());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 6, 12, 0, 0), result->get(1).get_timestamp());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::add_timeunits_calendar_close(utils->get_fn_ctx(),
+                                                                       FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // NULL calendar
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+        add_values->append_datum(17L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(kNullDatum);
+        calendar_ids->append_datum(kNullDatum);
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::add_timeunits_calendar_prepare(utils->get_fn_ctx(),
+                                                                         FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(utils->get_fn_ctx(),
+                                                                         {timestamps, add_values, time_units,
+                                                                          calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::add_timeunits_calendar_close(utils->get_fn_ctx(),
+                                                                       FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // Empty calendar
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+        add_values->append_datum(10L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray{});
+        calendar_ids->append_datum(kNullDatum);
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::add_timeunits_calendar_prepare(utils->get_fn_ctx(),
+                                                                         FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::add_timeunits_calendar(utils->get_fn_ctx(),
+                                                                         {timestamps, add_values, time_units,
+                                                                          calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 1, 20, 0, 0), result->get(0).get_timestamp());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::add_timeunits_calendar_close(utils->get_fn_ctx(),
+                                                                       FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // Malformed calendar
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+        add_values->append_datum(10L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray{"Unknown"});
+        calendar_ids->append_datum(kNullDatum);
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        // prepare
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar_prepare(utils->get_fn_ctx(),
+                                                                                     FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result.is_invalid_argument());
+        EXPECT_EQ(result.get_error_msg(), "[prepare] Calendar specification column is malformed.");
+    }
+    // NULL in Calendar json string array
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto add_values = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+        add_values->append_datum(10L);
+        time_units->append_datum("HOURS");
+        calendars->append_datum(DatumArray{kNullDatum});
+        calendar_ids->append_datum(kNullDatum);
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+        // prepare
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar_prepare(utils->get_fn_ctx(),
+                                                                                     FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result.is_invalid_argument());
+        EXPECT_EQ(result.get_error_msg(), "[prepare] Calendar array can not contain null values.");
+    }
+}
+
 TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_invalid_input) {
     {
         auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);

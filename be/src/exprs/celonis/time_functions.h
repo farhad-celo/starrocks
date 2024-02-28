@@ -85,6 +85,9 @@ public:
 
     static Status timeunits_between_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
+    static Status add_timeunits_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status add_timeunits_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
 
 } // namespace starrocks
