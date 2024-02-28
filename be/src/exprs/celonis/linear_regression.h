@@ -7,10 +7,10 @@ namespace starrocks {
 class CelonisLinearRegression {
 public:
     /**
-     * @param: [input_x, model]
-     * @paramType columns: [DOUBLE, VARCHAR]
+     * @param: [x, model]
+     * @paramType columns: [ARRAY_DOUBLE, VARCHAR]
      * @return: DOUBLE
-     * A valid model should be in format: "intercept:slope".
+     * A valid model should be in format: "intercept:coefficient_1:coefficient_2,...,coefficient_n".
      */
     DEFINE_VECTORIZED_FN(predict_linear_regression);
 
