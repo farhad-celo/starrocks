@@ -500,8 +500,17 @@ static bool match_helper(const std::string& input, const std::string& pattern, i
     return false;
 }
 
+bool contains_wildcard(const std::string& pattern) {
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        if ((pattern[i] == '%' || pattern[i] == '_') && (i == 0 || pattern[i - 1] != '\\')) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool string_match(const std::string& input, const std::string& pattern) {
-    bool has_wildcard = pattern.find_first_of("%_") != std::string::npos;
+    const bool has_wildcard = contains_wildcard(pattern);
     bool case_insensitive = !has_wildcard;
     std::string modified_pattern = has_wildcard ? pattern : "%" + pattern + "%";
     return match_helper(input, modified_pattern, 0, 0, case_insensitive);

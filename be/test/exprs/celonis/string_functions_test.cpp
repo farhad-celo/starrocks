@@ -567,6 +567,19 @@ TEST_F(CelonisStringFunctionsTest, in_like_normal_cases) {
         EXPECT_EQ(1L, result->get(5).get_int64());
         EXPECT_EQ(1L, result->get(6).get_int64());
     }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        input_strings->append_datum("%BCD");
+        input_strings->append_datum("_A");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            patterns->append_datum(DatumArray{"\\%b", "\\_a"});
+        }
+        const auto result = CelonisStringFunctions::in_like(nullptr, {input_strings, patterns}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+    }
 }
 
 TEST_F(CelonisStringFunctionsTest, in_like_empty_input) {
