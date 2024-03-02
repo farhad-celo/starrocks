@@ -76,8 +76,12 @@ public:
         ranges[1] = std::make_pair(boundaries[0], boundaries[1]);
         ranges[2] = std::make_pair(boundaries[2], boundaries[3]);
         ranges[3] = std::make_pair(boundaries[4], boundaries[5]);
+        bool must_be_empty = false;
         for (int i = 1; i <= 3; ++i) {
-            if (ranges[i].first > ranges[i].second) {
+            if (!must_be_empty && ranges[i].first > ranges[i].second) {
+                must_be_empty = true;
+            }
+            if (must_be_empty && ranges[i].first <= ranges[i].second) {
                 return std::nullopt;
             }
         }

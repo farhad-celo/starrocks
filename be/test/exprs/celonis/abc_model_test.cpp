@@ -109,6 +109,7 @@ TEST_F(CelonisAbcModelTest, invalid_models) {
     AddRow(10L, 7L, "7,10,5,6,1,4:5,0.2,0.4,0.4:0.3");
     AddRow(10L, 8L, "7,10,5,6,1,4:5,0.2,0.4,1.2");
     AddRow(10L, 8L, "7.0,10,5,6,1,4:");
+    AddRow(10L, 8L, "7,10,7,6,1,4:");
     const auto result = Run<LT>().value();
     EXPECT_EQ(value_column_->size(), result->size());
     for (auto i = 0; i < result->size(); ++i) {
@@ -130,6 +131,28 @@ TEST_F(CelonisAbcModelTest, bigint_input_with_valid_const_model) {
     EXPECT_EQ(3, result->get(1).get_int32());
     EXPECT_EQ(3, result->get(2).get_int32());
     EXPECT_EQ(3, result->get(3).get_int32());
+    EXPECT_EQ(2, result->get(4).get_int32());
+    EXPECT_EQ(2, result->get(5).get_int32());
+    EXPECT_EQ(1, result->get(6).get_int32());
+    EXPECT_EQ(1, result->get(7).get_int32());
+    EXPECT_EQ(1, result->get(8).get_int32());
+    EXPECT_EQ(1, result->get(9).get_int32());
+}
+
+TEST_F(CelonisAbcModelTest, bigint_input_const_model_with_empty_ranges) {
+    const LogicalType LT = TYPE_BIGINT;
+    Prepare<LT>();
+
+    for (int64_t v = 1; v <= 10; ++v) {
+        value_column_->append_datum(v);
+        pk_hash_column_->append_datum(v);
+    }
+    const auto result = RunConstantModel<LT>("7,10,5,6,0,-1:").value();
+    ASSERT_EQ(value_column_->size(), result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
+    EXPECT_TRUE(result->get(2).is_null());
+    EXPECT_TRUE(result->get(3).is_null());
     EXPECT_EQ(2, result->get(4).get_int32());
     EXPECT_EQ(2, result->get(5).get_int32());
     EXPECT_EQ(1, result->get(6).get_int32());
