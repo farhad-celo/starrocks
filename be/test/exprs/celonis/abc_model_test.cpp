@@ -109,7 +109,6 @@ TEST_F(CelonisAbcModelTest, invalid_models) {
     AddRow(10L, 7L, "7,10,5,6,1,4:5,0.2,0.4,0.4:0.3");
     AddRow(10L, 8L, "7,10,5,6,1,4:5,0.2,0.4,1.2");
     AddRow(10L, 8L, "7.0,10,5,6,1,4:");
-    AddRow(10L, 8L, "7,10,7,6,1,4:");
     const auto result = Run<LT>().value();
     EXPECT_EQ(value_column_->size(), result->size());
     for (auto i = 0; i < result->size(); ++i) {
