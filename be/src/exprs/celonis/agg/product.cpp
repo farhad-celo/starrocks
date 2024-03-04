@@ -45,11 +45,10 @@ void write_serialized_chunk(const ColumnPtr& src, ColumnPtr& dst, const size_t c
 
     /* Get the raw data of the struct column fields and resize them to chunk size. */
     StructColumn& dst_struct_column{down_cast<StructColumn&>(*dst_data_column)};
+    dst_struct_column.resize(chunk_size);
     auto&& [dst_stage_column, dst_product_column]{deconstruct<T>(dst_struct_column)};
     Buffer<RawStageType>& dst_stage_column_data{dst_stage_column.get_data()};
     auto& dst_product_column_data{dst_product_column.get_data()};
-    dst_stage_column_data.resize(chunk_size);
-    dst_product_column_data.resize(chunk_size);
 
     /* If dst ist nullable, we also need to write null flags. */
     if (dst.get()->is_nullable()) {
