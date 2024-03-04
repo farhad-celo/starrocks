@@ -8,6 +8,7 @@ on:
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.1-cs
+  BRANCH_3_2: branch-3.2
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 permissions:
@@ -27,11 +28,23 @@ jobs:
           git remote add upstream https://github.com/StarRocks/starrocks.git
         continue-on-error: true
 
-      - name: Fetch upstream and push
+      - name: Fetch upstream ${LATEST_UPSTREAM_BRANCH}
         run: |
           git remote -v
           git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
           git push origin ${LATEST_UPSTREAM_BRANCH}
+        continue-on-error: true
+
+      - name: Fetch upstream main
+        run: |
+          git remote -v
           git fetch upstream main:main
           git push origin main
+        continue-on-error: true
 
+      - name: Fetch upstream ${BRANCH_3_2}
+        run: |
+          git remote -v
+          git fetch upstream ${BRANCH_3_2}:${BRANCH_3_2}
+          git push origin ${BRANCH_3_2}
+        continue-on-error: true
