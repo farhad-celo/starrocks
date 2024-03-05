@@ -148,6 +148,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/enumerate_node_paths_test.cpp
         ./exprs/celonis/agg/histogram_boundaries_test.cpp
         ./exprs/celonis/agg/inductive_miner_test.cpp
+        ./exprs/celonis/agg/multi_linear_regression_test.cpp
         ./exprs/celonis/agg/product_test.cpp
         ./exprs/celonis/agg/sorted_first_last_test.cpp
         ./exprs/celonis/agg/trimmed_mean_test.cpp

@@ -320,6 +320,7 @@ public class FunctionSet {
     public static final String CELONIS_MAKE_WORKDAY_CALENDAR = "celonis_make_workday_calendar";
     public static final String CELONIS_BUILD_ABC_MODEL = "celonis_build_abc_model";
     public static final String CELONIS_BUILD_LINEAR_REGRESSION_MODEL = "celonis_build_linear_regression_model";
+    public static final String CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL = "celonis_build_multi_linear_regression_model";
 
     // Bitmap functions:
     public static final String BITMAP_AND = "bitmap_and";
@@ -1106,6 +1107,15 @@ public class FunctionSet {
     }
 
     private void initCelonisAggregateBuiltins() {
+        // celonis_build_multi_linear_regression_model (bigint)
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL,
+                    Lists.newArrayList(Type.BIGINT, Type.BIGINT), Type.VARCHAR, Type.VARBINARY,
+                    true, false, true));
+        // celonis_build_multi_linear_regression_model (double)
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL,
+                    Lists.newArrayList(Type.DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.VARBINARY,
+                    true, false, true));
+
         // celonis_build_abc_model (bigint)
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_ABC_MODEL,
                     Lists.newArrayList(Type.BIGINT, Type.BIGINT, Type.DOUBLE, Type.DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.VARBINARY,

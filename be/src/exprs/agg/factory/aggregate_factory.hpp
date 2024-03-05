@@ -61,6 +61,7 @@
 #include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/celonis/agg/inductive_miner.h"
 #include "exprs/celonis/agg/linear_regression.h"
+#include "exprs/celonis/agg/multi_linear_regression.h"
 #include "exprs/celonis/agg/product.h"
 #include "exprs/celonis/agg/sorted_first_last.h"
 #include "exprs/celonis/agg/trimmed_mean.h"
@@ -228,6 +229,9 @@ public:
     static AggregateFunctionPtr MakeCelonisInductiveMinerAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisBuildLinearRegressionModelAggregateFunction();
+
+    template <LogicalType LT>
+    static AggregateFunctionPtr MakeCelonisBuildMultiLinearRegressionModelAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisMakeFactoryCalendarAggregateFunction();
 
@@ -469,6 +473,11 @@ AggregateFunctionPtr AggregateFactory::MakeHllRawAggregateFunction() {
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeCelonisBuildAbcModelAggregateFunction() {
     return std::make_shared<CelonisAbcModelAggregationFunction<LT>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisBuildMultiLinearRegressionModelAggregateFunction() {
+    return std::make_shared<CelonisMultiLinearRegressionModelAggregationFunction<LT>>();
 }
 
 template <LogicalType LT>
