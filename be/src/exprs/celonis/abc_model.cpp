@@ -26,7 +26,7 @@ template<LogicalType LT>
 class AbcModel {
     using CppType = RunTimeCppType<LT>;
 public:
-    int label(CppType x, int64_t pk_hash) const {
+    int64_t label(CppType x, int64_t pk_hash) const {
         for (int label = 1; label <= 3; ++label) {
             CppType low = ranges_[label].first;
             CppType high = ranges_[label].second;
@@ -181,7 +181,7 @@ CelonisAbcModel<LT>::apply_abc_model_non_constant_model([[maybe_unused]]Function
     ColumnViewer pk_hash_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
     ColumnViewer model_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     const size_t num_rows = columns[0]->size();
-    ColumnBuilder<TYPE_INT> result(num_rows);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     for (int row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row)) {
             result.append_null();
@@ -211,7 +211,7 @@ StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_constant_model([[maybe_
             context->get_function_state(FunctionContext::THREAD_LOCAL));
 
     const size_t num_rows = columns[0]->size();
-    ColumnBuilder<TYPE_INT> result(num_rows);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     for (int row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || !state->model.has_value()) {
             result.append_null();

@@ -1514,8 +1514,8 @@ celostar_functions = [
     [5000103, 'celonis_square', True, False, 'DOUBLE', ['DOUBLE'], 'CelonisMathFunctions<TYPE_DOUBLE>::square'],
     [5000200, 'celonis_qnorm', True, False, 'DOUBLE', ['DOUBLE'], 'CelonisQnorm::qnorm'],
     [5000300, 'celonis_predict_linear_regression', True, False, 'DOUBLE', ['ARRAY_DOUBLE', 'VARCHAR'], 'CelonisLinearRegression::predict_linear_regression', 'CelonisLinearRegression::predict_prepare', 'CelonisLinearRegression::predict_close'],
-    [5000401, 'celonis_apply_abc_model', True, False, 'INT', ['BIGINT', 'BIGINT', 'VARCHAR'], 'CelonisAbcModel<TYPE_BIGINT>::apply_abc_model', 'CelonisAbcModel<TYPE_BIGINT>::prepare', 'CelonisAbcModel<TYPE_BIGINT>::close'],
-    [5000402, 'celonis_apply_abc_model', True, False, 'INT', ['DOUBLE', 'BIGINT', 'VARCHAR'], 'CelonisAbcModel<TYPE_DOUBLE>::apply_abc_model', 'CelonisAbcModel<TYPE_DOUBLE>::prepare', 'CelonisAbcModel<TYPE_DOUBLE>::close'],
+    [5000401, 'celonis_apply_abc_model', True, False, 'BIGINT', ['BIGINT', 'BIGINT', 'VARCHAR'], 'CelonisAbcModel<TYPE_BIGINT>::apply_abc_model', 'CelonisAbcModel<TYPE_BIGINT>::prepare', 'CelonisAbcModel<TYPE_BIGINT>::close'],
+    [5000402, 'celonis_apply_abc_model', True, False, 'BIGINT', ['DOUBLE', 'BIGINT', 'VARCHAR'], 'CelonisAbcModel<TYPE_DOUBLE>::apply_abc_model', 'CelonisAbcModel<TYPE_DOUBLE>::prepare', 'CelonisAbcModel<TYPE_DOUBLE>::close'],
 ]
 
 vectorized_functions.extend(celostar_functions)

@@ -3,7 +3,6 @@
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
-#include "util.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -87,14 +86,14 @@ TEST_F(CelonisAbcModelTest, null_input) {
     AddRow(1L, 5L, "7,10,5,6,1,4:");
     const auto result = Run<LT>().value();
     EXPECT_EQ(value_column_->size(), result->size());
-    EXPECT_EQ(1L, result->get(0).get_int32());
+    EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_TRUE(result->get(1).is_null());
     EXPECT_TRUE(result->get(2).is_null());
     EXPECT_TRUE(result->get(3).is_null());
     EXPECT_TRUE(result->get(4).is_null());
     EXPECT_TRUE(result->get(5).is_null());
     EXPECT_TRUE(result->get(6).is_null());
-    EXPECT_EQ(3L, result->get(7).get_int32());
+    EXPECT_EQ(3L, result->get(7).get_int64());
 }
 
 TEST_F(CelonisAbcModelTest, invalid_models) {
@@ -126,16 +125,16 @@ TEST_F(CelonisAbcModelTest, bigint_input_with_valid_const_model) {
     }
     const auto result = RunConstantModel<LT>("7,10,5,6,1,4:").value();
     ASSERT_EQ(value_column_->size(), result->size());
-    EXPECT_EQ(3, result->get(0).get_int32());
-    EXPECT_EQ(3, result->get(1).get_int32());
-    EXPECT_EQ(3, result->get(2).get_int32());
-    EXPECT_EQ(3, result->get(3).get_int32());
-    EXPECT_EQ(2, result->get(4).get_int32());
-    EXPECT_EQ(2, result->get(5).get_int32());
-    EXPECT_EQ(1, result->get(6).get_int32());
-    EXPECT_EQ(1, result->get(7).get_int32());
-    EXPECT_EQ(1, result->get(8).get_int32());
-    EXPECT_EQ(1, result->get(9).get_int32());
+    EXPECT_EQ(3L, result->get(0).get_int64());
+    EXPECT_EQ(3L, result->get(1).get_int64());
+    EXPECT_EQ(3L, result->get(2).get_int64());
+    EXPECT_EQ(3L, result->get(3).get_int64());
+    EXPECT_EQ(2L, result->get(4).get_int64());
+    EXPECT_EQ(2L, result->get(5).get_int64());
+    EXPECT_EQ(1L, result->get(6).get_int64());
+    EXPECT_EQ(1L, result->get(7).get_int64());
+    EXPECT_EQ(1L, result->get(8).get_int64());
+    EXPECT_EQ(1L, result->get(9).get_int64());
 }
 
 TEST_F(CelonisAbcModelTest, bigint_input_const_model_with_empty_ranges) {
@@ -152,12 +151,12 @@ TEST_F(CelonisAbcModelTest, bigint_input_const_model_with_empty_ranges) {
     EXPECT_TRUE(result->get(1).is_null());
     EXPECT_TRUE(result->get(2).is_null());
     EXPECT_TRUE(result->get(3).is_null());
-    EXPECT_EQ(2, result->get(4).get_int32());
-    EXPECT_EQ(2, result->get(5).get_int32());
-    EXPECT_EQ(1, result->get(6).get_int32());
-    EXPECT_EQ(1, result->get(7).get_int32());
-    EXPECT_EQ(1, result->get(8).get_int32());
-    EXPECT_EQ(1, result->get(9).get_int32());
+    EXPECT_EQ(2L, result->get(4).get_int64());
+    EXPECT_EQ(2L, result->get(5).get_int64());
+    EXPECT_EQ(1L, result->get(6).get_int64());
+    EXPECT_EQ(1L, result->get(7).get_int64());
+    EXPECT_EQ(1L, result->get(8).get_int64());
+    EXPECT_EQ(1L, result->get(9).get_int64());
 }
 
 TEST_F(CelonisAbcModelTest, bigint_input_with_valid_const_model_using_probs) {
@@ -187,16 +186,16 @@ TEST_F(CelonisAbcModelTest, bigint_input_with_valid_const_model_using_probs) {
 
     const auto result = RunConstantModel<LT>("7,10,5,7,3,5:7,0.5,0.5,0.0;5,0.0,0.5,0.5").value();
     ASSERT_EQ(value_column_->size(), result->size());
-    EXPECT_EQ(1, result->get(0).get_int32());
-    EXPECT_EQ(1, result->get(1).get_int32());
-    EXPECT_EQ(2, result->get(2).get_int32());
-    EXPECT_EQ(3, result->get(3).get_int32());
-    EXPECT_EQ(2, result->get(4).get_int32());
-    EXPECT_EQ(3, result->get(5).get_int32());
-    EXPECT_EQ(2, result->get(6).get_int32());
-    EXPECT_EQ(3, result->get(7).get_int32());
-    EXPECT_EQ(3, result->get(8).get_int32());
-    EXPECT_EQ(3, result->get(9).get_int32());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(2L, result->get(2).get_int64());
+    EXPECT_EQ(3L, result->get(3).get_int64());
+    EXPECT_EQ(2L, result->get(4).get_int64());
+    EXPECT_EQ(3L, result->get(5).get_int64());
+    EXPECT_EQ(2L, result->get(6).get_int64());
+    EXPECT_EQ(3L, result->get(7).get_int64());
+    EXPECT_EQ(3L, result->get(8).get_int64());
+    EXPECT_EQ(3L, result->get(9).get_int64());
 }
 
 TEST_F(CelonisAbcModelTest, bigint_input_with_invalid_const_model) {
@@ -225,11 +224,11 @@ TEST_F(CelonisAbcModelTest, bigint_input_with_nonconst_model) {
     AddRow(5L, 4L, "7,10,5,6,1,4:");
     const auto result = Run<LT>().value();
     ASSERT_EQ(value_column_->size(), result->size());
-    EXPECT_EQ(3, result->get(0).get_int32());
+    EXPECT_EQ(3L, result->get(0).get_int64());
     EXPECT_TRUE(result->get(1).is_null());
-    EXPECT_EQ(1, result->get(2).get_int32());
+    EXPECT_EQ(1L, result->get(2).get_int64());
     EXPECT_TRUE(result->get(3).is_null());
-    EXPECT_EQ(2, result->get(4).get_int32());
+    EXPECT_EQ(2L, result->get(4).get_int64());
 }
 
 TEST_F(CelonisAbcModelTest, double_input_with_valid_const_model) {
@@ -242,16 +241,16 @@ TEST_F(CelonisAbcModelTest, double_input_with_valid_const_model) {
     }
     const auto result = RunConstantModel<LT>("7.5,10.5,5.5,6.5,1.5,4.5:").value();
     ASSERT_EQ(value_column_->size(), result->size());
-    EXPECT_EQ(3, result->get(0).get_int32());
-    EXPECT_EQ(3, result->get(1).get_int32());
-    EXPECT_EQ(3, result->get(2).get_int32());
-    EXPECT_EQ(3, result->get(3).get_int32());
-    EXPECT_EQ(2, result->get(4).get_int32());
-    EXPECT_EQ(2, result->get(5).get_int32());
-    EXPECT_EQ(1, result->get(6).get_int32());
-    EXPECT_EQ(1, result->get(7).get_int32());
-    EXPECT_EQ(1, result->get(8).get_int32());
-    EXPECT_EQ(1, result->get(9).get_int32());
+    EXPECT_EQ(3L, result->get(0).get_int64());
+    EXPECT_EQ(3L, result->get(1).get_int64());
+    EXPECT_EQ(3L, result->get(2).get_int64());
+    EXPECT_EQ(3L, result->get(3).get_int64());
+    EXPECT_EQ(2L, result->get(4).get_int64());
+    EXPECT_EQ(2L, result->get(5).get_int64());
+    EXPECT_EQ(1L, result->get(6).get_int64());
+    EXPECT_EQ(1L, result->get(7).get_int64());
+    EXPECT_EQ(1L, result->get(8).get_int64());
+    EXPECT_EQ(1L, result->get(9).get_int64());
 }
 
 TEST_F(CelonisAbcModelTest, double_input_with_valid_const_model_using_probs) {
@@ -281,16 +280,16 @@ TEST_F(CelonisAbcModelTest, double_input_with_valid_const_model_using_probs) {
 
     const auto result = RunConstantModel<LT>("7.5,10.5,5.5,7.5,3.5,5.5:7.5,0.5,0.5,0.0;5.5,0.0,0.5,0.5").value();
     ASSERT_EQ(value_column_->size(), result->size());
-    EXPECT_EQ(1, result->get(0).get_int32());
-    EXPECT_EQ(1, result->get(1).get_int32());
-    EXPECT_EQ(2, result->get(2).get_int32());
-    EXPECT_EQ(3, result->get(3).get_int32());
-    EXPECT_EQ(2, result->get(4).get_int32());
-    EXPECT_EQ(3, result->get(5).get_int32());
-    EXPECT_EQ(2, result->get(6).get_int32());
-    EXPECT_EQ(3, result->get(7).get_int32());
-    EXPECT_EQ(3, result->get(8).get_int32());
-    EXPECT_EQ(3, result->get(9).get_int32());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(2L, result->get(2).get_int64());
+    EXPECT_EQ(3L, result->get(3).get_int64());
+    EXPECT_EQ(2L, result->get(4).get_int64());
+    EXPECT_EQ(3L, result->get(5).get_int64());
+    EXPECT_EQ(2L, result->get(6).get_int64());
+    EXPECT_EQ(3L, result->get(7).get_int64());
+    EXPECT_EQ(3L, result->get(8).get_int64());
+    EXPECT_EQ(3L, result->get(9).get_int64());
 }
 
 TEST_F(CelonisAbcModelTest, double_input_with_nonconst_model) {
@@ -304,11 +303,11 @@ TEST_F(CelonisAbcModelTest, double_input_with_nonconst_model) {
     AddRow(15.5, 5L, "7,10,5,6,1,4:");
     const auto result = Run<LT>().value();
     ASSERT_EQ(value_column_->size(), result->size());
-    EXPECT_EQ(3, result->get(0).get_int32());
+    EXPECT_EQ(3L, result->get(0).get_int64());
     EXPECT_TRUE(result->get(1).is_null());
-    EXPECT_EQ(1, result->get(2).get_int32());
+    EXPECT_EQ(1L, result->get(2).get_int64());
     EXPECT_TRUE(result->get(3).is_null());
-    EXPECT_EQ(2, result->get(4).get_int32());
+    EXPECT_EQ(2L, result->get(4).get_int64());
     EXPECT_TRUE(result->get(5).is_null());
 }
 

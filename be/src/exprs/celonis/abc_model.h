@@ -10,7 +10,7 @@ public:
     /**
      * @param: [input_value, pk_hash, model]
      * @paramType columns: [ BIGINT | DOUBLE, BIGINT, VARCHAR]
-     * @return: INT
+     * @return: BIGINT
      */
     DEFINE_VECTORIZED_FN(apply_abc_model);
 
