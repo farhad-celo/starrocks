@@ -28,7 +28,7 @@ jobs:
           git remote add upstream https://github.com/StarRocks/starrocks.git
         continue-on-error: true
 
-      - name: Fetch upstream ${LATEST_UPSTREAM_BRANCH}
+      - name: Fetch upstream ${{env.LATEST_UPSTREAM_BRANCH}}
         run: |
           git remote -v
           git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
@@ -42,7 +42,7 @@ jobs:
           git push origin main
         continue-on-error: true
 
-      - name: Fetch upstream ${BRANCH_3_2}
+      - name: Fetch upstream ${{env.BRANCH_3_2}}
         run: |
           git remote -v
           git fetch upstream ${BRANCH_3_2}:${BRANCH_3_2}
