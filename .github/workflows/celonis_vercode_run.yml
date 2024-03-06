@@ -1,0 +1,69 @@
+name: Run Veracode
+
+on:
+  schedule:
+    - cron:  '0 8 * * *' # At 1 AM (Pacific time)
+  workflow_dispatch:
+    inputs:
+      executeStaticAnalysis:
+        type: boolean
+        description: "Whether to trigger the Veracode static analysis check"
+        default: 'false'
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+env:
+  GITHUB_USERNAME: ${{ github.repository }}
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-e862a8f9
+
+jobs:
+  # SAST
+  static-analysis:
+    if: ${{ inputs.executeStaticAnalysis || github.event_name == 'schedule' }}
+    runs-on: [self-hosted, celostar]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        env:
+          GITHUB_USERNAME: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+        run: |
+          container_id=$(docker run -d -v `pwd`:/celostar-starrocks \
+          -w `pwd` --env GITHUB_TOKEN=${GITHUB_TOKEN} \
+          --env GITHUB_USERNAME=${GITHUB_USERNAME} \
+          ${BUILDER} \
+          sleep infinity)
+
+          echo "container_id=$container_id" >> $GITHUB_ENV
+          
+          docker exec ${container_id} bash -c "$(cat celonis/docker/veracode/static_analysis.sh)"
+          
+      - name: Determine current date
+        id: current_date_and_time
+        run: |
+          CURRENT_DATE_AND_TIME=$(date --iso-8601=seconds)
+          echo "date_and_time=${CURRENT_DATE_AND_TIME}" >> $GITHUB_OUTPUT
+
+      - name: SAST Scan FE (Static Analysis)
+        uses: veracode/veracode-uploadandscan-action@master
+        id: upload_and_scan
+        with:
+          appname: "${{ github.repository }}"
+          version: "${{ github.run_id }}-${{ steps.current_date_and_time.outputs.date_and_time }}"
+          filepath: "celostar-starrocks-fe.zip"
+          vid: "${{ secrets.VERACODE_API_ID }}"
+          vkey: "${{ secrets.VERACODE_API_SECRET }}"
+          scantimeout: 240
+
+      - name: Clean up
+        run: |
+          rm celostar-starrocks-fe.zip
+          docker container stop ${{ env.container_id }}
+          docker rm ${{ env.container_id }}
+          docker system prune -f
+          docker volume prune -f
+        continue-on-error: true
