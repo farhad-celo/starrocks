@@ -153,15 +153,22 @@ TEST(CelonisProductStateMerge, product_state_merge_overflowed_with_uninitialized
 }
 
 template <typename T>
-StructColumn::Ptr create_serialization_column() {
-    return StructColumn::create(Columns{ProductAggregateState<T>::StageFieldcolumnType::create(),
-                                        ProductAggregateState<T>::ProductFieldColumnType::create()});
+NullableColumn::Ptr create_serialization_column() {
+    auto stage_field_data_col{ProductAggregateState<T>::StageFieldcolumnType::create()};
+    auto product_field_data_col{ProductAggregateState<T>::ProductFieldColumnType::create()};
+    NullableColumn::Ptr stage_field_col{NullableColumn::create(std::move(stage_field_data_col), NullColumn::create())};
+    NullableColumn::Ptr product_field_col{
+            NullableColumn::create(std::move(product_field_data_col), NullColumn::create())};
+    StructColumn::Ptr struct_col{StructColumn::create(Columns{std::move(stage_field_col), std::move(product_field_col)},
+                                                      std::vector<std::string>{"Stage", "Product"})};
+    return NullableColumn::create(std::move(struct_col), NullColumn::create());
 }
 
 template <typename T>
 void verify_serialization_deserialization(const ProductAggregateState<T>& state) {
     static_assert(std::is_same_v<T, integer_t> || std::is_same_v<T, floating_point_t>);
-    auto struct_column{create_serialization_column<T>()};
+    auto serialization_column{create_serialization_column<T>()};
+    auto* struct_column{down_cast<StructColumn*>(ColumnHelper::get_data_column(serialization_column.get()))};
     state.append_to_struct_column(*struct_column);
     auto deserialized_state{ProductAggregateState<T>::read_from_struct_column(*struct_column, 0)};
     ASSERT_EQ(state.get_stage(), deserialized_state.get_stage());
@@ -252,7 +259,7 @@ public:
     }
 
     std::optional<RunTimeCppType> compute_product() {
-        StructColumn::Ptr serialization_column{create_serialization_column<RunTimeCppType>()};
+        NullableColumn::Ptr serialization_column{create_serialization_column<RunTimeCppType>()};
         auto result_column{NullableColumn::create(RunTimeColumnType<LOGICAL_TYPE>::create(), NullColumn::create())};
         if (managed_states.empty()) {
             return std::nullopt;
@@ -260,6 +267,7 @@ public:
         for (size_t i{1}; i < managed_states.size(); i++) {
             aggregate_func->serialize_to_column(local_ctx.get(), managed_states[i]->state(),
                                                 serialization_column.get());
+            serialization_column->check_or_die();
         }
 
         for (size_t i{0}; i < managed_states.size() - 1; i++) {
@@ -267,6 +275,7 @@ public:
         }
 
         aggregate_func->finalize_to_column(local_ctx.get(), managed_states.front()->state(), result_column.get());
+        result_column->check_or_die();
 
         if (result_column->is_null(0)) {
             return std::nullopt;
@@ -370,9 +379,13 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format) {
     this->aggregate_func->convert_to_serialize_format(this->local_ctx.get(), {input_column}, 4,
                                                       &serialization_column_abstract);
 
-    auto* serialized_stage_column{
-            down_cast<FixedLengthColumn<RawStageFieldType>*>(serialization_column->fields_column()[0].get())};
-    auto* serialized_product_column{down_cast<FixedLengthColumn<T>*>(serialization_column->fields_column()[1].get())};
+    serialization_column->check_or_die();
+
+    auto* serialized_struct_column{down_cast<StructColumn*>(ColumnHelper::get_data_column(serialization_column.get()))};
+    auto* serialized_stage_column{down_cast<FixedLengthColumn<RawStageFieldType>*>(
+            ColumnHelper::get_data_column(serialized_struct_column->fields_column()[0].get()))};
+    auto* serialized_product_column{down_cast<FixedLengthColumn<T>*>(
+            ColumnHelper::get_data_column(serialized_struct_column->fields_column()[1].get()))};
     std::vector<RawStageFieldType>& serialized_stage_data{serialized_stage_column->get_data()};
     std::vector<T>& serialized_product_data{serialized_product_column->get_data()};
 

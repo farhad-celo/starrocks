@@ -19,6 +19,7 @@ std::pair<StageFieldColumnType<T>&, ProductFieldColumnType<T>&> deconstruct(Stru
     DCHECK_EQ(field_columns.size(), 2);
     Column* uncasted_stage_column{ColumnHelper::get_data_column(field_columns[0].get())};
     Column* uncasted_product_column{ColumnHelper::get_data_column(field_columns[1].get())};
+
     auto& stage_column{down_cast<StageFieldColumnType<T>&>(*uncasted_stage_column)};
     auto& product_column{down_cast<ProductFieldColumnType<T>&>(*uncasted_product_column)};
     return {stage_column, product_column};
@@ -135,10 +136,10 @@ void ProductAggregateState<T>::merge(const ProductAggregateState& other) {
 
 template <typename T>
 void ProductAggregateState<T>::append_to_struct_column(StructColumn& column) const {
-    auto&& [stage_column, product_column]{deconstruct<T>(column)};
+    auto stage_val{static_cast<typename StageFieldColumnType<T>::ValueType>(stage_)};
+    auto product_val{product_};
 
-    stage_column.append(static_cast<typename StageFieldColumnType<T>::ValueType>(stage_));
-    product_column.append(product_);
+    column.append_datum(DatumStruct{Datum{stage_val}, Datum{product_val}});
 }
 
 template <typename T>
