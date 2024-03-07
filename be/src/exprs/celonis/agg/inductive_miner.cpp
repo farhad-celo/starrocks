@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <execution>
 
-#include "column/column_helper.h"
 #include "exprs/celonis/modules/operators/process/inductive_miner/inductive_miner_helper.h"
 #include "exprs/celonis/result_table.h"
 #include "rapidjson/document.h"
@@ -115,12 +114,7 @@ std::string InductiveMinerFinalizer::finalize() {
     // Matches activity ids and variant order to Saola.
     const auto& [activities, variants] = sort_activities_and_variants(activity_map_, variant_map_);
 
-    double imfd_frequency_threshold = 0.0;
-    if (ctx_->is_constant_column(2)) {
-        imfd_frequency_threshold = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx_->get_constant_column(2));
-    }
-
-    InductiveMinerHelper helper(variants, imfd_frequency_threshold);
+    InductiveMinerHelper helper(variants, imfd_frequency_threshold_);
     return json_string(activities, helper.vertex_table(), helper.edge_table(), helper.statistics());
 }
 

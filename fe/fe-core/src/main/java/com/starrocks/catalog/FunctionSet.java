@@ -1152,6 +1152,9 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS,
                 Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT), Type.VARCHAR, Type.VARCHAR,
                 false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS,
+                Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT, Type.BIGINT), Type.VARCHAR, Type.VARCHAR,
+                false, false, false));
         // celonis_trimmed_mean
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_TRIMMED_MEAN,
                 Lists.newArrayList(Type.BIGINT, Type.INT, Type.INT), Type.DOUBLE, Type.VARBINARY,

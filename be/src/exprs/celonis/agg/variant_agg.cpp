@@ -35,8 +35,20 @@ std::pair<int32_t, size_t> VariantAggregateState::maybe_add_activity(MemPool* me
     return std::make_pair(index, hash);
 }
 
-size_t VariantAggregateState::update(MemPool* mem_pool, const ArrayColumn& activity_column, size_t row_num,
-                                     int64_t weight) {
+size_t VariantAggregateState::update(FunctionContext* ctx, const Column** columns, size_t row_num) {
+    // Expects columns: [0] variant_column, [1] weight_column
+    // Pass a constant column with value 1 to ignore weight.
+    // NULL and NullableColumn are handled by NullableAggregateFunctionVariadic.
+    int64_t weight = 0;
+    if (!columns[1]->is_constant()) {
+        const auto& w_column = down_cast<const Int64Column&>(*columns[1]);
+        weight = w_column.get(row_num).get_int64();
+    } else {
+        const auto& w_column = down_cast<const ConstColumn&>(*columns[1]);
+        weight = w_column.get(0).get_int64();
+    }
+
+    const ArrayColumn& activity_column = down_cast<const ArrayColumn&>(*columns[0]);
     const UInt32Column::Container& c_offset = activity_column.offsets().get_data();
     const Column* activity_elements = &activity_column.elements();
     const NullableColumn* nc = dynamic_cast<const NullableColumn*>(activity_elements);
@@ -62,7 +74,7 @@ size_t VariantAggregateState::update(MemPool* mem_pool, const ArrayColumn& activ
             // we will consider that a,b form an edge.
             continue;
         }
-        auto idx_hash = maybe_add_activity(mem_pool, b_elements->get_slice(offset), &memory);
+        auto idx_hash = maybe_add_activity(ctx->mem_pool(), b_elements->get_slice(offset), &memory);
         variant.add(idx_hash.first, idx_hash.second);
     }
     // Add the variant into the variant_map.
@@ -206,59 +218,6 @@ std::string VariantAggregateState::debug_string() const {
         ss << it->first.debug_string() << " count " << it->second << "\n";
     }
     return ss.str();
-}
-
-void VariantAggregateFunction::update(FunctionContext* ctx, const Column** columns, AggDataPtr state,
-                                      size_t row_num) const {
-    // Expects columns: [0] variant_column, [1] weight_column
-    // Pass a constant column with value 1 to ignore weight.
-
-    if (columns[0]->is_nullable() && columns[0]->is_null(row_num)) {
-        return;
-    }
-    if (columns[1]->is_nullable() && columns[1]->is_null(row_num)) {
-        return;
-    }
-    int64_t weight = 0;
-    if (!columns[1]->is_constant()) {
-        const auto& w_column = down_cast<const Int64Column&>(*columns[1]);
-        weight = w_column.get(row_num).get_int64();
-    } else {
-        const auto& w_column = down_cast<const ConstColumn&>(*columns[1]);
-        weight = w_column.get(0).get_int64();
-    }
-    const ArrayColumn& activity_column = down_cast<const ArrayColumn&>(*columns[0]);
-    this->data(state).update(ctx->mem_pool(), activity_column, row_num, weight);
-}
-
-void VariantAggregateFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,
-                                     size_t row_num) const {
-    // merge internal state with column[row_num]
-    // the column type is binary
-    DCHECK(column->is_binary());
-    const auto* input_column = down_cast<const BinaryColumn*>(column);
-    Slice slice = input_column->get_slice(row_num);
-    size_t mem_usage = 0;
-    mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size);
-    ctx->add_mem_usage(mem_usage);
-}
-
-void VariantAggregateFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
-                                                   Column* to) const {
-    // append our serialized state to column "to"
-    auto* column = down_cast<BinaryColumn*>(to);
-    size_t old_size = column->get_bytes().size();
-    size_t new_size = old_size + this->data(state).serialized_size();
-    column->get_bytes().resize(new_size);
-    this->data(state).serialize(column->get_bytes().data() + old_size);
-    column->get_offset().emplace_back(new_size);
-}
-
-void VariantAggregateFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
-                                                  Column* to) const {
-    auto finalizer = get_finalizer(ctx, this->data(state));
-    std::string s = finalizer->finalize();
-    down_cast<BinaryColumn*>(to)->append(s);
 }
 
 } // namespace starrocks

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "column/binary_column.h"
+#include "column/const_column.h"
 #include "column/datum.h"
 #include "column/hash_set.h"
 #include "exprs/agg/aggregate.h"
@@ -12,20 +14,20 @@ class VariantAggregateState {
 public:
     VariantAggregateState() = default;
 
-    ~VariantAggregateState() = default;
+    virtual ~VariantAggregateState() = default;
 
     // Adds a variant with weight to the stats.
-    size_t update(MemPool* mem_pool, const ArrayColumn& activity_column, size_t row_num, int64_t weight);
+    virtual size_t update(FunctionContext* ctx, const Column** columns, size_t row_num);
 
     // Returns the total size in bytes required to encode this object.
-    size_t serialized_size() const;
+    virtual size_t serialized_size() const;
 
     // Writes and binary encoded version of the object to dst.
     // The size written will be serialized_size()
-    void serialize(uint8_t* dst) const;
+    virtual void serialize(uint8_t* dst) const;
 
     // Deserializes a VariantAggregateState object and merges it with the current state.
-    size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len);
+    virtual size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len);
 
     const SliceHashMap& activity_map() const { return activity_map_; }
     const VariantHashMap& variant_map() const { return variant_map_; }
@@ -61,13 +63,33 @@ protected:
 
 // Aggregates distinct variants and their counts.
 // A derived class must provide a custom VariantAggregateFinalizer which implements finalize().
-class VariantAggregateFunction : public AggregateFunctionBatchHelper<VariantAggregateState, VariantAggregateFunction> {
+template <typename State>
+class VariantAggregateFunction : public AggregateFunctionBatchHelper<State, VariantAggregateFunction<State>> {
 public:
-    void update(FunctionContext* ctx, const Column** columns, AggDataPtr state, size_t row_num) const final;
+    void update(FunctionContext* ctx, const Column** columns, AggDataPtr state, size_t row_num) const final {
+        this->data(state).update(ctx, columns, row_num);
+    }
 
-    void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const final;
+    void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const final {
+        // merge internal state with column[row_num]
+        // the column type is binary
+        DCHECK(column->is_binary());
+        const auto* input_column = down_cast<const BinaryColumn*>(column);
+        Slice slice = input_column->get_slice(row_num);
+        size_t mem_usage = 0;
+        mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size);
+        ctx->add_mem_usage(mem_usage);
+    }
 
-    void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const final;
+    void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const final {
+        // append our serialized state to column "to"
+        auto* column = down_cast<BinaryColumn*>(to);
+        size_t old_size = column->get_bytes().size();
+        size_t new_size = old_size + this->data(state).serialized_size();
+        column->get_bytes().resize(new_size);
+        this->data(state).serialize(column->get_bytes().data() + old_size);
+        column->get_offset().emplace_back(new_size);
+    }
 
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const final {
@@ -75,11 +97,15 @@ public:
         throw std::runtime_error("variant aggregate: convert_to_serialize_format not supported");
     }
 
-    void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const final;
+    void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const final {
+        auto finalizer = get_finalizer(ctx, this->data(state));
+        std::string s = finalizer->finalize();
+        down_cast<BinaryColumn*>(to)->append(s);
+    }
 
     // Returns a VariantAggregateFinalizer instance.
     virtual std::unique_ptr<VariantAggregateFinalizer> get_finalizer(FunctionContext* ctx,
-                                                                     const VariantAggregateState& state) const = 0;
+                                                                     const State& state) const = 0;
 };
 
 } // namespace starrocks

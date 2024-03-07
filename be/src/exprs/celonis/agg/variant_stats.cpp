@@ -1,5 +1,6 @@
 #include "variant_stats.h"
 
+#include "column/column_helper.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
@@ -218,8 +219,9 @@ std::string VariantStatsFinalizer::finalize() {
     std::vector<VList> activity_top_variants;
     std::vector<size_t> a_lastseen(activity_map_.size());
     std::map<std::pair<int32_t, int32_t>, std::pair<int32_t, int32_t>> edge_stats;
+    EdgeHashSet e_seen;
     for (const auto& [variant, count] : variant_map_) {
-        EdgeHashSet e_seen;
+        e_seen.clear();
         for (int i = 0; i < variant.data.size(); i++) {
             auto activity_id = variant.data[i];
             ActivityStats& a_stats = activity_stats_[activity_id];
@@ -236,7 +238,14 @@ std::string VariantStatsFinalizer::finalize() {
             }
             if (i > 0) {
                 Edge e(variant.data[i - 1], activity_id);
-                auto& e_stats = edge_map_[e];
+                auto it = edge_map_.find(e);
+                if (it == edge_map_.end()) {
+                    if (edge_count_ >= 0 && edge_map_.size() == edge_count_) {
+                        continue;
+                    }
+                    it = edge_map_.insert({e, EdgeStats{}}).first;
+                }
+                auto& e_stats = it->second;
                 e_stats.count += count;
                 auto e_it = e_seen.find(e, e.hash);
                 if (e_it == e_seen.end()) {

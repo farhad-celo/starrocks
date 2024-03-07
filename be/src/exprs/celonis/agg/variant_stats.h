@@ -1,5 +1,6 @@
 #pragma once
 
+#include "column/column_helper.h"
 #include "column/hash_set.h"
 #include "exprs/function_context.h"
 #include "rapidjson/document.h"
@@ -7,6 +8,45 @@
 #include "variant_agg.h"
 
 namespace starrocks {
+
+class VariantStatsState : public VariantAggregateState {
+public:
+    VariantStatsState() : VariantAggregateState() {}
+    ~VariantStatsState() {}
+
+    size_t update(FunctionContext* ctx, const Column** columns, size_t row_num) override {
+        if (ctx->is_notnull_constant_column(2)) {
+            // As of 2023-12-20, _const_columns in merge is not aligned with _arg_types. So we pass all consts from
+            // update() through serialization.
+            edge_count_ = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
+        }
+        return VariantAggregateState::update(ctx, columns, row_num);
+    }
+
+    size_t serialized_size() const override {
+        size_t result = sizeof(int64_t);
+        result += VariantAggregateState::serialized_size();
+        return result;
+    };
+
+    void serialize(uint8_t* dst) const override {
+        memcpy(dst, &edge_count_, sizeof(int64_t));
+        dst += sizeof(int64_t);
+        VariantAggregateState::serialize(dst);
+    }
+
+    size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len) override {
+        memcpy(&edge_count_, src, sizeof(int64_t));
+        src += sizeof(int64_t);
+        len -= sizeof(int64_t);
+        return VariantAggregateState::deserialize_and_merge(mem_pool, src, len);
+    }
+
+    int64_t edge_count() const { return edge_count_; }
+
+private:
+    int64_t edge_count_ = -1;
+};
 
 // A pair of activities that appear together in a variant.
 struct Edge {
@@ -66,8 +106,9 @@ public:
     using EdgeHashMap = phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
     using EdgeHashSet = phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge>;
 
-    VariantStatsFinalizer(FunctionContext* ctx, const VariantAggregateState& state)
-            : VariantAggregateFinalizer(ctx, state), activity_stats_(activity_map_.size()) {}
+    VariantStatsFinalizer(FunctionContext* ctx, const VariantStatsState& state)
+            : VariantAggregateFinalizer(ctx, static_cast<const VariantAggregateState&>(state)),
+              activity_stats_(activity_map_.size()), edge_count_(state.edge_count()) {}
 
     std::string finalize() override;
 
@@ -89,15 +130,27 @@ private:
 
     std::vector<ActivityStats> activity_stats_;
     EdgeHashMap edge_map_;
+    const int64_t edge_count_;
 };
 
 // Extends VariantAggregateFunction and calculates statistics of activities and edges.
 // TODO(hagonzal): Return json column. Now it returns a string column with json.
 // TODO(hagonzal): add option to compute approximate top-k variants, now it returns exact top-k.
-class VariantStatsAggregateFunction : public VariantAggregateFunction {
+/**
+ * @param: [ input_column, weight_column [, edge_count ] ]
+ * @paramType columns: [ BIGINT, BIGINT [, BIGINT] ]
+ * @return: json string
+ * weight_column : Indicates the frequency of the input(variant)
+ * edge_count (optional) : Limits the size of the edge table
+ *
+ * Used to support PQL EXPLORE_PROCESS and GRAPH
+ * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245719/EXPLORE+PROCESS
+ * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11248519/GRAPH+Query
+ */
+class VariantStatsAggregateFunction : public VariantAggregateFunction<VariantStatsState> {
 public:
     std::unique_ptr<VariantAggregateFinalizer> get_finalizer(FunctionContext* ctx,
-                                                             const VariantAggregateState& state) const override {
+                                                             const VariantStatsState& state) const override {
         return std::make_unique<VariantStatsFinalizer>(ctx, state);
     }
 
