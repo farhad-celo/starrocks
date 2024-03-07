@@ -467,34 +467,67 @@ CelonisStringFunctions::string_to_double(FunctionContext* context, const starroc
     return res.build(ColumnHelper::is_all_const(columns));
 }
 
-static bool match_helper(const std::string& input, const std::string& pattern, int i, int j, bool case_insensitive) {
+std::string to_lower_utf8(const std::string& input) {
+    // Mapping of German characters to their lowercase equivalents
+    std::unordered_map<std::string, std::string> replacements = {
+            {"Ä", "ä"},
+            {"Ö", "ö"},
+            {"Ü", "ü"}
+    };
+
+    std::string output;
+    output.reserve(input.size());
+
+    for (size_t i = 0; i < input.size();) {
+        unsigned char lead = input[i];
+        const auto char_length = UTF8_BYTE_LENGTH_TABLE[lead];
+        bool replaced = false;
+        for (const auto& [upper, lower]: replacements) {
+            if (char_length == upper.size() && input.substr(i, upper.size()) == upper) {
+                output += lower;
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced) {
+            if (char_length == 1 && input[i] >= 'A' && input[i] <= 'Z') {
+                output += std::tolower(static_cast<unsigned char>(input[i]));
+            } else {
+                output += input.substr(i, char_length);
+            }
+        }
+        i += char_length;
+    }
+
+    return output;
+}
+
+static bool match_helper(const std::string& input, const std::string& pattern, int i, int j) {
     if (j == pattern.length()) { // End of pattern
         return i == input.length(); // True if also end of input
     }
 
     // Handling escaped wildcards
     if (pattern[j] == '\\' && j + 1 < pattern.length() && (pattern[j + 1] == '%' || pattern[j + 1] == '_')) {
-        if (i < input.length() && ((case_insensitive && tolower(input[i]) == tolower(pattern[j + 1])) ||
-                                   (!case_insensitive && input[i] == pattern[j + 1]))) {
-            return match_helper(input, pattern, i + 1, j + 2, case_insensitive);
+        if (i < input.length() && input[i] == pattern[j + 1]) {
+            return match_helper(input, pattern, i + 1, j + 2);
         }
         return false;
     }
 
     if (pattern[j] == '%') {
         for (int k = i; k <= input.length(); ++k) {
-            if (match_helper(input, pattern, k, j + 1, case_insensitive)) {
+            if (match_helper(input, pattern, k, j + 1)) {
                 return true;
             }
         }
     } else if (pattern[j] == '_') {
         if (i < input.length()) {
-            return match_helper(input, pattern, i + 1, j + 1, case_insensitive);
+            return match_helper(input, pattern, i + 1, j + 1);
         }
     } else {
-        if (i < input.length() && ((case_insensitive && tolower(input[i]) == tolower(pattern[j])) ||
-                                   (!case_insensitive && input[i] == pattern[j]))) {
-            return match_helper(input, pattern, i + 1, j + 1, case_insensitive);
+        if (i < input.length() && input[i] == pattern[j]) {
+            return match_helper(input, pattern, i + 1, j + 1);
         }
     }
     return false;
@@ -513,7 +546,11 @@ static bool string_match(const std::string& input, const std::string& pattern) {
     const bool has_wildcard = contains_wildcard(pattern);
     bool case_insensitive = !has_wildcard;
     std::string modified_pattern = has_wildcard ? pattern : "%" + pattern + "%";
-    return match_helper(input, modified_pattern, 0, 0, case_insensitive);
+    if (case_insensitive) {
+        return match_helper(to_lower_utf8(input), to_lower_utf8(modified_pattern), 0, 0);
+    } else {
+        return match_helper(input, modified_pattern, 0, 0);
+    }
 }
 
 StatusOr<ColumnPtr>

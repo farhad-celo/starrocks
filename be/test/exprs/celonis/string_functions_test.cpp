@@ -582,6 +582,60 @@ TEST_F(CelonisStringFunctionsTest, in_like_normal_cases) {
     }
 }
 
+TEST_F(CelonisStringFunctionsTest, in_like_german_chars) {
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        input_strings->append_datum("Ä");
+        input_strings->append_datum("Ö");
+        input_strings->append_datum("Ü");
+        input_strings->append_datum("ß");
+        input_strings->append_datum("A");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            patterns->append_datum(DatumArray{"ä", "ö", "ü", "ß"});
+        }
+        const auto result = CelonisStringFunctions::in_like(nullptr, {input_strings, patterns}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+        EXPECT_EQ(1L, result->get(2).get_int64());
+        EXPECT_EQ(1L, result->get(3).get_int64());
+        EXPECT_EQ(0L, result->get(4).get_int64());
+    }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        input_strings->append_datum("ÄÖÜ");
+        input_strings->append_datum("ÖÜ");
+        input_strings->append_datum("ÄÜ");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            patterns->append_datum(DatumArray{"äöü", "öü"});
+        }
+        const auto result = CelonisStringFunctions::in_like(nullptr, {input_strings, patterns}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+        EXPECT_EQ(0L, result->get(2).get_int64());
+    }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        input_strings->append_datum("AÄ");
+        input_strings->append_datum("ÄA");
+        input_strings->append_datum("ÖO");
+        input_strings->append_datum("UÜ");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            patterns->append_datum(DatumArray{"aä", "uü"});
+        }
+        const auto result = CelonisStringFunctions::in_like(nullptr, {input_strings, patterns}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(0L, result->get(1).get_int64());
+        EXPECT_EQ(0L, result->get(2).get_int64());
+        EXPECT_EQ(1L, result->get(3).get_int64());
+    }
+}
+
 TEST_F(CelonisStringFunctionsTest, in_like_empty_input) {
     auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
