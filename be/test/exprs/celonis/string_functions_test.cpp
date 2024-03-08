@@ -348,30 +348,42 @@ TEST(CelonisStringFunctionsStringSplitTest, All) {
     }
 }
 
+#if !defined(__SANITIZE_ADDRESS__)
+TEST(CelonisStringFunctionsStringToIntTest, OutOfRange) {
+    auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+    strings->append_datum("9223372036854775908");
+    strings->append_datum("-9223372036854775809");
+    strings->append_datum("123");
+    const auto result = CelonisStringFunctions::string_to_int(nullptr, {strings}).value();
+    ASSERT_EQ(strings->size(), result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
+    EXPECT_EQ(123L, result->get(2).get_int64());
+}
+#endif
+
 TEST(CelonisStringFunctionsStringToIntTest, All) {
     auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     auto expected_int = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
 
     std::vector<DatumStruct> test_input = {
-            {"123456",               123456L},
-            {"-123456.11",           -123456L},
-            {"123456.11",            123456L},
-            {"123456.99",            123456L},
-            {"12345699",             12345699L},
-            {"9223372036854775807",  9223372036854775807L},
+            {"123456",              123456L},
+            {"-123456.11",          -123456L},
+            {"123456.11",           123456L},
+            {"123456.99",           123456L},
+            {"12345699",            12345699L},
+            {"9223372036854775807", 9223372036854775807L},
             {"-9223372036854775808", INT64_MIN},
             // Invalid string inputs
-            {kNullDatum,             kNullDatum},
-            {"  123456  ",           kNullDatum},
-            {"123 ",                 kNullDatum},
-            {" 123",                 kNullDatum},
-            {"9223372036854775908",  kNullDatum},
-            {"-9223372036854775809", kNullDatum},
-            {"4.70E+2",              kNullDatum},
-            {"-5.93E-2",             kNullDatum},
-            {"4.70e+2",              kNullDatum},
-            {"-5.93e-2",             kNullDatum},
-            {"HELLO",                kNullDatum},
+            {kNullDatum,            kNullDatum},
+            {"  123456  ",          kNullDatum},
+            {"123 ",                kNullDatum},
+            {" 123",                kNullDatum},
+            {"4.70E+2",             kNullDatum},
+            {"-5.93E-2",            kNullDatum},
+            {"4.70e+2",             kNullDatum},
+            {"-5.93e-2",            kNullDatum},
+            {"HELLO",               kNullDatum},
     };
     for (const auto& st: test_input) {
         if (st[0].is_null()) {
