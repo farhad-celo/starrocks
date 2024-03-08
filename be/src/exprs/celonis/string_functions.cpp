@@ -8,6 +8,7 @@
 
 #include "column/binary_column.h"
 #include "column/column_builder.h"
+#include "column/nullable_column.h"
 #include "column/column_hash.h"
 #include "column/column_viewer.h"
 #include "util/phmap/phmap.h"
@@ -132,6 +133,33 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
     }
 
     return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisStringFunctions::upper([[maybe_unused]]FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(1, columns.size());
+    auto result = columns[0]->clone();
+    auto dst = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(result.get()));
+    auto& dst_bytes = dst->get_bytes();
+
+    const size_t size = dst_bytes.size();
+    char* begin = (char*) (dst_bytes.data());
+    char* end = (char*) (begin + size);
+
+    // for UTF-8, the leading bytes and the continuation bytes do not share values.
+    for (char* ptr = begin; ptr < end; ++ptr) {
+        if ('a' <= (*ptr) && (*ptr) <= 'z') {
+            *ptr = (*ptr) - 32;
+            continue;
+        }
+        // Character: ä | UTF-8 Bytes: ['0xC3', '0xA4']
+        // Character: ö | UTF-8 Bytes: ['0xC3', '0xB6']
+        // Character: ü | UTF-8 Bytes: ['0xC3', '0xBC']
+        if ((*ptr) == '\xC3' && (ptr + 1) < end &&
+            ((*(ptr + 1) == '\xA4') || (*(ptr + 1) == '\xB6') || (*(ptr + 1) == '\xBC'))) {
+            *(ptr + 1) = *(ptr + 1) - 32;
+        }
+    }
+    return result;
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::FunctionContext* context,

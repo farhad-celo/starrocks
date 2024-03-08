@@ -62,6 +62,14 @@ public:
      */
     DEFINE_VECTORIZED_FN(match_strings);
 
+    /**
+     * @param: [input_string]
+     * @paramType: [BinaryColumn]
+     * @return: BinaryColumn
+     * Implements PQL UPPER https://docs.celonis.com/en/upper.html
+     */
+    DEFINE_VECTORIZED_FN(upper);
+
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
