@@ -348,7 +348,6 @@ TEST(CelonisStringFunctionsStringSplitTest, All) {
     }
 }
 
-#if !defined(__SANITIZE_ADDRESS__)
 TEST(CelonisStringFunctionsStringToIntTest, OutOfRange) {
     auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
     strings->append_datum("9223372036854775908");
@@ -360,7 +359,6 @@ TEST(CelonisStringFunctionsStringToIntTest, OutOfRange) {
     EXPECT_TRUE(result->get(1).is_null());
     EXPECT_EQ(123L, result->get(2).get_int64());
 }
-#endif
 
 TEST(CelonisStringFunctionsStringToIntTest, All) {
     auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);

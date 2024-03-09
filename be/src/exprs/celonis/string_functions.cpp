@@ -139,7 +139,7 @@ void fast_upper(Slice in) {
     if (in.size == 0) {
         return;
     }
-    char *s = in.data;
+    char* s = in.data;
     for (int i = 0; i < in.size - 1; i++) {
         if ('a' <= s[i] && s[i] <= 'z') {
             s[i] = s[i] - 32;
@@ -148,8 +148,8 @@ void fast_upper(Slice in) {
         // Character: ä | UTF-8 Bytes: ['0xC3', '0xA4']
         // Character: ö | UTF-8 Bytes: ['0xC3', '0xB6']
         // Character: ü | UTF-8 Bytes: ['0xC3', '0xBC']
-        if (s[i] == '\xC3' && ((s[i+1] == '\xA4') || (s[i+1] == '\xB6') || (s[i+1] == '\xBC'))) {
-            s[i+1] = s[i+1] - 32;
+        if (s[i] == '\xC3' && ((s[i + 1] == '\xA4') || (s[i + 1] == '\xB6') || (s[i + 1] == '\xBC'))) {
+            s[i + 1] = s[i + 1] - 32;
         }
     }
     int n = in.size - 1;
@@ -449,12 +449,13 @@ std::optional<int64_t> to_int64(const std::string& str) {
     if (str.empty() || std::isspace(str.front()) || std::isspace(str.back())) {
         return std::nullopt;
     }
-    try {
-        int64_t value = std::stoll(str);
-        return value;
-    } catch (const std::exception&) {
-        // catch std::invalid_argument, std::out_of_range, and other std::exception-based exceptions
+    char* end;
+    errno = 0;
+    int64_t number = std::strtoll(str.data(), &end, 10);
+    if ((errno == ERANGE && (number == LLONG_MIN || number == LLONG_MAX)) || (number == 0 && end == str.data())) {
         return std::nullopt;
+    } else {
+        return number;
     }
 }
 
