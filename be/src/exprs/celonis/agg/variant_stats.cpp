@@ -1,5 +1,7 @@
 #include "variant_stats.h"
 
+#include <queue>
+
 #include "column/column_helper.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -53,7 +55,7 @@ std::string ActivityStats::debug_string() const {
 int VariantStatsFinalizer::compute_happy_variant(const std::vector<VRef>& sorted) const {
     // Happy path
     // find top start activity
-    // find top end activity
+    // find top end activity which is not top start
     // find top variant with start end from above
     // if not found use top variant
 
@@ -166,17 +168,64 @@ std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_
     for (int i = 0; i < activity_stats_.size(); i++) {
         rapidjson::Value obj = activity_stats_[i].to_json(allocator);
         obj.AddMember("id", i, allocator);
+        auto it = edge_map_.find({i, i});
+        if (it != edge_map_.end()) {
+            obj.AddMember("self_loop_count_case", it->second.count_case, allocator);
+        }
         a_stats.PushBack(obj, allocator);
     }
     d.AddMember("a_stats", a_stats, allocator);
 
     // Edge stats
     rapidjson::Value e_stats(rapidjson::kArrayType);
-    for (auto it = edge_map_.begin(); it != edge_map_.end(); it++) {
-        rapidjson::Value obj = it->second.to_json(allocator);
-        obj.AddMember("src", it->first.src, allocator);
-        obj.AddMember("dst", it->first.dst, allocator);
-        e_stats.PushBack(obj, allocator);
+    if (edge_count_ < 0) {
+        for (auto it = edge_map_.begin(); it != edge_map_.end(); it++) {
+            rapidjson::Value obj = it->second.to_json(allocator);
+            obj.AddMember("src", it->first.src, allocator);
+            obj.AddMember("dst", it->first.dst, allocator);
+            e_stats.PushBack(obj, allocator);
+        }
+    } else {
+        d.AddMember("e_count", edge_map_.size(), allocator);
+        if (edge_count_ > 0) {
+            std::map<Slice, int32_t> ordered_activity_map(activity_map_.begin(), activity_map_.end());
+            std::vector<int32_t> activity_unorderd_to_ordered(activity_map_.size());
+            int index = 0;
+            for (auto it = ordered_activity_map.begin() ; it != ordered_activity_map.end(); ++it, ++index) {
+                DCHECK_LT(it->second, activity_unorderd_to_ordered.size());
+                activity_unorderd_to_ordered[it->second] = index;
+            }
+            struct EdgeOrderedID {
+                int32_t ordered_src;
+                int32_t ordered_dst;
+                EdgeHashMap::const_iterator it;
+            };
+            struct CmpOnEdgeOrderedID{
+                bool operator()(const EdgeOrderedID& x, const EdgeOrderedID& y) const {
+                    return std::tie(x.ordered_src, x.ordered_dst) < std::tie(y.ordered_src, y.ordered_dst);
+                }
+            };
+            std::priority_queue<EdgeOrderedID, std::vector<EdgeOrderedID>, CmpOnEdgeOrderedID> pq;
+            for (auto it = edge_map_.cbegin(); it != edge_map_.cend(); ++it) {
+                pq.push({activity_unorderd_to_ordered[it->first.src], activity_unorderd_to_ordered[it->first.dst], it});
+                if (pq.size() > edge_count_) {
+                    pq.pop();
+                }
+            }
+            // Pop first to list them in reverse sorted order
+            std::vector<EdgeHashMap::const_iterator> popped;
+            popped.reserve(pq.size());
+            while (!pq.empty()) {
+                popped.push_back(pq.top().it);
+                pq.pop();
+            }
+            for (auto rit = popped.rbegin(); rit != popped.rend(); ++rit) {
+                rapidjson::Value obj = (*rit)->second.to_json(allocator);
+                obj.AddMember("src", (*rit)->first.src, allocator);
+                obj.AddMember("dst", (*rit)->first.dst, allocator);
+                e_stats.PushBack(obj, allocator);
+            }
+        }
     }
     d.AddMember("e_stats", e_stats, allocator);
 
@@ -238,14 +287,7 @@ std::string VariantStatsFinalizer::finalize() {
             }
             if (i > 0) {
                 Edge e(variant.data[i - 1], activity_id);
-                auto it = edge_map_.find(e);
-                if (it == edge_map_.end()) {
-                    if (edge_count_ >= 0 && edge_map_.size() == edge_count_) {
-                        continue;
-                    }
-                    it = edge_map_.insert({e, EdgeStats{}}).first;
-                }
-                auto& e_stats = it->second;
+                auto& e_stats = edge_map_[e];
                 e_stats.count += count;
                 auto e_it = e_seen.find(e, e.hash);
                 if (e_it == e_seen.end()) {
