@@ -4,8 +4,8 @@
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
+#include "util/defer_op.h"
 
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 
 namespace starrocks {
@@ -47,7 +47,13 @@ private:
 
     template<LogicalType LT>
     StatusOr<ColumnPtr> Run(bool has_default) {
+        DeferOp close_fragment_local([this] {
+            CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisRemapValues<LT>::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([this] {
+            CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisRemapValues<LT>::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
         if (has_default) {
@@ -58,8 +64,6 @@ private:
             result = CelonisRemapValues<LT>::remap_values(ctx_.get(),
                                                           {value_column_, old_array_column_, new_array_column_});
         }
-        RETURN_IF_ERROR(CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL));
-        RETURN_IF_ERROR(CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
         return result;
     }
 
