@@ -1508,6 +1508,7 @@ celostar_functions = [
     [4000600, 'celonis_match_strings', True, False, 'VARCHAR', ['VARCHAR', 'ARRAY_VARCHAR', 'INT', 'VARCHAR'], 'CelonisStringFunctions::match_strings'],
     [4000700, 'celonis_string_to_int', True, False, 'BIGINT', ['VARCHAR'], 'CelonisStringFunctions::string_to_int'],
     [4000800, 'celonis_upper', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::upper'],
+    [4000900, 'celonis_lower', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::lower'],
 
     # Math functions
     [5000101, 'celonis_square', True, False, 'INT', ['INT'], 'CelonisMathFunctions<TYPE_INT>::square'],

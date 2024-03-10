@@ -934,4 +934,80 @@ TEST_F(CelonisStringFunctionsTest, upper) {
     }
 }
 
+TEST_F(CelonisStringFunctionsTest, lower) {
+    // normal chars
+    {
+        auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        strings->append_datum("Shirt");
+        strings->append_datum(kNullDatum);
+        strings->append_datum("Pants");
+        strings->append_datum("0123456789");
+        strings->append_datum("");
+        strings->append_datum(kNullDatum);
+        strings->append_datum("abcdefghijklmnopqrstuvwxyz");
+        strings->append_datum("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        strings->append_datum("abcABCabc");
+        strings->append_datum(kNullDatum);
+        strings->append_datum("()**==");
+        const auto result = CelonisStringFunctions::lower(nullptr, {strings}).value();
+        ASSERT_EQ(strings->size(), result->size());
+        EXPECT_EQ("shirt", result->get(0).get_slice());
+        EXPECT_TRUE(result->get(1).is_null());
+        EXPECT_EQ("pants", result->get(2).get_slice());
+        EXPECT_EQ("0123456789", result->get(3).get_slice());
+        EXPECT_EQ("", result->get(4).get_slice());
+        EXPECT_TRUE(result->get(5).is_null());
+        EXPECT_EQ("abcdefghijklmnopqrstuvwxyz", result->get(6).get_slice());
+        EXPECT_EQ("abcdefghijklmnopqrstuvwxyz", result->get(7).get_slice());
+        EXPECT_EQ("abcabcabc", result->get(8).get_slice());
+        EXPECT_TRUE(result->get(9).is_null());
+        EXPECT_EQ("()**==", result->get(10).get_slice());
+    }
+    // german chars and other special chars
+    {
+        auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        strings->append_datum("ä");
+        strings->append_datum("ö");
+        strings->append_datum("ü");
+        strings->append_datum("äöü");
+        strings->append_datum("Ä");
+        strings->append_datum("Ö");
+        strings->append_datum("Ü");
+        strings->append_datum(kNullDatum);
+        strings->append_datum("ÄÖÜ");
+        strings->append_datum("Aäöüabc");
+        strings->append_datum("€☺abcäöü");
+
+        const auto result = CelonisStringFunctions::lower(nullptr, {strings}).value();
+        ASSERT_EQ(strings->size(), result->size());
+        EXPECT_EQ("ä", result->get(0).get_slice());
+        EXPECT_EQ("ö", result->get(1).get_slice());
+        EXPECT_EQ("ü", result->get(2).get_slice());
+        EXPECT_EQ("äöü", result->get(3).get_slice());
+        EXPECT_EQ("ä", result->get(4).get_slice());
+        EXPECT_EQ("ö", result->get(5).get_slice());
+        EXPECT_EQ("ü", result->get(6).get_slice());
+        EXPECT_TRUE(result->get(7).is_null());
+        EXPECT_EQ("äöü", result->get(8).get_slice());
+        EXPECT_EQ("aäöüabc", result->get(9).get_slice());
+        EXPECT_EQ("€☺abcäöü", result->get(10).get_slice());
+    }
+    // malformed UTF-8
+    {
+        auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        strings->append_datum("\xC3");
+        strings->append_datum("\xC3\x84");
+        const auto result = CelonisStringFunctions::lower(nullptr, {strings}).value();
+        ASSERT_EQ(strings->size(), result->size());
+        ASSERT_EQ("\xC3", result->get(0).get_slice());
+        ASSERT_EQ("ä", result->get(1).get_slice());
+    }
+    // empty input column
+    {
+        auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        const auto result = CelonisStringFunctions::lower(nullptr, {strings}).value();
+        ASSERT_EQ(strings->size(), result->size());
+    }
+}
+
 } // namespace starrocks

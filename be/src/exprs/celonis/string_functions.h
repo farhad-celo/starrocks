@@ -70,6 +70,14 @@ public:
      */
     DEFINE_VECTORIZED_FN(upper);
 
+    /**
+     * @param: [input_string]
+     * @paramType: [BinaryColumn]
+     * @return: BinaryColumn
+     * Implements PQL LOWER https://docs.celonis.com/en/lower.html
+     */
+    DEFINE_VECTORIZED_FN(lower);
+
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
