@@ -13,6 +13,7 @@
 #include "util/phmap/phmap.h"
 #include "util/utf8.h"
 #include "exprs/celonis/util.h"
+#include "exprs/unary_function.h"
 
 namespace starrocks {
 
@@ -162,45 +163,39 @@ StatusOr<ColumnPtr> CelonisStringFunctions::lower([[maybe_unused]]FunctionContex
     return result;
 }
 
-void fast_upper(Slice in) {
-    if (in.size == 0) {
-        return;
-    }
-    char* s = in.data;
-    for (int i = 0; i < in.size - 1; i++) {
-        if ('a' <= s[i] && s[i] <= 'z') {
-            s[i] = s[i] - 32;
-            continue;
+struct StringCaseUpperFunction {
+public:
+    template<LogicalType Type, LogicalType ResultType>
+    static ColumnPtr evaluate(const ColumnPtr& column) {
+        auto result = column->clone_shared();
+        auto dst = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(result.get()));
+        auto& dst_bytes = dst->get_bytes();
+
+        const size_t size = dst_bytes.size();
+        char* begin = (char*) (dst_bytes.data());
+        char* end = (char*) (begin + size);
+
+        // for UTF-8, the leading bytes and the continuation bytes do not share values.
+        for (char* ptr = begin; ptr < end; ++ptr) {
+            if ('a' <= (*ptr) && (*ptr) <= 'z') {
+                *ptr = (*ptr) - 32;
+                continue;
+            }
+            // Character: ä | UTF-8 Bytes: ['0xC3', '0xA4']
+            // Character: ö | UTF-8 Bytes: ['0xC3', '0xB6']
+            // Character: ü | UTF-8 Bytes: ['0xC3', '0xBC']
+            if ((*ptr) == '\xC3' && (ptr + 1) < end &&
+                ((*(ptr + 1) == '\xA4') || (*(ptr + 1) == '\xB6') || (*(ptr + 1) == '\xBC'))) {
+                *(ptr + 1) = *(ptr + 1) - 32;
+            }
         }
-        // Character: ä | UTF-8 Bytes: ['0xC3', '0xA4']
-        // Character: ö | UTF-8 Bytes: ['0xC3', '0xB6']
-        // Character: ü | UTF-8 Bytes: ['0xC3', '0xBC']
-        if (s[i] == '\xC3' && ((s[i + 1] == '\xA4') || (s[i + 1] == '\xB6') || (s[i + 1] == '\xBC'))) {
-            s[i + 1] = s[i + 1] - 32;
-        }
+        return result;
     }
-    int n = in.size - 1;
-    if ('a' <= s[n] && s[n] <= 'z') {
-        s[n] = s[n] - 32;
-    }
-}
+};
 
 StatusOr<ColumnPtr> CelonisStringFunctions::upper([[maybe_unused]]FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
-    auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    auto size = columns[0]->size();
-    ColumnBuilder<TYPE_VARCHAR> result(size);
-    for (int row = 0; row < size; ++row) {
-        if (str_viewer.is_null(row)) {
-            result.append_null();
-            continue;
-        }
-        const std::string str = str_viewer.value(row).to_string();
-        Slice s(str.data(), str.size());
-        fast_upper(s);
-        result.append(s);
-    }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return VectorizedUnaryFunction<StringCaseUpperFunction>::evaluate<TYPE_VARCHAR>(columns[0]);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::FunctionContext* context,
