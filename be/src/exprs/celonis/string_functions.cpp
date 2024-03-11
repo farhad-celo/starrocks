@@ -135,32 +135,39 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
+struct StringCaseLowerFunction {
+public:
+    template<LogicalType Type, LogicalType ResultType>
+    static ColumnPtr evaluate(const ColumnPtr& column) {
+        auto result = column->clone_shared();
+        auto dst = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(result.get()));
+        auto& dst_bytes = dst->get_bytes();
+
+        const size_t size = dst_bytes.size();
+        char* begin = (char*) (dst_bytes.data());
+        char* end = (char*) (begin + size);
+
+        // for UTF-8, the leading bytes and the continuation bytes do not share values.
+        for (char* ptr = begin; ptr < end; ++ptr) {
+            if ('A' <= (*ptr) && (*ptr) <= 'Z') {
+                *ptr = (*ptr) + 32;
+                continue;
+            }
+            // Character: Ä | UTF-8 Bytes: ['0xC3', '0x84']
+            // Character: Ö | UTF-8 Bytes: ['0xC3', '0x96']
+            // Character: Ü | UTF-8 Bytes: ['0xC3', '0x9C']
+            if ((*ptr) == '\xC3' && (ptr + 1) < end &&
+                ((*(ptr + 1) == '\x84') || (*(ptr + 1) == '\x96') || (*(ptr + 1) == '\x9C'))) {
+                *(ptr + 1) = *(ptr + 1) + 32;
+            }
+        }
+        return result;
+    }
+};
+
 StatusOr<ColumnPtr> CelonisStringFunctions::lower([[maybe_unused]]FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
-    RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    auto result = columns[0]->clone_shared();
-    auto dst = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(result.get()));
-    auto& dst_bytes = dst->get_bytes();
-
-    const size_t size = dst_bytes.size();
-    char* begin = (char*) (dst_bytes.data());
-    char* end = (char*) (begin + size);
-
-    // for UTF-8, the leading bytes and the continuation bytes do not share values.
-    for (char* ptr = begin; ptr < end; ++ptr) {
-        if ('A' <= (*ptr) && (*ptr) <= 'Z') {
-            *ptr = (*ptr) + 32;
-            continue;
-        }
-        // Character: Ä | UTF-8 Bytes: ['0xC3', '0x84']
-        // Character: Ö | UTF-8 Bytes: ['0xC3', '0x96']
-        // Character: Ü | UTF-8 Bytes: ['0xC3', '0x9C']
-        if ((*ptr) == '\xC3' && (ptr + 1) < end &&
-            ((*(ptr + 1) == '\x84') || (*(ptr + 1) == '\x96') || (*(ptr + 1) == '\x9C'))) {
-            *(ptr + 1) = *(ptr + 1) + 32;
-        }
-    }
-    return result;
+    return VectorizedUnaryFunction<StringCaseLowerFunction>::evaluate<TYPE_VARCHAR>(columns[0]);
 }
 
 struct StringCaseUpperFunction {
