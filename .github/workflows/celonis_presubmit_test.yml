@@ -9,6 +9,7 @@ on:
       - 'celonis/assets/**'
       - '.github/**'
       - '!.github/workflows/celonis_presubmit_test.yml'
+      - 'celonis/docker/veracode/**'
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 

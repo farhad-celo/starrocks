@@ -21,7 +21,7 @@ env:
 
 jobs:
   # SAST
-  static-analysis:
+  static-analysis-java:
     if: ${{ inputs.executeStaticAnalysis || github.event_name == 'schedule' }}
     runs-on: [self-hosted, celostar]
     steps:
@@ -48,20 +48,20 @@ jobs:
           CURRENT_DATE_AND_TIME=$(date --iso-8601=seconds)
           echo "date_and_time=${CURRENT_DATE_AND_TIME}" >> $GITHUB_OUTPUT
 
-      - name: SAST Scan FE (Static Analysis)
+      - name: Java Static Analysis
         uses: veracode/veracode-uploadandscan-action@master
         id: upload_and_scan
         with:
           appname: "${{ github.repository }}"
           version: "${{ github.run_id }}-${{ steps.current_date_and_time.outputs.date_and_time }}"
-          filepath: "celostar-starrocks-fe.zip"
+          filepath: "celostar-starrocks-java.zip"
           vid: "${{ secrets.VERACODE_API_ID }}"
           vkey: "${{ secrets.VERACODE_API_SECRET }}"
           scantimeout: 240
 
       - name: Clean up
         run: |
-          rm celostar-starrocks-fe.zip
+          rm celostar-starrocks-java.zip
           docker container stop ${{ env.container_id }}
           docker rm ${{ env.container_id }}
           docker system prune -f
