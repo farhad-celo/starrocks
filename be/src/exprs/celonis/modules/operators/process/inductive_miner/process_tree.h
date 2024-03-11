@@ -17,9 +17,6 @@
 #include "modules/memory/table_fwd.h"
 #endif
 #include "modules/operators/process/inductive_miner/process_tree_ref.h"
-#ifdef CELOSTAR
-#include "result_table.h"
-#endif
 
 namespace celonis::accelerator::operators::process {
 
@@ -207,9 +204,7 @@ struct process_tree {
 
 void minimize(process_tree& pt);
 
-#ifdef CELOSTAR
-process_tree_ref convert_to_tables(const process_tree& pt);
-#else
+#ifndef CELOSTAR
 process_tree_ref convert_to_tables(const process_tree& pt, const memory::column_t& activity_column,
                                    memory::table_row_limit_t table_row_limit, const common::execution_context& context,
                                    const cube::execution::tracking::stop_token& stop_token);
