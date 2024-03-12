@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 #include <random>
-#include <re2/re2.h>
 
 #include "column/array_column.h"
 #include "column/column_builder.h"
@@ -11,6 +11,8 @@
 #include "runtime/mem_pool.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
+
+using json = nlohmann::json;
 
 namespace starrocks {
 
@@ -100,17 +102,65 @@ public:
         return ColumnHelper::create_const_column<TYPE_BIGINT>(weight, size);
     }
 
-    void Run(const VariantRows& variant_rows, std::string expected, Column::Ptr weight_column,
-             double imfd_frequency_threshold = 0.0, bool for_mo_bpmn_graph = false) {
+    void CompareStatistics(const json::array_t& actual, const json::array_t& expected) {
+        std::unordered_map<std::string, std::string> actual_map;
+        for (const auto& element : actual) {
+            ASSERT_EQ(element.size(), 2);
+            ASSERT_TRUE(element.contains("key"));
+            ASSERT_TRUE(element.contains("value"));
+            actual_map[element["key"]] = element["value"];
+        }
+        for (const auto& element : expected) {
+            ASSERT_EQ(element.size(), 2);
+            ASSERT_TRUE(element.contains("key"));
+            ASSERT_TRUE(element.contains("value"));
+            ASSERT_EQ(actual_map.count(element["key"]), 1);
+            EXPECT_EQ(actual_map[element["key"]], element["value"]) << " statistics mismatch in key " << element["key"];
+        }
+    }
+
+    // Compares JSON actual_str and expected_str. Redundant items in actual_str are allowed in "statistics".
+    void CompareJSON(const std::string& actual_str, const std::string& expected_str,
+                     const std::unordered_set<std::string>& to_ignore = {"object_count"}) {
+        json actual = json::parse(actual_str);
+        json expected = json::parse(expected_str);
+
+        for (const auto& [key, array] : expected.items()) {
+            ASSERT_TRUE(actual.contains(key));
+            ASSERT_TRUE(array.is_array());
+            ASSERT_TRUE(actual[key].is_array());
+            if (key == "statistics") {
+                CompareStatistics(actual[key], array);
+                continue;
+            }
+            ASSERT_EQ(actual[key].size(), array.size());
+            for (int i = 0; i < array.size(); ++i) {
+                for (const auto& [k, v] : array[i].items()) {
+                    EXPECT_EQ(actual[key][i][k], v) << " mismatch in " << k << " in " << key << "[" << i << "]";
+                }
+                for (const auto& [k, v] : actual[key][i].items()) {
+                    if (to_ignore.count(k) == 0) {
+                        EXPECT_TRUE(array[i].contains(k))
+                                            << " redundant element " << k << " in " << key << "[" << i << "]";
+                    }
+                }
+            }
+        }
+        // Check if there are redundant top-level elements in actual.
+        for (const auto& [key, value] : actual.items()) {
+            if (key != "statistics") {
+                EXPECT_TRUE(expected.contains(key)) << " redundant top-level element: " << key;
+            }
+        }
+    }
+
+    void Run(const VariantRows& variant_rows, const std::string& expected, Column::Ptr weight_column,
+             double imfd_frequency_threshold = 0.0) {
         const AggregateFunction* func = get_aggregate_function("celonis_inductive_miner", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto variants = build_variant_column(variant_rows);
         auto threshold_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(imfd_frequency_threshold, variant_rows.size());
 
-        Columns columns;
-        columns.push_back(variants);
-        columns.push_back(weight_column);
-        columns.push_back(threshold_column);
-        ctx->set_constant_columns(columns);
+        ctx->set_constant_columns({nullptr, nullptr, threshold_column});
 
         std::vector<const Column*> raw_columns;
         raw_columns.resize(3);
@@ -125,15 +175,7 @@ public:
         func->finalize_to_column(ctx, state->state(), result.get());
 
         ASSERT_EQ(result->size(), 1);
-        auto rs = result->get_slice(0).to_string();
-        // TODO(j.kim): Make tests less fragile.
-        re2::RE2::GlobalReplace(&rs, "[\\t ]+", "");
-        if (!for_mo_bpmn_graph) {
-            re2::RE2::GlobalReplace(&rs, R"((?s),\n\"statistics\":.*])", "");
-            re2::RE2::GlobalReplace(&rs, R"((?s),\n\"object_count\":[\d]+)", "");
-        }
-        re2::RE2::GlobalReplace(&expected, "[\\t ]+", "");
-        EXPECT_EQ(rs, expected);
+        CompareJSON(result->get_slice(0).to_string(), expected);
     }
 
     void Run(const VariantRows& variant_rows, const std::string& expected) {
@@ -1886,7 +1928,7 @@ TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
                 }
             ]
         })json";
-    Run(variants, expected, build_const_weight_column(1, variants.size()), 0.0, /*for_mo_bpmn_graph=*/true);
+    Run(variants, expected, build_const_weight_column(1, variants.size()), 0.0);
 }
 
 TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
@@ -2045,7 +2087,7 @@ TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
                 }
             ]
         })json";
-    Run(variants, expected, build_const_weight_column(1, variants.size()), 0.0, /*for_mo_bpmn_graph=*/true);
+    Run(variants, expected, build_const_weight_column(1, variants.size()), 0.0);
 }
 
 } // namespace starrocks
