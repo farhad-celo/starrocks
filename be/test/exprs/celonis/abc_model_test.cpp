@@ -22,15 +22,11 @@ private:
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT)),
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT));
+        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT));
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         value_column_ = ColumnHelper::create_column(TypeDescriptor(LT), true);
         pk_hash_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
-        // Array Literal is not wrapped with ConstColumn.
-        // As of 2024-02-29, it has one row in FunctionContext::constant_column_ and it is evaluated and unfolded to
-        // multiple rows in /be/src/exprs/array_expr.cpp before it is passed to celonis_apply_abc_model().
-        // In this test, we don't unfold the column when we call the function as the function doesn't read it.
         model_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     }
 
