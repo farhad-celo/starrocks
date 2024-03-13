@@ -28,7 +28,7 @@ FROM ubuntu:22.04
 ARG STARROCKS_ROOT=/opt/starrocks
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
-        binutils-dev default-jdk python2 mysql-client curl vim tree net-tools less tzdata linux-tools-common linux-tools-generic locales pigz inotify-tools && \
+        binutils-dev default-jdk python2 mysql-client curl vim tree net-tools less tzdata linux-tools-common linux-tools-generic locales pigz inotify-tools rclone gdb && \
         ln -fs /usr/share/zoneinfo/UTC /etc/localtime && \
         dpkg-reconfigure -f noninteractive tzdata && \
         locale-gen en_US.UTF-8 && \
@@ -55,7 +55,9 @@ COPY --from=artifacts --chown=starrocks:starrocks /release/be_artifacts/ $STARRO
 COPY --chown=starrocks:starrocks docker/dockerfiles/be/*.sh $STARROCKS_ROOT/
 
 # Copy core dump related scripts
-COPY --chown=starrocks:starrocks celonis/tools/coredump/*.sh $STARROCKS_ROOT/be/bin
+COPY --chown=starrocks:starrocks celonis/tools/coredump/upload_coredump.sh $STARROCKS_ROOT/be/bin
+COPY --chown=starrocks:starrocks celonis/tools/coredump/be_entrypoint.sh $STARROCKS_ROOT/
+
 
 # Create directory for BE storage, create cn symbolic link to be
 RUN mkdir -p $STARROCKS_ROOT/be/storage && ln -sfT be $STARROCKS_ROOT/cn

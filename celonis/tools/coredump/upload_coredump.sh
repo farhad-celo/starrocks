@@ -5,6 +5,11 @@ log_stdin()
     echo "[coredump] $@" >&1
 }
 
+COREDUMP_PATH=/opt/starrocks/be/storage/coredumps
+
+if [ ! -d ${COREDUMP_PATH} ]; then
+    mkdir -p ${COREDUMP_PATH}
+fi
 
 cd $COREDUMP_PATH
 
@@ -45,24 +50,17 @@ while true; do
 
   DATESTR=`TZ=${TZ} date +"%m-%d-%y.%H-%M-%S.%Z"`
   COREDUMP_FILE_ZIP=${KUBE_CLUSTER_NAME}.${POD_NAMESPACE}.${POD_NAME}.${SR_IMAGE_TAG}.${DATESTR}.gz
-  COREDUMP_S3_PATH=${COREDUMP_S3_BUCKET}/${KUBE_CLUSTER_NAME}/${POD_NAMESPACE}
 
-  # Subtract 4 from the number of CPU cores
-  p_value=$(( $(nproc) - 4 ))
-  log_stdin "Compressing core dump files with $p_value cpus to ${COREDUMP_FILE_ZIP} ..."
-  pigz -p $p_value -c $latestCoreFile > $COREDUMP_FILE_ZIP
+  log_stdin "Compressing core dump files to ${COREDUMP_FILE_ZIP} ..."
+  pigz -c $latestCoreFile > $COREDUMP_FILE_ZIP
+
 
   log_stdin "Zip complete"
   log_stdin "$(ls -lh ${COREDUMP_FILE_ZIP})"
 
-  log_stdin "Uploading compressed core dump to $COREDUMP_S3_PATH/$COREDUMP_FILE_ZIP ..."
-  /opt/starrocks/s3sync -concurrency 1 \
-    -accesskey $COREDUMP_S3_ACCESS_KEY \
-    -secretkey $COREDUMP_S3_SECRET_KEY \
-    -region $COREDUMP_S3_REGION \
-    -s3path $COREDUMP_S3_PATH \
-    -localdir $COREDUMP_FILE_ZIP \
-    -upload
+
+  rclone --config=/opt/starrocks/rclone.conf --bwlimit 1000M --multi-thread-streams 100 --multi-thread-cutoff 8M --progress sync $COREDUMP_FILE_ZIP coredump:${COREDUMP_BLOBSTORE_PREFIX}/${KUBE_CLUSTER_NAME}/${POD_NAMESPACE}
+
 
   log_stdin "Upload complete: ${latestCoreFile}"
 
