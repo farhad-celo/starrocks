@@ -80,6 +80,13 @@ public:
 
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status in_like_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status in_like_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+private:
+    DEFINE_VECTORIZED_FN(in_like_constant_patterns);
+    DEFINE_VECTORIZED_FN(in_like_non_constant_patterns);
 };
 
 }  // namespace starrocks

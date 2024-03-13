@@ -164,6 +164,7 @@ set(EXEC_FILES
         ./exprs/celonis/conformance_test.cpp
         ./exprs/celonis/greatest_least_test.cpp
         ./exprs/celonis/in_test.cpp
+        ./exprs/celonis/in_like_test.cpp
         ./exprs/celonis/index_activity_test.cpp
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/linear_regression_test.cpp

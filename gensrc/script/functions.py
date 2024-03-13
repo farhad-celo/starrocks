@@ -1504,7 +1504,7 @@ celostar_functions = [
     [4000200, 'celonis_sanitize_invalid_utf8', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::sanitize_invalid_utf8'],
     [4000300, 'celonis_string_split', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', 'INT'], 'CelonisStringFunctions::string_split'],
     [4000400, 'celonis_string_to_double', True, False, 'DOUBLE', ['VARCHAR'], 'CelonisStringFunctions::string_to_double'],
-    [4000500, 'celonis_in_like', True, False, 'BIGINT', ['VARCHAR', 'ARRAY_VARCHAR'], 'CelonisStringFunctions::in_like'],
+    [4000500, 'celonis_in_like', True, False, 'BIGINT', ['VARCHAR', 'ARRAY_VARCHAR'], 'CelonisStringFunctions::in_like', 'CelonisStringFunctions::in_like_prepare', 'CelonisStringFunctions::in_like_close'],
     [4000600, 'celonis_match_strings', True, False, 'VARCHAR', ['VARCHAR', 'ARRAY_VARCHAR', 'INT', 'VARCHAR'], 'CelonisStringFunctions::match_strings'],
     [4000700, 'celonis_string_to_int', True, False, 'BIGINT', ['VARCHAR'], 'CelonisStringFunctions::string_to_int'],
     [4000800, 'celonis_upper', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::upper'],

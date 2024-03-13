@@ -13,6 +13,7 @@
 #include "util/phmap/phmap.h"
 #include "util/utf8.h"
 #include "exprs/celonis/util.h"
+#include "exprs/builtin_functions.h"
 #include "exprs/unary_function.h"
 
 namespace starrocks {
@@ -540,38 +541,23 @@ CelonisStringFunctions::string_to_double(FunctionContext* context, const starroc
 }
 
 std::string to_lower_utf8(const std::string& input) {
-    // Mapping of German characters to their lowercase equivalents
-    std::unordered_map<std::string, std::string> replacements = {
-            {"Ä", "ä"},
-            {"Ö", "ö"},
-            {"Ü", "ü"}
-    };
-
-    std::string output;
-    output.reserve(input.size());
-
-    for (size_t i = 0; i < input.size();) {
-        unsigned char lead = input[i];
-        const auto char_length = UTF8_BYTE_LENGTH_TABLE[lead];
-        bool replaced = false;
-        for (const auto& [upper, lower]: replacements) {
-            if (char_length == upper.size() && input.substr(i, upper.size()) == upper) {
-                output += lower;
-                replaced = true;
-                break;
-            }
+    std::string rv = input;
+    const auto size = rv.size();
+    // for UTF-8, the leading bytes and the continuation bytes do not share values.
+    for (auto i = 0; i < size; ++i) {
+        if (rv[i] >= 'A' && rv[i] <= 'Z') {
+            rv[i] += 32;
+            continue;
         }
-        if (!replaced) {
-            if (char_length == 1 && input[i] >= 'A' && input[i] <= 'Z') {
-                output += std::tolower(static_cast<unsigned char>(input[i]));
-            } else {
-                output += input.substr(i, char_length);
-            }
+        // Character: Ä | UTF-8 Bytes: ['0xC3', '0x84']
+        // Character: Ö | UTF-8 Bytes: ['0xC3', '0x96']
+        // Character: Ü | UTF-8 Bytes: ['0xC3', '0x9C']
+        if (rv[i] == '\xC3' && (i + 1 < size) &&
+            ((rv[i + 1] == '\x84') || (rv[i + 1] == '\x96') || (rv[i + 1] == '\x9C'))) {
+            rv[i + 1] += 32;
         }
-        i += char_length;
     }
-
-    return output;
+    return rv;
 }
 
 static bool match_helper(const std::string& input, const std::string& pattern, int i, int j) {
@@ -580,7 +566,8 @@ static bool match_helper(const std::string& input, const std::string& pattern, i
     }
 
     // Handling escaped wildcards
-    if (pattern[j] == '\\' && j + 1 < pattern.length() && (pattern[j + 1] == '%' || pattern[j + 1] == '_')) {
+    if (pattern[j] == '\\' && j + 1 < pattern.length() &&
+        (pattern[j + 1] == '%' || pattern[j + 1] == '_' || pattern[j + 1] == '\\')) {
         if (i < input.length() && input[i] == pattern[j + 1]) {
             return match_helper(input, pattern, i + 1, j + 2);
         }
@@ -606,18 +593,43 @@ static bool match_helper(const std::string& input, const std::string& pattern, i
 }
 
 bool contains_wildcard(const std::string& pattern) {
-    for (size_t i = 0; i < pattern.size(); ++i) {
-        if ((pattern[i] == '%' || pattern[i] == '_') && (i == 0 || pattern[i - 1] != '\\')) {
-            return true;
+    int backslash_count = 0;
+    for (char ch: pattern) {
+        if (ch == '%' || ch == '_') {
+            // If the number of preceding backslashes is even (including 0), the wildcard is not escaped
+            if (backslash_count % 2 == 0) {
+                return true;
+            }
+        }
+        if (ch == '\\') {
+            ++backslash_count;
+        } else {
+            backslash_count = 0;
         }
     }
     return false;
 }
 
+static std::string augment_pattern(const std::string& pattern) {
+    int trailing_backslash_cnt = 0;
+    for (auto it = pattern.rbegin(); it != pattern.rend(); ++it) {
+        if ((*it) == '\\') {
+            ++trailing_backslash_cnt;
+        } else {
+            break;
+        }
+    }
+    if (trailing_backslash_cnt % 2 == 1) {
+        return "%" + pattern + "\\" + "%";
+    } else {
+        return "%" + pattern + "%";
+    }
+}
+
 static bool string_match(const std::string& input, const std::string& pattern) {
     const bool has_wildcard = contains_wildcard(pattern);
     bool case_insensitive = !has_wildcard;
-    std::string modified_pattern = has_wildcard ? pattern : "%" + pattern + "%";
+    std::string modified_pattern = has_wildcard ? pattern : augment_pattern(pattern);
     if (case_insensitive) {
         return match_helper(to_lower_utf8(input), to_lower_utf8(modified_pattern), 0, 0);
     } else {
@@ -625,8 +637,64 @@ static bool string_match(const std::string& input, const std::string& pattern) {
     }
 }
 
+struct CelonisInLikeState {
+    CelonisInLikeState() {}
+
+    std::vector<std::string> patterns;
+    std::vector<bool> case_insensitives;
+    bool has_null = false;
+    bool is_null = false;
+    ScalarFunction function;
+};
+
+Status CelonisStringFunctions::in_like_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+
+    auto state = new CelonisInLikeState();
+    context->set_function_state(scope, state);
+
+    auto pattern_column = context->get_constant_column(1);
+    if (pattern_column == nullptr) {
+        state->function = in_like_non_constant_patterns;
+        return Status::OK();
+    }
+    state->function = in_like_constant_patterns;
+    if (pattern_column->empty()) {
+        return Status::OK();
+    }
+    if (pattern_column->is_null(0)) {
+        state->is_null = true;
+        return Status::OK();
+    }
+    auto pattern_array = pattern_column->get(0).get_array();
+    for (const auto& pattern_datum: pattern_array) {
+        if (pattern_datum.is_null()) {
+            state->has_null = true;
+            continue;
+        }
+        const std::string raw_pattern = pattern_datum.get_slice().to_string();
+        const bool has_wildcard = contains_wildcard(raw_pattern);
+        bool case_insensitive = !has_wildcard;
+        const std::string modified_pattern = has_wildcard ? raw_pattern : augment_pattern(to_lower_utf8(raw_pattern));
+        state->patterns.push_back(modified_pattern);
+        state->case_insensitives.push_back(case_insensitive);
+    }
+    return Status::OK();
+}
+
+Status CelonisStringFunctions::in_like_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        auto* state = reinterpret_cast<CelonisInLikeState*>(context->get_function_state(scope));
+        delete state;
+    }
+    return Status::OK();
+}
+
 StatusOr<ColumnPtr>
-CelonisStringFunctions::in_like([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext* context,
+                                                      const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     UnnestedArrayData pattern_data = prepare_array_input(columns[1].get());
@@ -668,6 +736,55 @@ CelonisStringFunctions::in_like([[maybe_unused]] FunctionContext* context, const
         result.append(found_match);
     }
     return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr>
+CelonisStringFunctions::in_like_constant_patterns([[maybe_unused]] FunctionContext* context,
+                                                  const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 2);
+    ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+    const auto* state = reinterpret_cast<const CelonisInLikeState*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+
+    size_t n_rows = columns[0]->size();
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (state->is_null) {
+            result.append_null();
+            continue;
+        }
+        if (input_string_viewer.is_null(row)) {
+            result.append(state->has_null ? 1L : 0L);
+            continue;
+        }
+        const std::string input_string = input_string_viewer.value(row).to_string();
+        std::optional<std::string> lower_input_string = std::nullopt;
+        int64_t found_match = 0L;
+        for (auto j = 0; j < state->patterns.size(); ++j) {
+            bool matched = false;
+            if (state->case_insensitives[j]) {
+                if (!lower_input_string.has_value()) {
+                    lower_input_string = to_lower_utf8(input_string);
+                }
+                matched = match_helper(lower_input_string.value(), state->patterns[j], 0, 0);
+            } else {
+                matched = match_helper(input_string, state->patterns[j], 0, 0);
+            }
+            if (matched) {
+                found_match = 1L;
+                break;
+            }
+        }
+        result.append(found_match);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr>
+CelonisStringFunctions::in_like([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+    const auto* state = reinterpret_cast<const CelonisInLikeState*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return state->function(context, columns);
 }
 
 static int edit_distance(const std::string& str1, const std::string& str2) {
