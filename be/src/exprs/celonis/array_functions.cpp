@@ -452,7 +452,6 @@ public:
 
         size_t chunk_size = columns[0]->size();
         ColumnViewer offset_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
-        DCHECK_EQ(offset_viewer.size(), chunk_size);
 
         for (size_t i = 0; i < chunk_size; ++i) {
             if (offset_viewer.is_null(i)) {
@@ -537,7 +536,6 @@ public:
 
         size_t chunk_size = columns[0]->size();
         ColumnViewer offset_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
-        DCHECK_EQ(offset_viewer.size(), chunk_size);
 
         for (size_t i = 0; i < chunk_size; ++i) {
             if (offset_viewer.is_null(i)) {
