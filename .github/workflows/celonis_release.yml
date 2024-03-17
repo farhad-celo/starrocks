@@ -23,6 +23,7 @@ env:
   RELEASE_VERSION: ${{ github.ref_name }}
   IMAGE_TAG: ${{ github.ref_name }}
   CORE_DUMP_IMAGE_TAG: "${{ github.ref_name }}-coredump"
+  BRPC_1_8_IMAGE_TAG: "${{ github.ref_name }}-brpc1.8"
   BUILD_TYPE: Release
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
@@ -31,6 +32,7 @@ jobs:
     runs-on: [self-hosted, celostar]
     env:
       BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-e862a8f9
+      BRPC_1_8_BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-cs-ca2bfcd3-brpc-1-8
     steps:
       - name: Reset environmental variables for asan build
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -38,12 +40,14 @@ jobs:
           RELEASE_VERSION=${{inputs.asan_release_version}}
           IMAGE_TAG="${{inputs.asan_release_version}}-asan"
           CORE_DUMP_IMAGE_TAG="${{inputs.asan_release_version}}-asan-coredump"
+          BRPC_1_8_IMAGE_TAG="${{inputs.asan_release_version}}-asan-brpc1.8"
           BUILD_TYPE=ASAN
           
           # Write to env
           echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
           echo "CORE_DUMP_IMAGE_TAG=${CORE_DUMP_IMAGE_TAG}" >> $GITHUB_ENV
+          echo "BRPC_1_8_IMAGE_TAG=${BRPC_1_8_IMAGE_TAG}" >> $GITHUB_ENV
           echo "BUILD_TYPE=${BUILD_TYPE}" >> $GITHUB_ENV
 
       - name: checkout repository
@@ -61,7 +65,7 @@ jobs:
         run: |
           echo "The build type is ${BUILD_TYPE}"
           echo "The release version is ${RELEASE_VERSION}"
-          echo "The image tag is ${IMAGE_TAG}"
+          echo "The artifact image tag is ${IMAGE_TAG}"
 
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${IMAGE_TAG} .
@@ -85,6 +89,20 @@ jobs:
         run: |
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f celonis/tools/coredump/be-ubuntu.Dockerfile -t starrocks-be:${CORE_DUMP_IMAGE_TAG} .
+
+      - name: Build artifact image with ${{env.BRPC_1_8_BUILDER}}
+        run: |
+          echo "The build type is ${BUILD_TYPE}"
+          echo "The release version is ${BRPC_1_8_IMAGE_TAG}"
+          echo "The artifact image tag is ${BRPC_1_8_IMAGE_TAG}"
+
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RELEASE_VERSION=${BRPC_1_8_IMAGE_TAG} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BRPC_1_8_BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${BRPC_1_8_IMAGE_TAG} .
+
+      - name: Build BE with ${{env.BRPC_1_8_IMAGE_TAG}}
+        run: |
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${BRPC_1_8_IMAGE_TAG} -f celonis/tools/coredump/be-ubuntu.Dockerfile -t starrocks-be:${BRPC_1_8_IMAGE_TAG} .
 
       - name: Push allin1 image to GHCR
         uses: ./.github/actions/push-to-registry
@@ -111,6 +129,18 @@ jobs:
         with:
           local_image: starrocks-be:${CORE_DUMP_IMAGE_TAG}
           remote_image: ghcr.io/celonis/celostar/starrocks-be:${CORE_DUMP_IMAGE_TAG}
+
+      - name: Push FE with ${{env.BRPC_1_8_IMAGE_TAG}} to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-fe:${IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-fe:${BRPC_1_8_IMAGE_TAG}
+
+      - name: Push BE with ${{env.BRPC_1_8_IMAGE_TAG}} to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-be:${BRPC_1_8_IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-be:${BRPC_1_8_IMAGE_TAG}
 
       - name: GitHub Docker logout
         if: ${{ always() }}
@@ -168,6 +198,22 @@ jobs:
           local_image: starrocks-be:${CORE_DUMP_IMAGE_TAG}
           remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${CORE_DUMP_IMAGE_TAG}
 
+      - name: Push FE with ${{env.BRPC_1_8_IMAGE_TAG}} to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-fe:${IMAGE_TAG}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${BRPC_1_8_IMAGE_TAG}
+
+      - name: Push BE with ${{env.BRPC_1_8_IMAGE_TAG}} to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-be:${BRPC_1_8_IMAGE_TAG}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${BRPC_1_8_IMAGE_TAG}
+
       - name: Clean up
         if: ${{ always() }}
         run: |
@@ -177,6 +223,7 @@ jobs:
           docker rmi -f $(docker images -q starrocks-be:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-be:${CORE_DUMP_IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-artifacts:${IMAGE_TAG})
+          docker rmi -f $(docker images -q starrocks-artifacts:${BRPC_1_8_IMAGE_TAG})
           
           # Delete stopped containers, dangling images, dangling build cache, etc.
           docker system prune -f
