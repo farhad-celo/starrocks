@@ -7,11 +7,6 @@ log_stdin()
 
 log_stdin "Starrting all-in-1 container..."
 
-# Start UDF HTTP server endpoint
-log_stdin "Start UDF HTTP server endpoint"
-cd $SR_HOME/udf
-python2 -m SimpleHTTPServer 7000 &> $SR_HOME/udf/udf.log &
-
 # Start FE.
 cd $SR_HOME/fe/bin/
 # enable [FQDN access](https://docs.starrocks.io/en-us/2.4/administration/enable_fqdn#enable-fqdn-access)

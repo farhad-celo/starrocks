@@ -42,7 +42,6 @@ WORKDIR $DEPLOYDIR
 # Copy all artifacts to the runtime container image
 COPY --from=artifacts /release/be_artifacts/ $DEPLOYDIR/starrocks
 COPY --from=artifacts /release/fe_artifacts/ $DEPLOYDIR/starrocks
-COPY --from=artifacts /release/udf/ $DEPLOYDIR/starrocks/udf/
 
 # Create directory for FE meta and BE storage in StarRocks.
 RUN mkdir -p $DEPLOYDIR/starrocks/fe/meta && mkdir -p $DEPLOYDIR/starrocks/be/storage
