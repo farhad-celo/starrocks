@@ -610,30 +610,31 @@ bool contains_wildcard(const std::string& pattern) {
     return false;
 }
 
-static std::string augment_pattern(const std::string& pattern) {
-    int trailing_backslash_cnt = 0;
-    for (auto it = pattern.rbegin(); it != pattern.rend(); ++it) {
-        if ((*it) == '\\') {
-            ++trailing_backslash_cnt;
+std::string remove_escape(const std::string& str) {
+    std::string rv;
+    int backslash_count = 0;
+    for (char c: str) {
+        if (c == '\\') {
+            ++backslash_count;
         } else {
-            break;
+            rv.append(backslash_count / 2, '\\');
+            if (c != '_' && c != '%' && backslash_count % 2 == 1) {
+                rv += '\\';
+            }
+            rv += c;
+            backslash_count = 0;
         }
     }
-    if (trailing_backslash_cnt % 2 == 1) {
-        return "%" + pattern + "\\" + "%";
-    } else {
-        return "%" + pattern + "%";
-    }
+    rv.append(backslash_count / 2 + backslash_count % 2, '\\');
+    return rv;
 }
 
 static bool string_match(const std::string& input, const std::string& pattern) {
     const bool has_wildcard = contains_wildcard(pattern);
-    bool case_insensitive = !has_wildcard;
-    std::string modified_pattern = has_wildcard ? pattern : augment_pattern(pattern);
-    if (case_insensitive) {
-        return match_helper(to_lower_utf8(input), to_lower_utf8(modified_pattern), 0, 0);
+    if (!has_wildcard) {
+        return to_lower_utf8(input).find(to_lower_utf8(remove_escape(pattern))) != std::string::npos;
     } else {
-        return match_helper(input, modified_pattern, 0, 0);
+        return match_helper(input, pattern, 0, 0);
     }
 }
 
@@ -677,7 +678,7 @@ Status CelonisStringFunctions::in_like_prepare(FunctionContext* context, Functio
         const std::string raw_pattern = pattern_datum.get_slice().to_string();
         const bool has_wildcard = contains_wildcard(raw_pattern);
         bool case_insensitive = !has_wildcard;
-        const std::string modified_pattern = has_wildcard ? raw_pattern : augment_pattern(to_lower_utf8(raw_pattern));
+        const std::string modified_pattern = has_wildcard ? raw_pattern : to_lower_utf8(remove_escape(raw_pattern));
         state->patterns.push_back(modified_pattern);
         state->case_insensitives.push_back(case_insensitive);
     }
@@ -766,7 +767,7 @@ CelonisStringFunctions::in_like_constant_patterns([[maybe_unused]] FunctionConte
                 if (!lower_input_string.has_value()) {
                     lower_input_string = to_lower_utf8(input_string);
                 }
-                matched = match_helper(lower_input_string.value(), state->patterns[j], 0, 0);
+                matched = lower_input_string.value().find(state->patterns[j]) != std::string::npos;
             } else {
                 matched = match_helper(input_string, state->patterns[j], 0, 0);
             }

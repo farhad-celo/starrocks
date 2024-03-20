@@ -142,6 +142,37 @@ TEST_F(CelonisInLikeTest, const_patterns_normal_cases) {
         EXPECT_EQ(1L, result->get(0).get_int64());
         EXPECT_EQ(0L, result->get(1).get_int64());
     }
+    {
+        Prepare();
+        string_column_->append_datum("b%a");
+        string_column_->append_datum("b\\");
+        string_column_->append_datum("a\\");
+        string_column_->append_datum("b");
+        const auto result = RunConstantPatterns(DatumArray{"B\\%", "B\\"}).value();
+        ASSERT_EQ(string_column_->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+        EXPECT_EQ(0L, result->get(2).get_int64());
+        EXPECT_EQ(0L, result->get(3).get_int64());
+    }
+    {
+        Prepare();
+        string_column_->append_datum("b_a");
+        string_column_->append_datum("b\\");
+        string_column_->append_datum("B\\");
+        const auto result = RunConstantPatterns(DatumArray{"B\\_", "B\\"}).value();
+        ASSERT_EQ(string_column_->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+        EXPECT_EQ(1L, result->get(2).get_int64());
+    }
+    {
+        Prepare();
+        string_column_->append_datum("\\");
+        const auto result = RunConstantPatterns(DatumArray{"\\\\"}).value();
+        ASSERT_EQ(string_column_->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+    }
 }
 
 TEST_F(CelonisInLikeTest, empty_input) {
@@ -248,6 +279,11 @@ TEST_F(CelonisInLikeTest, non_const_patterns) {
     AddRow("\\", DatumArray{"\\"});
     AddRow("\\\\", DatumArray{"\\\\"});
     AddRow("", DatumArray{""});
+    AddRow("b\\", DatumArray{"B\\"});
+    AddRow("b", DatumArray{"B\\"});
+    AddRow("b%a", DatumArray{"B\\%"});
+    AddRow("b_a", DatumArray{"B\\_"});
+    AddRow("b\\a", DatumArray{"B\\\\"});
     const auto result = Run().value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
@@ -260,6 +296,11 @@ TEST_F(CelonisInLikeTest, non_const_patterns) {
     EXPECT_EQ(1L, result->get(7).get_int64());
     EXPECT_EQ(1L, result->get(8).get_int64());
     EXPECT_EQ(1L, result->get(9).get_int64());
+    EXPECT_EQ(1L, result->get(10).get_int64());
+    EXPECT_EQ(0L, result->get(11).get_int64());
+    EXPECT_EQ(1L, result->get(12).get_int64());
+    EXPECT_EQ(1L, result->get(13).get_int64());
+    EXPECT_EQ(1L, result->get(14).get_int64());
 }
 
 } // namespace starrocks
