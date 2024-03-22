@@ -68,12 +68,12 @@ jobs:
           echo "The artifact image tag is ${IMAGE_TAG}"
 
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${IMAGE_TAG} .
+          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${IMAGE_TAG} .
 
       - name: Build allin1 image
         run: |
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${IMAGE_TAG} celonis/docker/allin1
+          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${IMAGE_TAG} .
 
       - name: Build FE image
         run: |
@@ -97,7 +97,7 @@ jobs:
           echo "The artifact image tag is ${BRPC_1_8_IMAGE_TAG}"
 
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RELEASE_VERSION=${BRPC_1_8_IMAGE_TAG} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BRPC_1_8_BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${BRPC_1_8_IMAGE_TAG} .
+          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${BRPC_1_8_IMAGE_TAG} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BRPC_1_8_BUILDER} -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${BRPC_1_8_IMAGE_TAG} .
 
       - name: Build BE with ${{env.BRPC_1_8_IMAGE_TAG}}
         run: |
@@ -222,6 +222,7 @@ jobs:
           docker rmi -f $(docker images -q starrocks-fe:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-be:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-be:${CORE_DUMP_IMAGE_TAG})
+          docker rmi -f $(docker images -q starrocks-be:${BRPC_1_8_IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-artifacts:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-artifacts:${BRPC_1_8_IMAGE_TAG})
           
