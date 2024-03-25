@@ -110,6 +110,17 @@ public class PolymorphicFunctionAnalyzer {
         }
     }
 
+    private static class CelonisEnumerateTransitiveEdgesDeduce implements java.util.function.Function<Type[], Type> {
+        @Override
+        public Type apply(Type[] types) {
+            StructType structType = (StructType) types[0];
+            ArrayList<StructField> sf = Lists.newArrayList();
+            sf.add(new StructField("from", structType));
+            sf.add(new StructField("to", structType));
+            return new StructType(sf);
+        }
+    }
+
     private static class MapKeysDeduce implements java.util.function.Function<Type[], Type> {
         @Override
         public Type apply(Type[] types) {
@@ -214,6 +225,7 @@ public class PolymorphicFunctionAnalyzer {
     private static final ImmutableMap<String, java.util.function.Function<Type[], Type>> DEDUCE_RETURN_TYPE_FUNCTIONS
             = ImmutableMap.<String, java.util.function.Function<Type[], Type>>builder()
             .put(FunctionSet.CELONIS_ENUMERATE_NODE_PATHS, new CelonisEnumerateNodePathsDeduce())
+            .put(FunctionSet.CELONIS_ENUMERATE_TRANSITIVE_EDGES, new CelonisEnumerateTransitiveEdgesDeduce())
             .put(FunctionSet.MAP_KEYS, new MapKeysDeduce())
             .put(FunctionSet.MAP_VALUES, new MapValuesDeduce())
             .put(FunctionSet.MAP_FROM_ARRAYS, new MapFromArraysDeduce())

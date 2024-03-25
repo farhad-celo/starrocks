@@ -911,7 +911,8 @@ Status Aggregator::_evaluate_const_columns(int i) {
 }
 
 bool celonis_is_returning_multiple_rows(const std::string& function_name) {
-    return function_name == "celonis_enumerate_node_paths";
+    return function_name == "celonis_enumerate_node_paths" ||
+           function_name == "celonis_enumerate_transitive_edges";
 }
 
 Status Aggregator::convert_to_chunk_no_groupby(ChunkPtr* chunk) {

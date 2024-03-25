@@ -223,6 +223,8 @@ public:
 
     static AggregateFunctionPtr MakeCelonisEnumerateNodePathsAggregateFunction();
 
+    static AggregateFunctionPtr MakeCelonisEnumerateTransitiveEdgesAggregateFunction();
+
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisHistogramBoundariesAggregateFunction();
 

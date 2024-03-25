@@ -83,21 +83,20 @@ private:
 
 class EnumeratorImplBase {
 public:
-    virtual ~EnumeratorImplBase() {}
+    virtual ~EnumeratorImplBase() = default;
     virtual void Enumerate(Column* to) = 0;
 };
 
 template <bool allow_cycles>
-class EnumeratorImpl : public EnumeratorImplBase {
+class NodePathEnumerator : public EnumeratorImplBase {
 public:
     struct EdgeInfo {
         explicit EdgeInfo(int32_t in_idx) : in_index(in_idx) {}
         int32_t in_index;
     };
 
-    EnumeratorImpl(FunctionContext* ctx, const CelonisEnumerateNodePathsAggregateState& state);
-
-    ~EnumeratorImpl() = default;
+    NodePathEnumerator(FunctionContext* ctx, const CelonisEnumerateAggregateState& state);
+    ~NodePathEnumerator() override = default;
 
     // Enumerates paths up to maximum chunk size and writes the results to `to`.
     void Enumerate(Column* to) override;
@@ -122,7 +121,7 @@ private:
 };
 
 template <>
-struct EnumeratorImpl<true>::EdgeInfo {
+struct NodePathEnumerator<true>::EdgeInfo {
     explicit EdgeInfo(int32_t in_idx) : in_index(in_idx), pk_offset(-1) {}
     EdgeInfo(int32_t in_idx, int32_t pk_off) : in_index(in_idx), pk_offset(pk_off) {}
     int32_t in_index;
@@ -131,7 +130,7 @@ struct EnumeratorImpl<true>::EdgeInfo {
 };
 
 template <bool allow_cycles>
-EnumeratorImpl<allow_cycles>::EnumeratorImpl(FunctionContext* ctx, const CelonisEnumerateNodePathsAggregateState& state)
+NodePathEnumerator<allow_cycles>::NodePathEnumerator(FunctionContext* ctx, const CelonisEnumerateAggregateState& state)
         : key_size_(ctx->get_arg_type(InputColumnIndex::OUT_COLUMNS)->children.size()),
           length_comparison_(static_cast<LengthComparison>(state.length_comparison)),
           length_(state.length),
@@ -214,7 +213,7 @@ EnumeratorImpl<allow_cycles>::EnumeratorImpl(FunctionContext* ctx, const Celonis
 }
 
 template <bool allow_cycles>
-void EnumeratorImpl<allow_cycles>::NextPath() {
+void NodePathEnumerator<allow_cycles>::NextPath() {
     while (!stack_.empty()) {
         auto edge_info = stack_.back();
         stack_.pop_back();
@@ -248,7 +247,7 @@ void EnumeratorImpl<allow_cycles>::NextPath() {
 }
 
 template <bool allow_cycles>
-void EnumeratorImpl<allow_cycles>::Enumerate(Column* to) {
+void NodePathEnumerator<allow_cycles>::Enumerate(Column* to) {
     auto max_chunk_size = config::vector_chunk_size;
     std::vector<std::vector<int32_t>> results;
     auto may_add_path_to_results = [this, &results](bool* checked) {
@@ -317,16 +316,12 @@ void EnumeratorImpl<allow_cycles>::Enumerate(Column* to) {
             stack_.push_back(edge);
         }
     }
-    auto& columns = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
+    auto& fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
     std::vector<ArrayColumn*> array_columns(key_size_);
-    std::vector<NullData*> null_data(key_size_);
     for (int i = 0; i < key_size_; ++i) {
-        array_columns[i] = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(columns[i].get()));
-        if (columns[i]->is_nullable()) {
-            null_data[i] = &(down_cast<NullableColumn*>(columns[i].get())->null_column_data());
-        }
+        array_columns[i] = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(fields[i].get()));
     }
-    DCHECK_EQ(columns.size(), key_size_);
+    DCHECK_EQ(fields.size(), key_size_);
     for (const auto& result : results) {
         std::vector<DatumArray> arrays;
         for (int i = 0; i < key_size_; ++i) {
@@ -340,35 +335,204 @@ void EnumeratorImpl<allow_cycles>::Enumerate(Column* to) {
             }
         }
         for (int i = 0; i < key_size_; ++i) {
-            if (null_data[i] != nullptr) {
-                null_data[i]->emplace_back(0);
-            }
             array_columns[i]->append_datum(arrays[i]);
         }
-        if (to->is_nullable()) {
-            down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
+    }
+    for (int i = 0; i < key_size_; ++i) {
+        if (fields[i]->is_nullable()) {
+            down_cast<NullableColumn*>(fields[i].get())->mutable_null_column()->append_default(results.size());
         }
+    }
+    if (to->is_nullable()) {
+        down_cast<NullableColumn*>(to)->mutable_null_column()->append_default(results.size());
     }
 }
 
-Enumerator::~Enumerator() {
-    delete impl_;
+class TransitiveEdgeEnumerator : public EnumeratorImplBase {
+public:
+    TransitiveEdgeEnumerator(FunctionContext* ctx, const CelonisEnumerateAggregateState& state);
+    ~TransitiveEdgeEnumerator() override = default;
+
+    // Enumerates paths up to maximum chunk size and writes the results to `to`.
+    void Enumerate(Column* to) override;
+
+private:
+    // Traverses to the next path to consider. path_ will be empty if there is no next path available.
+    void NextPath();
+
+    int key_size_;
+    int64_t max_length_;
+
+    ColumnsKeyDictionary ckd_; // Dictionary of nodes. Index is used below for traversing paths.
+    phmap::flat_hash_map<int32_t, phmap::flat_hash_set<int32_t>> edges_map_; // Key: OutIndex, Value: InIndex
+
+    std::vector<int32_t> stack_;
+    std::vector<int32_t> path_; // The current path
+    phmap::flat_hash_map<int32_t, size_t> visit_info_; // The distance when a node is added for traversing.
+    phmap::flat_hash_set<int32_t> exported_; // To check if a pair has been exported.
+};
+
+TransitiveEdgeEnumerator::TransitiveEdgeEnumerator(FunctionContext* ctx, const CelonisEnumerateAggregateState& state)
+        : key_size_(ctx->get_arg_type(InputColumnIndex::OUT_COLUMNS)->children.size()),
+          max_length_(state.length),
+          ckd_(ctx, state.data_raw_columns->data(), state.logical_types->data()) {
+    phmap::flat_hash_set<int32_t> from;
+
+    auto elem_size = (*state.data_columns)[InputColumnIndex::OUT_COLUMNS]->size();
+    for (int32_t row = 0; row < elem_size; ++row) {
+        auto out_idx = ckd_.may_add_key(ColumnsKeyDictionary::ColumnsInfoType::OUT, row);
+        auto in_idx = ckd_.may_add_key(ColumnsKeyDictionary::ColumnsInfoType::IN, row);
+        if (out_idx != 0) {
+            from.insert(out_idx);
+            if (in_idx != 0) {
+                edges_map_[out_idx].insert(in_idx);
+            }
+        }
+        if (in_idx != 0) {
+            from.insert(in_idx);
+        }
+    }
+    for (auto idx : from) {
+        stack_.emplace_back(idx);
+    }
 }
 
-void Enumerator::Enumerate(
-        FunctionContext* ctx, const CelonisEnumerateNodePathsAggregateState& state, Column* to) {
-    if (impl_ == nullptr) {
-        if (state.allow_cycles && state.get_column(InputColumnIndex::PK_COLUMNS) != nullptr) {
-            impl_ = new EnumeratorImpl<true>(ctx, state);
+void TransitiveEdgeEnumerator::NextPath() {
+    while (!stack_.empty()) {
+        auto in_index = stack_.back();
+        stack_.pop_back();
+        if (in_index > 0) {
+            path_.push_back(in_index);
+            stack_.emplace_back(-1);
+            if (path_.size() == 1) {
+                visit_info_[in_index] = 0;
+            }
+            return;
         } else {
-            impl_ = new EnumeratorImpl<false>(ctx, state);
+            DCHECK_NE(in_index, 0);
+            DCHECK(!path_.empty());
+            path_.pop_back();
+            if (path_.empty()) {
+                visit_info_.clear();
+                exported_.clear();
+            }
         }
     }
-    impl_->Enumerate(to);
+    DCHECK(path_.empty());
 }
 
-void CelonisEnumerateNodePathsAggregateState::update(FunctionContext* ctx, const Column** columns, size_t row_num,
-                                                     size_t size) {
+
+void TransitiveEdgeEnumerator::Enumerate(Column* to) {
+    if (max_length_ == 0) {
+        to->append_default();
+        return;
+    }
+    std::vector<std::pair<int32_t, int32_t>> results;
+    auto max_chunk_size = config::vector_chunk_size;
+    while (results.size() < max_chunk_size) {
+        NextPath();
+        if (path_.empty()) {
+            break;
+        }
+        int32_t pathLast = path_.back();
+        DCHECK_NE(pathLast, 0);
+
+        if (!exported_.contains(pathLast)) {
+            results.emplace_back(this->path_.front(), pathLast);
+            exported_.insert(pathLast);
+        }
+        // Stops traversing further if the length constraint has been met.
+        if (path_.size() == max_length_) {
+            continue;
+        }
+        auto edge_it = edges_map_.find(pathLast);
+        if (edge_it == edges_map_.end()) {
+            continue;
+        }
+        for (auto in_index : edge_it->second) {
+            auto it = visit_info_.find(in_index);
+            if (it == visit_info_.end()) {
+                stack_.push_back(in_index);
+                visit_info_.emplace(in_index, path_.size());
+            } else if (it->second > path_.size()) {
+                // We have visited the node but we may not be able to visit all following paths due to maxLength.
+                // So we traverse from the node again. If further optimization is necessary, we may check if that is
+                // really the case.
+                stack_.push_back(in_index);
+                it->second = path_.size();
+            }
+        }
+    }
+    auto& fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
+    DCHECK_EQ(fields.size(), 2);
+    auto& from_fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[0].get()))->fields_column();
+    DCHECK_EQ(from_fields.size(), key_size_);
+    auto& to_fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[1].get()))->fields_column();
+    DCHECK_EQ(to_fields.size(), key_size_);
+
+    for (const auto& result : results) {
+        auto from_key = ckd_.key(result.first);
+        auto to_key = ckd_.key(result.second);
+        for (int i = 0; i < key_size_; ++i) {
+            from_fields[i]->append_datum(from_key.get(i));
+            to_fields[i]->append_datum(to_key.get(i));
+        }
+    }
+    if (fields[0]->is_nullable()) {
+        down_cast<NullableColumn*>(fields[0].get())->mutable_null_column()->append_default(results.size());
+    }
+    if (fields[1]->is_nullable()) {
+        down_cast<NullableColumn*>(fields[1].get())->mutable_null_column()->append_default(results.size());
+    }
+    if (to->is_nullable()) {
+        down_cast<NullableColumn*>(to)->mutable_null_column()->append_default(results.size());
+    }
+}
+
+class Enumerator {
+public:
+    Enumerator() = default;
+    ~Enumerator() {
+        delete impl_;
+    }
+
+    void Enumerate(FunctionContext* ctx, const CelonisEnumerateAggregateState& state,
+                   CelonisEnumerateAggregateFunction::Mode mode, Column* to) {
+        if (impl_ == nullptr) {
+            if (mode == CelonisEnumerateAggregateFunction::Mode::NODE_PATHS) {
+                if (state.allow_cycles && state.get_column(InputColumnIndex::PK_COLUMNS) != nullptr) {
+                    impl_ = new NodePathEnumerator<true>(ctx, state);
+                } else {
+                    impl_ = new NodePathEnumerator<false>(ctx, state);
+                }
+            } else {
+                DCHECK(mode == CelonisEnumerateAggregateFunction::Mode::TRANSITIVE_EDGES);
+                impl_ = new TransitiveEdgeEnumerator(ctx, state);
+            }
+        }
+        impl_->Enumerate(to);
+    }
+
+private:
+    EnumeratorImplBase* impl_ = nullptr;
+};
+
+CelonisEnumerateAggregateState::CelonisEnumerateAggregateState() : enumerator(new Enumerator()) {
+}
+
+CelonisEnumerateAggregateState::~CelonisEnumerateAggregateState() {
+    if (data_columns != nullptr) {
+        for (auto& col : *data_columns) {
+            col.reset();
+        }
+        data_columns->clear();
+        data_columns.reset(nullptr);
+    }
+    data_column_index.reset(nullptr);
+    delete enumerator;
+}
+
+void CelonisEnumerateAggregateState::update(FunctionContext* ctx, const Column** columns, size_t row_num, size_t size) {
     DCHECK(data_columns != nullptr);
     ColumnsKey::CommonInfo input_columns_key_info{
             .columns = const_cast<Column**>(columns), .types = logical_types->data(), .num_columns = key_col_num};
@@ -390,17 +554,16 @@ void CelonisEnumerateNodePathsAggregateState::update(FunctionContext* ctx, const
     }
 }
 
-size_t CelonisEnumerateNodePathsAggregateState::serialized_size() const {
+size_t CelonisEnumerateAggregateState::serialized_size(FunctionContext* ctx) const {
     size_t result = 0;
-    result += InputColumnIndex::NUMBER_OF_COLUMNS * sizeof(uint8_t); // Is null literal per each column
-    result += sizeof(uint8_t);                                       // Allow cycles
-    result += sizeof(RunTimeCppType<TYPE_TINYINT>);                  // Length comparison
-    result += sizeof(RunTimeCppType<TYPE_BIGINT>);                   // Length
+    result += ctx->get_num_args() * sizeof(uint8_t); // Is null literal per each column
+    result += sizeof(uint8_t);                       // Allow cycles
+    result += sizeof(RunTimeCppType<TYPE_TINYINT>);  // Length comparison
+    result += sizeof(RunTimeCppType<TYPE_BIGINT>);   // Length
     return result;
 }
 
-void CelonisEnumerateNodePathsAggregateState::serialize(FunctionContext* ctx, uint8_t* dst) const {
-    DCHECK_EQ(ctx->get_num_args(), InputColumnIndex::NUMBER_OF_COLUMNS);
+void CelonisEnumerateAggregateState::serialize(FunctionContext* ctx, uint8_t* dst) const {
     for (int i = 0; i < ctx->get_num_args(); ++i) {
         uint8_t is_null = 0;
         if (ctx->is_constant_column(i) && ctx->get_constant_column(i)->is_null(0)) {
@@ -417,8 +580,7 @@ void CelonisEnumerateNodePathsAggregateState::serialize(FunctionContext* ctx, ui
     dst += sizeof(RunTimeCppType<TYPE_BIGINT>);
 }
 
-std::vector<bool> CelonisEnumerateNodePathsAggregateState::deserialize(FunctionContext* ctx, const uint8_t* src,
-                                                                       size_t len) {
+std::vector<bool> CelonisEnumerateAggregateState::deserialize(FunctionContext* ctx, const uint8_t* src, size_t len) {
     const uint8_t* end = src + len;
     std::vector<bool> is_nulls;
     is_nulls.reserve(ctx->get_num_args());
@@ -441,18 +603,18 @@ std::vector<bool> CelonisEnumerateNodePathsAggregateState::deserialize(FunctionC
     return is_nulls;
 }
 
-void CelonisEnumerateNodePathsAggregateFunction::create_impl(FunctionContext* ctx,
-                                                             CelonisEnumerateNodePathsAggregateState& state,
-                                                             std::vector<bool>* is_nulls) const {
-    DCHECK_EQ(ctx->get_num_args(), InputColumnIndex::NUMBER_OF_COLUMNS);
-    DCHECK(is_nulls == nullptr || is_nulls->size() == InputColumnIndex::NUMBER_OF_COLUMNS);
+void CelonisEnumerateAggregateFunction::create_impl(FunctionContext* ctx, CelonisEnumerateAggregateState& state,
+                                                    std::vector<bool>* is_nulls) const {
+    int num_of_columns = mode_ == Mode::NODE_PATHS ? InputColumnIndex::NUMBER_OF_COLUMNS : 3;
+    int num_of_key_columns = mode_ == Mode::NODE_PATHS ? 3 : 2;
+    DCHECK_EQ(ctx->get_num_args(), num_of_columns);
+    DCHECK(is_nulls == nullptr || is_nulls->size() == num_of_columns);
 
     state.data_columns = std::make_unique<Columns>();
     state.data_raw_columns = std::make_unique<std::vector<Column*>>();
     state.logical_types = std::make_unique<std::vector<LogicalType>>();
-    state.data_column_index = std::make_unique<std::vector<int>>(InputColumnIndex::NUMBER_OF_COLUMNS, -1);
+    state.data_column_index = std::make_unique<std::vector<int>>(num_of_columns, -1);
 
-    // Key columns: outColumns, inColumns, pkColumns
     auto is_null = [ctx, is_nulls](int idx) -> bool {
         if (is_nulls == nullptr) {
             return ctx->is_constant_column(idx) && ctx->get_constant_column(idx)->is_null(0);
@@ -460,7 +622,9 @@ void CelonisEnumerateNodePathsAggregateFunction::create_impl(FunctionContext* ct
             return (*is_nulls)[idx];
         }
     };
-    for (int i = 0; i < 3; ++i) {
+
+    // Key columns: outColumns, inColumns, pkColumns
+    for (int i = 0; i < num_of_key_columns; ++i) {
         auto type_desc = *ctx->get_arg_type(i);
         if (i == InputColumnIndex::PK_COLUMNS && is_null(i)) {
             continue;
@@ -473,17 +637,33 @@ void CelonisEnumerateNodePathsAggregateFunction::create_impl(FunctionContext* ct
     }
     state.key_col_num = state.data_columns->size();
 
-    // Optional columns
-    for (int i = 3; i < 9; ++i) {
-        auto type_desc = *ctx->get_arg_type(i);
-        if (is_null(i)) {
-            continue;
+    if (mode_ == Mode::NODE_PATHS) {
+        // Optional columns
+        for (int i = 3; i < 9; ++i) {
+            auto type_desc = *ctx->get_arg_type(i);
+            if (is_null(i)) {
+                continue;
+            }
+            (*state.data_column_index)[i] = state.data_columns->size();
+            // Creates non-nullable columns. Null values will be mapped to false.
+            state.data_columns->emplace_back(ctx->create_column(type_desc, false));
+            state.logical_types->push_back(type_desc.type);
         }
-        (*state.data_column_index)[i] = state.data_columns->size();
-        // Creates non-nullable columns. Null values will be mapped to false.
-        state.data_columns->emplace_back(ctx->create_column(type_desc, false));
-        state.logical_types->push_back(type_desc.type);
+        // Non-optional constant columns. Types are defined in FunctionSet.java.
+        if (is_nulls == nullptr) {
+            state.allow_cycles = ColumnHelper::get_const_value<TYPE_BOOLEAN>(
+                    ctx->get_constant_column(InputColumnIndex::ALLOW_CYCLES));
+            state.length_comparison = parseLengthComparison(ColumnHelper::get_const_value<TYPE_VARCHAR>(
+                    ctx->get_constant_column(InputColumnIndex::LENGTH_COMPARISON)).to_string());
+            state.length = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(InputColumnIndex::LENGTH));
+        }
+    } else {
+        DCHECK(mode_ == Mode::TRANSITIVE_EDGES);
+        if (is_nulls == nullptr) {
+            state.length = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
+        }
     }
+
     for (const auto& column : *state.data_columns) {
         state.data_raw_columns->push_back(column.get());
     }
@@ -492,19 +672,10 @@ void CelonisEnumerateNodePathsAggregateFunction::create_impl(FunctionContext* ct
     state.columns_key_info.types = state.logical_types->data();
     state.columns_key_info.num_columns = state.key_col_num;
     state.hash_set = std::make_unique<ColumnsKeyHashSet>();
-
-    // Non-optional constant columns. Types are defined in FunctionSet.java.
-    if (is_nulls == nullptr) {
-        state.allow_cycles = ColumnHelper::get_const_value<TYPE_BOOLEAN>(
-                ctx->get_constant_column(InputColumnIndex::ALLOW_CYCLES));
-        state.length_comparison = parseLengthComparison(ColumnHelper::get_const_value<TYPE_VARCHAR>(
-                ctx->get_constant_column(InputColumnIndex::LENGTH_COMPARISON)).to_string());
-        state.length = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(InputColumnIndex::LENGTH));
-    }
 }
 
-void CelonisEnumerateNodePathsAggregateFunction::reset(FunctionContext* ctx, const Columns& args,
-                                                       AggDataPtr __restrict state) const {
+void CelonisEnumerateAggregateFunction::reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state)
+        const {
     auto& state_impl = this->data(state);
     if (state_impl.data_columns != nullptr) {
         for (auto& col : *state_impl.data_columns) {
@@ -513,17 +684,16 @@ void CelonisEnumerateNodePathsAggregateFunction::reset(FunctionContext* ctx, con
     }
 }
 
-void CelonisEnumerateNodePathsAggregateFunction::update_impl(FunctionContext* ctx, const Column** columns,
-                                                             AggDataPtr __restrict state, size_t row_num,
-                                                             size_t size) const {
+void CelonisEnumerateAggregateFunction::update_impl(FunctionContext* ctx, const Column** columns,
+                                                    AggDataPtr __restrict state, size_t row_num, size_t size) const {
     auto& state_impl = this->data(state);
     if (state_impl.data_columns == nullptr) {
         create_impl(ctx, state_impl, nullptr);
     }
     std::vector<const Column*> flattened_columns;
     for (int i = 0; i < 3; ++i) {
-        if (i == 2 && (*state_impl.data_column_index)[i] < 0) {
-            continue;
+        if (i == 2 && (mode_ == Mode::TRANSITIVE_EDGES || (*state_impl.data_column_index)[i] < 0)) {
+            break;
         }
         DCHECK_EQ((*state_impl.data_column_index)[i], flattened_columns.size());
         auto& fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[i]))->fields();
@@ -531,29 +701,31 @@ void CelonisEnumerateNodePathsAggregateFunction::update_impl(FunctionContext* ct
             flattened_columns.push_back(field.get());
         }
     }
-    for (int i = 3; i < 9; ++i) {
-        if ((*state_impl.data_column_index)[i] < 0) {
-            continue;
+    if (mode_ == Mode::NODE_PATHS) {
+        for (int i = 3; i < 9; ++i) {
+            if ((*state_impl.data_column_index)[i] < 0) {
+                continue;
+            }
+            DCHECK_EQ((*state_impl.data_column_index)[i], flattened_columns.size());
+            flattened_columns.push_back(columns[i]);
         }
-        DCHECK_EQ((*state_impl.data_column_index)[i], flattened_columns.size());
-        flattened_columns.push_back(columns[i]);
     }
     this->data(state).update(ctx, flattened_columns.data(), row_num, size);
 }
 
-void CelonisEnumerateNodePathsAggregateFunction::update(FunctionContext* ctx, const Column** columns,
-                                                        AggDataPtr __restrict state, size_t row_num) const {
+void CelonisEnumerateAggregateFunction::update(FunctionContext* ctx, const Column** columns,
+                                               AggDataPtr __restrict state, size_t row_num) const {
     update_impl(ctx, columns,state, row_num, 1);
 }
 
-void CelonisEnumerateNodePathsAggregateFunction::update_batch_single_state(FunctionContext* ctx, size_t chunk_size,
-                                                                           const Column** columns,
-                                                                           AggDataPtr __restrict state) const {
+void CelonisEnumerateAggregateFunction::update_batch_single_state(FunctionContext* ctx, size_t chunk_size,
+                                                                  const Column** columns, AggDataPtr __restrict state)
+        const {
     update_impl(ctx, columns,state, 0, chunk_size);
 }
 
-void CelonisEnumerateNodePathsAggregateFunction::merge(FunctionContext* ctx, const Column* column,
-                                                       AggDataPtr __restrict state, size_t row_num) const {
+void CelonisEnumerateAggregateFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,
+                                              size_t row_num) const {
     if (column->is_nullable() && column->is_null(row_num)) {
         return;
     }
@@ -588,9 +760,8 @@ void CelonisEnumerateNodePathsAggregateFunction::merge(FunctionContext* ctx, con
     this->data(state).update(ctx, columns.data(), offset, count);
 }
 
-void CelonisEnumerateNodePathsAggregateFunction::serialize_to_column(FunctionContext* ctx,
-                                                                     ConstAggDataPtr __restrict state,
-                                                                     Column* to) const {
+void CelonisEnumerateAggregateFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
+                                                            Column* to) const {
     auto& state_impl = this->data(state);
     if (state_impl.data_columns == nullptr || (*state_impl.data_columns)[0]->size() == 0) {
         to->append_default();
@@ -622,22 +793,21 @@ void CelonisEnumerateNodePathsAggregateFunction::serialize_to_column(FunctionCon
         binary_column = down_cast<BinaryColumn*>(fields[num_columns].get());
     }
     size_t old_size = binary_column->get_bytes().size();
-    size_t new_size = old_size + state_impl.serialized_size();
+    size_t new_size = old_size + state_impl.serialized_size(ctx);
     binary_column->get_bytes().resize(new_size);
     state_impl.serialize(ctx, binary_column->get_bytes().data() + old_size);
     binary_column->get_offset().emplace_back(new_size);
 }
 
-void CelonisEnumerateNodePathsAggregateFunction::finalize_to_column(FunctionContext* ctx,
-                                                                    ConstAggDataPtr __restrict state,
-                                                                    Column* to) const {
+void CelonisEnumerateAggregateFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
+                                                           Column* to) const {
     auto& state_impl = this->data(state);
     if (state_impl.data_columns == nullptr || (*state_impl.data_columns)[0]->size() == 0) {
         to->append_default();
         return;
     }
 
-    state_impl.enumerator->Enumerate(ctx, state_impl, to);
+    state_impl.enumerator->Enumerate(ctx, state_impl, mode_, to);
 }
 
 } // namespace starrocks

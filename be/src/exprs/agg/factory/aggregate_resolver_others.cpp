@@ -37,6 +37,9 @@ void AggregateFuncResolver::register_celonis() {
     add_aggregate_mapping_notnull<TYPE_STRUCT, TYPE_STRUCT>(
             "celonis_enumerate_node_paths", false, AggregateFactory::MakeCelonisEnumerateNodePathsAggregateFunction());
 
+    add_aggregate_mapping_notnull<TYPE_STRUCT, TYPE_STRUCT>(
+            "celonis_enumerate_transitive_edges", false, AggregateFactory::MakeCelonisEnumerateTransitiveEdgesAggregateFunction());
+
     add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_STRUCT>(
             "celonis_histogram_boundaries", false,
             AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_BIGINT>());

@@ -930,8 +930,7 @@ public class FunctionAnalyzer {
             ((AggregateFunction) fn).setNullsFirst(nullsFirst);
             fn.setRetType(argsTypes[0]);     // return null if scalar agg with empty input
         }  else if (FunctionSet.CELONIS_ENUMERATE_NODE_PATHS.equals(fnName)) {
-            fn = Expr.getBuiltinFunction(fnName, argumentTypes,
-                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             fn = fn.copy();
             // Input: ST<o0, o1, ...>, ST<i0, i1, ...>, ST<p0, p1, ...>, boolean, boolean, ...
             // Intermediate : ST<ARRAY<o0>, ARRAY<o1>, ..., ARRAY<i0>, ..., Array<p0>, ...,
@@ -954,6 +953,23 @@ public class FunctionAnalyzer {
             }
             fieldTypes.add(Type.VARBINARY);
             ((AggregateFunction) fn).setIntermediateType(new StructType(fieldTypes));
+            // RetType was set by deduce.
+        } else if (FunctionSet.CELONIS_ENUMERATE_TRANSITIVE_EDGES.equals(fnName)) {
+            fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            // Input: ST<o0, o1, ...>, ST<i0, i1, ...>, VARBINARY>
+            // Intermediate : ST<ARRAY<o0>, ARRAY<o1>, ..., ARRAY<i0>, ..., VARBINARY>
+            //                VARBINARY is same to CELINOS_ENUMERATE_NODE_PATHS.
+            ArrayList<Type> intermediateFieldTypes = new ArrayList<>(argumentTypes.length);
+            for (int i = 0; i < 2; ++i) {
+                assert argumentTypes[i].isStructType();
+                StructType structType = (StructType) argumentTypes[i];
+                for (StructField structField : structType.getFields()) {
+                    intermediateFieldTypes.add(new ArrayType(structField.getType()));
+                }
+            }
+            intermediateFieldTypes.add(Type.VARBINARY);
+            ((AggregateFunction) fn).setIntermediateType(new StructType(intermediateFieldTypes));
             // RetType was set by deduce.
         } else if (FunctionSet.STR_TO_DATE.equals(fnName)) {
             fn = getStrToDateFunction(node, argumentTypes);

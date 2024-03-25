@@ -306,6 +306,7 @@ public class FunctionSet {
 
     // Aggregate celonis functions:
     public static final String CELONIS_ENUMERATE_NODE_PATHS = "celonis_enumerate_node_paths";
+    public static final String CELONIS_ENUMERATE_TRANSITIVE_EDGES = "celonis_enumerate_transitive_edges";
     public static final String CELONIS_CALC_BUCKET_COUNT_BOUNDARIES = "celonis_calc_bucket_count_boundaries";
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
@@ -1235,6 +1236,33 @@ public class FunctionSet {
                     Lists.newArrayList(type), type, new StructType(sf),
                             false, false, false));
         }
+        // celonis_enumerate_node_paths
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_ENUMERATE_NODE_PATHS,
+                Lists.newArrayList(
+                        Type.ANY_STRUCT,  // outColumns
+                        Type.ANY_STRUCT,  // inColumns
+                        Type.ANY_STRUCT,  // pkColumns
+                        Type.BOOLEAN,     // outStart
+                        Type.BOOLEAN,     // outEnd
+                        Type.BOOLEAN,     // inStart
+                        Type.BOOLEAN,     // inEnd
+                        Type.BOOLEAN,     // outAll
+                        Type.BOOLEAN,     // inAll
+                        Type.BOOLEAN,     // allowCycles
+                        Type.VARCHAR,     // lengthComparison LESS, LESS_EQUAL, EQUAL, GREATER, GREATER_EQUAL, NOT_EQUAL
+                        Type.BIGINT),     // length
+                /*returnType=*/Type.ANY_STRUCT,
+                /*intermediateType=*/Type.ANY_STRUCT,
+                false, false, false));
+        // celonis_enumerate_transitive_edges
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_ENUMERATE_TRANSITIVE_EDGES,
+                Lists.newArrayList(
+                        Type.ANY_STRUCT,  // outColumns
+                        Type.ANY_STRUCT,  // inColumns
+                        Type.BIGINT),     // maxLength
+                /*returnType=*/Type.ANY_STRUCT,
+                /*intermediateType=*/Type.ANY_STRUCT,
+                false, false, false));
     }
 
     // Populate all the aggregate builtins in the globalStateMgr.
