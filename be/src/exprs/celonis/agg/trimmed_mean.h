@@ -50,6 +50,9 @@ class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggre
 
         using CppType = RunTimeCppType<LT>;
         std::vector<CppType> new_vector = std::move(this->data(state).items);
+        for (auto& innerData : this->data(state).grid) {
+            std::move(innerData.begin() + 1, innerData.end() - 1, std::back_inserter(new_vector));
+        }
         int first = new_vector.size() * lower_cutoff / 100;
         int last = new_vector.size() - new_vector.size() * upper_cutoff / 100;
         if (first >= last) {

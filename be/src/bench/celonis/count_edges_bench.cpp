@@ -55,7 +55,7 @@ static void do_bench(benchmark::State& state, int array_size, int num_rows) {
         table_state->set_params(input);
         function->prepare(table_state);
         state.ResumeTiming();
-        function->process(table_state);
+        function->process(nullptr, table_state);
         function->close(nullptr, table_state);
     }
 }

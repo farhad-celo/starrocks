@@ -8,7 +8,8 @@ namespace starrocks {
 
 class CountEdges : public TableFunction {
 public:
-    std::pair<Columns, UInt32Column::Ptr> process(TableFunctionState* state) const override;
+    std::pair<Columns, UInt32Column::Ptr> process([[maybe_unused]] RuntimeState* runtime_state,
+                                                  TableFunctionState* state) const override;
 
     Status init(const TFunction& fn, TableFunctionState** state) const override {
         *state = new TableFunctionState();

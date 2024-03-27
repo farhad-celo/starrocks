@@ -34,7 +34,7 @@ TEST_F(CelonisCountEdgesTest, count_edges) {
     table_state->set_params(input);
     ASSERT_OK(function->prepare(table_state));
 
-    auto [result, offset] = function->process(table_state);
+    auto [result, offset] = function->process(nullptr, table_state);
 
     EXPECT_EQ(4, table_state->processed_rows());
 
@@ -90,7 +90,7 @@ TEST_F(CelonisCountEdgesTest, count_edges_null) {
     table_state->set_params(input);
     ASSERT_OK(function->prepare(table_state));
 
-    auto [result, offset] = function->process(table_state);
+    auto [result, offset] = function->process(nullptr, table_state);
 
     EXPECT_EQ(3, table_state->processed_rows());
 

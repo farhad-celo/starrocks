@@ -17,7 +17,10 @@ protected:
         DatumArray expected;
     };
 
-    void SetUp() override {}
+    void SetUp() override {
+        rt_state_ = std::make_unique<RuntimeState>();
+        rt_state_->set_chunk_size(4096);
+    }
 
     void TearDown() override {}
 
@@ -82,13 +85,16 @@ protected:
     void Run(const std::vector<TestCase>& test_cases) {
         auto [table_state, function] = Prepare<LT, STEP_LT>(test_cases);
 
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), test_cases.size());
 
         Evaluate<LT>(results[0], test_cases);
 
         function->close(nullptr, table_state);
     }
+
+private:
+    std::unique_ptr<RuntimeState> rt_state_;
 };
 
 TEST_F(CelonisGenerateRangeTest, bigint) {
@@ -107,10 +113,8 @@ TEST_F(CelonisGenerateRangeTest, bigint_null_row) {
 }
 
 TEST_F(CelonisGenerateRangeTest, bigint_chunks) {
+    rt_state_->set_chunk_size(4);
     const auto LT = TYPE_BIGINT;
-    // TODO: Check if there is a better way to reset a global variable and if it is necessary to force serialized tests.
-    auto old_vector_chunk_size = config::vector_chunk_size;
-    config::vector_chunk_size = 4;
     std::vector<TestCase> test_cases{{3L, 3L, 14L, {}},
                                      {1L, 1L, 9L, {}},
                                      {2L, 0L, 2L, {}}};
@@ -118,28 +122,28 @@ TEST_F(CelonisGenerateRangeTest, bigint_chunks) {
     auto [table_state, function] = Prepare<LT, LT>(test_cases);
 
     {
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), 1); // input0 is processed.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 4);
         Evaluate<LT>(results[0], {3L, 6L, 9L, 12L});
     }
     {
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), 1); // input1 is being processed.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 4);
         Evaluate<LT>(results[0], {1L, 2L, 3L, 4L});
     }
     {
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), 1); // input1 is being processed.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 4);
         Evaluate<LT>(results[0], {5L, 6L, 7L, 8L});
     }
     {
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), 3); // input1 and input 2 are processed in this call.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 1);
@@ -148,7 +152,6 @@ TEST_F(CelonisGenerateRangeTest, bigint_chunks) {
     }
 
     function->close(nullptr, table_state);
-    config::vector_chunk_size = old_vector_chunk_size;
 }
 
 TEST_F(CelonisGenerateRangeTest, bigint_invalid_step) {
@@ -156,7 +159,7 @@ TEST_F(CelonisGenerateRangeTest, bigint_invalid_step) {
     std::vector<TestCase> test_cases{{0L, 3L, 4L, {}}};
 
     auto [table_state, function] = Prepare<LT, LT>(test_cases);
-    auto [results, offset] = function->process(table_state);
+    auto [results, offset] = function->process(rt_state_.get(), table_state);
 
     EXPECT_EQ(table_state->processed_rows(), 0);
     EXPECT_EQ(results[0]->size(), 0);
@@ -170,7 +173,7 @@ TEST_F(CelonisGenerateRangeTest, bigint_invalid_range) {
     std::vector<TestCase> test_cases{{1L, 3L, 0L, {}}};
 
     auto [table_state, function] = Prepare<LT, LT>(test_cases);
-    auto [results, offset] = function->process(table_state);
+    auto [results, offset] = function->process(rt_state_.get(), table_state);
 
     EXPECT_EQ(table_state->processed_rows(), 0);
     EXPECT_EQ(results[0]->size(), 0);
@@ -312,10 +315,9 @@ TEST_F(CelonisGenerateRangeTest, datetime_non_max_day) {
 }
 
 TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
+    rt_state_->set_chunk_size(4);
     const auto LT = TYPE_DATETIME;
     const auto STEP_LT = TYPE_VARCHAR;
-    auto old_vector_chunk_size = config::vector_chunk_size;
-    config::vector_chunk_size = 4;
     std::vector<TestCase> test_cases{
             { "1M", TimestampValue::create(2019, 12, 31, 1, 2, 3), TimestampValue::create(2020,  7,  1, 0, 0, 0), {}},
             { "1Q", TimestampValue::create(2018, 11, 29, 1, 2, 3), TimestampValue::create(2019, 12,  1, 0, 0, 0), {}},
@@ -325,7 +327,7 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
     auto [table_state, function] = Prepare<LT, STEP_LT>(test_cases);
 
     {
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), 0); // input0 is being processed.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 4);
@@ -339,7 +341,7 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
         Evaluate<LT>(results[0], expected);
     }
     {
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), 1); // input1 is being processed.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 3); // end of input0 output
@@ -354,7 +356,7 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
         Evaluate<LT>(results[0], expected);
     }
     {
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), 2); // input1 is processed in this call.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 4);
@@ -367,7 +369,7 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
         Evaluate<LT>(results[0], expected);
     }
     {
-        auto [results, offset] = function->process(table_state);
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
         EXPECT_EQ(table_state->processed_rows(), 3); // input2 is processed in this call.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 3);
@@ -380,7 +382,6 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
     }
 
     function->close(nullptr, table_state);
-    config::vector_chunk_size = old_vector_chunk_size;
 }
 
 } // namespace starrocks

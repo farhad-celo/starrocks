@@ -114,7 +114,8 @@ std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, co
 }
 }  // namespace
 
-std::pair<Columns, UInt32Column::Ptr> CountEdges::process(TableFunctionState* state) const {
+std::pair<Columns, UInt32Column::Ptr> CountEdges::process(RuntimeState* runtime_state,
+                                                          TableFunctionState* state) const {
     if (state->get_columns().empty()) {
         return {};
     }
