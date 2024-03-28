@@ -180,7 +180,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}}'])",
+                R"([['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}}']])",
                 res_array_col->debug_string());
     }
     // mixed NULL and non-NULL year, is_workdays, NULL calendar_id
@@ -247,7 +247,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}}'])",
+                R"([['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}}']])",
                 res_array_col->debug_string());
     }
     // non-NULL calendar_id
@@ -308,7 +308,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true],"calendarId":"id1"},{"year":"1971","isWorkday":[true,false,true,false],"calendarId":"id2"}]}}'])",
+                R"([['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true],"calendarId":"id1"},{"year":"1971","isWorkday":[true,false,true,false],"calendarId":"id2"}]}}']])",
                 res_array_col->debug_string());
     }
     // empty input
@@ -355,7 +355,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("['{}']", res_array_col->debug_string());
+        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
     }
     // no valid rows, row one has NULL year, row two has NULL is_workdays
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -409,7 +409,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("['{}']", res_array_col->debug_string());
+        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
     }
     // no valid rows, both rows contain NULL year
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -463,7 +463,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("['{}']", res_array_col->debug_string());
+        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
     }
     // resultant calendar is longer than 1M.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -599,7 +599,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}}'])",
+                R"([['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}}']])",
                 res_array_col->debug_string());
     }
     // mixed NULL and non-NULL start/end, NULL calendar_id
@@ -669,7 +669,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}}'])",
+                R"([['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}}']])",
                 res_array_col->debug_string());
     }
     // non-NULL calendar_id
@@ -730,7 +730,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000","calendarId":"id1"},{"startDate":"0","endDate":"7200000","calendarId":"id2"}]}}'])",
+                R"([['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000","calendarId":"id1"},{"startDate":"0","endDate":"7200000","calendarId":"id2"}]}}']])",
                 res_array_col->debug_string());
     }
     // empty input
@@ -778,7 +778,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("['{}']", res_array_col->debug_string());
+        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
     }
     // no valid rows, row one has NULL start timestamp, row two has NULL end timestamp.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -832,7 +832,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("['{}']", res_array_col->debug_string());
+        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
     }
     // no valid rows, both row one and row two have NULL start timestamp.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -886,7 +886,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("['{}']", res_array_col->debug_string());
+        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
     }
     // negative timestamp
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -948,7 +948,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(
-                R"(['{"factoryCalendar":{"entries":[{"startDate":"-86400000","endDate":"3600000","calendarId":"id1"},{"startDate":"-172800000","endDate":"7200000","calendarId":"id2"}]}}'])",
+                R"([['{"factoryCalendar":{"entries":[{"startDate":"-86400000","endDate":"3600000","calendarId":"id1"},{"startDate":"-172800000","endDate":"7200000","calendarId":"id2"}]}}']])",
                 res_array_col->debug_string());
     }
     // resultant calendar is longer than 1M.
@@ -1095,7 +1095,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":123,"end":123000}}},{"friday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}}'])",
+                R"([['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":123,"end":123000}}},{"friday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}}']])",
                 res_array_col->debug_string());
     }
     // mixed NULL and non-NULL weekday, NULL calendar_id
@@ -1168,7 +1168,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"multiWeekdayCalendar":{"calendars":[{"tuesday":{"useDay":true,"shift":{"begin":123,"end":123000}}},{"thursday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}}'])",
+                R"([['{"multiWeekdayCalendar":{"calendars":[{"tuesday":{"useDay":true,"shift":{"begin":123,"end":123000}}},{"thursday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}}']])",
                 res_array_col->debug_string());
     }
     // non-NULL calendar_id
@@ -1237,7 +1237,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"multiWeekdayCalendar":{"calendars":[{"wednesday":{"useDay":true,"shift":{"begin":123,"end":123000}},"calendarId":"DE"},{"saturday":{"useDay":true,"shift":{"begin":456,"end":456000}},"calendarId":"US"}]}}'])",
+                R"([['{"multiWeekdayCalendar":{"calendars":[{"wednesday":{"useDay":true,"shift":{"begin":123,"end":123000}},"calendarId":"DE"},{"saturday":{"useDay":true,"shift":{"begin":456,"end":456000}},"calendarId":"US"}]}}']])",
                 res_array_col->debug_string());
     }
     // empty input
@@ -1287,7 +1287,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("['{}']", res_array_col->debug_string());
+        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
     }
     // no valid rows, row one has NULL shift_begin, row two has NULL shift_end.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -1346,7 +1346,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("['{}']", res_array_col->debug_string());
+        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
     }
     // negative shift
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -1414,7 +1414,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"multiWeekdayCalendar":{"calendars":[{"sunday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}}'])",
+                R"([['{"multiWeekdayCalendar":{"calendars":[{"sunday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}}']])",
                 res_array_col->debug_string());
     }
     // resultant calendar is longer than 1M.
@@ -1562,7 +1562,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":32400000,"end":61200000}}},{"friday":{"useDay":true,"shift":{"begin":28800000,"end":57600000}}}]}}'])",
+                R"([['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":32400000,"end":61200000}}},{"friday":{"useDay":true,"shift":{"begin":28800000,"end":57600000}}}]}}']])",
                 res_array_col->debug_string());
     }
     // Non-NULL calendar_id
@@ -1631,7 +1631,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"DE"},{"friday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"US"}]}}'])",
+                R"([['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"DE"},{"friday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"US"}]}}']])",
                 res_array_col->debug_string());
     }
     // Non-NULL calendar_id with some invalid rows
@@ -1708,7 +1708,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(
-                R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"DE"},{"friday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"US"}]}}'])",
+                R"([['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"DE"},{"friday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"US"}]}}']])",
                 res_array_col->debug_string());
     }
 }
