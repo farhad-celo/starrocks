@@ -1772,7 +1772,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         auto agg_state = (LinearRegressionAggregateState*) (state->state());
         EXPECT_EQ(5, agg_state->x->size());
         EXPECT_EQ(5, agg_state->y->size());
-        EXPECT_EQ("[1], [1], [2], [3], [4]", agg_state->x->debug_string());
+        EXPECT_EQ("[[1], [1], [2], [3], [4]]", agg_state->x->debug_string());
         EXPECT_EQ("[100, 300, 400, 300, 500]", agg_state->y->debug_string());
 
         // test serialize_to_column.
@@ -1823,7 +1823,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         auto agg_state = (LinearRegressionAggregateState*) (state->state());
         EXPECT_EQ(1, agg_state->x->size());
         EXPECT_EQ(1, agg_state->y->size());
-        EXPECT_EQ("[1]", agg_state->x->debug_string());
+        EXPECT_EQ("[[1]]", agg_state->x->debug_string());
         EXPECT_EQ("[100]", agg_state->y->debug_string());
 
         // test serialize_to_column.
@@ -1878,7 +1878,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         auto agg_state = (LinearRegressionAggregateState*) (state->state());
         EXPECT_EQ(5, agg_state->x->size());
         EXPECT_EQ(5, agg_state->y->size());
-        EXPECT_EQ("[1], [1], [2], [3,4], [4]", agg_state->x->debug_string());
+        EXPECT_EQ("[[1], [1], [2], [3,4], [4]]", agg_state->x->debug_string());
         EXPECT_EQ("[100, 300, 400, 300, 500]", agg_state->y->debug_string());
 
         // test serialize_to_column.
@@ -1933,7 +1933,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         auto agg_state = (LinearRegressionAggregateState*) (state->state());
         EXPECT_EQ(5, agg_state->x->size());
         EXPECT_EQ(5, agg_state->y->size());
-        EXPECT_EQ("[3], [4], [1], [1], [2]", agg_state->x->debug_string());
+        EXPECT_EQ("[[3], [4], [1], [1], [2]]", agg_state->x->debug_string());
         EXPECT_EQ("[300, 500, 100, 300, 400]", agg_state->y->debug_string());
 
         // test serialize_to_column.
@@ -2000,7 +2000,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         auto agg_state = (LinearRegressionAggregateState*) (state->state());
         EXPECT_EQ(5, agg_state->x->size());
         EXPECT_EQ(5, agg_state->y->size());
-        EXPECT_EQ("[3], [4], [1], [1], [2]", agg_state->x->debug_string());
+        EXPECT_EQ("[[3], [4], [1], [1], [2]]", agg_state->x->debug_string());
         EXPECT_EQ("[300, 500, 100, 300, 400]", agg_state->y->debug_string());
 
         // test serialize_to_column.
