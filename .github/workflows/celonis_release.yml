@@ -3,11 +3,6 @@ name: 'celostar-starrocks release'
 on:
   release:
     types: [published]
-  workflow_dispatch:
-      inputs:
-        asan_release_version:
-          description: "The release version for build in asan mode"
-          required: true
 
 permissions:
   contents: read
@@ -23,6 +18,9 @@ env:
   RELEASE_VERSION: ${{ github.ref_name }}
   IMAGE_TAG: ${{ github.ref_name }}
   BUILD_TYPE: Release
+  ASAN_RELEASE_VERSION: "${{ github.ref_name }}-asan"
+  ASAN_IMAGE_TAG: "${{ github.ref_name }}-asan"
+  ASAN_BUILD_TYPE: ASAN
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 jobs:
@@ -31,18 +29,6 @@ jobs:
     env:
       BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-1f7b4b2
     steps:
-      - name: Reset environmental variables for asan build
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: |
-          RELEASE_VERSION=${{inputs.asan_release_version}}
-          IMAGE_TAG="${{inputs.asan_release_version}}-asan"
-          BUILD_TYPE=ASAN
-          
-          # Write to env
-          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
-          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
-          echo "BUILD_TYPE=${BUILD_TYPE}" >> $GITHUB_ENV
-
       - name: checkout repository
         uses: actions/checkout@v4
 
@@ -94,6 +80,26 @@ jobs:
           local_image: starrocks-be:${IMAGE_TAG}
           remote_image: ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
 
+      - name: Build artifact image in ASAN mode
+        run: |
+          echo "The build type is ${ASAN_BUILD_TYPE}"
+          echo "The release version is ${ASAN_RELEASE_VERSION}"
+          echo "The artifact image tag is ${ASAN_IMAGE_TAG}"
+
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${ASAN_RELEASE_VERSION} --build-arg BUILD_TYPE=${ASAN_BUILD_TYPE} --build-arg builder=${BUILDER} -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${ASAN_IMAGE_TAG} .
+
+      - name: Build ASAN allin1 image
+        run: |
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${ASAN_IMAGE_TAG} -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${ASAN_IMAGE_TAG} .
+
+      - name: Push ASAN allin1 image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-allin1:${ASAN_IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${ASAN_IMAGE_TAG}
+
       - name: GitHub Docker logout
         if: ${{ always() }}
         run: |
@@ -109,14 +115,6 @@ jobs:
       - name: prod Amazon ECR login
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Push allin1 image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-allin1:${IMAGE_TAG}
-          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${IMAGE_TAG}
 
       - name: Push FE image to ECR
         env:
@@ -139,9 +137,11 @@ jobs:
         run: |
           # Delete the built docker image from the runner.
           docker rmi -f $(docker images -q starrocks-allin1:${IMAGE_TAG})
+          docker rmi -f $(docker images -q starrocks-allin1:${ASAN_IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-fe:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-be:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-artifacts:${IMAGE_TAG})
+          docker rmi -f $(docker images -q starrocks-artifacts:${ASAN_IMAGE_TAG})
           
           # Delete stopped containers, dangling images, dangling build cache, etc.
           docker system prune -f
