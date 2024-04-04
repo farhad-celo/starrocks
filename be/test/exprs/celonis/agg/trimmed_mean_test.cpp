@@ -271,7 +271,7 @@ TEST_F(CelonisTrimmedMeanTest, null_handling) {
     auto data_column2 = RunTimeColumnType<TYPE_BIGINT>::create();
     auto const_column_lower2 = const_column_lower->clone();
     auto const_column_upper2 = const_column_upper->clone();
-    data_column2->append_nulls(10);
+    [[maybe_unused]] bool ok = data_column2->append_nulls(10);
 
     std::vector<const Column*> raw_columns2;
     raw_columns2.resize(3);
