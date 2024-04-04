@@ -27,7 +27,7 @@ jobs:
   build-image:
     runs-on: [self-hosted, celostar]
     env:
-      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-1f7b4b2
+      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-f2acbad2-locale-cpml2.161.2
     steps:
       - name: checkout repository
         uses: actions/checkout@v4

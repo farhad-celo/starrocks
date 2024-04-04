@@ -17,7 +17,7 @@ concurrency:
 env:
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-e862a8f9
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-f2acbad2-locale-cpml2.161.2
 
 jobs:
   # SAST
@@ -54,14 +54,14 @@ jobs:
         with:
           appname: "${{ github.repository }}"
           version: "${{ github.run_id }}-${{ steps.current_date_and_time.outputs.date_and_time }}"
-          filepath: "celostar-starrocks-java.zip"
+          filepath: "jars_for_static_scan"
           vid: "${{ secrets.VERACODE_API_ID }}"
           vkey: "${{ secrets.VERACODE_API_SECRET }}"
           scantimeout: 240
 
       - name: Clean up
         run: |
-          rm celostar-starrocks-java.zip
+          rm -rf jars_for_static_scan
           docker container stop ${{ env.container_id }}
           docker rm ${{ env.container_id }}
           docker system prune -f

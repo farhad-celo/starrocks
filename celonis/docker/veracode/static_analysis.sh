@@ -10,6 +10,9 @@ echo "./build.sh --fe --clean";
 echo "./build.sh --be --clean -j `nproc`";
 ./build.sh --be --clean -j `nproc`;
 
+echo "mkdir jars_for_static_scan"
+mkdir jars_for_static_scan
+
 # Zip FE
 echo "Start to zip jars in output"
-find ./output -name '*.jar' -print -exec zip celostar-starrocks-java.zip {} +
+find ./output -name '*.jar' -exec mv {} jars_for_static_scan \;
