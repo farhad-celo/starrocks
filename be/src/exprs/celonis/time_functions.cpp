@@ -4,6 +4,7 @@
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "column/array_column.h"
+#include "exprs/base64.h"
 #include "exprs/celonis/util.h"
 #include "google/protobuf/util/json_util.h"
 #include "modules/query/calendars.pb.h"
@@ -819,9 +820,29 @@ struct CalendarState {
     bool is_empty;
 };
 
+static bool
+base64_encoded_string_to_calendar(const std::string &calendar_string, celonis::accelerator::Calendar &calendar) {
+    int cipher_len = calendar_string.length();
+    std::unique_ptr<char[]> p;
+    p.reset(new char[cipher_len + 3]);
+
+    int len = base64_decode2(calendar_string.data(), calendar_string.length(), p.get());
+    std::string decoded_string(p.get(), len);
+    bool success = calendar.ParseFromString(decoded_string);
+    return success;
+}
+
 static bool json_string_to_calendar(const std::string& calendar_json_string, celonis::accelerator::Calendar& calendar) {
     auto status = google::protobuf::util::JsonStringToMessage(calendar_json_string, &calendar);
     return status.ok();
+}
+
+static bool string_to_calendar(const std::string& calendar_string, celonis::accelerator::Calendar& calendar) {
+    if (calendar_string.empty() || calendar_string.find('{') != std::string::npos) {
+        return json_string_to_calendar(calendar_string, calendar);
+    } else {
+        return base64_encoded_string_to_calendar(calendar_string, calendar);
+    }
 }
 
 static Status validate_weekday_calendar_entry(const celonis::accelerator::WeekdayCalendarEntry& entry) {
@@ -1019,11 +1040,11 @@ timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue
 }
 
 StatusOr<celonis::accelerator::Calendar>
-validate_and_to_proto(const std::string& calendar_json_string, bool in_prepare = false,
+validate_and_to_proto(const std::string& calendar_string, bool in_prepare = false,
                       bool reject_year_gap_in_workday_calendar = false) {
     celonis::accelerator::Calendar calendar_proto;
-    // parse calendar_json_string
-    if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
+    // parse calendar_string
+    if (!string_to_calendar(calendar_string, calendar_proto)) {
         const std::string msg =
                 (in_prepare ? "[prepare] " : "") + std::string("Calendar specification column is malformed.");
         return Status::InvalidArgument(msg.c_str());
@@ -1034,11 +1055,11 @@ validate_and_to_proto(const std::string& calendar_json_string, bool in_prepare =
 
 static StatusOr<std::optional<int64_t>>
 remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::string& time_unit,
-                         const std::string& calendar_json_string,
+                         const std::string& calendar_string,
                          std::optional<std::string>& calendar_id) {
     TimestampValue timestamp = input_timestamp;
     int64_t milliseconds = 0L;
-    if (calendar_json_string.empty()) {
+    if (calendar_string.empty()) {
         if (calendar_id.has_value()) {
             return Status::InvalidArgument(
                     "Calendar ID column should not be set when calendar specification is not set.");
@@ -1046,7 +1067,7 @@ remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::strin
         milliseconds = remap_timestamp_ms(timestamp);
     } else {
         ASSIGN_OR_RETURN(const celonis::accelerator::Calendar calendar_proto,
-                         validate_and_to_proto(calendar_json_string));
+                         validate_and_to_proto(calendar_string));
         Calendar calendar(calendar_proto);
         if (calendar.requires_calendar_id() && !calendar_id.has_value()) {
             return Status::InvalidArgument("Calendar ID column not provided.");
@@ -1090,14 +1111,14 @@ Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope sco
         context->set_function_state(scope, calendar_state);
         return Status::OK();
     }
-    ASSIGN_OR_RETURN(const std::string calendar_json_string, get_calendar_string(calendar_column->get(0).get_array()));
-    if (calendar_json_string.empty()) {
+    ASSIGN_OR_RETURN(const std::string calendar_string, get_calendar_string(calendar_column->get(0).get_array()));
+    if (calendar_string.empty()) {
         auto* calendar_state = new CalendarState{Calendar(), false, true};
         context->set_function_state(scope, calendar_state);
         return Status::OK();
     }
     ASSIGN_OR_RETURN(const celonis::accelerator::Calendar calendar_proto,
-                     validate_and_to_proto(calendar_json_string, true));
+                     validate_and_to_proto(calendar_string, true));
     auto* calendar_state = new CalendarState{Calendar(calendar_proto), false, false};
     context->set_function_state(scope, calendar_state);
     return Status::OK();
@@ -1260,16 +1281,16 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
         const auto timestamp = timestamp_viewer.value(row);
         size_t start = calendar_offsets[row];
         size_t end = calendar_offsets[row + 1];
-        std::string calendar_json_string;
+        std::string calendar_string;
         std::optional<std::string> calendar_id = std::nullopt;
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
         for (size_t id = start; id < end; ++id) {
-            calendar_json_string += calendars[id].to_string();
+            calendar_string += calendars[id].to_string();
         }
         ASSIGN_OR_RETURN(const std::optional<int64_t> time,
-                         remap_timestamp_calendar(timestamp, time_unit, calendar_json_string, calendar_id));
+                         remap_timestamp_calendar(timestamp, time_unit, calendar_string, calendar_id));
         if (time.has_value()) {
             result.append(time.value());
         } else {
@@ -1312,13 +1333,13 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_between([[maybe_unused]] Function
 
 static StatusOr<std::optional<bool>>
 timestamp_in_calendar(const TimestampValue& timestamp,
-                      const std::string& calendar_json_string,
+                      const std::string& calendar_string,
                       const std::optional<std::string>& calendar_id) {
-    if (calendar_json_string.empty()) {
+    if (calendar_string.empty()) {
         return std::nullopt;
     } else {
         ASSIGN_OR_RETURN(const celonis::accelerator::Calendar calendar_proto,
-                         validate_and_to_proto(calendar_json_string));
+                         validate_and_to_proto(calendar_string));
         Calendar calendar(calendar_proto);
         return calendar.is_timestamp_in(timestamp, calendar_id);
     }
@@ -1348,16 +1369,16 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
         auto timestamp = timestamp_viewer.value(row);
         size_t start = calendar_offsets[row];
         size_t end = calendar_offsets[row + 1];
-        std::string calendar_json_string;
+        std::string calendar_string;
         std::optional<std::string> calendar_id = std::nullopt;
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
         for (size_t id = start; id < end; ++id) {
-            calendar_json_string += calendars[id].to_string();
+            calendar_string += calendars[id].to_string();
         }
         ASSIGN_OR_RETURN(std::optional<bool> is_in,
-                         timestamp_in_calendar(timestamp, calendar_json_string, calendar_id));
+                         timestamp_in_calendar(timestamp, calendar_string, calendar_id));
         if (is_in.has_value()) {
             result.append(is_in.value() ? 1L : 0L);
         } else {
@@ -1426,12 +1447,12 @@ static StatusOr<celonis::accelerator::Calendar>
 get_calendar(const Slice* const calendars, const unsigned int* const offsets, int row) {
     size_t start = offsets[row];
     size_t end = offsets[row + 1];
-    std::string calendar_json_string;
+    std::string calendar_string;
     for (size_t i = start; i < end; ++i) {
-        calendar_json_string += calendars[i].to_string();
+        calendar_string += calendars[i].to_string();
     }
     celonis::accelerator::Calendar calendar_proto;
-    if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
+    if (!string_to_calendar(calendar_string, calendar_proto)) {
         return Status::InvalidArgument("Calendar json string is malformed.");
     }
     RETURN_IF_ERROR(validate_calendar(calendar_proto));
@@ -1499,9 +1520,9 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
 
 static StatusOr<std::optional<TimestampValue>>
 add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value,
-              const std::string& calendar_json_string,
+              const std::string& calendar_string,
               std::optional<std::string>& calendar_id) {
-    if (calendar_json_string.empty()) {
+    if (calendar_string.empty()) {
         if (calendar_id.has_value()) {
             return Status::InvalidArgument(
                     "Calendar ID column should not be set when calendar specification is not set.");
@@ -1509,7 +1530,7 @@ add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int
         return add_timeunits_helper(timestamp, time_unit, add_value);
     } else {
         ASSIGN_OR_RETURN(const celonis::accelerator::Calendar calendar_proto,
-                         validate_and_to_proto(calendar_json_string));
+                         validate_and_to_proto(calendar_string));
         Calendar calendar(calendar_proto);
         return calendar.add_timeunits(timestamp, time_unit, add_value, calendar_id);
     }
@@ -1640,18 +1661,18 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
         auto to_timestamp = to_timestamp_viewer.value(row);
         size_t start = calendar_offsets[row];
         size_t end = calendar_offsets[row + 1];
-        std::string calendar_json_string;
+        std::string calendar_string;
         std::optional<std::string> calendar_id = std::nullopt;
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
         for (size_t id = start; id < end; ++id) {
-            calendar_json_string += calendars[id].to_string();
+            calendar_string += calendars[id].to_string();
         }
         std::optional<Calendar> calendar = std::nullopt;
-        if (!calendar_json_string.empty()) {
+        if (!calendar_string.empty()) {
             ASSIGN_OR_RETURN(const celonis::accelerator::Calendar calendar_proto,
-                             validate_and_to_proto(calendar_json_string, false, true));
+                             validate_and_to_proto(calendar_string, false, true));
             calendar = Calendar(calendar_proto);
         }
         ASSIGN_OR_RETURN(const std::optional<double> diff,
@@ -1753,16 +1774,16 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
         auto add_value = add_value_viewer.value(row);
         size_t start = calendar_offsets[row];
         size_t end = calendar_offsets[row + 1];
-        std::string calendar_json_string;
+        std::string calendar_string;
         std::optional<std::string> calendar_id = std::nullopt;
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
         for (size_t id = start; id < end; ++id) {
-            calendar_json_string += calendars[id].to_string();
+            calendar_string += calendars[id].to_string();
         }
         ASSIGN_OR_RETURN(const std::optional<TimestampValue> new_timestamp,
-                         add_timeunits(timestamp, time_unit, add_value, calendar_json_string, calendar_id));
+                         add_timeunits(timestamp, time_unit, add_value, calendar_string, calendar_id));
         if (new_timestamp.has_value()) {
             result.append(new_timestamp.value());
         } else {
