@@ -8,15 +8,18 @@
 #include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
+#include "exprs/base64.h"
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/linear_regression.h"
 #include "exprs/celonis/agg/weekday_calendar.h"
 #include "exprs/celonis/agg/workday_calendar.h"
 #include "exprs/function_context.h"
+#include "modules/query/calendars.pb.h"
 #include "runtime/mem_pool.h"
 #include "testutil/function_utils.h"
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include <google/protobuf/util/json_util.h>
 
 namespace starrocks {
 
@@ -59,6 +62,23 @@ public:
             }
         }
         return true;
+    }
+
+    std::optional<std::string> to_calendar_json_string(const std::string& encoded_string) {
+        int cipher_len = encoded_string.length();
+        std::unique_ptr<char[]> p;
+        p.reset(new char[cipher_len + 3]);
+
+        int len = base64_decode2(encoded_string.data(), encoded_string.length(), p.get());
+        std::string decoded_string(p.get(), len);
+        celonis::accelerator::Calendar calendar_proto;
+        bool success = calendar_proto.ParseFromString(decoded_string);
+        if (!success) {
+            return std::nullopt;
+        }
+        std::string calendar_json;
+        google::protobuf::util::MessageToJsonString(calendar_proto, &calendar_json);
+        return calendar_json;
     }
 
 private:
@@ -598,9 +618,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         // test finalize_to_column.
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_EQ(
-                R"([['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}}']])",
-                res_array_col->debug_string());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}})");
     }
     // mixed NULL and non-NULL start/end, NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -668,9 +690,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         // test finalize_to_column.
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_EQ(
-                R"([['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}}']])",
-                res_array_col->debug_string());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000"},{"startDate":"0","endDate":"7200000"}]}})");
     }
     // non-NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -729,9 +753,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         // test finalize_to_column.
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_EQ(
-                R"([['{"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000","calendarId":"id1"},{"startDate":"0","endDate":"7200000","calendarId":"id2"}]}}']])",
-                res_array_col->debug_string());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"factoryCalendar":{"entries":[{"startDate":"0","endDate":"3600000","calendarId":"id1"},{"startDate":"0","endDate":"7200000","calendarId":"id2"}]}})");
     }
     // empty input
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -778,7 +804,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
     }
     // no valid rows, row one has NULL start timestamp, row two has NULL end timestamp.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -832,7 +858,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
     }
     // no valid rows, both row one and row two have NULL start timestamp.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -886,7 +912,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
     }
     // negative timestamp
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -947,14 +973,15 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
-        EXPECT_EQ(
-                R"([['{"factoryCalendar":{"entries":[{"startDate":"-86400000","endDate":"3600000","calendarId":"id1"},{"startDate":"-172800000","endDate":"7200000","calendarId":"id2"}]}}']])",
-                res_array_col->debug_string());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"factoryCalendar":{"entries":[{"startDate":"-86400000","endDate":"3600000","calendarId":"id1"},{"startDate":"-172800000","endDate":"7200000","calendarId":"id2"}]}})");
     }
     // resultant calendar is longer than 1M.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        const int64_t n_rows = 20000;
+        const int64_t n_rows = 40000;
         auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
 

@@ -139,6 +139,7 @@ set(CELONIS_FILES
   celonis/agg/inductive_miner.cpp
   celonis/agg/linear_regression.cpp
   celonis/agg/product.cpp
+  celonis/agg/util.cpp
   celonis/agg/variant_agg.cpp
   celonis/agg/variant_stats.cpp
   celonis/abc_model.cpp

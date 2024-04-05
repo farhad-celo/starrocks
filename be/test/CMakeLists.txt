@@ -656,6 +656,8 @@ if (USE_AVX2)
 endif ()
 
 add_library(starrocks_test_objs OBJECT ${EXEC_FILES})
+target_include_directories(starrocks_test_objs PRIVATE "${BUILD_DIR}/generated")
+target_link_libraries(starrocks_test_objs PRIVATE celonis_calendars_protos)
 SET_TARGET_PROPERTIES(starrocks_test_objs PROPERTIES COMPILE_FLAGS "-fno-access-control -g1")
 add_executable(starrocks_test test_main.cpp $<TARGET_OBJECTS:starrocks_test_objs>)
 
