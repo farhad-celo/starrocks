@@ -6,6 +6,7 @@
 #include "column/array_column.h"
 #include "exprs/base64.h"
 #include "exprs/celonis/util.h"
+#include "exprs/celonis/agg/util.h"
 #include "google/protobuf/util/json_util.h"
 #include "modules/query/calendars.pb.h"
 #include "types/date_value.h"
@@ -1500,13 +1501,12 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
         celonis::accelerator::Calendar calendar_proto;
         calendar_proto.mutable_intersect_calendar()->mutable_calendar1()->CopyFrom(status_or_calendar1.value());
         calendar_proto.mutable_intersect_calendar()->mutable_calendar2()->CopyFrom(status_or_calendar2.value());
-        std::string calendar_json;
-        google::protobuf::util::MessageToJsonString(calendar_proto, &calendar_json);
+        std::string calendar_string = to_base64_encoded_string(calendar_proto);
 
         std::vector<std::string> calendar_pieces;
-        calendar_pieces.reserve((calendar_json.size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
-        for (size_t i = 0; i < calendar_json.size(); i += MAX_STRING_SIZE) {
-            calendar_pieces.emplace_back(calendar_json.substr(i, MAX_STRING_SIZE));
+        calendar_pieces.reserve((calendar_string.size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
+        for (size_t i = 0; i < calendar_string.size(); i += MAX_STRING_SIZE) {
+            calendar_pieces.emplace_back(calendar_string.substr(i, MAX_STRING_SIZE));
         }
         DatumArray array;
         for (const auto& calendar_piece: calendar_pieces) {

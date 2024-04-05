@@ -7,6 +7,8 @@
 #include "testutil/function_utils.h"
 #include "exprs/anyval_util.h"
 #include "exprs/base64.h"
+#include "modules/query/calendars.pb.h"
+#include "google/protobuf/util/json_util.h"
 
 namespace starrocks {
 
@@ -43,6 +45,23 @@ protected:
         int len = base64_encode2((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*)p);
         std::string encoded_string(p, len);
         return encoded_string;
+    }
+
+    std::optional<std::string> to_calendar_json_string(const std::string& encoded_string) {
+        int cipher_len = encoded_string.length();
+        std::unique_ptr<char[]> p;
+        p.reset(new char[cipher_len + 3]);
+
+        int len = base64_decode2(encoded_string.data(), encoded_string.length(), p.get());
+        std::string decoded_string(p.get(), len);
+        ::celonis::accelerator::Calendar calendar_proto;
+        bool success = calendar_proto.ParseFromString(decoded_string);
+        if (!success) {
+            return std::nullopt;
+        }
+        std::string calendar_json;
+        google::protobuf::util::MessageToJsonString(calendar_proto, &calendar_json);
+        return calendar_json;
     }
 };
 
@@ -3164,9 +3183,10 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar) {
                 R"(} })"});
         const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
         ASSERT_EQ(calendars1->size(), result->size());
-        EXPECT_EQ(
-                R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})",
-                result->get(0).get_array()[0].get_slice().to_string());
+        auto json_string = to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})");
     }
     {
         auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
@@ -3181,16 +3201,17 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar) {
                 R"(} })"});
         const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
         ASSERT_EQ(calendars1->size(), result->size());
-        EXPECT_EQ(
-                R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"factoryCalendar":{"entries":[{"startDate":"-100","endDate":"100"}]}}}})",
-                result->get(0).get_array()[0].get_slice().to_string());
+        auto json_string = to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"factoryCalendar":{"entries":[{"startDate":"-100","endDate":"100"}]}}}})");
     }
 }
 
 TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_long_calendar) {
     auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-    const size_t n_entries = 10000;
+    const size_t n_entries = 20000;
     DatumArray array;
     array.emplace_back(R"({"factory_calendar": {)");
     for (size_t i = 0; i < n_entries; ++i) {
