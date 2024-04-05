@@ -13,9 +13,8 @@
 // limitations under the License.
 
 #include "factory_calendar.h"
-#include "modules/query/calendars.pb.h"
-#include <google/protobuf/util/json_util.h>
 #include "exprs/celonis/agg/util.h"
+#include "modules/query/calendars.pb.h"
 
 namespace starrocks {
 

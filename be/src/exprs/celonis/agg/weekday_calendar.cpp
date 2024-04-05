@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "weekday_calendar.h"
+#include "exprs/celonis/agg/util.h"
 #include "modules/query/calendars.pb.h"
-#include <google/protobuf/util/json_util.h>
 
 namespace starrocks {
 
@@ -257,12 +257,11 @@ void WeekdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
             }
         }
     }
-    std::string calendar_json;
-    google::protobuf::util::MessageToJsonString(calendar_proto, &calendar_json);
+    std::string calendar_string = to_base64_encoded_string(calendar_proto);
     std::vector<std::string> calendar_pieces;
-    calendar_pieces.reserve((calendar_json.size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
-    for (size_t i = 0; i < calendar_json.size(); i += MAX_STRING_SIZE) {
-        calendar_pieces.emplace_back(calendar_json.substr(i, MAX_STRING_SIZE));
+    calendar_pieces.reserve((calendar_string.size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
+    for (size_t i = 0; i < calendar_string.size(); i += MAX_STRING_SIZE) {
+        calendar_pieces.emplace_back(calendar_string.substr(i, MAX_STRING_SIZE));
     }
     DatumArray array;
     for (const auto& calendar_piece: calendar_pieces) {
