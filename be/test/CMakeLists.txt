@@ -156,6 +156,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/variant_agg_test.cpp
         ./exprs/celonis/agg/variant_stats_test.cpp
         ./exprs/celonis/abc_model_test.cpp
+        ./exprs/celonis/adjust_daily_timestamps_test.cpp
         ./exprs/celonis/align_model_test.cpp
         ./exprs/celonis/array_avg_test.cpp
         ./exprs/celonis/array_count_distinct_test.cpp
@@ -163,6 +164,7 @@ set(EXEC_FILES
         ./exprs/celonis/array_functions_test.cpp
         ./exprs/celonis/calc_throughput_test.cpp
         ./exprs/celonis/conformance_test.cpp
+        ./exprs/celonis/eventlog_utils.cpp
         ./exprs/celonis/greatest_least_test.cpp
         ./exprs/celonis/in_test.cpp
         ./exprs/celonis/in_like_test.cpp

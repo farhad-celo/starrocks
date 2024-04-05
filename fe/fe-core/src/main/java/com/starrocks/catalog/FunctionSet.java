@@ -522,6 +522,7 @@ public class FunctionSet {
 
 
     // Celonis functions:
+    public static final String CELONIS_ADJUST_DAILY_TIMESTAMPS = "celonis_adjust_daily_timestamps";
     public static final String CELONIS_ALIGN_MODEL = "celonis_align_model";
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";

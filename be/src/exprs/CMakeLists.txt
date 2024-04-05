@@ -143,6 +143,7 @@ set(CELONIS_FILES
   celonis/agg/variant_agg.cpp
   celonis/agg/variant_stats.cpp
   celonis/abc_model.cpp
+  celonis/adjust_daily_timestamps.cpp
   celonis/align_model.cpp
   celonis/array_avg.cpp
   celonis/array_count_distinct.cpp

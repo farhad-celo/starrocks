@@ -971,6 +971,15 @@ public class FunctionAnalyzer {
             intermediateFieldTypes.add(Type.VARBINARY);
             ((AggregateFunction) fn).setIntermediateType(new StructType(intermediateFieldTypes));
             // RetType was set by deduce.
+        } else if (FunctionSet.CELONIS_ADJUST_DAILY_TIMESTAMPS.equals(fnName)) {
+            // Set struct type
+            fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_ADJUST_DAILY_TIMESTAMPS, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            ArrayList<StructField> sf = Lists.newArrayList();
+            sf.add(new StructField("adjusted_timestamps", Type.ARRAY_DATETIME));
+            sf.add(new StructField("reordering", Type.ARRAY_BIGINT));
+            fn.setRetType(new StructType(sf));
         } else if (FunctionSet.STR_TO_DATE.equals(fnName)) {
             fn = getStrToDateFunction(node, argumentTypes);
         } else if (FunctionSet.ARRAY_GENERATE.equals(fnName)) {
