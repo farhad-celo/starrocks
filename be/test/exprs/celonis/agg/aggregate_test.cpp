@@ -199,9 +199,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         // test finalize_to_column.
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_EQ(
-                R"([['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}}']])",
-                res_array_col->debug_string());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}})");
     }
     // mixed NULL and non-NULL year, is_workdays, NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -266,9 +268,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         // test finalize_to_column.
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_EQ(
-                R"([['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}}']])",
-                res_array_col->debug_string());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}})");
     }
     // non-NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -327,9 +331,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         // test finalize_to_column.
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_EQ(
-                R"([['{"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true],"calendarId":"id1"},{"year":"1971","isWorkday":[true,false,true,false],"calendarId":"id2"}]}}']])",
-                res_array_col->debug_string());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true],"calendarId":"id1"},{"year":"1971","isWorkday":[true,false,true,false],"calendarId":"id2"}]}})");
     }
     // empty input
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -375,7 +381,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
     }
     // no valid rows, row one has NULL year, row two has NULL is_workdays
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -429,7 +435,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
     }
     // no valid rows, both rows contain NULL year
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -483,12 +489,12 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
-        EXPECT_EQ("[['{}']]", res_array_col->debug_string());
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
     }
     // resultant calendar is longer than 1M.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        const int64_t n_rows = 20000;
+        const int64_t n_rows = 40000;
         auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
 
@@ -518,9 +524,9 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         // test finalize_to_column.
         auto res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_GT(res_array_col->debug_string().size(), 2000000);
+        EXPECT_GT(res_array_col->debug_string().size(), 1000000);
         EXPECT_EQ(1, res_array_col->size());
-        EXPECT_EQ(3, res_array_col->get(0).get_array().size());
+        EXPECT_EQ(2, res_array_col->get(0).get_array().size());
         EXPECT_LT(res_array_col->get(0).get_array()[0].get_slice().to_string().size(), 1000000);
         EXPECT_LT(res_array_col->get(0).get_array()[1].get_slice().to_string().size(), 1000000);
     }
