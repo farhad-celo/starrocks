@@ -3237,7 +3237,10 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_empty_calendar_array) {
                 R"(} })"});
         const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
         ASSERT_EQ(calendars1->size(), result->size());
-        EXPECT_TRUE(result->get(0).is_null());
+        auto json_string = to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"intersectCalendar":{"calendar1":{},"calendar2":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})");
     }
     // calendar2 array is empty
     {
@@ -3250,7 +3253,10 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_empty_calendar_array) {
         calendars2->append_datum(DatumArray{});
         const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
         ASSERT_EQ(calendars1->size(), result->size());
-        EXPECT_TRUE(result->get(0).is_null());
+        auto json_string = to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{}}})");
     }
     // both calendar1 and calendar2 arrays are empty
     {
@@ -3260,7 +3266,9 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_empty_calendar_array) {
         calendars2->append_datum(DatumArray{});
         const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
         ASSERT_EQ(calendars1->size(), result->size());
-        EXPECT_TRUE(result->get(0).is_null());
+        auto json_string = to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"intersectCalendar":{"calendar1":{},"calendar2":{}}})");
     }
 }
 

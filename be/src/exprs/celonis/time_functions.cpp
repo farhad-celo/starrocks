@@ -839,7 +839,7 @@ static bool json_string_to_calendar(const std::string& calendar_json_string, cel
 }
 
 static bool string_to_calendar(const std::string& calendar_string, celonis::accelerator::Calendar& calendar) {
-    if (calendar_string.empty() || calendar_string.find('{') != std::string::npos) {
+    if (calendar_string.find('{') != std::string::npos) {
         return json_string_to_calendar(calendar_string, calendar);
     } else {
         return base64_encoded_string_to_calendar(calendar_string, calendar);
