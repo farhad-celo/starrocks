@@ -2085,28 +2085,19 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_weekday_calendar) {
         to_timestamps->append_datum(TimestampValue::create(2018, 1, 6, 1, 0, 0));
         from_timestamps->append_datum(TimestampValue::create(2018, 1, 8, 2, 0, 0));
         to_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 2, 0, 0));
-        time_units->append_datum("DAYS");
-        time_units->append_datum("DAYS");
-        calendars->append_datum(DatumArray{
-                R"({"weekday_calendar": {)",
-                // [8:00 am, 5:00 pm]
-                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"(} })"});
-        calendars->append_datum(DatumArray{
-                R"({"weekday_calendar": {)",
-                // [8:00 am, 5:00 pm]
-                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"(} })"});
-        calendar_ids->append_datum(kNullDatum);
-        calendar_ids->append_datum(kNullDatum);
+        for (auto i = 0; i < from_timestamps->size(); ++i) {
+            time_units->append_datum("DAYS");
+            calendars->append_datum(DatumArray{
+                    R"({"weekday_calendar": {)",
+                    // [8:00 am, 5:00 pm]
+                    R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"(} })"});
+            calendar_ids->append_datum(kNullDatum);
+        }
         const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
                                                                              {from_timestamps, to_timestamps,
                                                                               time_units, calendars,
@@ -2125,28 +2116,86 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_weekday_calendar) {
         to_timestamps->append_datum(TimestampValue::create(2018, 1, 6, 1, 0, 0));
         from_timestamps->append_datum(TimestampValue::create(2018, 1, 8, 2, 0, 0));
         to_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 2, 0, 0));
-        time_units->append_datum("WORKDAYS");
-        time_units->append_datum("WORKDAYS");
-        calendars->append_datum(DatumArray{
-                R"({"weekday_calendar": {)",
-                // [8:00 am, 5:00 pm]
-                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"(} })"});
-        calendars->append_datum(DatumArray{
-                R"({"weekday_calendar": {)",
-                // [8:00 am, 5:00 pm]
-                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"(} })"});
-        calendar_ids->append_datum(kNullDatum);
-        calendar_ids->append_datum(kNullDatum);
+
+        for (auto i = 0; i < from_timestamps->size(); ++i) {
+            time_units->append_datum("WORKDAYS");
+            calendars->append_datum(DatumArray{
+                    R"({"weekday_calendar": {)",
+                    // [8:00 am, 5:00 pm]
+                    R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                    R"(} })"});
+            calendar_ids->append_datum(kNullDatum);
+        }
+        const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
+                                                                             {from_timestamps, to_timestamps,
+                                                                              time_units, calendars,
+                                                                              calendar_ids}).value();
+        ASSERT_EQ(from_timestamps->size(), result->size());
+        EXPECT_EQ(3.0, result->get(0).get_double());
+        EXPECT_EQ(-5.0, result->get(1).get_double());
+    }
+    {
+        auto from_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto to_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        from_timestamps->append_datum(TimestampValue::create(2018, 1, 2, 1, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(2018, 1, 6, 1, 0, 0));
+        from_timestamps->append_datum(TimestampValue::create(2018, 1, 8, 2, 0, 0));
+        to_timestamps->append_datum(TimestampValue::create(2018, 1, 1, 2, 0, 0));
+        ::celonis::accelerator::Calendar calendar_proto;
+        google::protobuf::TextFormat::ParseFromString(R"(
+            multi_weekday_calendar {
+              calendars {
+                monday {
+                  use_day: true
+                  shift {
+                    begin: 28800000
+                    end: 61200000
+                  }
+                }
+                tuesday {
+                  use_day: true
+                  shift {
+                    begin: 28800000
+                    end: 61200000
+                  }
+                }
+                thursday {
+                  use_day: true
+                  shift {
+                    begin: 28800000
+                    end: 61200000
+                  }
+                }
+                friday {
+                  use_day: true
+                  shift {
+                    begin: 28800000
+                    end: 61200000
+                  }
+                }
+                saturday {
+                  use_day: true
+                  shift {
+                    begin: 28800000
+                    end: 61200000
+                  }
+                }
+              }
+            }
+        )", &calendar_proto);
+        std::string encoded_string = to_base64_encoded_string(calendar_proto);
+        for (auto i = 0; i < from_timestamps->size(); ++i) {
+            time_units->append_datum("WORKDAYS");
+            calendars->append_datum(DatumArray{encoded_string.c_str()});
+            calendar_ids->append_datum(kNullDatum);
+        }
         const auto result = CelonisTimeFunctions::timeunits_between_calendar(nullptr,
                                                                              {from_timestamps, to_timestamps,
                                                                               time_units, calendars,
