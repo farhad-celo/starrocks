@@ -8,6 +8,7 @@
 #include "exprs/anyval_util.h"
 #include "exprs/base64.h"
 #include "modules/query/calendars.pb.h"
+#include "google/protobuf/text_format.h"
 #include "google/protobuf/util/json_util.h"
 
 namespace starrocks {
@@ -34,11 +35,10 @@ protected:
         return rv;
     }
 
-    std::string to_base64_encoded_string(const std::vector<int>& byte_values) {
+    std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& calendar_proto) {
         std::string binary_string;
-        for (unsigned char byte : byte_values) {
-            binary_string += byte;
-        }
+        calendar_proto.SerializeToString(&binary_string);
+
         int cipher_len = (size_t)(4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
         char p[cipher_len];
 
@@ -320,10 +320,23 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_weekday_calendar) {
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         time_units->append_datum("SECONDS");
-        // "thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} }
-        std::vector<int> byte_values = {18, 11, 34, 9, 8, 1, 18, 5, 8, 0, 16, 232, 7};
-        std::string encoded_string = to_base64_encoded_string(byte_values);
+        ::celonis::accelerator::Calendar calendar_proto;
+        google::protobuf::TextFormat::ParseFromString(R"(
+        multi_weekday_calendar {
+          calendars {
+            thursday {
+              use_day: true
+              shift {
+                begin: 0
+                end: 1000
+              }
+            }
+          }
+        }
+        )", &calendar_proto);
+        std::string encoded_string = to_base64_encoded_string(calendar_proto);
         calendars->append_datum(DatumArray{encoded_string.c_str()});
+
         calendar_ids->append_datum(kNullDatum);
         const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
                                                                                       calendar_ids}).value();
@@ -337,9 +350,21 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_weekday_calendar) {
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         time_units->append_datum("SECONDS");
-        // "thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} }
-        std::vector<int> byte_values = {18, 11, 34, 9, 8, 1, 18, 5, 8, 0, 16, 232, 7};
-        std::string encoded_string = to_base64_encoded_string(byte_values);
+        ::celonis::accelerator::Calendar calendar_proto;
+        google::protobuf::TextFormat::ParseFromString(R"(
+        multi_weekday_calendar {
+          calendars {
+            thursday {
+              use_day: true
+              shift {
+                begin: 0
+                end: 1000
+              }
+            }
+          }
+        }
+        )", &calendar_proto);
+        std::string encoded_string = to_base64_encoded_string(calendar_proto);
         std::string first_half = encoded_string.substr(0, encoded_string.length() / 2);
         std::string second_half = encoded_string.substr(encoded_string.length() / 2);
         calendars->append_datum(DatumArray{first_half.c_str(), second_half.c_str()});
@@ -1606,10 +1631,21 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_multi_weekday_calendar) {
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(1970, 1, 1, 9, 0, 0));
-        // R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)"
-        std::vector<int> byte_values = {42, 18, 10, 16, 34, 14, 8, 1, 18, 10, 8, 128, 232, 221, 13, 16, 128, 173,
-                                        151, 29};
-        std::string encoded_string = to_base64_encoded_string(byte_values);
+        ::celonis::accelerator::Calendar calendar_proto;
+        google::protobuf::TextFormat::ParseFromString(R"(
+        multi_weekday_calendar {
+          calendars {
+            thursday {
+              use_day: true
+              shift {
+                begin: 28800000
+                end: 61200000
+              }
+            }
+          }
+        }
+        )", &calendar_proto);
+        std::string encoded_string = to_base64_encoded_string(calendar_proto);
         calendars->append_datum(DatumArray{encoded_string.c_str()});
         calendar_ids->append_datum(kNullDatum);
         const auto result = CelonisTimeFunctions::in_calendar(nullptr,
@@ -4237,15 +4273,22 @@ TEST_F(CelonisTimeFunctionsTest, add_minutes_with_calendar) {
         add_values->append_datum(62L);
         calendar_ids->append_datum("DE");
         calendar_ids->append_datum("US");
-
-        // R"("entries": {"start_date": 1514880000000, "end_date": 1514912400000, "calendar_id": "DE"}, )"
-        // R"("entries": {"start_date": 1514901600000, "end_date": 1514934000000, "calendar_id": "US"}, )"
-        std::vector<int> byte_values = {26, 40, 10, 18, 8, 128, 192, 137, 175, 139,
-                                        44, 16, 128, 133, 195, 190, 139, 44, 26, 2,
-                                        68, 69, 10, 18, 8, 128, 238, 175, 185, 139,
-                                        44, 16, 128, 179, 233, 200, 139, 44, 26, 2,
-                                        85, 83};
-        std::string encoded_string = to_base64_encoded_string(byte_values);
+        ::celonis::accelerator::Calendar calendar_proto;
+        google::protobuf::TextFormat::ParseFromString(R"(
+        factory_calendar {
+          entries {
+            start_date: 1514880000000
+            end_date: 1514912400000
+            calendar_id: "DE"
+          }
+          entries {
+            start_date: 1514901600000
+            end_date: 1514934000000
+            calendar_id: "US"
+          }
+        }
+        )", &calendar_proto);
+        std::string encoded_string = to_base64_encoded_string(calendar_proto);
         for (auto i = 0; i < timestamps->size(); ++i) {
             time_units->append_datum("MINUTES");
             calendars->append_datum(DatumArray{encoded_string.c_str()});
