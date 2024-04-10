@@ -1,4 +1,4 @@
-#include "mode_agg.h"
+#include "mode.h"
 
 #include "column/const_column.h"
 #include "exprs/celonis/serialization_utils.h"
@@ -94,11 +94,10 @@ void CelonisModeState<LT>::deserialize_from_src_and_merge(FunctionContext* const
 template <LogicalType LT>
 void CelonisModeAggregateFunction<LT>::update(FunctionContext* const ctx, const Column** const columns,
                                               AggDataPtr __restrict state, const size_t row_num) const {
-    const auto& input_column{down_cast<const NullableColumn&>(**columns)};
-    if (!input_column.is_null(row_num)) {
-        const Datum& value{input_column.data_column()->get(row_num)};
-        this->data(state).increment_occurrence(ctx, value.get<RunTimeCppType<LT>>());
-    }
+    using InputColumnType = RunTimeColumnType<LT>;
+    const auto& input_column{down_cast<const InputColumnType&>(**columns)};
+    const Datum value{input_column.get(row_num)};
+    this->data(state).increment_occurrence(ctx, value.get<RunTimeCppType<LT>>());
 }
 
 template <LogicalType LT>
@@ -125,9 +124,26 @@ void CelonisModeAggregateFunction<LT>::serialize_to_column([[maybe_unused]] Func
 template <LogicalType LT>
 void CelonisModeAggregateFunction<LT>::finalize_to_column([[maybe_unused]] FunctionContext* const ctx,
                                                           ConstAggDataPtr __restrict state, Column* const to) const {
+    using ResultColumnType = RunTimeColumnType<LT>;
+    auto& result_column{down_cast<ResultColumnType&>(*to)};
     const auto optional_final_result{this->data(state).most_frequent_or_null()};
-    auto& result_column{down_cast<NullableColumn&>(*to)};
-    result_column.append_datum(optional_final_result.has_value() ? Datum{*optional_final_result} : kNullDatum);
+    // The nullable aggregation wrapper handles nulls.
+    // If the input was empty, we do not have any final value
+    if (optional_final_result.has_value()) {
+        result_column.append(*optional_final_result);
+    }
+}
+
+template <LogicalType LT>
+void CelonisModeAggregateFunction<LT>::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
+                                                                   size_t chunk_size, ColumnPtr* dst) const {
+    // Used for streaming aggregation. Not implemented.
+    throw std::runtime_error("celonis_mode: convert_to_serialize_format not supported");
+}
+
+template <LogicalType LT>
+std::string CelonisModeAggregateFunction<LT>::get_name() const {
+    return "celonis_mode";
 }
 
 template class CelonisModeState<TYPE_BIGINT>;

@@ -149,6 +149,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/enumerate_transitive_edges_test.cpp
         ./exprs/celonis/agg/histogram_boundaries_test.cpp
         ./exprs/celonis/agg/inductive_miner_test.cpp
+        ./exprs/celonis/agg/mode_test.cpp
         ./exprs/celonis/agg/multi_linear_regression_test.cpp
         ./exprs/celonis/agg/product_test.cpp
         ./exprs/celonis/agg/sorted_first_last_test.cpp
@@ -175,7 +176,6 @@ set(EXEC_FILES
         ./exprs/celonis/match_process_test.cpp
         ./exprs/celonis/math_functions_test.cpp
         ./exprs/celonis/mo_bpmn_graph_test.cpp
-        ./exprs/celonis/mode_agg_test.cpp
         ./exprs/celonis/multi_in_test.cpp
         ./exprs/celonis/qnorm_test.cpp
         ./exprs/celonis/remap_values_test.cpp

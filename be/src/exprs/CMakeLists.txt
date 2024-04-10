@@ -138,6 +138,7 @@ set(CELONIS_FILES
   celonis/agg/workday_calendar.cpp
   celonis/agg/inductive_miner.cpp
   celonis/agg/linear_regression.cpp
+  celonis/agg/mode.cpp
   celonis/agg/product.cpp
   celonis/agg/util.cpp
   celonis/agg/variant_agg.cpp
@@ -160,7 +161,6 @@ set(CELONIS_FILES
   celonis/match_process.cpp
   celonis/math_functions.cpp
   celonis/mo_bpmn_graph.cpp
-  celonis/mode_agg.cpp
   celonis/multi_in.cpp
   celonis/qnorm.cpp
   celonis/remap_timestamp_weekday.cpp

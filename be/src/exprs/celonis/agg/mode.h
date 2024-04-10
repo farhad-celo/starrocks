@@ -24,14 +24,14 @@ public:
     CelonisModeState() = default;
 
     /**
-         * @brief Increments the occurrence cout of the given value.
-         * @note If the value was not yet stored and is a string, allocates memory in the current given function context
-         */
+      * @brief Increments the occurrence of the given value.
+      * @note If the value was not yet stored and is a string, allocates memory in the current given function context
+      */
     void increment_occurrence(FunctionContext* ctx, ValueType value, OccurrenceCountType count = 1);
     /**
-         * @brief Returns the currently most frequently occurring value or std::nullopt if there are no values stored
-         * @note If multiple values have the same number of occurrences, the smaller value is returned as tie breaker
-         */
+      * @brief Returns the currently most frequently occurring value or std::nullopt if there are no values stored
+      * @note If multiple values have the same number of occurrences, the smaller value is returned as tie breaker
+      */
     [[nodiscard]] std::optional<const ValueType> most_frequent_or_null() const;
     /** Returns the total number of required bytes to serialize this state */
     [[nodiscard]] std::size_t serialization_size() const;
@@ -62,18 +62,14 @@ template <LogicalType LT>
 class CelonisModeAggregateFunction final
         : public AggregateFunctionBatchHelper<CelonisModeState<LT>, CelonisModeAggregateFunction<LT>> {
 public:
-    void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state, size_t row_num) const override;
+    void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
+                size_t row_num) const override;
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override;
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override;
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override;
-
-    void convert_to_serialize_format([[maybe_unused]] FunctionContext* ctx, [[maybe_unused]] const Columns& src,
-                                     [[maybe_unused]] size_t chunk_size, [[maybe_unused]] ColumnPtr* dst) const override {
-        // Used for streaming aggregation. Not implemented.
-        throw std::runtime_error("celonis_mode: convert_to_serialize_format not supported");
-    }
-
-    [[nodiscard]] std::string get_name() const { return "celonis_mode"; }
+    void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
+                                     ColumnPtr* dst) const override;
+    [[nodiscard]] std::string get_name() const override;
 };
 
 } // namespace starrocks

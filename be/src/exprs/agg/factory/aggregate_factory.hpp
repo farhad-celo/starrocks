@@ -68,7 +68,7 @@
 #include "exprs/celonis/agg/variant_stats.h"
 #include "exprs/celonis/agg/weekday_calendar.h"
 #include "exprs/celonis/agg/workday_calendar.h"
-#include "exprs/celonis/mode_agg.h"
+#include "exprs/celonis/agg/mode.h"
 #include "types/logical_type.h"
 #include "types/logical_type_infra.h"
 #include "udf/java/java_function_fwd.h"
