@@ -1267,6 +1267,7 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
         return Status::InvalidArgument("Calendar array should not have null elements.");
     }
     DCHECK(calendar_array_data.elements->is_binary());
+    DCHECK_EQ(calendar_array_data.offsets->size(), n_rows + 1);
     const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *calendar_array_data.elements).get_data().data();
     const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
@@ -1357,6 +1358,7 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
         return Status::InvalidArgument("Calendar array can not contain null values.");
     }
     DCHECK(calendar_array_data.elements->is_binary());
+    DCHECK_EQ(calendar_array_data.offsets->size(), n_rows + 1);
     const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *calendar_array_data.elements).get_data().data();
     const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
@@ -1641,6 +1643,7 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
         return Status::InvalidArgument("Calendar array should not have null elements.");
     }
     DCHECK(calendar_array_data.elements->is_binary());
+    DCHECK_EQ(calendar_array_data.offsets->size(), n_rows + 1);
     const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *calendar_array_data.elements).get_data().data();
     const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
@@ -1757,6 +1760,7 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
         return Status::InvalidArgument("Calendar array should not have null elements.");
     }
     DCHECK(calendar_array_data.elements->is_binary());
+    DCHECK_EQ(calendar_array_data.offsets->size(), n_rows + 1);
     const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *calendar_array_data.elements).get_data().data();
     const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
