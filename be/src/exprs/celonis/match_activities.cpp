@@ -100,6 +100,17 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
     return 0L;
 }
 
+void _populate_filter(const ColumnPtr& column, int row, SliceHashSet& filter) {
+    if (!column->is_null(row)) {
+        auto start_node_array = column->get(row).get_array();
+        for (const auto& value: start_node_array) {
+            if (!value.is_null()) {
+                filter.insert(value.get_slice());
+            }
+        }
+    }
+}
+
 } // namespace
 
 Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* context,
@@ -128,30 +139,12 @@ Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* cont
         return Status::OK();
     }
 
-    auto start_node_array = start_nodes_column->get(0).get_array();
-    for (const auto& value: start_node_array) {
-        state->match_config.start_nodes.insert(value.get_slice());
-    }
-    auto node_array = nodes_column->get(0).get_array();
-    for (const auto& value: node_array) {
-        state->match_config.nodes.insert(value.get_slice());
-    }
-    auto end_node_array = end_nodes_column->get(0).get_array();
-    for (const auto& value: end_node_array) {
-        state->match_config.end_nodes.insert(value.get_slice());
-    }
-    auto excluding_node_array = excluding_nodes_column->get(0).get_array();
-    for (const auto& value: excluding_node_array) {
-        state->match_config.excluding_nodes.insert(value.get_slice());
-    }
-    auto excluding_all_node_array = excluding_all_nodes_column->get(0).get_array();
-    for (const auto& value: excluding_all_node_array) {
-        state->match_config.excluding_all_nodes.insert(value.get_slice());
-    }
-    auto any_node_array = any_nodes_column->get(0).get_array();
-    for (const auto& value: any_node_array) {
-        state->match_config.any_nodes.insert(value.get_slice());
-    }
+    _populate_filter(start_nodes_column, 0, state->match_config.start_nodes);
+    _populate_filter(nodes_column, 0, state->match_config.nodes);
+    _populate_filter(end_nodes_column, 0, state->match_config.end_nodes);
+    _populate_filter(excluding_nodes_column, 0, state->match_config.excluding_nodes);
+    _populate_filter(excluding_all_nodes_column, 0, state->match_config.excluding_all_nodes);
+    _populate_filter(any_nodes_column, 0, state->match_config.any_nodes);
     return Status::OK();
 }
 
@@ -181,39 +174,18 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(st
             continue;
         }
 
-        auto start_node_array = columns[1]->get(row).get_array();
         SliceHashSet start_nodes;
-        for (const auto& value: start_node_array) {
-            start_nodes.insert(value.get_slice());
-        }
-
-        auto node_array = columns[2]->get(row).get_array();
+        _populate_filter(columns[1], row, start_nodes);
         SliceHashSet nodes;
-        for (const auto& value: node_array) {
-            nodes.insert(value.get_slice());
-        }
-
-        auto end_node_array = columns[3]->get(row).get_array();
+        _populate_filter(columns[2], row, nodes);
         SliceHashSet end_nodes;
-        for (const auto& value: end_node_array) {
-            end_nodes.insert(value.get_slice());
-        }
-
-        auto excluding_node_array = columns[4]->get(row).get_array();
+        _populate_filter(columns[3], row, end_nodes);
         SliceHashSet excluding_nodes;
-        for (const auto& value: excluding_node_array) {
-            excluding_nodes.insert(value.get_slice());
-        }
-        auto excluding_all_node_array = columns[5]->get(row).get_array();
+        _populate_filter(columns[4], row, excluding_nodes);
         SliceHashSet excluding_all_nodes;
-        for (const auto& value: excluding_all_node_array) {
-            excluding_all_nodes.insert(value.get_slice());
-        }
-        auto any_node_array = columns[6]->get(row).get_array();
+        _populate_filter(columns[5], row, excluding_all_nodes);
         SliceHashSet any_nodes;
-        for (const auto& value: any_node_array) {
-            any_nodes.insert(value.get_slice());
-        }
+        _populate_filter(columns[6], row, any_nodes);
         result.append(
                 _match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes, end_nodes,
                                   excluding_nodes, excluding_all_nodes, any_nodes));

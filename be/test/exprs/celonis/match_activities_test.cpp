@@ -178,6 +178,33 @@ TEST_F(CelonisMatchActivitiesTest, with_start_and_end_nodes) {
     EXPECT_EQ(1L, result->get(6).get_int64());
 }
 
+TEST_F(CelonisMatchActivitiesTest, null_in_const_filters) {
+    Prepare();
+    activity_column_->append_datum(DatumArray{"start1", "end2"});
+    activity_column_->append_datum(DatumArray{"start2", "end1"});
+    activity_column_->append_datum(DatumArray{"start2", "excluding_activity", "end1"});
+    activity_column_->append_datum(DatumArray{"start2", "end1", "string1"});
+    activity_column_->append_datum(DatumArray{"string1", "start2", "end1"});
+    activity_column_->append_datum(DatumArray{kNullDatum, "start1", "end2", kNullDatum});
+    activity_column_->append_datum(DatumArray{"start2", "end1", kNullDatum});
+
+    auto start_nodes_array = DatumArray{"start1", kNullDatum, "start2", kNullDatum};
+    auto end_nodes_array = DatumArray{kNullDatum, "end1", "end2"};
+    auto excluding_nodes_array = DatumArray{"excluding_activity", kNullDatum};
+    auto empty_array = DatumArray{};
+    const auto result = RunConstantConfig(start_nodes_array, empty_array, end_nodes_array, excluding_nodes_array,
+                                          empty_array,
+                                          empty_array).value();
+    EXPECT_EQ(7, result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(0L, result->get(2).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+    EXPECT_EQ(0L, result->get(4).get_int64());
+    EXPECT_EQ(1L, result->get(5).get_int64());
+    EXPECT_EQ(1L, result->get(6).get_int64());
+}
+
 TEST_F(CelonisMatchActivitiesTest, with_excluding_all_nodes) {
     Prepare();
     activity_column_->append_datum(DatumArray{"B", "A"});
@@ -244,7 +271,7 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_empty_input) {
     EXPECT_EQ(0, result->size());
 }
 
-TEST_F(CelonisMatchActivitiesTest, with_non_const_filters) {
+TEST_F(CelonisMatchActivitiesTest, non_const_filters) {
     Prepare();
     AddRow(DatumArray{"start1", "end2"}, DatumArray{"start1"}, DatumArray{}, DatumArray{}, DatumArray{}, DatumArray{},
            DatumArray{});
@@ -253,6 +280,28 @@ TEST_F(CelonisMatchActivitiesTest, with_non_const_filters) {
     AddRow(DatumArray{kNullDatum, "start1", "end2", kNullDatum}, DatumArray{}, DatumArray{}, DatumArray{}, DatumArray{},
            DatumArray{}, DatumArray{});
     AddRow(DatumArray{"start2", "end1", kNullDatum}, DatumArray{"start2"}, DatumArray{}, DatumArray{"end2"},
+           DatumArray{}, DatumArray{}, DatumArray{});
+
+    const auto result = Run().value();
+    EXPECT_EQ(4, result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+}
+
+TEST_F(CelonisMatchActivitiesTest, null_in_non_const_filters) {
+    Prepare();
+    AddRow(DatumArray{"start1", "end2"}, DatumArray{kNullDatum, "start1", kNullDatum}, DatumArray{}, DatumArray{},
+           DatumArray{}, DatumArray{},
+           DatumArray{});
+    AddRow(DatumArray{"start2", "end1"}, DatumArray{kNullDatum, "start2"}, DatumArray{}, DatumArray{"end1"},
+           DatumArray{},
+           DatumArray{}, DatumArray{});
+    AddRow(DatumArray{kNullDatum, "start1", "end2", kNullDatum}, DatumArray{}, DatumArray{}, DatumArray{}, DatumArray{},
+           DatumArray{}, DatumArray{});
+    AddRow(DatumArray{"start2", "end1", kNullDatum}, DatumArray{"start2", kNullDatum}, DatumArray{},
+           DatumArray{"end2", kNullDatum},
            DatumArray{}, DatumArray{}, DatumArray{});
 
     const auto result = Run().value();
