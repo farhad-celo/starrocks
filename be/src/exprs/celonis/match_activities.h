@@ -14,6 +14,15 @@ public:
      * Implements PQL MATCH_ACTIVITIES: https://docs.celonis.com/en/match_activities.html
      */
     DEFINE_VECTORIZED_FN(celonis_match_activities);
+
+    static Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+private:
+    DEFINE_VECTORIZED_FN(celonis_match_activities_constant_config);
+
+    DEFINE_VECTORIZED_FN(celonis_match_activities_non_constant_config);
 };
 
 } // namespace starrocks

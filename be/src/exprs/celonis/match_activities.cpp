@@ -1,13 +1,33 @@
 #include "exprs/celonis/match_activities.h"
 
-#include "column/array_column.h"
 #include "column/column_builder.h"
 #include "column/hash_set.h"
+#include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
 
 namespace starrocks {
 
 namespace {
+
+struct MatchConfig {
+    // STARTING: case has to start with specified activity
+    // NODE: case has to have the specified activities
+    // ENDING: case has to end with specific activity
+    // EXCLUDING: case must not have the specified activities (and must have at least one non-NULL activity)
+    // EXCLUDING_ALL: case must not have any of the specified activities (and must have at least one non-NULL activity)
+    // NODES_ANY: case has to have at least one of the specified activities
+    SliceHashSet start_nodes;
+    SliceHashSet nodes;
+    SliceHashSet end_nodes;
+    SliceHashSet excluding_nodes;
+    SliceHashSet excluding_all_nodes;
+    SliceHashSet any_nodes;
+};
+
+struct MatchActivitiesStateFragmentLocal {
+    MatchConfig match_config;
+    ScalarFunction function;
+};
 
 int64_t
 _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
@@ -80,8 +100,74 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
     return 0L;
 }
 
+} // namespace
+
+Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* context,
+                                                FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+    auto state = new MatchActivitiesStateFragmentLocal();
+    context->set_function_state(scope, state);
+
+    auto start_nodes_column = context->get_constant_column(1);
+    auto nodes_column = context->get_constant_column(2);
+    auto end_nodes_column = context->get_constant_column(3);
+    auto excluding_nodes_column = context->get_constant_column(4);
+    auto excluding_all_nodes_column = context->get_constant_column(5);
+    auto any_nodes_column = context->get_constant_column(6);
+
+    if (start_nodes_column == nullptr || nodes_column == nullptr || end_nodes_column == nullptr ||
+        excluding_nodes_column == nullptr || excluding_all_nodes_column == nullptr || any_nodes_column == nullptr) {
+        state->function = celonis_match_activities_non_constant_config;
+        return Status::OK();
+    }
+    state->function = celonis_match_activities_constant_config;
+    if (start_nodes_column->empty() || nodes_column->empty() || end_nodes_column->empty() ||
+        excluding_nodes_column->empty() || excluding_all_nodes_column->empty() || any_nodes_column->empty()) {
+        return Status::OK();
+    }
+
+    auto start_node_array = start_nodes_column->get(0).get_array();
+    for (const auto& value: start_node_array) {
+        state->match_config.start_nodes.insert(value.get_slice());
+    }
+    auto node_array = nodes_column->get(0).get_array();
+    for (const auto& value: node_array) {
+        state->match_config.nodes.insert(value.get_slice());
+    }
+    auto end_node_array = end_nodes_column->get(0).get_array();
+    for (const auto& value: end_node_array) {
+        state->match_config.end_nodes.insert(value.get_slice());
+    }
+    auto excluding_node_array = excluding_nodes_column->get(0).get_array();
+    for (const auto& value: excluding_node_array) {
+        state->match_config.excluding_nodes.insert(value.get_slice());
+    }
+    auto excluding_all_node_array = excluding_all_nodes_column->get(0).get_array();
+    for (const auto& value: excluding_all_node_array) {
+        state->match_config.excluding_all_nodes.insert(value.get_slice());
+    }
+    auto any_node_array = any_nodes_column->get(0).get_array();
+    for (const auto& value: any_node_array) {
+        state->match_config.any_nodes.insert(value.get_slice());
+    }
+    return Status::OK();
+}
+
+Status CelonisMatchActivitiesFunctions::close(FunctionContext* context,
+                                              FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+        delete state;
+    }
+    return Status::OK();
+}
+
 StatusOr<ColumnPtr>
-_match_activities_general(const Columns& columns) {
+CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(starrocks::FunctionContext* context,
+                                                                              const starrocks::Columns& columns) {
     UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
@@ -137,7 +223,8 @@ _match_activities_general(const Columns& columns) {
 }
 
 StatusOr<ColumnPtr>
-_match_activities_const(const Columns& columns) {
+CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starrocks::FunctionContext* context,
+                                                                          const starrocks::Columns& columns) {
     UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
@@ -145,72 +232,30 @@ _match_activities_const(const Columns& columns) {
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
     size_t n_rows = columns[0]->size();
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    if (n_rows == 0) {
-        return result.build(ColumnHelper::is_all_const(columns));
-    }
-    auto start_node_array = columns[1]->get(0).get_array();
-    SliceHashSet start_nodes;
-    for (const auto& value: start_node_array) {
-        start_nodes.insert(value.get_slice());
-    }
-    auto node_array = columns[2]->get(0).get_array();
-    SliceHashSet nodes;
-    for (const auto& value: node_array) {
-        nodes.insert(value.get_slice());
-    }
-    auto end_node_array = columns[3]->get(0).get_array();
-    SliceHashSet end_nodes;
-    for (const auto& value: end_node_array) {
-        end_nodes.insert(value.get_slice());
-    }
-    auto excluding_node_array = columns[4]->get(0).get_array();
-    SliceHashSet excluding_nodes;
-    for (const auto& value: excluding_node_array) {
-        excluding_nodes.insert(value.get_slice());
-    }
-    auto excluding_all_node_array = columns[5]->get(0).get_array();
-    SliceHashSet excluding_all_nodes;
-    for (const auto& value: excluding_all_node_array) {
-        excluding_all_nodes.insert(value.get_slice());
-    }
-    auto any_node_array = columns[6]->get(0).get_array();
-    SliceHashSet any_nodes;
-    for (const auto& value: any_node_array) {
-        any_nodes.insert(value.get_slice());
-    }
+    const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
         }
         result.append(
-                _match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes, end_nodes,
-                                  excluding_nodes, excluding_all_nodes, any_nodes));
+                _match_activities(row, activity_array_data, activities, activity_offsets,
+                                  state->match_config.start_nodes, state->match_config.nodes,
+                                  state->match_config.end_nodes,
+                                  state->match_config.excluding_nodes, state->match_config.excluding_all_nodes,
+                                  state->match_config.any_nodes));
     }
 
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
-} // namespace
-
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities(FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(columns.size(), 7);
-    // schema:
-    // columns[1] -- STARTING: case has to start with specified activity
-    // columns[2] -- NODE: case has to have the specified activities
-    // columns[3] -- ENDING: case has to end with specific activity
-    // columns[4] -- EXCLUDING: case must not have the specified activities (and must have at least one non-NULL activity)
-    // columns[5] -- EXCLUDING_ALL: case must not have any of the specified activities (and must have at least one non-NULL activity)
-    // columns[6] -- NODES_ANY: case has to have at least one of the specified activities
-    // TODO(y.zhang): for now, it does not support NODES_ANY and EXCLUDING_ALL.
-    if (context->get_constant_column(1) != nullptr && context->get_constant_column(2) != nullptr &&
-        context->get_constant_column(3) != nullptr && context->get_constant_column(4) != nullptr &&
-        context->get_constant_column(5) != nullptr && context->get_constant_column(6) != nullptr) {
-        return _match_activities_const(columns);
-    } else {
-        return _match_activities_general(columns);
-    }
+    const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return state->function(context, columns);
 }
 
 } // namespace starrocks

@@ -1414,7 +1414,7 @@ celostar_functions = [
     [1000202, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT', 'BIGINT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
     [1000203, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
 
-    [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities'],
+    [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities', 'CelonisMatchActivitiesFunctions::prepare', 'CelonisMatchActivitiesFunctions::close'],
     [1000302, 'celonis_remap_timestamp_weekday', True, False, 'BIGINT', ['DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday_scalar'],
     [1000303, 'celonis_remap_timestamp_weekday', True, False, 'ARRAY_BIGINT', ['ARRAY_DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday'],
     # TODO(j.kim): Remove celonis_index_activity_order() after pql2sql is migrated to celonis_index_activity().
