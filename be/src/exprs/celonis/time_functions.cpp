@@ -1544,8 +1544,10 @@ add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int
 class DateFilters {
 public:
     DateFilters() {}
-    DateFilters(size_t row, ColumnPtr years_column, ColumnPtr quarters_column, ColumnPtr months_column,
-                ColumnPtr weeks_column, ColumnPtr days_column) {
+
+    DateFilters(size_t row, const ColumnPtr& years_column, const ColumnPtr& quarters_column,
+                const ColumnPtr& months_column,
+                const ColumnPtr& weeks_column, const ColumnPtr& days_column) {
         populate_filters(years_, row, years_column);
         populate_filters(quarters_, row, quarters_column);
         populate_filters(months_, row, months_column);

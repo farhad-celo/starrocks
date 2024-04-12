@@ -1750,7 +1750,7 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_prepare) {
                         R"( }})"});
         calendar_ids->append_datum("id1");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, from_timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
@@ -1797,7 +1797,7 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_prepare) {
         calendar_ids->append_datum("id1");
         calendar_ids->append_datum("id1");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, from_timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
@@ -1832,7 +1832,7 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_prepare) {
         calendars->append_datum(kNullDatum);
         calendar_ids->append_datum("id1");
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, from_timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
@@ -1866,7 +1866,7 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_prepare) {
         calendars->append_datum(DatumArray{});
         calendar_ids->append_datum(kNullDatum);
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, from_timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
@@ -1900,7 +1900,7 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_prepare) {
         calendars->append_datum(DatumArray{"Unknown"});
         calendar_ids->append_datum(kNullDatum);
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, from_timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
@@ -1927,7 +1927,7 @@ TEST_F(CelonisTimeFunctionsTest, timeunits_between_calendar_prepare) {
         calendars->append_datum(DatumArray{kNullDatum});
         calendar_ids->append_datum(kNullDatum);
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, from_timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
@@ -3679,7 +3679,7 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_prepare) {
                 R"(} })"});
         calendar_ids->append_datum(kNullDatum);
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
@@ -3724,7 +3724,7 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_prepare) {
             calendar_ids->append_datum(kNullDatum);
         }
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
@@ -3759,7 +3759,7 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_prepare) {
         calendars->append_datum(kNullDatum);
         calendar_ids->append_datum(kNullDatum);
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
@@ -3793,7 +3793,7 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_prepare) {
         calendars->append_datum(DatumArray{});
         calendar_ids->append_datum(kNullDatum);
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
@@ -3827,7 +3827,7 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_prepare) {
         calendars->append_datum(DatumArray{"Unknown"});
         calendar_ids->append_datum(kNullDatum);
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
@@ -3853,7 +3853,7 @@ TEST_F(CelonisTimeFunctionsTest, add_timeunits_calendar_prepare) {
         calendars->append_datum(DatumArray{kNullDatum});
         calendar_ids->append_datum(kNullDatum);
         auto utils = std::make_shared<FunctionUtils>();
-        auto const_calendars = ConstColumn::create(calendars, 1);
+        auto const_calendars = ConstColumn::create(calendars, timestamps->size());
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr, nullptr, const_calendars, nullptr});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
         utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_BIGINT});
