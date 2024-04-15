@@ -12,6 +12,15 @@ public:
      * @return: BOOLEAN
      */
     DEFINE_VECTORIZED_FN(multi_in);
+
+    static Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+private:
+    DEFINE_VECTORIZED_FN(multi_in_constant_config);
+
+    DEFINE_VECTORIZED_FN(multi_in_non_constant_config);
 };
 
 } // namespace starrocks
