@@ -165,6 +165,7 @@ set(EXEC_FILES
         ./exprs/celonis/array_functions_test.cpp
         ./exprs/celonis/calc_throughput_test.cpp
         ./exprs/celonis/conformance_test.cpp
+        ./exprs/celonis/date_match_test.cpp
         ./exprs/celonis/eventlog_utils.cpp
         ./exprs/celonis/greatest_least_test.cpp
         ./exprs/celonis/in_test.cpp

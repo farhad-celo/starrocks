@@ -1615,9 +1615,6 @@ struct DateMatchStateFragmentLocal {
 StatusOr<ColumnPtr> CelonisTimeFunctions::date_match([[maybe_unused]] FunctionContext* context,
                                                      const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 6);
-    if (context == nullptr) {
-        return date_match_non_constant_filters(context, columns);
-    }
     const auto* state = reinterpret_cast<const DateMatchStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
@@ -1653,6 +1650,10 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_constant_filters([[maybe_un
     }
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     for (auto row = 0; row < n_rows; ++row) {
+        if (timestamp_viewer.is_null(row)) {
+            result.append_null();
+            continue;
+        }
         auto timestamp = timestamp_viewer.value(row);
         result.append(state->date_filters.matches(timestamp) ? 1L : 0L);
     }
