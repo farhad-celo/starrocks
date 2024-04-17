@@ -18,6 +18,40 @@
 
 namespace starrocks {
 
+StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,
+                                                         const starrocks::Columns& columns) {
+    std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
+
+    column_viewers.reserve(columns.size());
+    for (const auto& column : columns) {
+        column_viewers.emplace_back(column);
+    }
+
+    const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
+
+    size_t row_size = columns[0]->size();
+    std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
+
+    for (const auto& viewer : column_viewers) {
+        for (size_t row = 0; row < row_size; ++row) {
+            if (viewer.is_null(row)) {
+                continue;
+            }
+            auto slice = viewer.value(row);
+            uint128_t seed = seeds_vec[row];
+            seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+        }
+    }
+
+    ColumnBuilder<TYPE_LARGEINT> builder(row_size);
+    std::vector<bool> is_null_vec(row_size, false);
+    for (int row = 0; row < row_size; ++row) {
+        builder.append(seeds_vec[row], is_null_vec[row]);
+    }
+
+    return builder.build(ColumnHelper::is_all_const(columns));
+}
+
 struct CelonisTranslateState {
     CelonisTranslateState(Slice pattern, Slice replace)
             : pattern_chars(pattern.to_string()), replace_chars(replace.to_string()) {}

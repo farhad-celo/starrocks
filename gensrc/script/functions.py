@@ -1511,6 +1511,7 @@ celostar_functions = [
     [4000700, 'celonis_string_to_int', True, False, 'BIGINT', ['VARCHAR'], 'CelonisStringFunctions::string_to_int'],
     [4000800, 'celonis_upper', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::upper'],
     [4000900, 'celonis_lower', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::lower'],
+    [4001000, 'celonis_xx_hash3_128', True, False, 'LARGEINT', ['VARCHAR', '...'], 'CelonisStringFunctions::xx_hash3_128'],
 
     # Math functions
     [5000101, 'celonis_square', True, False, 'INT', ['INT'], 'CelonisMathFunctions<TYPE_INT>::square'],

@@ -2,8 +2,15 @@
 
 #include "column/array_column.h"
 #include "column/column_helper.h"
+#include "util/xxh3.h"
 
 namespace starrocks {
+
+uint128_t xx_hash3_128(const void* key, int32_t len, uint128_t seed) {
+    const auto result = XXH3_128bits_withSeed(key, len, seed);
+    return (uint128_t(result.high64) << 64) | result.low64;
+}
+
 const ArrayColumn& extract_array_column(const Column* input_column) {
     return *(down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_column)));
 }

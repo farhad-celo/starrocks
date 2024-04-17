@@ -527,6 +527,7 @@ public class FunctionSet {
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";
     public static final String CELONIS_MULTI_IN = "celonis_multi_in";
+    public static final String CELONIS_XX_HASH3_128 = "celonis_xx_hash3_128";
 
     // JSON functions
     public static final Function JSON_QUERY_FUNC = new Function(
@@ -662,6 +663,7 @@ public class FunctionSet {
             ImmutableSet.<String>builder()
                     .add(FunctionSet.CELONIS_GREATEST)
                     .add(FunctionSet.CELONIS_LEAST)
+                    .add(FunctionSet.CELONIS_XX_HASH3_128)
                     .build();
 
     public static final Set<String> alwaysReturnNonNullableFunctions =

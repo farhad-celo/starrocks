@@ -5,6 +5,10 @@
 
 namespace starrocks {
 
+const uint128_t XXHASH3_128_SEED = 0;
+
+uint128_t xx_hash3_128(const void* key, int32_t len, uint128_t seed);
+
 // Casts 'input_column' as an ArrayColumn (removing Nullable wrapper if present).
 const ArrayColumn& extract_array_column(const Column* input_column);
 
@@ -21,4 +25,5 @@ struct UnnestedArrayData {
 };
 
 UnnestedArrayData prepare_array_input(const Column* input_array);
+
 } // namespace starrocks
