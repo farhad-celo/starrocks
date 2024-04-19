@@ -158,10 +158,12 @@ set(CELONIS_FILES
   celonis/like.cpp
   celonis/linear_regression.cpp
   celonis/match_activities.cpp
+  celonis/match_pattern_util.cpp
   celonis/match_process.cpp
   celonis/math_functions.cpp
   celonis/mo_bpmn_graph.cpp
   celonis/multi_in.cpp
+  celonis/patindex.cpp
   celonis/qnorm.cpp
   celonis/remap_timestamp_weekday.cpp
   celonis/remap_values.cpp
