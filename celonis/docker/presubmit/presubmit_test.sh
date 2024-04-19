@@ -18,7 +18,6 @@ cd /celostar-starrocks;
 #export FE_UT_PARALLEL=16;
 #./run-fe-ut.sh;
 
-# TODO: consolidate this after rebasing https://github.com/StarRocks/starrocks/pull/43991
 echo "Start to run BE UT"
 export LD_LIBRARY_PATH=/var/local/thirdparty/installed/lib
 export GTEST_PARALLEL=celonis/tools/gtest-parallel/gtest-parallel

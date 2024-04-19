@@ -6,12 +6,21 @@
 #include "column/datum.h"
 #include "column/type_traits.h"
 #include "column/vectorized_fwd.h"
+#include "exprs/base64.h"
+#include "modules/query/calendars.pb.h"
 #include "runtime/types.h"
 #include "types/logical_type.h"
 
 namespace starrocks::celonis {
 // Creates an array type from the given 'element_type'
 TypeDescriptor array_type(const LogicalType& element_type);
+
+// Gets the str representation of is_workday part in WorkdayCalendar
+std::string get_is_workdays_str(int n_days, const std::unordered_set<int>& one_indexes);
+
+std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& calendar_proto);
+
+std::optional<std::string> to_calendar_json_string(const std::string& encoded_string);
 
 template <LogicalType LT>
 class TestEvaluator {
