@@ -1,6 +1,7 @@
 #include "exprs/celonis/time_functions.h"
 
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
@@ -56,12 +57,8 @@ private:
             calendar_array.emplace_back(calendar_str.c_str());
         }
         calendar_column_->append_datum(calendar_array);
-        ctx_->set_constant_columns({nullptr, calendar_column_, nullptr});
-        return Run();
-    }
-
-    StatusOr<ColumnPtr> RunConstantConfig() {
-        ctx_->set_constant_columns({nullptr, calendar_column_, nullptr});
+        ctx_->set_constant_columns(
+                {nullptr, ConstColumn::create(calendar_column_, timestamp_column_->size()), nullptr});
         return Run();
     }
 
