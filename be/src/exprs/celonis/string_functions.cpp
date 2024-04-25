@@ -23,7 +23,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
     std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
 
     column_viewers.reserve(columns.size());
-    for (const auto& column : columns) {
+    for (const auto& column: columns) {
         column_viewers.emplace_back(column);
     }
 
@@ -32,7 +32,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
     size_t row_size = columns[0]->size();
     std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
 
-    for (const auto& viewer : column_viewers) {
+    for (const auto& viewer: column_viewers) {
         for (size_t row = 0; row < row_size; ++row) {
             if (viewer.is_null(row)) {
                 continue;
@@ -45,6 +45,44 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
 
     ColumnBuilder<TYPE_LARGEINT> builder(row_size);
     std::vector<bool> is_null_vec(row_size, false);
+    for (int row = 0; row < row_size; ++row) {
+        builder.append(seeds_vec[row], is_null_vec[row]);
+    }
+
+    return builder.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::FunctionContext* context,
+                                                                  const starrocks::Columns& columns) {
+    std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
+
+    column_viewers.reserve(columns.size());
+    for (const auto& column: columns) {
+        column_viewers.emplace_back(column);
+    }
+
+    const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
+
+    size_t row_size = columns[0]->size();
+    std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
+    std::vector<bool> is_null_vec(row_size, false);
+
+    for (const auto& viewer: column_viewers) {
+        for (size_t row = 0; row < row_size; ++row) {
+            if (is_null_vec[row]) {
+                continue;
+            }
+            if (viewer.is_null(row)) {
+                is_null_vec[row] = true;
+                continue;
+            }
+            auto slice = viewer.value(row);
+            uint128_t seed = seeds_vec[row];
+            seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+        }
+    }
+
+    ColumnBuilder<TYPE_LARGEINT> builder(row_size);
     for (int row = 0; row < row_size; ++row) {
         builder.append(seeds_vec[row], is_null_vec[row]);
     }

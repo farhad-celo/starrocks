@@ -15,6 +15,13 @@ public:
     DEFINE_VECTORIZED_FN(xx_hash3_128);
 
     /**
+     * @param: [string_value, ...]
+     * @paramType: [BinaryColumn, ...]
+     * @return LargeIntColumn
+     */
+    DEFINE_VECTORIZED_FN(xx_hash3_128_nullable);
+
+    /**
      * @param: [string_value, pattern_value, replace_value]
      * @paramType: [BinaryColumn, BinaryColumn, BinaryColumn]
      * @return: BinaryColumn

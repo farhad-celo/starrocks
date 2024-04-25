@@ -1512,8 +1512,9 @@ celostar_functions = [
     [4000800, 'celonis_upper', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::upper'],
     [4000900, 'celonis_lower', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::lower'],
     [4001000, 'celonis_xx_hash3_128', True, False, 'LARGEINT', ['VARCHAR', '...'], 'CelonisStringFunctions::xx_hash3_128'],
-    [4001101, 'celonis_patindex', True, False, 'BIGINT', ['VARCHAR', 'VARCHAR'], 'CelonisPatindex::patindex', 'CelonisPatindex::prepare', 'CelonisPatindex::close'],
-    [4001102, 'celonis_patindex', True, False, 'BIGINT', ['VARCHAR', 'VARCHAR', 'BIGINT'], 'CelonisPatindex::patindex', 'CelonisPatindex::prepare', 'CelonisPatindex::close'],
+    [4001100, 'celonis_xx_hash3_128_nullable', True, False, 'LARGEINT', ['VARCHAR', '...'], 'CelonisStringFunctions::xx_hash3_128_nullable'],
+    [4001201, 'celonis_patindex', True, False, 'BIGINT', ['VARCHAR', 'VARCHAR'], 'CelonisPatindex::patindex', 'CelonisPatindex::prepare', 'CelonisPatindex::close'],
+    [4001202, 'celonis_patindex', True, False, 'BIGINT', ['VARCHAR', 'VARCHAR', 'BIGINT'], 'CelonisPatindex::patindex', 'CelonisPatindex::prepare', 'CelonisPatindex::close'],
 
     # Math functions
     [5000101, 'celonis_square', True, False, 'INT', ['INT'], 'CelonisMathFunctions<TYPE_INT>::square'],
