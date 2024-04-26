@@ -35,9 +35,20 @@ build_spdlog() {
     cp -r $TP_SOURCE_DIR/$SPDLOG_SOURCE/include/spdlog $TP_INCLUDE_DIR/
 }
 
+# BLAKE2
+build_blake2() {
+    check_if_source_exist $BLAKE2_SOURCE
+    cd $TP_SOURCE_DIR/$BLAKE2_SOURCE/ref
+    gcc -O2 -I../testvectors -Wall -Wextra -std=c89 -pedantic -Wno-long-long -c blake2s-ref.c -o blake2s.o
+    ar rcs libblake2s.a blake2s.o
+    cp -r $TP_SOURCE_DIR/$BLAKE2_SOURCE/ref/blake2.h $TP_INCLUDE_DIR/
+    cp -r $TP_SOURCE_DIR/$BLAKE2_SOURCE/ref/libblake2s.a $TP_LIB_DIR/
+}
+
 build_thirdparty_celonis() {
     build_namedtype
     build_nlohmann_json
     build_onetbb
     build_spdlog
+    build_blake2
 }
