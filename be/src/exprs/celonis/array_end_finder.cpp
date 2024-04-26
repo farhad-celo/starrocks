@@ -12,10 +12,12 @@ template<LogicalType LT>
 StatusOr<ColumnPtr>
 CelonisArrayEndFinder<LT>::array_first([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
-    UnnestedArrayData array_data = prepare_array_input(columns[0].get());
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    const auto num_rows = columns[0]->size();
+    UnnestedArrayData array_data = prepare_array_input(
+            ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]).get());
     const auto& elements = down_cast<const RunTimeColumnType<LT>&>(*array_data.elements).get_data().data();
     const auto& offsets = array_data.offsets->get_data().data();
-    const auto num_rows = columns[0]->size();
     ColumnBuilder<LT> result(num_rows);
     for (auto row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row)) {
@@ -44,10 +46,12 @@ template<LogicalType LT>
 StatusOr<ColumnPtr>
 CelonisArrayEndFinder<LT>::array_last([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
-    UnnestedArrayData array_data = prepare_array_input(columns[0].get());
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    const auto num_rows = columns[0]->size();
+    UnnestedArrayData array_data = prepare_array_input(
+            ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]).get());
     const auto& elements = down_cast<const RunTimeColumnType<LT>&>(*array_data.elements).get_data().data();
     const auto& offsets = array_data.offsets->get_data().data();
-    const auto num_rows = columns[0]->size();
     ColumnBuilder<LT> result(num_rows);
     for (auto row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row)) {
