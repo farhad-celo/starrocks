@@ -1,6 +1,7 @@
 #include "exprs/celonis/array_functions.h"
 
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "runtime/types.h"
 #include "util.h"
 
@@ -2828,6 +2829,15 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_to_null_invalid_input) {
     }
 }
 
+TEST_F(CelonisArrayFunctionsTest, array_count_const_null_column) {
+    auto arrays = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    arrays->append_datum(kNullDatum);
+    const auto result = CelonisArrayFunctions::array_count(nullptr, {ConstColumn::create(arrays, 2)}).value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
+}
+
 TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
     // STRING
     {
@@ -2936,6 +2946,15 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
         EXPECT_EQ(2L, result->get(5).get_int64());
         EXPECT_EQ(3L, result->get(6).get_int64());
     }
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_bool_or_const_null_column) {
+    auto arrays = ColumnHelper::create_column(TYPE_ARRAY_BOOLEAN, true);
+    arrays->append_datum(kNullDatum);
+    const auto result = CelonisArrayFunctions::array_bool_or(nullptr, {ConstColumn::create(arrays, 2)}).value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_bool_or_normal_case) {
