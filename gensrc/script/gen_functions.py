@@ -95,6 +95,7 @@ ${license}
 #include "exprs/celonis/remap_values.h"
 #include "exprs/celonis/shortened_variant.h"
 #include "exprs/celonis/source_target.h"
+#include "exprs/celonis/stringhash.h"
 #include "exprs/celonis/string_functions.h"
 #include "exprs/celonis/time_functions.h"
 #include "exprs/map_functions.h"
