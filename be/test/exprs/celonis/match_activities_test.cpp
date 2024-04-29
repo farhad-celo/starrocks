@@ -1,6 +1,7 @@
 #include "exprs/celonis/match_activities.h"
 
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
@@ -96,6 +97,35 @@ private:
     ColumnPtr any_nodes_column_;
 };
 
+TEST_F(CelonisMatchActivitiesTest, const_null_activity_column) {
+    {
+        Prepare();
+        activity_column_->append_datum(kNullDatum);
+        activity_column_ = ConstColumn::create(activity_column_, 1);
+        starting_nodes_column_->append_datum(DatumArray{});
+        nodes_column_->append_datum(DatumArray{"string1", "string3"});
+        ending_nodes_column_->append_datum(DatumArray{});
+        excluding_nodes_column_->append_datum(DatumArray{});
+        excluding_all_nodes_column_->append_datum(DatumArray{});
+        any_nodes_column_->append_datum(DatumArray{});
+        const auto result = Run().value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        Prepare();
+        activity_column_->append_datum(kNullDatum);
+        activity_column_ = ConstColumn::create(activity_column_, 2);
+        auto nodes_array = DatumArray{"string1", "string3"};
+        auto empty_array = DatumArray{};
+        const auto result = RunConstantConfig(empty_array, nodes_array, empty_array, empty_array, empty_array,
+                                              empty_array).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+}
+
 TEST_F(CelonisMatchActivitiesTest, with_nodes) {
     Prepare();
     activity_column_->append_datum(DatumArray{"string1", "string2"});
@@ -106,7 +136,7 @@ TEST_F(CelonisMatchActivitiesTest, with_nodes) {
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(empty_array, nodes_array, empty_array, empty_array, empty_array,
                                           empty_array).value();
-    EXPECT_EQ(3, result->size());
+    ASSERT_EQ(3, result->size());
     EXPECT_EQ(0, result->get(0).get_int64());
     EXPECT_EQ(1, result->get(1).get_int64());
     EXPECT_EQ(1, result->get(2).get_int64());
@@ -125,7 +155,7 @@ TEST_F(CelonisMatchActivitiesTest, with_excluding_nodes) {
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(empty_array, nodes_array, empty_array, excluding_nodes_array, empty_array,
                                           empty_array).value();
-    EXPECT_EQ(5, result->size());
+    ASSERT_EQ(5, result->size());
     EXPECT_EQ(0, result->get(0).get_int64());
     EXPECT_EQ(0, result->get(1).get_int64());
     EXPECT_EQ(1, result->get(2).get_int64());
@@ -144,7 +174,7 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_with_only_excluding_
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(empty_array, empty_array, empty_array, excluding_nodes_array, empty_array,
                                           empty_array).value();
-    EXPECT_EQ(4, result->size());
+    ASSERT_EQ(4, result->size());
     EXPECT_EQ(0, result->get(0).get_int64());
     EXPECT_EQ(1, result->get(1).get_int64());
     EXPECT_EQ(0, result->get(2).get_int64());
@@ -168,7 +198,7 @@ TEST_F(CelonisMatchActivitiesTest, with_start_and_end_nodes) {
     const auto result = RunConstantConfig(start_nodes_array, empty_array, end_nodes_array, excluding_nodes_array,
                                           empty_array,
                                           empty_array).value();
-    EXPECT_EQ(7, result->size());
+    ASSERT_EQ(7, result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
     EXPECT_EQ(0L, result->get(2).get_int64());
@@ -195,7 +225,7 @@ TEST_F(CelonisMatchActivitiesTest, null_in_const_filters) {
     const auto result = RunConstantConfig(start_nodes_array, empty_array, end_nodes_array, excluding_nodes_array,
                                           empty_array,
                                           empty_array).value();
-    EXPECT_EQ(7, result->size());
+    ASSERT_EQ(7, result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
     EXPECT_EQ(0L, result->get(2).get_int64());
@@ -221,7 +251,7 @@ TEST_F(CelonisMatchActivitiesTest, with_excluding_all_nodes) {
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(empty_array, empty_array, empty_array, empty_array, excluding_all_nodes_array,
                                           empty_array).value();
-    EXPECT_EQ(9, result->size());
+    ASSERT_EQ(9, result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
     EXPECT_EQ(1L, result->get(2).get_int64());
@@ -248,7 +278,7 @@ TEST_F(CelonisMatchActivitiesTest, with_nodes_any) {
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(empty_array, empty_array, empty_array, empty_array, empty_array,
                                           any_nodes_array).value();
-    EXPECT_EQ(8, result->size());
+    ASSERT_EQ(8, result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(0L, result->get(1).get_int64());
     EXPECT_EQ(1L, result->get(2).get_int64());
@@ -283,7 +313,7 @@ TEST_F(CelonisMatchActivitiesTest, non_const_filters) {
            DatumArray{}, DatumArray{}, DatumArray{});
 
     const auto result = Run().value();
-    EXPECT_EQ(4, result->size());
+    ASSERT_EQ(4, result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
     EXPECT_EQ(1L, result->get(2).get_int64());
@@ -305,7 +335,7 @@ TEST_F(CelonisMatchActivitiesTest, null_in_non_const_filters) {
            DatumArray{}, DatumArray{}, DatumArray{});
 
     const auto result = Run().value();
-    EXPECT_EQ(4, result->size());
+    ASSERT_EQ(4, result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
     EXPECT_EQ(1L, result->get(2).get_int64());

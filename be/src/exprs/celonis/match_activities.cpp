@@ -161,12 +161,13 @@ Status CelonisMatchActivitiesFunctions::close(FunctionContext* context,
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(starrocks::FunctionContext* context,
                                                                               const starrocks::Columns& columns) {
-    UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
+    size_t n_rows = columns[0]->size();
+    UnnestedArrayData activity_array_data = prepare_array_input(
+            ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]).get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
-    size_t n_rows = columns[0]->size();
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row)) {
@@ -197,12 +198,13 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(st
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starrocks::FunctionContext* context,
                                                                           const starrocks::Columns& columns) {
-    UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
+    size_t n_rows = columns[0]->size();
+    UnnestedArrayData activity_array_data = prepare_array_input(
+            ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]).get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
-    size_t n_rows = columns[0]->size();
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
     const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));

@@ -1,6 +1,7 @@
 #include "exprs/celonis/linear_regression.h"
 
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
@@ -56,6 +57,29 @@ private:
     ColumnPtr x_column_;
     ColumnPtr model_column_;
 };
+
+TEST_F(CelonisLinearRegressionTest, null_const_column) {
+    {
+        Prepare();
+        x_column_->append_datum(kNullDatum);
+        x_column_ = ConstColumn::create(x_column_, 2);
+        const auto result = RunConstantModel("2.0:2.5").value();
+        ASSERT_EQ(x_column_->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+    {
+        Prepare();
+        x_column_->append_datum(kNullDatum);
+        x_column_ = ConstColumn::create(x_column_, 2);
+        model_column_->append_datum("2.0:2.5");
+        model_column_->append_datum("2.0:2.5");
+        const auto result = Run().value();
+        ASSERT_EQ(x_column_->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+}
 
 TEST_F(CelonisLinearRegressionTest, single_feature_const_valid_model) {
     Prepare();
