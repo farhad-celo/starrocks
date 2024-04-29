@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "column/vectorized_fwd.h"
 #include "exprs/celonis/string_functions.h"
 #include "exprs/function_context.h"
@@ -693,6 +694,26 @@ TEST(CelonisStringFunctionsStringToDoubleTest, All) {
             EXPECT_EQ(v->get(i).get_double(), test_input[i][1].get_double()) << debug_string();
         }
     }
+}
+
+TEST_F(CelonisStringFunctionsTest, match_strings_const_null_match_strings) {
+    auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+    auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+    auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    input_strings->append_datum("Shirt");
+    input_strings->append_datum("Pants");
+    match_strings->append_datum(kNullDatum);
+    match_strings = ConstColumn::create(match_strings, 2);
+    top_ks->append_datum(kNullDatum);
+    top_ks->append_datum(kNullDatum);
+    separators->append_datum(kNullDatum);
+    separators->append_datum(kNullDatum);
+    const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                        separators}).value();
+    ASSERT_EQ(input_strings->size(), result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
 }
 
 TEST_F(CelonisStringFunctionsTest, match_strings_normal_cases) {

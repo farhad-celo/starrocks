@@ -885,14 +885,15 @@ static int edit_distance(const std::string& str1, const std::string& str2) {
 StatusOr<ColumnPtr>
 CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 4);
+    size_t n_rows = columns[0]->size();
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    UnnestedArrayData match_string_data = prepare_array_input(columns[1].get());
+    UnnestedArrayData match_string_data = prepare_array_input(
+            ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[1]).get());
     const auto& match_strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *match_string_data.elements).get_data().data();
     const auto& offsets = match_string_data.offsets->get_data().data();
     ColumnViewer top_k_viewer = ColumnViewer<TYPE_INT>(columns[2]);
     ColumnViewer separator_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
-    size_t n_rows = columns[0]->size();
     ColumnBuilder<TYPE_VARCHAR> result(n_rows);
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row)) {
