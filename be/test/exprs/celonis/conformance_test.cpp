@@ -151,5 +151,127 @@ TEST_F(CelonisConformanceTest, invalid_json_spec) {
     EXPECT_THAT(conform(input, nullptr).message().to_string(), testing::HasSubstr("does not contain 'mapping'."));
 }
 
+class CelonisReadableConformanceTest : public ::testing::Test {
+protected:
+    void SetUp() override {}
+
+    void TearDown() override {}
+
+    TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
+
+    void evaluate(Column* result, Column* expected) {
+        ASSERT_EQ(result->size(), expected->size());
+        for (int i = 0; i < result->size(); ++i) {
+            auto result_array = result->get(i).get_array();
+            auto expected_array = expected->get(i).get_array();
+            ASSERT_EQ(result_array.size(), expected_array.size());
+            for (int j = 0; j < result_array.size(); j++) {
+                EXPECT_EQ(result_array[j].get_slice(), expected_array[j].get_slice())
+                                    << "row index: " << i << ", element index: " << j;
+            }
+        }
+    }
+
+    Status conform(const Columns& columns, Column* expected) {
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        auto context = ctx.get();
+        context->set_constant_columns(columns);
+
+        DeferOp close_fragment_local([&context] {
+            CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        });
+        RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([&context] {
+            CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL);
+        });
+        RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
+
+        const auto result = CelonisConformance::readable_conformance(context, columns).value();
+        evaluate(result.get(), expected);
+
+        return Status::OK();
+    }
+};
+
+TEST_F(CelonisReadableConformanceTest, pql_conformance_examples) {
+    Slice jsonInput(
+            R"json({
+              "places" : [ "P_0", "P_1", "P_2" ],
+              "transitions" : [ "T_01", "T_12" ],
+              "arcs" : [
+                {
+                  "from" : "P_0",
+                  "to" : "T_01"
+                }, {
+                  "from" : "T_01",
+                  "to" : "P_1"
+                }, {
+                  "from" : "P_1",
+                  "to" : "T_12"
+                }, {
+                  "from" : "T_12",
+                  "to" : "P_2"
+                }
+              ],
+              "mapping" : [
+                {
+                  "from" : "A",
+                  "to" : "T_01"
+                }, {
+                  "from" : "B",
+                  "to" : "T_12"
+                }
+              ],
+              "initial_marking" : [
+                {
+                  "node" : "P_0",
+                  "count" : 1
+                }
+              ],
+              "final_marking" : [
+                {
+                  "node" : "P_2",
+                  "count" : 1
+                }
+              ]
+            })json");
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    auto expected = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+
+    array->append_datum(DatumArray{"A", "B"});
+    expected->append_datum(DatumArray{"Conforms", "Conforms"});
+
+    array->append_datum(DatumArray{"A", "C"});
+    expected->append_datum(DatumArray{"Conforms", "C is an undesired activity"});
+
+    array->append_datum(DatumArray{"A"});
+    expected->append_datum(DatumArray{"Incomplete"});
+
+    array->append_datum(DatumArray{"A", "A"});
+    expected->append_datum(DatumArray{"Conforms", "A is followed by A"});
+
+    array->append_datum(DatumArray{"B", "A", "B"});
+    expected->append_datum(DatumArray{"B is executed as start activity", "Conforms", "Conforms"});
+
+    array->append_datum(DatumArray{"A", "C", "A"});
+    expected->append_datum(DatumArray{"Conforms", "C is an undesired activity", "A is followed by A"});
+
+    // NULL handling. A NULL value conforms with any Petri net.
+    array->append_datum(DatumArray{"A", Datum{}, "B"});
+    expected->append_datum(DatumArray{"Conforms", "Conforms", "Conforms"});
+
+    array->append_datum(DatumArray{"B", "C", "A", "C", Datum{}, "A", "B"});
+    expected->append_datum(DatumArray{"B is executed as start activity", "C is an undesired activity", "Conforms",
+                                      "C is an undesired activity", "Conforms", "A is followed by A", "Conforms"});
+
+    auto json_spec = ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, array->size());
+
+    Columns input;
+    input.push_back(array);
+    input.push_back(json_spec);
+
+    EXPECT_OK(conform(input, expected.get()));
+}
+
 } // namespace starrocks::vectorized
 

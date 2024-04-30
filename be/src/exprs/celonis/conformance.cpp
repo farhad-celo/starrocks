@@ -230,16 +230,43 @@ struct ConformanceState {
     std::unique_ptr<PetriNet> petri_net;
 };
 
+std::string conformance_result_to_string(int64_t result, const RunTimeColumnType<TYPE_VARCHAR>& elements, int index,
+                                         int last_conform_index) {
+    // To directly decode a result to a string, we need to map activity ids in the result to activity strings. For this,
+    // we would need to maintain a hash map. But actually it is not necessary to map activity ids at all. Instead, we
+    // ignore activity ids in the result and deduce activity names from the current index and by tracking the last
+    // conforming activity.
+    if (result == 0) {
+        return "Conforms";
+    } else if (result == INCOMPLETE_VIOLATION_KEY) {
+        return "Incomplete";
+    } else if (result == TOO_COMPLEX_MODEL) {
+        return "Too complex";
+    } else if (result < 0) {
+        return elements.get_slice(index).to_string() + " is an undesired activity";
+    }
+    int32_t last_activity = result >> 32;
+    if (last_activity == MISSING_START_ACTIVITY_KEY) {
+        return elements.get_slice(index).to_string() + " is executed as start activity";
+    } else if (last_conform_index >= 0) {
+        return elements.get_slice(last_conform_index).to_string() + " is followed by " +
+               elements.get_slice(index).to_string();
+    }
+    return "Unknown violation";
+}
+
+template <bool readable>
 ColumnPtr CelonisConformance::conformance_internal(const PetriNet& petri_net,
                                                    const RunTimeColumnType<TYPE_VARCHAR>& elements,
                                                    const UInt32Column& offsets,
                                                    const NullColumn::Container* null_elements,
                                                    const NullColumn::Container* null_arrays) {
+    using ColumnType = std::conditional_t<readable, RunTimeColumnType<TYPE_VARCHAR>, RunTimeColumnType<TYPE_BIGINT>>;
+
     const size_t num_array = offsets.size() - 1;
     auto offsets_ptr = offsets.get_data().data();
-    auto result_array =
-            ArrayColumn::create(NullableColumn::create(RunTimeColumnType<TYPE_BIGINT>::create(), NullColumn::create()),
-                                UInt32Column::create());
+    auto result_array = ArrayColumn::create(NullableColumn::create(ColumnType::create(), NullColumn::create()),
+                                            UInt32Column::create());
     UInt32Column::Container& result_offsets = result_array->offsets_column()->get_data();
     ColumnPtr& result_elements = result_array->elements_column();
     result_offsets.reserve(num_array);
@@ -260,8 +287,18 @@ ColumnPtr CelonisConformance::conformance_internal(const PetriNet& petri_net,
 
         ConformanceCaseChecker checker(offset, array_size, petri_net, elements, null_elements);
         auto results = checker.check();
-        for (auto result : results) {
-            result_elements->append_datum(result);
+        int last_conform_index = -1;
+        for (int j = 0; j < results.size(); j++) {
+            auto result = results[j];
+            if constexpr (readable) {
+                if (result == 0 && (null_elements == nullptr || (*null_elements)[offset + j] == 0)) {
+                    last_conform_index = offset + j;
+                }
+                result_elements->append_datum(Slice(conformance_result_to_string(result, elements, offset + j,
+                                                                                 last_conform_index)));
+            } else {
+                result_elements->append_datum(result);
+            }
         }
         new_offset += results.size();
         result_offsets.push_back(new_offset);
@@ -304,9 +341,18 @@ StatusOr<ColumnPtr> CelonisConformance::conformance(FunctionContext* context, co
     const auto* state =
             reinterpret_cast<const ConformanceState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     UnnestedArrayData array_data = prepare_array_input(columns[0].get());
-    return conformance_internal(*state->petri_net,
-                                *down_cast<const RunTimeColumnType<TYPE_VARCHAR>*>(array_data.elements),
-                                *array_data.offsets, array_data.null_elements, array_data.null_arrays);
+    return conformance_internal</*readable=*/false>(*state->petri_net,
+            *down_cast<const RunTimeColumnType<TYPE_VARCHAR>*>(array_data.elements),
+            *array_data.offsets, array_data.null_elements, array_data.null_arrays);
+}
+
+StatusOr<ColumnPtr> CelonisConformance::readable_conformance(FunctionContext* context, const Columns& columns) {
+    const auto* state =
+            reinterpret_cast<const ConformanceState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    UnnestedArrayData array_data = prepare_array_input(columns[0].get());
+    return conformance_internal</*readable=*/true>(*state->petri_net,
+            *down_cast<const RunTimeColumnType<TYPE_VARCHAR>*>(array_data.elements),
+            *array_data.offsets, array_data.null_elements, array_data.null_arrays);
 }
 
 std::optional<bool> PetriNetSearch::TransitionCache::lookup(const PetriNet::Transition* transition,

@@ -18,8 +18,8 @@ class CelonisConformance {
 public:
     /**
      * @param: [activity array, json_petri_net_spec]
-     * @paramType columns: [ARRAY_VARCHAR | VARCHAR]
-     * @return: IntColumn
+     * @paramType: [ARRAY_VARCHAR, VARCHAR]
+     * @return: [ARRAY_BIGINT](conformance), [ARRAY_VARCHAR](readable_conformance)
      * Supports PQL IN https://docs.celonis.com/en/conformance.html
      *
      * json_petri_net_spec is a json version of PetriNetDescription message in
@@ -30,10 +30,12 @@ public:
      * counts as 1 following Saola implementation.
      */
     DEFINE_VECTORIZED_FN(conformance);
+    DEFINE_VECTORIZED_FN(readable_conformance);
     static Status conformance_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status conformance_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
 private:
+    template <bool readable>
     static ColumnPtr conformance_internal(const PetriNet& petri_net, const RunTimeColumnType<TYPE_VARCHAR>& elements,
                                           const UInt32Column& offsets, const NullColumn::Container* null_elements,
                                           const NullColumn::Container* null_arrays);
