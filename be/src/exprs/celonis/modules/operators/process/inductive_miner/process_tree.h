@@ -15,8 +15,8 @@
 #include "modules/memory/row_id.h"
 #ifndef CELOSTAR
 #include "modules/memory/table_fwd.h"
-#endif
 #include "modules/operators/process/inductive_miner/process_tree_ref.h"
+#endif
 
 namespace celonis::accelerator::operators::process {
 

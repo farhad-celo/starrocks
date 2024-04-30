@@ -181,6 +181,6 @@ add_library(blake2s STATIC IMPORTED)
 set_target_properties(blake2s PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib/libblake2s.a)
 
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})
-target_include_directories(Exprs PRIVATE "${BUILD_DIR}/generated")
+target_include_directories(Exprs PRIVATE "${BUILD_DIR}/generated" "celonis/cpml_proxy/include")
 target_link_libraries(Exprs PRIVATE blake2s)
 target_link_libraries(Exprs PRIVATE celonis_calendars_protos)

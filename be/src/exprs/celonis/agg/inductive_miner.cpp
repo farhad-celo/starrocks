@@ -3,14 +3,12 @@
 #include <algorithm>
 #include <execution>
 
-#include "exprs/celonis/modules/operators/process/inductive_miner/inductive_miner_helper.h"
-#include "exprs/celonis/result_table.h"
+#include "cpml_proxy/inductive_miner_proxy.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "variant.h"
 
-using celonis::accelerator::operators::process::InductiveMinerHelper;
 using cel_int_t = int64_t;
 
 namespace starrocks {
@@ -114,8 +112,8 @@ std::string InductiveMinerFinalizer::finalize() {
     // Matches activity ids and variant order to Saola.
     const auto& [activities, variants] = sort_activities_and_variants(activity_map_, variant_map_);
 
-    InductiveMinerHelper helper(variants, imfd_frequency_threshold_);
-    return json_string(activities, helper.vertex_table(), helper.edge_table(), helper.statistics());
+    const auto [vertex_table, edge_table, statistics]{cpml_proxy::inductive_miner(variants, imfd_frequency_threshold_)};
+    return json_string(activities, *vertex_table, *edge_table, statistics);
 }
 
 } // namespace starrocks

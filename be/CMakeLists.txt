@@ -892,6 +892,7 @@ set(STARROCKS_LINK_LIBS
     Geo
     Cache
     Celonis
+    cpml_proxy # Custom to Celonis: Link against the Celonis Process Mining Library (proxy)
     ${WL_END_GROUP}
 )
 
@@ -1189,6 +1190,7 @@ add_subdirectory(${SRC_DIR}/testutil)
 add_subdirectory(${SRC_DIR}/types)
 add_subdirectory(${SRC_DIR}/udf)
 add_subdirectory(${SRC_DIR}/cache)
+add_subdirectory(${SRC_DIR}/exprs/celonis/cpml_proxy)
 add_subdirectory(${SRC_DIR}/exprs/celonis)
 add_subdirectory(${SRC_DIR}/tools)
 add_subdirectory(${SRC_DIR}/util)

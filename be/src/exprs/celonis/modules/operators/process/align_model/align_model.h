@@ -26,7 +26,6 @@
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/bpmn_graph_fwd.h"
 #include "modules/operators/process/bpmn/vertex_types.h"
-#include "modules/operators/process/inductive_miner/splittable_eventlog_fwd.h"
 
 namespace celonis::accelerator::operators::process::align_model {
 // avoid circular includes

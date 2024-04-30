@@ -30,11 +30,11 @@
 // TODO(j.kim)
 #include "modules/operators/process/dot_format_helper.h"
 #endif
+#include "modules/operators/process/inductive_miner/inductive_miner_statistics.h"
+#ifndef CELOSTAR
 #include "modules/operators/process/inductive_miner/directly_follows_graph.h"
 #include "modules/operators/process/inductive_miner/inductive_miner.h"
 #include "modules/operators/process/inductive_miner/inductive_miner_config.h"
-#include "modules/operators/process/inductive_miner/inductive_miner_statistics.h"
-#ifndef CELOSTAR
 #include "modules/operators/process/inductive_miner/replay_eventlog_on_process_tree.h"
 #include "modules/operators/process/inductive_miner/replay_variants_on_process_tree.h"
 #include "modules/operators/process/inductive_miner/splittable_eventlog.h"

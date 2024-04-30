@@ -73,10 +73,6 @@ add_main_source(operators/process/alignment/petri_net/unfolding)
 add_main_source(operators/process/alignment/rl_align)
 add_main_source(operators/process/alignment/rl_align/rl_statistics)
 add_main_source(operators/process/inductive_miner)
-add_main_source(operators/process/inductive_miner/base_case_strategies)
-add_main_source(operators/process/inductive_miner/cut_strategies)
-add_main_source(operators/process/inductive_miner/fallback_strategies)
-add_main_source(operators/process/inductive_miner/noisy_cut_strategies)
 
 # modularization split
 add_module("concurrency")
@@ -126,24 +122,3 @@ target_link_libraries(Celonis
         ${Boost_LIBRARIES}
         onetbb
 )
-
-# Test
-if (${MAKE_TEST} STREQUAL "ON")
-    add_library(gtest_main STATIC IMPORTED)
-    set_target_properties(gtest_main PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib/libgtest_main.a)
-
-    set(EXEC_FILES
-            ${TEST_DIR}/exprs/celonis/inductive_miner/directly_follows_graph_test.cpp
-            )
-    add_executable(celonis_test ${EXEC_FILES})
-    target_compile_definitions(celonis_test PRIVATE CELOSTAR)
-
-    target_link_libraries(celonis_test
-            PRIVATE ${TEST_LINK_LIBS}
-            PRIVATE gtest_main
-            PRIVATE Celonis)
-    target_include_directories(celonis_test
-            PRIVATE $<TARGET_PROPERTY:Celonis,INCLUDE_DIRECTORIES>
-            )
-    set_target_properties(celonis_test PROPERTIES COMPILE_FLAGS "-fno-access-control")
-endif ()

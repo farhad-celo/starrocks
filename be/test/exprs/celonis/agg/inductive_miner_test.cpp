@@ -192,6 +192,28 @@ private:
     FunctionContext* ctx{};
 };
 
+TEST_F(CelonisInductiveMinerTest, NegativeFilterThresholdLeadsToFailure) {
+    // GIVEN
+    VariantRows dummy_variants{{"dummy"}};
+    const std::string dummy_json{};
+    const auto dummy_weight{build_const_weight_column(1, 1)};
+    const double invalid_imfd_frequency_threshold{-0.1};
+
+    // WHEN - THEN
+    ASSERT_ANY_THROW(Run(dummy_variants, dummy_json, dummy_weight, invalid_imfd_frequency_threshold));
+}
+
+TEST_F(CelonisInductiveMinerTest, FilterThresholdAboveOneLeadsToFailure) {
+    // GIVEN
+    VariantRows dummy_variants{{"dummy"}};
+    const std::string dummy_json{};
+    const auto dummy_weight{build_const_weight_column(1, 1)};
+    const double invalid_imfd_frequency_threshold{1.1};
+
+    // WHEN - THEN
+    ASSERT_ANY_THROW(Run(dummy_variants, dummy_json, dummy_weight, invalid_imfd_frequency_threshold));
+}
+
 TEST_F(CelonisInductiveMinerTest, Q1) {
     VariantRows variants = {{"A", "B", "E"},
                             {"A", "B", "F"}};
@@ -1832,7 +1854,7 @@ TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
             "statistics": [
                 {
                     "key":"m2a_precision_times_1E4",
-                    "value":"0"
+                    "value":"10000"
                 },
                 {
                     "key":"flower_fallback_count",
@@ -1872,7 +1894,7 @@ TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
                 },
                 {
                     "key":"tree_size",
-                    "value":"0"
+                    "value":"6"
                 },
                 {
                     "key":"strict_tau_loop_count",
@@ -1888,7 +1910,7 @@ TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
                 },
                 {
                     "key":"activity_count",
-                    "value":"0"
+                    "value":"4"
                 },
                 {
                     "key":"noisy_xor_count",
@@ -1991,7 +2013,7 @@ TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
             "statistics": [
                 {
                     "key":"m2a_precision_times_1E4",
-                    "value":"0"
+                    "value":"10000"
                 },
                 {
                     "key":"flower_fallback_count",
@@ -2031,7 +2053,7 @@ TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
                 },
                 {
                     "key":"tree_size",
-                    "value":"0"
+                    "value":"6"
                 },
                 {
                     "key":"strict_tau_loop_count",
@@ -2047,7 +2069,7 @@ TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
                 },
                 {
                     "key":"activity_count",
-                    "value":"0"
+                    "value":"3"
                 },
                 {
                     "key":"noisy_xor_count",
@@ -2055,7 +2077,7 @@ TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
                 },
                 {
                     "key":"tau_transitions_count",
-                    "value":"0"
+                    "value":"1"
                 },
                 {
                     "key":"empty_log_base_case_count",
