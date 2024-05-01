@@ -68,11 +68,12 @@ TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_null_arrays) {
     auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     array->append_datum(DatumArray{Datum()});
     array->append_datum(Datum());
+    array->append_datum(DatumArray{Datum(), "b", Datum(), "b", "b"});
     array->append_datum(DatumArray{"b", Datum(), "b", Datum(), "b"});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
     modifier->append_datum(2L);
     const auto result_sources = CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array, modifier}).value();
-    ASSERT_EQ(3, result_sources->size());
+    ASSERT_EQ(4, result_sources->size());
     auto first_row = result_sources->get(0).get_array();
     EXPECT_EQ(0, first_row.size());
 
@@ -82,6 +83,11 @@ TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_null_arrays) {
     EXPECT_EQ(2, third_row.size());
     EXPECT_EQ("b", third_row[0].get_slice());
     EXPECT_EQ("b", third_row[1].get_slice());
+
+    auto fourth_row = result_sources->get(3).get_array();
+    EXPECT_EQ(2, fourth_row.size());
+    EXPECT_EQ("b", fourth_row[0].get_slice());
+    EXPECT_EQ("b", fourth_row[1].get_slice());
 }
 
 TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_longer_cycle) {

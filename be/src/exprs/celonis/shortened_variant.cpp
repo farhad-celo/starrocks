@@ -49,8 +49,8 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
         if (null_element_offsets == nullptr || (*null_element_offsets)[offset] == 0) {
             // This is a non-NULL element.
             result_elements->append_datum(elements_ptr[cur]);
+            new_offset++;
         }
-        new_offset++;
         while (cur + 1 - offset < array_size) {
             cur++;
             if (null_element_offsets != nullptr && (*null_element_offsets)[cur] != 0) {
