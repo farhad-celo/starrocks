@@ -32,12 +32,9 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v4
 
-      - name: GitHub Docker login
-        run: |
-          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
-
       - name: Pull dev env image
         run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
           docker pull ${BUILDER}
 
       - name: Build artifact image
@@ -83,28 +80,6 @@ jobs:
           local_image: starrocks-be:${IMAGE_TAG}
           remote_image: ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
 
-      - name: Build artifact image in ASAN mode
-        run: |
-          echo "The build type is ${ASAN_BUILD_TYPE}"
-          echo "The release version is ${ASAN_RELEASE_VERSION}"
-          echo "The artifact image tag is ${ASAN_IMAGE_TAG}"
-
-          # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${ASAN_RELEASE_VERSION} --build-arg BUILD_TYPE=${ASAN_BUILD_TYPE} --build-arg builder=${BUILDER} -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${ASAN_IMAGE_TAG} .
-
-      - name: Build ASAN allin1 image
-        run: |
-          # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg WITH_DEBUG_INFO=true \
-            --build-arg ARTIFACTIMAGE=starrocks-artifacts:${ASAN_IMAGE_TAG} \
-            -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${ASAN_IMAGE_TAG} .
-
-      - name: Push ASAN allin1 image to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-allin1:${ASAN_IMAGE_TAG}
-          remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${ASAN_IMAGE_TAG}
-
       - name: GitHub Docker logout
         if: ${{ always() }}
         run: |
@@ -142,10 +117,65 @@ jobs:
         run: |
           # Delete the built docker image from the runner.
           docker rmi -f $(docker images -q starrocks-allin1:${IMAGE_TAG})
-          docker rmi -f $(docker images -q starrocks-allin1:${ASAN_IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-fe:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-be:${IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-artifacts:${IMAGE_TAG})
+          
+          # Delete stopped containers, dangling images, dangling build cache, etc.
+          docker system prune -f
+          
+          # We could not simply delete the repo as it will fail the "Post checkout repository" step from the checkout action
+          # after this step.
+          rm -rf /runner/_work/celostar-starrocks/celostar-starrocks/*
+
+          # Remove temporary files.
+          rm -rf /tmp/*
+        continue-on-error: true
+
+  build-asan-allin1-image:
+    runs-on: [self-hosted, celostar]
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: Pull dev env image
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+          docker pull ${BUILDER}
+
+      - name: Build artifact image in ASAN mode
+        run: |
+          echo "The build type is ${ASAN_BUILD_TYPE}"
+          echo "The release version is ${ASAN_RELEASE_VERSION}"
+          echo "The artifact image tag is ${ASAN_IMAGE_TAG}"
+
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${ASAN_RELEASE_VERSION} --build-arg BUILD_TYPE=${ASAN_BUILD_TYPE} --build-arg builder=${BUILDER} -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${ASAN_IMAGE_TAG} .
+
+      - name: Build ASAN allin1 image
+        run: |
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg WITH_DEBUG_INFO=true \
+            --build-arg ARTIFACTIMAGE=starrocks-artifacts:${ASAN_IMAGE_TAG} \
+            -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${ASAN_IMAGE_TAG} .
+
+      - name: Push ASAN allin1 image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-allin1:${ASAN_IMAGE_TAG}
+          remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${ASAN_IMAGE_TAG}
+
+      - name: GitHub Docker logout
+        if: ${{ always() }}
+        run: |
+          docker logout ghcr.io
+
+      - name: Clean up
+        if: ${{ always() }}
+        run: |
+          # Delete the built docker image from the runner.
+          docker rmi -f $(docker images -q starrocks-allin1:${ASAN_IMAGE_TAG})
           docker rmi -f $(docker images -q starrocks-artifacts:${ASAN_IMAGE_TAG})
           
           # Delete stopped containers, dangling images, dangling build cache, etc.
