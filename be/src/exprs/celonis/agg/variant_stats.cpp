@@ -96,10 +96,10 @@ int VariantStatsFinalizer::compute_happy_variant(const std::vector<VRef>& sorted
     return happy;
 }
 
-int VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_top_variants, VRef& happy) const {
+void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_top_variants, VRef& happy) const {
     if (variant_map_.empty() || activity_map_.empty()) {
         // No data.
-        return 0;
+        return;
     }
 
     // 1. sort variants by count
@@ -111,7 +111,15 @@ int VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_top
     std::sort(v_count.begin(), v_count.end(),
               [](const VRef& lhs, const VRef& rhs) { return lhs->second > rhs->second; });
 
-    // 2. find top-10 variants for each activity
+    // 2. find a happy variant
+    int happy_v = compute_happy_variant(v_count);
+    happy = v_count[happy_v];
+
+    if (disable_top_variant_stats_) {
+        return;
+    }
+
+    // 3. find top-10 variants for each activity
     // Make sure we get enough variants so that each activity has 10 entries
 
     activity_top_variants.resize(activity_map_.size());
@@ -142,9 +150,6 @@ int VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_top
             break;
         }
     }
-    int happy_v = compute_happy_variant(v_count);
-    happy = v_count[happy_v];
-    return variant_map_.size();
 }
 
 std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
@@ -230,23 +235,25 @@ std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_
     d.AddMember("e_stats", e_stats, allocator);
 
     // Variants
-    rapidjson::Value topv(rapidjson::kArrayType);
-    for (int i = 0; i < activity_top_variants.size(); i++) {
-        rapidjson::Value obj(rapidjson::kObjectType);
-        obj.AddMember("id", i, allocator);
-        rapidjson::Value a(rapidjson::kArrayType);
-        for (int j = 0; j < activity_top_variants[i].size(); j++) {
-            rapidjson::Value var_obj(rapidjson::kObjectType);
-            rapidjson::Value act = activity_top_variants[i][j]->first.to_json(allocator);
-            size_t count = activity_top_variants[i][j]->second;
-            var_obj.AddMember("variant", act, allocator);
-            var_obj.AddMember("count", count, allocator);
-            a.PushBack(var_obj, allocator);
+    if (!disable_top_variant_stats_) {
+        rapidjson::Value topv(rapidjson::kArrayType);
+        for (int i = 0; i < activity_top_variants.size(); i++) {
+            rapidjson::Value obj(rapidjson::kObjectType);
+            obj.AddMember("id", i, allocator);
+            rapidjson::Value a(rapidjson::kArrayType);
+            for (int j = 0; j < activity_top_variants[i].size(); j++) {
+                rapidjson::Value var_obj(rapidjson::kObjectType);
+                rapidjson::Value act = activity_top_variants[i][j]->first.to_json(allocator);
+                size_t count = activity_top_variants[i][j]->second;
+                var_obj.AddMember("variant", act, allocator);
+                var_obj.AddMember("count", count, allocator);
+                a.PushBack(var_obj, allocator);
+            }
+            obj.AddMember("top", a, allocator);
+            topv.PushBack(obj, allocator);
         }
-        obj.AddMember("top", a, allocator);
-        topv.PushBack(obj, allocator);
+        d.AddMember("top", topv, allocator);
     }
-    d.AddMember("top", topv, allocator);
 
     // Happy path
     size_t happy_count = happy->second;
@@ -265,6 +272,10 @@ std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_
 }
 
 std::string VariantStatsFinalizer::finalize() {
+    if (variant_map_.empty() || activity_map_.empty()) {
+        return "{}";
+    }
+
     std::vector<VList> activity_top_variants;
     std::vector<size_t> a_lastseen(activity_map_.size());
     std::map<std::pair<int32_t, int32_t>, std::pair<int32_t, int32_t>> edge_stats;
@@ -297,12 +308,8 @@ std::string VariantStatsFinalizer::finalize() {
             }
         }
     }
-    // Add the variant into the variant_map.
     VRef happy;
-    int num_variants = compute_top_variants(activity_top_variants, happy);
-    if (num_variants == 0) {
-        return "{}";
-    }
+    compute_top_variants(activity_top_variants, happy);
     return json_string(activity_top_variants, happy);
 }
 

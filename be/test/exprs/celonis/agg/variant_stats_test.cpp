@@ -298,6 +298,7 @@ struct VariantStatsResult {
     }
 
     bool top_from_json(const rapidjson::Document& document) {
+        if (!document.HasMember("top")) return true;
         const auto& a = document["top"].GetArray();
         top.resize(a.Size());
         for (int i = 0; i < a.Size(); i++) {
@@ -601,7 +602,8 @@ TEST_F(CelonisVariantStatsTest, test_empty) {
         raw_columns[0] = col1.get();
         raw_columns[1] = weights.get();
         auto state1 = ManagedAggrState::create(ctx, func);
-        func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
+        // Don't call update when there is no data.
+        // func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
         auto result = BinaryColumn::create();
         func->finalize_to_column(ctx, state1->state(), result.get());
         EXPECT_EQ(result->size(), 1);
@@ -1222,6 +1224,190 @@ TEST_F(CelonisVariantStatsTest, test_self_loop) {
             "happy": {
                 "variant": [0,1],
                 "count": 1
+            }
+        })json";
+    match(e_s, rs);
+}
+
+TEST_F(CelonisVariantStatsTest, test_disable_top_variant_stats) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
+                                      {"a1", "a2", "a1", "a2"}});
+
+    auto weights = build_weight_column({1, 10});
+    auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());
+    auto disable_top = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
+    std::vector<const Column*> raw_columns;
+    raw_columns.resize(4);
+    raw_columns[0] = col1.get();
+    raw_columns[1] = weights.get();
+    raw_columns[2] = edge_count.get();
+    raw_columns[3] = disable_top.get();
+    ctx->set_constant_columns({nullptr, nullptr, edge_count, disable_top});
+    auto state1 = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
+
+    // Get the result
+    auto result = BinaryColumn::create();
+    func->finalize_to_column(ctx, state1->state(), result.get());
+    EXPECT_EQ(result->size(), 1);
+
+    Slice slice = result->get_slice(0);
+    std::string rs = slice.to_string();
+
+    std::string e_s =
+            R"json({
+            "dict": [
+                {
+                    "id": 0,
+                    "name": "a1"
+                },
+                {
+                    "id": 1,
+                    "name": "a2"
+                },
+                {
+                    "id": 2,
+                    "name": "a3"
+                },
+                {
+                    "id": 3,
+                    "name": "a4"
+                },
+                {
+                    "id": 4,
+                    "name": "a5"
+                },
+                {
+                    "id": 5,
+                    "name": "a6"
+                },
+                {
+                    "id": 6,
+                    "name": "a7"
+                },
+                {
+                    "id": 7,
+                    "name": "a00"
+                },
+                {
+                    "id": 8,
+                    "name": "a01"
+                },
+                {
+                    "id": 9,
+                    "name": "a02"
+                }
+            ],
+            "a_stats": [
+                {
+                    "count": 21,
+                    "count_case": 11,
+                    "count_start": 11,
+                    "count_end": 0,
+                    "id": 0
+                },
+                {
+                    "count": 21,
+                    "count_case": 11,
+                    "count_start": 0,
+                    "count_end": 10,
+                    "id": 1
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "count_start": 0,
+                    "count_end": 0,
+                    "id": 2
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "count_start": 0,
+                    "count_end": 0,
+                    "id": 3
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "count_start": 0,
+                    "count_end": 0,
+                    "id": 4
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "count_start": 0,
+                    "count_end": 0,
+                    "id": 5
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "count_start": 0,
+                    "count_end": 0,
+                    "id": 6
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "count_start": 0,
+                    "count_end": 0,
+                    "id": 7
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "count_start": 0,
+                    "count_end": 0,
+                    "id": 8
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "count_start": 0,
+                    "count_end": 1,
+                    "id": 9
+                }
+            ],
+            "e_count": 10,
+            "e_stats": [
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "src": 7,
+                    "dst": 8
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "src": 8,
+                    "dst": 9
+                },
+                {
+                    "count": 21,
+                    "count_case": 11,
+                    "src": 0,
+                    "dst": 1
+                },
+                {
+                    "count": 10,
+                    "count_case": 10,
+                    "src": 1,
+                    "dst": 0
+                },
+                {
+                    "count": 1,
+                    "count_case": 1,
+                    "src": 1,
+                    "dst": 2
+                }
+            ],
+            "happy": {
+                "variant": [0,1,0,1],
+                "count": 10
             }
         })json";
     match(e_s, rs);
