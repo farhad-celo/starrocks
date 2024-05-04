@@ -115,22 +115,6 @@ if(STARROCKS_JIT_ENABLE)
 
 endif()
 
-# Celonis proto sources
-message(STATUS "Proto sources will be created at ${BUILD_DIR}/generated/modules/query/")
-foreach (name calendars)
-    list(APPEND PROTO_GENERATED_SRCS "${BUILD_DIR}/generated/modules/query/${name}.pb.cc")
-    list(APPEND PROTO_GENERATED_HDRS "${BUILD_DIR}/generated/modules/query/${name}.pb.h")
-    list(APPEND PROTO_SRCS "${SRC_DIR}/exprs/celonis/protos/${name}.proto")
-endforeach()
-
-file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated/modules/query")
-add_custom_command(
-    OUTPUT ${PROTO_GENERATED_SRCS} ${PROTO_GENERATED_HDRS}
-    COMMAND ${THIRDPARTY_DIR}/bin/protoc -I=${SRC_DIR}/exprs/celonis/protos --cpp_out=${CMAKE_BINARY_DIR}/generated/modules/query ${PROTO_SRCS}
-    DEPENDS ${PROTO_SRCS}
-    )
-add_library(celonis_calendars_protos ${PROTO_GENERATED_SRCS} ${PROTO_GENERATED_HDRS})
-
 set(CELONIS_FILES
   celonis/agg/enumerate_node_paths.cpp
   celonis/agg/weekday_calendar.cpp
@@ -183,4 +167,4 @@ set_target_properties(blake2s PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})
 target_include_directories(Exprs PRIVATE "${BUILD_DIR}/generated" "celonis/cpml_proxy/include")
 target_link_libraries(Exprs PRIVATE blake2s)
-target_link_libraries(Exprs PRIVATE celonis_calendars_protos)
+target_link_libraries(Exprs PRIVATE celonis_protos)

@@ -11,18 +11,37 @@
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
 #include "exprs/arithmetic_operation.h"
+#include "exprs/base64.h"
 #include "exprs/celonis/agg/variant_stats.h"
+#include "google/protobuf/util/json_util.h"
+#include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "runtime/mem_pool.h"
-#include "runtime/time_types.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
 
 namespace starrocks {
 
 namespace {
+
+std::optional<std::string> to_statistics_json_string(const std::string& encoded_string) {
+    int cipher_len = encoded_string.length();
+    std::unique_ptr<char[]> p;
+    p.reset(new char[cipher_len + 3]);
+
+    int len = base64_decode2(encoded_string.data(), encoded_string.length(), p.get());
+    std::string decoded_string(p.get(), len);
+    ::celonis::accelerator::Statistics statistics_proto;
+    bool success = statistics_proto.ParseFromString(decoded_string);
+    if (!success) {
+        return std::nullopt;
+    }
+    std::string statistics_json;
+    google::protobuf::util::MessageToJsonString(statistics_proto, &statistics_json);
+    return statistics_json;
+}
 
 class ManagedAggrState {
 public:
@@ -48,7 +67,7 @@ private:
 
 } // namespace
 
-// Parses json to VariantStats data strutures.
+// Parses json to VariantStats data structures.
 // Compares results in a manner robust to changes in activity dictionary.
 struct VariantStatsResult {
     std::vector<std::string> act_map; // idx -> activity_name
@@ -427,7 +446,7 @@ public:
         VariantStatsResult e_vs;
         ASSERT_TRUE(e_vs.from_json(e_s));
 
-        EXPECT_TRUE(e_vs.equals(vs)) << "Actual: " << vs.debug_string()<< "\nExpected: " << e_vs.debug_string();
+        EXPECT_TRUE(e_vs.equals(vs)) << "Actual: " << vs.debug_string() << "\nExpected: " << e_vs.debug_string();
     }
 
 private:
@@ -650,7 +669,7 @@ TEST_F(CelonisVariantStatsTest, test_empty) {
         Slice slice = result->get_slice(0);
         std::string rs = slice.to_string();
         std::string e_s =
-                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':1,'id':0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1}}";
+                "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':1,'id':0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1}}";
         match(e_s, rs);
     }
 
@@ -672,7 +691,7 @@ TEST_F(CelonisVariantStatsTest, test_empty) {
         Slice slice = result->get_slice(0);
         std::string rs = slice.to_string();
         std::string e_s =
-                  "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':2,'count_case':1,'count_start':1,'count_end':1,'self_loop_count_case':1,'id':0}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':0}],'top':[{'id':0,'top':[{'variant':[0,0],'count':1}]}],'happy':{'variant':[0,0],'count':1}}";
+                "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':2,'count_case':1,'count_start':1,'count_end':1,'self_loop_count_case':1,'id':0}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':0}],'top':[{'id':0,'top':[{'variant':[0,0],'count':1}]}],'happy':{'variant':[0,0],'count':1}}";
         match(e_s, rs);
     }
 }
@@ -763,7 +782,7 @@ TEST_F(CelonisVariantStatsTest, test_top_with_repeated_activities) {
     std::string rs = slice.to_string();
 
     std::string e_s =
-        R"json({
+            R"json({
             "dict": [
                 {
                     "id": 0,
@@ -1411,6 +1430,41 @@ TEST_F(CelonisVariantStatsTest, test_disable_top_variant_stats) {
             }
         })json";
     match(e_s, rs);
+}
+
+TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
+                                      {"a1", "a2", "a1", "a2"}});
+
+    auto weights = build_weight_column({1, 10});
+    auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());
+    auto disable_top = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
+    auto enable_proto_encoding = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
+    std::vector<const Column*> raw_columns;
+    raw_columns.resize(5);
+    raw_columns[0] = col1.get();
+    raw_columns[1] = weights.get();
+    raw_columns[2] = edge_count.get();
+    raw_columns[3] = disable_top.get();
+    raw_columns[4] = enable_proto_encoding.get();
+    ctx->set_constant_columns({nullptr, nullptr, edge_count, disable_top, enable_proto_encoding});
+    auto state1 = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
+
+    // Get the result
+    auto result = BinaryColumn::create();
+    func->finalize_to_column(ctx, state1->state(), result.get());
+    EXPECT_EQ(result->size(), 1);
+
+    Slice slice = result->get_slice(0);
+    std::string encoded_string = slice.to_string();
+    auto json_string = to_statistics_json_string(encoded_string);
+    ASSERT_TRUE(json_string.has_value());
+    EXPECT_EQ(
+            "{\"dict\":[{\"id\":3,\"name\":\"a4\"},{\"id\":5,\"name\":\"a6\"},{\"id\":4,\"name\":\"a5\"},{\"id\":6,\"name\":\"a7\"},{\"id\":9,\"name\":\"a02\"},{\"id\":2,\"name\":\"a3\"},{\"id\":7,\"name\":\"a00\"},{\"id\":0,\"name\":\"a1\"},{\"id\":1,\"name\":\"a2\"},{\"id\":8,\"name\":\"a01\"}],\"aStats\":[{\"count\":\"21\",\"countCase\":\"11\",\"countStart\":\"11\",\"countEnd\":\"0\",\"id\":0},{\"count\":\"21\",\"countCase\":\"11\",\"countStart\":\"0\",\"countEnd\":\"10\",\"id\":1},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":2},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":3},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":4},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":5},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":6},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":7},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":8},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"1\",\"id\":9}],\"eCount\":\"10\",\"eStats\":[{\"count\":\"1\",\"countCase\":\"1\",\"src\":7,\"dst\":8},{\"count\":\"1\",\"countCase\":\"1\",\"src\":8,\"dst\":9},{\"count\":\"21\",\"countCase\":\"11\",\"src\":0,\"dst\":1},{\"count\":\"10\",\"countCase\":\"10\",\"src\":1,\"dst\":0},{\"count\":\"1\",\"countCase\":\"1\",\"src\":1,\"dst\":2}],\"happy\":{\"variant\":[0,1,0,1],\"count\":\"10\"}}",
+            json_string.value());
 }
 
 } // namespace starrocks

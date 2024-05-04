@@ -3,6 +3,8 @@
 #include <queue>
 
 #include "column/column_helper.h"
+#include "exprs/base64.h"
+#include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
@@ -152,6 +154,8 @@ void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_to
     }
 }
 
+// std::string
+
 std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
@@ -196,7 +200,7 @@ std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_
             std::map<Slice, int32_t> ordered_activity_map(activity_map_.begin(), activity_map_.end());
             std::vector<int32_t> activity_unorderd_to_ordered(activity_map_.size());
             int index = 0;
-            for (auto it = ordered_activity_map.begin() ; it != ordered_activity_map.end(); ++it, ++index) {
+            for (auto it = ordered_activity_map.begin(); it != ordered_activity_map.end(); ++it, ++index) {
                 DCHECK_LT(it->second, activity_unorderd_to_ordered.size());
                 activity_unorderd_to_ordered[it->second] = index;
             }
@@ -205,7 +209,7 @@ std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_
                 int32_t ordered_dst;
                 EdgeHashMap::const_iterator it;
             };
-            struct CmpOnEdgeOrderedID{
+            struct CmpOnEdgeOrderedID {
                 bool operator()(const EdgeOrderedID& x, const EdgeOrderedID& y) const {
                     return std::tie(x.ordered_src, x.ordered_dst) < std::tie(y.ordered_src, y.ordered_dst);
                 }
@@ -271,6 +275,133 @@ std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_
     return buf.GetString();
 }
 
+std::string VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
+    celonis::accelerator::Statistics statistics_proto;
+    // construct proto
+    // Dictionary
+    for (auto it = activity_map_.begin(); it != activity_map_.end(); it++) {
+        celonis::accelerator::DictionaryEntry entry;
+        entry.set_id(it->second);
+        entry.set_name(std::string(it->first.data, it->first.size));
+        *statistics_proto.add_dict() = entry;
+    }
+    // Activity stats
+    for (int i = 0; i < activity_stats_.size(); i++) {
+        celonis::accelerator::ActivityStatsEntry entry;
+        const auto as = activity_stats_[i];
+        entry.set_id(i);
+        entry.set_count(as.count);
+        entry.set_count_case(as.count_case);
+        entry.set_count_start(as.count_start);
+        entry.set_count_end(as.count_end);
+        auto it = edge_map_.find({i, i});
+        if (it != edge_map_.end()) {
+            entry.set_self_loop_count_case(it->second.count_case);
+        }
+        *statistics_proto.add_a_stats() = entry;
+    }
+    // Edge stats
+    if (edge_count_ < 0) {
+        for (auto it = edge_map_.begin(); it != edge_map_.end(); it++) {
+            celonis::accelerator::EdgeStatsEntry entry;
+            entry.set_count(it->second.count);
+            entry.set_count_case(it->second.count_case);
+            entry.set_src(it->first.src);
+            entry.set_dst(it->first.dst);
+            *statistics_proto.add_e_stats() = entry;
+        }
+    } else {
+        statistics_proto.set_e_count(edge_map_.size());
+        if (edge_count_ > 0) {
+            std::map<Slice, int32_t> ordered_activity_map(activity_map_.begin(), activity_map_.end());
+            std::vector<int32_t> activity_unorderd_to_ordered(activity_map_.size());
+            int index = 0;
+            for (auto it = ordered_activity_map.begin(); it != ordered_activity_map.end(); ++it, ++index) {
+                DCHECK_LT(it->second, activity_unorderd_to_ordered.size());
+                activity_unorderd_to_ordered[it->second] = index;
+            }
+            struct EdgeOrderedID {
+                int32_t ordered_src;
+                int32_t ordered_dst;
+                EdgeHashMap::const_iterator it;
+            };
+            struct CmpOnEdgeOrderedID {
+                bool operator()(const EdgeOrderedID& x, const EdgeOrderedID& y) const {
+                    return std::tie(x.ordered_src, x.ordered_dst) < std::tie(y.ordered_src, y.ordered_dst);
+                }
+            };
+            std::priority_queue<EdgeOrderedID, std::vector<EdgeOrderedID>, CmpOnEdgeOrderedID> pq;
+            for (auto it = edge_map_.cbegin(); it != edge_map_.cend(); ++it) {
+                pq.push({activity_unorderd_to_ordered[it->first.src], activity_unorderd_to_ordered[it->first.dst], it});
+                if (pq.size() > edge_count_) {
+                    pq.pop();
+                }
+            }
+            // Pop first to list them in reverse sorted order
+            std::vector<EdgeHashMap::const_iterator> popped;
+            popped.reserve(pq.size());
+            while (!pq.empty()) {
+                popped.push_back(pq.top().it);
+                pq.pop();
+            }
+            for (auto rit = popped.rbegin(); rit != popped.rend(); ++rit) {
+                celonis::accelerator::EdgeStatsEntry entry;
+                entry.set_count((*rit)->second.count);
+                entry.set_count_case((*rit)->second.count_case);
+                entry.set_src((*rit)->first.src);
+                entry.set_dst((*rit)->first.dst);
+                *statistics_proto.add_e_stats() = entry;
+            }
+        }
+    }
+    // Variants
+    if (!disable_top_variant_stats_) {
+        rapidjson::Value topv(rapidjson::kArrayType);
+        for (int i = 0; i < activity_top_variants.size(); i++) {
+            celonis::accelerator::VariantEntry entry;
+            entry.set_id(i);
+            for (int j = 0; j < activity_top_variants[i].size(); j++) {
+                celonis::accelerator::VariantCountPair count_pair;
+                size_t count = activity_top_variants[i][j]->second;
+                count_pair.set_count(count);
+                const auto& data = activity_top_variants[i][j]->first.data;
+                for (int k = 0; k < data.size(); ++k) {
+                    count_pair.add_variant(data[k]);
+                }
+                *entry.add_top() = count_pair;
+            }
+            *statistics_proto.add_top() = entry;
+        }
+    }
+    // Happy path
+    celonis::accelerator::VariantCountPair count_pair;
+    size_t happy_count = happy->second;
+    count_pair.set_count(happy_count);
+    const auto& data = happy->first.data;
+    for (int i = 0; i < data.size(); i++) {
+        count_pair.add_variant(data[i]);
+    }
+    *statistics_proto.mutable_happy() = count_pair;
+
+    std::string binary_string;
+    statistics_proto.SerializeToString(&binary_string);
+    // encode the proto string
+    int cipher_len = (size_t) (4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
+    char p[cipher_len];
+
+    int len = base64_encode2((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*) p);
+    std::string encoded_string(p, len);
+    return encoded_string;
+}
+
+std::string VariantStatsFinalizer::to_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
+    if (enable_proto_encoding_) {
+        return base64_encoded_string(activity_top_variants, happy);
+    } else {
+        return json_string(activity_top_variants, happy);
+    }
+}
+
 std::string VariantStatsFinalizer::finalize() {
     if (variant_map_.empty() || activity_map_.empty()) {
         return "{}";
@@ -280,7 +411,7 @@ std::string VariantStatsFinalizer::finalize() {
     std::vector<size_t> a_lastseen(activity_map_.size());
     std::map<std::pair<int32_t, int32_t>, std::pair<int32_t, int32_t>> edge_stats;
     EdgeHashSet e_seen;
-    for (const auto& [variant, count] : variant_map_) {
+    for (const auto& [variant, count]: variant_map_) {
         e_seen.clear();
         for (int i = 0; i < variant.data.size(); i++) {
             auto activity_id = variant.data[i];
@@ -310,7 +441,7 @@ std::string VariantStatsFinalizer::finalize() {
     }
     VRef happy;
     compute_top_variants(activity_top_variants, happy);
-    return json_string(activity_top_variants, happy);
+    return to_string(activity_top_variants, happy);
 }
 
 } // namespace starrocks

@@ -23,12 +23,16 @@ public:
         if (ctx->is_notnull_constant_column(3)) {
             disable_top_variant_stats_= ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(3));
         }
+        if (ctx->is_notnull_constant_column(4)) {
+            enable_proto_encoding_= ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(4));
+        }
         return VariantAggregateState::update(ctx, columns, row_num);
     }
 
     size_t serialized_size() const override {
-        size_t result = sizeof(int64_t);
-        result += sizeof(uint8_t);
+        size_t result = sizeof(int64_t); // edge_count_
+        result += sizeof(uint8_t);       // disable_top_variant_stats_
+        result += sizeof(uint8_t);       // enable_proto_encoding_
         result += VariantAggregateState::serialized_size();
         return result;
     };
@@ -38,6 +42,9 @@ public:
         dst += sizeof(int64_t);
         uint8_t dtvs = disable_top_variant_stats_;
         memcpy(dst, &dtvs, sizeof(uint8_t));
+        dst += sizeof(uint8_t);
+        uint8_t epe = enable_proto_encoding_;
+        memcpy(dst, &epe, sizeof(uint8_t));
         dst += sizeof(uint8_t);
         VariantAggregateState::serialize(dst);
     }
@@ -51,15 +58,22 @@ public:
         disable_top_variant_stats_ = dtvs;
         src += sizeof(uint8_t);
         len -= sizeof(uint8_t);
+        uint8_t epe;
+        memcpy(&epe, src, sizeof(uint8_t));
+        enable_proto_encoding_ = epe;
+        src += sizeof(uint8_t);
+        len -= sizeof(uint8_t);
         return VariantAggregateState::deserialize_and_merge(mem_pool, src, len);
     }
 
     int64_t edge_count() const { return edge_count_; }
     bool disable_top_variant_stats() const { return disable_top_variant_stats_; }
+    bool enable_proto_encoding() const { return enable_proto_encoding_; }
 
 private:
     int64_t edge_count_ = -1;
     bool disable_top_variant_stats_ = false;
+    bool enable_proto_encoding_ = false;
 };
 
 // A pair of activities that appear together in a variant.
@@ -124,7 +138,8 @@ public:
             : VariantAggregateFinalizer(ctx, static_cast<const VariantAggregateState&>(state)),
               activity_stats_(activity_map_.size()),
               edge_count_(state.edge_count()),
-              disable_top_variant_stats_(state.disable_top_variant_stats()) {}
+              disable_top_variant_stats_(state.disable_top_variant_stats()),
+              enable_proto_encoding_(state.enable_proto_encoding()) {}
 
     std::string finalize() override;
 
@@ -137,6 +152,10 @@ private:
 
     std::string json_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
 
+    std::string base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
+
+    std::string to_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
+
     // Computes the variant that starts and ends with the most common start/end activities,
     // otherwise returns the top most frequent activity.
     int compute_happy_variant(const std::vector<VRef>& sorted) const;
@@ -148,6 +167,7 @@ private:
     EdgeHashMap edge_map_;
     const int64_t edge_count_;
     const bool disable_top_variant_stats_;
+    const bool enable_proto_encoding_;
 };
 
 // Extends VariantAggregateFunction and calculates statistics of activities and edges.
@@ -155,11 +175,12 @@ private:
 // TODO(hagonzal): add option to compute approximate top-k variants, now it returns exact top-k.
 /**
  * @param: [ input_column, weight_column [, edge_count ] ]
- * @paramType columns: [ BIGINT, BIGINT [, BIGINT [, BOOLEAN ] ] ]
+ * @paramType columns: [ BIGINT, BIGINT [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
  * @return: json string
  * weight_column : Indicates the frequency of the input(variant)
  * edge_count (optional) : Limits the size of the edge table. If < 0, there is no limit.
  * disable_top_variant_stats (optional) : Disables top variant stats
+ * enable_proto_encoding (optional): Enable base64 encoded binary proto output
  *
  * Used to support PQL EXPLORE_PROCESS and GRAPH
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245719/EXPLORE+PROCESS

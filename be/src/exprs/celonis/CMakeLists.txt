@@ -92,7 +92,7 @@ target_compile_definitions(Celonis PRIVATE CELOSTAR)
 
 # Proto sources
 message(STATUS "Proto sources will be created at ${BUILD_DIR}/generated/modules/query/")
-foreach (name operators celonis_types)
+foreach (name operators celonis_types calendars variantstats)
     list(APPEND PROTO_GENERATED_SRCS "${BUILD_DIR}/generated/modules/query/${name}.pb.cc")
     list(APPEND PROTO_GENERATED_HDRS "${BUILD_DIR}/generated/modules/query/${name}.pb.h")
     list(APPEND PROTO_SRCS "${SRC_DIR}/exprs/celonis/protos/${name}.proto")

@@ -1,0 +1,42 @@
+syntax = "proto2";
+package celonis.accelerator;
+
+message DictionaryEntry {
+  optional int32 id = 1;
+  optional string name = 2;
+}
+
+message ActivityStatsEntry {
+  optional int64 count = 1;
+  optional int64 count_case = 2;
+  optional int64 count_start = 3;
+  optional int64 count_end = 4;
+  optional int64 self_loop_count_case = 5;
+  optional int32 id = 6;
+}
+
+message EdgeStatsEntry {
+  optional int64 count = 1;
+  optional int64 count_case = 2;
+  optional int32 src = 3;
+  optional int32 dst = 4;
+}
+
+message VariantCountPair {
+  repeated int32 variant = 1;
+  optional int64 count = 2;
+}
+
+message VariantEntry {
+  optional int32 id = 1;
+  repeated VariantCountPair top = 2;
+}
+
+message Statistics {
+  repeated DictionaryEntry dict = 1;
+  repeated ActivityStatsEntry a_stats = 2;
+  optional int64 e_count = 3;
+  repeated EdgeStatsEntry e_stats = 4;
+  repeated VariantEntry top = 5;
+  optional VariantCountPair happy = 6;
+}
