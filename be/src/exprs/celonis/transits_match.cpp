@@ -11,6 +11,14 @@ namespace starrocks {
 
 namespace {
 
+struct TransitsMatchStateFragmentLocal {
+    ScalarFunction function;
+    std::optional<std::map<DatumKey, std::set<DatumKey>>> manual_map = std::nullopt;
+    // Only one of left_manual and right_manual is NULL; left_manual and right_manual have different length;
+    // left_manual or right_manual contains NULL
+    bool is_malformed = false;
+};
+
 struct Edge {
     size_t left_index;
     size_t right_index;
@@ -93,12 +101,64 @@ std::vector<Edge> compute_edges(const DatumArray& left_match_array, const DatumA
     return edges;
 }
 
+} // namespace
+
+Status CelonisTransitsMatch::prepare(starrocks::FunctionContext* context,
+                                     FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+    auto state = new TransitsMatchStateFragmentLocal();
+    context->set_function_state(scope, state);
+
+    auto left_manual_column = context->get_constant_column(4);
+    auto right_manual_column = context->get_constant_column(5);
+
+    if (left_manual_column == nullptr || right_manual_column == nullptr) {
+        state->function = transits_match_non_constant_manual;
+        return Status::OK();
+    }
+    state->function = transits_match_constant_manual;
+    if (left_manual_column->empty() || right_manual_column->empty()) {
+        return Status::OK();
+    }
+    if (left_manual_column->get(0).is_null() != right_manual_column->get(0).is_null()) {
+        state->is_malformed = true;
+        return Status::OK();
+    }
+    if (left_manual_column->get(0).is_null() && right_manual_column->get(0).is_null()) {
+        return Status::OK();
+    }
+    auto left_manual_array = left_manual_column->get(0).get_array();
+    auto right_manual_array = right_manual_column->get(0).get_array();
+    if (left_manual_array.size() != right_manual_array.size()) {
+        state->is_malformed = true;
+        return Status::OK();
+    }
+    const auto size = left_manual_array.size();
+    for (auto i = 0; i < size; ++i) {
+        if (left_manual_array[i].is_null() || right_manual_array[i].is_null()) {
+            state->is_malformed = true;
+            return Status::OK();
+        }
+    }
+    state->manual_map = build_map(left_manual_array, right_manual_array);
+    return Status::OK();
+}
+
+Status CelonisTransitsMatch::close(starrocks::FunctionContext* context,
+                                   FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        const auto* state = reinterpret_cast<const TransitsMatchStateFragmentLocal*>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+        delete state;
+    }
+    return Status::OK();
 }
 
 StatusOr<ColumnPtr>
-CelonisTransitsMatch::transits_match([[maybe_unused]] starrocks::FunctionContext* context,
-                                     const starrocks::Columns& columns) {
-    DCHECK_EQ(6, columns.size());
+CelonisTransitsMatch::transits_match_non_constant_manual([[maybe_unused]] starrocks::FunctionContext* context,
+                                                         const starrocks::Columns& columns) {
     const size_t n_rows = columns[0]->size();
     auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();
@@ -204,6 +264,93 @@ CelonisTransitsMatch::transits_match([[maybe_unused]] starrocks::FunctionContext
         AddEdges(edges, left_key_fields, right_key_fields, res_left_fields, res_right_fields, null_column, row);
     }
     return res;
+}
+
+StatusOr<ColumnPtr>
+CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks::FunctionContext* context,
+                                                     const starrocks::Columns& columns) {
+    const size_t n_rows = columns[0]->size();
+    auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
+    auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();
+
+    const auto n_fields = left_key_fields.size();
+    ColumnPtr res = context->create_column(context->get_return_type(), true);
+    auto null_column = down_cast<NullableColumn*>(res.get());
+    StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
+    auto fields = st->fields_column();
+    DCHECK_EQ(2, fields.size());
+    StructColumn* res_left_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[0].get()));
+    StructColumn* res_right_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[1].get()));
+    auto res_left_fields = res_left_column->fields_column();
+    auto res_right_fields = res_right_column->fields_column();
+
+    const auto* state = reinterpret_cast<const TransitsMatchStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+
+    for (auto row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
+            columns[3]->is_null(row) || right_key_fields.size() != n_fields || n_fields == 0 || state->is_malformed) {
+            res->append_nulls(1);
+            continue;
+        }
+        const auto length = left_key_fields[0]->get(row).get_array().size();
+        bool inconsistent_length = false;
+        for (auto i = 0; i < n_fields; ++i) {
+            if (left_key_fields[i]->get(row).get_array().size() != length ||
+                right_key_fields[i]->get(row).get_array().size() != length) {
+                inconsistent_length = true;
+                break;
+            }
+        }
+        if (inconsistent_length) {
+            res->append_nulls(1);
+            continue;
+        }
+        auto left_match_array = columns[1]->get(row).get_array();
+        auto right_match_array = columns[3]->get(row).get_array();
+        if (length != left_match_array.size() || length != right_match_array.size()) {
+            res->append_nulls(1);
+            continue;
+        }
+
+        bool has_null_match_value = false;
+        for (size_t i = 0; i < length; ++i) {
+            if (left_match_array[i].is_null()) {
+                has_null_match_value = true;
+                break;
+            }
+        }
+        for (size_t i = 0; i < length; ++i) {
+            if (right_match_array[i].is_null()) {
+                has_null_match_value = true;
+                break;
+            }
+        }
+        if (has_null_match_value) {
+            res->append_nulls(1);
+            continue;
+        }
+        if (fields[0]->is_nullable()) {
+            auto null_column_1 = down_cast<NullableColumn*>(fields[0].get());
+            null_column_1->null_column_data().emplace_back(0);
+        }
+        if (fields[1]->is_nullable()) {
+            auto null_column_2 = down_cast<NullableColumn*>(fields[1].get());
+            null_column_2->null_column_data().emplace_back(0);
+        }
+        std::vector<Edge> edges = compute_edges(left_match_array, right_match_array, state->manual_map);
+        AddEdges(edges, left_key_fields, right_key_fields, res_left_fields, res_right_fields, null_column, row);
+    }
+    return res;
+}
+
+StatusOr<ColumnPtr>
+CelonisTransitsMatch::transits_match([[maybe_unused]] starrocks::FunctionContext* context,
+                                     const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 6);
+    const auto* state = reinterpret_cast<const TransitsMatchStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return state->function(context, columns);
 }
 
 } // namespace starrocks

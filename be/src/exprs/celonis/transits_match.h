@@ -15,6 +15,15 @@ public:
      * This function is used to support PQL TRANSIT_COLUMN
      */
     DEFINE_VECTORIZED_FN(transits_match);
+
+    static Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+private:
+    DEFINE_VECTORIZED_FN(transits_match_constant_manual);
+
+    DEFINE_VECTORIZED_FN(transits_match_non_constant_manual);
 };
 
 } // namespace starrocks
