@@ -106,12 +106,14 @@ void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_to
 
     // 1. sort variants by count
     std::vector<VRef> v_count(variant_map_.size());
-    int i = 0;
+    int index = 0;
     for (auto it = variant_map_.cbegin(); it != variant_map_.cend(); it++) {
-        v_count[i++] = it;
+        v_count[index++] = it;
     }
+    LOG(INFO) << "started variants sorting\n";
     std::sort(v_count.begin(), v_count.end(),
               [](const VRef& lhs, const VRef& rhs) { return lhs->second > rhs->second; });
+    LOG(INFO) << "done variants sorting (variant_map_ size = " << variant_map_.size() << ")\n";
 
     // 2. find a happy variant
     int happy_v = compute_happy_variant(v_count);
@@ -411,6 +413,9 @@ std::string VariantStatsFinalizer::finalize() {
     std::vector<size_t> a_lastseen(activity_map_.size());
     std::map<std::pair<int32_t, int32_t>, std::pair<int32_t, int32_t>> edge_stats;
     EdgeHashSet e_seen;
+    LOG(INFO) << "started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
+    LOG(INFO) << "size of activity_stats_: " << activity_stats_.size() << "\n";
+    LOG(INFO) << "size of edge_map_: " << edge_map_.size() << "\n";
     for (const auto& [variant, count]: variant_map_) {
         e_seen.clear();
         for (int i = 0; i < variant.data.size(); i++) {
@@ -439,9 +444,15 @@ std::string VariantStatsFinalizer::finalize() {
             }
         }
     }
+    LOG(INFO) << "done traversing variant_map_\n";
     VRef happy;
+    LOG(INFO) << "started finding top\n";
     compute_top_variants(activity_top_variants, happy);
-    return to_string(activity_top_variants, happy);
+    LOG(INFO) << "done finding top (activity_top_variants size = " << activity_top_variants.size() << ")\n";
+    LOG(INFO) << "started to_string\n";
+    auto rv = to_string(activity_top_variants, happy);
+    LOG(INFO) << "done to_string (length = " << rv.size() << ")\n";
+    return rv;
 }
 
 } // namespace starrocks
