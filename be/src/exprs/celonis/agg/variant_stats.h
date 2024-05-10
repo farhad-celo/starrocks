@@ -6,6 +6,7 @@
 #include "rapidjson/document.h"
 #include "variant.h"
 #include "variant_agg.h"
+#include <boost/functional/hash.hpp>
 
 namespace starrocks {
 
@@ -83,8 +84,8 @@ struct Edge {
     int32_t dst;
 
     Edge(int32_t in_src, int32_t in_dst) : src(in_src), dst(in_dst) {
-        hash = std::hash<int32_t>()(src);
-        HashUtil::hash_combine(hash, std::hash<int32_t>()(dst));
+        static boost::hash<std::tuple<int32_t, int32_t>> hasher;
+        hash = hasher({src, dst});
     }
 
     rapidjson::Value to_json(rapidjson::Document::AllocatorType& allocator) const;
