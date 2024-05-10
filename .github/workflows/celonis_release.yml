@@ -48,6 +48,9 @@ jobs:
 
       - name: Build allin1 image
         run: |
+          # Need to set the flag to make Celostar compliance test pass.
+          echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf
+
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg WITH_DEBUG_INFO=true \
             --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} \
@@ -155,6 +158,9 @@ jobs:
 
       - name: Build ASAN allin1 image
         run: |
+          # Need to set the flag to make Celostar compliance test pass.
+          echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf
+
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg WITH_DEBUG_INFO=true \
             --build-arg ARTIFACTIMAGE=starrocks-artifacts:${ASAN_IMAGE_TAG} \
