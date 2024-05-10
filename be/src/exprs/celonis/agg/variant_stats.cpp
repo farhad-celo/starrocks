@@ -406,7 +406,7 @@ std::string VariantStatsFinalizer::to_string(std::vector<VList>& activity_top_va
 
 std::string VariantStatsFinalizer::finalize() {
     if (variant_map_.empty() || activity_map_.empty()) {
-        return "{}";
+        return enable_proto_encoding_ ? "" : "{}";
     }
 
     std::vector<VList> activity_top_variants;

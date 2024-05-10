@@ -1467,4 +1467,34 @@ TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding) {
             json_string.value());
 }
 
+TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding_empty) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col1 = build_variant_column({{}});
+
+    auto weights = build_weight_column({1});
+    auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());
+    auto disable_top = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
+    auto enable_proto_encoding = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
+    std::vector<const Column*> raw_columns;
+    raw_columns.resize(5);
+    raw_columns[0] = col1.get();
+    raw_columns[1] = weights.get();
+    raw_columns[2] = edge_count.get();
+    raw_columns[3] = disable_top.get();
+    raw_columns[4] = enable_proto_encoding.get();
+    ctx->set_constant_columns({nullptr, nullptr, edge_count, disable_top, enable_proto_encoding});
+    auto state1 = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
+
+    // Get the result
+    auto result = BinaryColumn::create();
+    func->finalize_to_column(ctx, state1->state(), result.get());
+    EXPECT_EQ(result->size(), 1);
+
+    Slice slice = result->get_slice(0);
+    std::string encoded_string = slice.to_string();
+    EXPECT_EQ("", encoded_string);
+}
+
 } // namespace starrocks
