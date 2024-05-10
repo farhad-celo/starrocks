@@ -84,7 +84,7 @@ struct Edge {
     int32_t dst;
 
     Edge(int32_t in_src, int32_t in_dst) : src(in_src), dst(in_dst) {
-        static boost::hash<std::tuple<int32_t, int32_t>> hasher;
+        boost::hash<std::tuple<int32_t, int32_t>> hasher;
         hash = hasher({src, dst});
     }
 
