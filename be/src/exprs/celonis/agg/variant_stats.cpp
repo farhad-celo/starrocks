@@ -358,7 +358,7 @@ std::string VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& act
     }
     // Variants
     if (!disable_top_variant_stats_) {
-        rapidjson::Value topv(rapidjson::kArrayType);
+        uint32_t total_variants = 0;
         for (int i = 0; i < activity_top_variants.size(); i++) {
             celonis::accelerator::VariantEntry entry;
             entry.set_id(i);
@@ -368,12 +368,14 @@ std::string VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& act
                 count_pair.set_count(count);
                 const auto& data = activity_top_variants[i][j]->first.data;
                 for (int k = 0; k < data.size(); ++k) {
+                    ++total_variants;
                     count_pair.add_variant(data[k]);
                 }
                 *entry.add_top() = count_pair;
             }
             *statistics_proto.add_top() = entry;
         }
+        LOG(INFO) << "CELONIS_VARIANT_STATS: total number of variants = " << total_variants << "\n";
     }
     // Happy path
     celonis::accelerator::VariantCountPair count_pair;
@@ -389,10 +391,10 @@ std::string VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& act
     statistics_proto.SerializeToString(&binary_string);
     // encode the proto string
     int cipher_len = (size_t) (4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
-    char p[cipher_len];
+    std::string p(cipher_len, '\0');
 
-    int len = base64_encode2((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*) p);
-    std::string encoded_string(p, len);
+    int len = base64_encode2((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*) p.data());
+    std::string encoded_string(p.data(), len);
     return encoded_string;
 }
 
