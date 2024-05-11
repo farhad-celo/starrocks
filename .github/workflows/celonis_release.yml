@@ -72,17 +72,6 @@ jobs:
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${IMAGE_TAG} .
 
-      - name: Push FE image to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-fe:${IMAGE_TAG}
-          remote_image: ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG}
-      - name: Push BE docker image to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-be:${IMAGE_TAG}
-          remote_image: ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
-
       - name: GitHub Docker logout
         if: ${{ always() }}
         run: |
