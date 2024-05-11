@@ -271,7 +271,7 @@ std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_
 
     // Encode to string.
     rapidjson::StringBuffer buf;
-    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buf);
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
     d.Accept(writer);
 
     return buf.GetString();
