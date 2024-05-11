@@ -132,7 +132,7 @@ struct ActivityStats {
 
 class VariantStatsFinalizer : public VariantAggregateFinalizer {
 public:
-    using EdgeHashMap = std::unordered_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
+    using EdgeHashMap = phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
     using EdgeHashSet = phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge>;
 
     VariantStatsFinalizer(FunctionContext* ctx, const VariantStatsState& state)
