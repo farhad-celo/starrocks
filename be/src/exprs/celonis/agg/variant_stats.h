@@ -105,6 +105,7 @@ struct HashOnEdge {
 struct EdgeStats {
     size_t count{0};      // Number of times this edge appears
     size_t count_case{0}; // Number distinct cases this edge appears in
+    const Variant* last_variant = nullptr; // last variant to update count_case
 
     bool equal(const EdgeStats& other) { return count == other.count && count_case == other.count_case; }
 

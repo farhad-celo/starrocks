@@ -414,12 +414,10 @@ std::string VariantStatsFinalizer::finalize() {
     std::vector<VList> activity_top_variants;
     std::vector<size_t> a_lastseen(activity_map_.size());
     std::map<std::pair<int32_t, int32_t>, std::pair<int32_t, int32_t>> edge_stats;
-    EdgeHashSet e_seen;
     LOG(INFO) << "CELONIS_VARIANT_STATS: started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
     LOG(INFO) << "CELONIS_VARIANT_STATS: size of activity_stats_ = " << activity_stats_.size() << "\n";
     LOG(INFO) << "CELONIS_VARIANT_STATS: size of edge_map_ = " << edge_map_.size() << "\n";
     for (const auto& [variant, count]: variant_map_) {
-        e_seen.clear();
         for (int i = 0; i < variant.data.size(); i++) {
             auto activity_id = variant.data[i];
             ActivityStats& a_stats = activity_stats_[activity_id];
@@ -438,7 +436,8 @@ std::string VariantStatsFinalizer::finalize() {
                 Edge e(variant.data[i - 1], activity_id);
                 auto& e_stats = edge_map_[e];
                 e_stats.count += count;
-                if (e_seen.insert(e).second) {
+                if (e_stats.last_variant != &variant) {
+                    e_stats.last_variant = &variant;
                     e_stats.count_case += count;
                 }
             }
