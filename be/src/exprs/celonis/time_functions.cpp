@@ -1506,12 +1506,15 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
         celonis::accelerator::Calendar calendar_proto;
         calendar_proto.mutable_intersect_calendar()->mutable_calendar1()->CopyFrom(status_or_calendar1.value());
         calendar_proto.mutable_intersect_calendar()->mutable_calendar2()->CopyFrom(status_or_calendar2.value());
-        std::string calendar_string = to_base64_encoded_string(calendar_proto);
-
+        std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto);
+        if (!calendar_string.has_value()) {
+            output_column->append_nulls(1);
+            continue;
+        }
         std::vector<std::string> calendar_pieces;
-        calendar_pieces.reserve((calendar_string.size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
-        for (size_t i = 0; i < calendar_string.size(); i += MAX_STRING_SIZE) {
-            calendar_pieces.emplace_back(calendar_string.substr(i, MAX_STRING_SIZE));
+        calendar_pieces.reserve((calendar_string->size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
+        for (size_t i = 0; i < calendar_string->size(); i += MAX_STRING_SIZE) {
+            calendar_pieces.emplace_back(calendar_string->substr(i, MAX_STRING_SIZE));
         }
         DatumArray array;
         for (const auto& calendar_piece: calendar_pieces) {

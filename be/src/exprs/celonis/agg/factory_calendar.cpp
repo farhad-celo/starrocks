@@ -14,6 +14,7 @@
 
 #include "factory_calendar.h"
 #include "exprs/celonis/agg/util.h"
+#include "gutil/strings/strcat.h"
 #include "modules/query/calendars.pb.h"
 
 namespace starrocks {
@@ -170,11 +171,17 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         }
         *calendar_proto.mutable_factory_calendar()->add_entries() = entry;
     }
-    std::string calendar_string = to_base64_encoded_string(calendar_proto);
+    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto);
+    if (!calendar_string.has_value()) {
+        ctx->set_error(StrCat("Calendar proto serialized size (", calendar_proto.ByteSizeLong(),
+                              " bytes) exceeds maximum supported length (4GB)").c_str(), false);
+        return;
+    }
+
     std::vector<std::string> calendar_pieces;
-    calendar_pieces.reserve((calendar_string.size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
-    for (size_t i = 0; i < calendar_string.size(); i += MAX_STRING_SIZE) {
-        calendar_pieces.emplace_back(calendar_string.substr(i, MAX_STRING_SIZE));
+    calendar_pieces.reserve((calendar_string->size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
+    for (size_t i = 0; i < calendar_string->size(); i += MAX_STRING_SIZE) {
+        calendar_pieces.emplace_back(calendar_string->substr(i, MAX_STRING_SIZE));
     }
     DatumArray array;
     for (const auto& calendar_piece: calendar_pieces) {

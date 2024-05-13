@@ -3,7 +3,7 @@
 #include <queue>
 
 #include "column/column_helper.h"
-#include "exprs/base64.h"
+#include "exprs/celonis/agg/util.h"
 #include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -387,15 +387,12 @@ std::string VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& act
     }
     *statistics_proto.mutable_happy() = count_pair;
 
-    std::string binary_string;
-    statistics_proto.SerializeToString(&binary_string);
-    // encode the proto string
-    int cipher_len = (size_t) (4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
-    std::string p(cipher_len, '\0');
-
-    int len = base64_encode2((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*) p.data());
-    std::string encoded_string(p.data(), len);
-    return encoded_string;
+    std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto);
+    if (!encoded_string.has_value()) {
+        LOG(ERROR) << "proto serialized size exceeds maximum supported length (4GB).\n";
+        return "";
+    }
+    return encoded_string.value();
 }
 
 std::string VariantStatsFinalizer::to_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
