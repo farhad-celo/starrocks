@@ -72,7 +72,7 @@ public:
     bool enable_proto_encoding() const { return enable_proto_encoding_; }
 
 private:
-    int64_t edge_count_ = -1;
+    int64_t edge_count_ = (1LL << 32); // very large number to output all edges.
     bool disable_top_variant_stats_ = false;
     bool enable_proto_encoding_ = false;
 };
@@ -180,7 +180,7 @@ private:
  * @paramType columns: [ BIGINT, BIGINT [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
  * @return: json string
  * weight_column : Indicates the frequency of the input(variant)
- * edge_count (optional) : Limits the size of the edge table. If < 0, there is no limit.
+ * edge_count (optional) : Limits the size of the edge table. if edge_count <= 0, edge stats is not populated and output.
  * disable_top_variant_stats (optional) : Disables top variant stats
  * enable_proto_encoding (optional): Enable base64 encoded binary proto output
  *
