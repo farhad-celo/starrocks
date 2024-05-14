@@ -409,7 +409,7 @@ std::string VariantStatsFinalizer::finalize() {
             if (i == variant.data.size() - 1) {
                 a_stats.count_end += count;
             }
-            if (i > 0 && edge_count_ > 0) {
+            if (i > 0 && (edge_count_ >= 0 || variant.data[i - 1] == activity_id)) {
                 Edge e(variant.data[i - 1], activity_id);
                 auto& e_stats = edge_map_[e];
                 e_stats.count += count;

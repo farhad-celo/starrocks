@@ -187,6 +187,10 @@ private:
  * Used to support PQL EXPLORE_PROCESS and GRAPH
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245719/EXPLORE+PROCESS
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11248519/GRAPH+Query
+ * Below are the 3 use cases
+ * 1. explore_process will pass in edge_count = -1. It needs self-loop stats but it does not need overall edge count or the edge table;
+ * 2. graph with edge_count = 0. It needs overall edge count but does not need the edge table;
+ * 3. graph with a positive edge_count. It needs overall edge count and the edge table (trimmed by edge count).
  */
 class VariantStatsAggregateFunction : public VariantAggregateFunction<VariantStatsState> {
 public:
