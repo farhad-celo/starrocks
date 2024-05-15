@@ -2752,9 +2752,9 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_null_value_in_calendar_
                 R"({"weekday_calendar": {)",
                 R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
                 R"(} })"});
-        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2});
-        ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "calendar1 array must not contain null values.");
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
     }
     // null value in calendar2 array
     {
@@ -2769,9 +2769,9 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_null_value_in_calendar_
                 kNullDatum,
                 R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
                 R"(} })"});
-        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2});
-        ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "calendar2 array must not contain null values.");
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
     }
     // null value in both calendar1 and calendar2
     {
@@ -2787,9 +2787,9 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_null_value_in_calendar_
                 kNullDatum,
                 R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
                 R"(} })"});
-        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2});
-        ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "calendar1 array must not contain null values.");
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
     }
 }
 

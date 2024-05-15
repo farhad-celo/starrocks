@@ -1450,43 +1450,15 @@ Status CelonisTimeFunctions::remap_timestamps_calendar_close(FunctionContext* co
 }
 
 static StatusOr<celonis::accelerator::Calendar>
-get_calendar(const Slice* const calendars, const unsigned int* const offsets, int row) {
-    size_t start = offsets[row];
-    size_t end = offsets[row + 1];
-    std::string calendar_string;
-    for (size_t i = start; i < end; ++i) {
-        calendar_string += calendars[i].to_string();
-    }
-    celonis::accelerator::Calendar calendar_proto;
-    if (!string_to_calendar(calendar_string, calendar_proto)) {
-        return Status::InvalidArgument("Calendar json string is malformed.");
-    }
-    RETURN_IF_ERROR(validate_calendar(calendar_proto));
-    return calendar_proto;
+get_calendar(const ColumnPtr& calendar_column, int row) {
+    ASSIGN_OR_RETURN(const std::string calendar_string, get_calendar_string(calendar_column->get(0).get_array()));
+    return validate_and_to_proto(calendar_string, false);
 }
 
 StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::FunctionContext* context,
                                                                   const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
     size_t n_rows = columns[0]->size();
-
-    UnnestedArrayData calendar1_array_data = prepare_array_input(columns[0].get());
-    if (calendar1_array_data.null_elements != nullptr) {
-        return Status::InvalidArgument("calendar1 array must not contain null values.");
-    }
-    DCHECK(calendar1_array_data.elements->is_binary());
-    const auto& calendars1 = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *calendar1_array_data.elements).get_data().data();
-    const auto& calendar1_offsets = calendar1_array_data.offsets->get_data().data();
-
-    UnnestedArrayData calendar2_array_data = prepare_array_input(columns[1].get());
-    if (calendar2_array_data.null_elements != nullptr) {
-        return Status::InvalidArgument("calendar2 array must not contain null values.");
-    }
-    DCHECK(calendar2_array_data.elements->is_binary());
-    const auto& calendars2 = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *calendar2_array_data.elements).get_data().data();
-    const auto& calendar2_offsets = calendar2_array_data.offsets->get_data().data();
 
     ColumnPtr output_column = columns[0]->clone_empty();
     output_column = NullableColumn::wrap_if_necessary(output_column);
@@ -1495,10 +1467,8 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
             output_column->append_nulls(1);
             continue;
         }
-        StatusOr<celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(calendars1, calendar1_offsets,
-                                                                                    row);
-        StatusOr<celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(calendars2, calendar2_offsets,
-                                                                                    row);
+        StatusOr<celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(columns[0], row);
+        StatusOr<celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(columns[1], row);
         if (!status_or_calendar1.ok() || !status_or_calendar2.ok()) {
             output_column->append_nulls(1);
             continue;
