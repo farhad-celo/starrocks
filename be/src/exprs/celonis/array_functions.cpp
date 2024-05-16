@@ -784,12 +784,13 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] Fu
 StatusOr<ColumnPtr> CelonisArrayFunctions::array_count([[maybe_unused]] FunctionContext* context,
                                                        const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const size_t n_rows = columns[0]->size();
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
     const auto& offsets = array_data.offsets->get_data().data();
-
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
+
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
@@ -812,14 +813,15 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_count([[maybe_unused]] Function
 StatusOr<ColumnPtr> CelonisArrayFunctions::array_bool_or([[maybe_unused]] FunctionContext* context,
                                                          const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const size_t n_rows = columns[0]->size();
     ColumnPtr boolean_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData boolean_array_data = prepare_array_input(boolean_array_column.get());
     const auto& booleans =
             down_cast<const RunTimeColumnType<TYPE_BOOLEAN>&>(*boolean_array_data.elements).get_data().data();
     const auto& offsets = boolean_array_data.offsets->get_data().data();
-
     ColumnBuilder<TYPE_BOOLEAN> result(n_rows);
+
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();

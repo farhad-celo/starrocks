@@ -13,13 +13,14 @@ StatusOr<ColumnPtr>
 CelonisArrayAvg<LT>::array_avg([[maybe_unused]] starrocks::FunctionContext* context,
                                const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const size_t n_rows = columns[0]->size();
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
     const auto& elements = down_cast<const RunTimeColumnType<LT>&>(*array_data.elements).get_data().data();
     const auto& offsets = array_data.offsets->get_data().data();
-
     ColumnBuilder<TYPE_DOUBLE> result(n_rows);
+
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
