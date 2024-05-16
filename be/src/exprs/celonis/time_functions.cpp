@@ -1263,8 +1263,8 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
-    UnnestedArrayData calendar_array_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]).get());
+    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]);
+    UnnestedArrayData calendar_array_data = prepare_array_input(calendar_array_column.get());
     if (calendar_array_data.null_elements != nullptr) {
         return Status::InvalidArgument("Calendar array should not have null elements.");
     }
@@ -1355,8 +1355,8 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
 
-    UnnestedArrayData calendar_array_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(columns[1]->size(), columns[1]).get());
+    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[1]->size(), columns[1]);
+    UnnestedArrayData calendar_array_data = prepare_array_input(calendar_array_column.get());
     if (calendar_array_data.null_elements != nullptr) {
         return Status::InvalidArgument("Calendar array can not contain null values.");
     }
@@ -1692,8 +1692,8 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
     ColumnViewer to_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
-    UnnestedArrayData calendar_array_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(columns[3]->size(), columns[3]).get());
+    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[3]->size(), columns[3]);
+    UnnestedArrayData calendar_array_data = prepare_array_input(calendar_array_column.get());
     if (calendar_array_data.null_elements != nullptr) {
         return Status::InvalidArgument("Calendar array should not have null elements.");
     }
@@ -1810,8 +1810,8 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
     ColumnViewer add_value_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
-    UnnestedArrayData calendar_array_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(columns[3]->size(), columns[3]).get());
+    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[3]->size(), columns[3]);
+    UnnestedArrayData calendar_array_data = prepare_array_input(calendar_array_column.get());
     if (calendar_array_data.null_elements != nullptr) {
         return Status::InvalidArgument("Calendar array should not have null elements.");
     }

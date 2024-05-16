@@ -1,6 +1,5 @@
 #include "exprs/celonis/linear_regression.h"
 
-#include "column/array_column.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
@@ -118,8 +117,8 @@ CelonisLinearRegression::predict_linear_regression_non_constant_model([[maybe_un
     const auto num_rows = model_column->size();
     ColumnViewer<TYPE_VARCHAR> model_viewer(model_column);
 
-    UnnestedArrayData array_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]).get());
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
     const auto& elements = down_cast<const RunTimeColumnType<TYPE_DOUBLE>&>(*array_data.elements).get_data().data();
     const auto& offsets = array_data.offsets->get_data().data();
 
@@ -172,8 +171,8 @@ CelonisLinearRegression::predict_linear_regression_constant_model([[maybe_unused
     const auto* state = reinterpret_cast<const LinearRegressionStateThreadLocal*>(
             context->get_function_state(FunctionContext::THREAD_LOCAL));
 
-    UnnestedArrayData array_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]).get());
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
     const auto& elements = down_cast<const RunTimeColumnType<TYPE_DOUBLE>&>(*array_data.elements).get_data().data();
     const auto& offsets = array_data.offsets->get_data().data();
 

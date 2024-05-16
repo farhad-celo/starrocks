@@ -162,8 +162,8 @@ StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(starrocks::FunctionContext* context,
                                                                               const starrocks::Columns& columns) {
     size_t n_rows = columns[0]->size();
-    UnnestedArrayData activity_array_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]).get());
+    ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
+    UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *activity_array_data.elements).get_data().data();
@@ -199,8 +199,8 @@ StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starrocks::FunctionContext* context,
                                                                           const starrocks::Columns& columns) {
     size_t n_rows = columns[0]->size();
-    UnnestedArrayData activity_array_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]).get());
+    ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
+    UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *activity_array_data.elements).get_data().data();

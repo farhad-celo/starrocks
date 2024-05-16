@@ -887,8 +887,8 @@ CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context,
     DCHECK_EQ(columns.size(), 4);
     size_t n_rows = columns[0]->size();
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    UnnestedArrayData match_string_data = prepare_array_input(
-            ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[1]).get());
+    ColumnPtr match_string_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[1]);
+    UnnestedArrayData match_string_data = prepare_array_input(match_string_column.get());
     const auto& match_strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *match_string_data.elements).get_data().data();
     const auto& offsets = match_string_data.offsets->get_data().data();
