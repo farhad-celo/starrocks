@@ -1,6 +1,7 @@
 #include "exprs/celonis/time_functions.h"
 
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "types/timestamp_value.h"
 #include "util.h"
 #include <gtest/gtest.h>
@@ -2594,6 +2595,108 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_prepare) {
         ASSERT_TRUE(result.is_invalid_argument());
         EXPECT_EQ(result.get_error_msg(), "[prepare] Calendar array can not contain null values.");
     }
+}
+
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_const_input) {
+    // calendar1 is const
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars1 = ConstColumn::create(calendars1, calendars1->size());
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        auto json_string = celonis::to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})");
+    }
+    // calendar2 is const
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2 = ConstColumn::create(calendars2, calendars2->size());
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        auto json_string = celonis::to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})");
+    }
+    // both calendar1 and calendar2 are const
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars1 = ConstColumn::create(calendars1, calendars1->size());
+        calendars2 = ConstColumn::create(calendars2, calendars2->size());
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        auto json_string = celonis::to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})");
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_empty_input) {
+
+    auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+    ASSERT_EQ(calendars1->size(), result->size());
+}
+
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_multiple_rows) {
+    auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    calendars1->append_datum(DatumArray{
+            R"({"weekday_calendar": {)",
+            R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+            R"(} })"});
+    calendars1->append_datum(kNullDatum);
+    calendars1->append_datum(DatumArray{
+            R"({"weekday_calendar": {)",
+            R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 2000} })",
+            R"(} })"});
+    calendars2->append_datum(DatumArray{
+            R"({"weekday_calendar": {)",
+            R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+            R"(} })"});
+    calendars2 = ConstColumn::create(calendars2, calendars1->size());
+    const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+    ASSERT_EQ(calendars1->size(), result->size());
+    auto json_string1 = celonis::to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+    ASSERT_TRUE(json_string1.has_value());
+    EXPECT_EQ(json_string1.value(),
+              R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})");
+    EXPECT_TRUE(result->get(1).is_null());
+    auto json_string2 = celonis::to_calendar_json_string(result->get(2).get_array()[0].get_slice().to_string());
+    ASSERT_TRUE(json_string2.has_value());
+    EXPECT_EQ(json_string2.value(),
+              R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":2000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})");
 }
 
 TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar) {

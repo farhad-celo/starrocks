@@ -1451,7 +1451,7 @@ Status CelonisTimeFunctions::remap_timestamps_calendar_close(FunctionContext* co
 
 static StatusOr<celonis::accelerator::Calendar>
 get_calendar(const ColumnPtr& calendar_column, int row) {
-    ASSIGN_OR_RETURN(const std::string calendar_string, get_calendar_string(calendar_column->get(0).get_array()));
+    ASSIGN_OR_RETURN(const std::string calendar_string, get_calendar_string(calendar_column->get(row).get_array()));
     return validate_and_to_proto(calendar_string, false);
 }
 
@@ -1460,17 +1460,23 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
     DCHECK_EQ(columns.size(), 2);
     size_t n_rows = columns[0]->size();
 
-    ColumnPtr output_column = columns[0]->clone_empty();
-    output_column = NullableColumn::wrap_if_necessary(output_column);
+    int offset = 0;
+    UInt32Column::Ptr array_offsets = UInt32Column::create();
+    array_offsets->reserve(n_rows + 1);
+
+    BinaryColumn::Ptr array_binary_column = BinaryColumn::create();
+    auto null_column = NullColumn::create();
+
     for (size_t row = 0; row < n_rows; ++row) {
+        array_offsets->append(offset);
         if (columns[0]->is_null(row) || columns[1]->is_null(row)) {
-            output_column->append_nulls(1);
+            null_column->append(1);
             continue;
         }
         StatusOr<celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(columns[0], row);
         StatusOr<celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(columns[1], row);
         if (!status_or_calendar1.ok() || !status_or_calendar2.ok()) {
-            output_column->append_nulls(1);
+            null_column->append(1);
             continue;
         }
         celonis::accelerator::Calendar calendar_proto;
@@ -1478,22 +1484,24 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
         calendar_proto.mutable_intersect_calendar()->mutable_calendar2()->CopyFrom(status_or_calendar2.value());
         std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto);
         if (!calendar_string.has_value()) {
-            output_column->append_nulls(1);
+            null_column->append(1);
             continue;
         }
+        null_column->append(0);
         std::vector<std::string> calendar_pieces;
         calendar_pieces.reserve((calendar_string->size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
         for (size_t i = 0; i < calendar_string->size(); i += MAX_STRING_SIZE) {
             calendar_pieces.emplace_back(calendar_string->substr(i, MAX_STRING_SIZE));
         }
-        DatumArray array;
         for (const auto& calendar_piece: calendar_pieces) {
-            array.emplace_back(calendar_piece.c_str());
+            array_binary_column->append(Slice(calendar_piece.c_str()));
         }
-
-        output_column->append_datum(array);
+        offset += calendar_pieces.size();
     }
-    return output_column;
+    array_offsets->append(offset);
+    return NullableColumn::create(
+            ArrayColumn::create(NullableColumn::create(array_binary_column, NullColumn::create(offset, 0)),
+                                array_offsets), null_column);
 }
 
 static StatusOr<std::optional<TimestampValue>>
