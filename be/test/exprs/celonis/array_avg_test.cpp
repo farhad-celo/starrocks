@@ -25,12 +25,21 @@ protected:
 };
 
 TEST_F(CelonisArrayAvgTest, const_null_column) {
-    auto arrays = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
-    arrays->append_datum(kNullDatum);
-    const auto result = CelonisArrayAvg<TYPE_INT>::array_avg(nullptr, {ConstColumn::create(arrays, 2)}).value();
-    ASSERT_EQ(2, result->size());
-    EXPECT_TRUE(result->get(0).is_null());
-    EXPECT_TRUE(result->get(1).is_null());
+    {
+        auto arrays = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        arrays->append_datum(kNullDatum);
+        const auto result = CelonisArrayAvg<TYPE_INT>::array_avg(nullptr, {ConstColumn::create(arrays, 2)}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+    {
+        auto arrays = ColumnHelper::create_const_null_column(2);
+        const auto result = CelonisArrayAvg<TYPE_INT>::array_avg(nullptr, {arrays}).value();
+        EXPECT_EQ(2, result->size());
+        EXPECT_TRUE(result->only_null());
+        EXPECT_TRUE(result->is_constant());
+    }
 }
 
 TEST_F(CelonisArrayAvgTest, array_int) {

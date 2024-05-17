@@ -2830,12 +2830,21 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_to_null_invalid_input) {
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_count_const_null_column) {
-    auto arrays = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
-    arrays->append_datum(kNullDatum);
-    const auto result = CelonisArrayFunctions::array_count(nullptr, {ConstColumn::create(arrays, 2)}).value();
-    ASSERT_EQ(2, result->size());
-    EXPECT_TRUE(result->get(0).is_null());
-    EXPECT_TRUE(result->get(1).is_null());
+    {
+        auto arrays = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        arrays->append_datum(kNullDatum);
+        const auto result = CelonisArrayFunctions::array_count(nullptr, {ConstColumn::create(arrays, 2)}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+    {
+        auto arrays = ColumnHelper::create_const_null_column(2);
+        const auto result = CelonisArrayFunctions::array_count(nullptr, {arrays}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->only_null());
+        EXPECT_TRUE(result->is_constant());
+    }
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
@@ -2949,12 +2958,21 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_bool_or_const_null_column) {
-    auto arrays = ColumnHelper::create_column(TYPE_ARRAY_BOOLEAN, true);
-    arrays->append_datum(kNullDatum);
-    const auto result = CelonisArrayFunctions::array_bool_or(nullptr, {ConstColumn::create(arrays, 2)}).value();
-    ASSERT_EQ(2, result->size());
-    EXPECT_TRUE(result->get(0).is_null());
-    EXPECT_TRUE(result->get(1).is_null());
+    {
+        auto arrays = ColumnHelper::create_column(TYPE_ARRAY_BOOLEAN, true);
+        arrays->append_datum(kNullDatum);
+        const auto result = CelonisArrayFunctions::array_bool_or(nullptr, {ConstColumn::create(arrays, 2)}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+    {
+        auto arrays = ColumnHelper::create_const_null_column(2);
+        const auto result = CelonisArrayFunctions::array_bool_or(nullptr, {arrays}).value();
+        EXPECT_EQ(2, result->size());
+        EXPECT_TRUE(result->only_null());
+        EXPECT_TRUE(result->is_constant());
+    }
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_bool_or_normal_case) {
