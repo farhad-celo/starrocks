@@ -4,7 +4,6 @@
 
 namespace starrocks {
 
-template<LogicalType LT>
 class CelonisRemapValues {
 public:
     /**

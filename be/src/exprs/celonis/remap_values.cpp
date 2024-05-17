@@ -1,7 +1,7 @@
 #include "exprs/celonis/remap_values.h"
 
 #include "column/array_column.h"
-#include "column/column_viewer.h"
+#include "column/column_helper.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
 
@@ -12,8 +12,7 @@ struct RemapValuesStateThreadLocal {
     ScalarFunction function;
 };
 
-template<LogicalType LT>
-Status CelonisRemapValues<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+Status CelonisRemapValues::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::THREAD_LOCAL) {
         return Status::OK();
     }
@@ -48,8 +47,7 @@ Status CelonisRemapValues<LT>::prepare(FunctionContext* context, FunctionContext
     return Status::OK();
 }
 
-template<LogicalType LT>
-Status CelonisRemapValues<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+Status CelonisRemapValues::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::THREAD_LOCAL) {
         const auto* state = reinterpret_cast<const RemapValuesStateThreadLocal*>(
                 context->get_function_state(FunctionContext::THREAD_LOCAL));
@@ -58,10 +56,9 @@ Status CelonisRemapValues<LT>::close(FunctionContext* context, FunctionContext::
     return Status::OK();
 }
 
-template<LogicalType LT>
 StatusOr<ColumnPtr>
-CelonisRemapValues<LT>::remap_values_non_constant_value_map([[maybe_unused]]FunctionContext* context,
-                                                            const Columns& columns) {
+CelonisRemapValues::remap_values_non_constant_value_map([[maybe_unused]]FunctionContext* context,
+                                                        const Columns& columns) {
     const auto& value_column = columns[0];
     const auto& old_value_column = columns[1];
     const auto& new_value_column = columns[2];
@@ -73,8 +70,9 @@ CelonisRemapValues<LT>::remap_values_non_constant_value_map([[maybe_unused]]Func
         DCHECK_EQ(columns[3]->size(), num_rows);
     }
 
-    ColumnViewer<LT> value_viewer(value_column);
-    auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
+    auto unfolded_value_column = ColumnHelper::unfold_const_column(
+            TypeDescriptor::from_logical_type(context->get_arg_type(0)->type), columns[0]->size(), columns[0]);
+    auto result = NullableColumn::wrap_if_necessary(unfolded_value_column->clone_empty());
 
     for (int row = 0; row < num_rows; ++row) {
         auto old_value_datum = old_value_column->get(row);
@@ -104,12 +102,13 @@ CelonisRemapValues<LT>::remap_values_non_constant_value_map([[maybe_unused]]Func
     return result;
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[maybe_unused]]FunctionContext* context,
-                                                                            const Columns& columns) {
+StatusOr<ColumnPtr> CelonisRemapValues::remap_values_constant_value_map([[maybe_unused]]FunctionContext* context,
+                                                                        const Columns& columns) {
     const auto& value_column = columns[0];
     const bool has_default = columns.size() == 4;
-    auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
+    auto unfolded_value_column = ColumnHelper::unfold_const_column(
+            TypeDescriptor::from_logical_type(context->get_arg_type(0)->type), columns[0]->size(), columns[0]);
+    auto result = NullableColumn::wrap_if_necessary(unfolded_value_column->clone_empty());
     const auto* state = reinterpret_cast<const RemapValuesStateThreadLocal*>(
             context->get_function_state(FunctionContext::THREAD_LOCAL));
 
@@ -126,28 +125,14 @@ StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[ma
             result->append_datum(it->second);
         }
     }
-
     return result;
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values(FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisRemapValues::remap_values(FunctionContext* context, const Columns& columns) {
     DCHECK(columns.size() == 3 || columns.size() == 4);
     const auto* state = reinterpret_cast<const RemapValuesStateThreadLocal*>(
             context->get_function_state(FunctionContext::THREAD_LOCAL));
     return state->function(context, columns);
 }
-
-template
-class CelonisRemapValues<TYPE_BIGINT>;
-
-template
-class CelonisRemapValues<TYPE_VARCHAR>;
-
-template
-class CelonisRemapValues<TYPE_DOUBLE>;
-
-template
-class CelonisRemapValues<TYPE_DATETIME>;
 
 } // namespace starrocks

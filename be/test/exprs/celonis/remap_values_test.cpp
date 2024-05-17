@@ -1,6 +1,7 @@
 #include "exprs/celonis/remap_values.h"
 
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
@@ -45,35 +46,33 @@ private:
         default_column_->append_datum(default_value);
     }
 
-    template<LogicalType LT>
     StatusOr<ColumnPtr> Run(bool has_default) {
         DeferOp close_fragment_local([this] {
-            CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
+            CelonisRemapValues::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
         });
-        RETURN_IF_ERROR(CelonisRemapValues<LT>::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        RETURN_IF_ERROR(CelonisRemapValues::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
         DeferOp close_thread_local([this] {
-            CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
+            CelonisRemapValues::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
         });
-        RETURN_IF_ERROR(CelonisRemapValues<LT>::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
+        RETURN_IF_ERROR(CelonisRemapValues::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
         if (has_default) {
-            result = CelonisRemapValues<LT>::remap_values(ctx_.get(),
+            result = CelonisRemapValues::remap_values(ctx_.get(),
                                                           {value_column_, old_array_column_, new_array_column_,
                                                            default_column_});
         } else {
-            result = CelonisRemapValues<LT>::remap_values(ctx_.get(),
+            result = CelonisRemapValues::remap_values(ctx_.get(),
                                                           {value_column_, old_array_column_, new_array_column_});
         }
         return result;
     }
 
-    template<LogicalType LT>
     StatusOr<ColumnPtr>
     RunConstantValueMap(const DatumArray& old_array, const DatumArray& new_array, bool has_default) {
         old_array_column_->append_datum(old_array);
         new_array_column_->append_datum(new_array);
         ctx_->set_constant_columns({nullptr, old_array_column_, new_array_column_, nullptr});
-        return Run<LT>(has_default);
+        return Run(has_default);
     }
 
     std::unique_ptr<FunctionContext> ctx_;
@@ -93,7 +92,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_const_inconsist_value_map) {
     auto old_array = DatumArray{"string1", "string2"};
     auto new_array = DatumArray{"string1-new", "string2-new", "string3-new"};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, true);
+    const auto result = RunConstantValueMap(old_array, new_array, true);
     EXPECT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ("[prepare] old value array must have the same length as new value array.",
               result.status().get_error_msg());
@@ -105,7 +104,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_const_inconsist_value_ma
 
     AddRow("string", DatumArray{"string1", "string2"}, DatumArray{"string2"}, "default");
 
-    const auto result = Run<LT>(true);
+    const auto result = Run(true);
     EXPECT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ("old value array must have the same length as new value array.",
               result.status().get_error_msg());
@@ -115,25 +114,25 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_empty_value_column) {
     {
         const LogicalType LT = TYPE_VARCHAR;
         Prepare<LT>();
-        const auto result = Run<LT>(true).value();
+        const auto result = Run(true).value();
         ASSERT_EQ(0, result->size());
     }
     {
         const LogicalType LT = TYPE_VARCHAR;
         Prepare<LT>();
-        const auto result = Run<LT>(false).value();
+        const auto result = Run(false).value();
         ASSERT_EQ(0, result->size());
     }
     {
         const LogicalType LT = TYPE_BIGINT;
         Prepare<LT>();
-        const auto result = Run<LT>(true).value();
+        const auto result = Run(true).value();
         ASSERT_EQ(0, result->size());
     }
     {
         const LogicalType LT = TYPE_BIGINT;
         Prepare<LT>();
-        const auto result = Run<LT>(false).value();
+        const auto result = Run(false).value();
         ASSERT_EQ(0, result->size());
     }
 }
@@ -155,7 +154,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_null_in_value_map_with_defau
     auto old_array = DatumArray{"string1", kNullDatum, "string2"};
     auto new_array = DatumArray{"string1-new", "NULL", "string3"};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    const auto result = RunConstantValueMap(old_array, new_array, true).value();
     ASSERT_EQ(4, result->size());
     EXPECT_EQ("string1-new", result->get(0).get_slice());
     EXPECT_EQ("string3", result->get(1).get_slice());
@@ -175,7 +174,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_null_in_value_map_without_de
     auto old_array = DatumArray{"string1", kNullDatum, "string2", "string2"};
     auto new_array = DatumArray{"string1-new", "NULL", "string3", kNullDatum};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, false).value();
+    const auto result = RunConstantValueMap(old_array, new_array, false).value();
     ASSERT_EQ(4, result->size());
     EXPECT_EQ("string1-new", result->get(0).get_slice());
     EXPECT_TRUE(result->get(1).is_null());
@@ -202,7 +201,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_string_with_default) {
     auto old_array = DatumArray{"string1", "string2"};
     auto new_array = DatumArray{"string1-new", "string2-new"};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    const auto result = RunConstantValueMap(old_array, new_array, true).value();
     ASSERT_EQ(5, result->size());
     EXPECT_EQ("string1-new", result->get(0).get_slice());
     EXPECT_EQ("string2-new", result->get(1).get_slice());
@@ -228,7 +227,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_string_empty_value_map_with_
     auto old_array = DatumArray{};
     auto new_array = DatumArray{};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    const auto result = RunConstantValueMap(old_array, new_array, true).value();
     ASSERT_EQ(4, result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_TRUE(result->get(1).is_null());
@@ -255,7 +254,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_string_map_overwrite_with_de
     auto old_array = DatumArray{"string1", "string2", "string1"};
     auto new_array = DatumArray{"string1-old", "string2-new", "string1-new"};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    const auto result = RunConstantValueMap(old_array, new_array, true).value();
     ASSERT_EQ(5, result->size());
     EXPECT_EQ("string1-new", result->get(0).get_slice());
     EXPECT_EQ("string2-new", result->get(1).get_slice());
@@ -277,7 +276,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_string_without_default) {
     auto old_array = DatumArray{"string1", "string2"};
     auto new_array = DatumArray{"string1-new", "string2-new"};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, false).value();
+    const auto result = RunConstantValueMap(old_array, new_array, false).value();
     ASSERT_EQ(5, result->size());
     EXPECT_EQ("string1-new", result->get(0).get_slice());
     EXPECT_EQ("string2-new", result->get(1).get_slice());
@@ -299,7 +298,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_string_empty_value_map_witho
     auto old_array = DatumArray{};
     auto new_array = DatumArray{};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, false).value();
+    const auto result = RunConstantValueMap(old_array, new_array, false).value();
     ASSERT_EQ(4, result->size());
     EXPECT_EQ("string1", result->get(0).get_slice());
     EXPECT_EQ("string2", result->get(1).get_slice());
@@ -315,7 +314,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_string) {
         AddRow("string", DatumArray{"string1", "string"}, DatumArray{"string2", "new-string"}, "default");
         AddRow("string3", DatumArray{"string1", "string"}, DatumArray{"string2", "new-string"}, "default");
 
-        const auto result = Run<LT>(true).value();
+        const auto result = Run(true).value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ("new-string", result->get(0).get_slice());
         EXPECT_EQ("default", result->get(1).get_slice());
@@ -327,7 +326,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_string) {
         AddRow("string", DatumArray{"string1", "string"}, DatumArray{"string2", "new-string"}, "default");
         AddRow("string3", DatumArray{"string1", "string"}, DatumArray{"string2", "new-string"}, "default");
 
-        const auto result = Run<LT>(false).value();
+        const auto result = Run(false).value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ("new-string", result->get(0).get_slice());
         EXPECT_EQ("string3", result->get(1).get_slice());
@@ -353,7 +352,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_bigint) {
     auto old_array = DatumArray{1L, 2L};
     auto new_array = DatumArray{100L, 200L};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    const auto result = RunConstantValueMap(old_array, new_array, true).value();
     ASSERT_EQ(5, result->size());
     EXPECT_EQ(100L, result->get(0).get_int64());
     EXPECT_EQ(200L, result->get(1).get_int64());
@@ -370,7 +369,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_bigint) {
         AddRow(2L, DatumArray{1L, 2L, 1L}, DatumArray{2L, 5L, 10L}, 0L);
         AddRow(kNullDatum, DatumArray{1L, 2L}, DatumArray{3L, 4L}, 0L);
 
-        const auto result = Run<LT>(true).value();
+        const auto result = Run(true).value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ(5L, result->get(0).get_int64());
         EXPECT_EQ(0L, result->get(1).get_int64());
@@ -382,10 +381,76 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_bigint) {
         AddRow(1L, DatumArray{1L, 2L, 1L}, DatumArray{2L, 5L, 10L}, 0L);
         AddRow(kNullDatum, DatumArray{1L, 2L, kNullDatum}, DatumArray{3L, 4L, 5L}, 0L);
 
-        const auto result = Run<LT>(true).value();
+        const auto result = Run(true).value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ(10L, result->get(0).get_int64());
         EXPECT_EQ(5L, result->get(1).get_int64());
+    }
+}
+
+TEST_F(CelonisRemapValuesTest, celonis_remap_values_const_value_column) {
+    {
+        const LogicalType LT = TYPE_DOUBLE;
+        Prepare<LT>();
+
+        value_column_->append_datum(1.0);
+        value_column_ = ConstColumn::create(value_column_, 2);
+        default_column_->append_datum(kNullDatum);
+        default_column_->append_datum(kNullDatum);
+
+        auto old_array = DatumArray{1.0, 2.0};
+        auto new_array = DatumArray{100.0, 200.0};
+
+        const auto result = RunConstantValueMap(old_array, new_array, true).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ(100.0, result->get(0).get_double());
+        EXPECT_EQ(100.0, result->get(1).get_double());
+    }
+    {
+        const LogicalType LT = TYPE_DOUBLE;
+        Prepare<LT>();
+
+        value_column_->append_datum(kNullDatum);
+        value_column_ = ConstColumn::create(value_column_, 2);
+        default_column_->append_datum(kNullDatum);
+        default_column_->append_datum(kNullDatum);
+
+        auto old_array = DatumArray{1.0, 2.0};
+        auto new_array = DatumArray{100.0, 200.0};
+
+        const auto result = RunConstantValueMap(old_array, new_array, true).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+    {
+        const LogicalType LT = TYPE_DOUBLE;
+        Prepare<LT>();
+
+        value_column_->append_datum(1.5);
+        value_column_ = ConstColumn::create(value_column_, 2);
+        default_column_->append_datum(1.0);
+        default_column_->append_datum(kNullDatum);
+
+        auto old_array = DatumArray{1.0, 2.0};
+        auto new_array = DatumArray{100.0, 200.0};
+
+        const auto result = RunConstantValueMap(old_array, new_array, true).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ(1.0, result->get(0).get_double());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+    {
+        const LogicalType LT = TYPE_DATETIME;
+        Prepare<LT>();
+
+        AddRow(TimestampValue::create(1970, 1, 2, 0, 0, 0), DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0)},
+               DatumArray{TimestampValue::create(1970, 1, 20, 0, 0, 0)}, TimestampValue::create(1970, 1, 1, 0, 0, 0));
+
+        value_column_ = ConstColumn::create(value_column_, 1);
+        const auto result = Run(true).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ(TimestampValue::create(1970, 1, 20, 0, 0, 0), result->get(0).get_timestamp());
     }
 }
 
@@ -408,7 +473,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_double) {
     auto old_array = DatumArray{1.0, 2.0};
     auto new_array = DatumArray{100.0, 200.0};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    const auto result = RunConstantValueMap(old_array, new_array, true).value();
     ASSERT_EQ(5, result->size());
     EXPECT_EQ(100.0, result->get(0).get_double());
     EXPECT_EQ(200.0, result->get(1).get_double());
@@ -425,7 +490,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_double) {
         AddRow(2.0, DatumArray{1.0, 2.0, 1.0}, DatumArray{2.0, 5.0, 10.0}, 0.0);
         AddRow(kNullDatum, DatumArray{1.0, 2.0}, DatumArray{3.0, 4.0}, 0.0);
 
-        const auto result = Run<LT>(true).value();
+        const auto result = Run(true).value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ(5.0, result->get(0).get_double());
         EXPECT_EQ(0.0, result->get(1).get_double());
@@ -437,7 +502,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_double) {
         AddRow(1.0, DatumArray{1.0, 2.0, 1.0}, DatumArray{2.0, 5.0, 10.5}, 0.0);
         AddRow(kNullDatum, DatumArray{1.0, 2.0, kNullDatum}, DatumArray{3.0, 4.0, 5.5}, 0.0);
 
-        const auto result = Run<LT>(true).value();
+        const auto result = Run(true).value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ(10.5, result->get(0).get_double());
         EXPECT_EQ(5.5, result->get(1).get_double());
@@ -465,7 +530,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_datetime) {
     auto new_array = DatumArray{TimestampValue::create(1970, 1, 10, 0, 0, 0),
                                 TimestampValue::create(1970, 1, 20, 0, 0, 0)};
 
-    const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
+    const auto result = RunConstantValueMap(old_array, new_array, true).value();
     ASSERT_EQ(5, result->size());
     EXPECT_EQ(TimestampValue::create(1970, 1, 10, 0, 0, 0), result->get(0).get_timestamp());
     EXPECT_EQ(TimestampValue::create(1970, 1, 20, 0, 0, 0), result->get(1).get_timestamp());
@@ -482,7 +547,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_datetime) {
            DatumArray{TimestampValue::create(1970, 1, 20, 0, 0, 0)}, TimestampValue::create(1970, 1, 1, 0, 0, 0));
     AddRow(kNullDatum, DatumArray{}, DatumArray{}, TimestampValue::create(1970, 1, 1, 0, 0, 0));
 
-    const auto result = Run<LT>(true).value();
+    const auto result = Run(true).value();
     ASSERT_EQ(2, result->size());
     EXPECT_EQ(TimestampValue::create(1970, 1, 20, 0, 0, 0), result->get(0).get_timestamp());
     EXPECT_EQ(TimestampValue::create(1970, 1, 1, 0, 0, 0), result->get(1).get_timestamp());
