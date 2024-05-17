@@ -299,10 +299,12 @@ Status CelonisMatchProcess::match_process_close(FunctionContext* context, Functi
 }
 
 StatusOr<ColumnPtr> CelonisMatchProcess::celonis_match_process(FunctionContext* context, const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     const auto* state = reinterpret_cast<const MatchProcessState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     DCHECK(state != nullptr);
     const auto& nfa = state->nfa;
-    UnnestedArrayData array_data = prepare_array_input(columns[0].get());
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
     return celonis_match_process_internal(nfa.get(), *array_data.elements, *array_data.offsets, array_data.null_elements, array_data.null_arrays);
 }
 } // namespace starrocks

@@ -161,6 +161,7 @@ Status CelonisMatchActivitiesFunctions::close(FunctionContext* context,
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(starrocks::FunctionContext* context,
                                                                               const starrocks::Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     size_t n_rows = columns[0]->size();
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
@@ -198,6 +199,7 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(st
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starrocks::FunctionContext* context,
                                                                           const starrocks::Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     size_t n_rows = columns[0]->size();
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());

@@ -40,6 +40,7 @@ StatusOr<ColumnPtr>
 CelonisArrayCountDistinct<LT>::array_count_distinct([[maybe_unused]] starrocks::FunctionContext* context,
                                                     const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const size_t n_rows = columns[0]->size();
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());

@@ -1567,7 +1567,8 @@ private:
 
     void populate_filters(std::unordered_set<int64_t>& filters, size_t row, ColumnPtr column) {
         DCHECK(row < column->size());
-        UnnestedArrayData array_data = prepare_array_input(column.get());
+        ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(column->size(), column);
+        UnnestedArrayData array_data = prepare_array_input(array_column.get());
         const auto& elements = down_cast<const RunTimeColumnType<TYPE_BIGINT>&>(*array_data.elements).get_data().data();
         const auto& offsets = array_data.offsets->get_data().data();
         const size_t start = offsets[row];

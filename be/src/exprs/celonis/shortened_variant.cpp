@@ -76,8 +76,10 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
 }  // namespace
 
 StatusOr<ColumnPtr> CelonisShortenedVariant::celonis_shortened_variant(FunctionContext* context, const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     const Column* array = columns[0].get();
-    UnnestedArrayData array_data = prepare_array_input(array);
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
 
     ColumnViewer<TYPE_BIGINT> cycle_length(columns[1]);
     ColumnPtr result = celonis_shortened_variant_impl(*array_data.elements, *array_data.offsets,

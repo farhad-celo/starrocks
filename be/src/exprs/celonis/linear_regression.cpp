@@ -113,6 +113,7 @@ StatusOr<ColumnPtr>
 CelonisLinearRegression::predict_linear_regression_non_constant_model([[maybe_unused]]FunctionContext* context,
                                                                       const Columns& columns) {
     DCHECK_EQ(2, columns.size());
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto& model_column = columns[1];
     const auto num_rows = model_column->size();
     ColumnViewer<TYPE_VARCHAR> model_viewer(model_column);
@@ -167,6 +168,7 @@ CelonisLinearRegression::predict_linear_regression_constant_model([[maybe_unused
                                                                   const Columns& columns) {
 
     DCHECK_EQ(2, columns.size());
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto num_rows = columns[0]->size();
     const auto* state = reinterpret_cast<const LinearRegressionStateThreadLocal*>(
             context->get_function_state(FunctionContext::THREAD_LOCAL));

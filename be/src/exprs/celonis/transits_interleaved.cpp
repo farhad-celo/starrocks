@@ -92,6 +92,7 @@ StatusOr<ColumnPtr>
 CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::FunctionContext* context,
                                                  const starrocks::Columns& columns) {
     DCHECK_EQ(5, columns.size());
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const size_t n_rows = columns[0]->size();
     auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();

@@ -83,6 +83,7 @@ Status CelonisAlignModel::align_model_close(FunctionContext* context, FunctionCo
 }
 
 StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     const auto* align_model_state_fragment_local = reinterpret_cast<const AlignModelStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     const auto& json_bpmn_model_description = align_model_state_fragment_local->json_bpmn_model_description;

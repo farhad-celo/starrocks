@@ -656,7 +656,9 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] Functi
 
 Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
     DCHECK_EQ(columns.size(), 5);
-    UnnestedArrayData activity_array_data = prepare_array_input(columns[0].get());
+    size_t n_rows = columns[0]->size();
+    ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
+    UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *activity_array_data.elements).get_data().data();
@@ -667,7 +669,6 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
     ColumnViewer end_activity_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
     ColumnViewer end_mode_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
 
-    size_t n_rows = columns[0]->size();
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || begin_mode_viewer.is_null(row) ||
             (begin_mode_viewer.value(row).to_string() != "ALL" && begin_activity_viewer.is_null(row)) ||
@@ -763,6 +764,7 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionContext* context,
                                                      const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     TypeDescriptor type_array_bigint;
     type_array_bigint.type = TYPE_ARRAY;
     type_array_bigint.children.resize(1);
@@ -776,6 +778,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionCo
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] FunctionContext* context,
                                                              const Columns& columns) {
     DCHECK(columns.size() == 5);
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
     RETURN_IF_ERROR(calc_crop_impl(columns, false, result));
     return result;

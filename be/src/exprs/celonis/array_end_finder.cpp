@@ -12,7 +12,7 @@ template<LogicalType LT>
 StatusOr<ColumnPtr>
 CelonisArrayEndFinder<LT>::array_first([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto num_rows = columns[0]->size();
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
@@ -46,7 +46,7 @@ template<LogicalType LT>
 StatusOr<ColumnPtr>
 CelonisArrayEndFinder<LT>::array_last([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto num_rows = columns[0]->size();
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());

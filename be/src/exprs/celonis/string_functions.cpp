@@ -884,6 +884,7 @@ static int edit_distance(const std::string& str1, const std::string& str2) {
 
 StatusOr<ColumnPtr>
 CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
     DCHECK_EQ(columns.size(), 4);
     size_t n_rows = columns[0]->size();
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
