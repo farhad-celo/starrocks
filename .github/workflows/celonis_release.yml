@@ -22,7 +22,7 @@ env:
   ASAN_IMAGE_TAG: "${{ github.ref_name }}-asan"
   ASAN_BUILD_TYPE: ASAN
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-c39ac1cf-locale-cpml2.161.2-ubuntu
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-c39ac1cf-locale-cpml2.161.2-ubuntu-brpc1.8
 
 jobs:
   build-image:
@@ -42,6 +42,9 @@ jobs:
           echo "The build type is ${BUILD_TYPE}"
           echo "The release version is ${RELEASE_VERSION}"
           echo "The artifact image tag is ${IMAGE_TAG}"
+          
+          # Build without starcache; otherwise it won't compile with brpc 1.8.
+          sed -i 's/--enable-shared-data/--without-starcache --with-brpc-keepalive/g' docker/dockerfiles/artifacts/artifact.Dockerfile
 
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${IMAGE_TAG} .
@@ -141,6 +144,9 @@ jobs:
           echo "The build type is ${ASAN_BUILD_TYPE}"
           echo "The release version is ${ASAN_RELEASE_VERSION}"
           echo "The artifact image tag is ${ASAN_IMAGE_TAG}"
+          
+          # Build without starcache; otherwise it won't compile with brpc 1.8.
+          sed -i 's/--enable-shared-data/--without-starcache --with-brpc-keepalive/g' docker/dockerfiles/artifacts/artifact.Dockerfile
 
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${ASAN_RELEASE_VERSION} --build-arg BUILD_TYPE=${ASAN_BUILD_TYPE} --build-arg builder=${BUILDER} -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${ASAN_IMAGE_TAG} .
