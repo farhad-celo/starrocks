@@ -165,8 +165,12 @@ Status CelonisSourceTargetFunctions::celonis_array_sources_prepare(starrocks::Fu
             return Status::InvalidArgument(
                     "The second parameter of celonis_array_sources() only accepts a literal value");
         }
+        if (!context->is_notnull_constant_column(1)) {
+            return Status::OK();
+        }
+        auto edge_config_column = context->get_constant_column(1);
         CelonisSourceTargetFunctions::EdgeConfig edge_config = getEdgeConfig(
-                ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(1)).to_string());
+                ColumnHelper::get_const_value<TYPE_VARCHAR>(edge_config_column).to_string());
         if (edge_config != ANY_TO_ANY) {
             // TODO(j.kim): support other edge configurations.
             return Status::InvalidArgument("unsupported edge configuration in celonis_array_targets()");
@@ -188,8 +192,12 @@ Status CelonisSourceTargetFunctions::celonis_array_targets_prepare(starrocks::Fu
             return Status::InvalidArgument(
                     "The second parameter of celonis_array_targets() only accepts a literal value");
         }
+        if (!context->is_notnull_constant_column(1)) {
+            return Status::OK();
+        }
+        auto edge_config_column = context->get_constant_column(1);
         CelonisSourceTargetFunctions::EdgeConfig edge_config = getEdgeConfig(
-                ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(1)).to_string());
+                ColumnHelper::get_const_value<TYPE_VARCHAR>(edge_config_column).to_string());
         if (edge_config != ANY_TO_ANY) {
             // TODO(j.kim): support other edge configurations.
             return Status::InvalidArgument("unsupported edge configuration in celonis_array_targets()");
@@ -206,6 +214,7 @@ Status CelonisSourceTargetFunctions::celonis_array_targets_close(starrocks::Func
 
 StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_sources(FunctionContext* context, const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
 
     const Column *array = columns[0].get();
     UnnestedArrayData array_data = prepare_array_input(array);
@@ -229,6 +238,7 @@ StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_sources(Function
 
 StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_targets(FunctionContext* context, const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
 
     const Column* array = columns[0].get();
     UnnestedArrayData array_data = prepare_array_input(array);

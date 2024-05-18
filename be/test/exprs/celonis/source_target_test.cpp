@@ -191,6 +191,20 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_null_in_input) {
     evaluator_targets.evaluate(result_targets);
 }
 
+TEST_F(CelonisSourceTargetTest, source_target_const_null_column) {
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    array->append_datum(DatumArray{2});
+    array->append_datum(DatumArray{3});
+    auto modifier = ColumnHelper::create_const_null_column(2);
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    ctx->set_constant_columns({nullptr, modifier});
+
+    EXPECT_TRUE(CelonisSourceTargetFunctions::celonis_array_sources_prepare(
+            ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
+    EXPECT_TRUE(CelonisSourceTargetFunctions::celonis_array_targets_prepare(
+            ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
+}
+
 TEST_F(CelonisSourceTargetTest, array_celonis_source_unsupported_mode) {
     // "any->all" is not supported.
     auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
