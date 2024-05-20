@@ -59,6 +59,30 @@ private:
     celonis::TestEvaluator<TYPE_BIGINT> evaluator_;
 };
 
+TEST_F(CelonisIndexActivityTest, const_null_column_mode_direction) {
+    auto array = ColumnHelper::create_const_null_column(2);
+    auto mode_column = ColumnHelper::create_const_null_column(2);
+    auto direction_column = ColumnHelper::create_const_null_column(2);
+
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_BIGINT);
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+
+    Columns columns{array, mode_column, direction_column};
+    ctx->set_constant_columns(columns);
+
+    DeferOp op([&ctx] {
+        CelonisIndexActivity::celonis_index_activity_close(
+                ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+    });
+
+    ASSERT_TRUE(CelonisIndexActivity::celonis_index_activity_prepare(
+            ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+}
+
 TEST_F(CelonisIndexActivityTest, index_activity_order_empty_input) {
     auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
 

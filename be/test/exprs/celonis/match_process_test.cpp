@@ -202,4 +202,22 @@ TEST_F(CelonisMatchProcessTest, celonis_match_activities_inverse_match) {
     match_process(input, {0, 1});
 }
 
+TEST_F(CelonisMatchProcessTest, const_null_column) {
+    auto array = ColumnHelper::create_const_null_column(2);
+    auto json_spec = ColumnHelper::create_const_null_column(2);
+    auto columns = {array, json_spec};
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    auto context = ctx.get();
+    context->set_constant_columns(columns);
+
+    ASSERT_TRUE(
+            CelonisMatchProcess::match_process_prepare(context,
+                                                       FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+
+    const auto result = CelonisMatchProcess::celonis_match_process(context, columns).value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_TRUE(result->only_null());
+    EXPECT_TRUE(result->is_constant());
+}
+
 } // namespace starrocks::vectorized

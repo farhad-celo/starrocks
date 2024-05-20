@@ -63,6 +63,9 @@ Status CelonisAlignModel::align_model_prepare(FunctionContext* context, Function
             return Status::InvalidArgument(
                     "The second parameter of celonis_align_model() only accepts a literal value");
         }
+        if (!context->is_notnull_constant_column(1)) {
+            return Status::OK();
+        }
         auto state = new AlignModelStateFragmentLocal();
         // As of 2023-10-11, get_const_value() is not thread-safe. So it shouldn't be called in align_model().
         state->json_bpmn_model_description =
@@ -83,7 +86,7 @@ Status CelonisAlignModel::align_model_close(FunctionContext* context, FunctionCo
 }
 
 StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto* align_model_state_fragment_local = reinterpret_cast<const AlignModelStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     const auto& json_bpmn_model_description = align_model_state_fragment_local->json_bpmn_model_description;

@@ -769,6 +769,7 @@ StatusOr<ColumnPtr>
 CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext* context,
                                                       const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     UnnestedArrayData pattern_data = prepare_array_input(columns[1].get());
     const auto& patterns = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*pattern_data.elements).get_data().data();

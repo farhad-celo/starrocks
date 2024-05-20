@@ -274,6 +274,9 @@ Status CelonisMatchProcess::match_process_prepare(FunctionContext* context, Func
         return Status::InvalidArgument(
                 "celonis_match_process needs 2 parameters: column, json spec");
     }
+    if (!context->is_notnull_constant_column(1)) {
+        return Status::OK();
+    }
     const auto json_input = context->get_constant_column(1);
     std::string json = ColumnHelper::get_const_value<TYPE_VARCHAR>(json_input).to_string();
     StatusOr<std::unique_ptr<NFA>> nfa_status = from_json(json);
@@ -299,7 +302,7 @@ Status CelonisMatchProcess::match_process_close(FunctionContext* context, Functi
 }
 
 StatusOr<ColumnPtr> CelonisMatchProcess::celonis_match_process(FunctionContext* context, const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto* state = reinterpret_cast<const MatchProcessState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     DCHECK(state != nullptr);
     const auto& nfa = state->nfa;

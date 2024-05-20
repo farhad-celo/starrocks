@@ -265,6 +265,12 @@ Status CelonisIndexActivity::celonis_index_activity_prepare(starrocks::FunctionC
         auto state = new CelonisIndexActivityStateFragmentLocal();
         context->set_function_state(scope, state);
 
+        if (!context->is_notnull_constant_column(1)) {
+            return Status::OK();
+        }
+        if (!context->is_notnull_constant_column(2)) {
+            return Status::OK();
+        }
         auto mode = getMode(ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(1)));
         auto direction = getDirection(ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(2)));
         if (mode == Mode::ORDER && direction == Direction::FORWARD) {
@@ -299,8 +305,7 @@ Status CelonisIndexActivity::celonis_index_activity_close(starrocks::FunctionCon
 
 StatusOr<ColumnPtr> CelonisIndexActivity::celonis_index_activity(FunctionContext* context,
                                                                  const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
-
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     Column* array_column = columns[0].get();
     const auto* state = reinterpret_cast<const CelonisIndexActivityStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
