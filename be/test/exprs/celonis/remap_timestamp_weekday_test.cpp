@@ -17,6 +17,15 @@ protected:
     TypeDescriptor TYPE_ARRAY_DATETIME = celonis::array_type(TYPE_DATETIME);
 };
 
+TEST_F(CelonisRemapTimestampWeekdayTest, remap_weekday_const_null) {
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    auto array = ColumnHelper::create_const_null_column(2);
+    const auto result = CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday(ctx.get(), {array}).value();
+    EXPECT_EQ(2, result->size());
+    EXPECT_TRUE(result->only_null());
+    EXPECT_TRUE(result->is_constant());
+}
+
 TEST_F(CelonisRemapTimestampWeekdayTest, remap_weekdays) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
     auto array = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, false);

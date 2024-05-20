@@ -121,6 +121,35 @@ private:
     FunctionContext::TypeDesc return_type_;
 };
 
+TEST_F(CelonisAdjustDailyTimestampsTest, const_null_column) {
+    {
+        auto timestamp_column = ColumnHelper::create_const_null_column(2);
+        auto is_day_based_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BOOLEAN), false);
+        is_day_based_column->append_datum(false);
+        is_day_based_column->append_datum(false);
+        const auto result = CelonisAdjustDailyTimestamps::celonis_adjust_daily_timestamps(nullptr, {timestamp_column,
+                                                                                                    is_day_based_column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->only_null());
+        EXPECT_TRUE(result->is_constant());
+    }
+    {
+        auto timestamp_column = ColumnHelper::create_const_null_column(2);
+        auto is_day_based_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BOOLEAN), false);
+        auto sorting_column = ColumnHelper::create_column(celonis::array_type(TYPE_BIGINT), false);
+        is_day_based_column->append_datum(false);
+        is_day_based_column->append_datum(false);
+        sorting_column->append_datum(DatumArray{1L});
+        sorting_column->append_datum(DatumArray{2L});
+        const auto result = CelonisAdjustDailyTimestamps::celonis_adjust_daily_timestamps(nullptr, {timestamp_column,
+                                                                                                    is_day_based_column,
+                                                                                                    sorting_column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->only_null());
+        EXPECT_TRUE(result->is_constant());
+    }
+}
+
 TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_day_based_activity_reordered_after_non_day_based) {
     auto activities{ActivitiesBuilder{}.add_non_day_based_activity("A", 1).add_day_based_activity("B", 2).build()};
     auto case1{CaseBuilder{activities}

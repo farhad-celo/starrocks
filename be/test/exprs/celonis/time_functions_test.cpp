@@ -2597,6 +2597,44 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_prepare) {
     }
 }
 
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_const_null_column) {
+    // calendars1 is const null column
+    {
+        auto calendars1 = ColumnHelper::create_const_null_column(1);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->only_null());
+        EXPECT_TRUE(result->is_constant());
+    }
+    // calendars2 is const null column
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        auto calendars2 = ColumnHelper::create_const_null_column(1);
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->only_null());
+        EXPECT_TRUE(result->is_constant());
+    }
+    // both calendars are const null columns
+    {
+        auto calendars1 = ColumnHelper::create_const_null_column(2);
+        auto calendars2 = ColumnHelper::create_const_null_column(2);
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_TRUE(result->only_null());
+        EXPECT_TRUE(result->is_constant());
+    }
+}
+
 TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_const_input) {
     // calendar1 is const
     {

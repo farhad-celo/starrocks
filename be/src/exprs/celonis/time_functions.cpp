@@ -1259,6 +1259,7 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionCon
 StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionContext* context,
                                                       const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 4);
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[2]});
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
@@ -1351,6 +1352,7 @@ timestamp_in_calendar(const TimestampValue& timestamp,
 
 StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 3);
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
@@ -1458,6 +1460,7 @@ get_calendar(const ColumnPtr& calendar_column, int row) {
 StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::FunctionContext* context,
                                                                   const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     size_t n_rows = columns[0]->size();
 
     int offset = 0;
@@ -1696,6 +1699,7 @@ Status CelonisTimeFunctions::timeunits_between_calendar_close(FunctionContext* c
 StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] FunctionContext* context,
                                                        const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 5);
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[3]});
     const size_t n_rows = columns[0]->size();
     ColumnViewer from_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer to_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
@@ -1814,6 +1818,7 @@ Status CelonisTimeFunctions::add_timeunits_calendar_close(FunctionContext* conte
 static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] FunctionContext* context,
                                                           const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 5);
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[3]});
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer add_value_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);

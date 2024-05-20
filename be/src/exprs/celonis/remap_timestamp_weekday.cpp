@@ -74,6 +74,7 @@ StatusOr<ColumnPtr> CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekda
 }
 
 StatusOr<ColumnPtr> CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday(FunctionContext* context, const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const Column* timestamp_array = columns[0].get();
     const NullableColumn* nullable_timestamp_array = nullptr;
     if (timestamp_array->is_nullable()) {

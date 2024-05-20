@@ -346,6 +346,7 @@ Status adjust_daily_timestamps_impl(DeconstructedOutputColumn& output_data, cons
 StatusOr<ColumnPtr> CelonisAdjustDailyTimestamps::celonis_adjust_daily_timestamps(FunctionContext* context,
                                                                                   const Columns& columns) {
     DCHECK(columns.size() == 2 || columns.size() == 3);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
 
     auto* input_timestamps{columns[0].get()};
 
