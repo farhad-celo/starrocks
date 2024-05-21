@@ -1,0 +1,60 @@
+name: Build allin1 image
+
+inputs:
+  artifact_image:
+    required: true
+  image_tag:
+    required: true
+  branch:
+    required: false
+
+outputs:
+  allin1_image_tag:
+    value: ${{steps.build-allin1.allin1_image_tag}}
+
+runs:
+  using: composite
+  steps:
+    - name: Pull artifact image
+      shell: bash
+      run: |
+        echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+        docker pull ${{inputs.artifact_image}}
+
+    - name: Build allin1 image
+      id: build-allin1
+      shell: bash
+      run: |
+        if [ -n "${{inputs.branch}}" ]; then
+          echo "Switching to branch ${{inputs.branch}}"
+          git checkout ${{inputs.branch}}
+        fi
+
+        # Need to set the flag to make Celostar compliance test pass.
+        echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf
+
+        # Build image and always remove intermediate containers.
+        DOCKER_BUILDKIT=1 docker buildx build --force-rm=true \
+          --build-arg WITH_DEBUG_INFO=true \
+          --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
+          -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile \
+          -t starrocks-allin1:${{inputs.image_tag}} .
+
+        echo "allin1_image_tag=${{inputs.image_tag}}" >> $GITHUB_OUTPUT
+
+    - name: Push to GHCR
+      uses: ./.github/actions/push-to-registry
+      with:
+        local_image: starrocks-allin1:${{inputs.image_tag}}
+        remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${{inputs.image_tag}}
+
+    - name: Clean up
+      if: ${{ always() }}
+      shell: bash
+      run: |
+        docker rmi -f $(docker images -q starrocks-allin1:${{inputs.image_tag}}) || true
+        docker rmi -f $(docker images -q ${{inputs.artifact_image}}) || true
+        docker system prune -f
+        docker volume prune -f
+        docker logout ghcr.io
+      continue-on-error: true

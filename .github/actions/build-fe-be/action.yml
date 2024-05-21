@@ -1,0 +1,34 @@
+name: Build and push FE & BE images
+
+inputs:
+  artifact_image:
+    required: true
+  image_tag:
+    required: true
+  branch:
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Build FE image
+      shell: bash
+      run: |
+        if [ -n "${{inputs.branch}}" ]; then
+          echo "Switching to branch ${{inputs.branch}}"
+          git checkout ${{inputs.branch}}
+        fi
+
+        DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
+          -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${{inputs.image_tag}} .
+
+    - name: Build FE image
+      shell: bash
+      run: |
+        if [ -n "${{inputs.branch}}" ]; then
+          echo "Switching to branch ${{inputs.branch}}"
+          git checkout ${{inputs.branch}}
+        fi
+
+        DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
+          -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${{inputs.image_tag}} .

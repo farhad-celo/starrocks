@@ -1,0 +1,29 @@
+name: Trigger Celostar Test
+
+inputs:
+  owner:
+    required: true
+  repo:
+    requried: true
+  workflow_file:
+    required: true
+  payload:
+    required: false
+
+outputs:
+  workflow_url:
+    value: ${{steps.trigger.outputs.workflow_url}}
+
+runs:
+  using: composite
+  steps:
+    - name: Trigger Test
+      id: trigger
+      shell: bash
+      run: |
+        echo "owner: ${{inputs.owner}}"
+        echo "repo: ${{inputs.repo}}"
+        echo "workflow_file: ${{inputs.workflow_file}}"
+        echo "payload: ${{inputs.payload}}"
+        chmod +x celonis/tools/run_workflow.sh
+        celonis/tools/run_workflow.sh ${{inputs.owner}} ${{inputs.repo}} ${{inputs.workflow_file}} "${{inputs.payload}}"

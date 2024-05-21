@@ -1,188 +1,364 @@
-name: Sync rebase upstream and test
+name: Rebase Upstream and Test
 
 on:
   schedule:
-    # At 00:00 of pacific time.
-    - cron:  '0 7 * * *'
-  # Configuring a workflow to run manually
+    - cron:  '0 17 * * Thu'
   workflow_dispatch:
 
 # This allows a subsequently queued workflow run to interrupt previous runs
-concurrency:
-  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
-  cancel-in-progress: true
+#concurrency:
+#  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+#  cancel-in-progress: true
 
 env:
-  LATEST_UPSTREAM_BRANCH: branch-3.1-cs
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.1-e862a8f9
+  LATEST_UPSTREAM_BRANCH: branch-3.2
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-c39ac1cf-locale-cpml2.161.2-ubuntu
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
-  sync-rebase-upstream-and-test:
-    runs-on: [self-hosted, celostar-starrocks-test]
+  sync-and-rebase-upstream:
+    runs-on: [self-hosted, celostar]
+    outputs:
+      #test_branch: ${{steps.rebase.outputs.test_branch}}
+      test_branch: gh-branch-3.2-fdc838d7-2024-05-20T21-40-43
     steps:
-      - name: Start fresh
-        run: |
-          echo "Deleting the existing repo"
-          # We need the repo directory exist to make the checkout action work.
-          rm -rf /runner/_work/celostar-starrocks; mkdir -p /runner/_work/celostar-starrocks/celostar-starrocks; echo "Deletion done"
-        # Ignore not existing error
-        continue-on-error: true
-
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        # We need to ref a branch which is not the default one or ${LATEST_UPSTREAM_BRANCH} to make rebase work.
+      - name: checkout repository
+        uses: actions/checkout@v4
+        # we need to ref a branch which is not the default one or ${LATEST_UPSTREAM_BRANCH} to make rebase work.
         with:
           ref: branch-3.0-c0d5082c-celo
-
-      - name: Remote add upstream
+      - name: remote add upstream
         id: remote-add
         run: |
-          git remote add upstream https://github.com/StarRocks/starrocks.git
-        # Skip error of remote upstream already exists
+          git remote add upstream https://github.com/starrocks/starrocks.git
+        # skip error of remote upstream already exists
         continue-on-error: true
-      - name: Fetch upstream and push
+      - name: fetch upstream and push
         run: |
           git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
           git push origin ${LATEST_UPSTREAM_BRANCH}
-      - name: Rebase
+      - name: rebase
         id: rebase
         run: |
-          echo "Start to rebase ..."
-          
-          # Get the latest commit
+          echo "start to rebase ..."
+
+          # get the latest commit
           git fetch
           git checkout ${LATEST_UPSTREAM_BRANCH}
           latest_commit=$(git rev-parse --short=8 HEAD)
-          echo "The latest commit is ${latest_commit}"
-          
-          # Create the new default branch
-          newDefaultBranch=${LATEST_UPSTREAM_BRANCH}-${latest_commit}-celo
-          echo "new_default_branch=$newDefaultBranch" >> $GITHUB_ENV
-          git checkout -b ${newDefaultBranch}
-          git push --set-upstream origin ${newDefaultBranch}
-                    
-          # Get the current default branch
+          echo "the latest commit is ${latest_commit}"
+
+          # create the new default branch
+          newdefaultbranch=${LATEST_UPSTREAM_BRANCH}-${latest_commit}-celo
+          echo "The new default branch is: ${newdefaultbranch}"
+
+          # check if the branch exists
+          if git show-ref --quiet refs/heads/${newdefaultbranch}; then
+              echo "branch '${newdefaultbranch}' already exists. checking out..."
+              git checkout ${newdefaultbranch}
+          else
+              echo "branch '${newdefaultbranch}' does not exist. creating and checking out and pushing to remote ..."
+              git checkout -b ${newdefaultbranch}
+              git push --set-upstream origin ${newdefaultbranch}
+          fi
+
+          # get the current default branch
           default_branch=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
-          echo "The current default branch is ${default_branch}"
-          
-          # Rebase
+          echo "the current default branch is ${default_branch}"
+
+          # rebase
           git checkout ${default_branch}
           timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
-          echo "timestamp=$timestamp" >> $GITHUB_ENV
-          testBranch=gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}
-          echo "test_branch=$testBranch" >> $GITHUB_ENV
-          git checkout -b $testBranch
-          git rebase ${newDefaultBranch}
-          git push --set-upstream origin $testBranch
+          testbranch=gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}-${timestamp}
+          git checkout -b $testbranch
+          git rebase ${newdefaultbranch}
+          git push --set-upstream origin $testbranch
+          echo "test_branch=$testbranch" >> $GITHUB_OUTPUT
 
-      - name: GitHub Docker login
-        run: |
-          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
-
+  presubmit-test:
+    runs-on: [self-hosted, celostar]
+    needs: sync-and-rebase-upstream
+    env:
+      test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Pull dev env image
         run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
           docker pull ${BUILDER}
-          
-      - name: Build and test celostar-starrocks
+      - name: Test new branch
+        id: test-new-branch
         run: |
-          git checkout ${{ env.test_branch }}
-          echo "Starting the dev env container"
+          git checkout ${{env.test_branch}}
+          echo "starting the dev env container"
           container_id=$(docker run -d -v `pwd`:/celostar-starrocks \
           -w `pwd` --env GITHUB_TOKEN=${GITHUB_TOKEN} \
           --env GITHUB_USERNAME=${GITHUB_USERNAME} \
           ${BUILDER} sleep infinity)
-          echo "Starting to build and test"
-          docker exec ${container_id} sh -c "$(cat celonis/docker/presubmit/presubmit_test.sh)"
-
-      - name: Build artifact docker image
+          echo "container_id=$container_id" >> $GITHUB_ENV
+          echo "starting to run presubmit test"
+          docker exec ${container_id} bash -c "$(cat celonis/docker/presubmit/presubmit_test.sh)"
+      - name: Summarize test
+        if: always() && steps.test-new-branch.outcome != 'skipped'
         run: |
-          git checkout ${{ env.test_branch }}
-          # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RELEASE_VERSION=${{ env.test_branch }} --build-arg builder=${BUILDER} -f celonis/docker/artifact/artifact.Dockerfile -t starrocks-artifacts:${{ env.test_branch }} .
-
-      - name: Package allin1 docker image
-        run: |
-          git checkout ${{ env.test_branch }}
-          # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${{ env.test_branch }} -f celonis/docker/allin1/allin1-ubuntu.Dockerfile -t starrocks-allin1:${{ env.test_branch }} celonis/docker/allin1
-          echo "allin1_image_tag=${{ env.test_branch }}" >> $GITHUB_ENV
-          echo "allin1_image=starrocks-allin1:${{ env.test_branch }}" >> $GITHUB_ENV
-
-      - name: Push allin1 docker image to GHCR
-        run: |
-          docker tag starrocks-allin1:${{ env.test_branch }} ghcr.io/celonis/celostar/starrocks-allin1:${{ env.test_branch }}
-          
-          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-allin1:${{ env.test_branch }}
-          do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-allin1:${{ env.test_branch }} trying again."
-          done
-
-      - name: Checkout celostar repo
-        uses: actions/checkout@v3
-        with:
-          repository: celonis/celostar
-          path: _celostar
-          # Need to call the token explicitly again.
-          token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-
-      - name: Build and test celostar with the new allin1 image
-        id: test-celostar
-        run: |
-          cd _celostar
-          mvn clean package -DskipFormat -Dmaven.artifact.threads=128 -Dgithub.user=${{ github.repository }} \
-          -Dgithub.password=${{ secrets.CELOBOT_GITHUB_TOKEN }} \
-          -Dcelostar-starrocks-image=${{ env.allin1_image }}
-
-      # Need this step so that create-an-issue action could find the templates.
-      - name: Recheckout the repo
-        if: ${{ always() }}
-        uses: actions/checkout@v3
-
-      - name: Create the failure report
-        if: ${{ failure() }}
-        uses: JasonEtco/create-an-issue@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-        with:
-          filename: .github/ISSUE_TEMPLATE/celonis_sync_rebase_test_failure_report.md
-
-      - name: Create the success report
-        if: ${{ steps.test-celostar.outcome }} == 'success'
-        uses: JasonEtco/create-an-issue@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-        with:
-          filename: .github/ISSUE_TEMPLATE/celonis_sync_rebase_test_success_report.md
-
-      - name: Docker logout and remove containers
+          {
+            echo "The test branch is ${{env.test_branch}}"
+          } >> $GITHUB_STEP_SUMMARY
+      - name: clean up
         if: ${{ always() }}
         run: |
-          docker logout ghcr.io
-          docker rm -f $(docker ps -aq)
-          echo "Done"
-        continue-on-error: true
-
-      - name: Docker cleanup
-        if: ${{ always() }}
-        run: |
-          docker rmi -f $(docker images -q starrocks-artifacts:${{ env.test_branch }})
-          docker rmi -f $(docker images -q ${{ env.allin1_image }})
+          docker kill ${{ env.container_id }} || true
           docker system prune -f
           docker volume prune -f
-          echo "Finished cleanup docker files"
+          docker logout ghcr.io
         continue-on-error: true
 
-      - name: Clean up celostar-starrocks repo
+  build-artifact:
+    runs-on: [self-hosted, celostar]
+    needs: sync-and-rebase-upstream
+    env:
+      test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
+    outputs:
+      test_branch: ${{env.test_branch}}
+      artifact_image_tag: ${{env.test_branch}}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: build and push artifact image
+        id: build-artifact
+        uses: ./.github/actions/build-artifact
+        with:
+          dev_env_image: ${BUILDER}
+          image_tag: ${test_branch}
+          branch: ${test_branch}
+
+  build-allin1:
+    runs-on: [self-hosted, celostar]
+    needs: build-artifact
+    env:
+      test_branch: ${{needs.build-artifact.outputs.test_branch}}
+      artifact_image_tag: ${{needs.build-artifact.outputs.artifact_image_tag}}
+    outputs:
+      allin1_image_tag: ${{env.artifact_image_tag}}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: build and push allin1 image
+        id: build-allin1
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${artifact_image_tag}
+          image_tag: ${test_branch}
+          branch: ${test_branch}
+
+  celostar-presubmit-test:
+    runs-on: [self-hosted, celostar]
+    needs: build-allin1
+    env:
+      test_image_tag: ${{needs.build-allin1.outputs.allin1_image_tag}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run celostar compliance test
+        id: run-test
+        uses: ./.github/actions/trigger-celostar-test
+        with:
+          owner: celonis
+          repo: celostar
+          workflow_file: "presubmit-test.yml"
+          payload: '{\"event_type\":\"trigger_presubmit_test\",\"client_payload\":{\"image_tag\":\"${test_image_tag}\"}}'
+
+      - name: Summarize the result
+        if: always() && steps.run-test.outcome != 'skipped'
+        run: |
+          {
+            echo "The presubmit test workflow is: ${{steps.run-test.outputs.workflow_url}}"
+          } >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true
+
+  build-fe-be:
+    runs-on: [self-hosted, celostar]
+    needs: build-artifact
+    env:
+      test_branch: ${{needs.build-artifact.outputs.test_branch}}
+      test_image_tag: ${{needs.build-artifact.outputs.artifact_image_tag}}
+    outputs:
+      test_image_tag: ${{env.test_image_tag}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pull artifact image
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+          docker pull ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
+
+      - name: Build FE & BE
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
+          image_tag: ${test_image_tag}
+          branch: ${test_branch}
+
+      - name: Push FE image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-fe:${test_image_tag}
+          remote_image: ghcr.io/celonis/celostar/starrocks-fe:${test_image_tag}
+
+      - name: Push BE image to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-be:${test_image_tag}
+          remote_image: ghcr.io/celonis/celostar/starrocks-be:${test_image_tag}
+
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push FE image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-fe:${test_image_tag}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${test_image_tag}
+
+      - name: Push BE image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-be:${test_image_tag}
+          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${test_image_tag}
+
+      - name: clean up
         if: ${{ always() }}
-        run:
-          # We need the repo directory exist to make the checkout action work.
-          rm -rf /runner/_work/celostar-starrocks;
-          mkdir -p /runner/_work/celostar-starrocks/celostar-starrocks;
-          echo "Deletion done"
+        run: |
+          docker rmi -f $(docker images -q starrocks-fe:${test_image_tag}) || true
+          docker rmi -f $(docker images -q starrocks-be:${test_image_tag}) || true
+          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}) || true
+          docker system prune -f
+          docker volume prune -f
+          docker logout ghcr.io
+        continue-on-error: true
+
+  celostar-e2e-test:
+    runs-on: [self-hosted, celostar]
+    needs: build-fe-be
+    env:
+      test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run celostar e2e test
+        id: run-test
+        uses: ./.github/actions/trigger-celostar-test
+        with:
+          owner: celonis
+          repo: celostar
+          workflow_file: "e2e.yml"
+          payload: '{\"event_type\":\"trigger_e2e_test\",\"client_payload\":{\"cluster\":\"stateless\",\"starrocks_image_tag\":\"${test_image_tag}\",\"dataset\":\"abb_10m\",\"query_option\":\"single_query\"}}'
+
+      - name: Summarize the result
+        if: always() && steps.run-test.outcome != 'skipped'
+        run: |
+          {
+            echo "The E2E test workflow is: ${{steps.run-test.outputs.workflow_url}}"
+          } >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true
+
+  build-asan-artifact:
+    runs-on: [self-hosted, celostar]
+    needs: sync-and-rebase-upstream
+    env:
+      test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
+    outputs:
+      test_branch: ${{env.test_branch}}
+      test_image_tag: "${{env.test_branch}}-asan"
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: build and push artifact image
+        uses: ./.github/actions/build-artifact
+        with:
+          dev_env_image: ${BUILDER}
+          image_tag: "${test_branch}-asan"
+          is_asan_mode: 'yes'
+          branch: ${test_branch}
+
+  build-asan-allin1:
+    runs-on: [self-hosted, celostar]
+    needs: build-asan-artifact
+    env:
+      test_branch: ${{needs.build-asan-artifact.outputs.test_branch}}
+      test_image_tag: ${{needs.build-asan-artifact.outputs.test_image_tag}}
+    outputs:
+      allin1_image_tag: ${{env.test_image_tag}}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: build and push asan allin1 image
+        id: build-allin1
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
+          image_tag: ${test_image_tag}
+          branch: ${test_branch}
+
+  celostar-compliance-test:
+    runs-on: [self-hosted, celostar]
+    needs: build-asan-allin1
+    env:
+      test_image_tag: ${{needs.build-asan-allin1.outputs.allin1_image_tag}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run celostar compliance test
+        id: run-test
+        uses: ./.github/actions/trigger-celostar-test
+        with:
+          owner: celonis
+          repo: celostar
+          workflow_file: "compliance-test.yml"
+          payload: '{\"event_type\":\"trigger_compliance_test\",\"client_payload\":{\"image_tag\":\"${test_image_tag}\"}}'
+
+      - name: Summarize the result
+        if: always() && steps.run-test.outcome != 'skipped'
+        run: |
+          {
+            echo "The compliance test workflow is: ${{steps.run-test.outputs.workflow_url}}"
+          } >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
