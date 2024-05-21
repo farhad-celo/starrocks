@@ -24,8 +24,7 @@ jobs:
   sync-and-rebase-upstream:
     runs-on: [self-hosted, celostar]
     outputs:
-      #test_branch: ${{steps.rebase.outputs.test_branch}}
-      test_branch: gh-branch-3.2-fdc838d7-2024-05-20T21-40-43
+      test_branch: ${{steps.rebase.outputs.test_branch}}
     steps:
       - name: checkout repository
         uses: actions/checkout@v4
@@ -90,6 +89,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Pull dev env image
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
@@ -158,7 +158,6 @@ jobs:
           fetch-depth: 0
 
       - name: build and push allin1 image
-        id: build-allin1
         uses: ./.github/actions/build-allin1
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${artifact_image_tag}
@@ -330,7 +329,6 @@ jobs:
           fetch-depth: 0
 
       - name: build and push asan allin1 image
-        id: build-allin1
         uses: ./.github/actions/build-allin1
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}

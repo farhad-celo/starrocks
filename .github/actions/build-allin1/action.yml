@@ -8,10 +8,6 @@ inputs:
   branch:
     required: false
 
-outputs:
-  allin1_image_tag:
-    value: ${{steps.build-allin1.allin1_image_tag}}
-
 runs:
   using: composite
   steps:
@@ -39,8 +35,6 @@ runs:
           --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
           -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile \
           -t starrocks-allin1:${{inputs.image_tag}} .
-
-        echo "allin1_image_tag=${{inputs.image_tag}}" >> $GITHUB_OUTPUT
 
     - name: Push to GHCR
       uses: ./.github/actions/push-to-registry
