@@ -565,6 +565,22 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_calendar_factory_calendar_with
         auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1969, 1, 2, 0, 0, 0));
+        time_units->append_datum("HOURS");
+        // 01/01/1970 [8:00 am, 5:00 pm]
+        calendars->append_datum(
+                DatumArray{R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::remap_timestamps_calendar(nullptr, {timestamps, time_units, calendars,
+                                                                                      calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(0L, result->get(0).get_int64());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto time_units = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         time_units->append_datum("HOURS");
         // 01/01/1970 [8:00 am, 5:00 pm]

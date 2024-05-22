@@ -229,9 +229,13 @@ struct TimeRange {
     }
 };
 
-static void merge_non_weekly_time_ranges(std::vector<TimeRange>& time_ranges) {
+static void sort_time_ranges(std::vector<TimeRange>& time_ranges) {
     std::sort(time_ranges.begin(), time_ranges.end(),
               [](const TimeRange& a, const TimeRange& b) { return a.begin_ms < b.begin_ms; });
+}
+
+static void merge_non_weekly_time_ranges(std::vector<TimeRange>& time_ranges) {
+    sort_time_ranges(time_ranges);
     std::vector<TimeRange> merged;
     for (const auto& time_range: time_ranges) {
         if (merged.empty() || time_range.begin_ms > merged.back().end_ms) {
@@ -264,6 +268,8 @@ public:
             handle_intersect_calendar(calendar_proto.intersect_calendar());
         }
         set_scope();
+        set_cum_sum();
+        set_no_weekly();
     }
 
     bool requires_calendar_id() const {
@@ -434,6 +440,25 @@ public:
 private:
     using IdToTimeRangesMap = std::unordered_map<std::optional<std::string>, std::vector<TimeRange>>;
     using IdToWeekdayMap = std::unordered_map<std::optional<std::string>, std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry>>;
+
+    void set_cum_sum() {
+        for (auto& kv: id_to_time_ranges_) {
+            auto& time_ranges = kv.second;
+            sort_time_ranges(time_ranges);
+            std::vector<int64_t> cum_sum = {0};
+            for (const auto& time_range: time_ranges) {
+                cum_sum.push_back(cum_sum.back() + time_range.end_ms - time_range.begin_ms);
+            }
+            id_to_cum_sum_.insert({kv.first, cum_sum});
+        }
+    }
+
+    void set_no_weekly() {
+        for (const auto& kv: id_to_time_ranges_) {
+            id_to_no_weekly_.insert({kv.first, std::all_of(kv.second.begin(), kv.second.end(),
+                                                           [](const TimeRange& time_range) { return !time_range.is_weekly; })});
+        }
+    }
 
     void set_scope() {
         for (const auto& [id, time_ranges]: id_to_time_ranges_) {
@@ -787,12 +812,67 @@ private:
         populate_id_to_time_ranges(to_time_ranges(workday_calendar));
     }
 
+    // finds the most right time range index that its end_ms <= ms.
+    int find_most_right_index(int64_t ms, const std::vector<TimeRange>& time_ranges) const {
+        DCHECK(!time_ranges.empty());
+        if (time_ranges.front().end_ms > ms) {
+            return -1;
+        }
+        // find the last time_range whose end_ms <= ms
+        int lo = 0;
+        // time_ranges is not empty
+        int hi = time_ranges.size() - 1;
+        while (lo < hi) {
+            int mid = hi - (hi - lo) / 2;
+            if (time_ranges[mid].end_ms > ms) {
+                hi = mid - 1;
+            } else {
+                lo = mid;
+            }
+        }
+        return lo;
+    }
+
+    // computes the duration of [min_begin_ms, ms] in the time_ranges.
+    int64_t
+    compute_duration(int64_t ms, const std::vector<TimeRange>& time_ranges, const std::vector<int64_t>& cum_sum) const {
+        if (time_ranges.empty() || ms <= time_ranges.front().begin_ms) {
+            return 0L;
+        }
+        int64_t rv = 0L;
+        int index = find_most_right_index(ms, time_ranges);
+        rv += cum_sum[index + 1];
+        // need to check next time_range if exists
+        if (index + 1 < time_ranges.size()) {
+            if (ms > time_ranges[index + 1].begin_ms) {
+               rv += std::min(ms, time_ranges[index + 1].end_ms) - time_ranges[index + 1].begin_ms;
+            }
+        }
+        return rv;
+    }
+
+    // This function assumes time_ranges is sorted and contains only non-weekly time_ranges.
+    int64_t quick_compute_overlap(int64_t left_ms, int64_t right_ms, const std::vector<TimeRange>& time_ranges,
+                                  const std::vector<int64_t>& cum_sum) const {
+        if (time_ranges.empty() || left_ms >= time_ranges.back().end_ms || right_ms <= time_ranges.front().begin_ms) {
+            return 0L;
+        }
+        return compute_duration(right_ms, time_ranges, cum_sum) - compute_duration(left_ms, time_ranges, cum_sum);
+    }
+
     int64_t compute_overlap(int64_t left_ms, int64_t right_ms, const std::optional<std::string>& calendar_id,
                             bool round_to_day = false) const {
         int64_t rv = 0L;
-        auto itr = id_to_time_ranges_.find(calendar_id);
-        if (itr != id_to_time_ranges_.end()) {
-            for (const auto& cur_time_range: itr->second) {
+        auto time_ranges_it = id_to_time_ranges_.find(calendar_id);
+        if (time_ranges_it != id_to_time_ranges_.end()) {
+            auto no_weekly_it = id_to_no_weekly_.find(calendar_id);
+            DCHECK(no_weekly_it != id_to_no_weekly_.end());
+            if (no_weekly_it->second && !round_to_day) {
+                auto cum_sum_it = id_to_cum_sum_.find(calendar_id);
+                DCHECK(cum_sum_it != id_to_cum_sum_.end());
+                return quick_compute_overlap(left_ms, right_ms, time_ranges_it->second, cum_sum_it->second);
+            }
+            for (const auto& cur_time_range: time_ranges_it->second) {
                 if (!round_to_day) {
                     rv += cur_time_range.compute_overlap(left_ms, right_ms);
                 } else {
@@ -813,6 +893,10 @@ private:
     };
 
     IdToTimeRangesMap id_to_time_ranges_;
+    // suppose the time_ranges is [(-4, -2), (1, 2), (3, 6), (7, 11)], the cum_sum is [0, 2, 3, 6, 10].
+    std::unordered_map<std::optional<std::string>, std::vector<int64_t>> id_to_cum_sum_;
+    // no_weekly is set to true if all the time range in time_ranges is not weekly.
+    std::unordered_map<std::optional<std::string>, bool> id_to_no_weekly_;
     std::unordered_map<std::optional<std::string>, std::optional<Scope>> id_to_scope_;
 };
 
