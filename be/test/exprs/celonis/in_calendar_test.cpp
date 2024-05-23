@@ -357,4 +357,17 @@ TEST_F(CelonisInCalendarTest, non_const_invalid_calendar) {
     }
 }
 
+TEST_F(CelonisInCalendarTest, const_null_calendar_column) {
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    calendar_column_ = ColumnHelper::create_const_null_column(2);
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+    const auto result = Run().value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_TRUE(result->only_null());
+    EXPECT_TRUE(result->is_constant());
+}
+
 } // namespace starrocks

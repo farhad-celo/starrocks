@@ -871,4 +871,21 @@ TEST_F(CelonisAddTimeunitsCalendarTest, non_const_calendar) {
     EXPECT_EQ(TimestampValue::create(2018, 1, 4, 11, 0, 0), result->get(1).get_timestamp());
 }
 
+TEST_F(CelonisAddTimeunitsCalendarTest, const_null_calendar_column) {
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+    add_value_column_->append_datum(26L);
+    add_value_column_->append_datum(17L);
+    time_unit_column_->append_datum("HOURS");
+    time_unit_column_->append_datum("HOURS");
+    calendar_column_ = ColumnHelper::create_const_null_column(2);
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+    const auto result = Run().value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_TRUE(result->only_null());
+    EXPECT_TRUE(result->is_constant());
+}
+
 } // namespace starrocks
