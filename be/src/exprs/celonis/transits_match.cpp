@@ -72,12 +72,13 @@ build_map(const std::optional<DatumArray>& left_manual_array, const std::optiona
 std::vector<Edge> compute_edges(const DatumArray& left_match_array, const DatumArray& right_match_array,
                                 const std::optional<std::map<DatumKey, std::set<DatumKey>>>& manual_map) {
     std::vector<Edge> edges;
-    const auto size = left_match_array.size();
+    const auto left_size = left_match_array.size();
+    const auto right_size = right_match_array.size();
     std::map<DatumKey, std::vector<size_t>> right_key_to_indexes;
-    for (size_t i = 0; i < size; ++i) {
+    for (size_t i = 0; i < right_size; ++i) {
         right_key_to_indexes[right_match_array[i].convert2DatumKey()].push_back(i);
     }
-    for (size_t i = 0; i < size; ++i) {
+    for (size_t i = 0; i < left_size; ++i) {
         const auto left_datum_key = left_match_array[i].convert2DatumKey();
         // compute matched keys
         std::set matched_keys = {left_datum_key};
@@ -180,34 +181,48 @@ CelonisTransitsMatch::transits_match_non_constant_manual([[maybe_unused]] starro
             res->append_nulls(1);
             continue;
         }
-        const auto length = left_key_fields[0]->get(row).get_array().size();
-        bool inconsistent_length = false;
+
+        const auto left_length = left_key_fields[0]->get(row).get_array().size();
+        bool inconsistent_left_length = false;
         for (auto i = 0; i < n_fields; ++i) {
-            if (left_key_fields[i]->get(row).get_array().size() != length ||
-                right_key_fields[i]->get(row).get_array().size() != length) {
-                inconsistent_length = true;
+            if (left_key_fields[i]->get(row).get_array().size() != left_length) {
+                inconsistent_left_length = true;
                 break;
             }
         }
-        if (inconsistent_length) {
+        if (inconsistent_left_length) {
             res->append_nulls(1);
             continue;
         }
+
+        const auto right_length = right_key_fields[0]->get(row).get_array().size();
+        bool inconsistent_right_length = false;
+        for (auto i = 0; i < n_fields; ++i) {
+            if (right_key_fields[i]->get(row).get_array().size() != right_length) {
+                inconsistent_right_length = true;
+                break;
+            }
+        }
+        if (inconsistent_right_length) {
+            res->append_nulls(1);
+            continue;
+        }
+
         auto left_match_array = columns[1]->get(row).get_array();
         auto right_match_array = columns[3]->get(row).get_array();
-        if (length != left_match_array.size() || length != right_match_array.size()) {
+        if (left_length != left_match_array.size() || right_length != right_match_array.size()) {
             res->append_nulls(1);
             continue;
         }
 
         bool has_null_match_value = false;
-        for (size_t i = 0; i < length; ++i) {
+        for (size_t i = 0; i < left_length; ++i) {
             if (left_match_array[i].is_null()) {
                 has_null_match_value = true;
                 break;
             }
         }
-        for (size_t i = 0; i < length; ++i) {
+        for (size_t i = 0; i < right_length; ++i) {
             if (right_match_array[i].is_null()) {
                 has_null_match_value = true;
                 break;
@@ -293,34 +308,49 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
             res->append_nulls(1);
             continue;
         }
-        const auto length = left_key_fields[0]->get(row).get_array().size();
-        bool inconsistent_length = false;
+
+        const auto left_length = left_key_fields[0]->get(row).get_array().size();
+        bool inconsistent_left_length = false;
         for (auto i = 0; i < n_fields; ++i) {
-            if (left_key_fields[i]->get(row).get_array().size() != length ||
-                right_key_fields[i]->get(row).get_array().size() != length) {
-                inconsistent_length = true;
+            if (left_key_fields[i]->get(row).get_array().size() != left_length) {
+                inconsistent_left_length = true;
                 break;
             }
         }
-        if (inconsistent_length) {
+        if (inconsistent_left_length) {
             res->append_nulls(1);
             continue;
         }
+
+        const auto right_length = right_key_fields[0]->get(row).get_array().size();
+        bool inconsistent_right_length = false;
+        for (auto i = 0; i < n_fields; ++i) {
+            if (right_key_fields[i]->get(row).get_array().size() != right_length) {
+                inconsistent_right_length = true;
+                break;
+            }
+        }
+        if (inconsistent_right_length) {
+            res->append_nulls(1);
+            continue;
+        }
+
+
         auto left_match_array = columns[1]->get(row).get_array();
         auto right_match_array = columns[3]->get(row).get_array();
-        if (length != left_match_array.size() || length != right_match_array.size()) {
+        if (left_length != left_match_array.size() || right_length != right_match_array.size()) {
             res->append_nulls(1);
             continue;
         }
 
         bool has_null_match_value = false;
-        for (size_t i = 0; i < length; ++i) {
+        for (size_t i = 0; i < left_length; ++i) {
             if (left_match_array[i].is_null()) {
                 has_null_match_value = true;
                 break;
             }
         }
-        for (size_t i = 0; i < length; ++i) {
+        for (size_t i = 0; i < right_length; ++i) {
             if (right_match_array[i].is_null()) {
                 has_null_match_value = true;
                 break;

@@ -226,29 +226,32 @@ TEST_F(CelonisTransitsInterleavedTest, null_column_input) {
     }
 }
 
-TEST_F(CelonisTransitsInterleavedTest, inconsistent_keys_length) {
-    {
-        Prepare({TYPE_VARCHAR});
-        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"}};
-        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1"}};
-        AddRow(left_keys_arrays,
-               DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
-               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0)}, false);
-        const auto result = Run().value();
-        ASSERT_EQ(1, result->size());
-        EXPECT_TRUE(result->get(0).is_null());
-    }
+TEST_F(CelonisTransitsInterleavedTest, different_key_length) {
     {
         Prepare({TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"}};
         AddRow(left_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
-               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0)}, false);
+               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0), TimestampValue::create(1970, 1, 7, 0, 0, 0)}, false);
         const auto result = Run().value();
         ASSERT_EQ(1, result->size());
-        EXPECT_TRUE(result->get(0).is_null());
+        Validate(result, 0, {DatumArray{"L1"}}, {DatumArray{"R1"}});
     }
+    {
+        Prepare({TYPE_VARCHAR});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1"}};
+        AddRow(left_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0), TimestampValue::create(1970, 1, 6, 0, 0, 0)}, right_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 7, 0, 0, 0)}, false);
+        const auto result = Run().value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{"L2"}}, {DatumArray{"R1"}});
+    }
+}
+
+TEST_F(CelonisTransitsInterleavedTest, inconsistent_keys_length) {
     {
         Prepare({TYPE_VARCHAR, TYPE_BIGINT});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"},
@@ -257,7 +260,8 @@ TEST_F(CelonisTransitsInterleavedTest, inconsistent_keys_length) {
                                                                                            DatumArray{2L, 3L}};
         AddRow(left_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
-               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0)}, false);
+               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0), TimestampValue::create(1970, 1, 7, 0, 0, 0)},
+               false);
         const auto result = Run().value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(result->get(0).is_null());
@@ -269,8 +273,10 @@ TEST_F(CelonisTransitsInterleavedTest, inconsistent_keys_length) {
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"},
                                                                                            DatumArray{2L}};
         AddRow(left_keys_arrays,
-               DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
-               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0)}, false);
+               DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0), TimestampValue::create(1970, 1, 7, 0, 0, 0)},
+               right_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0), TimestampValue::create(1970, 1, 8, 0, 0, 0)},
+               false);
         const auto result = Run().value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(result->get(0).is_null());

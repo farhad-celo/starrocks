@@ -129,16 +129,28 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
             res->append_nulls(1);
             continue;
         }
-        const auto length = left_key_fields[0]->get(row).get_array().size();
-        bool inconsistent_length = false;
+        const auto left_length = left_key_fields[0]->get(row).get_array().size();
+        bool inconsistent_left_length = false;
         for (auto i = 0; i < n_fields; ++i) {
-            if (left_key_fields[i]->get(row).get_array().size() != length ||
-                right_key_fields[i]->get(row).get_array().size() != length) {
-                inconsistent_length = true;
+            if (left_key_fields[i]->get(row).get_array().size() != left_length) {
+                inconsistent_left_length = true;
                 break;
             }
         }
-        if (inconsistent_length) {
+        if (inconsistent_left_length) {
+            res->append_nulls(1);
+            continue;
+        }
+
+        const auto right_length = right_key_fields[0]->get(row).get_array().size();
+        bool inconsistent_right_length = false;
+        for (auto i = 0; i < n_fields; ++i) {
+            if (right_key_fields[i]->get(row).get_array().size() != right_length) {
+                inconsistent_right_length = true;
+                break;
+            }
+        }
+        if (inconsistent_right_length) {
             res->append_nulls(1);
             continue;
         }
@@ -146,7 +158,7 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
         const auto left_end = left_timestamps_offsets[row + 1];
         const auto right_start = right_timestamps_offsets[row];
         const auto right_end = right_timestamps_offsets[row + 1];
-        if (length != left_end - left_start || length != right_end - right_start) {
+        if (left_length != left_end - left_start || right_length != right_end - right_start) {
             res->append_nulls(1);
             continue;
         }
@@ -180,15 +192,15 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
         std::optional<Node> pre_node = std::nullopt;
         size_t left_i = 0;
         size_t right_i = 0;
-        while (left_i < length || right_i < length) {
+        while (left_i < left_length || right_i < right_length) {
             Node node = {false, 0};
-            if (left_i < length && left_i > 0) {
+            if (left_i < left_length && left_i > 0) {
                 DCHECK(left_timestamps[left_i + left_start] >= left_timestamps[left_i - 1 + left_start]);
             }
-            if (right_i < length && right_i > 0) {
+            if (right_i < right_length && right_i > 0) {
                 DCHECK(right_timestamps[right_i + right_start] >= right_timestamps[right_i - 1 + right_start]);
             }
-            if (left_i < length && right_i < length) {
+            if (left_i < left_length && right_i < right_length) {
                 if (left_timestamps[left_i + left_start] <= right_timestamps[right_i + right_start]) {
                     node.from_left = true;
                     node.index = left_i++;
@@ -196,7 +208,7 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
                     node.from_left = false;
                     node.index = right_i++;
                 }
-            } else if (left_i < length) {
+            } else if (left_i < left_length) {
                 node.from_left = true;
                 node.index = left_i++;
             } else {
