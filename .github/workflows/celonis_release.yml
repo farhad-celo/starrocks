@@ -42,12 +42,14 @@ jobs:
           echo "The build type is ${BUILD_TYPE}"
           echo "The release version is ${RELEASE_VERSION}"
           echo "The artifact image tag is ${IMAGE_TAG}"
-          
+
           # Build without starcache; otherwise it won't compile with brpc 1.8.
           sed -i 's/--enable-shared-data/--without-starcache --with-brpc-keepalive/g' docker/dockerfiles/artifacts/artifact.Dockerfile
 
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${IMAGE_TAG} .
+          DOCKER_BUILDKIT=1 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} \
+            --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} \
+            -f docker/dockerfiles/artifacts/artifact.Dockerfile -t starrocks-artifacts:${IMAGE_TAG} .
 
       - name: Build allin1 image
         run: |

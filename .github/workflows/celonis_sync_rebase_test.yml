@@ -4,6 +4,10 @@ on:
   schedule:
     - cron:  '0 17 * * Thu'
   workflow_dispatch:
+    inputs:
+      branch_to_test:
+        description: "The branch to run all tests."
+        default: ''
 
 # This allows a subsequently queued workflow run to interrupt previous runs
 #concurrency:
@@ -13,6 +17,7 @@ on:
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.2
   BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-c39ac1cf-locale-cpml2.161.2-ubuntu
+  RELEASE_BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-c39ac1cf-locale-cpml2.161.2-ubuntu-brpc1.8
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
@@ -24,25 +29,39 @@ jobs:
   sync-and-rebase-upstream:
     runs-on: [self-hosted, celostar]
     outputs:
-      test_branch: ${{steps.rebase.outputs.test_branch}}
+      test_branch: ${{steps.rebase.outputs.test_branch || inputs.branch_to_test}}
+      test_image_tag: ${{steps.rebase.outputs.test_branch || steps.image_tag_output.outputs.test_image_tag}}
     steps:
-      - name: checkout repository
+      - name: Output image tag
+        if: ${{inputs.branch_to_test != ''}}
+        id: image_tag_output
+        run: |
+          branch=${{inputs.branch_to_test}}
+          echo "The branch to test is: ${branch}"
+          image_tag="${branch//\//_}"
+          echo "The test image tag to build is: ${image_tag}"
+          echo "test_image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        if: ${{inputs.branch_to_test == ''}}
         uses: actions/checkout@v4
         # we need to ref a branch which is not the default one or ${LATEST_UPSTREAM_BRANCH} to make rebase work.
         with:
           ref: branch-3.0-c0d5082c-celo
-      - name: remote add upstream
-        id: remote-add
+      - name: Remote add upstream
+        if: ${{inputs.branch_to_test == ''}}
         run: |
           git remote add upstream https://github.com/starrocks/starrocks.git
         # skip error of remote upstream already exists
         continue-on-error: true
-      - name: fetch upstream and push
+      - name: Fetch upstream and push
+        if: ${{inputs.branch_to_test == ''}}
         run: |
           git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
           git push origin ${LATEST_UPSTREAM_BRANCH}
-      - name: rebase
+      - name: Rebase
         id: rebase
+        if: ${{inputs.branch_to_test == ''}}
         run: |
           echo "start to rebase ..."
 
@@ -77,10 +96,12 @@ jobs:
           git checkout -b $testbranch
           git rebase ${newdefaultbranch}
           git push --set-upstream origin $testbranch
-          echo "test_branch=$testbranch" >> $GITHUB_OUTPUT
+          echo "test_branch=$testbranch" >> "$GITHUB_OUTPUT"
 
   presubmit-test:
     runs-on: [self-hosted, celostar]
+    # No need to run presubmit test on existing branch as the pull request of the branch will trigger it.
+    if: inputs.branch_to_test == ''
     needs: sync-and-rebase-upstream
     env:
       test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
@@ -125,10 +146,11 @@ jobs:
     runs-on: [self-hosted, celostar]
     needs: sync-and-rebase-upstream
     env:
+      test_image_tag: ${{needs.sync-and-rebase-upstream.outputs.test_image_tag}}
       test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
     outputs:
       test_branch: ${{env.test_branch}}
-      artifact_image_tag: ${{env.test_branch}}
+      artifact_image_tag: ${{env.test_image_tag}}
     steps:
       - name: checkout repository
         uses: actions/checkout@v4
@@ -139,8 +161,8 @@ jobs:
         id: build-artifact
         uses: ./.github/actions/build-artifact
         with:
-          dev_env_image: ${BUILDER}
-          image_tag: ${test_branch}
+          dev_env_image: ${RELEASE_BUILDER}
+          image_tag: ${test_image_tag}
           branch: ${test_branch}
 
   build-allin1:
@@ -161,7 +183,7 @@ jobs:
         uses: ./.github/actions/build-allin1
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${artifact_image_tag}
-          image_tag: ${test_branch}
+          image_tag: ${artifact_image_tag}
           branch: ${test_branch}
 
   celostar-presubmit-test:
@@ -282,7 +304,7 @@ jobs:
           owner: celonis
           repo: celostar
           workflow_file: "e2e.yml"
-          payload: '{\"event_type\":\"trigger_e2e_test\",\"client_payload\":{\"cluster\":\"stateless\",\"starrocks_image_tag\":\"${test_image_tag}\",\"dataset\":\"abb_10m\",\"query_option\":\"single_query\"}}'
+          payload: '{\"event_type\":\"trigger_e2e_test\",\"client_payload\":{\"e2e_job_name\":\"${test_image_tag}\",\"cluster\":\"stateless\",\"starrocks_image_tag\":\"${test_image_tag}\",\"dataset\":\"abb_10m\",\"query_option\":\"single_query\"}}'
 
       - name: Summarize the result
         if: always() && steps.run-test.outcome != 'skipped'
@@ -297,9 +319,10 @@ jobs:
     needs: sync-and-rebase-upstream
     env:
       test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
+      test_image_tag: "${{needs.sync-and-rebase-upstream.outputs.test_image_tag}}-asan"
     outputs:
       test_branch: ${{env.test_branch}}
-      test_image_tag: "${{env.test_branch}}-asan"
+      test_image_tag: ${{env.test_image_tag}}
     steps:
       - name: checkout repository
         uses: actions/checkout@v4
@@ -309,8 +332,8 @@ jobs:
       - name: build and push artifact image
         uses: ./.github/actions/build-artifact
         with:
-          dev_env_image: ${BUILDER}
-          image_tag: "${test_branch}-asan"
+          dev_env_image: ${RELEASE_BUILDER}
+          image_tag: ${test_image_tag}
           is_asan_mode: 'yes'
           branch: ${test_branch}
 
