@@ -1209,6 +1209,7 @@ StatusOr<std::string> get_calendar_string(const std::vector<Datum>& array) {
 }
 
 Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope, int num_cols, int calendar_index) {
+    LOG(INFO) << "Calendar prepare function is called.\n";
     // context->is_constant_column(index) must not be used to determine if the argument is Array Literal because as of
     // 2024-02-26 it returns false for Array Literal while get_constant_column(index) returns non nullptr.
     if (scope != FunctionContext::FRAGMENT_LOCAL || context->get_num_args() != num_cols ||
