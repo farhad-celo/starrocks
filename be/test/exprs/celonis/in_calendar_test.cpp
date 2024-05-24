@@ -126,6 +126,21 @@ TEST_F(CelonisInCalendarTest, const_multiple_weekday_calendar) {
     }
 }
 
+TEST_F(CelonisInCalendarTest, const_factory_calendar) {
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(1970, 12, 31, 0, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 8, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 17, 0, 0));
+    for (auto i = 0; i < timestamp_column_->size(); ++i) {
+        calendar_id_column_->append_datum(kNullDatum);
+    }
+    const auto result = RunConstantCalendar({R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
+    ASSERT_EQ(timestamp_column_->size(), result->size());
+    EXPECT_EQ(0L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(0L, result->get(2).get_int64());
+}
+
 TEST_F(CelonisInCalendarTest, const_weekday_calendar) {
     {
         Prepare();

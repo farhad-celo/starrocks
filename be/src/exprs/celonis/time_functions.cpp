@@ -426,9 +426,14 @@ public:
             return std::nullopt;
         }
         const int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
-        auto itr = id_to_time_ranges_.find(calendar_id);
-        if (itr != id_to_time_ranges_.end()) {
-            for (const auto& cur_time_range: itr->second) {
+        auto time_ranges_it = id_to_time_ranges_.find(calendar_id);
+        if (time_ranges_it != id_to_time_ranges_.end()) {
+            auto no_weekly_it = id_to_no_weekly_.find(calendar_id);
+            DCHECK(no_weekly_it != id_to_no_weekly_.end());
+            if (no_weekly_it->second) {
+                return quick_is_timestamp_in(ms, time_ranges_it->second);
+            }
+            for (const auto& cur_time_range: time_ranges_it->second) {
                 if (cur_time_range.is_ms_in(ms)) {
                     return true;
                 }
@@ -897,6 +902,18 @@ private:
             }
         }
         return rv;
+    }
+
+    bool quick_is_timestamp_in(int64_t ms, const std::vector<TimeRange>& time_ranges) const {
+        if (time_ranges.empty()) {
+            return false;
+        }
+        int index = find_most_right_index(ms, time_ranges);
+        // we only need to check (index + 1)-th time_range if it exists
+        if (index + 1 < time_ranges.size()) {
+            return time_ranges.at(index + 1).is_ms_in(ms);
+        }
+        return false;
     }
 
     struct Scope {
