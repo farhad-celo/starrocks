@@ -1262,9 +1262,6 @@ StatusOr<ColumnPtr> func(FunctionContext* context, const starrocks::Columns& col
                          StatusOr<ColumnPtr> (* func_const)(FunctionContext*, const starrocks::Columns&,
                                                             const CalendarState*),
                          StatusOr<ColumnPtr> (* func_general)(FunctionContext*, const starrocks::Columns&)) {
-    if (context == nullptr) {
-        return func_general(context, columns);
-    }
     auto* calendar_state = reinterpret_cast<CalendarState*>(context->get_function_state(
             FunctionContext::FRAGMENT_LOCAL));
     if (calendar_state == nullptr) {

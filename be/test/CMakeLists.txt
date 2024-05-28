@@ -185,6 +185,7 @@ set(EXEC_FILES
         ./exprs/celonis/qnorm_test.cpp
         ./exprs/celonis/remap_values_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
+        ./exprs/celonis/remap_timestamps_calendar_test.cpp
         ./exprs/celonis/serialization_utils_test.cpp
         ./exprs/celonis/shortened_variant_test.cpp
         ./exprs/celonis/source_target_test.cpp
