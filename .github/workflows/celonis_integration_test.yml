@@ -1,5 +1,5 @@
 name: Integration Test
-run-name: Integration Test - ${{inputs.branch_to_test || "sync and rebase upstream"}}
+run-name: Integration Test - ${{inputs.branch_to_test || 'sync and rebase upstream'}}
 
 on:
   schedule:
