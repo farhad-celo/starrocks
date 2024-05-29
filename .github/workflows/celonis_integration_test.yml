@@ -1,8 +1,9 @@
-name: Rebase Upstream and Test
+name: Integration Test
+run-name: Integration Test - ${{inputs.branch_to_test || "sync and rebase upstream"}}
 
 on:
   schedule:
-    - cron:  '0 17 * * Thu'
+    - cron:  '0 7 * * 0,2,4' # Around Pacific time of midnight of Sunday, Tuesday and Thursday
   workflow_dispatch:
     inputs:
       branch_to_test:
