@@ -322,13 +322,23 @@ public:
         if (is_out_scope(timestamp, calendar_id)) {
             return std::nullopt;
         }
+        int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         const bool is_workdays = (time_unit == "WORKDAYS");
+        auto time_unit_iter = TIME_UNIT_TO_MS.find(time_unit);
+        DCHECK(time_unit_iter != TIME_UNIT_TO_MS.end());
+        const auto add_ms = add_value * time_unit_iter->second;
+        auto time_range_iter = id_to_time_ranges_.find(calendar_id);
+        if (time_range_iter != id_to_time_ranges_.end()) {
+            auto no_weekly_it = id_to_no_weekly_.find(calendar_id);
+            DCHECK(no_weekly_it != id_to_no_weekly_.end());
+            if (!is_workdays && no_weekly_it->second) {
+                return quick_add_ms(ms, add_ms, time_range_iter->second, calendar_id);
+            }
+        }
         const bool left_to_right = add_value >= 0;
-        std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
         std::vector<TimeRange> time_ranges;
-        auto itr = id_to_time_ranges_.find(calendar_id);
-        if (itr != id_to_time_ranges_.end()) {
-            for (const auto& cur_time_range: itr->second) {
+        if (time_range_iter != id_to_time_ranges_.end()) {
+            for (const auto& cur_time_range: time_range_iter->second) {
                 if (is_workdays) {
                     auto time_range_copy = cur_time_range;
                     time_range_copy.begin_ms = floor_to_nearest_multiple(cur_time_range.begin_ms,
@@ -340,7 +350,7 @@ public:
                 }
             }
         }
-        int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
         for (auto& time_range: time_ranges) {
             if (!time_range.is_weekly) {
                 pq.push(time_range);
@@ -362,9 +372,7 @@ public:
                 pq.emplace(a, b, true);
             }
         }
-        auto iter = TIME_UNIT_TO_MS.find(time_unit);
-        DCHECK(iter != TIME_UNIT_TO_MS.end());
-        int64_t ms_left = std::abs(add_value * iter->second);
+        int64_t ms_left = std::abs(add_ms);
         int64_t max_ms = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64_t min_ms = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         // [begin_ms, end_ms)
@@ -914,6 +922,44 @@ private:
             return time_ranges.at(index + 1).is_ms_in(ms);
         }
         return false;
+    }
+
+    std::optional<TimestampValue> quick_add_ms(int64_t ms, int64_t add_ms, const std::vector<TimeRange>& time_ranges,
+                                               const std::optional<std::string>& calendar_id) const {
+        if (time_ranges.empty()) {
+            return std::nullopt;
+        }
+        auto cum_sum_iter = id_to_cum_sum_.find(calendar_id);
+        DCHECK(cum_sum_iter != id_to_cum_sum_.end());
+        const auto& cum_sum = cum_sum_iter->second;
+        if (add_ms >= 0) {
+            ms = std::max(ms, time_ranges.front().begin_ms);
+        } else {
+            ms = std::min(ms, time_ranges.back().end_ms);
+        }
+        const int64_t start = compute_duration(ms, time_ranges, cum_sum);
+        const int64_t target = start + add_ms;
+        if (target < 0 || target >= cum_sum.back()) {
+            return std::nullopt;
+        }
+        // Compute the time (i.e., target_ms) which corresponds to target.
+        // Find the first value in cum_sum which is greater than target.
+        auto it = std::upper_bound(cum_sum.begin(), cum_sum.end(), target);
+        // target is at index-th time_range
+        auto index = std::distance(cum_sum.begin(), it) - 1;
+        DCHECK(index >= 0 && index < time_ranges.size());
+        const auto begin_ms = time_ranges.at(index).begin_ms;
+        const auto target_ms = begin_ms + target - cum_sum.at(index);
+        const int64_t max_ms = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        const int64_t min_ms = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        if (target_ms < min_ms || target_ms >= max_ms) {
+            return std::nullopt;
+        }
+        auto res_timestamp = add_timeunits_helper(EPOCH, "MILLISECONDS", target_ms);
+        if (is_out_scope(res_timestamp, calendar_id)) {
+            return std::nullopt;
+        }
+        return res_timestamp;
     }
 
     struct Scope {

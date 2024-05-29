@@ -244,6 +244,25 @@ TEST_F(CelonisAddTimeunitsCalendarTest, add_workdays) {
     }
 }
 
+TEST_F(CelonisAddTimeunitsCalendarTest, add_days) {
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(2018, 1, 3, 0, 0, 0));
+    add_value_column_->append_datum(3650000L);
+    add_value_column_->append_datum(-3650000L);
+    time_unit_column_->append_datum("DAYS");
+    time_unit_column_->append_datum("DAYS");
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+    const auto result = RunConstantCalendar(
+            {R"({"weekday_calendar": {)",
+             R"("tuesday": {"use_day": true, "shift": {"begin": 0, "end": 61200000} }, )",
+             R"(} })"}).value();
+    ASSERT_EQ(timestamp_column_->size(), result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
+}
+
 TEST_F(CelonisAddTimeunitsCalendarTest, add_hours) {
     {
         Prepare();
@@ -646,6 +665,42 @@ TEST_F(CelonisAddTimeunitsCalendarTest, add_millis) {
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(TimestampValue::create(2018, 1, 1, 9, 0, 0), result->get(0).get_timestamp());
         EXPECT_EQ(TimestampValue::create(2018, 1, 1, 9, 0, 0), result->get(1).get_timestamp());
+    }
+    {
+        Prepare();
+        timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        add_value_column_->append_datum(0L);
+        add_value_column_->append_datum(1000L);
+        add_value_column_->append_datum(1000L);
+        add_value_column_->append_datum(-5L);
+        add_value_column_->append_datum(1000L);
+        time_unit_column_->append_datum("MILLISECONDS");
+        time_unit_column_->append_datum("MILLISECONDS");
+        time_unit_column_->append_datum("MILLISECONDS");
+        time_unit_column_->append_datum("MILLISECONDS");
+        time_unit_column_->append_datum("MILLISECONDS");
+        calendar_id_column_->append_datum("DE");
+        calendar_id_column_->append_datum("US");
+        calendar_id_column_->append_datum("DE");
+        calendar_id_column_->append_datum("US");
+        calendar_id_column_->append_datum("JP");
+        const auto result = RunConstantCalendar(
+                {R"({"factory_calendar": {)",
+                 R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "DE"}, )",
+                 R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "JP"}, )",
+                 R"("entries": {"start_date": 2000, "end_date": 3000, "calendar_id": "JP"}, )",
+                 R"("entries": {"start_date": 0, "end_date": 1001, "calendar_id": "US"}, )",
+                 R"( }})"}).value();
+        ASSERT_EQ(timestamp_column_->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(1970, 1, 1, 0, 0, 0), result->get(0).get_timestamp());
+        EXPECT_EQ(TimestampValue::create(1970, 1, 1, 0, 0, 1), result->get(1).get_timestamp());
+        EXPECT_TRUE(result->get(2).is_null());
+        EXPECT_TRUE(result->get(3).is_null());
+        EXPECT_EQ(TimestampValue::create(1970, 1, 1, 0, 0, 2), result->get(4).get_timestamp());
     }
     {
         Prepare();
