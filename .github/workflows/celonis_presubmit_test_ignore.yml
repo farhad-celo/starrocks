@@ -10,6 +10,7 @@ on:
       - '.github/**'
       - 'celonis/tools/**'
       - 'celonis/docker/**'
+      - 'docker/**'
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 

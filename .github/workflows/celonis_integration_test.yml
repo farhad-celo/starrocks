@@ -17,8 +17,8 @@ on:
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.2
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-c39ac1cf-locale-cpml2.161.2-ubuntu
-  RELEASE_BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-c39ac1cf-locale-cpml2.161.2-ubuntu-brpc1.8
+  TEST_BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-33347faf-locale-cpml2.161.2-ubuntu
+  RELEASE_BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-33347faf-locale-cpml2.161.2-ubuntu-brpc1.8
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
@@ -115,33 +115,13 @@ jobs:
       - name: Pull dev env image
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
-          docker pull ${BUILDER}
-      - name: Test new branch
-        id: test-new-branch
-        run: |
-          git checkout ${{env.test_branch}}
-          echo "starting the dev env container"
-          container_id=$(docker run -d -v `pwd`:/celostar-starrocks \
-          -w `pwd` --env GITHUB_TOKEN=${GITHUB_TOKEN} \
-          --env GITHUB_USERNAME=${GITHUB_USERNAME} \
-          ${BUILDER} sleep infinity)
-          echo "container_id=$container_id" >> $GITHUB_ENV
-          echo "starting to run presubmit test"
-          docker exec ${container_id} bash -c "$(cat celonis/docker/presubmit/presubmit_test.sh)"
-      - name: Summarize test
-        if: always() && steps.test-new-branch.outcome != 'skipped'
-        run: |
-          {
-            echo "The test branch is ${{env.test_branch}}"
-          } >> $GITHUB_STEP_SUMMARY
-      - name: clean up
-        if: ${{ always() }}
-        run: |
-          docker kill ${{ env.container_id }} || true
-          docker system prune -f
-          docker volume prune -f
-          docker logout ghcr.io
-        continue-on-error: true
+          docker pull ${TEST_BUILDER}
+
+      - name: Test
+        uses: ./.github/actions/presubmit-test
+        with:
+          builder: ${TEST_BUILDER}
+          branch: ${{env.test_branch}}
 
   build-artifact:
     runs-on: [self-hosted, celostar]

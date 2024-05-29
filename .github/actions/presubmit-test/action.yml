@@ -1,0 +1,45 @@
+name: Presubmit Test
+
+inputs:
+  builder:
+    required: true
+  branch:
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Start the dev env and run test
+      shell: bash
+      run: |
+        if [ -n "${{inputs.branch}}" ]; then
+          echo "Switching to branch ${{inputs.branch}}"
+          git checkout ${{inputs.branch}}
+        fi
+
+        echo "starting the dev env container"
+        container_id=$(docker run -d -v `pwd`:/celostar-starrocks \
+          -w `pwd` --env GITHUB_TOKEN=${GITHUB_TOKEN} \
+          --env GITHUB_USERNAME=${GITHUB_USERNAME} \
+          ${{inputs.builder}} sleep infinity)
+
+        echo "container_id=$container_id" >> $GITHUB_ENV
+
+        echo "starting to run presubmit test"
+        docker exec ${container_id} bash -c "$(cat celonis/tools/presubmit/presubmit_test.sh)"
+
+    - name: Summarize test
+      if: ${{ always() && steps.test-new-branch.outcome != 'skipped' && inputs.branch != '' }}
+      shell: bash
+      run: |
+          echo "The test branch is ${{inputs.branch}}" >> $GITHUB_STEP_SUMMARY
+
+    - name: clean up
+      if: ${{ always() }}
+      shell: bash
+      run: |
+        docker kill ${{ env.container_id }} || true
+        docker system prune -f
+        docker volume prune -f
+        docker logout ghcr.io
+      continue-on-error: true
