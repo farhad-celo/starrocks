@@ -169,6 +169,23 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_weekday_calendar) {
     }
     {
         Prepare();
+        from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+        time_unit_column_->append_datum("WORKDAYS");
+        time_unit_column_->append_datum("DAYS");
+        calendar_id_column_->append_datum(kNullDatum);
+        calendar_id_column_->append_datum(kNullDatum);
+        const auto result = RunConstantCalendar({R"({"factory_calendar": {)",
+                                                 R"("entries": {"start_date": 28800000, "end_date": 61200000 })",
+                                                 R"(} })"}).value();
+        ASSERT_EQ(from_timestamp_column_->size(), result->size());
+        EXPECT_EQ(1.0, result->get(0).get_double());
+        EXPECT_EQ(0.375, result->get(1).get_double());
+    }
+    {
+        Prepare();
         from_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 1, 0, 0));
         from_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 8, 2, 0, 0));
         to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 6, 1, 0, 0));

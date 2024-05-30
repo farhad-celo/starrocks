@@ -267,8 +267,12 @@ public:
         if (calendar_proto.has_intersect_calendar()) {
             handle_intersect_calendar(calendar_proto.intersect_calendar());
         }
+        // sort the time ranges of each calendar_id
+        process_time_ranges();
         set_scope();
         set_cum_sum();
+        set_round_time_ranges();
+        set_round_cum_sum();
         set_no_weekly();
     }
 
@@ -466,15 +470,46 @@ private:
     using IdToTimeRangesMap = std::unordered_map<std::optional<std::string>, std::vector<TimeRange>>;
     using IdToWeekdayMap = std::unordered_map<std::optional<std::string>, std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry>>;
 
-    void set_cum_sum() {
+    void process_time_ranges() {
         for (auto& kv: id_to_time_ranges_) {
             auto& time_ranges = kv.second;
             sort_time_ranges(time_ranges);
+        }
+    }
+
+    void set_cum_sum() {
+        for (const auto& kv: id_to_time_ranges_) {
+            const auto& time_ranges = kv.second;
             std::vector<int64_t> cum_sum = {0};
             for (const auto& time_range: time_ranges) {
                 cum_sum.push_back(cum_sum.back() + time_range.end_ms - time_range.begin_ms);
             }
-            id_to_cum_sum_.insert({kv.first, cum_sum});
+            id_to_cum_sum_.emplace(kv.first, std::move(cum_sum));
+        }
+    }
+
+    void set_round_time_ranges() {
+        for (const auto& kv: id_to_time_ranges_) {
+            std::vector<TimeRange> round_time_ranges;
+            for (const auto& time_range: kv.second) {
+                auto round_time_range = time_range;
+                round_time_range.begin_ms = floor_to_nearest_multiple(round_time_range.begin_ms,
+                                                                      NUM_MILLISECONDS_PER_DAY);
+                round_time_range.end_ms = ceil_to_nearest_multiple(round_time_range.end_ms, NUM_MILLISECONDS_PER_DAY);
+                round_time_ranges.push_back(round_time_range);
+            }
+            id_to_round_time_ranges_.emplace(kv.first, std::move(round_time_ranges));
+        }
+    }
+
+    void set_round_cum_sum() {
+        for (const auto& kv: id_to_round_time_ranges_) {
+            const auto& round_time_ranges = kv.second;
+            std::vector<int64_t> round_cum_sum = {0};
+            for (const auto& round_time_range: round_time_ranges) {
+                round_cum_sum.push_back(round_cum_sum.back() + round_time_range.end_ms - round_time_range.begin_ms);
+            }
+            id_to_round_cum_sum_.emplace(kv.first, std::move(round_cum_sum));
         }
     }
 
@@ -870,7 +905,7 @@ private:
         // need to check next time_range if exists
         if (index + 1 < time_ranges.size()) {
             if (ms > time_ranges[index + 1].begin_ms) {
-               rv += std::min(ms, time_ranges[index + 1].end_ms) - time_ranges[index + 1].begin_ms;
+                rv += std::min(ms, time_ranges[index + 1].end_ms) - time_ranges[index + 1].begin_ms;
             }
         }
         return rv;
@@ -890,22 +925,19 @@ private:
         int64_t rv = 0L;
         auto time_ranges_it = id_to_time_ranges_.find(calendar_id);
         if (time_ranges_it != id_to_time_ranges_.end()) {
+            const auto& time_ranges = round_to_day ? id_to_round_time_ranges_.find(calendar_id)->second
+                                                   : time_ranges_it->second;
             auto no_weekly_it = id_to_no_weekly_.find(calendar_id);
             DCHECK(no_weekly_it != id_to_no_weekly_.end());
-            if (no_weekly_it->second && !round_to_day) {
-                auto cum_sum_it = id_to_cum_sum_.find(calendar_id);
-                DCHECK(cum_sum_it != id_to_cum_sum_.end());
-                return quick_compute_overlap(left_ms, right_ms, time_ranges_it->second, cum_sum_it->second);
-            }
-            for (const auto& cur_time_range: time_ranges_it->second) {
-                if (!round_to_day) {
+            if (no_weekly_it->second) {
+                auto cum_sum_it = round_to_day ? id_to_round_cum_sum_.find(calendar_id) : id_to_cum_sum_.find(
+                        calendar_id);
+                DCHECK((round_to_day && cum_sum_it != id_to_round_cum_sum_.end()) ||
+                       (!round_to_day && cum_sum_it != id_to_cum_sum_.end()));
+                return quick_compute_overlap(left_ms, right_ms, time_ranges, cum_sum_it->second);
+            } else {
+                for (const auto& cur_time_range: time_ranges) {
                     rv += cur_time_range.compute_overlap(left_ms, right_ms);
-                } else {
-                    auto time_range_copy = cur_time_range;
-                    time_range_copy.begin_ms = floor_to_nearest_multiple(cur_time_range.begin_ms,
-                                                                         NUM_MILLISECONDS_PER_DAY);
-                    time_range_copy.end_ms = ceil_to_nearest_multiple(cur_time_range.end_ms, NUM_MILLISECONDS_PER_DAY);
-                    rv += time_range_copy.compute_overlap(left_ms, right_ms);
                 }
             }
         }
@@ -970,6 +1002,8 @@ private:
     IdToTimeRangesMap id_to_time_ranges_;
     // suppose the time_ranges is [(-4, -2), (1, 2), (3, 6), (7, 11)], the cum_sum is [0, 2, 3, 6, 10].
     std::unordered_map<std::optional<std::string>, std::vector<int64_t>> id_to_cum_sum_;
+    IdToTimeRangesMap id_to_round_time_ranges_;
+    std::unordered_map<std::optional<std::string>, std::vector<int64_t>> id_to_round_cum_sum_;
     // no_weekly is set to true if all the time range in time_ranges is not weekly.
     std::unordered_map<std::optional<std::string>, bool> id_to_no_weekly_;
     std::unordered_map<std::optional<std::string>, std::optional<Scope>> id_to_scope_;
@@ -982,7 +1016,7 @@ struct CalendarState {
 };
 
 static bool
-base64_encoded_string_to_calendar(const std::string &calendar_string, celonis::accelerator::Calendar &calendar) {
+base64_encoded_string_to_calendar(const std::string& calendar_string, celonis::accelerator::Calendar& calendar) {
     int cipher_len = calendar_string.length();
     std::unique_ptr<char[]> p;
     p.reset(new char[cipher_len + 3]);
@@ -1417,7 +1451,7 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
                                                       const starrocks::Columns& columns) {
     LOG(INFO) << "Non-const version of remap_timestamps_calendar is called.\n";
     DCHECK_EQ(columns.size(), 4);
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[2]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[2] });
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
@@ -1508,7 +1542,8 @@ timestamp_in_calendar(const TimestampValue& timestamp,
     }
 }
 
-StatusOr<ColumnPtr> get_calendar_entry_start_general([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+StatusOr<ColumnPtr>
+get_calendar_entry_start_general([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
     LOG(INFO) << "Non-const version of get_calendar_entry_start is called.\n";
     DCHECK_EQ(columns.size(), 3);
     size_t n_rows = columns[0]->size();
@@ -1519,8 +1554,9 @@ StatusOr<ColumnPtr> get_calendar_entry_start_general([[maybe_unused]] FunctionCo
     return Status::NotSupported("Non-const calendar is not supported in get_calendar_entry_start.");
 }
 
-StatusOr<ColumnPtr> get_calendar_entry_start_const([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns,
-                                      const CalendarState* calendar_state) {
+StatusOr<ColumnPtr>
+get_calendar_entry_start_const([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns,
+                               const CalendarState* calendar_state) {
     DCHECK_EQ(columns.size(), 3);
     size_t n_rows = columns[0]->size();
     ColumnViewer index_viewer = ColumnViewer<TYPE_INT>(columns[0]);
@@ -1567,7 +1603,7 @@ Status CelonisTimeFunctions::get_calendar_entry_start_close(FunctionContext* con
 StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
     LOG(INFO) << "Non-const version of in_calendar is called.\n";
     DCHECK_EQ(columns.size(), 3);
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
@@ -1820,8 +1856,8 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match([[maybe_unused]] FunctionCo
     return state->function(context, columns);
 }
 
-StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_non_constant_filters([[maybe_unused]] FunctionContext *context,
-                                                                          const starrocks::Columns &columns) {
+StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_non_constant_filters([[maybe_unused]] FunctionContext* context,
+                                                                          const starrocks::Columns& columns) {
     const size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
@@ -1838,8 +1874,8 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_non_constant_filters([[mayb
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
-StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_constant_filters([[maybe_unused]] FunctionContext *context,
-                                                                      const starrocks::Columns &columns) {
+StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_constant_filters([[maybe_unused]] FunctionContext* context,
+                                                                      const starrocks::Columns& columns) {
     const size_t n_rows = columns[0]->size();
     const auto* state = reinterpret_cast<const DateMatchStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
@@ -1860,7 +1896,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_constant_filters([[maybe_un
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
-Status CelonisTimeFunctions::date_match_prepare(FunctionContext *context, FunctionContext::FunctionStateScope scope) {
+Status CelonisTimeFunctions::date_match_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
     }
@@ -1915,7 +1951,7 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
                                                        const starrocks::Columns& columns) {
     LOG(INFO) << "Non-const version of timeunits_between_calendar is called.\n";
     DCHECK_EQ(columns.size(), 5);
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[3]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[3] });
     const size_t n_rows = columns[0]->size();
     ColumnViewer from_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer to_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
@@ -2035,7 +2071,7 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
                                                           const starrocks::Columns& columns) {
     LOG(INFO) << "Non-const version of add_timeunits_calendar is called.\n";
     DCHECK_EQ(columns.size(), 5);
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[3]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[3] });
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer add_value_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
