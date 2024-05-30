@@ -341,33 +341,30 @@ public:
         }
         auto no_weekly_it = id_to_no_weekly_.find(calendar_id);
         DCHECK(no_weekly_it != id_to_no_weekly_.end());
-        if (!is_workdays && no_weekly_it->second) {
-            return quick_add_ms(ms, add_ms, time_range_iter->second, calendar_id);
-        }
-        const bool left_to_right = add_value >= 0;
         const std::vector<TimeRange>& time_ranges = is_workdays ? id_to_round_time_ranges_.find(calendar_id)->second
                                                                 : time_range_iter->second;
+        if (no_weekly_it->second) {
+            return quick_add_ms(timestamp, ms, add_ms, time_ranges, calendar_id, is_workdays);
+        }
+        const bool left_to_right = add_value >= 0;
         std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
         for (const auto& time_range: time_ranges) {
-            if (!time_range.is_weekly) {
-                pq.push(time_range);
-            } else {
-                int64_t a = time_range.begin_ms;
-                int64_t b = time_range.end_ms;
-                // move [a, b) to the left of ms
-                if (left_to_right && a - ms >= NUM_MILLISECONDS_PER_WEEK) {
-                    int64_t nperiods = (a - ms + NUM_MILLISECONDS_PER_WEEK - 1) / NUM_MILLISECONDS_PER_WEEK;
-                    a -= nperiods * NUM_MILLISECONDS_PER_WEEK;
-                    b -= nperiods * NUM_MILLISECONDS_PER_WEEK;
-                }
-                // move [a, b) to the right of ms
-                if (!left_to_right && ms - b >= NUM_MILLISECONDS_PER_WEEK) {
-                    int64_t nperiods = (ms - b + NUM_MILLISECONDS_PER_WEEK - 1) / NUM_MILLISECONDS_PER_WEEK;
-                    a += nperiods * NUM_MILLISECONDS_PER_WEEK;
-                    b += nperiods * NUM_MILLISECONDS_PER_WEEK;
-                }
-                pq.emplace(a, b, true);
+            DCHECK(time_range.is_weekly);
+            int64_t a = time_range.begin_ms;
+            int64_t b = time_range.end_ms;
+            // move [a, b) to the left of ms
+            if (left_to_right && a - ms >= NUM_MILLISECONDS_PER_WEEK) {
+                const int64_t n_periods = (a - ms + NUM_MILLISECONDS_PER_WEEK - 1) / NUM_MILLISECONDS_PER_WEEK;
+                a -= n_periods * NUM_MILLISECONDS_PER_WEEK;
+                b -= n_periods * NUM_MILLISECONDS_PER_WEEK;
             }
+            // move [a, b) to the right of ms
+            if (!left_to_right && ms - b >= NUM_MILLISECONDS_PER_WEEK) {
+                const int64_t n_periods = (ms - b + NUM_MILLISECONDS_PER_WEEK - 1) / NUM_MILLISECONDS_PER_WEEK;
+                a += n_periods * NUM_MILLISECONDS_PER_WEEK;
+                b += n_periods * NUM_MILLISECONDS_PER_WEEK;
+            }
+            pq.emplace(a, b, true);
         }
         int64_t ms_left = std::abs(add_ms);
         // [begin_ms, end_ms)
@@ -395,12 +392,10 @@ public:
                     break;
                 }
             }
-            if (top.is_weekly) {
-                int64_t new_begin_ms = top.begin_ms + period;
-                int64_t new_end_ms = top.end_ms + period;
-                if (!((left_to_right && new_begin_ms >= MAX_MS) || (!left_to_right && new_end_ms < MIN_MS))) {
-                    pq.emplace(new_begin_ms, new_end_ms, true);
-                }
+            int64_t new_begin_ms = top.begin_ms + period;
+            int64_t new_end_ms = top.end_ms + period;
+            if (!((left_to_right && new_begin_ms >= MAX_MS) || (!left_to_right && new_end_ms < MIN_MS))) {
+                pq.emplace(new_begin_ms, new_end_ms, true);
             }
         }
         if (rv.has_value()) {
@@ -408,15 +403,10 @@ public:
             if (is_out_scope(res_timestamp, calendar_id)) {
                 return std::nullopt;
             }
-            if (!is_workdays) {
-                return res_timestamp;
+            // For WORKDAYS, keep the time (hour, minute, second) of the day unchanged.
+            if (is_workdays) {
+                set_time_from(timestamp, res_timestamp);
             }
-            // For WORKDAYS, keep the time of the day unchanged.
-            int new_year, new_month, new_day, new_hour, new_minute, new_second, new_usec;
-            res_timestamp.to_timestamp(&new_year, &new_month, &new_day, &new_hour, &new_minute, &new_second, &new_usec);
-            int old_year, old_month, old_day, old_hour, old_minute, old_second, old_usec;
-            timestamp.to_timestamp(&old_year, &old_month, &old_day, &old_hour, &old_minute, &old_second, &old_usec);
-            res_timestamp.from_timestamp(new_year, new_month, new_day, old_hour, old_minute, old_second, old_usec);
             return res_timestamp;
         }
         return std::nullopt;
@@ -460,6 +450,14 @@ public:
 private:
     using IdToTimeRangesMap = std::unordered_map<std::optional<std::string>, std::vector<TimeRange>>;
     using IdToWeekdayMap = std::unordered_map<std::optional<std::string>, std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry>>;
+
+    void set_time_from(const TimestampValue& ref_timestamp, TimestampValue& timestamp) const {
+        int new_year, new_month, new_day, new_hour, new_minute, new_second, new_usec;
+        timestamp.to_timestamp(&new_year, &new_month, &new_day, &new_hour, &new_minute, &new_second, &new_usec);
+        int old_year, old_month, old_day, old_hour, old_minute, old_second, old_usec;
+        ref_timestamp.to_timestamp(&old_year, &old_month, &old_day, &old_hour, &old_minute, &old_second, &old_usec);
+        timestamp.from_timestamp(new_year, new_month, new_day, old_hour, old_minute, old_second, old_usec);
+    }
 
     void process_time_ranges() {
         for (auto& kv: id_to_time_ranges_) {
@@ -947,13 +945,15 @@ private:
         return false;
     }
 
-    std::optional<TimestampValue> quick_add_ms(int64_t ms, int64_t add_ms, const std::vector<TimeRange>& time_ranges,
-                                               const std::optional<std::string>& calendar_id) const {
+    std::optional<TimestampValue>
+    quick_add_ms(const TimestampValue& timestamp, int64_t ms, int64_t add_ms, const std::vector<TimeRange>& time_ranges,
+                 const std::optional<std::string>& calendar_id, bool is_workdays) const {
         if (time_ranges.empty()) {
             return std::nullopt;
         }
-        auto cum_sum_iter = id_to_cum_sum_.find(calendar_id);
-        DCHECK(cum_sum_iter != id_to_cum_sum_.end());
+        auto cum_sum_iter = is_workdays ? id_to_round_cum_sum_.find(calendar_id) : id_to_cum_sum_.find(calendar_id);
+        DCHECK((is_workdays && cum_sum_iter != id_to_round_cum_sum_.end()) ||
+               (!is_workdays && cum_sum_iter != id_to_cum_sum_.end()));
         const auto& cum_sum = cum_sum_iter->second;
         if (add_ms >= 0) {
             ms = std::max(ms, time_ranges.front().begin_ms);
@@ -979,6 +979,9 @@ private:
         auto res_timestamp = add_timeunits_helper(EPOCH, "MILLISECONDS", target_ms);
         if (is_out_scope(res_timestamp, calendar_id)) {
             return std::nullopt;
+        }
+        if (is_workdays) {
+            set_time_from(timestamp, res_timestamp);
         }
         return res_timestamp;
     }
