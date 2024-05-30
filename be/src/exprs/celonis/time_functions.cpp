@@ -48,6 +48,10 @@ static const TimestampValue MAX_YEAR = TimestampValue::create(10000, 1, 1, 0, 0,
 
 static const TimestampValue MIN_YEAR = TimestampValue::create(1400, 1, 1, 0, 0, 0);
 
+static int64_t MAX_MS = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+
+static int64_t MIN_MS = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+
 static TimestampValue
 add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
     std::vector<int> adds;
@@ -332,30 +336,19 @@ public:
         DCHECK(time_unit_iter != TIME_UNIT_TO_MS.end());
         const auto add_ms = add_value * time_unit_iter->second;
         auto time_range_iter = id_to_time_ranges_.find(calendar_id);
-        if (time_range_iter != id_to_time_ranges_.end()) {
-            auto no_weekly_it = id_to_no_weekly_.find(calendar_id);
-            DCHECK(no_weekly_it != id_to_no_weekly_.end());
-            if (!is_workdays && no_weekly_it->second) {
-                return quick_add_ms(ms, add_ms, time_range_iter->second, calendar_id);
-            }
+        if (time_range_iter == id_to_time_ranges_.end() || time_range_iter->second.empty()) {
+            return (add_ms == 0) ? std::optional<TimestampValue>(timestamp) : std::nullopt;
+        }
+        auto no_weekly_it = id_to_no_weekly_.find(calendar_id);
+        DCHECK(no_weekly_it != id_to_no_weekly_.end());
+        if (!is_workdays && no_weekly_it->second) {
+            return quick_add_ms(ms, add_ms, time_range_iter->second, calendar_id);
         }
         const bool left_to_right = add_value >= 0;
-        std::vector<TimeRange> time_ranges;
-        if (time_range_iter != id_to_time_ranges_.end()) {
-            for (const auto& cur_time_range: time_range_iter->second) {
-                if (is_workdays) {
-                    auto time_range_copy = cur_time_range;
-                    time_range_copy.begin_ms = floor_to_nearest_multiple(cur_time_range.begin_ms,
-                                                                         NUM_MILLISECONDS_PER_DAY);
-                    time_range_copy.end_ms = ceil_to_nearest_multiple(cur_time_range.end_ms, NUM_MILLISECONDS_PER_DAY);
-                    time_ranges.push_back(time_range_copy);
-                } else {
-                    time_ranges.push_back(cur_time_range);
-                }
-            }
-        }
+        const std::vector<TimeRange>& time_ranges = is_workdays ? id_to_round_time_ranges_.find(calendar_id)->second
+                                                                : time_range_iter->second;
         std::priority_queue<TimeRange, std::vector<TimeRange>, CompareTimeRange> pq(CompareTimeRange{left_to_right});
-        for (auto& time_range: time_ranges) {
+        for (const auto& time_range: time_ranges) {
             if (!time_range.is_weekly) {
                 pq.push(time_range);
             } else {
@@ -377,11 +370,9 @@ public:
             }
         }
         int64_t ms_left = std::abs(add_ms);
-        int64_t max_ms = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
-        int64_t min_ms = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         // [begin_ms, end_ms)
-        int64_t begin_ms = left_to_right ? ms : min_ms;
-        int64_t end_ms = left_to_right ? max_ms : ms;
+        int64_t begin_ms = left_to_right ? ms : MIN_MS;
+        int64_t end_ms = left_to_right ? MAX_MS : ms;
         std::optional<int64_t> rv = std::nullopt;
         int64_t period = left_to_right ? NUM_MILLISECONDS_PER_WEEK : -NUM_MILLISECONDS_PER_WEEK;
         while (!pq.empty()) {
@@ -407,7 +398,7 @@ public:
             if (top.is_weekly) {
                 int64_t new_begin_ms = top.begin_ms + period;
                 int64_t new_end_ms = top.end_ms + period;
-                if (!((left_to_right && new_begin_ms >= max_ms) || (!left_to_right && new_end_ms < min_ms))) {
+                if (!((left_to_right && new_begin_ms >= MAX_MS) || (!left_to_right && new_end_ms < MIN_MS))) {
                     pq.emplace(new_begin_ms, new_end_ms, true);
                 }
             }
@@ -982,9 +973,7 @@ private:
         DCHECK(index >= 0 && index < time_ranges.size());
         const auto begin_ms = time_ranges.at(index).begin_ms;
         const auto target_ms = begin_ms + target - cum_sum.at(index);
-        const int64_t max_ms = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
-        const int64_t min_ms = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
-        if (target_ms < min_ms || target_ms >= max_ms) {
+        if (target_ms < MIN_MS || target_ms >= MAX_MS) {
             return std::nullopt;
         }
         auto res_timestamp = add_timeunits_helper(EPOCH, "MILLISECONDS", target_ms);

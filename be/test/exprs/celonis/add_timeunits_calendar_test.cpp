@@ -467,6 +467,19 @@ TEST_F(CelonisAddTimeunitsCalendarTest, add_minutes) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+        add_value_column_->append_datum(0L);
+        time_unit_column_->append_datum("MINUTES");
+        calendar_id_column_->append_datum("JP");
+        const auto result = RunConstantCalendar({R"({"factory_calendar": {)",
+                                                 R"("entries": {"start_date": 1514880000000, "end_date": 1514912400000, "calendar_id": "DE"}, )",
+                                                 R"("entries": {"start_date": 1514901600000, "end_date": 1514934000000, "calendar_id": "US"}, )",
+                                                 R"( }})"}).value();
+        ASSERT_EQ(timestamp_column_->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 0, 0, 0), result->get(0).get_timestamp());
+    }
+    {
+        Prepare();
+        timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
         timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
         add_value_column_->append_datum(61L);
         add_value_column_->append_datum(62L);
@@ -527,6 +540,19 @@ TEST_F(CelonisAddTimeunitsCalendarTest, add_minutes) {
 }
 
 TEST_F(CelonisAddTimeunitsCalendarTest, add_seconds) {
+    {
+        Prepare();
+        timestamp_column_->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+        add_value_column_->append_datum(0L);
+        time_unit_column_->append_datum("SECONDS");
+        calendar_id_column_->append_datum(kNullDatum);
+        const auto result = RunConstantCalendar(
+                {R"({"weekday_calendar": {)",
+                 R"("monday": {"use_day": false, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                 R"(} })"}).value();
+        ASSERT_EQ(timestamp_column_->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 1, 10, 0, 0), result->get(0).get_timestamp());
+    }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
