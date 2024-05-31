@@ -1,4 +1,5 @@
-name: 'celostar-starrocks build dev env image'
+name: Build dev env image
+run-name: Build dev env image ${{inputs.image_tag}}
 
 on:
   workflow_dispatch:
@@ -19,40 +20,41 @@ concurrency:
 
 env:
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+  image_tag: ${{inputs.image_tag}}
 
 jobs:
-  release-ubuntu-image:
+  build-dev-env-image:
     runs-on: [self-hosted, celostar]
     steps:
-      - name: checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: GitHub Docker login
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
 
-      - name: build ubuntu docker image
+      - name: Build dev env image
         run: |
           # Check the current branch.
           branch=`git branch --show-current`
           echo "The current branch is ${branch}"
 
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true -f docker/dockerfiles/dev-env/dev-env.Dockerfile -t ghcr.io/celonis/celostar/starrocks-dev-env:${{ inputs.image_tag }} .
+          docker buildx build --force-rm=true --build-arg prebuild_maven=true \
+            -f docker/dockerfiles/dev-env/dev-env.Dockerfile \
+            -t starrocks-dev-env:${image_tag} .
 
-      - name: push ubuntu docker image to GHCR
-        run: |
-          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
-          until docker push ghcr.io/celonis/celostar/starrocks-dev-env:${{ inputs.image_tag }}
-          do
-            echo "Could not push ghcr.io/celonis/celostar/starrocks-dev-env:${{ inputs.image_tag }} trying again."
-          done
+      - name: Push to GHCR
+        uses: ./.github/actions/push-to-registry
+        with:
+          local_image: starrocks-dev-env:${image_tag}
+          remote_image: ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}
 
-      - name: Clean up and GitHub Docker logout
+      - name: Clean up
         if: ${{ always() }}
         run: |
           docker logout ghcr.io
-          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-dev-env:${{ inputs.image_tag }})
+          docker rmi -f $(docker images -q starrocks-dev-env:${image_tag})
           
           # Delete stopped containers, dangling images, dangling build cache, etc.
           docker system prune -f
