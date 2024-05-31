@@ -7,18 +7,26 @@ inputs:
     required: true
   branch:
     required: false
+  pull_artifact:
+    description: 'Whether to pull artifact image'
+    required: false
+    default: true
+  for_dic:
+    description: 'Whether the allin1 is for DIC purpose'
+    required: false
+    default: false
 
 runs:
   using: composite
   steps:
     - name: Pull artifact image
+      if: ${{inputs.pull_artifact == 'true'}}
       shell: bash
       run: |
         echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
         docker pull ${{inputs.artifact_image}}
 
     - name: Build allin1 image
-      id: build-allin1
       shell: bash
       run: |
         if [ -n "${{inputs.branch}}" ]; then
@@ -28,6 +36,18 @@ runs:
 
         # Need to set the flag to make Celostar compliance test pass.
         echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf
+        
+        if [[ "${{inputs.for_dic}}" == "true" ]]; then
+          echo "Adding more configs for DIC"
+          {
+            echo 'JAVA_OPTS="-Xms8g -Xmx64g"'
+            echo "max_varchar_length = 50000000"
+          } >> docker/dockerfiles/allin1/fe.conf
+          {
+            echo "olap_string_max_length = 50000000"
+            echo "disable_storage_page_cache = true"
+          } >> docker/dockerfiles/allin1/be.conf
+        fi
 
         # Build image and always remove intermediate containers.
         DOCKER_BUILDKIT=1 docker buildx build --force-rm=true \

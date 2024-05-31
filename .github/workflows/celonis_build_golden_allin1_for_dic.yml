@@ -1,0 +1,50 @@
+name: Build golden allin1 for DIC
+run-name: Build golden allin1 ${{inputs.image_tag}}-dic
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "The prefix of image tag, the full tag will have suffix '-dic'"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+env:
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-33347faf-locale-cpml2.161.2-ubuntu-brpc1.8
+  GITHUB_USERNAME: ${{ github.repository }}
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+  image_tag: "${{inputs.image_tag}}-dic"
+
+jobs:
+  build-allin1:
+    runs-on: [self-hosted, celostar]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and push artifact image
+        uses: ./.github/actions/build-artifact
+        with:
+          dev_env_image: ${BUILDER}
+          image_tag: ${image_tag}
+          to_push: false
+
+      - name: GHCR login
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+
+      - name: Build and push allin1 image
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: starrocks-artifacts:${image_tag}
+          image_tag: ${image_tag}
+          pull_artifact: false
+          for_dic: true
