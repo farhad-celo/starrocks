@@ -1,0 +1,497 @@
+#include "cluster_variants.h"
+
+#include <queue>
+
+#include "column/column_helper.h"
+#include "exprs/celonis/agg/util.h"
+#include "runtime/mem_pool.h"
+#include "util/defer_op.h"
+
+namespace starrocks {
+
+namespace {
+
+static const int64_t NULL_VARIANT_LABEL = -2;
+
+// A pair of activities that appear together in a variant.
+struct Edge {
+    size_t hash;
+    int32_t src;
+    int32_t dst;
+
+    Edge(int32_t in_src, int32_t in_dst) : src(in_src), dst(in_dst) {
+        boost::hash<std::tuple<int32_t, int32_t>> hasher;
+        hash = hasher({src, dst});
+    }
+
+    bool operator<(const Edge& other) const {
+        if (src != other.src) {
+            return src < other.src;
+        }
+        return dst < other.dst;
+    }
+
+    bool operator==(const Edge& other) const {
+        return src == other.src && dst == other.dst;
+    }
+
+    std::string debug_string() const {
+        return "(" + std::to_string(src) + "," + std::to_string(dst) + ")";
+    }
+};
+
+struct EqualOnEdge {
+    bool operator()(const Edge& x, const Edge& y) const { return x.src == y.src && x.dst == y.dst; }
+};
+
+struct HashOnEdge {
+    std::size_t operator()(const Edge& x) const { return x.hash; }
+};
+
+// One edge sets can correspond to multiple variants
+struct EdgeSet {
+    size_t hash{0};
+    bool is_empty_variant = false;
+    std::vector<Edge> edges;
+
+    EdgeSet(const Variant& variant) {
+        phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> edge_set;
+        if (variant.data.empty()) {
+            is_empty_variant = true;
+        }
+        int32_t pre_node = -1;
+        for (auto node: variant.data) {
+            edge_set.insert({pre_node, node});
+            pre_node = node;
+        }
+        edge_set.insert({pre_node, -1});
+        edges.reserve(edge_set.size());
+        std::copy(edge_set.begin(), edge_set.end(), std::back_inserter(edges));
+        std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
+            if (a.src != b.src) {
+                return a.src < b.src;
+            } else {
+                return a.dst < b.dst;
+            }
+        });
+        for (const auto& edge: edges) {
+            boost::hash_combine(hash, edge.hash);
+        }
+    }
+
+    size_t size() const {
+        return edges.size();
+    }
+
+    std::string debug_string() const {
+        std::stringstream ss;
+        ss << "edges (" << edges.size() << ") [";
+        std::string sep = "";
+        for (int i = 0; i < edges.size(); i++) {
+            ss << sep << "(" << edges[i].src << "," << edges[i].dst << ")";
+            sep = ",";
+        }
+        ss << "] hash " << hash;
+        return ss.str();
+    }
+};
+
+struct EqualOnEdgeSet {
+    bool operator()(const EdgeSet& x, const EdgeSet& y) const {
+        if (x.hash != y.hash) {
+            return false;
+        }
+        if (x.edges.size() != y.edges.size()) {
+            return false;
+        }
+        const auto size = x.edges.size();
+        for (auto i = 0; i < size; ++i) {
+            if (x.edges[i].src != y.edges[i].src || x.edges[i].dst != y.edges[i].dst) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
+struct HashOnEdgeSet {
+    std::size_t operator()(const EdgeSet& x) const { return x.hash; }
+};
+
+struct VariantHashesWithCount {
+    std::vector<int128_t> hashes;
+    int64_t count = 0;
+};
+
+struct Clusterer {
+    int64_t min_pts;
+    int64_t epsilon;
+    phmap::flat_hash_map<Edge, std::vector<size_t>, HashOnEdge, EqualOnEdge> edge_to_indexes;
+
+    Clusterer(int64_t min_pts, int64_t epsilon) : min_pts(min_pts), epsilon(epsilon) {}
+
+    std::vector<int64_t> dbscan(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts) {
+        DCHECK_EQ(points.size(), counts.size());
+        const auto n_points = points.size();
+        std::vector<int64_t> labels(n_points, -1);
+        for (int i = 0; i < n_points; ++i) {
+            if (points[i].is_empty_variant) {
+                labels[i] = NULL_VARIANT_LABEL;
+            }
+        }
+        int64_t cluster_id = 0;
+        build_prefix_index(points);
+        LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: size of edge_to_indexes is " << edge_to_indexes.size() << std::endl;
+        // Traverse the points
+        for (auto index = 0; index < points.size(); ++index) {
+            if (labels[index] != -1) {
+                continue;
+            }
+            auto neighbors = get_neighbors(points, index);
+            auto density = compute_density(counts, neighbors);
+            if (density < min_pts) {
+                labels[index] = -1;
+                continue;
+            }
+            labels[index] = cluster_id;
+            expand_cluster(points, counts, index, neighbors, cluster_id, labels);
+            ++cluster_id;
+        }
+        return labels;
+    }
+
+    void build_prefix_index(const std::vector<EdgeSet>& points) {
+        edge_to_indexes.clear();
+        const auto n_tokens = epsilon + 1;
+        for (auto index = 0; index < points.size(); ++index) {
+            // check the first n_tokens;
+            const auto& point = points[index];
+            for (auto j = 0; j < n_tokens && j < point.size(); ++j) {
+                edge_to_indexes[point.edges[j]].push_back(index);
+            }
+        }
+    }
+
+    int64_t compute_density(const std::vector<int64_t>& counts, const phmap::flat_hash_set<size_t>& neighbors) const {
+        int64_t rv = 0;
+        for (auto index: neighbors) {
+            rv += counts[index];
+        }
+        return rv;
+    }
+
+    // TODO: Change this to in_neighbor to return early?
+    int64_t hamming_distance(const EdgeSet& a, const EdgeSet& b) const {
+        phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> unique_edges(a.edges.begin(), a.edges.end());
+        int64_t length = 0;
+        for (const auto& edge: b.edges) {
+            if (unique_edges.contains(edge)) {
+                unique_edges.erase(edge);
+            } else {
+                ++length;
+            }
+        }
+        length += unique_edges.size();
+        return length;
+    }
+
+    // Finds the first index such that points[index].edges.size() <= max_length.
+    int find_index(const std::vector<EdgeSet>& points, size_t max_length) const {
+        if (points.empty()) {
+            return -1;
+        }
+        if (points.back().edges.size() > max_length) {
+            return -1;
+        }
+        size_t lo = 0;
+        size_t hi = points.size() - 1;
+        while (lo < hi) {
+            size_t mid = lo + (hi - lo) / 2;
+            if (points[mid].edges.size() <= max_length) {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        return lo;
+    }
+
+    // Finds the first index such that points[indexes[index]].edges.size() <= max_length.
+    int find_index(const std::vector<EdgeSet>& points, const std::vector<size_t>& indexes, size_t max_length) const {
+        if (indexes.empty()) {
+            return -1;
+        }
+        if (points[indexes.back()].edges.size() > max_length) {
+            return -1;
+        }
+        size_t lo = 0;
+        size_t hi = indexes.size() - 1;
+        while (lo < hi) {
+            size_t mid = lo + (hi - lo) / 2;
+            if (points[indexes[mid]].edges.size() <= max_length) {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        return lo;
+    }
+
+    phmap::flat_hash_set<size_t> get_neighbors(const std::vector<EdgeSet>& points, size_t index) const {
+        const auto& point = points[index];
+        const auto length = point.size();
+        const auto max_length = length + epsilon;
+        const auto min_length = length >= epsilon ? (length - epsilon) : 0;
+        phmap::flat_hash_set<size_t> rv = {index};
+        if (epsilon >= length) {
+            size_t start_index = find_index(points, max_length);
+            if (start_index != -1) {
+                for (auto i = start_index; i < points.size(); ++i) {
+                    if (i == index) {
+                        continue;
+                    }
+                    const auto& other = points[i];
+                    if (other.size() < min_length) {
+                        break;
+                    }
+                    if (hamming_distance(point, other) <= epsilon) {
+                        rv.insert(i);
+                    }
+                }
+            }
+        } else {
+            phmap::flat_hash_set<size_t> checked;
+            for (auto i = 0; i < epsilon + 1 && i < point.size(); ++i) {
+                const Edge& edge = point.edges[i];
+                auto it = edge_to_indexes.find(edge);
+                DCHECK(it != edge_to_indexes.end());
+                const auto& indexes = it->second;
+                size_t start_index = find_index(points, indexes, max_length);
+                if (start_index != -1) {
+                    for (auto j = start_index; j < indexes.size(); ++j) {
+                        const auto k = indexes[j];
+                        if (index == k || checked.contains(k)) {
+                            continue;
+                        }
+                        checked.insert(k);
+                        const auto& other = points[k];
+                        if (other.size() < min_length) {
+                            break;
+                        }
+                        if (hamming_distance(point, other) <= epsilon) {
+                            rv.insert(k);
+                        }
+                    }
+                }
+            }
+        }
+        return rv;
+    }
+
+    void expand_cluster(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts, size_t index,
+                        const phmap::flat_hash_set<size_t>& neighbors, int64_t cluster_id,
+                        std::vector<int64_t>& labels) const {
+        std::deque<size_t> unvisited(neighbors.begin(), neighbors.end());
+        while (!unvisited.empty()) {
+            size_t neighbor_index = unvisited.front();
+            unvisited.pop_front();
+            if (labels[neighbor_index] == -1) {
+                labels[neighbor_index] = cluster_id;
+            } else {
+                continue;
+            }
+            const auto cur_neighbors = get_neighbors(points, neighbor_index);
+            if (compute_density(counts, cur_neighbors) >= min_pts) {
+                for (auto cur_neighbor: cur_neighbors) {
+                    unvisited.push_back(cur_neighbor);
+                }
+            }
+        }
+    }
+
+};
+
+} // namespace
+
+
+std::pair<int32_t, size_t> ClusterVariantsState::maybe_add_activity(MemPool* mem_pool, const Slice& slice,
+                                                                    size_t* memory) {
+    int32_t index = 0;
+    SliceWithHash key(slice);
+    size_t hash = key.hash;
+
+    DCHECK(mem_pool != nullptr);
+    auto it = activity_map_.find(key, key.hash);
+    if (it == activity_map_.end()) {
+        // New activity - allocate memory
+        char* pos = (char*) mem_pool->allocate(key.size);
+        DCHECK(pos != nullptr);
+        memcpy(pos, key.data, key.size);
+        *memory += phmap::item_serialize_size<SliceHashMap>::value;
+        key.data = pos;
+        index = activity_map_.size();
+        activity_map_.insert(std::pair<SliceWithHash, int32_t>(key, activity_map_.size()));
+    } else {
+        key.data = it->first.data;
+        index = it->second;
+    }
+    return std::make_pair(index, hash);
+}
+
+void ClusterVariantsAggregateFunction::update(FunctionContext* ctx, const Column** columns, AggDataPtr state,
+                                              size_t row_num) const {
+    this->data(state).update(ctx, columns, row_num);
+}
+
+void ClusterVariantsAggregateFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,
+                                             size_t row_num) const {
+    // merge internal state with column[row_num]
+    // the column type is binary
+    const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
+    if (input_column->is_null(row_num)) {
+        return;
+    }
+    Slice slice = input_column->get_slice(row_num);
+    size_t mem_usage = 0;
+    mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*) slice.data, slice.size);
+    ctx->add_mem_usage(mem_usage);
+}
+
+void ClusterVariantsAggregateFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
+                                                           Column* to) const {
+    // append our serialized state to column "to"
+    auto* column = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(to));
+    if (to->is_nullable()) {
+        down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
+    }
+    size_t old_size = column->get_bytes().size();
+    size_t new_size = old_size + this->data(state).serialized_size();
+    column->get_bytes().resize(new_size);
+    this->data(state).serialize(column->get_bytes().data() + old_size);
+    column->get_offset().emplace_back(new_size);
+}
+
+void ClusterVariantsAggregateFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
+                                                                   size_t chunk_size,
+                                                                   ColumnPtr* dst) const {
+    // Used for streaming aggregation. Not implemented.
+    throw std::runtime_error("variant aggregate: convert_to_serialize_format not supported");
+}
+
+void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
+                                                          Column* to) const {
+    if (UNLIKELY(!ColumnHelper::get_data_column(to)->is_struct())) {
+        ctx->set_error(std::string("The output column of " + get_name() +
+                                   " finalize_to_column() is not struct, but is " + to->get_name())
+                               .c_str(),
+                       false);
+        return;
+    }
+    auto& state_impl = this->data(state);
+    const auto min_pts = state_impl.min_pts();
+    const auto epsilon = state_impl.epsilon();
+    const auto& variant_map = state_impl.variant_map();
+    const auto& hash_map = state_impl.hash_map();
+    const auto& null_variant_hashes = state_impl.null_variant_hashes();
+    // We need to create a map from EdgeSet to (count, vector of variant hashes), then cluster based on it.
+    phmap::flat_hash_map<EdgeSet, VariantHashesWithCount, HashOnEdgeSet, EqualOnEdgeSet> edges_map;
+    int64_t total_variant_size = 0;
+    size_t max_variant_size = 0;
+    for (const auto& [variant, count]: variant_map) {
+        total_variant_size += variant.data.size();
+        max_variant_size = std::max(max_variant_size, variant.data.size());
+        const auto& variant_hash = variant.hash;
+        const int128_t hash128 = hash_map.find(variant_hash)->second;
+        const EdgeSet edge_set(variant);
+        auto& hashes_with_count = edges_map[edge_set];
+        hashes_with_count.count += count;
+        hashes_with_count.hashes.emplace_back(hash128);
+    }
+    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique variants is " << variant_map.size() << ", average size is "
+              << (variant_map.empty() ? 0 : (total_variant_size / variant_map.size())) << ", maximum size is "
+              << max_variant_size << std::endl;
+    // Compute the frequency of each edge.
+    const auto n_points = edges_map.size();
+    phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge> edge_counter;
+    std::vector<std::pair<EdgeSet, VariantHashesWithCount>> pairs;
+    int64_t total_set_size = 0;
+    size_t max_set_size = 0;
+    for (auto& entry: edges_map) {
+        const EdgeSet& edge_set = entry.first;
+        total_set_size += edge_set.size();
+        max_set_size = std::max(max_set_size, edge_set.size());
+        for (const auto& edge: edge_set.edges) {
+            edge_counter[edge] += 1;
+        }
+        pairs.emplace_back(std::move(entry.first), std::move(entry.second));
+    }
+    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique set representation is " << edges_map.size()
+              << ", average size is " << (edges_map.empty() ? 0 : (total_set_size / edges_map.size()))
+              << ", maximum size is " << max_set_size
+              << std::endl;
+    // Sort the points based on their length (from high to low)
+    std::sort(pairs.begin(), pairs.end(),
+              [](const auto& a, const auto& b) { return a.first.size() > b.first.size(); });
+
+    std::vector<EdgeSet> points;
+    std::vector<int64_t> counts;
+    std::vector<std::vector<int128_t>> hashes_vec;
+    points.reserve(n_points);
+    counts.reserve(n_points);
+    hashes_vec.reserve(n_points);
+    for (auto& entry: pairs) {
+        points.emplace_back(std::move(entry.first));
+        counts.push_back(entry.second.count);
+        hashes_vec.emplace_back(std::move(entry.second.hashes));
+    }
+    // Reorder the edges based on their frequency in each EdgeSet
+    for (auto& point: points) {
+        std::sort(point.edges.begin(), point.edges.end(),
+                  [&edge_counter](const auto& a, const auto& b) { return edge_counter[a] < edge_counter[b]; });
+    }
+    Clusterer clusterer(min_pts, epsilon);
+    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: started clustering\n";
+    std::vector<int64_t> labels = clusterer.dbscan(points, counts);
+    // Write to output column
+    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: writing to column\n";
+    auto& fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
+    if (to->is_nullable()) {
+        down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
+    }
+    if (fields[0]->is_nullable()) {
+        down_cast<NullableColumn*>(fields[0].get())->null_column_data().emplace_back(0);
+    }
+    if (fields[1]->is_nullable()) {
+        down_cast<NullableColumn*>(fields[1].get())->null_column_data().emplace_back(0);
+    }
+    auto hash_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(fields[0].get()));
+    auto label_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(fields[1].get()));
+    uint32_t n_elements = 0;
+    phmap::flat_hash_set<int128_t> null_variant_hashes_seen;
+    for (auto i = 0; i < n_points; ++i) {
+        const auto label = labels[i];
+        for (const int128_t hash128: hashes_vec[i]) {
+            hash_col->elements_column()->append_datum(hash128);
+            label_col->elements_column()->append_datum(label);
+            ++n_elements;
+            if (label == NULL_VARIANT_LABEL) {
+                null_variant_hashes_seen.insert(hash128);
+            }
+        }
+    }
+    for (int128_t hash128: null_variant_hashes) {
+        if (!null_variant_hashes_seen.contains(hash128)) {
+            hash_col->elements_column()->append_datum(hash128);
+            label_col->elements_column()->append_datum(NULL_VARIANT_LABEL);
+            ++n_elements;
+        }
+    }
+    auto& label_offsets = label_col->offsets_column()->get_data();
+    auto& hash_offsets = hash_col->offsets_column()->get_data();
+    label_offsets.push_back(label_offsets.back() + n_elements);
+    hash_offsets.push_back(hash_offsets.back() + n_elements);
+}
+
+std::string ClusterVariantsAggregateFunction::get_name() const { return "celonis_cluster_variants"; }
+
+} // namespace starrocks

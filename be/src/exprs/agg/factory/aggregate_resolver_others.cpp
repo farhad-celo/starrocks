@@ -101,6 +101,7 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_DOUBLE>());
 
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
+    add_array_mapping_celonis<TYPE_ARRAY, TYPE_STRUCT>("celonis_cluster_variants");
 
     auto add_product_aggregate_mapping{[this]<LogicalType LT>() {
         add_aggregate_mapping_notnull<LT, ProductResultLT<LT>>("celonis_product", false,

@@ -238,12 +238,17 @@ public:
             } else if (name == "celonis_variant_stats") {
                 auto variant_stats = AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
                 return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantStatsState>(variant_stats);
+            } else if (name == "celonis_cluster_variants") {
+                // cluster_variants accepts NULL variant
+                return AggregateFactory::MakeCelonisClusterVariantsAggregateFunction();
             }
         } else {
             if (name == "celonis_inductive_miner") {
                 return AggregateFactory::MakeCelonisInductiveMinerAggregateFunction();
             } else if (name == "celonis_variant_stats") {
                 return AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
+            } else if (name == "celonis_cluster_variants") {
+                return AggregateFactory::MakeCelonisClusterVariantsAggregateFunction();
             }
         }
         return nullptr;
