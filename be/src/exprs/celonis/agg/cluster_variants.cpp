@@ -392,6 +392,8 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     const auto epsilon = state_impl.epsilon();
     const auto& variant_map = state_impl.variant_map();
     const auto& hash_map = state_impl.hash_map();
+    const auto& activity_map = state_impl.activity_map();
+    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique activities is " << activity_map.size() << std::endl;
     const auto& null_variant_hashes = state_impl.null_variant_hashes();
     // We need to create a map from EdgeSet to (count, vector of variant hashes), then cluster based on it.
     phmap::flat_hash_map<EdgeSet, VariantHashesWithCount, HashOnEdgeSet, EqualOnEdgeSet> edges_map;
