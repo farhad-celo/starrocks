@@ -157,6 +157,7 @@ struct Clusterer {
             expand_cluster(points, counts, index, neighbors, cluster_id, labels);
             ++cluster_id;
         }
+        LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of clusters is " << cluster_id << std::endl;
         return labels;
     }
 
@@ -180,19 +181,19 @@ struct Clusterer {
         return rv;
     }
 
-    // TODO: Change this to in_neighbor to return early?
-    int64_t hamming_distance(const EdgeSet& a, const EdgeSet& b) const {
+    bool is_neighbor(const EdgeSet& a, const EdgeSet& b) const {
         phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> unique_edges(a.edges.begin(), a.edges.end());
-        int64_t length = 0;
+        int64_t distance = 0;
         for (const auto& edge: b.edges) {
             if (unique_edges.contains(edge)) {
                 unique_edges.erase(edge);
             } else {
-                ++length;
+                if (++distance > epsilon) {
+                    return false;
+                }
             }
         }
-        length += unique_edges.size();
-        return length;
+        return (distance + unique_edges.size()) <= epsilon;
     }
 
     // Finds the first index such that points[index].edges.size() <= max_length.
@@ -254,7 +255,7 @@ struct Clusterer {
                     if (other.size() < min_length) {
                         break;
                     }
-                    if (hamming_distance(point, other) <= epsilon) {
+                    if (is_neighbor(point, other)) {
                         rv.insert(i);
                     }
                 }
@@ -264,6 +265,9 @@ struct Clusterer {
             for (auto i = 0; i < epsilon + 1 && i < point.size(); ++i) {
                 const Edge& edge = point.edges[i];
                 auto it = edge_to_indexes.find(edge);
+                if (it == edge_to_indexes.end()) {
+                    continue;
+                }
                 DCHECK(it != edge_to_indexes.end());
                 const auto& indexes = it->second;
                 size_t start_index = find_index(points, indexes, max_length);
@@ -278,7 +282,7 @@ struct Clusterer {
                         if (other.size() < min_length) {
                             break;
                         }
-                        if (hamming_distance(point, other) <= epsilon) {
+                        if (is_neighbor(point, other)) {
                             rv.insert(k);
                         }
                     }
