@@ -1,6 +1,5 @@
 #include "cluster_variants.h"
 
-#include <ctime>
 #include <queue>
 
 #include "column/column_helper.h"
@@ -133,7 +132,6 @@ struct Clusterer {
     std::vector<int64_t> prefix_bitmasks;
     // true means the prefix_bitmask is the exact bitmask
     std::vector<bool> is_bitmask_exacts;
-    double in_neighbor_time;
     int64_t n_in_neighbor_checks;
     int64_t n_shortcut_checks;
 
@@ -173,7 +171,6 @@ struct Clusterer {
                                 const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique edges is " << edge_counter.size() << std::endl;
         DCHECK_EQ(points.size(), counts.size());
-        in_neighbor_time = 0.0;
         n_in_neighbor_checks = 0;
         n_shortcut_checks = 0;
         build_prefix_index(points);
@@ -204,7 +201,6 @@ struct Clusterer {
             ++cluster_id;
         }
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of clusters is " << cluster_id << std::endl;
-        LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: in_neighbor_time (s) = " << in_neighbor_time << std::endl;
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: n_in_neighbor_checks = " << n_in_neighbor_checks << std::endl;
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: n_shortcut_checks = " << n_shortcut_checks << std::endl;
         return labels;
@@ -238,7 +234,6 @@ struct Clusterer {
             return it->second;
         }
         ++n_in_neighbor_checks;
-        clock_t start = clock();
         // check prefix bitmask first
         int64_t xor_result = prefix_bitmasks[i] ^ prefix_bitmasks[j];
         const auto prefix_distance = __builtin_popcountll(xor_result);
@@ -246,8 +241,6 @@ struct Clusterer {
             ++n_shortcut_checks;
             bool result = prefix_distance <= epsilon;
             cache.insert({key, result});
-            clock_t end = clock();
-            in_neighbor_time += double(end - start) / CLOCKS_PER_SEC;
             return result;
         }
         const auto& a = points[i];
@@ -267,8 +260,6 @@ struct Clusterer {
         }
         result = (distance + unique_edges.size()) <= epsilon;
         cache.insert({key, result});
-        clock_t end = clock();
-        in_neighbor_time += double(end - start) / CLOCKS_PER_SEC;
         return result;
     }
 
@@ -345,7 +336,6 @@ struct Clusterer {
                 if (it == edge_to_indexes.end()) {
                     continue;
                 }
-                DCHECK(it != edge_to_indexes.end());
                 const auto& indexes = it->second;
                 size_t start_index = find_index(points, indexes, max_length);
                 if (start_index != -1) {
