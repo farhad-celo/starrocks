@@ -130,7 +130,8 @@ struct Clusterer {
     int64_t epsilon;
     phmap::flat_hash_map<Edge, std::vector<size_t>, HashOnEdge, EqualOnEdge> edge_to_indexes;
     std::vector<int64_t> prefix_bitmasks;
-    // true means the prefix_bitmask is the exact bitmask
+    std::vector<int64_t> second_prefix_bitmasks;
+    // true means the (prefix_bitmask + second_prefix_bitmask) is the exact bitmask
     std::vector<bool> is_bitmask_exacts;
     int64_t n_in_neighbor_checks;
     int64_t n_shortcut_checks;
@@ -141,9 +142,10 @@ struct Clusterer {
                                const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
         const auto n_points = points.size();
         prefix_bitmasks.resize(n_points, 0);
+        second_prefix_bitmasks.resize(n_points, 0);
         is_bitmask_exacts.resize(n_points, false);
-        // compute the top (most) 64 frequent edges
-        std::vector<std::pair<Edge, int64_t>> temp_edges(std::min(sizeof(int64_t) * CHAR_BIT, edge_counter.size()));
+        // compute the top (most) 2 * 64 frequent edges
+        std::vector<std::pair<Edge, int64_t>> temp_edges(std::min(2 * sizeof(int64_t) * CHAR_BIT, edge_counter.size()));
         std::vector<std::pair<Edge, int64_t>> edge_cnts(edge_counter.begin(), edge_counter.end());
         std::partial_sort_copy(edge_cnts.begin(), edge_cnts.end(), temp_edges.begin(), temp_edges.end(),
                                [](const auto& a, const auto& b) { return a.second > b.second; });
@@ -157,13 +159,21 @@ struct Clusterer {
             const auto& point = points[i];
             phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> cur_edges(point.edges.begin(), point.edges.end());
             int64_t bitmask = 0;
-            for (auto j = 0; j < freq_edges.size(); ++j) {
+            for (auto j = 0; j < std::min(sizeof(int64_t) * CHAR_BIT, freq_edges.size()); ++j) {
                 if (cur_edges.contains(freq_edges[j])) {
                     bitmask |= (one << j);
                 }
             }
             prefix_bitmasks[i] = bitmask;
-            is_bitmask_exacts[i] = (__builtin_popcountll(bitmask) == cur_edges.size());
+            int64_t second_bitmask = 0;
+            for (auto j = 64; j < std::min(2 * sizeof(int64_t) * CHAR_BIT, freq_edges.size()); ++j) {
+                if (cur_edges.contains(freq_edges[j])) {
+                    second_bitmask |= (one << (j - 64));
+                }
+            }
+            second_prefix_bitmasks[i] = second_bitmask;
+            is_bitmask_exacts[i] = ((__builtin_popcountll(bitmask) + __builtin_popcountll(second_bitmask)) ==
+                                    cur_edges.size());
         }
     }
 
@@ -189,15 +199,14 @@ struct Clusterer {
             if (labels[index] != -1) {
                 continue;
             }
-            phmap::flat_hash_map<std::pair<size_t, size_t>, bool> cache;
-            auto neighbors = get_neighbors(points, index, cache);
+            auto neighbors = get_neighbors(points, index);
             auto density = compute_density(counts, neighbors);
             if (density < min_pts) {
                 labels[index] = -1;
                 continue;
             }
             labels[index] = cluster_id;
-            expand_cluster(points, counts, neighbors, cluster_id, labels, cache);
+            expand_cluster(points, counts, neighbors, cluster_id, labels);
             ++cluster_id;
         }
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of clusters is " << cluster_id << std::endl;
@@ -226,41 +235,30 @@ struct Clusterer {
         return rv;
     }
 
-    bool is_neighbor(const std::vector<EdgeSet>& points, size_t i, size_t j,
-                     phmap::flat_hash_map<std::pair<size_t, size_t>, bool>& cache) {
-        std::pair<size_t, size_t> key = {std::min(i, j), std::max(i, j)};
-        auto it = cache.find(key);
-        if (it != cache.end()) {
-            return it->second;
-        }
+    bool is_neighbor(const std::vector<EdgeSet>& points, size_t i, size_t j) {
         ++n_in_neighbor_checks;
         // check prefix bitmask first
         int64_t xor_result = prefix_bitmasks[i] ^ prefix_bitmasks[j];
-        const auto prefix_distance = __builtin_popcountll(xor_result);
+        int64_t second_xor_result = second_prefix_bitmasks[i] ^ second_prefix_bitmasks[j];
+        const auto prefix_distance = __builtin_popcountll(xor_result) + __builtin_popcountll(second_xor_result);
         if ((prefix_distance > epsilon) || (is_bitmask_exacts[i] && is_bitmask_exacts[j])) {
             ++n_shortcut_checks;
-            bool result = prefix_distance <= epsilon;
-            cache.insert({key, result});
-            return result;
+            return prefix_distance <= epsilon;
         }
         const auto& a = points[i];
         const auto& b = points[j];
         phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> unique_edges(a.edges.begin(), a.edges.end());
         int64_t distance = 0;
-        bool result = false;
         for (const auto& edge: b.edges) {
             if (unique_edges.contains(edge)) {
                 unique_edges.erase(edge);
             } else {
                 if (++distance > epsilon) {
-                    result = false;
-                    break;
+                    return false;
                 }
             }
         }
-        result = (distance + unique_edges.size()) <= epsilon;
-        cache.insert({key, result});
-        return result;
+        return (distance + unique_edges.size()) <= epsilon;
     }
 
     // Finds the first index such that points[index].edges.size() <= max_length.
@@ -305,8 +303,7 @@ struct Clusterer {
         return lo;
     }
 
-    phmap::flat_hash_set<size_t> get_neighbors(const std::vector<EdgeSet>& points, size_t index,
-                                               phmap::flat_hash_map<std::pair<size_t, size_t>, bool>& cache) {
+    phmap::flat_hash_set<size_t> get_neighbors(const std::vector<EdgeSet>& points, size_t index) {
         const auto& point = points[index];
         const auto length = point.size();
         const auto max_length = length + epsilon;
@@ -323,7 +320,7 @@ struct Clusterer {
                     if (other.size() < min_length) {
                         break;
                     }
-                    if (is_neighbor(points, index, i, cache)) {
+                    if (is_neighbor(points, index, i)) {
                         rv.insert(i);
                     }
                 }
@@ -349,7 +346,7 @@ struct Clusterer {
                         if (other.size() < min_length) {
                             break;
                         }
-                        if (is_neighbor(points, index, k, cache)) {
+                        if (is_neighbor(points, index, k)) {
                             rv.insert(k);
                         }
                     }
@@ -361,8 +358,7 @@ struct Clusterer {
 
     void expand_cluster(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
                         const phmap::flat_hash_set<size_t>& neighbors, int64_t cluster_id,
-                        std::vector<int64_t>& labels,
-                        phmap::flat_hash_map<std::pair<size_t, size_t>, bool>& cache) {
+                        std::vector<int64_t>& labels) {
         std::deque<size_t> unvisited(neighbors.begin(), neighbors.end());
         while (!unvisited.empty()) {
             size_t neighbor_index = unvisited.front();
@@ -372,7 +368,7 @@ struct Clusterer {
             } else {
                 continue;
             }
-            const auto cur_neighbors = get_neighbors(points, neighbor_index, cache);
+            const auto cur_neighbors = get_neighbors(points, neighbor_index);
             if (compute_density(counts, cur_neighbors) >= min_pts) {
                 for (auto cur_neighbor: cur_neighbors) {
                     unvisited.push_back(cur_neighbor);
