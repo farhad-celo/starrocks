@@ -20,35 +20,60 @@ namespace starrocks {
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,
                                                          const starrocks::Columns& columns) {
-    std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
-
-    column_viewers.reserve(columns.size());
-    for (const auto& column: columns) {
-        column_viewers.emplace_back(column);
-    }
-
+    const size_t row_size = columns[0]->size();
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
-
-    size_t row_size = columns[0]->size();
     std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
-
-    for (const auto& viewer: column_viewers) {
+    bool is_array_input = false;
+    if (columns[0]->is_nullable()) {
+        if (!columns[0]->only_null()) {
+            auto nullable_array = down_cast<const NullableColumn*>(columns[0].get());
+            is_array_input = nullable_array->data_column().get()->is_array();
+        }
+    } else {
+        is_array_input = columns[0]->is_array();
+    }
+    if (is_array_input) {
+        UnnestedArrayData string_data = prepare_array_input(columns[0].get());
+        const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+                *string_data.elements).get_data().data();
+        const auto& offsets = string_data.offsets->get_data().data();
         for (size_t row = 0; row < row_size; ++row) {
-            if (viewer.is_null(row)) {
+            if (columns[0]->is_null(row)) {
                 continue;
             }
-            auto slice = viewer.value(row);
-            uint128_t seed = seeds_vec[row];
-            seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+            const auto start = offsets[row];
+            const auto end = offsets[row + 1];
+            for (auto i = start; i < end; ++i) {
+                if (string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0) {
+                    continue;
+                }
+                Slice slice = strings[i];
+                uint128_t seed = seeds_vec[row];
+                seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+            }
+        }
+    } else {
+        std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
+        column_viewers.reserve(columns.size());
+        for (const auto& column: columns) {
+            column_viewers.emplace_back(column);
+        }
+        for (const auto& viewer: column_viewers) {
+            for (size_t row = 0; row < row_size; ++row) {
+                if (viewer.is_null(row)) {
+                    continue;
+                }
+                auto slice = viewer.value(row);
+                uint128_t seed = seeds_vec[row];
+                seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+            }
         }
     }
-
     ColumnBuilder<TYPE_LARGEINT> builder(row_size);
     std::vector<bool> is_null_vec(row_size, false);
     for (int row = 0; row < row_size; ++row) {
         builder.append(seeds_vec[row], is_null_vec[row]);
     }
-
     return builder.build(ColumnHelper::is_all_const(columns));
 }
 
@@ -769,7 +794,7 @@ StatusOr<ColumnPtr>
 CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext* context,
                                                       const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     UnnestedArrayData pattern_data = prepare_array_input(columns[1].get());
     const auto& patterns = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*pattern_data.elements).get_data().data();
@@ -885,7 +910,7 @@ static int edit_distance(const std::string& str1, const std::string& str2) {
 
 StatusOr<ColumnPtr>
 CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
     DCHECK_EQ(columns.size(), 4);
     size_t n_rows = columns[0]->size();
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
