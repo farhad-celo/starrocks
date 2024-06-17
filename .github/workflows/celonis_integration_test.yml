@@ -7,7 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       branch_to_test:
-        description: "The branch to run all tests."
+        description: "The branch to build images and run tests. If empty, will rebase upstream code and then build images to test"
+        default: ''
+      image_to_build:
+        description: "The image tag to build. Only take effect when above input is not empty. If empty, will construct one from the above input branch name"
         default: ''
 
 # This allows a subsequently queued workflow run to interrupt previous runs
@@ -39,7 +42,19 @@ jobs:
         run: |
           branch=${{inputs.branch_to_test}}
           echo "The branch to test is: ${branch}"
-          image_tag="${branch//\//_}"
+          if [[ -n "${{inputs.image_to_build}}" ]]; then
+            image_tag="${{inputs.image_to_build}}"
+            # Check if the tag contains only valid characters
+            if ! [[ "$image_tag" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+              echo "Invalid image tag: must contain only lowercase and uppercase letters, digits, underscores (_), periods (.), and dashes (-)."
+              exit 1
+            elif [[ "$image_tag" =~ ^[.-] ]]; then
+              echo "Invalid image tag: must not start with a period (.) or a dash (-)."
+              exit 1
+            fi
+          else
+            image_tag="${branch//\//_}"
+          fi
           echo "The test image tag to build is: ${image_tag}"
           echo "test_image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
 
