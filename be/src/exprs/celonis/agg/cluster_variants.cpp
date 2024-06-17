@@ -133,7 +133,7 @@ struct Clusterer {
     std::vector<int64_t> second_prefix_bitmasks;
     // true means the (prefix_bitmask + second_prefix_bitmask) is the exact bitmask
     std::vector<bool> is_bitmask_exacts;
-    int64_t n_in_neighbor_checks;
+    int64_t n_is_neighbor_checks;
     int64_t n_shortcut_checks;
 
     Clusterer(int64_t min_pts, int64_t epsilon) : min_pts(min_pts), epsilon(epsilon) {}
@@ -181,13 +181,14 @@ struct Clusterer {
                                 const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique edges is " << edge_counter.size() << std::endl;
         DCHECK_EQ(points.size(), counts.size());
-        n_in_neighbor_checks = 0;
+        n_is_neighbor_checks = 0;
         n_shortcut_checks = 0;
         build_prefix_index(points);
         build_prefix_bitmasks(points, edge_counter);
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: size of edge_to_indexes is " << edge_to_indexes.size() << std::endl;
         const auto n_points = points.size();
         std::vector<int64_t> labels(n_points, -1);
+        std::vector<bool> is_cores(n_points, false);
         for (int i = 0; i < n_points; ++i) {
             if (points[i].is_empty_variant) {
                 labels[i] = NULL_VARIANT_LABEL;
@@ -199,18 +200,17 @@ struct Clusterer {
             if (labels[index] != -1) {
                 continue;
             }
-            auto neighbors = get_neighbors(points, index);
+            auto neighbors = get_neighbors(points, index, is_cores);
             auto density = compute_density(counts, neighbors);
             if (density < min_pts) {
                 labels[index] = -1;
                 continue;
             }
-            labels[index] = cluster_id;
-            expand_cluster(points, counts, neighbors, cluster_id, labels);
+            expand_cluster(points, counts, index, neighbors, cluster_id, labels, is_cores);
             ++cluster_id;
         }
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of clusters is " << cluster_id << std::endl;
-        LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: n_in_neighbor_checks = " << n_in_neighbor_checks << std::endl;
+        LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: n_is_neighbor_checks = " << n_is_neighbor_checks << std::endl;
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: n_shortcut_checks = " << n_shortcut_checks << std::endl;
         return labels;
     }
@@ -236,7 +236,7 @@ struct Clusterer {
     }
 
     bool is_neighbor(const std::vector<EdgeSet>& points, size_t i, size_t j) {
-        ++n_in_neighbor_checks;
+        ++n_is_neighbor_checks;
         // check prefix bitmask first
         int64_t xor_result = prefix_bitmasks[i] ^ prefix_bitmasks[j];
         int64_t second_xor_result = second_prefix_bitmasks[i] ^ second_prefix_bitmasks[j];
@@ -303,7 +303,8 @@ struct Clusterer {
         return lo;
     }
 
-    phmap::flat_hash_set<size_t> get_neighbors(const std::vector<EdgeSet>& points, size_t index) {
+    phmap::flat_hash_set<size_t>
+    get_neighbors(const std::vector<EdgeSet>& points, size_t index, const std::vector<bool>& is_cores) {
         const auto& point = points[index];
         const auto length = point.size();
         const auto max_length = length + epsilon;
@@ -313,11 +314,11 @@ struct Clusterer {
             size_t start_index = find_index(points, max_length);
             if (start_index != -1) {
                 for (auto i = start_index; i < points.size(); ++i) {
-                    if (i == index) {
+                    // A point labeled as core point in previous iterations can not be neighbor of any points afterward.
+                    if (is_cores[i] || i == index) {
                         continue;
                     }
-                    const auto& other = points[i];
-                    if (other.size() < min_length) {
+                    if (points[i].size() < min_length) {
                         break;
                     }
                     if (is_neighbor(points, index, i)) {
@@ -338,12 +339,11 @@ struct Clusterer {
                 if (start_index != -1) {
                     for (auto j = start_index; j < indexes.size(); ++j) {
                         const auto k = indexes[j];
-                        if (index == k || checked.contains(k)) {
+                        if (is_cores[k] || index == k || checked.contains(k)) {
                             continue;
                         }
                         checked.insert(k);
-                        const auto& other = points[k];
-                        if (other.size() < min_length) {
+                        if (points[k].size() < min_length) {
                             break;
                         }
                         if (is_neighbor(points, index, k)) {
@@ -357,8 +357,10 @@ struct Clusterer {
     }
 
     void expand_cluster(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
-                        const phmap::flat_hash_set<size_t>& neighbors, int64_t cluster_id,
-                        std::vector<int64_t>& labels) {
+                        size_t start_index, const phmap::flat_hash_set<size_t>& neighbors, int64_t cluster_id,
+                        std::vector<int64_t>& labels, std::vector<bool>& is_cores) {
+        std::vector<size_t> core_indexes = {start_index};
+        labels[start_index] = cluster_id;
         std::deque<size_t> unvisited(neighbors.begin(), neighbors.end());
         while (!unvisited.empty()) {
             size_t neighbor_index = unvisited.front();
@@ -368,12 +370,16 @@ struct Clusterer {
             } else {
                 continue;
             }
-            const auto cur_neighbors = get_neighbors(points, neighbor_index);
+            const auto cur_neighbors = get_neighbors(points, neighbor_index, is_cores);
             if (compute_density(counts, cur_neighbors) >= min_pts) {
+                core_indexes.push_back(neighbor_index);
                 for (auto cur_neighbor: cur_neighbors) {
                     unvisited.push_back(cur_neighbor);
                 }
             }
+        }
+        for (auto index: core_indexes) {
+            is_cores[index] = true;
         }
     }
 
