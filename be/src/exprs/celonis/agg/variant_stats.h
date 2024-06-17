@@ -41,11 +41,9 @@ public:
     void serialize(uint8_t* dst) const override {
         memcpy(dst, &edge_count_, sizeof(int64_t));
         dst += sizeof(int64_t);
-        uint8_t dtvs = disable_top_variant_stats_;
-        memcpy(dst, &dtvs, sizeof(uint8_t));
+        memcpy(dst, &disable_top_variant_stats_, sizeof(uint8_t));
         dst += sizeof(uint8_t);
-        uint8_t epe = enable_proto_encoding_;
-        memcpy(dst, &epe, sizeof(uint8_t));
+        memcpy(dst, &enable_proto_encoding_, sizeof(uint8_t));
         dst += sizeof(uint8_t);
         VariantAggregateState::serialize(dst);
     }
@@ -54,14 +52,10 @@ public:
         memcpy(&edge_count_, src, sizeof(int64_t));
         src += sizeof(int64_t);
         len -= sizeof(int64_t);
-        uint8_t dtvs;
-        memcpy(&dtvs, src, sizeof(uint8_t));
-        disable_top_variant_stats_ = dtvs;
+        memcpy(&disable_top_variant_stats_, src, sizeof(uint8_t));
         src += sizeof(uint8_t);
         len -= sizeof(uint8_t);
-        uint8_t epe;
-        memcpy(&epe, src, sizeof(uint8_t));
-        enable_proto_encoding_ = epe;
+        memcpy(&enable_proto_encoding_, src, sizeof(uint8_t));
         src += sizeof(uint8_t);
         len -= sizeof(uint8_t);
         return VariantAggregateState::deserialize_and_merge(mem_pool, src, len);
@@ -176,9 +170,9 @@ private:
 // TODO(hagonzal): Return json column. Now it returns a string column with json.
 // TODO(hagonzal): add option to compute approximate top-k variants, now it returns exact top-k.
 /**
- * @param: [ input_column, weight_column [, edge_count ] ]
- * @paramType columns: [ BIGINT, BIGINT [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
- * @return: json string
+ * @param: [ input_column, weight_column [, edge_count [, disable_top_variant_stats [, enable_proto_encoding ] ] ] ]
+ * @paramType columns: [ ARRAY_VARCHAR, BIGINT [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
+ * @return: json or base64 encoded binary proto string
  * weight_column : Indicates the frequency of the input(variant)
  * edge_count (optional) : Limits the size of the edge table. if edge_count <= 0, edge stats is not populated and output.
  * disable_top_variant_stats (optional) : Disables top variant stats
