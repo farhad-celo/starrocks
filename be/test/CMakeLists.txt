@@ -145,6 +145,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/abc_model_test.cpp
         ./exprs/celonis/agg/aggregate_test.cpp
         ./exprs/celonis/agg/calc_bucket_boundaries_test.cpp
+        ./exprs/celonis/agg/cluster_strings_test.cpp
         ./exprs/celonis/agg/cluster_variants_test.cpp
         ./exprs/celonis/agg/enumerate_node_paths_test.cpp
         ./exprs/celonis/agg/enumerate_transitive_edges_test.cpp

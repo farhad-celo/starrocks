@@ -56,6 +56,7 @@
 #include "exprs/agg/window_funnel.h"
 #include "exprs/celonis/agg/abc_model.h"
 #include "exprs/celonis/agg/calc_bucket_boundaries.h"
+#include "exprs/celonis/agg/cluster_strings.h"
 #include "exprs/celonis/agg/cluster_variants.h"
 #include "exprs/celonis/agg/enumerate_node_paths.h"
 #include "exprs/celonis/agg/factory_calendar.h"
@@ -221,6 +222,8 @@ public:
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisCalcBucketBoundariesAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisClusterStringsAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisClusterVariantsAggregateFunction();
 

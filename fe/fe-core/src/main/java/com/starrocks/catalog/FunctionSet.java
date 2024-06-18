@@ -308,6 +308,7 @@ public class FunctionSet {
     public static final String CELONIS_ENUMERATE_NODE_PATHS = "celonis_enumerate_node_paths";
     public static final String CELONIS_ENUMERATE_TRANSITIVE_EDGES = "celonis_enumerate_transitive_edges";
     public static final String CELONIS_CALC_BUCKET_COUNT_BOUNDARIES = "celonis_calc_bucket_count_boundaries";
+    public static final String CELONIS_CLUSTER_STRINGS = "celonis_cluster_strings";
     public static final String CELONIS_CLUSTER_VARIANTS = "celonis_cluster_variants";
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
@@ -1122,6 +1123,14 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL,
                     Lists.newArrayList(Type.DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.VARBINARY,
                     true, false, true));
+
+        // celonis_cluster_strings
+        ArrayList<StructField> cluster_strings_sf = Lists.newArrayList();
+        cluster_strings_sf.add(new StructField("hash", Type.ARRAY_LARGEINT));
+        cluster_strings_sf.add(new StructField("cluster_representative", Type.ARRAY_VARCHAR));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_CLUSTER_STRINGS,
+                    Lists.newArrayList(Type.VARCHAR, Type.LARGEINT, Type.BIGINT, Type.VARCHAR, Type.BIGINT),
+                    new StructType(cluster_strings_sf), Type.VARCHAR, true, false, true));
 
         // celonis_cluster_variants
         ArrayList<StructField> cluster_variants_sf = Lists.newArrayList();

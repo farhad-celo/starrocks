@@ -116,6 +116,7 @@ if(STARROCKS_JIT_ENABLE)
 endif()
 
 set(CELONIS_FILES
+  celonis/agg/cluster_strings.cpp
   celonis/agg/cluster_variants.cpp
   celonis/agg/enumerate_node_paths.cpp
   celonis/agg/weekday_calendar.cpp
