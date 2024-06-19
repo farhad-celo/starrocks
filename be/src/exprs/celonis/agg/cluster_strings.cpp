@@ -125,14 +125,28 @@ struct StringClusterer {
         }
     }
 
+    int64_t get_string_cost(const String& s) const {
+        int64_t cost = 0;
+        for (auto i = 0; i < s.length(); ++i) {
+            cost += get_cost(char_to_cost, s[i]);
+        }
+        return cost;
+    }
+
     // TODO: Improve the efficiency
     std::vector<std::vector<size_t>>
     build_graph(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
         const auto n = tuples.size();
         std::vector<std::vector<size_t>> graph(n, std::vector<size_t>(0));
+        std::vector<int64_t> costs(n, 0);
+        for (auto i = 0; i < n; ++i) {
+            costs[i] = get_string_cost(std::get<1>(tuples[i]));
+        }
         for (auto i = 0; i < n; ++i) {
             for (auto j = 0; j < i; ++j) {
-                if (weighted_edit_distance(std::get<1>(tuples[i]), std::get<1>(tuples[j]), char_to_cost) <=
+                // edit_distance(s1, s2) <= cost(s1) + cost(s2)
+                if (edit_threshold >= costs[i] + costs[j] ||
+                    weighted_edit_distance(std::get<1>(tuples[i]), std::get<1>(tuples[j]), char_to_cost) <=
                     edit_threshold) {
                     graph[i].push_back(j);
                     graph[j].push_back(i);

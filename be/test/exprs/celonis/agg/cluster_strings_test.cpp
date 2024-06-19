@@ -339,6 +339,22 @@ TEST_F(CelonisClusterStringsTest, different_weight_and_length) {
     Run(strings1, hashes1, strings2, hashes2, 5, "abcXY", 3, expected);
 }
 
+TEST_F(CelonisClusterStringsTest, large_edit_threshold) {
+    std::vector<std::optional<std::string>> strings1 = {"abdefghi", "abXY", "bdefgh"};
+    std::vector<int128_t> hashes1 = {1, 2, 3};
+    std::vector<std::optional<std::string>> strings2 = {"abd", "adef", "Xghijk", "X", "abd"};
+    std::vector<int128_t> hashes2 = {4, 5, 6, 7, 4};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "abd"},
+                                                                             {2, "abd"},
+                                                                             {3, "abd"},
+                                                                             {4, "abd"},
+                                                                             {5, "abd"},
+                                                                             {6, "abd"},
+                                                                             {7, "abd"}};
+
+    Run(strings1, hashes1, strings2, hashes2, 16, "", 0, expected);
+}
+
 TEST_F(CelonisClusterStringsTest, unicode) {
     std::vector<std::optional<std::string>> strings1 = {"\u3082\u3076\u3089", "\u3082\u3077\u3089"};
     std::vector<int128_t> hashes1 = {1, 2};
@@ -380,6 +396,18 @@ TEST_F(CelonisClusterStringsTest, simple_case) {
                                                                              {3, "Pizza"},
                                                                              {4, "Pizza"}};
     Run(strings1, hashes1, strings2, hashes2, 2, "", 0, expected);
+}
+
+TEST_F(CelonisClusterStringsTest, unicode_weighted_tokens) {
+    std::vector<std::optional<std::string>> strings1 = {"\u3082\u3076\u3089", "\u3082\u3077\u3089"};
+    std::vector<int128_t> hashes1 = {1, 2};
+    std::vector<std::optional<std::string>> strings2 = {"\uFFD4\u3076\u3089"};
+    std::vector<int128_t> hashes2 = {3};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "\u3082\u3076\u3089"},
+                                                                             {2, "\u3082\u3076\u3089"},
+                                                                             {3, "\uFFD4\u3076\u3089"}};
+
+    Run(strings1, hashes1, strings2, hashes2, 1, "xyz\uFFD4", 10, expected);
 }
 
 } // namespace starrocks
