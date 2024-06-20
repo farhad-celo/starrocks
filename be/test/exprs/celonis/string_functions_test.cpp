@@ -220,6 +220,81 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128) {
     }
 }
 
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
+        ASSERT_EQ(0, result->size());
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{"hello"});
+        column->append_datum(DatumArray{"starrocks"});
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("70964585907158640341122805077717094742", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{"hello", "world"});
+        column->append_datum(DatumArray{"hello", "starrocks"});
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("-9508340982777299797928774324431085410", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-60119840840360818224922178158465423753", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), false);
+        column->append_datum(DatumArray{"hello", "world"});
+        column->append_datum(DatumArray{"hello", "starrocks"});
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("-9508340982777299797928774324431085410", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-60119840840360818224922178158465423753", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{"hello", kNullDatum, "world"});
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(kNullDatum);
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        Columns columns;
+        auto column1 = ColumnHelper::create_const_null_column(1);
+
+        columns.emplace_back(column1);
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), columns).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto strings = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        strings->append_datum(DatumArray{"Celonis"});
+        strings->append_datum(kNullDatum);
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {strings}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("113354056479506190712662670385450615649", int128_to_string(result->get(0).get_int128()));
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+}
+
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable) {
     {
         Columns columns;

@@ -79,34 +79,66 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::FunctionContext* context,
                                                                   const starrocks::Columns& columns) {
-    std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
-
-    column_viewers.reserve(columns.size());
-    for (const auto& column: columns) {
-        column_viewers.emplace_back(column);
-    }
-
-    const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
-
     size_t row_size = columns[0]->size();
+    const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
     std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
     std::vector<bool> is_null_vec(row_size, false);
 
-    for (const auto& viewer: column_viewers) {
+    bool is_array_input = false;
+    if (columns[0]->is_nullable()) {
+        if (!columns[0]->only_null()) {
+            auto nullable_array = down_cast<const NullableColumn*>(columns[0].get());
+            is_array_input = nullable_array->data_column().get()->is_array();
+        }
+    } else {
+        is_array_input = columns[0]->is_array();
+    }
+
+    if (is_array_input) {
+        UnnestedArrayData string_data = prepare_array_input(columns[0].get());
+        const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+                *string_data.elements).get_data().data();
+        const auto& offsets = string_data.offsets->get_data().data();
         for (size_t row = 0; row < row_size; ++row) {
-            if (is_null_vec[row]) {
-                continue;
-            }
-            if (viewer.is_null(row)) {
+            if (columns[0]->is_null(row)) {
                 is_null_vec[row] = true;
                 continue;
             }
-            auto slice = viewer.value(row);
-            uint128_t seed = seeds_vec[row];
-            seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+            const auto start = offsets[row];
+            const auto end = offsets[row + 1];
+            for (auto i = start; i < end; ++i) {
+                if (string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0) {
+                    is_null_vec[row] = true;
+                    break;
+                }
+                Slice slice = strings[i];
+                uint128_t seed = seeds_vec[row];
+                seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+            }
+        }
+    } else {
+        std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
+
+        column_viewers.reserve(columns.size());
+        for (const auto& column: columns) {
+            column_viewers.emplace_back(column);
+        }
+
+        for (const auto& viewer: column_viewers) {
+            for (size_t row = 0; row < row_size; ++row) {
+                if (is_null_vec[row]) {
+                    continue;
+                }
+                if (viewer.is_null(row)) {
+                    is_null_vec[row] = true;
+                    continue;
+                }
+                auto slice = viewer.value(row);
+                uint128_t seed = seeds_vec[row];
+                seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+            }
         }
     }
-
     ColumnBuilder<TYPE_LARGEINT> builder(row_size);
     for (int row = 0; row < row_size; ++row) {
         builder.append(seeds_vec[row], is_null_vec[row]);
