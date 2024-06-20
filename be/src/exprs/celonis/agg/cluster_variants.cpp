@@ -309,25 +309,18 @@ struct Clusterer {
         const auto length = point.size();
         const auto max_length = length + epsilon;
         const auto min_length = length >= epsilon ? (length - epsilon) : 0;
-        phmap::flat_hash_set<size_t> rv = {index};
+        phmap::flat_hash_set<size_t> candidates = {};
         if (epsilon >= length) {
             size_t start_index = find_index(points, max_length);
             if (start_index != -1) {
-                for (auto i = start_index; i < points.size(); ++i) {
-                    // A point labeled as core point in previous iterations can not be neighbor of any points afterward.
-                    if (is_cores[i] || i == index) {
+                for (auto i = start_index; i < points.size() && points[i].size() >= min_length; ++i) {
+                    if (is_cores[i] || index == i) {
                         continue;
                     }
-                    if (points[i].size() < min_length) {
-                        break;
-                    }
-                    if (is_neighbor(points, index, i)) {
-                        rv.insert(i);
-                    }
+                    candidates.insert(i);
                 }
             }
         } else {
-            phmap::flat_hash_set<size_t> checked;
             for (auto i = 0; i < epsilon + 1 && i < point.size(); ++i) {
                 const Edge& edge = point.edges[i];
                 auto it = edge_to_indexes.find(edge);
@@ -337,20 +330,20 @@ struct Clusterer {
                 const auto& indexes = it->second;
                 size_t start_index = find_index(points, indexes, max_length);
                 if (start_index != -1) {
-                    for (auto j = start_index; j < indexes.size(); ++j) {
+                    for (auto j = start_index; j < indexes.size() && points[indexes[j]].size() >= min_length; ++j) {
                         const auto k = indexes[j];
-                        if (is_cores[k] || index == k || checked.contains(k)) {
+                        if (is_cores[k] || index == k) {
                             continue;
                         }
-                        checked.insert(k);
-                        if (points[k].size() < min_length) {
-                            break;
-                        }
-                        if (is_neighbor(points, index, k)) {
-                            rv.insert(k);
-                        }
+                        candidates.insert(indexes[j]);
                     }
                 }
+            }
+        }
+        phmap::flat_hash_set<size_t> rv = {index};
+        for (auto candidate : candidates) {
+            if (is_neighbor(points, index, candidate)) {
+                rv.insert(candidate);
             }
         }
         return rv;
