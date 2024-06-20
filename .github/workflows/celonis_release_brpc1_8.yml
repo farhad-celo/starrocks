@@ -66,15 +66,11 @@ jobs:
           local_image: starrocks-allin1:${IMAGE_TAG}
           remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${IMAGE_TAG}
 
-      - name: Build FE image
-        run: |
-          # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${IMAGE_TAG} .
-
-      - name: Build BE image
-        run: |
-          # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg ARTIFACTIMAGE=starrocks-artifacts:${IMAGE_TAG} -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${IMAGE_TAG} .
+      - name: Build FE & BE
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: starrocks-artifacts:${IMAGE_TAG}
+          image_tag: ${IMAGE_TAG}
 
       - name: GitHub Docker logout
         if: ${{ always() }}
