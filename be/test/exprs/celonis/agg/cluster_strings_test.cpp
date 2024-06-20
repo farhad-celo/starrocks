@@ -386,7 +386,7 @@ TEST_F(CelonisClusterStringsTest, negative_token_weight) {
     Run(strings1, hashes1, strings2, hashes2, 5, "abcXY", -1, expected);
 }
 
-TEST_F(CelonisClusterStringsTest, simple_case) {
+TEST_F(CelonisClusterStringsTest, simple_case_1) {
     std::vector<std::optional<std::string>> strings1 = {"Pizza", "Pisza", "Pizza"};
     std::vector<int128_t> hashes1 = {1, 2, 1};
     std::vector<std::optional<std::string>> strings2 = {"Pitza", "Bizza"};
@@ -396,6 +396,30 @@ TEST_F(CelonisClusterStringsTest, simple_case) {
                                                                              {3, "Pizza"},
                                                                              {4, "Pizza"}};
     Run(strings1, hashes1, strings2, hashes2, 2, "", 0, expected);
+}
+
+TEST_F(CelonisClusterStringsTest, simple_case_2) {
+    std::vector<std::optional<std::string>> strings1 = {"AA", "AB"};
+    std::vector<int128_t> hashes1 = {1, 2};
+    std::vector<std::optional<std::string>> strings2 = {"CD"};
+    std::vector<int128_t> hashes2 = {3};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "AA"},
+                                                                             {2, "AA"},
+                                                                             {3, "AA"}};
+    Run(strings1, hashes1, strings2, hashes2, 2, "", 0, expected);
+}
+
+TEST_F(CelonisClusterStringsTest, zero_token_weight) {
+    std::vector<std::optional<std::string>> strings1 = {"1AA", "A2A"};
+    std::vector<int128_t> hashes1 = {1, 2};
+    std::vector<std::optional<std::string>> strings2 = {"AA34567", "A789A123"};
+    std::vector<int128_t> hashes2 = {3, 4};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "1AA"},
+                                                                             {2, "1AA"},
+                                                                             {3, "1AA"},
+                                                                             {4, "1AA"}};
+    // since the cost of digits is zero, all the strings belong to the same cluster.
+    Run(strings1, hashes1, strings2, hashes2, 0, "0123456789", 0, expected);
 }
 
 TEST_F(CelonisClusterStringsTest, unicode_weighted_tokens) {

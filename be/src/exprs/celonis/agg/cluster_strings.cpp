@@ -27,30 +27,6 @@ static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
         // invalid utf8 byte: 0b1111'1000~ 0b1111'1111
         4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1};
 
-struct String {
-    std::vector<std::variant<char, std::string>> tokens;
-
-    String(const std::string& s) {
-        int char_size = 0;
-        for (const char* str_p = s.data(), * str_end = str_p + s.size(); str_p < str_end; str_p += char_size) {
-            char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
-            if (char_size == 1) {
-                tokens.push_back(*str_p);
-            } else {
-                tokens.push_back(std::string(str_p, char_size));
-            }
-        }
-    }
-
-    size_t size() const { return tokens.size(); }
-
-    size_t length() const { return tokens.size(); }
-
-    const std::variant<char, std::string>& operator[](size_t index) const {
-        return tokens[index];
-    }
-};
-
 int64_t get_cost(const phmap::flat_hash_map<std::variant<char, std::string>, int64_t>& char_to_cost,
                  const std::variant<char, std::string>& ch) {
     auto it = char_to_cost.find(ch);
@@ -59,6 +35,40 @@ int64_t get_cost(const phmap::flat_hash_map<std::variant<char, std::string>, int
     }
     return it->second;
 }
+
+struct String {
+    std::vector<std::variant<char, std::string>> tokens;
+    // number of chars which have non-zero cost.
+    size_t real_len = 0;
+
+    String(const std::string& s, const phmap::flat_hash_map<std::variant<char, std::string>, int64_t>& char_to_cost) {
+        int char_size = 0;
+        for (const char* str_p = s.data(), * str_end = str_p + s.size(); str_p < str_end; str_p += char_size) {
+            char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
+            if (char_size == 1) {
+                tokens.emplace_back(*str_p);
+            } else {
+                tokens.emplace_back(std::string(str_p, char_size));
+            }
+        }
+        real_len = 0;
+        for (auto i = 0; i < tokens.size(); ++i) {
+            if (get_cost(char_to_cost, tokens[i]) != 0) {
+                ++real_len;
+            }
+        }
+    }
+
+    size_t size() const { return tokens.size(); }
+
+    size_t length() const { return tokens.size(); }
+
+    size_t real_length() const { return real_len; }
+
+    const std::variant<char, std::string>& operator[](size_t index) const {
+        return tokens[index];
+    }
+};
 
 int64_t weighted_edit_distance(const String& s1, const String& s2,
                                const phmap::flat_hash_map<std::variant<char, std::string>, int64_t>& char_to_cost) {
@@ -119,7 +129,7 @@ struct StringClusterer {
 
     StringClusterer(int64_t edit_threshold, const std::string& weighted_tokens, int64_t token_weight) : edit_threshold(
             edit_threshold) {
-        String string_tokens(weighted_tokens);
+        String string_tokens(weighted_tokens, {});
         for (auto i = 0; i < string_tokens.size(); ++i) {
             char_to_cost.insert({string_tokens[i], token_weight});
         }
@@ -142,9 +152,14 @@ struct StringClusterer {
         for (auto i = 0; i < n; ++i) {
             costs[i] = get_string_cost(std::get<1>(tuples[i]));
         }
-        for (auto i = 0; i < n; ++i) {
-            for (auto j = 0; j < i; ++j) {
-                // edit_distance(s1, s2) <= cost(s1) + cost(s2)
+        for (auto i = 1; i < n; ++i) {
+            auto length_i = std::get<1>(tuples[i]).real_length();
+            for (auto j = i - 1; j >= 0; --j) {
+                // edit_distance(s_i, s_j) >= abs(length_i - length_j)
+                if (length_i - std::get<1>(tuples[j]).real_length() > edit_threshold) {
+                    break;
+                }
+                // edit_distance(s_i, s_j) <= cost(s_i) + cost(s_j)
                 if (edit_threshold >= costs[i] + costs[j] ||
                     weighted_edit_distance(std::get<1>(tuples[i]), std::get<1>(tuples[j]), char_to_cost) <=
                     edit_threshold) {
@@ -163,11 +178,14 @@ struct StringClusterer {
         std::vector<std::tuple<int128_t, String, std::string, int64_t>> tuples;
         tuples.reserve(n);
         for (const auto& [hash128, string_with_count]: hash_to_string_with_count) {
-            tuples.emplace_back(hash128, String(string_with_count.first), string_with_count.first,
+            tuples.emplace_back(hash128, String(string_with_count.first, char_to_cost), string_with_count.first,
                                 string_with_count.second);
         }
+        // strings are sorted based on their real length in ascending order.
         std::sort(tuples.begin(), tuples.end(),
-                  [](const auto& a, const auto& b) { return std::get<1>(a).size() < std::get<1>(b).size(); });
+                  [](const auto& a, const auto& b) {
+                      return std::get<1>(a).real_length() < std::get<1>(b).real_length();
+                  });
         // build the graph
         auto graph = build_graph(tuples);
         LOG(INFO) << "CELONIS_CLUSTER_STRINGS: built graph\n";
