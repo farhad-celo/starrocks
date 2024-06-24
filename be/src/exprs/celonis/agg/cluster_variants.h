@@ -13,11 +13,98 @@
 
 namespace starrocks {
 
+static const int32_t DUMMY_NODE = -1;
+
+// One edge sets can correspond to multiple variants
+struct EdgeSet {
+    size_t hash{0};
+    bool is_empty_variant = false;
+    std::vector<Edge> edges;
+
+    EdgeSet() = default;
+
+    EdgeSet(const std::vector<Edge>& input_edges) {
+        edges = input_edges;
+        if (edges.size() == 1) {
+            is_empty_variant = true;
+        }
+        compute_and_set_hash();
+    }
+
+    EdgeSet(const Variant& variant) {
+        phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> edge_set;
+        if (variant.data.empty()) {
+            is_empty_variant = true;
+        }
+        int32_t pre_node = DUMMY_NODE;
+        for (auto node: variant.data) {
+            edge_set.insert({pre_node, node});
+            pre_node = node;
+        }
+        edge_set.insert({pre_node, DUMMY_NODE});
+        edges.reserve(edge_set.size());
+        std::copy(edge_set.begin(), edge_set.end(), std::back_inserter(edges));
+        compute_and_set_hash();
+    }
+
+    size_t size() const {
+        return edges.size();
+    }
+
+    std::string debug_string() const {
+        std::stringstream ss;
+        ss << "edges (" << edges.size() << ") [";
+        std::string sep = "";
+        for (int i = 0; i < edges.size(); i++) {
+            ss << sep << "(" << edges[i].src << "," << edges[i].dst << ")";
+            sep = ",";
+        }
+        ss << "] hash " << hash;
+        return ss.str();
+    }
+
+private:
+    void compute_and_set_hash() {
+        std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
+            if (a.src != b.src) {
+                return a.src < b.src;
+            } else {
+                return a.dst < b.dst;
+            }
+        });
+        for (const auto& edge: edges) {
+            boost::hash_combine(hash, edge.hash);
+        }
+    }
+};
+
+struct EqualOnEdgeSet {
+    bool operator()(const EdgeSet& x, const EdgeSet& y) const {
+        if (x.hash != y.hash) {
+            return false;
+        }
+        if (x.edges.size() != y.edges.size()) {
+            return false;
+        }
+        const auto size = x.edges.size();
+        for (auto i = 0; i < size; ++i) {
+            if (x.edges[i].src != y.edges[i].src || x.edges[i].dst != y.edges[i].dst) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
+struct HashOnEdgeSet {
+    std::size_t operator()(const EdgeSet& x) const { return x.hash; }
+};
+
 class ClusterVariantsState {
 public:
-    ClusterVariantsState() {}
+    ClusterVariantsState() = default;
 
-    ~ClusterVariantsState() {}
+    ~ClusterVariantsState() = default;
 
     size_t update(FunctionContext* ctx, const Column** columns, size_t row_num) {
         // _const_columns in merge is not aligned with _arg_types. So we pass all consts from
@@ -88,10 +175,13 @@ public:
             auto idx_hash = maybe_add_activity(ctx->mem_pool(), b_elements->get_slice(offset), &memory);
             variant.add(idx_hash.first, idx_hash.second);
         }
-        // Add the variant into the variant_map.
-        variant_map_[variant] += 1;
-        hash_map_[variant.hash] = hash128;
-
+        // Add the variant to edge_set_map.
+        auto& edge_count = edge_set_map_[hash128];
+        if (edge_count.second == 0) {
+            EdgeSet edge_set(variant);
+            edge_count.first = edge_set;
+        }
+        ++edge_count.second;
         return memory;
     }
 
@@ -109,14 +199,13 @@ public:
             result += sizeof(uint32_t); // size
             result += it->first.size;   // data
         }
-
-        // variants
-        result += sizeof(uint32_t); // num_variants
-        for (auto it = variant_map_.begin(); it != variant_map_.end(); it++) {
-            result += sizeof(int128_t);                         // 128 bits hash
-            result += sizeof(size_t);                           // count
-            result += sizeof(uint32_t);                         // num_activities
-            result += sizeof(uint32_t) * it->first.data.size(); // activity indices
+        // edge_sets
+        result += sizeof(uint32_t); // num_edge_sets
+        for (auto it = edge_set_map_.begin(); it != edge_set_map_.end(); it++) {
+            result += sizeof(int128_t);                                    // 128 bits hash
+            result += sizeof(uint32_t);                                    // num_edges
+            result += 2 * sizeof(int32_t) * it->second.first.edges.size(); // edges
+            result += sizeof(int64_t);                                     // count
         }
 
         return result;
@@ -160,28 +249,32 @@ public:
             dst += it->first.size;
         }
 
-        // variants
-        uint32_t num_variants = variant_map_.size();
-        memcpy(dst, &num_variants, sizeof(uint32_t));
+        // edge_sets
+        uint32_t num_edge_sets = edge_set_map_.size();
+        memcpy(dst, &num_edge_sets, sizeof(uint32_t));
         dst += sizeof(uint32_t);
-        for (auto it = variant_map_.begin(); it != variant_map_.end(); it++) {
-            size_t count = it->second;
-            int128_t hash128 = hash_map_.find(it->first.hash)->second;
-            uint32_t length = it->first.data.size();
-
+        for (auto it = edge_set_map_.begin(); it != edge_set_map_.end(); it++) {
+            int128_t hash128 = it->first;
             memcpy(dst, &hash128, sizeof(int128_t));
             dst += sizeof(int128_t);
-            memcpy(dst, &count, sizeof(size_t));
-            dst += sizeof(size_t);
-            memcpy(dst, &length, sizeof(uint32_t));
+
+            const auto& edge_set = it->second.first;
+            uint32_t num_edges = edge_set.edges.size();
+            memcpy(dst, &num_edges, sizeof(uint32_t));
             dst += sizeof(uint32_t);
 
-            for (int i = 0; i < it->first.data.size(); i++) {
-                uint32_t idx = it->first.data[i];
-                memcpy(dst, &idx, sizeof(uint32_t));
-                dst += sizeof(uint32_t);
+            for (const auto& edge: edge_set.edges) {
+                memcpy(dst, &edge.src, sizeof(int32_t));
+                dst += sizeof(int32_t);
+                memcpy(dst, &edge.dst, sizeof(int32_t));
+                dst += sizeof(int32_t);
             }
+
+            int64_t count = it->second.second;
+            memcpy(dst, &count, sizeof(int64_t));
+            dst += sizeof(int64_t);
         }
+
     }
 
     size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len) {
@@ -217,43 +310,47 @@ public:
             std::vector<std::pair<int32_t, size_t>> index_vector;
             index_vector.resize(num_activities);
             for (uint32_t i = 0; i < num_activities; i++) {
-                uint32_t len;
+                uint32_t slice_len;
                 uint32_t idx;
                 memcpy(&idx, src, sizeof(uint32_t));
                 src += sizeof(uint32_t);
-                memcpy(&len, src, sizeof(uint32_t));
+                memcpy(&slice_len, src, sizeof(uint32_t));
                 src += sizeof(uint32_t);
-                Slice s(src, len);
-                src += len;
+                Slice s(src, slice_len);
+                src += slice_len;
                 index_vector[idx] = maybe_add_activity(mem_pool, s, &mem);
             }
 
-            // variants
-            uint32_t num_variants;
-            memcpy(&num_variants, src, sizeof(uint32_t));
+            // edge_sets
+            uint32_t num_edge_sets;
+            memcpy(&num_edge_sets, src, sizeof(uint32_t));
             src += sizeof(uint32_t);
-
-            for (int i = 0; i < num_variants; i++) {
-                size_t count;
+            for (int i = 0; i < num_edge_sets; i++) {
                 int128_t hash128;
-                uint32_t num_activities;
+                uint32_t num_edges;
+                int64_t count;
                 memcpy(&hash128, src, sizeof(int128_t));
                 src += sizeof(int128_t);
-                memcpy(&count, src, sizeof(size_t));
-                src += sizeof(size_t);
-                memcpy(&num_activities, src, sizeof(uint32_t));
+                memcpy(&num_edges, src, sizeof(uint32_t));
                 src += sizeof(uint32_t);
-
-                Variant variant(num_activities);
-                for (int j = 0; j < num_activities; j++) {
-                    uint32_t idx;
-                    memcpy(&idx, src, sizeof(uint32_t));
-                    src += sizeof(uint32_t);
-                    auto pair = index_vector[idx];
-                    variant.add(pair.first, pair.second);
+                std::vector<Edge> edges;
+                edges.reserve(num_edges);
+                for (auto j = 0; j < num_edges; ++j) {
+                    int32_t edge_src;
+                    int32_t edge_dst;
+                    memcpy(&edge_src, src, sizeof(int32_t));
+                    src += sizeof(int32_t);
+                    memcpy(&edge_dst, src, sizeof(int32_t));
+                    src += sizeof(int32_t);
+                    edge_src = (edge_src == DUMMY_NODE) ? DUMMY_NODE : index_vector[edge_src].first;
+                    edge_dst = (edge_dst == DUMMY_NODE) ? DUMMY_NODE : index_vector[edge_dst].first;
+                    edges.emplace_back(edge_src, edge_dst);
                 }
-                variant_map_[variant] += count;
-                hash_map_[variant.hash] = hash128;
+                memcpy(&count, src, sizeof(int64_t));
+                src += sizeof(int64_t);
+                auto& edge_set_count = edge_set_map_[hash128];
+                edge_set_count.first = EdgeSet(edges);
+                edge_set_count.second += count;
             }
         }
         return mem;
@@ -265,9 +362,7 @@ public:
 
     const SliceHashMap& activity_map() const { return activity_map_; }
 
-    const VariantHashMap& variant_map() const { return variant_map_; }
-
-    const phmap::flat_hash_map<size_t, int128_t> hash_map() const { return hash_map_; }
+    const phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>>& edge_set_map() const { return edge_set_map_; }
 
     const phmap::flat_hash_set<int128_t> null_variant_hashes() const { return null_variant_hashes_; }
 
@@ -279,9 +374,8 @@ private:
 
     int64_t min_pts_ = 0;
     int64_t epsilon_ = 0;
+    phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>> edge_set_map_; // variant_hash128 -> (edge_set, count)
     SliceHashMap activity_map_;  // activity -> index
-    VariantHashMap variant_map_; // variant -> count
-    phmap::flat_hash_map<size_t, int128_t> hash_map_; // variant hash -> input hash value
     // We need to keep track of hash values of variant = NULL. This is because variant = [] or [NULL, ...] may have
     // the different hash value as variant = NULL.
     phmap::flat_hash_set<int128_t> null_variant_hashes_;

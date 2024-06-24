@@ -4,6 +4,7 @@
 #include "rapidjson/document.h"
 #include "util/phmap/phmap.h"
 #include "util/slice.h"
+#include <boost/functional/hash.hpp>
 
 namespace starrocks {
 
@@ -49,5 +50,31 @@ struct VariantCount {
 };
 
 using Variants = std::vector<VariantCount>;
+
+// A pair of activities that appear together in a variant.
+struct Edge {
+    size_t hash;
+    int32_t src;
+    int32_t dst;
+
+    Edge() : hash(0), src(-1), dst(-1) {}
+
+    Edge(int32_t in_src, int32_t in_dst) : src(in_src), dst(in_dst) {
+        boost::hash<std::tuple<int32_t, int32_t>> hasher;
+        hash = hasher({src, dst});
+    }
+
+    rapidjson::Value to_json(rapidjson::Document::AllocatorType& allocator) const;
+
+    std::string debug_string() const;
+};
+
+struct EqualOnEdge {
+    bool operator()(const Edge& x, const Edge& y) const { return x.src == y.src && x.dst == y.dst; }
+};
+
+struct HashOnEdge {
+    std::size_t operator()(const Edge& x) const { return x.hash; }
+};
 
 } // namespace starrocks

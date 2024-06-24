@@ -13,6 +13,7 @@ namespace starrocks {
 class VariantStatsState : public VariantAggregateState {
 public:
     VariantStatsState() : VariantAggregateState() {}
+
     ~VariantStatsState() {}
 
     size_t update(FunctionContext* ctx, const Column** columns, size_t row_num) override {
@@ -22,10 +23,10 @@ public:
             edge_count_ = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
         }
         if (ctx->is_notnull_constant_column(3)) {
-            disable_top_variant_stats_= ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(3));
+            disable_top_variant_stats_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(3));
         }
         if (ctx->is_notnull_constant_column(4)) {
-            enable_proto_encoding_= ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(4));
+            enable_proto_encoding_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(4));
         }
         return VariantAggregateState::update(ctx, columns, row_num);
     }
@@ -62,37 +63,15 @@ public:
     }
 
     int64_t edge_count() const { return edge_count_; }
+
     bool disable_top_variant_stats() const { return disable_top_variant_stats_; }
+
     bool enable_proto_encoding() const { return enable_proto_encoding_; }
 
 private:
     int64_t edge_count_ = (1LL << 32); // very large number to output all edges.
     bool disable_top_variant_stats_ = false;
     bool enable_proto_encoding_ = false;
-};
-
-// A pair of activities that appear together in a variant.
-struct Edge {
-    size_t hash;
-    int32_t src;
-    int32_t dst;
-
-    Edge(int32_t in_src, int32_t in_dst) : src(in_src), dst(in_dst) {
-        boost::hash<std::tuple<int32_t, int32_t>> hasher;
-        hash = hasher({src, dst});
-    }
-
-    rapidjson::Value to_json(rapidjson::Document::AllocatorType& allocator) const;
-
-    std::string debug_string() const;
-};
-
-struct EqualOnEdge {
-    bool operator()(const Edge& x, const Edge& y) const { return x.src == y.src && x.dst == y.dst; }
-};
-
-struct HashOnEdge {
-    std::size_t operator()(const Edge& x) const { return x.hash; }
 };
 
 // Basic statistics on an Edge.

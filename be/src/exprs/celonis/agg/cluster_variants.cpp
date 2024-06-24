@@ -13,113 +13,6 @@ namespace {
 
 static const int64_t NULL_VARIANT_LABEL = -2;
 
-// A pair of activities that appear together in a variant.
-struct Edge {
-    size_t hash;
-    int32_t src;
-    int32_t dst;
-
-    Edge() : hash(0), src(-1), dst(-1) {}
-
-    Edge(int32_t in_src, int32_t in_dst) : src(in_src), dst(in_dst) {
-        boost::hash<std::tuple<int32_t, int32_t>> hasher;
-        hash = hasher({src, dst});
-    }
-
-    bool operator<(const Edge& other) const {
-        if (src != other.src) {
-            return src < other.src;
-        }
-        return dst < other.dst;
-    }
-
-    bool operator==(const Edge& other) const {
-        return src == other.src && dst == other.dst;
-    }
-
-    std::string debug_string() const {
-        return "(" + std::to_string(src) + "," + std::to_string(dst) + ")";
-    }
-};
-
-struct EqualOnEdge {
-    bool operator()(const Edge& x, const Edge& y) const { return x.src == y.src && x.dst == y.dst; }
-};
-
-struct HashOnEdge {
-    std::size_t operator()(const Edge& x) const { return x.hash; }
-};
-
-// One edge sets can correspond to multiple variants
-struct EdgeSet {
-    size_t hash{0};
-    bool is_empty_variant = false;
-    std::vector<Edge> edges;
-
-    EdgeSet(const Variant& variant) {
-        phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> edge_set;
-        if (variant.data.empty()) {
-            is_empty_variant = true;
-        }
-        int32_t pre_node = -1;
-        for (auto node: variant.data) {
-            edge_set.insert({pre_node, node});
-            pre_node = node;
-        }
-        edge_set.insert({pre_node, -1});
-        edges.reserve(edge_set.size());
-        std::copy(edge_set.begin(), edge_set.end(), std::back_inserter(edges));
-        std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
-            if (a.src != b.src) {
-                return a.src < b.src;
-            } else {
-                return a.dst < b.dst;
-            }
-        });
-        for (const auto& edge: edges) {
-            boost::hash_combine(hash, edge.hash);
-        }
-    }
-
-    size_t size() const {
-        return edges.size();
-    }
-
-    std::string debug_string() const {
-        std::stringstream ss;
-        ss << "edges (" << edges.size() << ") [";
-        std::string sep = "";
-        for (int i = 0; i < edges.size(); i++) {
-            ss << sep << "(" << edges[i].src << "," << edges[i].dst << ")";
-            sep = ",";
-        }
-        ss << "] hash " << hash;
-        return ss.str();
-    }
-};
-
-struct EqualOnEdgeSet {
-    bool operator()(const EdgeSet& x, const EdgeSet& y) const {
-        if (x.hash != y.hash) {
-            return false;
-        }
-        if (x.edges.size() != y.edges.size()) {
-            return false;
-        }
-        const auto size = x.edges.size();
-        for (auto i = 0; i < size; ++i) {
-            if (x.edges[i].src != y.edges[i].src || x.edges[i].dst != y.edges[i].dst) {
-                return false;
-            }
-        }
-        return true;
-    }
-};
-
-struct HashOnEdgeSet {
-    std::size_t operator()(const EdgeSet& x) const { return x.hash; }
-};
-
 struct VariantHashesWithCount {
     std::vector<int128_t> hashes;
     int64_t count = 0;
@@ -341,7 +234,7 @@ struct Clusterer {
             }
         }
         phmap::flat_hash_set<size_t> rv = {index};
-        for (auto candidate : candidates) {
+        for (auto candidate: candidates) {
             if (is_neighbor(points, index, candidate)) {
                 rv.insert(candidate);
             }
@@ -457,28 +350,18 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     auto& state_impl = this->data(state);
     const auto min_pts = state_impl.min_pts();
     const auto epsilon = state_impl.epsilon();
-    const auto& variant_map = state_impl.variant_map();
-    const auto& hash_map = state_impl.hash_map();
     const auto& activity_map = state_impl.activity_map();
+    const auto& edge_set_map = state_impl.edge_set_map();
     LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique activities is " << activity_map.size() << std::endl;
     const auto& null_variant_hashes = state_impl.null_variant_hashes();
     // We need to create a map from EdgeSet to (count, vector of variant hashes), then cluster based on it.
     phmap::flat_hash_map<EdgeSet, VariantHashesWithCount, HashOnEdgeSet, EqualOnEdgeSet> edges_map;
-    int64_t total_variant_size = 0;
-    size_t max_variant_size = 0;
-    for (const auto& [variant, count]: variant_map) {
-        total_variant_size += variant.data.size();
-        max_variant_size = std::max(max_variant_size, variant.data.size());
-        const auto& variant_hash = variant.hash;
-        const int128_t hash128 = hash_map.find(variant_hash)->second;
-        const EdgeSet edge_set(variant);
-        auto& hashes_with_count = edges_map[edge_set];
-        hashes_with_count.count += count;
+    for (const auto& [hash128, edge_set_count]: edge_set_map) {
+        auto& hashes_with_count = edges_map[edge_set_count.first];
+        hashes_with_count.count += edge_set_count.second;
         hashes_with_count.hashes.emplace_back(hash128);
     }
-    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique variants is " << variant_map.size() << ", average size is "
-              << (variant_map.empty() ? 0 : (total_variant_size / variant_map.size())) << ", maximum size is "
-              << max_variant_size << std::endl;
+    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique variants is " << edge_set_map.size() << std::endl;
     // Compute the frequency of each edge.
     const auto n_points = edges_map.size();
     phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge> edge_counter;
