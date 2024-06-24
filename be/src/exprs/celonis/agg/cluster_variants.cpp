@@ -82,6 +82,7 @@ struct Clusterer {
         const auto n_points = points.size();
         std::vector<int64_t> labels(n_points, -1);
         std::vector<bool> is_cores(n_points, false);
+        std::vector<bool> is_isolated(n_points, false);
         for (int i = 0; i < n_points; ++i) {
             if (points[i].is_empty_variant) {
                 labels[i] = NULL_VARIANT_LABEL;
@@ -93,13 +94,16 @@ struct Clusterer {
             if (labels[index] != -1) {
                 continue;
             }
-            auto neighbors = get_neighbors(points, index, is_cores);
+            auto neighbors = get_neighbors(points, index, is_cores, is_isolated);
+            if (neighbors.size() == 1) {
+                is_isolated[index] = true;
+            }
             auto density = compute_density(counts, neighbors);
             if (density < min_pts) {
                 labels[index] = -1;
                 continue;
             }
-            expand_cluster(points, counts, index, neighbors, cluster_id, labels, is_cores);
+            expand_cluster(points, counts, index, neighbors, cluster_id, labels, is_cores, is_isolated);
             ++cluster_id;
         }
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of clusters is " << cluster_id << std::endl;
@@ -197,7 +201,8 @@ struct Clusterer {
     }
 
     phmap::flat_hash_set<size_t>
-    get_neighbors(const std::vector<EdgeSet>& points, size_t index, const std::vector<bool>& is_cores) {
+    get_neighbors(const std::vector<EdgeSet>& points, size_t index, const std::vector<bool>& is_cores,
+                  const std::vector<bool>& is_isolated) {
         const auto& point = points[index];
         const auto length = point.size();
         const auto max_length = length + epsilon;
@@ -207,7 +212,7 @@ struct Clusterer {
             size_t start_index = find_index(points, max_length);
             if (start_index != -1) {
                 for (auto i = start_index; i < points.size() && points[i].size() >= min_length; ++i) {
-                    if (is_cores[i] || index == i) {
+                    if (is_isolated[i] || is_cores[i] || index == i) {
                         continue;
                     }
                     candidates.insert(i);
@@ -225,7 +230,7 @@ struct Clusterer {
                 if (start_index != -1) {
                     for (auto j = start_index; j < indexes.size() && points[indexes[j]].size() >= min_length; ++j) {
                         const auto k = indexes[j];
-                        if (is_cores[k] || index == k) {
+                        if (is_isolated[k] || is_cores[k] || index == k) {
                             continue;
                         }
                         candidates.insert(indexes[j]);
@@ -244,7 +249,7 @@ struct Clusterer {
 
     void expand_cluster(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
                         size_t start_index, const phmap::flat_hash_set<size_t>& neighbors, int64_t cluster_id,
-                        std::vector<int64_t>& labels, std::vector<bool>& is_cores) {
+                        std::vector<int64_t>& labels, std::vector<bool>& is_cores, std::vector<bool>& is_isolated) {
         std::vector<size_t> core_indexes = {start_index};
         labels[start_index] = cluster_id;
         std::deque<size_t> unvisited(neighbors.begin(), neighbors.end());
@@ -256,7 +261,10 @@ struct Clusterer {
             } else {
                 continue;
             }
-            const auto cur_neighbors = get_neighbors(points, neighbor_index, is_cores);
+            const auto cur_neighbors = get_neighbors(points, neighbor_index, is_cores, is_isolated);
+            if (cur_neighbors.size() == 1) {
+                is_isolated[neighbor_index] = true;
+            }
             if (compute_density(counts, cur_neighbors) >= min_pts) {
                 core_indexes.push_back(neighbor_index);
                 for (auto cur_neighbor: cur_neighbors) {
