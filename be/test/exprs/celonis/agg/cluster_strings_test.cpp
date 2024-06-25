@@ -323,7 +323,7 @@ TEST_F(CelonisClusterStringsTest, linear_cluster) {
     Run(strings1, hashes1, strings2, hashes2, 1, "", 1, expected);
 }
 
-TEST_F(CelonisClusterStringsTest, different_weight_and_length) {
+TEST_F(CelonisClusterStringsTest, different_weight_and_length_1) {
     std::vector<std::optional<std::string>> strings1 = {"abdefghi", "abXY", "bdefgh"};
     std::vector<int128_t> hashes1 = {1, 2, 3};
     std::vector<std::optional<std::string>> strings2 = {"abd", "adef", "Xghijk", "X"};
@@ -337,6 +337,20 @@ TEST_F(CelonisClusterStringsTest, different_weight_and_length) {
                                                                              {7, "X"}};
 
     Run(strings1, hashes1, strings2, hashes2, 5, "abcXY", 3, expected);
+}
+
+TEST_F(CelonisClusterStringsTest, different_weight_and_length_2) {
+    std::vector<std::optional<std::string>> strings1 = {"ABCD", "abdefg", "abc"};
+    std::vector<int128_t> hashes1 = {1, 2, 3};
+    std::vector<std::optional<std::string>> strings2 = {"bcde", "A"};
+    std::vector<int128_t> hashes2 = {4, 5};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "A"},
+                                                                             {2, "abc"},
+                                                                             {3, "abc"},
+                                                                             {4, "abc"},
+                                                                             {5, "A"}};
+
+    Run(strings1, hashes1, strings2, hashes2, 9, "abcXY", 3, expected);
 }
 
 TEST_F(CelonisClusterStringsTest, large_edit_threshold) {
@@ -403,9 +417,10 @@ TEST_F(CelonisClusterStringsTest, simple_case_2) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"CD"};
     std::vector<int128_t> hashes2 = {3};
+    // "CD" is not in the same cluster as "AA", because they do not share any chars.
     std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "AA"},
                                                                              {2, "AA"},
-                                                                             {3, "AA"}};
+                                                                             {3, "CD"}};
     Run(strings1, hashes1, strings2, hashes2, 2, "", 0, expected);
 }
 

@@ -70,6 +70,19 @@ struct String {
     }
 };
 
+bool have_overlap(const String& s1, const String& s2) {
+    phmap::flat_hash_set<std::variant<char, std::string>> set1;
+    for (auto i = 0; i < s1.size(); ++i) {
+        set1.insert(s1[i]);
+    }
+    for (auto j = 0; j < s2.size(); ++j) {
+        if (set1.find(s2[j]) != set1.end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int64_t weighted_edit_distance(const String& s1, const String& s2,
                                const phmap::flat_hash_map<std::variant<char, std::string>, int64_t>& char_to_cost) {
     size_t m = s1.length();
@@ -158,6 +171,9 @@ struct StringClusterer {
                 // edit_distance(s_i, s_j) >= abs(length_i - length_j)
                 if (length_i - std::get<1>(tuples[j]).real_length() > edit_threshold) {
                     break;
+                }
+                if (!have_overlap(std::get<1>(tuples[i]), std::get<1>(tuples[j]))) {
+                    continue;
                 }
                 // edit_distance(s_i, s_j) <= cost(s_i) + cost(s_j)
                 if (edit_threshold >= costs[i] + costs[j] ||
