@@ -1504,6 +1504,7 @@ celostar_functions = [
     [3000170, 'celonis_millis_timestamp',            True, False, 'BIGINT', ['DATETIME'], 'CelonisTimeFunctions::millis_timestamp'],
     [3000180, 'celonis_date_match',                  True, False, 'BIGINT', ['DATETIME', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT'], 'CelonisTimeFunctions::date_match', 'CelonisTimeFunctions::date_match_prepare', 'CelonisTimeFunctions::date_match_close'],
     [3000190, 'celonis_get_calendar_entry_start',    True, False, 'BIGINT', ['INT', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::get_calendar_entry_start', 'CelonisTimeFunctions::get_calendar_entry_start_prepare', 'CelonisTimeFunctions::get_calendar_entry_start_close'],
+    [3000200, 'celonis_calculate_range_end',         True, False, 'DATETIME', ['DATETIME', 'VARCHAR', 'BIGINT'], 'CelonisCalculateRangeEnd::calculate_range_end'],
 
     # String functions
     [4000100, 'celonis_translate', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisStringFunctions::translate', 'CelonisStringFunctions::translate_prepare', 'CelonisStringFunctions::translate_close' ],

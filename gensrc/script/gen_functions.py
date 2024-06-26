@@ -78,6 +78,7 @@ ${license}
 #include "exprs/celonis/array_end_finder.h"
 #include "exprs/celonis/array_functions.h"
 #include "exprs/celonis/calc_throughput.h"
+#include "exprs/celonis/calculate_range_end.h"
 #include "exprs/celonis/conformance.h"
 #include "exprs/celonis/greatest_least.h"
 #include "exprs/celonis/in.h"
