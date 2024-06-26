@@ -1,17 +1,19 @@
 #include "cluster_variants.h"
 
 #include <queue>
+#include <chrono>
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
 #include "runtime/mem_pool.h"
-#include "util/defer_op.h"
 
 namespace starrocks {
 
 namespace {
 
 static const int64_t NULL_VARIANT_LABEL = -2;
+static const size_t MAX_DISTINCT_VARIANTS = 10000000;
+static const double MAX_DBSCAN_SECONDS = 10 * 60.0;
 
 struct VariantHashesWithCount {
     std::vector<int128_t> hashes;
@@ -70,8 +72,9 @@ struct Clusterer {
         }
     }
 
-    std::vector<int64_t> dbscan(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
-                                const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
+    std::optional<std::vector<int64_t>> dbscan(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
+                                               const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
+        auto start_time = std::chrono::high_resolution_clock::now();
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique edges is " << edge_counter.size() << std::endl;
         DCHECK_EQ(points.size(), counts.size());
         n_is_neighbor_checks = 0;
@@ -105,6 +108,13 @@ struct Clusterer {
             }
             expand_cluster(points, counts, index, neighbors, cluster_id, labels, is_cores, is_isolated);
             ++cluster_id;
+            if (index % 100 == 0) {
+                auto cur_time = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed_time = cur_time - start_time;
+                if (elapsed_time.count() > MAX_DBSCAN_SECONDS) {
+                    return std::nullopt;
+                }
+            }
         }
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of clusters is " << cluster_id << std::endl;
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: n_is_neighbor_checks = " << n_is_neighbor_checks << std::endl;
@@ -360,6 +370,12 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     const auto epsilon = state_impl.epsilon();
     const auto& activity_map = state_impl.activity_map();
     const auto& edge_set_map = state_impl.edge_set_map();
+    if (edge_set_map.size() > MAX_DISTINCT_VARIANTS) {
+        ctx->set_error(std::string(
+                "CELONIS_CLUSTER_VARIANTS is currently limited to 10,000,000 distinct variants, however there are " +
+                std::to_string(edge_set_map.size()) + " unique variants").c_str(), false);
+        return;
+    }
     LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique activities is " << activity_map.size() << std::endl;
     const auto& null_variant_hashes = state_impl.null_variant_hashes();
     // We need to create a map from EdgeSet to (count, vector of variant hashes), then cluster based on it.
@@ -369,7 +385,7 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         hashes_with_count.count += edge_set_count.second;
         hashes_with_count.hashes.emplace_back(hash128);
     }
-    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique variants is " << edge_set_map.size() << std::endl;
+    LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique edge sets is " << edge_set_map.size() << std::endl;
     // Compute the frequency of each edge.
     const auto n_points = edges_map.size();
     phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge> edge_counter;
@@ -411,9 +427,13 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     }
     Clusterer clusterer(min_pts, epsilon);
     LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: started clustering\n";
-    std::vector<int64_t> labels = clusterer.dbscan(points, counts, edge_counter);
+    auto labels = clusterer.dbscan(points, counts, edge_counter);
     // Write to output column
     LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: writing to column\n";
+    if (!labels.has_value()) {
+        ctx->set_error(std::string("CELONIS_CLUSTER_VARIANTS timeout").c_str(), false);
+        return;
+    }
     auto& fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
     if (to->is_nullable()) {
         down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
@@ -429,7 +449,7 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     uint32_t n_elements = 0;
     phmap::flat_hash_set<int128_t> null_variant_hashes_seen;
     for (auto i = 0; i < n_points; ++i) {
-        const auto label = labels[i];
+        const auto label = labels->at(i);
         for (const int128_t hash128: hashes_vec[i]) {
             hash_col->elements_column()->append_datum(hash128);
             label_col->elements_column()->append_datum(label);
