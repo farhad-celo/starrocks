@@ -211,4 +211,14 @@ TEST_F(CelonisCalculateRangeEndTest, add_years) {
     }
 }
 
+TEST_F(CelonisCalculateRangeEndTest, large_number_does_not_overflow) {
+    Prepare();
+    start_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+    step_size_column_->append_datum("1000000000000h");
+    step_count_column_->append_datum(1000000000000L);
+    const auto result = Run().value();
+    ASSERT_EQ(1, result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+}
+
 } // namespace starrocks
