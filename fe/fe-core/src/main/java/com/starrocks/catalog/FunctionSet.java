@@ -308,6 +308,7 @@ public class FunctionSet {
     public static final String CELONIS_ENUMERATE_NODE_PATHS = "celonis_enumerate_node_paths";
     public static final String CELONIS_ENUMERATE_TRANSITIVE_EDGES = "celonis_enumerate_transitive_edges";
     public static final String CELONIS_CALC_BUCKET_COUNT_BOUNDARIES = "celonis_calc_bucket_count_boundaries";
+    public static final String CELONIS_CALC_STRING_BUCKET_COUNT_BOUNDARIES = "celonis_calc_string_bucket_count_boundaries";
     public static final String CELONIS_CLUSTER_STRINGS = "celonis_cluster_strings";
     public static final String CELONIS_CLUSTER_VARIANTS = "celonis_cluster_variants";
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
@@ -1139,6 +1140,11 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_CLUSTER_VARIANTS,
                     Lists.newArrayList(Type.ARRAY_VARCHAR, Type.LARGEINT, Type.BIGINT, Type.BIGINT),
                     new StructType(cluster_variants_sf), Type.VARCHAR, true, false, true));
+
+        // celonis_calc_string_bucket_count_boundaries
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_STRING_BUCKET_COUNT_BOUNDARIES, 
+                    Lists.newArrayList(Type.VARCHAR, Type.LARGEINT, Type.BIGINT, Type.DOUBLE), Type.ARRAY_VARCHAR, Type.VARBINARY,
+                    false, false, false));
 
         // celonis_build_abc_model (bigint)
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_ABC_MODEL,

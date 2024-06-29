@@ -11,6 +11,26 @@ uint128_t xx_hash3_128(const void* key, int32_t len, uint128_t seed) {
     return (uint128_t(result.high64) << 64) | result.low64;
 }
 
+bool is_ratio_invalid(double ratio) {
+    return ratio < -EPS || ratio > 1.0 + EPS;
+}
+
+int128_t safe_abs(int128_t value) {
+    if (value == std::numeric_limits<int128_t>::min()) {
+        return std::numeric_limits<int128_t>::max();
+    } else {
+        return value < 0 ? -value : value;
+    }
+}
+
+int64_t safe_abs(int64_t value) {
+    if (value == std::numeric_limits<int64_t>::min()) {
+        return std::numeric_limits<int64_t>::max();
+    } else {
+        return value < 0 ? -value : value;
+    }
+}
+
 const ArrayColumn& extract_array_column(const Column* input_column) {
     return *(down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_column)));
 }

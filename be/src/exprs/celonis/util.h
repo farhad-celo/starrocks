@@ -6,8 +6,15 @@
 namespace starrocks {
 
 const uint128_t XXHASH3_128_SEED = 0;
+const double EPS = 1e-9;
 
 uint128_t xx_hash3_128(const void* key, int32_t len, uint128_t seed);
+
+bool is_ratio_invalid(double ratio);
+
+int128_t safe_abs(int128_t value);
+
+int64_t safe_abs(int64_t value);
 
 // Casts 'input_column' as an ArrayColumn (removing Nullable wrapper if present).
 const ArrayColumn& extract_array_column(const Column* input_column);

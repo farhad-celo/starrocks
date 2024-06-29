@@ -13,22 +13,6 @@
 
 namespace starrocks {
 
-namespace {
-
-static const double EPS = 1e-9;
-
-inline bool is_ratio_invalid(double ratio) {
-    return ratio < -EPS || ratio > 1.0 + EPS;
-}
-
-int64_t safe_abs(int64_t value) {
-    if (value == std::numeric_limits<int64_t>::min()) {
-        return std::numeric_limits<int64_t>::max();
-    } else {
-        return value < 0 ? -value : value;
-    }
-}
-
 template<LogicalType LT, typename T = RunTimeCppType<LT>>
 std::string to_model(const std::vector<std::pair<std::optional<T>, std::optional<T>>>& ranges,
                      const std::map<T, std::vector<int64_t>>& num_to_counter) {
@@ -149,8 +133,6 @@ struct CelonisAbcModelAggregateState {
     double sample_ratio = 1.0;
     std::multiset<CppType> nums;
 };
-
-} // namespace
 
 /**
  * @param: [value_col, pk_hash_col, sample_ratio, A, B]
