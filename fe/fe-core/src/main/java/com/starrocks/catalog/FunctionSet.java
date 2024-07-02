@@ -310,6 +310,7 @@ public class FunctionSet {
     public static final String CELONIS_CALC_BUCKET_COUNT_BOUNDARIES = "celonis_calc_bucket_count_boundaries";
     public static final String CELONIS_CALC_BUCKET_WIDTH_BOUNDARIES = "celonis_calc_bucket_width_boundaries";
     public static final String CELONIS_CALC_STRING_BUCKET_COUNT_BOUNDARIES = "celonis_calc_string_bucket_count_boundaries";
+    public static final String CELONIS_CALC_STRING_BUCKET_WIDTH_BOUNDARIES = "celonis_calc_string_bucket_width_boundaries";
     public static final String CELONIS_CLUSTER_STRINGS = "celonis_cluster_strings";
     public static final String CELONIS_CLUSTER_VARIANTS = "celonis_cluster_variants";
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
@@ -1143,7 +1144,12 @@ public class FunctionSet {
                     new StructType(cluster_variants_sf), Type.VARCHAR, true, false, true));
 
         // celonis_calc_string_bucket_count_boundaries
-        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_STRING_BUCKET_COUNT_BOUNDARIES, 
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_STRING_BUCKET_COUNT_BOUNDARIES,
+                    Lists.newArrayList(Type.VARCHAR, Type.LARGEINT, Type.BIGINT, Type.DOUBLE), Type.ARRAY_VARCHAR, Type.VARBINARY,
+                    false, false, false));
+
+        // celonis_calc_string_bucket_width_boundaries
+        addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_STRING_BUCKET_WIDTH_BOUNDARIES,
                     Lists.newArrayList(Type.VARCHAR, Type.LARGEINT, Type.BIGINT, Type.DOUBLE), Type.ARRAY_VARCHAR, Type.VARBINARY,
                     false, false, false));
 

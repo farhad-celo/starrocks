@@ -79,6 +79,10 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisCalcStringBucketCountBoundarie
     return std::make_shared<CelonisCalcStringBucketCountBoundariesAggregationFunction>();
 }
 
+AggregateFunctionPtr AggregateFactory::MakeCelonisCalcStringBucketWidthBoundariesAggregateFunction() {
+    return std::make_shared<CelonisCalcStringBucketWidthBoundariesAggregationFunction>();
+}
+
 AggregateFunctionPtr AggregateFactory::MakeCelonisClusterStringsAggregateFunction() {
     return std::make_shared<ClusterStringsAggregateFunction>();
 }

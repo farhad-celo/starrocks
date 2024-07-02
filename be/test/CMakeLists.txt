@@ -147,6 +147,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/calc_bucket_boundaries_test.cpp
         ./exprs/celonis/agg/calc_bucket_width_boundaries_test.cpp
         ./exprs/celonis/agg/calc_string_bucket_boundaries_test.cpp
+        ./exprs/celonis/agg/calc_string_bucket_width_boundaries_test.cpp
         ./exprs/celonis/agg/cluster_strings_test.cpp
         ./exprs/celonis/agg/cluster_variants_test.cpp
         ./exprs/celonis/agg/enumerate_node_paths_test.cpp

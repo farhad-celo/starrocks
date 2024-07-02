@@ -48,6 +48,10 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_calc_string_bucket_count_boundaries", false,
             AggregateFactory::MakeCelonisCalcStringBucketCountBoundariesAggregateFunction());
 
+    add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_ARRAY>(
+            "celonis_calc_string_bucket_width_boundaries", false,
+            AggregateFactory::MakeCelonisCalcStringBucketWidthBoundariesAggregateFunction());
+
     add_aggregate_mapping_notnull<TYPE_STRUCT, TYPE_STRUCT>(
             "celonis_enumerate_node_paths", false, AggregateFactory::MakeCelonisEnumerateNodePathsAggregateFunction());
 

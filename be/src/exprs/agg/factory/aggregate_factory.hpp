@@ -58,6 +58,7 @@
 #include "exprs/celonis/agg/calc_bucket_boundaries.h"
 #include "exprs/celonis/agg/calc_bucket_width_boundaries.h"
 #include "exprs/celonis/agg/calc_string_bucket_boundaries.h"
+#include "exprs/celonis/agg/calc_string_bucket_width_boundaries.h"
 #include "exprs/celonis/agg/cluster_strings.h"
 #include "exprs/celonis/agg/cluster_variants.h"
 #include "exprs/celonis/agg/enumerate_node_paths.h"
@@ -226,6 +227,8 @@ public:
     static AggregateFunctionPtr MakeCelonisBuildAbcModelAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisCalcStringBucketCountBoundariesAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisCalcStringBucketWidthBoundariesAggregateFunction();
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisCalcBucketBoundariesAggregateFunction();
