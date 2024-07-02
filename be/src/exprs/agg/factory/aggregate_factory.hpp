@@ -56,6 +56,7 @@
 #include "exprs/agg/window_funnel.h"
 #include "exprs/celonis/agg/abc_model.h"
 #include "exprs/celonis/agg/calc_bucket_boundaries.h"
+#include "exprs/celonis/agg/calc_bucket_width_boundaries.h"
 #include "exprs/celonis/agg/calc_string_bucket_boundaries.h"
 #include "exprs/celonis/agg/cluster_strings.h"
 #include "exprs/celonis/agg/cluster_variants.h"
@@ -218,6 +219,9 @@ public:
     static AggregateFunctionPtr MakeHllRawAggregateFunction();
 
     // Celonis functions
+    template <LogicalType LT>
+    static AggregateFunctionPtr MakeCelonisCalcBucketWidthBoundariesAggregateFunction();
+
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisBuildAbcModelAggregateFunction();
 
@@ -489,6 +493,11 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisBuildAbcModelAggregateFunction
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeCelonisBuildMultiLinearRegressionModelAggregateFunction() {
     return std::make_shared<CelonisMultiLinearRegressionModelAggregationFunction<LT>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisCalcBucketWidthBoundariesAggregateFunction() {
+    return std::make_shared<CelonisCalcBucketWidthBoundariesAggregateFunction<LT>>();
 }
 
 template <LogicalType LT>

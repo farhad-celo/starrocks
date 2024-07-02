@@ -25,6 +25,16 @@ namespace starrocks {
 
 void AggregateFuncResolver::register_celonis() {
     add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_ARRAY>(
+            "celonis_calc_bucket_width_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketWidthBoundariesAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_ARRAY>(
+            "celonis_calc_bucket_width_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketWidthBoundariesAggregateFunction<TYPE_DOUBLE>());
+    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_ARRAY>(
+            "celonis_calc_bucket_width_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketWidthBoundariesAggregateFunction<TYPE_DATETIME>());
+
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_ARRAY>(
             "celonis_calc_bucket_count_boundaries", false,
             AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_BIGINT>());
     add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_ARRAY>(

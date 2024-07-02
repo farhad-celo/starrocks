@@ -7,6 +7,30 @@ namespace starrocks {
 
 const uint128_t XXHASH3_128_SEED = 0;
 const double EPS = 1e-9;
+const double HISTOGRAM_MIN_TARGET_QUANTILE = 0.05;
+const double HISTOGRAM_MAX_TARGET_QUANTILE = 0.95;
+
+template<LogicalType LT>
+inline double to_histogram_value(const RunTimeCppType<LT>& value) {
+    return static_cast<double>(value);
+}
+
+template<>
+inline double to_histogram_value<TYPE_DATETIME>(const TimestampValue& value) {
+    return static_cast<double>(value.to_unix_second());
+}
+
+template<LogicalType LT>
+inline RunTimeCppType<LT> from_histogram_value(const double& value) {
+    return static_cast<RunTimeCppType<LT>>(value);
+}
+
+template<>
+inline TimestampValue from_histogram_value<TYPE_DATETIME>(const double& value) {
+    TimestampValue result;
+    result.from_unix_second(static_cast<int64_t>(value));
+    return result;
+}
 
 uint128_t xx_hash3_128(const void* key, int32_t len, uint128_t seed);
 

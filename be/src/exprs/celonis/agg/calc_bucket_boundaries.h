@@ -5,40 +5,12 @@
 #include "column/object_column.h"
 #include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate.h"
+#include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "util/percentile_value.h"
 #include "util/tdigest.h"
 
 namespace starrocks {
-
-static double MIN_TARGET_QUANTILE = 0.05;
-static double MAX_TARGET_QUANTILE = 0.95;
-
-namespace {
-
-template<LogicalType LT>
-inline double to_histogram_value(const RunTimeCppType<LT>& value) {
-    return static_cast<double>(value);
-}
-
-template<>
-inline double to_histogram_value<TYPE_DATETIME>(const TimestampValue& value) {
-    return static_cast<double>(value.to_unix_second());
-}
-
-template<LogicalType LT>
-inline RunTimeCppType<LT> from_histogram_value(const double& value) {
-    return static_cast<RunTimeCppType<LT>>(value);
-}
-
-template<>
-inline TimestampValue from_histogram_value<TYPE_DATETIME>(const double& value) {
-    TimestampValue result;
-    result.from_unix_second(static_cast<int64_t>(value));
-    return result;
-}
-
-} // namespace
 
 template <LogicalType LT>
 struct CelonisCalcBucketBoundariesState {
@@ -274,8 +246,8 @@ public:
             return;
         }
 
-        double min_value = state_impl.percentile->quantile(MIN_TARGET_QUANTILE);
-        double max_value = state_impl.percentile->quantile(MAX_TARGET_QUANTILE);
+        double min_value = state_impl.percentile->quantile(HISTOGRAM_MIN_TARGET_QUANTILE);
+        double max_value = state_impl.percentile->quantile(HISTOGRAM_MAX_TARGET_QUANTILE);
 
         generate_boundaries(min_value, max_value, state_impl.true_min, state_impl.true_max, state_impl.count,
                             down_cast<ArrayColumn*>(data_column));
