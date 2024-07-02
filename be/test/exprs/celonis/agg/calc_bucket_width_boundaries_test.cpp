@@ -62,7 +62,6 @@ protected:
 
     template<LogicalType LT>
     void Evaluate(Column* result, const Datum& expected) {
-        std::cerr << result->debug_string() << std::endl;
         ASSERT_EQ(result->size(), 1);
         if (expected.is_null()) {
             EXPECT_TRUE(result->is_null(0));
@@ -246,6 +245,34 @@ TEST_F(CelonisCalcBucketWidthBoundariesTest, double_merge_null_and_one_row) {
     Run<TYPE_DOUBLE>(input1, input2, width, expected);
 }
 
+TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_input) {
+    auto input1 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 5), TimestampValue::create(1970, 1, 1, 0, 0, 10)};
+    auto input2 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 20)};
+    int width = 5;
+    auto expected = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
+                               TimestampValue::create(1970, 1, 1, 0, 0, 10),
+                               TimestampValue::create(1970, 1, 1, 0, 0, 15),
+                               TimestampValue::create(1970, 1, 1, 0, 0, 20),
+                               TimestampValue::create(1970, 1, 1, 0, 0, 25)};
+
+    Run<TYPE_DATETIME>(input1, input2, width, expected);
+}
+
+TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_input_with_nulls) {
+    auto input1 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 10), kNullDatum,
+                             TimestampValue::create(1970, 1, 1, 0, 0, 5)};
+    auto input2 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 20),
+                             kNullDatum};
+    int width = 5;
+    auto expected = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
+                               TimestampValue::create(1970, 1, 1, 0, 0, 10),
+                               TimestampValue::create(1970, 1, 1, 0, 0, 15),
+                               TimestampValue::create(1970, 1, 1, 0, 0, 20),
+                               TimestampValue::create(1970, 1, 1, 0, 0, 25)};
+
+    Run<TYPE_DATETIME>(input1, input2, width, expected);
+}
+
 TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_merge_null_and_one_row) {
     auto input1 = DatumArray{kNullDatum};
     auto input2 = DatumArray{TimestampValue::create(2024, 1, 2, 3, 4, 5)};
@@ -255,6 +282,5 @@ TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_merge_null_and_one_row) {
 
     Run<TYPE_DATETIME>(input1, input2, width, expected);
 }
-// TODO(y.zhang): Add more tests for datetime
 
 } // namespace starrocks

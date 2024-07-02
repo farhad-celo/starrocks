@@ -167,7 +167,6 @@ protected:
         // Serialize state1 and state2
         // Use nullable, because SR prepares nullable *to* column for serialize_to_column.
         auto serde_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        // ColumnPtr serde_col = BinaryColumn::create();
         func->serialize_to_column(local_ctx1.get(), state1->state(), serde_col.get());
         func->serialize_to_column(local_ctx2.get(), state2->state(), serde_col.get());
 

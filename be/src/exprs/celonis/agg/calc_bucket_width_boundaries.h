@@ -89,6 +89,8 @@ public:
  * Outputs a boundary array to be used as an input of celonis_histogram_boundaries() to implement PQL HISTOGRAM with
  * mode BUCKET_WIDTH. https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245736/HISTOGRAM
  *
+ * The implementation is similar to calc_bucket_count_boundaries which implements PQL HISTOGRAM with mode BUCKET_COUNT.
+ *
  * Note: PercentileValue uses float so it may lose some precision especially with DATETIME with narrow ranges.
  */
 template<LogicalType LT>
