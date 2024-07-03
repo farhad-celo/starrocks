@@ -244,13 +244,14 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, double_merge_null_and_one_row) {
 }
 
 TEST_F(CelonisCalcBucketCountBoundariesTest, datetime_input) {
-    auto input1 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 5), TimestampValue::create(1970, 1, 1, 0, 0, 10)};
+    auto input1 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 10),
+                             TimestampValue::create(1970, 1, 1, 0, 0, 5)};
     auto input2 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 20)};
     int count = 4;
     auto expected = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
                                TimestampValue::create(1970, 1, 1, 0, 0, 10),
                                TimestampValue::create(1970, 1, 1, 0, 0, 15),
-                               TimestampValue::create(1970, 1, 1, 0, 0, 21)};
+                               TimestampValue::create(1970, 1, 1, 0, 0, 20)};
 
     Run<TYPE_DATETIME>(input1, input2, count, expected);
 }
@@ -264,7 +265,7 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, datetime_input_with_nulls) {
     auto expected = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
                                TimestampValue::create(1970, 1, 1, 0, 0, 10),
                                TimestampValue::create(1970, 1, 1, 0, 0, 15),
-                               TimestampValue::create(1970, 1, 1, 0, 0, 21)};
+                               TimestampValue::create(1970, 1, 1, 0, 0, 20)};
 
     Run<TYPE_DATETIME>(input1, input2, count, expected);
 }
@@ -273,8 +274,8 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, datetime_merge_null_and_one_row) {
     auto input1 = DatumArray{kNullDatum};
     auto input2 = DatumArray{TimestampValue::create(2024, 1, 2, 3, 4, 5)};
     int count = 10;
-    auto expected = DatumArray{TimestampValue::create(2024, 1, 2, 3, 3, 28),
-                               TimestampValue::create(2024, 1, 2, 3, 4, 6)};
+    auto expected = DatumArray{TimestampValue::create(2024, 1, 2, 3, 3, 9),
+                               TimestampValue::create(2024, 1, 2, 3, 4, 5)};
 
     Run<TYPE_DATETIME>(input1, input2, count, expected);
 }

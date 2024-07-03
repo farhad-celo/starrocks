@@ -248,7 +248,7 @@ TEST_F(CelonisCalcBucketWidthBoundariesTest, double_merge_null_and_one_row) {
 TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_input) {
     auto input1 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 5), TimestampValue::create(1970, 1, 1, 0, 0, 10)};
     auto input2 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 20)};
-    int width = 5;
+    int width = 5000; // milliseconds
     auto expected = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
                                TimestampValue::create(1970, 1, 1, 0, 0, 10),
                                TimestampValue::create(1970, 1, 1, 0, 0, 15),
@@ -263,7 +263,7 @@ TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_input_with_nulls) {
                              TimestampValue::create(1970, 1, 1, 0, 0, 5)};
     auto input2 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 20),
                              kNullDatum};
-    int width = 5;
+    int width = 5000; // milliseconds
     auto expected = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
                                TimestampValue::create(1970, 1, 1, 0, 0, 10),
                                TimestampValue::create(1970, 1, 1, 0, 0, 15),
@@ -276,9 +276,9 @@ TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_input_with_nulls) {
 TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_merge_null_and_one_row) {
     auto input1 = DatumArray{kNullDatum};
     auto input2 = DatumArray{TimestampValue::create(2024, 1, 2, 3, 4, 5)};
-    int width = 1;
-    auto expected = DatumArray{TimestampValue::create(2024, 1, 2, 3, 3, 28),
-                               TimestampValue::create(2024, 1, 2, 3, 4, 6)};
+    int width = 1000; // milliseconds
+    auto expected = DatumArray{TimestampValue::create(2024, 1, 2, 3, 3, 9),
+                               TimestampValue::create(2024, 1, 2, 3, 4, 5)};
 
     Run<TYPE_DATETIME>(input1, input2, width, expected);
 }

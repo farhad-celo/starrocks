@@ -17,7 +17,9 @@ inline double to_histogram_value(const RunTimeCppType<LT>& value) {
 
 template<>
 inline double to_histogram_value<TYPE_DATETIME>(const TimestampValue& value) {
-    return static_cast<double>(value.to_unix_second());
+    const auto epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
+    // convert it to milliseconds
+    return static_cast<double>(value.diff_microsecond(epoch) / 1000L);
 }
 
 template<LogicalType LT>
@@ -26,9 +28,9 @@ inline RunTimeCppType<LT> from_histogram_value(const double& value) {
 }
 
 template<>
-inline TimestampValue from_histogram_value<TYPE_DATETIME>(const double& value) {
+inline TimestampValue from_histogram_value<TYPE_DATETIME>(const double& millis) {
     TimestampValue result;
-    result.from_unix_second(static_cast<int64_t>(value));
+    result.from_unix_second(static_cast<int64_t>(millis) / 1000L);
     return result;
 }
 
