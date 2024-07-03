@@ -214,9 +214,6 @@ private:
             }
             cnt += 1;
         }
-        if (boundaries.back() != *string_set.rbegin()) {
-            boundaries.push_back(*string_set.rbegin());
-        }
         return boundaries;
     }
 };

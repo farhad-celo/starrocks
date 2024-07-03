@@ -214,7 +214,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, even_number_of_strings_2) {
     std::vector<std::optional<int128_t>> hashes2 = {6, 7, 8, 9, 10};
     int64_t width = 2;
     double sample_ratio = 1.0;
-    auto expected = DatumArray{"a", "c", "e", "g", "i", "j"};
+    auto expected = DatumArray{"a", "c", "e", "g", "i"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
@@ -226,7 +226,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, empty_string_works) {
     std::vector<std::optional<int128_t>> hashes2 = {6, 7, 8, 9, 10};
     int64_t width = 2;
     double sample_ratio = 1.0;
-    auto expected = DatumArray{"", "c", "e", "g", "i", "j"};
+    auto expected = DatumArray{"", "c", "e", "g", "i"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
@@ -250,7 +250,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, odd_number_of_strings_2) {
     std::vector<std::optional<int128_t>> hashes2 = {4, 5};
     int64_t width = 3;
     double sample_ratio = 1.0;
-    auto expected = DatumArray{"apple", "dog", "eye"};
+    auto expected = DatumArray{"apple", "dog"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
@@ -275,7 +275,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, negative_sample_ratio) {
     std::vector<std::optional<int128_t>> hashes2 = {6, 7, 8, 9, 10};
     int64_t width = 2;
     double sample_ratio = -0.2;
-    auto expected = DatumArray{"a", "c", "e", "g", "i", "j"};
+    auto expected = DatumArray{"a", "c", "e", "g", "i"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
@@ -287,7 +287,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, sample_ratio_greater_than_one
     std::vector<std::optional<int128_t>> hashes2 = {6, 7, 8, 9, 10};
     int64_t width = 2;
     double sample_ratio = 1.2;
-    auto expected = DatumArray{"a", "c", "e", "g", "i", "j"};
+    auto expected = DatumArray{"a", "c", "e", "g", "i"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
@@ -299,7 +299,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, duplicate_strings) {
     std::vector<std::optional<int128_t>> hashes2 = {4, 5, 4, 5};
     int64_t width = 3;
     double sample_ratio = 1.0;
-    auto expected = DatumArray{"a", "d", "e"};
+    auto expected = DatumArray{"a", "d"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
@@ -311,7 +311,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, null_strings_are_ignored) {
     std::vector<std::optional<int128_t>> hashes2 = {6, 7, 8, 9, 10, 0};
     int64_t width = 2;
     double sample_ratio = 1.0;
-    auto expected = DatumArray{"a", "c", "e", "g", "i", "j"};
+    auto expected = DatumArray{"a", "c", "e", "g", "i"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
@@ -323,7 +323,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, null_hashes_are_ignored) {
     std::vector<std::optional<int128_t>> hashes2 = {6, 7, 8, 9, 10, std::nullopt};
     int64_t width = 2;
     double sample_ratio = 1.0;
-    auto expected = DatumArray{"a", "c", "e", "g", "i", "j"};
+    auto expected = DatumArray{"a", "c", "e", "g", "i"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
