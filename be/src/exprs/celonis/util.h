@@ -31,7 +31,7 @@ template<>
 inline TimestampValue from_histogram_value<TYPE_DATETIME>(const double& millis) {
     TimestampValue result;
     result.from_unix_second(static_cast<int64_t>(millis) / 1000L);
-    return result;
+    return result.add<TimeUnit::MILLISECOND>(static_cast<int64_t>(millis) % 1000L);
 }
 
 uint128_t xx_hash3_128(const void* key, int32_t len, uint128_t seed);

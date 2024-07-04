@@ -277,8 +277,8 @@ TEST_F(CelonisCalcBucketWidthBoundariesTest, datetime_merge_null_and_one_row) {
     auto input1 = DatumArray{kNullDatum};
     auto input2 = DatumArray{TimestampValue::create(2024, 1, 2, 3, 4, 5)};
     int width = 1000; // milliseconds
-    auto expected = DatumArray{TimestampValue::create(2024, 1, 2, 3, 3, 9),
-                               TimestampValue::create(2024, 1, 2, 3, 4, 5)};
+    auto expected = DatumArray{TimestampValue::create(2024, 1, 2, 3, 3, 9, 568000),
+                               TimestampValue::create(2024, 1, 2, 3, 4, 5, 1000)};
 
     Run<TYPE_DATETIME>(input1, input2, width, expected);
 }
