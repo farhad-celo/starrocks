@@ -12,13 +12,14 @@
 
 namespace starrocks {
 
-template <LogicalType LT>
+template<LogicalType LT>
 struct CelonisCalcBucketBoundariesState {
 public:
     using CppType = RunTimeCppType<LT>;
     using CountType = RunTimeCppType<TYPE_BIGINT>;
 
     CelonisCalcBucketBoundariesState() : percentile(new PercentileValue()) {}
+
     ~CelonisCalcBucketBoundariesState() = default;
 
     void update(CppType value) {
@@ -44,7 +45,7 @@ public:
         memcpy(&src_true_max, src, sizeof(CppType));
         src += sizeof(CppType);
         PercentileValue src_percentile;
-        src_percentile.deserialize((const char *)src);
+        src_percentile.deserialize((const char*) src);
 
         count = src_count;
         true_min = std::min<CppType>(true_min, src_true_min);
@@ -90,10 +91,10 @@ public:
  *
  * Note: PercentileValue uses float so it may lose some precision especially with DATETIME with narrow ranges.
  */
-template <LogicalType LT>
+template<LogicalType LT>
 class CelonisCalcBucketBoundariesAggregateFunction final
         : public AggregateFunctionBatchHelper<CelonisCalcBucketBoundariesState<LT>,
-                                              CelonisCalcBucketBoundariesAggregateFunction<LT>> {
+                CelonisCalcBucketBoundariesAggregateFunction<LT>> {
 public:
     using CppType = RunTimeCppType<LT>;
     using ColumnType = RunTimeColumnType<LT>;
@@ -136,7 +137,7 @@ public:
             src = binary_column->get_slice(row_num);
         }
 
-        this->data(state).deserialize_and_merge((const uint8_t*)src.data);
+        this->data(state).deserialize_and_merge((const uint8_t*) src.data);
     }
 
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
@@ -288,11 +289,17 @@ private:
         auto* offsets_column = to->offsets_column().get();
         int new_offset = 0;
 
-        elements_column->append_datum(from_histogram_value<LT>(std::min(min_value, std::floor(true_min_value))));
+        const Datum lower_bound = from_histogram_value<LT>(std::min(min_value, std::floor(true_min_value)));
+        elements_column->append_datum(lower_bound);
         new_offset++;
+        Datum prev_boundary = lower_bound;
         for (int i = 1; i < count; i++) {
-            elements_column->append_datum(from_histogram_value<LT>(min_value + (static_cast<double>(i) * width)));
-            new_offset++;
+            const Datum boundary = from_histogram_value<LT>(min_value + (static_cast<double>(i) * width));
+            if (prev_boundary.convert2DatumKey() != boundary.convert2DatumKey()) {
+                elements_column->append_datum(boundary);
+                new_offset++;
+                prev_boundary = boundary;
+            }
         }
         elements_column->append_datum(from_histogram_value<LT>(std::max(max_value, std::ceil(true_max_value + 1))));
         new_offset++;

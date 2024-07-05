@@ -279,11 +279,17 @@ private:
         auto* offsets_column = to->offsets_column().get();
         int new_offset = 0;
 
-        elements_column->append_datum(from_histogram_value<LT>(std::min(min_value, std::floor(true_min_value))));
+        const Datum lower_bound = from_histogram_value<LT>(std::min(min_value, std::floor(true_min_value)));
+        elements_column->append_datum(lower_bound);
         new_offset++;
+        Datum prev_boundary = lower_bound;
         for (int i = 1; i < count; i++) {
-            elements_column->append_datum(from_histogram_value<LT>(min_value + (static_cast<double>(i) * width)));
-            new_offset++;
+            const Datum boundary = from_histogram_value<LT>(min_value + (static_cast<double>(i) * width));
+            if (prev_boundary.convert2DatumKey() != boundary.convert2DatumKey()) {
+                elements_column->append_datum(boundary);
+                new_offset++;
+                prev_boundary = boundary;
+            }
         }
         elements_column->append_datum(from_histogram_value<LT>(std::max(max_value, std::ceil(true_max_value + 1))));
         new_offset++;
