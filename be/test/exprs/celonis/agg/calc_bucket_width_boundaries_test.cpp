@@ -61,15 +61,19 @@ protected:
     }
 
     template<LogicalType LT>
-    void Evaluate(Column* result, const Datum& expected) {
+    void Evaluate(Column* result, const std::optional<Datum>& expected) {
+        if (!expected.has_value()) {
+            EXPECT_EQ(result->size(), 0);
+            return;
+        }
         ASSERT_EQ(result->size(), 1);
-        if (expected.is_null()) {
+        if (expected->is_null()) {
             EXPECT_TRUE(result->is_null(0));
             return;
         }
         ASSERT_FALSE(result->is_null(0));
 
-        auto expected_array = expected.get_array();
+        auto expected_array = expected->get_array();
         auto result_array = result->get(0).get_array();
         ASSERT_EQ(result_array.size(), expected_array.size());
         for (int i = 0; i < expected_array.size(); ++i) {
@@ -114,7 +118,7 @@ protected:
     }
 
     template<LogicalType LT>
-    void RunNoMerge(const DatumArray& input, int width, const Datum& expected) {
+    void RunNoMerge(const DatumArray& input, int width, const std::optional<Datum>& expected) {
         auto [local_ctx, state, func] = RunUpdate(LT, input, width);
 
         auto result = ColumnHelper::create_column(get_return_type(LT), true);
@@ -124,7 +128,7 @@ protected:
     }
 
     template<LogicalType LT>
-    void RunMerge(const DatumArray& input1, const DatumArray& input2, int width, const Datum& expected) {
+    void RunMerge(const DatumArray& input1, const DatumArray& input2, int width, const std::optional<Datum>& expected) {
         auto [local_ctx1, state1, func] = RunUpdate(LT, input1, width);
         auto [local_ctx2, state2, func2] = RunUpdate(LT, input2, width);
 
@@ -143,7 +147,8 @@ protected:
     }
 
     template<LogicalType LT>
-    void RunMergeToNew(const DatumArray& input1, const DatumArray& input2, int width, const Datum& expected) {
+    void
+    RunMergeToNew(const DatumArray& input1, const DatumArray& input2, int width, const std::optional<Datum>& expected) {
         auto [local_ctx1, state1, func] = RunUpdate(LT, input1, width);
         auto [local_ctx2, state2, func2] = RunUpdate(LT, input2, width);
 
@@ -168,7 +173,7 @@ protected:
     }
 
     template<LogicalType LT>
-    void Run(const DatumArray& input1, const DatumArray& input2, int width, const Datum& expected) {
+    void Run(const DatumArray& input1, const DatumArray& input2, int width, const std::optional<Datum>& expected) {
         RunMerge<LT>(input1, input2, width, expected);
         RunMergeToNew<LT>(input1, input2, width, expected);
     }
@@ -225,6 +230,22 @@ TEST_F(CelonisCalcBucketWidthBoundariesTest, bigint_merge_outlier) {
     int width = 10;
     auto expected = DatumArray{1L, 11L, 21L, 31L, 41L, 51L, 61L, 71L, 81L, 91L, 101L};
 
+    Run<TYPE_BIGINT>(input1, input2, width, expected);
+}
+
+TEST_F(CelonisCalcBucketWidthBoundariesTest, too_many_buckets) {
+    // 2 * length > MAX_NUM_BUCKETS
+    const int64_t length = 550000;
+    auto input1 = DatumArray{};
+    for (int64_t i = 0; i < length; ++i) {
+        input1.emplace_back(i);
+    }
+    auto input2 = DatumArray{};
+    for (int64_t i = 0; i < length; ++i) {
+        input2.emplace_back(i + length);
+    }
+    int width = 1;
+    auto expected = std::nullopt;
     Run<TYPE_BIGINT>(input1, input2, width, expected);
 }
 

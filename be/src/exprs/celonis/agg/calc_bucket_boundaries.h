@@ -234,14 +234,15 @@ public:
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         const auto& state_impl = this->data(state);
         auto* data_column = to;
+        NullData* null_data = nullptr;
         if (to->is_nullable()) {
             auto* nullable_column = down_cast<NullableColumn*>(to);
+            null_data = &nullable_column->null_column_data();
             if (state_impl.is_null) {
                 // TODO: Check if this case is handled well by celonis_histogram_boundaries().
                 nullable_column->append_default();
                 return;
             }
-            nullable_column->null_column_data().push_back(0);
             data_column = nullable_column->mutable_data_column();
         } else if (this->data(state).is_null) {
             return;
@@ -250,15 +251,17 @@ public:
         double min_value = state_impl.percentile->quantile(HISTOGRAM_MIN_TARGET_QUANTILE);
         double max_value = state_impl.percentile->quantile(HISTOGRAM_MAX_TARGET_QUANTILE);
 
-        generate_boundaries(min_value, max_value, state_impl.true_min, state_impl.true_max, state_impl.count,
-                            down_cast<ArrayColumn*>(data_column));
+        generate_boundaries(ctx, min_value, max_value, state_impl.true_min, state_impl.true_max, state_impl.count,
+                            down_cast<ArrayColumn*>(data_column), null_data);
     }
 
     std::string get_name() const override { return "celonis_calc_bucket_count_boundaries"; }
 
 private:
-    void generate_boundaries(double min_value, double max_value, CppType true_min, CppType true_max, CountType count,
-                             ArrayColumn* to) const {
+    void
+    generate_boundaries(FunctionContext* ctx, double min_value, double max_value, CppType true_min, CppType true_max,
+                        CountType count,
+                        ArrayColumn* to, NullData* null_data) const {
         double true_min_value = to_histogram_value<LT>(true_min);
         double true_max_value = to_histogram_value<LT>(true_max);
 
@@ -274,6 +277,17 @@ private:
             width = std::ceil(width);
         }
         count = std::min(count, static_cast<CountType>(std::ceil((true_max_value - true_min_value + 1) / width)));
+
+        if (count > MAX_NUM_BUCKETS) {
+            ctx->set_error(
+                    std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
+                    false);
+            return;
+        }
+        // The output column is nullable, populate null_data.
+        if (null_data != nullptr) {
+            null_data->push_back(0);
+        }
 
         if (min_value + (width * static_cast<double>(count)) > true_max_value && min_value > true_min_value) {
             min_value = min_value - std::min(min_value - true_min_value,

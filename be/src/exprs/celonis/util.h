@@ -7,6 +7,8 @@ namespace starrocks {
 
 const uint128_t XXHASH3_128_SEED = 0;
 const double EPS = 1e-9;
+// maximum number of buckets output by CALC_(STRING_)BUCKET_COUNT/WIDTH_BOUNDARIES
+const int64_t MAX_NUM_BUCKETS = 1000000;
 const double HISTOGRAM_MIN_TARGET_QUANTILE = 0.05;
 const double HISTOGRAM_MAX_TARGET_QUANTILE = 0.95;
 
