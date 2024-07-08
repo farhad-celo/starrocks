@@ -18,6 +18,18 @@ struct CelonisCalcStringBucketWidthBoundariesAggregateState {
     // This function assumes the row_num row of string_column and hash_column does not contain NULL.
     void update(const Column* string_column, const Column* hash_column, size_t row_num) {
         auto string_value = string_column->get(row_num).get_slice().to_string();
+        if (!min_max_set) {
+            min_string = string_value;
+            max_string = string_value;
+            min_max_set = true;
+        } else {
+            if (string_value < min_string) {
+                min_string = string_value;
+            }
+            if (string_value > max_string) {
+                max_string = string_value;
+            }
+        }
         if (sample_ratio == 1.0) {
             strings.insert(string_value);
         } else {
@@ -38,6 +50,9 @@ struct CelonisCalcStringBucketWidthBoundariesAggregateState {
         }
         result += sizeof(double);                     // sample_ratio
         result += sizeof(int64_t);                    // width
+        result += sizeof(uint8_t);                    // min_max_set
+        result += min_string.size() + 1;              // min_string
+        result += max_string.size() + 1;              // max_string
         return result;
     }
 
@@ -57,6 +72,12 @@ struct CelonisCalcStringBucketWidthBoundariesAggregateState {
         dst += sizeof(double);
         memcpy(dst, &width, sizeof(int64_t));
         dst += sizeof(int64_t);
+        memcpy(dst, &min_max_set, sizeof(uint8_t));
+        dst += sizeof(uint8_t);
+        memcpy(dst, min_string.data(), min_string.size() + 1);
+        dst += min_string.size() + 1;
+        memcpy(dst, max_string.data(), max_string.size() + 1);
+        dst += max_string.size() + 1;
     }
 
     // Deserializes a CelonisCalcStringBucketWidthBoundariesAggregateState object and merges it with the current state.
@@ -76,14 +97,38 @@ struct CelonisCalcStringBucketWidthBoundariesAggregateState {
         src += sizeof(double);
         memcpy(&width, src, sizeof(int64_t));
         src += sizeof(int64_t);
+        bool cur_min_max_set;
+        memcpy(&cur_min_max_set, src, sizeof(uint8_t));
+        src += sizeof(uint8_t);
+        const std::string cur_min_string = std::string(reinterpret_cast<const char*>(src));
+        src += cur_min_string.size() + 1;
+        const std::string cur_max_string = std::string(reinterpret_cast<const char*>(src));
+        src += cur_max_string.size() + 1;
+        if (cur_min_max_set) {
+            if (!min_max_set) {
+                min_string = cur_min_string;
+                max_string = cur_max_string;
+                min_max_set = true;
+            } else {
+                if (cur_min_string < min_string) {
+                    min_string = cur_min_string;
+                }
+                if (cur_max_string > max_string) {
+                    max_string = cur_max_string;
+                }
+            }
+        }
         DCHECK_EQ(src, end);
         initialized = true;
     }
 
     bool initialized = false;
+    std::set<std::string> strings;
     double sample_ratio = 1.0;
     int64_t width = 1;
-    std::set<std::string> strings;
+    bool min_max_set = false;
+    std::string min_string = "";
+    std::string max_string = "";
 };
 
 /**
@@ -177,7 +222,11 @@ public:
             return;
         }
 
-        const std::set<std::string>& string_set = state_impl.strings;
+        std::set<std::string> string_set = state_impl.strings;
+        if (state_impl.min_max_set) {
+            string_set.insert(state_impl.min_string);
+            string_set.insert(state_impl.max_string);
+        }
         const int64_t bucket_width = state_impl.width;
         const double sample_ratio = state_impl.sample_ratio;
         std::vector<std::string> boundaries = compute_boundaries(string_set, bucket_width, sample_ratio);

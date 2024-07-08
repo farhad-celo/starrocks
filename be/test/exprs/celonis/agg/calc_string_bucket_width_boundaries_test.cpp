@@ -331,13 +331,27 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, null_hashes_are_ignored) {
 TEST_F(CelonisCalcStringBucketWidthBoundariesTest, sampling_works_1) {
     int128_t hash_to_drop = std::numeric_limits<int128_t>::max() / 10 * 3;
     std::vector<std::optional<std::string>> strings1 = {"a", "b", "c"};
-    // "f" is dropped
+    // "e" is dropped
     std::vector<std::optional<std::string>> strings2 = {"d", "e", "f"};
     std::vector<std::optional<int128_t>> hashes1 = {1, 2, 3};
-    std::vector<std::optional<int128_t>> hashes2 = {4, 5, hash_to_drop};
+    std::vector<std::optional<int128_t>> hashes2 = {4, hash_to_drop, 5};
     int64_t width = 1;
     double sample_ratio = 0.2;
-    auto expected = DatumArray{"a", "b", "c", "d", "e"};
+    auto expected = DatumArray{"a", "b", "c", "d", "f"};
+
+    Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
+}
+
+TEST_F(CelonisCalcStringBucketWidthBoundariesTest, min_and_max_are_tracked) {
+    int128_t hash_to_drop = std::numeric_limits<int128_t>::max() / 10 * 3;
+    std::vector<std::optional<std::string>> strings1 = {"a", "b", "c"};
+    std::vector<std::optional<std::string>> strings2 = {"d", "e", "f"};
+    // "a" and "f" are not dropped
+    std::vector<std::optional<int128_t>> hashes1 = {hash_to_drop, 2, 3};
+    std::vector<std::optional<int128_t>> hashes2 = {4, 5, hash_to_drop + 50000};
+    int64_t width = 1;
+    double sample_ratio = 0.2;
+    auto expected = DatumArray{"a", "b", "c", "d", "e", "f"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
@@ -345,13 +359,13 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, sampling_works_1) {
 TEST_F(CelonisCalcStringBucketWidthBoundariesTest, sampling_works_2) {
     int128_t hash_to_drop = std::numeric_limits<int128_t>::max() / 10 * 6;
     std::vector<std::optional<std::string>> strings1 = {"a", "b", "c", "g"};
-    // "f" and "g" are dropped
+    // "c" and "e" are dropped
     std::vector<std::optional<std::string>> strings2 = {"d", "e", "f"};
-    std::vector<std::optional<int128_t>> hashes1 = {1, 2, 3, hash_to_drop + 100000};
-    std::vector<std::optional<int128_t>> hashes2 = {4, 5, hash_to_drop};
+    std::vector<std::optional<int128_t>> hashes1 = {1, 2, hash_to_drop + 100000, 3};
+    std::vector<std::optional<int128_t>> hashes2 = {4, hash_to_drop, 5};
     int64_t width = 1;
     double sample_ratio = 0.5;
-    auto expected = DatumArray{"a", "b", "c", "d", "e"};
+    auto expected = DatumArray{"a", "b", "d", "f", "g"};
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
