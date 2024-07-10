@@ -1133,7 +1133,7 @@ public class FunctionSet {
         cluster_strings_sf.add(new StructField("cluster_representative", Type.ARRAY_VARCHAR));
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_CLUSTER_STRINGS,
                     Lists.newArrayList(Type.VARCHAR, Type.LARGEINT, Type.BIGINT, Type.VARCHAR, Type.BIGINT),
-                    new StructType(cluster_strings_sf), Type.VARCHAR, true, false, true));
+                    new StructType(cluster_strings_sf), Type.VARBINARY, true, false, true));
 
         // celonis_cluster_variants
         ArrayList<StructField> cluster_variants_sf = Lists.newArrayList();
@@ -1141,7 +1141,7 @@ public class FunctionSet {
         cluster_variants_sf.add(new StructField("cluster_id", Type.ARRAY_BIGINT));
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_CLUSTER_VARIANTS,
                     Lists.newArrayList(Type.ARRAY_VARCHAR, Type.LARGEINT, Type.BIGINT, Type.BIGINT),
-                    new StructType(cluster_variants_sf), Type.VARCHAR, true, false, true));
+                    new StructType(cluster_variants_sf), Type.VARBINARY, true, false, true));
 
         // celonis_calc_string_bucket_count_boundaries
         addBuiltin(AggregateFunction.createBuiltin(CELONIS_CALC_STRING_BUCKET_COUNT_BOUNDARIES,
