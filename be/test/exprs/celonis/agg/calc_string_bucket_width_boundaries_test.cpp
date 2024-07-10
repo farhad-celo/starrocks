@@ -62,15 +62,19 @@ protected:
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
 
-    void Evaluate(Column* result, const Datum& expected) {
+    void Evaluate(Column* result, const std::optional<Datum>& expected) {
+        if (!expected.has_value()) {
+            EXPECT_EQ(result->size(), 0);
+            return;
+        }
         ASSERT_EQ(result->size(), 1);
-        if (expected.is_null()) {
+        if (expected->is_null()) {
             EXPECT_TRUE(result->is_null(0));
             return;
         }
         ASSERT_FALSE(result->is_null(0));
 
-        auto expected_array = expected.get_array();
+        auto expected_array = expected->get_array();
         auto result_array = result->get(0).get_array();
         ASSERT_EQ(result_array.size(), expected_array.size());
         for (int i = 0; i < expected_array.size(); ++i) {
@@ -136,7 +140,7 @@ protected:
                   const std::vector<std::optional<std::string>>& strings2,
                   const std::vector<std::optional<int128_t>>& hashes1,
                   const std::vector<std::optional<int128_t>>& hashes2, int64_t width, double sample_ratio,
-                  const Datum& expected) {
+                  const std::optional<Datum>& expected) {
         auto [local_ctx1, state1, func] = RunUpdate(strings1, hashes1, width, sample_ratio);
         auto [local_ctx2, state2, func2] = RunUpdate(strings2, hashes2, width, sample_ratio);
 
@@ -158,7 +162,7 @@ protected:
                        const std::vector<std::optional<std::string>>& strings2,
                        const std::vector<std::optional<int128_t>>& hashes1,
                        const std::vector<std::optional<int128_t>>& hashes2, int64_t width, double sample_ratio,
-                       const Datum& expected) {
+                       const std::optional<Datum>& expected) {
         auto [local_ctx1, state1, func] = RunUpdate(strings1, hashes1, width, sample_ratio);
         auto [local_ctx2, state2, func2] = RunUpdate(strings2, hashes2, width, sample_ratio);
 
@@ -187,7 +191,7 @@ protected:
              const std::vector<std::optional<std::string>>& strings2,
              const std::vector<std::optional<int128_t>>& hashes1,
              const std::vector<std::optional<int128_t>>& hashes2, int64_t width, double sample_ratio,
-             const Datum& expected) {
+             const std::optional<Datum>& expected) {
         RunMerge(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
         RunMergeToNew(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
     }
@@ -324,6 +328,32 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, null_hashes_are_ignored) {
     int64_t width = 2;
     double sample_ratio = 1.0;
     auto expected = DatumArray{"a", "c", "e", "g", "i"};
+
+    Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
+}
+
+TEST_F(CelonisCalcStringBucketWidthBoundariesTest, too_many_buckets) {
+    // 2 * length > MAX_NUM_BUCKETS
+    const int64_t length = 550000;
+    std::vector<std::optional<std::string>> strings1;
+    std::vector<std::optional<std::string>> strings2;
+    std::vector<std::optional<int128_t>> hashes1;
+    std::vector<std::optional<int128_t>> hashes2;
+    strings1.reserve(length);
+    strings2.reserve(length);
+    hashes1.reserve(length);
+    hashes2.reserve(length);
+    for (int64_t i = 0; i < length; ++i) {
+        hashes1.emplace_back(i);
+        strings1.emplace_back(std::to_string(i));
+    }
+    for (int64_t i = 0; i < length; ++i) {
+        hashes2.emplace_back(i + length);
+        strings2.emplace_back(std::to_string(i + length));
+    }
+    int64_t width = 1;
+    double sample_ratio = 1.0;
+    auto expected = std::nullopt;
 
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }

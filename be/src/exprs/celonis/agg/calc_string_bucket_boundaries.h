@@ -207,13 +207,14 @@ public:
                             Column* to) const override {
         auto& state_impl = this->data(state);
         auto* data_column = to;
+        NullData* null_data = nullptr;
         if (to->is_nullable()) {
             auto* nullable_column = down_cast<NullableColumn*>(to);
+            null_data = &nullable_column->null_column_data();
             if (!state_impl.initialized) {
                 nullable_column->append_default();
                 return;
             }
-            nullable_column->null_column_data().push_back(0);
             data_column = nullable_column->mutable_data_column();
         } else if (!state_impl.initialized) {
             to->append_default();
@@ -225,7 +226,17 @@ public:
             string_set.insert(state_impl.min_string);
             string_set.insert(state_impl.max_string);
         }
-        auto n = state_impl.count;
+        const auto n = state_impl.count;
+        if (n > MAX_NUM_BUCKETS) {
+            ctx->set_error(
+                    std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
+                    false);
+            return;
+        }
+        // The output column is nullable, populate null_data.
+        if (null_data != nullptr) {
+            null_data->push_back(0);
+        }
         std::vector<std::string> boundaries = compute_boundaries(string_set, n);
         // populate output column
         ArrayColumn* array_column = down_cast<ArrayColumn*>(data_column);

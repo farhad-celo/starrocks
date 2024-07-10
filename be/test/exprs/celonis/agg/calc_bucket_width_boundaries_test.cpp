@@ -237,10 +237,12 @@ TEST_F(CelonisCalcBucketWidthBoundariesTest, too_many_buckets) {
     // 2 * length > MAX_NUM_BUCKETS
     const int64_t length = 550000;
     auto input1 = DatumArray{};
+    input1.reserve(length);
     for (int64_t i = 0; i < length; ++i) {
         input1.emplace_back(i);
     }
     auto input2 = DatumArray{};
+    input2.reserve(length);
     for (int64_t i = 0; i < length; ++i) {
         input2.emplace_back(i + length);
     }

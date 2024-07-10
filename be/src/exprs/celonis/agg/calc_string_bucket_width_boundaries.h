@@ -209,13 +209,14 @@ public:
                             Column* to) const override {
         auto& state_impl = this->data(state);
         auto* data_column = to;
+        NullData* null_data = nullptr;
         if (to->is_nullable()) {
             auto* nullable_column = down_cast<NullableColumn*>(to);
+            null_data = &nullable_column->null_column_data();
             if (!state_impl.initialized) {
                 nullable_column->append_default();
                 return;
             }
-            nullable_column->null_column_data().push_back(0);
             data_column = nullable_column->mutable_data_column();
         } else if (!state_impl.initialized) {
             to->append_default();
@@ -229,7 +230,22 @@ public:
         }
         const int64_t bucket_width = state_impl.width;
         const double sample_ratio = state_impl.sample_ratio;
-        std::vector<std::string> boundaries = compute_boundaries(string_set, bucket_width, sample_ratio);
+        auto bucket_size = static_cast<int64_t>(bucket_width * sample_ratio + 0.5);
+        if (bucket_size == 0) {
+            bucket_size = 1;
+        }
+        const auto n = static_cast<int64_t>(std::ceil(string_set.size() / bucket_size));
+        if (n > MAX_NUM_BUCKETS) {
+            ctx->set_error(
+                    std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
+                    false);
+            return;
+        }
+        // The output column is nullable, populate null_data.
+        if (null_data != nullptr) {
+            null_data->push_back(0);
+        }
+        std::vector<std::string> boundaries = compute_boundaries(string_set, bucket_size, sample_ratio);
         // populate output column
         ArrayColumn* array_column = down_cast<ArrayColumn*>(data_column);
         auto* elements_column = array_column->elements_column().get();
@@ -247,11 +263,7 @@ public:
 
 private:
     std::vector<std::string>
-    compute_boundaries(const std::set<std::string>& string_set, int64_t bucket_width, double sample_ratio) const {
-        auto bucket_size = static_cast<int64_t>(bucket_width * sample_ratio + 0.5);
-        if (bucket_size == 0) {
-            bucket_size = 1;
-        }
+    compute_boundaries(const std::set<std::string>& string_set, int64_t bucket_size, double sample_ratio) const {
         std::vector<std::string> boundaries;
         std::multiset<std::string>::const_iterator it = string_set.begin();
         boundaries.push_back(*it);
