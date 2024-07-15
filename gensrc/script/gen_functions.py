@@ -91,6 +91,7 @@ ${license}
 #include "exprs/celonis/mo_bpmn_graph.h"
 #include "exprs/celonis/multi_in.h"
 #include "exprs/celonis/patindex.h"
+#include "exprs/celonis/peek_merged_sorted_arrays.h"
 #include "exprs/celonis/qnorm.h"
 #include "exprs/celonis/remap_timestamp_weekday.h"
 #include "exprs/celonis/remap_values.h"

@@ -1,0 +1,171 @@
+#include "exprs/celonis/peek_merged_sorted_arrays.h"
+
+#include "column/array_column.h"
+#include "column/column_builder.h"
+#include "column/column_helper.h"
+#include "exprs/function_context.h"
+#include "exprs/celonis/util.h"
+
+namespace starrocks {
+
+template<LogicalType LT>
+StatusOr<ColumnPtr>
+CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::FunctionContext* context,
+                                                             const starrocks::Columns& columns) {
+    DCHECK(columns.size() == 4 || columns.size() == 5);
+    size_t chunk_size = columns[0]->size();
+    ColumnPtr timestamp_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[1]);
+    if (timestamp_column->has_null()) {
+        return Status::InvalidArgument("timestamp_array should not be NULL.");
+    }
+    UnnestedArrayData timestamp_array_data = prepare_array_input(timestamp_column.get());
+    if (timestamp_array_data.null_elements != nullptr) {
+        return Status::InvalidArgument("timestamp_array should not have NULL elements.");
+    }
+    DCHECK(timestamp_array_data.elements->is_timestamp());
+    const auto& timestamps =
+            down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*timestamp_array_data.elements).get_data().data();
+    const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
+
+    std::vector<DatumKey> secondary_orders;
+    const bool has_secondary_order = columns.size() == 5;
+    if (has_secondary_order) {
+        secondary_orders.reserve(timestamp_offsets[chunk_size]);
+        ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
+        if (secondary_order_column->has_null()) {
+            return Status::InvalidArgument("If provided, secondary_order_array should not be NULL.");
+        }
+        UnnestedArrayData secondary_order_array_data = prepare_array_input(secondary_order_column.get());
+        if (secondary_order_array_data.null_elements != nullptr) {
+            return Status::InvalidArgument("If provided, secondary_order_array should not have NULL elements.");
+        }
+        const auto& secondary_order_offsets = secondary_order_array_data.offsets->get_data().data();
+        for (auto row = 0; row < chunk_size; ++row) {
+            const auto start = timestamp_offsets[row];
+            const auto end = timestamp_offsets[row + 1];
+            if (secondary_order_offsets[row] != start || secondary_order_offsets[row + 1] != end) {
+                return Status::InvalidArgument(
+                        "If provided, the size of secondary_order_array and timestamp_array should not be different.");
+            }
+        }
+        for (auto row = 0; row < chunk_size; ++row) {
+            auto array = secondary_order_column->get(row).get_array();
+            for (const auto& item: array) {
+                secondary_orders.push_back(item.convert2DatumKey());
+            }
+        }
+    }
+
+    ColumnPtr size_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[2]);
+    if (size_column->has_null()) {
+        return Status::InvalidArgument("size_array should not be NULL.");
+    }
+    UnnestedArrayData size_array_data = prepare_array_input(size_column.get());
+    if (size_array_data.null_elements != nullptr) {
+        return Status::InvalidArgument("size_array should not have NULL elements.");
+    }
+    const auto& sizes = down_cast<const RunTimeColumnType<TYPE_INT>&>(*size_array_data.elements).get_data().data();
+    const auto& size_offsets = size_array_data.offsets->get_data().data();
+
+    ColumnPtr priority_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[3]);
+    if (priority_column->has_null()) {
+        return Status::InvalidArgument("priority_array should not be NULL.");
+    }
+    UnnestedArrayData priority_array_data = prepare_array_input(priority_column.get());
+    if (priority_array_data.null_elements != nullptr) {
+        return Status::InvalidArgument("priority_array should not have NULL elements.");
+    }
+    const auto& priorities =
+            down_cast<const RunTimeColumnType<TYPE_INT>&>(*priority_array_data.elements).get_data().data();
+    const auto& priority_offsets = priority_array_data.offsets->get_data().data();
+
+    if (columns[0]->is_nullable()) {
+        if (columns[0]->has_null()) {
+            return Status::InvalidArgument("input_array should not be null.");
+        }
+    }
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
+    const auto& src_elements = down_cast<const RunTimeColumnType<LT>&>(*array_data.elements).get_data().data();
+    const auto& src_offsets = array_data.offsets->get_data().data();
+    ColumnBuilder<LT> result(chunk_size);
+
+    for (size_t row = 0; row < chunk_size; row++) {
+        size_t src_timestamp_start = src_offsets[row];
+        size_t src_timestamp_end = src_offsets[row + 1];
+        if (timestamp_offsets[row + 1] != src_timestamp_end) {
+            return Status::InvalidArgument("The size of input_array and timestamp_array should not be different.");
+        }
+        size_t size_priority_start = size_offsets[row];
+        size_t size_priority_end = size_offsets[row + 1];
+        if (priority_offsets[row + 1] != size_priority_end) {
+            return Status::InvalidArgument("The size of size_array and priority_array should not be different.");
+        }
+        size_t start = src_timestamp_start;
+        size_t next = 0;
+        size_t first_index = -1;
+        size_t priority_index = -1;
+        for (size_t i = size_priority_start; i < size_priority_end; i++) {
+            next = start + sizes[i];
+            if (next > src_timestamp_end) {
+                return Status::InvalidArgument(
+                        "The size of input_array and timestamp_array should not be different than the sum of "
+                        "size_array.");
+            }
+            if (start == next) {
+                // Skip empty arrays.
+                continue;
+            }
+            if (first_index == -1) {
+                first_index = start;
+            } else {
+                if (timestamps[start] != timestamps[first_index]) {
+                    if (timestamps[start] < timestamps[first_index]) {
+                        first_index = start;
+                        priority_index = i;
+                    }
+                } else if (!has_secondary_order || secondary_orders[start] == secondary_orders[first_index]) {
+                    if (priorities[i] > priorities[priority_index]) {
+                        first_index = start;
+                        priority_index = i;
+                    }
+                } else {
+                    if (secondary_orders[start] < secondary_orders[first_index]) {
+                        first_index = start;
+                        priority_index = i;
+                    }
+                }
+            }
+            start = next;
+        }
+        if (next != src_timestamp_end) {
+            return Status::InvalidArgument(
+                    "The size of input_array and timestamp_array should not be different than the sum of "
+                    "size_array.");
+        }
+        if (first_index != -1 &&
+            (array_data.null_elements == nullptr || (*array_data.null_elements)[first_index] == 0)) {
+            result.append(src_elements[first_index]);
+        } else {
+            result.append_null();
+        }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+template
+class CelonisPeekMergedSortedArrays<TYPE_INT>;
+
+template
+class CelonisPeekMergedSortedArrays<TYPE_BIGINT>;
+
+template
+class CelonisPeekMergedSortedArrays<TYPE_DOUBLE>;
+
+template
+class CelonisPeekMergedSortedArrays<TYPE_DATETIME>;
+
+template
+class CelonisPeekMergedSortedArrays<TYPE_VARCHAR>;
+
+} // namespace starrocks

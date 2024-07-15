@@ -151,6 +151,7 @@ set(CELONIS_FILES
   celonis/mo_bpmn_graph.cpp
   celonis/multi_in.cpp
   celonis/patindex.cpp
+  celonis/peek_merged_sorted_arrays.cpp
   celonis/qnorm.cpp
   celonis/remap_timestamp_weekday.cpp
   celonis/remap_values.cpp

@@ -188,6 +188,7 @@ set(EXEC_FILES
         ./exprs/celonis/mo_bpmn_graph_test.cpp
         ./exprs/celonis/multi_in_test.cpp
         ./exprs/celonis/patindex_test.cpp
+        ./exprs/celonis/peek_merged_sorted_arrays_test.cpp
         ./exprs/celonis/qnorm_test.cpp
         ./exprs/celonis/remap_values_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
