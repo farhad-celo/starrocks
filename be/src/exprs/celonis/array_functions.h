@@ -11,7 +11,7 @@ public:
     /**
      * @param: [input_array, timestamp_array, size_array, priority_array, (optional) secondary_order_array]
      * @paramType: [ANY_ARRAY, ARRAY_TIMESTAMP, ARRAY_INT, ARRAY_INT, ARRAY_INT | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_STRING]
-     * @return: input_arrays type
+     * @return: input_array type
      * input_array and timestamp_array should have the same number of elements which is equal to the sum of size_array.
      * size_array and priority_array should have the same number of elements.
      * timestamp_array, size_array and priority_array should not be NULL and should not have NULL elements.

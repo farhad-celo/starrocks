@@ -187,9 +187,9 @@ public:
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
 
         std::vector<DatumKey> secondary_orders;
-        secondary_orders.reserve(timestamp_offsets[chunk_size]);
         const bool has_secondary_order = columns.size() == 5;
         if (has_secondary_order) {
+            secondary_orders.reserve(timestamp_offsets[chunk_size]);
             ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
             if (secondary_order_column->has_null()) {
                 return Status::InvalidArgument("If provided, secondary_order_array should not be NULL.");
@@ -209,12 +209,10 @@ public:
             }
             for (auto row = 0; row < chunk_size; ++row) {
                 auto array = secondary_order_column->get(row).get_array();
-                for (const auto& item : array) {
+                for (const auto& item: array) {
                     secondary_orders.push_back(item.convert2DatumKey());
                 }
             }
-        } else {
-            secondary_orders.assign(timestamp_offsets[chunk_size], 0);
         }
 
         ColumnPtr size_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[2]);
@@ -298,6 +296,9 @@ public:
                     if (*lhs.timestamp != *rhs.timestamp) {
                         return *lhs.timestamp > *rhs.timestamp;
                     }
+                    if (lhs.secondary_order == nullptr || rhs.secondary_order == nullptr) {
+                        return lhs.priority < rhs.priority;
+                    }
                     const DatumKey lhs_order = *lhs.secondary_order;
                     const DatumKey rhs_order = *rhs.secondary_order;
                     if (lhs_order == rhs_order) {
@@ -320,7 +321,11 @@ public:
                     // Skip empty arrays.
                     continue;
                 }
-                pq.emplace(start, next, timestamps + start, secondary_orders.data() + start, priorities[i]);
+                if (has_secondary_order) {
+                    pq.emplace(start, next, timestamps + start, secondary_orders.data() + start, priorities[i]);
+                } else {
+                    pq.emplace(start, next, timestamps + start, nullptr, priorities[i]);
+                }
                 start = next;
             }
             if (next != src_timestamp_end) {
@@ -335,7 +340,9 @@ public:
                 new_offset++;
                 if (++curr.index < curr.end) {
                     curr.timestamp++;
-                    curr.secondary_order++;
+                    if (curr.secondary_order != nullptr) {
+                        curr.secondary_order++;
+                    }
                     pq.push(curr);
                 }
             }
@@ -771,7 +778,7 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionContext* context,
                                                      const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
     TypeDescriptor type_array_bigint;
     type_array_bigint.type = TYPE_ARRAY;
     type_array_bigint.children.resize(1);
@@ -785,7 +792,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionCo
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] FunctionContext* context,
                                                              const Columns& columns) {
     DCHECK(columns.size() == 5);
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
     auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
     RETURN_IF_ERROR(calc_crop_impl(columns, false, result));
     return result;
