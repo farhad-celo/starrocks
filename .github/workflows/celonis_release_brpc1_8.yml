@@ -23,7 +23,7 @@ env:
   IMAGE_TAG: "${{ inputs.image_tag }}-brpc1.8"
   BUILD_TYPE: Release
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-33347faf-locale-cpml2.161.2-ubuntu-brpc1.8
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-ef2f161a-locale-cpml2.161.2-ubuntu-brpc1.8
 
 jobs:
   build-image:

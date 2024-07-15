@@ -20,7 +20,7 @@ runs:
         fi
 
         # Build image and always remove intermediate containers.
-        DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg USER=starrocks \
+        DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RUN_AS_USER=starrocks \
           --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
           -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile -t starrocks-fe:${{inputs.image_tag}} .
 
@@ -33,6 +33,6 @@ runs:
         fi
 
         # Build image and always remove intermediate containers.
-        DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg USER=starrocks \
+        DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RUN_AS_USER=starrocks \
           --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
           -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${{inputs.image_tag}} .
