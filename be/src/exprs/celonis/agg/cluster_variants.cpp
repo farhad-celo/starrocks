@@ -134,7 +134,7 @@ struct Clusterer {
         }
     }
 
-    int64_t compute_density(const std::vector<int64_t>& counts, const phmap::flat_hash_set<size_t>& neighbors) const {
+    int64_t compute_density(const std::vector<int64_t>& counts, const std::vector<size_t>& neighbors) const {
         int64_t rv = 0;
         for (auto index: neighbors) {
             rv += counts[index];
@@ -210,14 +210,16 @@ struct Clusterer {
         return lo;
     }
 
-    phmap::flat_hash_set<size_t>
+    std::vector<size_t>
     get_neighbors(const std::vector<EdgeSet>& points, size_t index, const std::vector<bool>& is_cores,
                   const std::vector<bool>& is_isolated) {
         const auto& point = points[index];
         const auto length = point.size();
         const auto max_length = length + epsilon;
         const auto min_length = length >= epsilon ? (length - epsilon) : 0;
-        phmap::flat_hash_set<size_t> candidates = {};
+        // based on benchmark, std::vector performs better than std::unordered_set and phmap::flat_hash_set.
+        // Since epsilon is in [0, 5], candidates can not be very big.
+        std::vector<size_t> candidates = {};
         if (epsilon >= length) {
             size_t start_index = find_index(points, max_length);
             if (start_index != -1) {
@@ -225,7 +227,7 @@ struct Clusterer {
                     if (is_isolated[i] || is_cores[i] || index == i) {
                         continue;
                     }
-                    candidates.insert(i);
+                    candidates.push_back(i);
                 }
             }
         } else {
@@ -243,22 +245,27 @@ struct Clusterer {
                         if (is_isolated[k] || is_cores[k] || index == k) {
                             continue;
                         }
-                        candidates.insert(indexes[j]);
+                        candidates.push_back(indexes[j]);
                     }
                 }
             }
         }
-        phmap::flat_hash_set<size_t> rv = {index};
-        for (auto candidate: candidates) {
+        std::vector<size_t> rv = {index};
+        std::sort(candidates.begin(), candidates.end());
+        for (auto i = 0; i < candidates.size(); ++i) {
+            if (i > 0 && candidates[i] == candidates[i - 1]) {
+                continue;
+            }
+            const auto candidate = candidates[i];
             if (is_neighbor(points, index, candidate)) {
-                rv.insert(candidate);
+                rv.push_back(candidate);
             }
         }
         return rv;
     }
 
     void expand_cluster(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
-                        size_t start_index, const phmap::flat_hash_set<size_t>& neighbors, int64_t cluster_id,
+                        size_t start_index, const std::vector<size_t>& neighbors, int64_t cluster_id,
                         std::vector<int64_t>& labels, std::vector<bool>& is_cores, std::vector<bool>& is_isolated) {
         std::vector<size_t> core_indexes = {start_index};
         labels[start_index] = cluster_id;
