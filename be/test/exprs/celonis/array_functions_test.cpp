@@ -1226,6 +1226,67 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_int_secondary_order) {
     EXPECT_EQ(1020, result->get(1).get_array()[3].get_int32());
 }
 
+TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_in_input_array) {
+    auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)),
+                                                   false);
+    input_array->append_datum(DatumArray{kNullDatum, "120", "215", "225", "310", "315", "320"});
+    input_array->append_datum(DatumArray{"1010", "1020", kNullDatum, kNullDatum});
+
+    auto timestamp_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)),
+                                                       false);
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+            TimestampValue::create(2023, 1, 1, 0, 0, 15),
+            TimestampValue::create(2023, 1, 1, 0, 0, 25),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 15),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+    });
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+    });
+
+    auto secondary_order_array = ColumnHelper::create_column(
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DOUBLE)),
+            false);
+    secondary_order_array->append_datum(DatumArray{1.5, 1.5, 3.5, 3.5, 2.5, 2.5, 2.5});
+    secondary_order_array->append_datum(DatumArray{2.5, 2.5, 1.5, 1.5});
+
+    auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                  false);
+    size_array->append_datum(DatumArray{2, 2, 3});
+    size_array->append_datum(DatumArray{2, 2});
+
+    auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+    priority_array->append_datum(DatumArray{1, 1, 1});
+    priority_array->append_datum(DatumArray{1, 1});
+
+    const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
+            nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
+    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    const auto& result = rs.value();
+    ASSERT_EQ(2, result->size());
+    ASSERT_EQ(7, result->get(0).get_array().size());
+    EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+    EXPECT_EQ("310", result->get(0).get_array()[1].get_slice().to_string());
+
+    EXPECT_EQ("315", result->get(0).get_array()[2].get_slice().to_string());
+    EXPECT_EQ("215", result->get(0).get_array()[3].get_slice().to_string());
+    EXPECT_EQ("120", result->get(0).get_array()[4].get_slice().to_string());
+    EXPECT_EQ("320", result->get(0).get_array()[5].get_slice().to_string());
+    EXPECT_EQ("225", result->get(0).get_array()[6].get_slice().to_string());
+    ASSERT_EQ(4, result->get(1).get_array().size());
+    EXPECT_TRUE(result->get(1).get_array()[0].is_null());
+    EXPECT_EQ("1010", result->get(1).get_array()[1].get_slice().to_string());
+    EXPECT_TRUE(result->get(1).get_array()[2].is_null());
+    EXPECT_EQ("1020", result->get(1).get_array()[3].get_slice().to_string());
+}
+
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_double_secondary_order) {
     auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), false);
     input_array->append_datum(DatumArray{110, 120, 215, 225, 310, 315, 320});
