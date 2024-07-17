@@ -4,6 +4,7 @@
 
 #include "column/datum.h"
 #include "column/type_traits.h"
+#include "column/hash_set.h"
 #include "exprs/agg/aggregate.h"
 #include "exprs/function_context.h"
 #include "gutil/casts.h"

@@ -164,7 +164,7 @@ public:
 
     const std::string& weighted_tokens() const { return weighted_tokens_; }
 
-    const phmap::flat_hash_set<int128_t>& null_hashes() const { return null_hashes_; }
+    const HashSet<int128_t>& null_hashes() const { return null_hashes_; }
 
     const phmap::flat_hash_map<int128_t, std::pair<std::string, int64_t>>& hash_to_string_with_count() const {
         return hash_to_string_with_count_;
@@ -174,7 +174,7 @@ private:
     std::string weighted_tokens_;
     int64_t edit_threshold_ = 0;
     int64_t token_weight_ = 1;
-    phmap::flat_hash_set<int128_t> null_hashes_;
+    HashSet<int128_t> null_hashes_;
     phmap::flat_hash_map<int128_t, std::pair<std::string, int64_t>> hash_to_string_with_count_;
 };
 

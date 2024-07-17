@@ -111,13 +111,13 @@ private:
 
     ColumnsKeyDictionary ckd_; // Dictionary of nodes. Index is used below for traversing paths.
     phmap::flat_hash_map<int32_t, std::vector<EdgeInfo>> edges_map_; // Key: OutIndex, Value: EdgeInfo
-    phmap::flat_hash_set<int32_t> is_end_;
-    phmap::flat_hash_set<int32_t> is_not_all_;
+    HashSet<int32_t> is_end_;
+    HashSet<int32_t> is_not_all_;
 
     std::vector<EdgeInfo> stack_;
     std::vector<int32_t> path_; // The current path
     std::vector<int32_t> path_pk_offset_; // PK offsets in the current path. Used when allow_cycles is true.
-    phmap::flat_hash_set<int32_t> visited_; // To check if a node (or a pk when allow_cycles is true) has been visited.
+    HashSet<int32_t> visited_; // To check if a node (or a pk when allow_cycles is true) has been visited.
 };
 
 template <>
@@ -143,11 +143,11 @@ NodePathEnumerator<allow_cycles>::NodePathEnumerator(FunctionContext* ctx, const
     Column* in_all = state.get_column(InputColumnIndex::IN_ALL);
 
     // To find implicit start
-    phmap::flat_hash_set<int32_t> outs;
-    phmap::flat_hash_set<int32_t> ins;
+    HashSet<int32_t> outs;
+    HashSet<int32_t> ins;
     phmap::flat_hash_map<int32_t, std::vector<int32_t>> reverse_edges;
     // To keep explicit start
-    phmap::flat_hash_set<int32_t> is_start;
+    HashSet<int32_t> is_start;
 
     auto elem_size = (*state.data_columns)[InputColumnIndex::OUT_COLUMNS]->size();
     for (int32_t row = 0; row < elem_size; ++row) {
@@ -364,19 +364,19 @@ private:
     int64_t max_length_;
 
     ColumnsKeyDictionary ckd_; // Dictionary of nodes. Index is used below for traversing paths.
-    phmap::flat_hash_map<int32_t, phmap::flat_hash_set<int32_t>> edges_map_; // Key: OutIndex, Value: InIndex
+    phmap::flat_hash_map<int32_t, HashSet<int32_t>> edges_map_; // Key: OutIndex, Value: InIndex
 
     std::vector<int32_t> stack_;
     std::vector<int32_t> path_; // The current path
     phmap::flat_hash_map<int32_t, size_t> visit_info_; // The distance when a node is added for traversing.
-    phmap::flat_hash_set<int32_t> exported_; // To check if a pair has been exported.
+    HashSet<int32_t> exported_; // To check if a pair has been exported.
 };
 
 TransitiveEdgeEnumerator::TransitiveEdgeEnumerator(FunctionContext* ctx, const CelonisEnumerateAggregateState& state)
         : key_size_(ctx->get_arg_type(InputColumnIndex::OUT_COLUMNS)->children.size()),
           max_length_(state.length),
           ckd_(ctx, state.data_raw_columns->data(), state.logical_types->data()) {
-    phmap::flat_hash_set<int32_t> from;
+    HashSet<int32_t> from;
 
     auto elem_size = (*state.data_columns)[InputColumnIndex::OUT_COLUMNS]->size();
     for (int32_t row = 0; row < elem_size; ++row) {

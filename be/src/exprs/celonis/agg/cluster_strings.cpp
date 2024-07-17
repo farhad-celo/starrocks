@@ -71,7 +71,7 @@ struct String {
 };
 
 bool have_overlap(const String& s1, const String& s2) {
-    phmap::flat_hash_set<std::variant<char, std::string>> set1;
+    HashSet<std::variant<char, std::string>> set1;
     for (auto i = 0; i < s1.size(); ++i) {
         set1.insert(s1[i]);
     }
