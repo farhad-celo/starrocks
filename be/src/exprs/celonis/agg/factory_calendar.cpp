@@ -168,7 +168,7 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto);
     if (!calendar_string.has_value()) {
         ctx->set_error(StrCat("Calendar proto serialized size (", calendar_proto.ByteSizeLong(),
-                              " bytes) exceeds maximum supported length (4GB)").c_str(), false);
+                              " bytes) exceeds maximum supported length (1GB)").c_str(), false);
         return;
     }
 
