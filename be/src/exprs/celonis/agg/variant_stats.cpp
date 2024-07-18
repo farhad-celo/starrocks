@@ -158,7 +158,8 @@ void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_to
 
 // std::string
 
-std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
+std::optional<std::string>
+VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
@@ -268,7 +269,8 @@ std::string VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_
     return buf.GetString();
 }
 
-std::string VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
+std::optional<std::string>
+VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
     celonis::accelerator::Statistics statistics_proto;
     // construct proto
     // Dictionary
@@ -367,15 +369,16 @@ std::string VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& act
     }
     *statistics_proto.mutable_happy() = count_pair;
 
-    std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto);
+    // set size limit to 100M.
+    std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto, (100LL << 20));
     if (!encoded_string.has_value()) {
-        LOG(ERROR) << "proto serialized size exceeds maximum supported length (4GB).\n";
-        return "";
+        LOG(ERROR) << "CELONIS_VARIANT_STATS: proto serialized size exceeds maximum supported length (100M).\n";
     }
-    return encoded_string.value();
+    return encoded_string;
 }
 
-std::string VariantStatsFinalizer::to_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
+std::optional<std::string>
+VariantStatsFinalizer::to_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
     if (enable_proto_encoding_) {
         return base64_encoded_string(activity_top_variants, happy);
     } else {
@@ -383,7 +386,16 @@ std::string VariantStatsFinalizer::to_string(std::vector<VList>& activity_top_va
     }
 }
 
-std::string VariantStatsFinalizer::finalize() {
+std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx) {
+    if (activity_map_.size() > std::numeric_limits<int16_t>::max()) {
+        ctx->set_error(std::string(
+                               "CELONIS_VARIANT_STATS: the size of activity_map is " + std::to_string(activity_map_.size()) +
+                               " which is greater than the limit " +
+                               std::to_string(std::numeric_limits<int16_t>::max()))
+                               .c_str(),
+                       false);
+        return std::nullopt;
+    }
     if (variant_map_.empty() || activity_map_.empty()) {
         return enable_proto_encoding_ ? "" : "{}";
     }
@@ -432,7 +444,12 @@ std::string VariantStatsFinalizer::finalize() {
               << activity_top_variants.size() << ")\n";
     LOG(INFO) << "CELONIS_VARIANT_STATS: started to_string\n";
     auto rv = to_string(activity_top_variants, happy);
-    LOG(INFO) << "CELONIS_VARIANT_STATS: done to_string (length = " << rv.size() << ")\n";
+    if (rv.has_value()) {
+        LOG(INFO) << "CELONIS_VARIANT_STATS: done to_string (length = " << rv->size() << ")\n";
+    } else {
+        ctx->set_error(std::string("CELONIS_VARIANT_STATS: output string size exceeds the limit (100M)").c_str(),
+                       false);
+    }
     return rv;
 }
 

@@ -52,8 +52,9 @@ public:
 
     virtual ~VariantAggregateFinalizer() = default;
 
-    // Finalizes the state and returns a json string representing the result.
-    virtual std::string finalize() = 0;
+    // Finalizes the state and returns a string representing the result.
+    // When there is an exception, set ctx accordingly and return std::nullopt.
+    virtual std::optional<std::string> finalize(FunctionContext* ctx) = 0;
 
 protected:
     FunctionContext* ctx_;
@@ -99,8 +100,10 @@ public:
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const final {
         auto finalizer = get_finalizer(ctx, this->data(state));
-        std::string s = finalizer->finalize();
-        down_cast<BinaryColumn*>(to)->append(s);
+        std::optional<std::string> s = finalizer->finalize(ctx);
+        if (s.has_value()) {
+            down_cast<BinaryColumn*>(to)->append(s.value());
+        }
     }
 
     // Returns a VariantAggregateFinalizer instance.

@@ -108,7 +108,7 @@ std::string InductiveMinerFinalizer::json_string(const std::vector<Slice>& activ
     return buf.GetString();
 }
 
-std::string InductiveMinerFinalizer::finalize() {
+std::optional<std::string> InductiveMinerFinalizer::finalize(FunctionContext* ctx) {
     // Matches activity ids and variant order to Saola.
     const auto& [activities, variants] = sort_activities_and_variants(activity_map_, variant_map_);
 

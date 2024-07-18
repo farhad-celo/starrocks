@@ -50,7 +50,7 @@ public:
             : VariantAggregateFinalizer(ctx, static_cast<const VariantAggregateState&>(state)),
               imfd_frequency_threshold_(state.imfd_frequency_threshold()) {}
 
-    std::string finalize() override;
+    std::optional<std::string> finalize(FunctionContext* ctx) override;
 
 private:
     std::string json_string(const std::vector<Slice>& activities,

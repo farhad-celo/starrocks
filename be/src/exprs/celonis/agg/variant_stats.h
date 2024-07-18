@@ -116,7 +116,7 @@ public:
               disable_top_variant_stats_(state.disable_top_variant_stats()),
               enable_proto_encoding_(state.enable_proto_encoding()) {}
 
-    std::string finalize() override;
+    std::optional<std::string> finalize(FunctionContext* ctx) override;
 
 private:
     // Holds a reference (iterator) to a variant in the VariantHashMap.
@@ -125,11 +125,11 @@ private:
     // List of variant references, used to hold top-k variants per activity.
     using VList = std::vector<VRef>;
 
-    std::string json_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
+    std::optional<std::string> json_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
 
-    std::string base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
+    std::optional<std::string> base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
 
-    std::string to_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
+    std::optional<std::string> to_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
 
     // Computes the variant that starts and ends with the most common start/end activities,
     // otherwise returns the top most frequent activity.
@@ -146,7 +146,6 @@ private:
 };
 
 // Extends VariantAggregateFunction and calculates statistics of activities and edges.
-// TODO(hagonzal): Return json column. Now it returns a string column with json.
 // TODO(hagonzal): add option to compute approximate top-k variants, now it returns exact top-k.
 /**
  * @param: [ input_column, weight_column [, edge_count [, disable_top_variant_stats [, enable_proto_encoding ] ] ] ]
