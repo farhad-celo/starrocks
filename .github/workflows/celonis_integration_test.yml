@@ -92,11 +92,11 @@ jobs:
           echo "The new default branch is: ${newdefaultbranch}"
 
           # check if the branch exists
-          if git show-ref --quiet refs/heads/${newdefaultbranch}; then
-              echo "branch '${newdefaultbranch}' already exists. checking out..."
+          if git show-ref --verify --quiet refs/heads/${newdefaultbranch}; then
+              echo "branch '${newdefaultbranch}' already exists. Checking out..."
               git checkout ${newdefaultbranch}
           else
-              echo "branch '${newdefaultbranch}' does not exist. creating and checking out and pushing to remote ..."
+              echo "branch '${newdefaultbranch}' does not exist. Creating and checking out and pushing to remote ..."
               git checkout -b ${newdefaultbranch}
               git push --set-upstream origin ${newdefaultbranch}
           fi
@@ -105,12 +105,31 @@ jobs:
           default_branch=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
           echo "the current default branch is ${default_branch}"
 
-          # rebase
-          git checkout ${default_branch}
-          timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
-          testbranch=gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}-${timestamp}
-          git checkout -b $testbranch
-          git rebase ${newdefaultbranch}
+          retries=5
+          count=0
+
+          run_rebase() {
+            git checkout ${default_branch} && \
+            timestamp=$(date +'%Y-%m-%dT%H-%M-%S') && \
+            testbranch=gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}-${timestamp} && \
+            git checkout -b $testbranch && \
+            git rebase ${newdefaultbranch}
+          }
+
+          until [ $count -ge $retries ]
+          do
+            echo "Attempt $((count+1))"
+            run_rebase && break
+            count=$((count+1))
+            echo "Rebase failed, retrying in 5 seconds..."
+            sleep 5
+          done
+
+          if [ $count -eq $retries ]; then
+            echo "Command failed after $retries attempts"
+            exit 1
+          fi
+
           git push --set-upstream origin $testbranch
           echo "test_branch=$testbranch" >> "$GITHUB_OUTPUT"
 
