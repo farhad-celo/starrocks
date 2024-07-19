@@ -362,9 +362,10 @@ public:
 
     const SliceHashMap& activity_map() const { return activity_map_; }
 
-    const phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>>& edge_set_map() const { return edge_set_map_; }
+    const phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>, StdHash<int128_t>>&
+    edge_set_map() const { return edge_set_map_; }
 
-    const phmap::flat_hash_set<int128_t> null_variant_hashes() const { return null_variant_hashes_; }
+    const HashSet<int128_t> null_variant_hashes() const { return null_variant_hashes_; }
 
 private:
     // Adds an activity to the dictionary if it does not exist.
@@ -374,11 +375,11 @@ private:
 
     int64_t min_pts_ = 0;
     int64_t epsilon_ = 0;
-    phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>> edge_set_map_; // variant_hash128 -> (edge_set, count)
+    phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>, StdHash<int128_t>> edge_set_map_; // variant_hash128 -> (edge_set, count)
     SliceHashMap activity_map_;  // activity -> index
     // We need to keep track of hash values of variant = NULL. This is because variant = [] or [NULL, ...] may have
     // the different hash value as variant = NULL.
-    phmap::flat_hash_set<int128_t> null_variant_hashes_;
+    HashSet<int128_t> null_variant_hashes_;
 };
 
 /**

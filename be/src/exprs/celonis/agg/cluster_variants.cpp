@@ -217,9 +217,7 @@ struct Clusterer {
         const auto length = point.size();
         const auto max_length = length + epsilon;
         const auto min_length = length >= epsilon ? (length - epsilon) : 0;
-        // based on benchmark, std::vector performs better than std::unordered_set and phmap::flat_hash_set.
-        // Since epsilon is in [0, 5], candidates can not be very big.
-        std::vector<size_t> candidates = {};
+        HashSet<size_t> candidates = {};
         if (epsilon >= length) {
             size_t start_index = find_index(points, max_length);
             if (start_index != -1) {
@@ -227,7 +225,7 @@ struct Clusterer {
                     if (is_isolated[i] || is_cores[i] || index == i) {
                         continue;
                     }
-                    candidates.push_back(i);
+                    candidates.insert(i);
                 }
             }
         } else {
@@ -245,18 +243,13 @@ struct Clusterer {
                         if (is_isolated[k] || is_cores[k] || index == k) {
                             continue;
                         }
-                        candidates.push_back(indexes[j]);
+                        candidates.insert(indexes[j]);
                     }
                 }
             }
         }
         std::vector<size_t> rv = {index};
-        std::sort(candidates.begin(), candidates.end());
-        for (auto i = 0; i < candidates.size(); ++i) {
-            if (i > 0 && candidates[i] == candidates[i - 1]) {
-                continue;
-            }
-            const auto candidate = candidates[i];
+        for (auto candidate: candidates) {
             if (is_neighbor(points, index, candidate)) {
                 rv.push_back(candidate);
             }
