@@ -2,6 +2,7 @@
 
 #include <boost/dynamic_bitset.hpp>
 
+#include "column/hash_set.h"
 #include "exprs/function_context.h"
 #include "exprs/function_helper.h"
 #include "util/phmap/phmap.h"
@@ -76,7 +77,7 @@ struct PetriNet {
     std::vector<Place> places;
     std::vector<Transition> transitions;
     // Mapped transitions per activity. key: activity row id
-    phmap::flat_hash_map<int32_t, std::vector<Transition*>> transition_mapping;
+    phmap::flat_hash_map<int32_t, std::vector<Transition*>, StdHash<int32_t>> transition_mapping;
     // Initial states of the Petri net. Bits at indexes of places in initial marking are set.
     boost::dynamic_bitset<> initial_states;
     // Final states of the Petri net. Bits at indexes of places in final marking are set.

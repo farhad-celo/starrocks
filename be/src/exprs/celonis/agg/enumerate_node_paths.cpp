@@ -110,7 +110,7 @@ private:
     int64_t length_;
 
     ColumnsKeyDictionary ckd_; // Dictionary of nodes. Index is used below for traversing paths.
-    phmap::flat_hash_map<int32_t, std::vector<EdgeInfo>> edges_map_; // Key: OutIndex, Value: EdgeInfo
+    phmap::flat_hash_map<int32_t, std::vector<EdgeInfo>, StdHash<int32_t>> edges_map_; // Key: OutIndex, Value: EdgeInfo
     HashSet<int32_t> is_end_;
     HashSet<int32_t> is_not_all_;
 
@@ -145,7 +145,7 @@ NodePathEnumerator<allow_cycles>::NodePathEnumerator(FunctionContext* ctx, const
     // To find implicit start
     HashSet<int32_t> outs;
     HashSet<int32_t> ins;
-    phmap::flat_hash_map<int32_t, std::vector<int32_t>> reverse_edges;
+    phmap::flat_hash_map<int32_t, std::vector<int32_t>, StdHash<int32_t>> reverse_edges;
     // To keep explicit start
     HashSet<int32_t> is_start;
 
@@ -364,11 +364,11 @@ private:
     int64_t max_length_;
 
     ColumnsKeyDictionary ckd_; // Dictionary of nodes. Index is used below for traversing paths.
-    phmap::flat_hash_map<int32_t, HashSet<int32_t>> edges_map_; // Key: OutIndex, Value: InIndex
+    phmap::flat_hash_map<int32_t, HashSet<int32_t>, StdHash<int32_t>> edges_map_; // Key: OutIndex, Value: InIndex
 
     std::vector<int32_t> stack_;
     std::vector<int32_t> path_; // The current path
-    phmap::flat_hash_map<int32_t, size_t> visit_info_; // The distance when a node is added for traversing.
+    phmap::flat_hash_map<int32_t, size_t, StdHash<int32_t>> visit_info_; // The distance when a node is added for traversing.
     HashSet<int32_t> exported_; // To check if a pair has been exported.
 };
 
