@@ -27,8 +27,9 @@ static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
         // invalid utf8 byte: 0b1111'1000~ 0b1111'1111
         4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1};
 
-int64_t get_cost(const phmap::flat_hash_map<std::variant<char, std::string>, int64_t>& char_to_cost,
-                 const std::variant<char, std::string>& ch) {
+using Char = std::variant<char, std::string>;
+
+int64_t get_cost(const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_to_cost, const Char& ch) {
     auto it = char_to_cost.find(ch);
     if (it == char_to_cost.end()) {
         return 1;
@@ -37,41 +38,41 @@ int64_t get_cost(const phmap::flat_hash_map<std::variant<char, std::string>, int
 }
 
 struct String {
-    std::vector<std::variant<char, std::string>> tokens;
+    std::vector<Char> chars;
     // number of chars which have non-zero cost.
     size_t real_len = 0;
 
-    String(const std::string& s, const phmap::flat_hash_map<std::variant<char, std::string>, int64_t>& char_to_cost) {
+    String(const std::string& s, const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_to_cost) {
         int char_size = 0;
         for (const char* str_p = s.data(), * str_end = str_p + s.size(); str_p < str_end; str_p += char_size) {
             char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
             if (char_size == 1) {
-                tokens.emplace_back(*str_p);
+                chars.emplace_back(*str_p);
             } else {
-                tokens.emplace_back(std::string(str_p, char_size));
+                chars.emplace_back(std::string(str_p, char_size));
             }
         }
         real_len = 0;
-        for (auto i = 0; i < tokens.size(); ++i) {
-            if (get_cost(char_to_cost, tokens[i]) != 0) {
+        for (auto i = 0; i < chars.size(); ++i) {
+            if (get_cost(char_to_cost, chars[i]) != 0) {
                 ++real_len;
             }
         }
     }
 
-    size_t size() const { return tokens.size(); }
+    size_t size() const { return chars.size(); }
 
-    size_t length() const { return tokens.size(); }
+    size_t length() const { return chars.size(); }
 
     size_t real_length() const { return real_len; }
 
-    const std::variant<char, std::string>& operator[](size_t index) const {
-        return tokens[index];
+    const Char& operator[](size_t index) const {
+        return chars[index];
     }
 };
 
 bool have_overlap(const String& s1, const String& s2) {
-    HashSet<std::variant<char, std::string>> set1;
+    HashSet<Char> set1;
     for (auto i = 0; i < s1.size(); ++i) {
         set1.insert(s1[i]);
     }
@@ -84,7 +85,7 @@ bool have_overlap(const String& s1, const String& s2) {
 }
 
 int64_t weighted_edit_distance(const String& s1, const String& s2,
-                               const phmap::flat_hash_map<std::variant<char, std::string>, int64_t>& char_to_cost) {
+                               const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_to_cost) {
     size_t m = s1.length();
     size_t n = s2.length();
     std::vector<std::vector<int64_t>> dp(m + 1, std::vector<int64_t>(n + 1, 0));
@@ -138,7 +139,7 @@ get_cluster(const std::vector<std::vector<size_t>>& graph, size_t start, std::ve
 
 struct StringClusterer {
     int64_t edit_threshold;
-    phmap::flat_hash_map<std::variant<char, std::string>, int64_t> char_to_cost;
+    phmap::flat_hash_map<Char, int64_t, StdHash<Char>> char_to_cost;
 
     StringClusterer(int64_t edit_threshold, const std::string& weighted_tokens, int64_t token_weight) : edit_threshold(
             edit_threshold) {
@@ -188,7 +189,7 @@ struct StringClusterer {
     }
 
     std::vector<std::pair<int128_t, std::string>>
-    cluster(const phmap::flat_hash_map<int128_t, std::pair<std::string, int64_t>>& hash_to_string_with_count) const {
+    cluster(const phmap::flat_hash_map<int128_t, std::pair<std::string, int64_t>, StdHash<int128_t>>& hash_to_string_with_count) const {
         LOG(INFO) << "CELONIS_CLUSTER_STRINGS: started clustering\n";
         const auto n = hash_to_string_with_count.size();
         std::vector<std::tuple<int128_t, String, std::string, int64_t>> tuples;
