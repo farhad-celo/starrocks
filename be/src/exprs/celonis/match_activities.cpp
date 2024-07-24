@@ -24,7 +24,7 @@ struct MatchConfig {
     SliceHashSet any_nodes;
 };
 
-struct MatchActivitiesStateFragmentLocal {
+struct MatchActivitiesStateThreadLocal {
     MatchConfig match_config;
     ScalarFunction function;
 };
@@ -115,10 +115,10 @@ void _populate_filter(const ColumnPtr& column, int row, SliceHashSet& filter) {
 
 Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* context,
                                                 FunctionContext::FunctionStateScope scope) {
-    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+    if (scope != FunctionContext::THREAD_LOCAL) {
         return Status::OK();
     }
-    auto state = new MatchActivitiesStateFragmentLocal();
+    auto state = new MatchActivitiesStateThreadLocal();
     context->set_function_state(scope, state);
 
     auto start_nodes_column = context->get_constant_column(1);
@@ -150,9 +150,9 @@ Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* cont
 
 Status CelonisMatchActivitiesFunctions::close(FunctionContext* context,
                                               FunctionContext::FunctionStateScope scope) {
-    if (scope == FunctionContext::FRAGMENT_LOCAL) {
-        const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
-                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    if (scope == FunctionContext::THREAD_LOCAL) {
+        const auto* state = reinterpret_cast<const MatchActivitiesStateThreadLocal*>(
+                context->get_function_state(FunctionContext::THREAD_LOCAL));
         delete state;
     }
     return Status::OK();
@@ -208,8 +208,8 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starro
             *activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
-            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    const auto* state = reinterpret_cast<const MatchActivitiesStateThreadLocal*>(
+            context->get_function_state(FunctionContext::THREAD_LOCAL));
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
@@ -229,8 +229,8 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starro
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities(FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(columns.size(), 7);
-    const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
-            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    const auto* state = reinterpret_cast<const MatchActivitiesStateThreadLocal*>(
+            context->get_function_state(FunctionContext::THREAD_LOCAL));
     return state->function(context, columns);
 }
 
