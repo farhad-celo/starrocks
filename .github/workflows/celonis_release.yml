@@ -22,7 +22,7 @@ env:
   ASAN_IMAGE_TAG: "${{ github.ref_name }}-asan"
   ASAN_BUILD_TYPE: ASAN
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-ef2f161a-locale-cpml2.161.2-ubuntu-brpc1.8
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-ef2f161a-locale-cpml2.177-ubuntu-brpc1.8
 
 jobs:
   build-image:

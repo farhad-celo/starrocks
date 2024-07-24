@@ -7,8 +7,8 @@ cd /celostar-starrocks;
 echo "./build.sh --fe --clean";
 ./build.sh --fe --clean;
 
-echo "./build.sh --be --clean -j `nproc`";
-./build.sh --be --clean -j `nproc`;
+echo "./build.sh --be --without-starcache --with-brpc-keepalive --clean -j `nproc`";
+./build.sh --be --without-starcache --with-brpc-keepalive --clean -j `nproc`;
 
 echo "mkdir jars_for_static_scan"
 mkdir jars_for_static_scan
