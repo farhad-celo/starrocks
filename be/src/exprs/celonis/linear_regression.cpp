@@ -57,7 +57,7 @@ bool parse_model(const std::string& model, double& intercept, std::vector<double
     return true;
 }
 
-struct LinearRegressionStateThreadLocal {
+struct LinearRegressionStateFragmentLocal {
     bool is_valid = false;
     std::optional<LinearRegressionModel> model = std::nullopt;
     ScalarFunction function;
@@ -66,11 +66,11 @@ struct LinearRegressionStateThreadLocal {
 } // namespace
 
 Status CelonisLinearRegression::predict_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-    if (scope != FunctionContext::THREAD_LOCAL || context->get_num_args() != 2) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL || context->get_num_args() != 2) {
         return Status::OK();
     }
 
-    auto state = new LinearRegressionStateThreadLocal();
+    auto state = new LinearRegressionStateFragmentLocal();
     context->set_function_state(scope, state);
 
     auto model_column = context->get_constant_column(1);
@@ -101,9 +101,9 @@ Status CelonisLinearRegression::predict_prepare(FunctionContext* context, Functi
 }
 
 Status CelonisLinearRegression::predict_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-    if (scope == FunctionContext::THREAD_LOCAL) {
-        const auto* state = reinterpret_cast<const LinearRegressionStateThreadLocal*>(
-                context->get_function_state(FunctionContext::THREAD_LOCAL));
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        const auto* state = reinterpret_cast<const LinearRegressionStateFragmentLocal*>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
         delete state;
     }
     return Status::OK();
@@ -170,8 +170,8 @@ CelonisLinearRegression::predict_linear_regression_constant_model([[maybe_unused
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto num_rows = columns[0]->size();
-    const auto* state = reinterpret_cast<const LinearRegressionStateThreadLocal*>(
-            context->get_function_state(FunctionContext::THREAD_LOCAL));
+    const auto* state = reinterpret_cast<const LinearRegressionStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
@@ -216,8 +216,8 @@ CelonisLinearRegression::predict_linear_regression_constant_model([[maybe_unused
 StatusOr<ColumnPtr>
 CelonisLinearRegression::predict_linear_regression(FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(2, columns.size());
-    const auto* state = reinterpret_cast<const LinearRegressionStateThreadLocal*>(
-            context->get_function_state(FunctionContext::THREAD_LOCAL));
+    const auto* state = reinterpret_cast<const LinearRegressionStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
 

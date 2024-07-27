@@ -128,8 +128,8 @@ private:
 } // namespace
 
 template<LogicalType LT>
-struct AbcModelStateThreadLocal {
-    AbcModelStateThreadLocal() : model(std::nullopt) {}
+struct AbcModelStateFragmentLocal {
+    AbcModelStateFragmentLocal() : model(std::nullopt) {}
 
     std::optional<AbcModel<LT>> model;
     ScalarFunction function;
@@ -137,11 +137,11 @@ struct AbcModelStateThreadLocal {
 
 template<LogicalType LT>
 Status CelonisAbcModel<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-    if (scope != FunctionContext::THREAD_LOCAL) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
     }
 
-    auto state = new AbcModelStateThreadLocal<LT>();
+    auto state = new AbcModelStateFragmentLocal<LT>();
     context->set_function_state(scope, state);
 
     auto model_column = context->get_constant_column(2);
@@ -164,9 +164,9 @@ Status CelonisAbcModel<LT>::prepare(FunctionContext* context, FunctionContext::F
 
 template<LogicalType LT>
 Status CelonisAbcModel<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-    if (scope == FunctionContext::THREAD_LOCAL) {
-        const auto* state = reinterpret_cast<const AbcModelStateThreadLocal<LT>*>(
-                context->get_function_state(FunctionContext::THREAD_LOCAL));
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        const auto* state = reinterpret_cast<const AbcModelStateFragmentLocal<LT>*>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
         delete state;
     }
     return Status::OK();
@@ -207,8 +207,8 @@ StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_constant_model([[maybe_
                                                                         const Columns& columns) {
     ColumnViewer value_viewer = ColumnViewer<LT>(columns[0]);
     ColumnViewer pk_hash_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
-    const auto* state = reinterpret_cast<const AbcModelStateThreadLocal<LT>*>(
-            context->get_function_state(FunctionContext::THREAD_LOCAL));
+    const auto* state = reinterpret_cast<const AbcModelStateFragmentLocal<LT>*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
     const size_t num_rows = columns[0]->size();
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
@@ -231,8 +231,8 @@ StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_constant_model([[maybe_
 template<LogicalType LT>
 StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model(FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(3, columns.size());
-    const auto* state = reinterpret_cast<const AbcModelStateThreadLocal<LT>*>(
-            context->get_function_state(FunctionContext::THREAD_LOCAL));
+    const auto* state = reinterpret_cast<const AbcModelStateFragmentLocal<LT>*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
 
