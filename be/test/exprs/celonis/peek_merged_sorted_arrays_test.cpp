@@ -73,6 +73,36 @@ TEST_F(CelonisPeekMergedSortedArraysTest, empty_input) {
     ASSERT_EQ(0, result->size());
 }
 
+TEST_F(CelonisPeekMergedSortedArraysTest, datetime_input_and_bigint_secondary_order) {
+    const LogicalType InputLT = TYPE_DATETIME;
+    const LogicalType SecondaryLT = TYPE_BIGINT;
+    Prepare<InputLT, SecondaryLT>();
+    AddRow(DatumArray{TimestampValue::create(2110, 1, 1, 0, 0, 0), TimestampValue::create(2120, 1, 1, 0, 0, 0),
+                      TimestampValue::create(2215, 1, 1, 0, 0, 0), TimestampValue::create(2225, 1, 1, 0, 0, 0),
+                      TimestampValue::create(2310, 1, 1, 0, 0, 0), TimestampValue::create(2315, 1, 1, 0, 0, 0),
+                      TimestampValue::create(2320, 1, 1, 0, 0, 0)}, DatumArray{
+                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
+           DatumArray{1L, 1L, 3L, 3L, 2L, 2L, 2L});
+    AddRow(DatumArray{TimestampValue::create(1010, 1, 1, 0, 0, 0), TimestampValue::create(1020, 1, 1, 0, 0, 0),
+                      TimestampValue::create(2010, 1, 1, 0, 0, 0), TimestampValue::create(2120, 1, 1, 0, 0, 0)},
+           DatumArray{
+                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
+           DatumArray{2L, 2L, 1L, 1L});
+    const auto result = Run<InputLT>().value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_EQ(TimestampValue::create(2110, 1, 1, 0, 0, 0), result->get(0).get_timestamp());
+    EXPECT_EQ(TimestampValue::create(2010, 1, 1, 0, 0, 0), result->get(1).get_timestamp());
+}
+
 TEST_F(CelonisPeekMergedSortedArraysTest, int_input_and_bigint_secondary_order) {
     const LogicalType InputLT = TYPE_INT;
     const LogicalType SecondaryLT = TYPE_BIGINT;
