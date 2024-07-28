@@ -187,13 +187,15 @@ public:
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
 
         std::vector<DatumKey> secondary_orders;
-        const bool has_secondary_order = columns.size() == 5;
+        const bool has_secondary_order = (columns.size() == 5) && (!columns[4]->has_null());
         if (has_secondary_order) {
             secondary_orders.reserve(timestamp_offsets[chunk_size]);
             ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
+            /*
             if (secondary_order_column->has_null()) {
                 return Status::InvalidArgument("If provided, secondary_order_array should not be NULL.");
             }
+            */
             UnnestedArrayData secondary_order_array_data = prepare_array_input(secondary_order_column.get());
             if (secondary_order_array_data.null_elements != nullptr) {
                 return Status::InvalidArgument("If provided, secondary_order_array should not have NULL elements.");
