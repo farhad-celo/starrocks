@@ -2672,6 +2672,7 @@ windowFunction
     : name = ROW_NUMBER '(' ')'
     | name = RANK '(' ')'
     | name = DENSE_RANK '(' ')'
+    | name = CELONIS_COUNT_DISTINCT '(' expression ')'
     | name = CUME_DIST '(' ')'
     | name = PERCENT_RANK '(' ')'
     | name = NTILE  '(' expression? ')'

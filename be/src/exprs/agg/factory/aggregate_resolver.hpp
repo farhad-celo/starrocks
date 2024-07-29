@@ -57,6 +57,7 @@ class AggregateFuncResolver {
 
 public:
     void register_celonis();
+    void register_celonis_window();
     void register_avg();
     void register_bitmap();
     void register_minmaxany();

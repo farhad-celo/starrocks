@@ -61,6 +61,7 @@
 #include "exprs/celonis/agg/calc_string_bucket_width_boundaries.h"
 #include "exprs/celonis/agg/cluster_strings.h"
 #include "exprs/celonis/agg/cluster_variants.h"
+#include "exprs/celonis/agg/count_distinct.h"
 #include "exprs/celonis/agg/enumerate_node_paths.h"
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/histogram_boundaries.h"
@@ -236,6 +237,8 @@ public:
     static AggregateFunctionPtr MakeCelonisClusterStringsAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisClusterVariantsAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisCountDistinctWindowFunction();
 
     static AggregateFunctionPtr MakeCelonisEnumerateNodePathsAggregateFunction();
 

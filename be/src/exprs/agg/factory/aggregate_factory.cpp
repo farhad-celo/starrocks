@@ -31,6 +31,7 @@ DEFINE_FAIL_POINT(not_exist_agg_function);
 
 AggregateFuncResolver::AggregateFuncResolver() {
     register_celonis();
+    register_celonis_window();
     register_avg();
     register_minmaxany();
     register_bitmap();
@@ -89,6 +90,10 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisClusterStringsAggregateFunctio
 
 AggregateFunctionPtr AggregateFactory::MakeCelonisClusterVariantsAggregateFunction() {
     return std::make_shared<ClusterVariantsAggregateFunction>();
+}
+
+AggregateFunctionPtr AggregateFactory::MakeCelonisCountDistinctWindowFunction() {
+    return std::make_shared<CelonisCountDistinctAggregateFunction>();
 }
 
 AggregateFunctionPtr AggregateFactory::MakeCelonisEnumerateNodePathsAggregateFunction() {

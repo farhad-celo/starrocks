@@ -70,6 +70,19 @@ void AggregateFuncResolver::register_window() {
             "session_number", true, AggregateFactory::MakeSessionNumberWindowFunction<TYPE_BIGINT>());
     add_aggregate_mapping_notnull<TYPE_INT, TYPE_BIGINT>("session_number", true,
                                                          AggregateFactory::MakeSessionNumberWindowFunction<TYPE_INT>());
+
+}
+
+void AggregateFuncResolver::register_celonis_window() {
+    // count_distinct
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_BIGINT>("celonis_count_distinct", true,
+                                                            AggregateFactory::MakeCelonisCountDistinctWindowFunction());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_BIGINT>("celonis_count_distinct", true,
+                                                            AggregateFactory::MakeCelonisCountDistinctWindowFunction());
+    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_BIGINT>("celonis_count_distinct", true,
+                                                              AggregateFactory::MakeCelonisCountDistinctWindowFunction());
+    add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_BIGINT>("celonis_count_distinct", true,
+                                                             AggregateFactory::MakeCelonisCountDistinctWindowFunction());
 }
 
 } // namespace starrocks

@@ -122,6 +122,9 @@ public class AnalyticExpr extends Expr {
     // The function of HLL_UNION_AGG can't be used with a window by now.
     public static String HLL_UNION_AGG = "HLL_UNION_AGG";
 
+    // Celonis window functions:
+    public static String CELONIS_COUNT_DISTINCT = "CELONIS_COUNT_DISTINCT";
+
     public AnalyticExpr(FunctionCallExpr fnCall, List<Expr> partitionExprs, List<OrderByElement> orderByElements,
                         AnalyticWindow window, List<String> hints) {
         this(fnCall, partitionExprs, orderByElements, window, hints, NodePosition.ZERO, null, List.of());

@@ -536,6 +536,9 @@ public class FunctionSet {
     public static final String CELONIS_TRANSITS_MATCH = "celonis_transits_match";
     public static final String CELONIS_XX_HASH3_128 = "celonis_xx_hash3_128";
 
+    // Celonis window functions:
+    public static final String CELONIS_COUNT_DISTINCT = "celonis_count_distinct";
+
     // JSON functions
     public static final Function JSON_QUERY_FUNC = new Function(
             new FunctionName(JSON_QUERY), new Type[] {Type.JSON, Type.VARCHAR}, Type.JSON, false);
@@ -763,6 +766,7 @@ public class FunctionSet {
             .add(FunctionSet.LAST_VALUE)
             .add(FunctionSet.FIRST_VALUE_REWRITE)
             .add(FunctionSet.SESSION_NUMBER)
+            .add(FunctionSet.CELONIS_COUNT_DISTINCT)
             .build();
 
     public static final Set<String> VARIANCE_FUNCTIONS = ImmutableSet.<String>builder()
@@ -1315,6 +1319,18 @@ public class FunctionSet {
                 /*returnType=*/Type.ANY_STRUCT,
                 /*intermediateType=*/Type.ANY_STRUCT,
                 false, false, false));
+
+        // Celonis window functions:
+        // celonis_count_distinct
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
+                    Lists.newArrayList(Type.BIGINT), Type.BIGINT, Type.VARBINARY));
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
+                    Lists.newArrayList(Type.DOUBLE), Type.BIGINT, Type.VARBINARY));
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
+                    Lists.newArrayList(Type.DATETIME), Type.BIGINT, Type.VARBINARY));
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
+                    Lists.newArrayList(Type.VARCHAR), Type.BIGINT, Type.VARBINARY));
+
     }
 
     // Populate all the aggregate builtins in the globalStateMgr.
