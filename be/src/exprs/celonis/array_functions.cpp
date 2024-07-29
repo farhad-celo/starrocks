@@ -191,11 +191,6 @@ public:
         if (has_secondary_order) {
             secondary_orders.reserve(timestamp_offsets[chunk_size]);
             ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
-            /*
-            if (secondary_order_column->has_null()) {
-                return Status::InvalidArgument("If provided, secondary_order_array should not be NULL.");
-            }
-            */
             UnnestedArrayData secondary_order_array_data = prepare_array_input(secondary_order_column.get());
             if (secondary_order_array_data.null_elements != nullptr) {
                 return Status::InvalidArgument("If provided, secondary_order_array should not have NULL elements.");

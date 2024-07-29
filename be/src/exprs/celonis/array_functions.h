@@ -15,7 +15,8 @@ public:
      * input_array and timestamp_array should have the same number of elements which is equal to the sum of size_array.
      * size_array and priority_array should have the same number of elements.
      * timestamp_array, size_array and priority_array should not be NULL and should not have NULL elements.
-     * When secondary_order_array is provided, it has the same length as input_array.
+     * secondary_order_array column can be a NULL literal, when it is not, secondary_order_array has the same length as
+     * the corresponding input_array.
      */
     DEFINE_VECTORIZED_FN(merge_sorted_arrays);
 
