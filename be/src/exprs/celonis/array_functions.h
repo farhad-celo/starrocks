@@ -9,14 +9,15 @@ public:
     DEFINE_VECTORIZED_FN(array_is_sorted);
 
     /**
-     * @param: [input_array, timestamp_array, size_array, priority_array, (optional) secondary_order_array]
-     * @paramType: [ANY_ARRAY, ARRAY_TIMESTAMP, ARRAY_INT, ARRAY_INT, ARRAY_INT | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_STRING]
+     * @param: [input_array, timestamp_array, size_array, priority_array, secondary_order_array, limit]
+     * @paramType: [ANY_ARRAY, ARRAY_TIMESTAMP, ARRAY_INT, ARRAY_INT, ARRAY_INT | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_STRING, BIGINT]
      * @return: input_array type
      * input_array and timestamp_array should have the same number of elements which is equal to the sum of size_array.
      * size_array and priority_array should have the same number of elements.
      * timestamp_array, size_array and priority_array should not be NULL and should not have NULL elements.
      * secondary_order_array column can be a NULL literal, when it is not, secondary_order_array has the same length as
      * the corresponding input_array.
+     * If limit is set, only output the first limit elements.
      */
     DEFINE_VECTORIZED_FN(merge_sorted_arrays);
 

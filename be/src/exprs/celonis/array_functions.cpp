@@ -169,7 +169,7 @@ CelonisArrayFunctions::array_is_sorted([[maybe_unused]] FunctionContext* context
 class CelonisMergeSortedArrays {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
-        DCHECK(columns.size() == 4 || columns.size() == 5);
+        DCHECK(columns.size() == 4 || columns.size() == 5 || columns.size() == 6);
 
         size_t chunk_size = columns[0]->size();
 
@@ -187,7 +187,7 @@ public:
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
 
         std::vector<DatumKey> secondary_orders;
-        const bool has_secondary_order = (columns.size() == 5) && (!columns[4]->has_null());
+        const bool has_secondary_order = (columns.size() >= 5) && (!columns[4]->has_null());
         if (has_secondary_order) {
             secondary_orders.reserve(timestamp_offsets[chunk_size]);
             ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
@@ -263,8 +263,16 @@ public:
         std::vector<uint32_t> src_index;
         src_index.reserve(src_elements.size());
         int new_offset = 0;
-
+        int64_t limit = INT64_MAX;
         for (size_t row = 0; row < chunk_size; row++) {
+            if (columns.size() == 6 && !columns[5]->is_null(row)) {
+                limit = columns[5]->get(row).get_int64();
+                if (limit < 0) {
+                    return Status::InvalidArgument("limit must not be negative.");
+                }
+            } else {
+                limit = INT64_MAX;
+            }
             size_t src_timestamp_start = src_offsets[row];
             size_t src_timestamp_end = src_offsets[row + 1];
             if (timestamp_offsets[row + 1] != src_timestamp_end) {
@@ -330,11 +338,13 @@ public:
                         "The size of input_array and timestamp_array should not be different than the sum of "
                         "size_array.");
             }
-            while (!pq.empty()) {
+            int64_t cnt = 0;
+            while (!pq.empty() && cnt < limit) {
                 Array curr = pq.top();
                 pq.pop();
                 src_index.push_back(curr.index);
                 new_offset++;
+                cnt++;
                 if (++curr.index < curr.end) {
                     curr.timestamp++;
                     if (curr.secondary_order != nullptr) {
