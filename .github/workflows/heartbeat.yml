@@ -1,0 +1,23 @@
+name: Action Runner Heartbeat
+
+on:
+  schedule:
+    - cron: "0 */12 * * *" # every 12 hours
+  workflow_dispatch:
+
+jobs:
+  ec2-runner-1:
+    runs-on: [self-hosted, starrocks-ec2-runner-1]
+    steps:
+      - name: Heartbeat
+        run: echo "Runner is alive and registered"
+  ec2-runner-2:
+    runs-on: [self-hosted, starrocks-ec2-runner-2]
+    steps:
+      - name: Heartbeat
+        run: echo "Runner is alive and registered"
+  azure-runner-3:
+    runs-on: [self-hosted, starrocks-azure-runner-3]
+    steps:
+      - name: Heartbeat
+        run: echo "Runner is alive and registered"
