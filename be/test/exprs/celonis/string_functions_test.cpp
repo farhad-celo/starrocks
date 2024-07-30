@@ -110,7 +110,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {column}).value();
         ASSERT_EQ(1, result->size());
-        EXPECT_EQ("-9508340982777299797928774324431085410", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("74246737348891246928363368458797820763", int128_to_string(result->get(0).get_int128()));
     }
     {
         Columns columns;
@@ -120,7 +120,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128(ctx.get(), columns).value();
         ASSERT_EQ(1, result->size());
-        EXPECT_EQ("0", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("140510453822038601413216693103982955033", int128_to_string(result->get(0).get_int128()));
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -132,7 +132,20 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
         ASSERT_EQ(3, result->size());
         EXPECT_EQ("113354056479506190712662670385450615649", int128_to_string(result->get(0).get_int128()));
         EXPECT_EQ("0", int128_to_string(result->get(1).get_int128()));
-        EXPECT_EQ("0", int128_to_string(result->get(2).get_int128()));
+        EXPECT_EQ("140510453822038601413216693103982955033", int128_to_string(result->get(2).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), false);
+        column->append_datum(DatumArray{"Celonis", kNullDatum});
+        column->append_datum(DatumArray{kNullDatum, "Celonis"});
+        column->append_datum(DatumArray{kNullDatum});
+        column->append_datum(DatumArray{kNullDatum, kNullDatum});
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {column}).value();
+        ASSERT_EQ(4, result->size());
+        EXPECT_NE(int128_to_string(result->get(0).get_int128()), int128_to_string(result->get(1).get_int128()));
+        EXPECT_NE(int128_to_string(result->get(1).get_int128()), int128_to_string(result->get(2).get_int128()));
+        EXPECT_NE(int128_to_string(result->get(2).get_int128()), int128_to_string(result->get(3).get_int128()));
     }
 }
 
@@ -196,7 +209,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128) {
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128(ctx.get(), columns).value();
         ASSERT_EQ(1, result->size());
-        EXPECT_EQ("-9508340982777299797928774324431085410", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("74246737348891246928363368458797820763", int128_to_string(result->get(0).get_int128()));
     }
     {
         Columns columns;
@@ -206,7 +219,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128) {
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128(ctx.get(), columns).value();
         ASSERT_EQ(1, result->size());
-        EXPECT_EQ("0", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("140510453822038601413216693103982955033", int128_to_string(result->get(0).get_int128()));
     }
     {
         auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
@@ -216,7 +229,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128) {
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {strings}).value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ("113354056479506190712662670385450615649", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("0", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("140510453822038601413216693103982955033", int128_to_string(result->get(1).get_int128()));
     }
 }
 

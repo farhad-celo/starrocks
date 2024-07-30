@@ -44,12 +44,15 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
             const auto start = offsets[row];
             const auto end = offsets[row + 1];
             for (auto i = start; i < end; ++i) {
-                if (string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0) {
-                    continue;
-                }
-                Slice slice = strings[i];
+                const bool is_null = string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0;
                 uint128_t seed = seeds_vec[row];
-                seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+                if (is_null) {
+                    seeds_vec[row] = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_STRING.data(),
+                                                               XXHASH3_128_NULL_STRING.size(), seed);
+                } else {
+                    Slice slice = strings[i];
+                    seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+                }
             }
         }
     } else {
@@ -60,12 +63,14 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
         }
         for (const auto& viewer: column_viewers) {
             for (size_t row = 0; row < row_size; ++row) {
-                if (viewer.is_null(row)) {
-                    continue;
-                }
-                auto slice = viewer.value(row);
                 uint128_t seed = seeds_vec[row];
-                seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+                if (viewer.is_null(row)) {
+                    seeds_vec[row] = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_STRING.data(),
+                                                               XXHASH3_128_NULL_STRING.size(), seed);
+                } else {
+                    auto slice = viewer.value(row);
+                    seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+                }
             }
         }
     }
