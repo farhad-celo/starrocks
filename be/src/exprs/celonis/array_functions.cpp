@@ -223,17 +223,55 @@ public:
         const auto& sizes = down_cast<const RunTimeColumnType<TYPE_INT>&>(*size_array_data.elements).get_data().data();
         const auto& size_offsets = size_array_data.offsets->get_data().data();
 
-        ColumnPtr priority_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[3]);
-        if (priority_column->has_null()) {
-            return Status::InvalidArgument("priority_array should not be NULL.");
+        std::vector<int32_t> priorities;
+        const bool has_priority = (columns.size() != 6) || (columns.size() == 6 && !columns[3]->has_null());
+        if (has_priority) {
+            priorities.reserve(timestamp_offsets[chunk_size]);
+            const bool similar_to_size = columns.size() != 6;
+            ColumnPtr priority_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[3]);
+            if (priority_column->has_null()) {
+                return Status::InvalidArgument("priority_array should not be NULL.");
+            }
+            UnnestedArrayData priority_array_data = prepare_array_input(priority_column.get());
+            if (priority_array_data.null_elements != nullptr) {
+                return Status::InvalidArgument("priority_array should not have NULL elements.");
+            }
+            const auto& priority_offsets = priority_array_data.offsets->get_data().data();
+            for (auto row = 0; row < chunk_size; ++row) {
+                const auto start = similar_to_size ? size_offsets[row] : timestamp_offsets[row];
+                const auto end = similar_to_size ? size_offsets[row + 1] : timestamp_offsets[row + 1];
+                if (priority_offsets[row] != start || priority_offsets[row + 1] != end) {
+                    if (similar_to_size) {
+                        return Status::InvalidArgument(
+                                "If provided, the size of size_array and priority_array should not be different.");
+                    } else {
+                        return Status::InvalidArgument(
+                                "If provided, the size of timestamp_array and priority_array should not be different.");
+                    }
+                }
+            }
+            if (similar_to_size) {
+                for (auto row = 0; row < chunk_size; ++row) {
+                    auto priority_array = priority_column->get(row).get_array();
+                    auto size_array = size_column->get(row).get_array();
+                    DCHECK_EQ(size_array.size(), priority_array.size());
+                    for (auto i = 0; i < priority_array.size(); ++i) {
+                        for (auto j = 0; j < size_array[i].get_int32(); ++j) {
+                            priorities.push_back(priority_array[i].get_int32());
+                        }
+                    }
+                }
+            } else {
+                for (auto row = 0; row < chunk_size; ++row) {
+                    auto array = priority_column->get(row).get_array();
+                    for (const auto& item: array) {
+                        priorities.push_back(item.get_int32());
+                    }
+                }
+            }
+        } else {
+            priorities.resize(timestamp_offsets[chunk_size], 0);
         }
-        UnnestedArrayData priority_array_data = prepare_array_input(priority_column.get());
-        if (priority_array_data.null_elements != nullptr) {
-            return Status::InvalidArgument("priority_array should not have NULL elements.");
-        }
-        const auto& priorities =
-                down_cast<const RunTimeColumnType<TYPE_INT>&>(*priority_array_data.elements).get_data().data();
-        const auto& priority_offsets = priority_array_data.offsets->get_data().data();
 
         ColumnPtr src_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[0]);
         auto* src_data_column = src_column.get();
@@ -278,15 +316,12 @@ public:
             if (timestamp_offsets[row + 1] != src_timestamp_end) {
                 return Status::InvalidArgument("The size of input_array and timestamp_array should not be different.");
             }
-            size_t size_priority_start = size_offsets[row];
-            size_t size_priority_end = size_offsets[row + 1];
-            if (priority_offsets[row + 1] != size_priority_end) {
-                return Status::InvalidArgument("The size of size_array and priority_array should not be different.");
-            }
+            size_t size_start = size_offsets[row];
+            size_t size_end = size_offsets[row + 1];
 
             struct Array {
                 Array(size_t start, size_t end, const TimestampValue* timestamp, const DatumKey* secondary_order,
-                      int priority)
+                      int* priority)
                         : index(start), end(end), timestamp(timestamp), secondary_order(secondary_order),
                           priority(priority) {}
 
@@ -294,7 +329,7 @@ public:
                 size_t end;
                 const TimestampValue* timestamp;
                 const DatumKey* secondary_order;
-                int priority;
+                int* priority;
             };
             struct CompareArrayElement {
                 bool operator()(const Array& lhs, const Array& rhs) {
@@ -302,12 +337,12 @@ public:
                         return *lhs.timestamp > *rhs.timestamp;
                     }
                     if (lhs.secondary_order == nullptr || rhs.secondary_order == nullptr) {
-                        return lhs.priority < rhs.priority;
+                        return *lhs.priority < *rhs.priority;
                     }
                     const DatumKey lhs_order = *lhs.secondary_order;
                     const DatumKey rhs_order = *rhs.secondary_order;
                     if (lhs_order == rhs_order) {
-                        return lhs.priority < rhs.priority;
+                        return *lhs.priority < *rhs.priority;
                     }
                     return lhs_order > rhs_order;
                 }
@@ -315,7 +350,7 @@ public:
             std::priority_queue<Array, std::vector<Array>, CompareArrayElement> pq;
             size_t start = src_timestamp_start;
             size_t next = 0;
-            for (size_t i = size_priority_start; i < size_priority_end; i++) {
+            for (size_t i = size_start; i < size_end; i++) {
                 next = start + sizes[i];
                 if (next > src_timestamp_end) {
                     return Status::InvalidArgument(
@@ -327,9 +362,9 @@ public:
                     continue;
                 }
                 if (has_secondary_order) {
-                    pq.emplace(start, next, timestamps + start, secondary_orders.data() + start, priorities[i]);
+                    pq.emplace(start, next, timestamps + start, secondary_orders.data() + start, priorities.data() + start);
                 } else {
-                    pq.emplace(start, next, timestamps + start, nullptr, priorities[i]);
+                    pq.emplace(start, next, timestamps + start, nullptr, priorities.data() + start);
                 }
                 start = next;
             }
@@ -347,6 +382,7 @@ public:
                 cnt++;
                 if (++curr.index < curr.end) {
                     curr.timestamp++;
+                    curr.priority++;
                     if (curr.secondary_order != nullptr) {
                         curr.secondary_order++;
                     }
