@@ -538,7 +538,7 @@ public class FunctionSet {
 
     // Celonis window functions:
     public static final String CELONIS_MOVING_TRIMMED_MEAN = "celonis_moving_trimmed_mean";
-    public static final String CELONIS_COUNT_DISTINCT = "celonis_count_distinct";
+    public static final String CELONIS_MOVING_COUNT_DISTINCT = "celonis_moving_count_distinct";
     public static final String CELONIS_MOVING_MEDIAN = "celonis_moving_median";
 
     // JSON functions
@@ -769,7 +769,7 @@ public class FunctionSet {
             .add(FunctionSet.FIRST_VALUE_REWRITE)
             .add(FunctionSet.SESSION_NUMBER)
             .add(FunctionSet.CELONIS_MOVING_TRIMMED_MEAN)
-            .add(FunctionSet.CELONIS_COUNT_DISTINCT)
+            .add(FunctionSet.CELONIS_MOVING_COUNT_DISTINCT)
             .add(FunctionSet.CELONIS_MOVING_MEDIAN)
             .build();
 
@@ -1331,14 +1331,14 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_TRIMMED_MEAN,
                     Lists.newArrayList(Type.DOUBLE), Type.DOUBLE, Type.VARBINARY));
 
-        // celonis_count_distinct
-        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
+        // celonis_moving_count_distinct
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_COUNT_DISTINCT,
                     Lists.newArrayList(Type.BIGINT), Type.BIGINT, Type.VARBINARY));
-        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_COUNT_DISTINCT,
                     Lists.newArrayList(Type.DOUBLE), Type.BIGINT, Type.VARBINARY));
-        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_COUNT_DISTINCT,
                     Lists.newArrayList(Type.DATETIME), Type.BIGINT, Type.VARBINARY));
-        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_COUNT_DISTINCT,
                     Lists.newArrayList(Type.VARCHAR), Type.BIGINT, Type.VARBINARY));
 
         // celonis_moving_median

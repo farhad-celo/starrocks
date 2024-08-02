@@ -1,6 +1,6 @@
--- name: test_celonis_count_distinct_window_function
-DROP TABLE IF EXISTS `count_distinct_test`;
-CREATE TABLE IF NOT EXISTS `count_distinct_test` (
+-- name: test_celonis_moving_count_distinct_window_function
+DROP TABLE IF EXISTS `moving_count_distinct_test`;
+CREATE TABLE IF NOT EXISTS `moving_count_distinct_test` (
   k1 INT,
   k2 INT,
   v1 BIGINT SUM,
@@ -15,7 +15,7 @@ PROPERTIES(
   "replication_num" = "1"
 );
 
-INSERT INTO `count_distinct_test` (k1, k2, v1, v2, v3, v4)
+INSERT INTO `moving_count_distinct_test` (k1, k2, v1, v2, v3, v4)
 VALUES (1, 10, 15, 2.5, '2023-01-01', 'apple'),
        (1, 2, 15, 2.5, '2023-01-02', 'banana'),
        (1, 8, 15, 3.5, '2023-01-03', 'cherry'),
@@ -72,17 +72,17 @@ VALUES (1, 10, 15, 2.5, '2023-01-01', 'apple'),
        (17, 4, 60, 13.5, null, 'cloudberry'),
        (17, 3, 60, 14.5, '2023-02-28', 'dewberry');
 
-SELECT k1, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k1) AS nunique_k1_v1 FROM count_distinct_test ORDER BY k1;
-SELECT k2, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k2) AS nunique_k2_v1 FROM count_distinct_test ORDER BY k2;
-SELECT k1, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k1) AS nunique_k1_v2 FROM count_distinct_test ORDER BY k1;
-SELECT k2, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k2) AS nunique_k2_v2 FROM count_distinct_test ORDER BY k2;
-SELECT k1, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k1) AS nunique_k1_v3 FROM count_distinct_test ORDER BY k1;
-SELECT k2, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k2) AS nunique_k2_v3 FROM count_distinct_test ORDER BY k2;
-SELECT k1, CELONIS_COUNT_DISTINCT(v4) OVER (PARTITION BY k1) AS nunique_k1_v4 FROM count_distinct_test ORDER BY k1;
-SELECT k2, CELONIS_COUNT_DISTINCT(v4) OVER (PARTITION BY k2) AS nunique_k2_v4 FROM count_distinct_test ORDER BY k2;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v1) OVER (PARTITION BY k1) AS nunique_k1_v1 FROM moving_count_distinct_test ORDER BY k1;
+SELECT k2, CELONIS_MOVING_COUNT_DISTINCT(v1) OVER (PARTITION BY k2) AS nunique_k2_v1 FROM moving_count_distinct_test ORDER BY k2;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v2) OVER (PARTITION BY k1) AS nunique_k1_v2 FROM moving_count_distinct_test ORDER BY k1;
+SELECT k2, CELONIS_MOVING_COUNT_DISTINCT(v2) OVER (PARTITION BY k2) AS nunique_k2_v2 FROM moving_count_distinct_test ORDER BY k2;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v3) OVER (PARTITION BY k1) AS nunique_k1_v3 FROM moving_count_distinct_test ORDER BY k1;
+SELECT k2, CELONIS_MOVING_COUNT_DISTINCT(v3) OVER (PARTITION BY k2) AS nunique_k2_v3 FROM moving_count_distinct_test ORDER BY k2;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v4) OVER (PARTITION BY k1) AS nunique_k1_v4 FROM moving_count_distinct_test ORDER BY k1;
+SELECT k2, CELONIS_MOVING_COUNT_DISTINCT(v4) OVER (PARTITION BY k2) AS nunique_k2_v4 FROM moving_count_distinct_test ORDER BY k2;
 
-SELECT k1, k2, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k1, k2 ORDER BY v1 ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS nunique_k12_v1 FROM count_distinct_test ORDER BY k1, k2;
-SELECT k1, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k1 ORDER BY v1 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING) AS nunique_k1_v2 FROM count_distinct_test ORDER BY k1;
-SELECT k1, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k1 ORDER BY v1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS nunique_k1_v3 FROM count_distinct_test ORDER BY k1;
+SELECT k1, k2, CELONIS_MOVING_COUNT_DISTINCT(v1) OVER (PARTITION BY k1, k2 ORDER BY v1 ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS nunique_k12_v1 FROM moving_count_distinct_test ORDER BY k1, k2;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v2) OVER (PARTITION BY k1 ORDER BY v1 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING) AS nunique_k1_v2 FROM moving_count_distinct_test ORDER BY k1;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v3) OVER (PARTITION BY k1 ORDER BY v1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS nunique_k1_v3 FROM moving_count_distinct_test ORDER BY k1;
 
-DROP TABLE IF EXISTS `count_distinct_test`;
+DROP TABLE IF EXISTS `moving_count_distinct_test`;

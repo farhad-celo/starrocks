@@ -10,7 +10,7 @@
 
 namespace starrocks {
 
-struct CelonisCountDistinctAggregateState {
+struct CelonisMovingCountDistinctAggregateState {
     std::map<DatumKey, int64_t> frequency_map;
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
@@ -32,8 +32,8 @@ struct CelonisCountDistinctAggregateState {
     }
 };
 
-class CelonisCountDistinctAggregateFunction final
-        : public WindowFunction<CelonisCountDistinctAggregateState> {
+class CelonisMovingCountDistinctAggregateFunction final
+        : public WindowFunction<CelonisMovingCountDistinctAggregateState> {
 public:
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr state) const override {
         this->data(state).frequency_map = {};
@@ -91,7 +91,7 @@ public:
         }
     }
 
-    std::string get_name() const override { return "celonis_count_distinct"; }
+    std::string get_name() const override { return "celonis_moving_count_distinct"; }
 };
 
 } // namespace starrocks

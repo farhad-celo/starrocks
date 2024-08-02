@@ -92,8 +92,8 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisClusterVariantsAggregateFuncti
     return std::make_shared<ClusterVariantsAggregateFunction>();
 }
 
-AggregateFunctionPtr AggregateFactory::MakeCelonisCountDistinctWindowFunction() {
-    return std::make_shared<CelonisCountDistinctAggregateFunction>();
+AggregateFunctionPtr AggregateFactory::MakeCelonisMovingCountDistinctWindowFunction() {
+    return std::make_shared<CelonisMovingCountDistinctAggregateFunction>();
 }
 
 AggregateFunctionPtr AggregateFactory::MakeCelonisEnumerateNodePathsAggregateFunction() {

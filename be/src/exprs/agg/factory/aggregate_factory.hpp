@@ -61,12 +61,12 @@
 #include "exprs/celonis/agg/calc_string_bucket_width_boundaries.h"
 #include "exprs/celonis/agg/cluster_strings.h"
 #include "exprs/celonis/agg/cluster_variants.h"
-#include "exprs/celonis/agg/count_distinct.h"
 #include "exprs/celonis/agg/enumerate_node_paths.h"
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/celonis/agg/inductive_miner.h"
 #include "exprs/celonis/agg/linear_regression.h"
+#include "exprs/celonis/agg/moving_count_distinct.h"
 #include "exprs/celonis/agg/moving_median.h"
 #include "exprs/celonis/agg/moving_trimmed_mean.h"
 #include "exprs/celonis/agg/multi_linear_regression.h"
@@ -246,7 +246,7 @@ public:
 
     static AggregateFunctionPtr MakeCelonisClusterVariantsAggregateFunction();
 
-    static AggregateFunctionPtr MakeCelonisCountDistinctWindowFunction();
+    static AggregateFunctionPtr MakeCelonisMovingCountDistinctWindowFunction();
 
     static AggregateFunctionPtr MakeCelonisEnumerateNodePathsAggregateFunction();
 

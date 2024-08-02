@@ -79,15 +79,15 @@ void AggregateFuncResolver::register_celonis_window() {
                                                             AggregateFactory::MakeCelonisMovingTrimmedMeanWindowFunction<TYPE_BIGINT>());
     add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_DOUBLE>("celonis_moving_trimmed_mean", true,
                                                             AggregateFactory::MakeCelonisMovingTrimmedMeanWindowFunction<TYPE_DOUBLE>());
-    // count_distinct
-    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_BIGINT>("celonis_count_distinct", true,
-                                                            AggregateFactory::MakeCelonisCountDistinctWindowFunction());
-    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_BIGINT>("celonis_count_distinct", true,
-                                                            AggregateFactory::MakeCelonisCountDistinctWindowFunction());
-    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_BIGINT>("celonis_count_distinct", true,
-                                                              AggregateFactory::MakeCelonisCountDistinctWindowFunction());
-    add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_BIGINT>("celonis_count_distinct", true,
-                                                             AggregateFactory::MakeCelonisCountDistinctWindowFunction());
+    // moving_count_distinct
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_BIGINT>("celonis_moving_count_distinct", true,
+                                                            AggregateFactory::MakeCelonisMovingCountDistinctWindowFunction());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_BIGINT>("celonis_moving_count_distinct", true,
+                                                            AggregateFactory::MakeCelonisMovingCountDistinctWindowFunction());
+    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_BIGINT>("celonis_moving_count_distinct", true,
+                                                              AggregateFactory::MakeCelonisMovingCountDistinctWindowFunction());
+    add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_BIGINT>("celonis_moving_count_distinct", true,
+                                                             AggregateFactory::MakeCelonisMovingCountDistinctWindowFunction());
     // moving_median
     add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_BIGINT>("celonis_moving_median", true,
                                                             AggregateFactory::MakeCelonisMovingMedianWindowFunction<TYPE_BIGINT>());

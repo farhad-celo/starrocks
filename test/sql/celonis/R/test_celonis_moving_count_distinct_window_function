@@ -1,9 +1,9 @@
--- name: test_celonis_count_distinct_window_function
-DROP TABLE IF EXISTS `count_distinct_test`;
+-- name: test_celonis_moving_count_distinct_window_function
+DROP TABLE IF EXISTS `moving_count_distinct_test`;
 -- result:
 []
 -- !result
-CREATE TABLE IF NOT EXISTS `count_distinct_test` (
+CREATE TABLE IF NOT EXISTS `moving_count_distinct_test` (
   k1 INT,
   k2 INT,
   v1 BIGINT SUM,
@@ -20,7 +20,7 @@ PROPERTIES(
 -- result:
 []
 -- !result
-INSERT INTO `count_distinct_test` (k1, k2, v1, v2, v3, v4)
+INSERT INTO `moving_count_distinct_test` (k1, k2, v1, v2, v3, v4)
 VALUES (1, 10, 15, 2.5, '2023-01-01', 'apple'),
        (1, 2, 15, 2.5, '2023-01-02', 'banana'),
        (1, 8, 15, 3.5, '2023-01-03', 'cherry'),
@@ -79,7 +79,7 @@ VALUES (1, 10, 15, 2.5, '2023-01-01', 'apple'),
 -- result:
 []
 -- !result
-SELECT k1, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k1) AS cume_dist_k1_v1 FROM count_distinct_test ORDER BY k1;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v1) OVER (PARTITION BY k1) AS nunique_k1_v1 FROM moving_count_distinct_test ORDER BY k1;
 -- result:
 1	2
 1	2
@@ -136,7 +136,7 @@ SELECT k1, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k1) AS cume_dist_k1_v1 
 17	1
 17	1
 -- !result
-SELECT k2, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k2) AS cume_dist_k2_v1 FROM count_distinct_test ORDER BY k2;
+SELECT k2, CELONIS_MOVING_COUNT_DISTINCT(v1) OVER (PARTITION BY k2) AS nunique_k2_v1 FROM moving_count_distinct_test ORDER BY k2;
 -- result:
 1	1
 1	1
@@ -193,7 +193,7 @@ SELECT k2, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k2) AS cume_dist_k2_v1 
 10	3
 10	3
 -- !result
-SELECT k1, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k1) AS cume_dist_k1_v2 FROM count_distinct_test ORDER BY k1;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v2) OVER (PARTITION BY k1) AS nunique_k1_v2 FROM moving_count_distinct_test ORDER BY k1;
 -- result:
 1	2
 1	2
@@ -250,7 +250,7 @@ SELECT k1, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k1) AS cume_dist_k1_v2 
 17	2
 17	2
 -- !result
-SELECT k2, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k2) AS cume_dist_k2_v2 FROM count_distinct_test ORDER BY k2;
+SELECT k2, CELONIS_MOVING_COUNT_DISTINCT(v2) OVER (PARTITION BY k2) AS nunique_k2_v2 FROM moving_count_distinct_test ORDER BY k2;
 -- result:
 1	1
 1	1
@@ -307,7 +307,7 @@ SELECT k2, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k2) AS cume_dist_k2_v2 
 10	3
 10	3
 -- !result
-SELECT k1, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k1) AS cume_dist_k1_v3 FROM count_distinct_test ORDER BY k1;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v3) OVER (PARTITION BY k1) AS nunique_k1_v3 FROM moving_count_distinct_test ORDER BY k1;
 -- result:
 1	4
 1	4
@@ -364,7 +364,7 @@ SELECT k1, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k1) AS cume_dist_k1_v3 
 17	1
 17	1
 -- !result
-SELECT k2, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k2) AS cume_dist_k2_v3 FROM count_distinct_test ORDER BY k2;
+SELECT k2, CELONIS_MOVING_COUNT_DISTINCT(v3) OVER (PARTITION BY k2) AS nunique_k2_v3 FROM moving_count_distinct_test ORDER BY k2;
 -- result:
 1	2
 1	2
@@ -421,7 +421,7 @@ SELECT k2, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k2) AS cume_dist_k2_v3 
 10	4
 10	4
 -- !result
-SELECT k1, CELONIS_COUNT_DISTINCT(v4) OVER (PARTITION BY k1) AS cume_dist_k1_v4 FROM count_distinct_test ORDER BY k1;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v4) OVER (PARTITION BY k1) AS nunique_k1_v4 FROM moving_count_distinct_test ORDER BY k1;
 -- result:
 1	4
 1	4
@@ -478,7 +478,7 @@ SELECT k1, CELONIS_COUNT_DISTINCT(v4) OVER (PARTITION BY k1) AS cume_dist_k1_v4 
 17	2
 17	2
 -- !result
-SELECT k2, CELONIS_COUNT_DISTINCT(v4) OVER (PARTITION BY k2) AS cume_dist_k2_v4 FROM count_distinct_test ORDER BY k2;
+SELECT k2, CELONIS_MOVING_COUNT_DISTINCT(v4) OVER (PARTITION BY k2) AS nunique_k2_v4 FROM moving_count_distinct_test ORDER BY k2;
 -- result:
 1	1
 1	1
@@ -535,7 +535,7 @@ SELECT k2, CELONIS_COUNT_DISTINCT(v4) OVER (PARTITION BY k2) AS cume_dist_k2_v4 
 10	3
 10	3
 -- !result
-SELECT k1, k2, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k1, k2 ORDER BY v1 ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS cume_dist_k12_v1 FROM count_distinct_test ORDER BY k1, k2;
+SELECT k1, k2, CELONIS_MOVING_COUNT_DISTINCT(v1) OVER (PARTITION BY k1, k2 ORDER BY v1 ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS nunique_k12_v1 FROM moving_count_distinct_test ORDER BY k1, k2;
 -- result:
 1	2	1
 1	7	1
@@ -592,7 +592,7 @@ SELECT k1, k2, CELONIS_COUNT_DISTINCT(v1) OVER (PARTITION BY k1, k2 ORDER BY v1 
 17	3	1
 17	4	1
 -- !result
-SELECT k1, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k1 ORDER BY v1 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING) AS cume_dist_k1_v2 FROM count_distinct_test ORDER BY k1;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v2) OVER (PARTITION BY k1 ORDER BY v1 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING) AS nunique_k1_v2 FROM moving_count_distinct_test ORDER BY k1;
 -- result:
 1	2
 1	2
@@ -649,7 +649,7 @@ SELECT k1, CELONIS_COUNT_DISTINCT(v2) OVER (PARTITION BY k1 ORDER BY v1 ROWS BET
 17	2
 17	2
 -- !result
-SELECT k1, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k1 ORDER BY v1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS cume_dist_k1_v3 FROM count_distinct_test ORDER BY k1;
+SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v3) OVER (PARTITION BY k1 ORDER BY v1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS nunique_k1_v3 FROM moving_count_distinct_test ORDER BY k1;
 -- result:
 1	4
 1	4
@@ -706,7 +706,7 @@ SELECT k1, CELONIS_COUNT_DISTINCT(v3) OVER (PARTITION BY k1 ORDER BY v1 ROWS BET
 17	1
 17	1
 -- !result
-DROP TABLE IF EXISTS `count_distinct_test`;
+DROP TABLE IF EXISTS `moving_count_distinct_test`;
 -- result:
 []
 -- !result
