@@ -83,6 +83,15 @@ void AggregateFuncResolver::register_celonis_window() {
                                                               AggregateFactory::MakeCelonisCountDistinctWindowFunction());
     add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_BIGINT>("celonis_count_distinct", true,
                                                              AggregateFactory::MakeCelonisCountDistinctWindowFunction());
+    // moving_median
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_BIGINT>("celonis_moving_median", true,
+                                                            AggregateFactory::MakeCelonisMovingMedianWindowFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_DOUBLE>("celonis_moving_median", true,
+                                                            AggregateFactory::MakeCelonisMovingMedianWindowFunction<TYPE_DOUBLE>());
+    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_DATETIME>("celonis_moving_median", true,
+                                                                AggregateFactory::MakeCelonisMovingMedianWindowFunction<TYPE_DATETIME>());
+    add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_VARCHAR>("celonis_moving_median", true,
+                                                              AggregateFactory::MakeCelonisMovingMedianWindowFunction<TYPE_VARCHAR>());
 }
 
 } // namespace starrocks

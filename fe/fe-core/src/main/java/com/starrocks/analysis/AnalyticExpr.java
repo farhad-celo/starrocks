@@ -124,6 +124,7 @@ public class AnalyticExpr extends Expr {
 
     // Celonis window functions:
     public static String CELONIS_COUNT_DISTINCT = "CELONIS_COUNT_DISTINCT";
+    public static String CELONIS_MOVING_MEDIAN = "CELONIS_MOVING_MEDIAN";
 
     public AnalyticExpr(FunctionCallExpr fnCall, List<Expr> partitionExprs, List<OrderByElement> orderByElements,
                         AnalyticWindow window, List<String> hints) {

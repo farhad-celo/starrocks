@@ -2673,6 +2673,7 @@ windowFunction
     | name = RANK '(' ')'
     | name = DENSE_RANK '(' ')'
     | name = CELONIS_COUNT_DISTINCT '(' expression ')'
+    | name = CELONIS_MOVING_MEDIAN '(' expression ')'
     | name = CUME_DIST '(' ')'
     | name = PERCENT_RANK '(' ')'
     | name = NTILE  '(' expression? ')'

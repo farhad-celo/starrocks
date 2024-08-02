@@ -538,6 +538,7 @@ public class FunctionSet {
 
     // Celonis window functions:
     public static final String CELONIS_COUNT_DISTINCT = "celonis_count_distinct";
+    public static final String CELONIS_MOVING_MEDIAN = "celonis_moving_median";
 
     // JSON functions
     public static final Function JSON_QUERY_FUNC = new Function(
@@ -767,6 +768,7 @@ public class FunctionSet {
             .add(FunctionSet.FIRST_VALUE_REWRITE)
             .add(FunctionSet.SESSION_NUMBER)
             .add(FunctionSet.CELONIS_COUNT_DISTINCT)
+            .add(FunctionSet.CELONIS_MOVING_MEDIAN)
             .build();
 
     public static final Set<String> VARIANCE_FUNCTIONS = ImmutableSet.<String>builder()
@@ -1330,6 +1332,16 @@ public class FunctionSet {
                     Lists.newArrayList(Type.DATETIME), Type.BIGINT, Type.VARBINARY));
         addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
                     Lists.newArrayList(Type.VARCHAR), Type.BIGINT, Type.VARBINARY));
+
+        // celonis_moving_median
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_MEDIAN,
+                    Lists.newArrayList(Type.BIGINT), Type.BIGINT, Type.VARBINARY));
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_MEDIAN,
+                    Lists.newArrayList(Type.DOUBLE), Type.DOUBLE, Type.VARBINARY));
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_MEDIAN,
+                    Lists.newArrayList(Type.DATETIME), Type.DATETIME, Type.VARBINARY));
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_MEDIAN,
+                    Lists.newArrayList(Type.VARCHAR), Type.VARCHAR, Type.VARBINARY));
 
     }
 
