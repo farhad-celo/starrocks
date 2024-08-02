@@ -58,8 +58,9 @@ struct CelonisMovingMedianAggregateState {
                 const auto* column = down_cast<const ColumnType*>(value_column);
                 to_remove = column->get_data()[row_num];
             }
-            if (lower_half.find(to_remove) != lower_half.end()) {
-                lower_half.erase(lower_half.find(to_remove));
+            auto it = lower_half.find(to_remove);
+            if (it != lower_half.end()) {
+                lower_half.erase(it);
             } else {
                 upper_half.erase(upper_half.find(to_remove));
             }
