@@ -74,6 +74,11 @@ void AggregateFuncResolver::register_window() {
 }
 
 void AggregateFuncResolver::register_celonis_window() {
+    // moving_trimmed_mean
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_DOUBLE>("celonis_moving_trimmed_mean", true,
+                                                            AggregateFactory::MakeCelonisMovingTrimmedMeanWindowFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_DOUBLE>("celonis_moving_trimmed_mean", true,
+                                                            AggregateFactory::MakeCelonisMovingTrimmedMeanWindowFunction<TYPE_DOUBLE>());
     // count_distinct
     add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_BIGINT>("celonis_count_distinct", true,
                                                             AggregateFactory::MakeCelonisCountDistinctWindowFunction());

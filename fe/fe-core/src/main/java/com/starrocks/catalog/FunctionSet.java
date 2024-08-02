@@ -537,6 +537,7 @@ public class FunctionSet {
     public static final String CELONIS_XX_HASH3_128 = "celonis_xx_hash3_128";
 
     // Celonis window functions:
+    public static final String CELONIS_MOVING_TRIMMED_MEAN = "celonis_moving_trimmed_mean";
     public static final String CELONIS_COUNT_DISTINCT = "celonis_count_distinct";
     public static final String CELONIS_MOVING_MEDIAN = "celonis_moving_median";
 
@@ -767,6 +768,7 @@ public class FunctionSet {
             .add(FunctionSet.LAST_VALUE)
             .add(FunctionSet.FIRST_VALUE_REWRITE)
             .add(FunctionSet.SESSION_NUMBER)
+            .add(FunctionSet.CELONIS_MOVING_TRIMMED_MEAN)
             .add(FunctionSet.CELONIS_COUNT_DISTINCT)
             .add(FunctionSet.CELONIS_MOVING_MEDIAN)
             .build();
@@ -1323,6 +1325,12 @@ public class FunctionSet {
                 false, false, false));
 
         // Celonis window functions:
+        // celonis_moving_trimmed_mean
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_TRIMMED_MEAN,
+                    Lists.newArrayList(Type.BIGINT), Type.DOUBLE, Type.VARBINARY));
+        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_TRIMMED_MEAN,
+                    Lists.newArrayList(Type.DOUBLE), Type.DOUBLE, Type.VARBINARY));
+
         // celonis_count_distinct
         addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_COUNT_DISTINCT,
                     Lists.newArrayList(Type.BIGINT), Type.BIGINT, Type.VARBINARY));

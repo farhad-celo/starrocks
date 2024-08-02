@@ -68,6 +68,7 @@
 #include "exprs/celonis/agg/inductive_miner.h"
 #include "exprs/celonis/agg/linear_regression.h"
 #include "exprs/celonis/agg/moving_median.h"
+#include "exprs/celonis/agg/moving_trimmed_mean.h"
 #include "exprs/celonis/agg/multi_linear_regression.h"
 #include "exprs/celonis/agg/product.h"
 #include "exprs/celonis/agg/sorted_first_last.h"
@@ -227,6 +228,9 @@ public:
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisCalcBucketWidthBoundariesAggregateFunction();
+
+    template <LogicalType LT>
+    static AggregateFunctionPtr MakeCelonisMovingTrimmedMeanWindowFunction();
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisBuildAbcModelAggregateFunction();
@@ -503,6 +507,11 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisMovingMedianWindowFunction() {
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeCelonisBuildAbcModelAggregateFunction() {
     return std::make_shared<CelonisAbcModelAggregationFunction<LT>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisMovingTrimmedMeanWindowFunction() {
+    return std::make_shared<CelonisMovingTrimmedMeanAggregateFunction<LT>>();
 }
 
 template <LogicalType LT>

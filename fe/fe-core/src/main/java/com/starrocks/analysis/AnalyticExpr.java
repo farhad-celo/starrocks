@@ -123,6 +123,7 @@ public class AnalyticExpr extends Expr {
     public static String HLL_UNION_AGG = "HLL_UNION_AGG";
 
     // Celonis window functions:
+    public static String CELONIS_MOVING_TRIMMED_MEAN = "CELONIS_MOVING_TRIMMED_MEAN";
     public static String CELONIS_COUNT_DISTINCT = "CELONIS_COUNT_DISTINCT";
     public static String CELONIS_MOVING_MEDIAN = "CELONIS_MOVING_MEDIAN";
 
