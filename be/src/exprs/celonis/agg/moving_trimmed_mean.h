@@ -18,6 +18,7 @@ struct CelonisMovingTrimmedMeanAggregateState {
     using ColumnType = RunTimeColumnType<LT>;
 
     std::multiset<CppType> window;
+    CppType sum = {};
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
         const Column* value_column = columns[0];
@@ -32,6 +33,7 @@ struct CelonisMovingTrimmedMeanAggregateState {
                 to_add = column->get_data()[row_num];
             }
             window.insert(to_add);
+            sum += to_add;
         }
     }
 
@@ -50,6 +52,7 @@ struct CelonisMovingTrimmedMeanAggregateState {
             auto it = window.find(to_remove);
             if (it != window.end()) {
                 window.erase(it);
+                sum -= to_remove;
             }
         }
     }
@@ -61,12 +64,16 @@ struct CelonisMovingTrimmedMeanAggregateState {
             return std::nullopt;
         }
         const auto num_trimmed = static_cast<size_t>(std::round(window.size() * DEFAULT_ONE_END_CUTOFF / 100.0));
+        if (num_trimmed == 0) {
+            return static_cast<double>(sum) / window.size();
+        }
         auto start = window.begin();
         std::advance(start, num_trimmed);
         auto end = window.end();
         std::advance(end, -num_trimmed);
-        double sum = std::accumulate(start, end, 0.0);
-        return sum / (window.size() - 2 * num_trimmed);
+        double low_cut = std::accumulate(window.begin(), start, 0.0);
+        double high_cut = std::accumulate(end, window.end(), 0.0);
+        return (static_cast<double>(sum) - low_cut - high_cut) / (window.size() - 2 * num_trimmed);
     }
 };
 
@@ -78,6 +85,7 @@ public:
 
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr state) const override {
         this->data(state).window = {};
+        this->data(state).sum = {};
     }
 
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
