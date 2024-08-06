@@ -127,7 +127,7 @@ public:
         DCHECK_GT(end, start);
         DCHECK(dst->is_nullable());
         auto& s = this->data(state);
-        std::optional<CppType> mean = s.get_trimmed_mean();
+        std::optional<double> mean = s.get_trimmed_mean();
         auto* nullable_dst = down_cast<NullableColumn*>(dst);
         auto* data_column = down_cast<DoubleColumn*>(nullable_dst->data_column().get());
         if (mean.has_value()) {
