@@ -19,6 +19,7 @@ struct CelonisMovingTrimmedMeanAggregateState {
 
     std::multiset<CppType> window;
     CppType sum = {};
+    bool is_frame_init = false;
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
         const Column* value_column = columns[0];
@@ -86,6 +87,7 @@ public:
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr state) const override {
         this->data(state).window = {};
         this->data(state).sum = {};
+        this->data(state).is_frame_init = false;
     }
 
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
@@ -110,15 +112,36 @@ public:
                                              int64_t current_row_position, int64_t partition_start,
                                              int64_t partition_end, int64_t rows_start_offset, int64_t rows_end_offset,
                                              bool ignore_subtraction, bool ignore_addition) const override {
+        DCHECK(!ignore_subtraction);
+        DCHECK(!ignore_addition);
+        const auto frame_start =
+                std::min(std::max(current_row_position + rows_start_offset, partition_start), partition_end);
+        const auto frame_end =
+                std::max(std::min(current_row_position + rows_end_offset + 1, partition_end), partition_start);
+        const auto frame_size = frame_end - frame_start;
+        // For cases like: rows between 2 preceding and 1 preceding
+        // If frame_start ge frame_end, means the frame is empty,
+        // we could directly return.
+        if (frame_size <= 0) {
+            return;
+        }
         const int64_t previous_frame_first_position = current_row_position - 1 + rows_start_offset;
         const int64_t current_frame_last_position = current_row_position + rows_end_offset;
-        if (!ignore_subtraction && previous_frame_first_position >= partition_start &&
-            previous_frame_first_position < partition_end) {
-            this->data(state).retract(ctx, columns, previous_frame_first_position);
-        }
-        if (!ignore_addition && current_frame_last_position >= partition_start &&
-            current_frame_last_position < partition_end) {
-            this->data(state).update(ctx, columns, current_frame_last_position);
+        if (this->data(state).is_frame_init) {
+            if (previous_frame_first_position >= partition_start &&
+                previous_frame_first_position < partition_end) {
+                this->data(state).retract(ctx, columns, previous_frame_first_position);
+            }
+            if (current_frame_last_position >= partition_start &&
+                current_frame_last_position < partition_end) {
+                this->data(state).update(ctx, columns, current_frame_last_position);
+            }
+        } else {
+            // Build the frame for the first time
+            for (size_t i = frame_start; i < frame_end; ++i) {
+                this->data(state).update(ctx, columns, i);
+            }
+            this->data(state).is_frame_init = true;
         }
     }
 
