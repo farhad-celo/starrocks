@@ -68,13 +68,17 @@ struct CelonisMovingTrimmedMeanAggregateState {
         if (num_trimmed == 0) {
             return static_cast<double>(sum) / window.size();
         }
-        auto start = window.begin();
-        std::advance(start, num_trimmed);
-        auto end = window.end();
-        std::advance(end, -num_trimmed);
-        double low_cut = std::accumulate(window.begin(), start, 0.0);
-        double high_cut = std::accumulate(end, window.end(), 0.0);
-        return (static_cast<double>(sum) - low_cut - high_cut) / (window.size() - 2 * num_trimmed);
+        DCHECK(num_trimmed <= window.size() / 2);
+        double total = static_cast<double>(sum);
+        auto low_it = window.begin();
+        for (auto i = 0; i < num_trimmed; ++low_it, ++i) {
+            total -= *low_it;
+        }
+        auto high_it = window.rbegin();
+        for (auto i = 0; i < num_trimmed; ++high_it, ++i) {
+            total -= *high_it;
+        }
+        return total / (window.size() - 2 * num_trimmed);
     }
 };
 
