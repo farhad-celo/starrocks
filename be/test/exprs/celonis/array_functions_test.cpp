@@ -1184,7 +1184,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_priority_size_mismatch_wit
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array, limit_column});
     EXPECT_EQ(rs.status().get_error_msg(),
-              "If provided, the size of timestamp_array and priority_array should not be different.");
+              "When limit is set and priority_array is not NULL literal, priority_array (length = 3) should have the same length as timestamp_array (length = 7).");
 }
 
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_priority_column_works) {
@@ -2052,7 +2052,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_array_size_mismatch) {
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().get_error_msg(),
-                  "If provided, the size of size_array and priority_array should not be different.");
+                  "If provided, priority_array (length = 4) should have the same length as size_array (length = 3).");
     }
 }
 

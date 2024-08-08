@@ -7,6 +7,7 @@
 #include "exprs/celonis/util.h"
 #include "column/column_builder.h"
 #include "column/column_viewer.h"
+#include "gutil/strings/strcat.h"
 
 namespace starrocks {
 
@@ -241,12 +242,18 @@ public:
                 const auto start = similar_to_size ? size_offsets[row] : timestamp_offsets[row];
                 const auto end = similar_to_size ? size_offsets[row + 1] : timestamp_offsets[row + 1];
                 if (priority_offsets[row] != start || priority_offsets[row + 1] != end) {
+                    const auto priority_length = priority_offsets[row + 1] - priority_offsets[row];
+                    const auto expected_length = end - start;
                     if (similar_to_size) {
                         return Status::InvalidArgument(
-                                "If provided, the size of size_array and priority_array should not be different.");
+                                StrCat("If provided, priority_array (length = ", priority_length,
+                                       ") should have the same length as size_array (length = ", expected_length,
+                                       ").").c_str());
                     } else {
                         return Status::InvalidArgument(
-                                "If provided, the size of timestamp_array and priority_array should not be different.");
+                                StrCat("When limit is set and priority_array is not NULL literal, priority_array (length = ",
+                                       priority_length, ") should have the same length as timestamp_array (length = ",
+                                       expected_length, ").").c_str());
                     }
                 }
             }
