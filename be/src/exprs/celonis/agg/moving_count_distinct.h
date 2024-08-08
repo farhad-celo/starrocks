@@ -7,11 +7,13 @@
 #include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "types/logical_type.h"
+#include "util/phmap/btree.h"
 
 namespace starrocks {
 
 struct CelonisMovingCountDistinctAggregateState {
-    std::map<DatumKey, int64_t> frequency_map;
+    // TODO(y.zhang): Explore the possibility of using hash map.
+    phmap::btree_map<DatumKey, int64_t> frequency_map;
     bool is_frame_init = false;
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
