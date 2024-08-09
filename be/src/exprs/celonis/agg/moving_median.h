@@ -7,6 +7,7 @@
 #include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "types/logical_type.h"
+#include "util/phmap/btree.h"
 
 namespace starrocks {
 
@@ -15,8 +16,8 @@ struct CelonisMovingMedianAggregateState {
     using CppType = RunTimeCppType<LT>;
     using ColumnType = RunTimeColumnType<LT>;
 
-    std::multiset<CppType> lower_half;
-    std::multiset<CppType> upper_half;
+    phmap::btree_multiset<CppType> lower_half;
+    phmap::btree_multiset<CppType> upper_half;
     bool is_frame_init = false;
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
