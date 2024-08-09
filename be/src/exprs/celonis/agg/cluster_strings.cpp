@@ -1,6 +1,7 @@
 #include "cluster_strings.h"
 
 #include <stack>
+#include <chrono>
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
@@ -9,6 +10,8 @@
 namespace starrocks {
 
 namespace {
+
+static const double MAX_CLUSTERING_SECONDS = 10 * 60.0;
 
 static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
         // start byte of 1-byte utf8 char: 0b0000'0000 ~ 0b0111'1111
@@ -157,9 +160,10 @@ struct StringClusterer {
         return cost;
     }
 
-    // TODO: Improve the efficiency
-    std::vector<std::vector<size_t>>
+    // TODO(y.zhang): Improve the efficiency
+    std::optional<std::vector<std::vector<size_t>>>
     build_graph(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
+        auto start_time = std::chrono::high_resolution_clock::now();
         const auto n = tuples.size();
         std::vector<std::vector<size_t>> graph(n, std::vector<size_t>(0));
         std::vector<int64_t> costs(n, 0);
@@ -184,11 +188,18 @@ struct StringClusterer {
                     graph[j].push_back(i);
                 }
             }
+            if (i % 100 == 0) {
+                auto cur_time = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed_time = cur_time - start_time;
+                if (elapsed_time.count() > MAX_CLUSTERING_SECONDS) {
+                    return std::nullopt;
+                }
+            }
         }
         return graph;
     }
 
-    std::vector<std::pair<int128_t, std::string>>
+    std::optional<std::vector<std::pair<int128_t, std::string>>>
     cluster(const phmap::flat_hash_map<int128_t, std::pair<std::string, int64_t>, StdHash<int128_t>>& hash_to_string_with_count) const {
         LOG(INFO) << "CELONIS_CLUSTER_STRINGS: started clustering\n";
         const auto n = hash_to_string_with_count.size();
@@ -205,13 +216,16 @@ struct StringClusterer {
                   });
         // build the graph
         auto graph = build_graph(tuples);
+        if (!graph.has_value()) {
+            return std::nullopt;
+        }
         LOG(INFO) << "CELONIS_CLUSTER_STRINGS: built graph\n";
         std::vector<bool> visited(n, false);
         std::vector<std::pair<int128_t, std::string>> rv;
         rv.reserve(n);
         for (auto i = 0; i < n; ++i) {
             if (!visited[i]) {
-                std::vector<size_t> cluster = get_cluster(graph, i, visited);
+                std::vector<size_t> cluster = get_cluster(graph.value(), i, visited);
                 // compute representative
                 size_t representative = cluster[0];
                 for (auto j = 0; j < cluster.size(); ++j) {
@@ -292,6 +306,10 @@ void ClusterStringsAggregateFunction::finalize_to_column(FunctionContext* ctx, C
               << std::endl;
     StringClusterer clusterer(edit_threshold, weighted_tokens, token_weight);
     auto hash_string_pairs = clusterer.cluster(hash_to_string_with_count);
+    if (!hash_string_pairs.has_value()) {
+        ctx->set_error(std::string("CELONIS_CLUSTER_STRINGS timeout").c_str(), false);
+        return;
+    }
     // Write to output column
     LOG(INFO) << "CELONIS_CLUSTER_STRINGS: writing to column\n";
     auto& fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
@@ -307,7 +325,7 @@ void ClusterStringsAggregateFunction::finalize_to_column(FunctionContext* ctx, C
     auto hash_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(fields[0].get()));
     auto representative_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(fields[1].get()));
     uint32_t n_elements = 0;
-    for (const auto& [hash128, str]: hash_string_pairs) {
+    for (const auto& [hash128, str]: hash_string_pairs.value()) {
         hash_col->elements_column()->append_datum(hash128);
         representative_col->elements_column()->append_datum(Slice(str));
         ++n_elements;
