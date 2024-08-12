@@ -1050,7 +1050,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                 R"(} })"});
         const auto result = RunConstantCalendar();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "[prepare] Calendar array can not contain null values.");
+        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
     }
     {
         Prepare();
@@ -1064,7 +1064,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                 R"(} })"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar array should not have null elements.");
+        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
     }
     {
         Prepare();
