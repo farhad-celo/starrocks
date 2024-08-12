@@ -1449,6 +1449,7 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
     ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]);
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    std::optional<CalendarState> calendar_state = std::nullopt;
     for (size_t row = 0; row < n_rows; ++row) {
         if (timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) || columns[2]->is_null(row)) {
             result.append_null();
@@ -1461,10 +1462,12 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
-        ASSIGN_OR_RETURN(CalendarState calendar_state,
-                         CalendarState::create_calendar_state(calendar_array_column, row, false, false));
+        if (!config::treat_calendar_column_as_constant_in_calendar_functions || !calendar_state.has_value()) {
+            ASSIGN_OR_RETURN(calendar_state,
+                             CalendarState::create_calendar_state(calendar_array_column, row, false, false));
+        }
         ASSIGN_OR_RETURN(const std::optional<int64_t> time,
-                         remap_timestamp_calendar(timestamp, time_unit, calendar_state, calendar_id));
+                         remap_timestamp_calendar(timestamp, time_unit, calendar_state.value(), calendar_id));
         if (time.has_value()) {
             result.append(time.value());
         } else {
@@ -1582,8 +1585,8 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[1]->size(), columns[1]);
-
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    std::optional<CalendarState> calendar_state = std::nullopt;
     for (size_t row = 0; row < n_rows; ++row) {
         if (timestamp_viewer.is_null(row) || columns[1]->is_null(row)) {
             result.append_null();
@@ -1594,9 +1597,11 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
-        ASSIGN_OR_RETURN(CalendarState calendar_state,
-                         CalendarState::create_calendar_state(calendar_array_column, row, false, false));
-        ASSIGN_OR_RETURN(std::optional<bool> is_in, timestamp_in_calendar(timestamp, calendar_state, calendar_id));
+        if (!config::treat_calendar_column_as_constant_in_calendar_functions || !calendar_state.has_value()) {
+            ASSIGN_OR_RETURN(calendar_state,
+                             CalendarState::create_calendar_state(calendar_array_column, row, false, false));
+        }
+        ASSIGN_OR_RETURN(std::optional<bool> is_in, timestamp_in_calendar(timestamp, calendar_state.value(), calendar_id));
         if (is_in.has_value()) {
             result.append(is_in.value() ? 1L : 0L);
         } else {
@@ -1914,8 +1919,8 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
     ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[3]->size(), columns[3]);
-
     ColumnBuilder<TYPE_DOUBLE> result(n_rows);
+    std::optional<CalendarState> calendar_state = std::nullopt;
     for (size_t row = 0; row < n_rows; ++row) {
         if (from_timestamp_viewer.is_null(row) || to_timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
             columns[3]->is_null(row)) {
@@ -1933,10 +1938,12 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
-        ASSIGN_OR_RETURN(CalendarState calendar_state,
-                         CalendarState::create_calendar_state(calendar_array_column, row, false, true));
+        if (!config::treat_calendar_column_as_constant_in_calendar_functions || !calendar_state.has_value()) {
+            ASSIGN_OR_RETURN(calendar_state,
+                             CalendarState::create_calendar_state(calendar_array_column, row, false, true));
+        }
         ASSIGN_OR_RETURN(const std::optional<double> diff,
-                         timeunits_between(from_timestamp, to_timestamp, time_unit, calendar_state, calendar_id));
+                         timeunits_between(from_timestamp, to_timestamp, time_unit, calendar_state.value(), calendar_id));
         if (diff.has_value()) {
             result.append(diff.value());
         } else {
@@ -2008,8 +2015,8 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
     ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[3]->size(), columns[3]);
-
     ColumnBuilder<TYPE_DATETIME> result(n_rows);
+    std::optional<CalendarState> calendar_state = std::nullopt;
     for (size_t row = 0; row < n_rows; ++row) {
         if (timestamp_viewer.is_null(row) || add_value_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
             columns[3]->is_null(row)) {
@@ -2024,10 +2031,12 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
-        ASSIGN_OR_RETURN(CalendarState calendar_state,
-                         CalendarState::create_calendar_state(calendar_array_column, row, false, false));
+        if (!config::treat_calendar_column_as_constant_in_calendar_functions || !calendar_state.has_value()) {
+            ASSIGN_OR_RETURN(calendar_state,
+                             CalendarState::create_calendar_state(calendar_array_column, row, false, false));
+        }
         ASSIGN_OR_RETURN(const std::optional<TimestampValue> new_timestamp,
-                         add_timeunits(timestamp, time_unit, add_value, calendar_state, calendar_id));
+                         add_timeunits(timestamp, time_unit, add_value, calendar_state.value(), calendar_id));
         if (new_timestamp.has_value()) {
             result.append(new_timestamp.value());
         } else {

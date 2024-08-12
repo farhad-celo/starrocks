@@ -320,6 +320,8 @@ TEST_F(CelonisInCalendarTest, const_invalid_calendar) {
 }
 
 TEST_F(CelonisInCalendarTest, non_const_calendar) {
+    const bool treat_calendar_column_as_constant_in_calendar_functions = config::treat_calendar_column_as_constant_in_calendar_functions;
+    config::treat_calendar_column_as_constant_in_calendar_functions = false;
     Prepare();
     timestamp_column_->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
     timestamp_column_->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
@@ -335,6 +337,28 @@ TEST_F(CelonisInCalendarTest, non_const_calendar) {
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
+    config::treat_calendar_column_as_constant_in_calendar_functions = treat_calendar_column_as_constant_in_calendar_functions;
+}
+
+TEST_F(CelonisInCalendarTest, treat_calendar_column_as_constant_works) {
+    const bool treat_calendar_column_as_constant_in_calendar_functions = config::treat_calendar_column_as_constant_in_calendar_functions;
+    config::treat_calendar_column_as_constant_in_calendar_functions = true;
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
+    calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
+                                              R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                                              R"(} })"});
+    calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
+                                              R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200001} }, )",
+                                              R"(} })"});
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+    const auto result = Run().value();
+    ASSERT_EQ(timestamp_column_->size(), result->size());
+    EXPECT_EQ(0L, result->get(0).get_int64());
+    EXPECT_EQ(0L, result->get(1).get_int64());
+    config::treat_calendar_column_as_constant_in_calendar_functions = treat_calendar_column_as_constant_in_calendar_functions;
 }
 
 TEST_F(CelonisInCalendarTest, non_const_invalid_calendar) {

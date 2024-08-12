@@ -937,6 +937,8 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_multi_weekday_calendar) {
 }
 
 TEST_F(CelonisRemapTimestampsCalendarTest, non_const_calendar) {
+    const bool treat_calendar_column_as_constant_in_calendar_functions = config::treat_calendar_column_as_constant_in_calendar_functions;
+    config::treat_calendar_column_as_constant_in_calendar_functions = false;
     Prepare();
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
@@ -978,6 +980,37 @@ TEST_F(CelonisRemapTimestampsCalendarTest, non_const_calendar) {
     EXPECT_EQ(660L, result->get(0).get_int64());
     EXPECT_EQ(9L, result->get(1).get_int64());
     EXPECT_EQ(5L, result->get(2).get_int64());
+    config::treat_calendar_column_as_constant_in_calendar_functions = treat_calendar_column_as_constant_in_calendar_functions;
+}
+
+TEST_F(CelonisRemapTimestampsCalendarTest, treat_calendar_column_as_constant_works) {
+    const bool treat_calendar_column_as_constant_in_calendar_functions = config::treat_calendar_column_as_constant_in_calendar_functions;
+    config::treat_calendar_column_as_constant_in_calendar_functions = true;
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
+    time_unit_column_->append_datum("MINUTES");
+    time_unit_column_->append_datum("MINUTES");
+    calendar_column_->append_datum(DatumArray{
+            R"({"weekday_calendar": {)",
+            // [8:00 am, 5:00 pm]
+            R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+            // [8:00 am, 5:00 pm]
+            R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} })",
+            R"(} })"});
+    calendar_column_->append_datum(DatumArray{
+            R"({"weekday_calendar": {)",
+            // [8:00 am, 5:00 pm]
+            R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+            R"("friday": {"use_day": false, "shift": {"begin": 0, "end": 0} })",
+            R"(} })"});
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+    const auto result = Run().value();
+    ASSERT_EQ(timestamp_column_->size(), result->size());
+    EXPECT_EQ(660L, result->get(0).get_int64());
+    EXPECT_EQ(660L, result->get(1).get_int64());
+    config::treat_calendar_column_as_constant_in_calendar_functions = treat_calendar_column_as_constant_in_calendar_functions;
 }
 
 TEST_F(CelonisRemapTimestampsCalendarTest, null_column) {

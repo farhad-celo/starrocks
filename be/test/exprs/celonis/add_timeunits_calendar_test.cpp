@@ -924,6 +924,8 @@ TEST_F(CelonisAddTimeunitsCalendarTest, null_input) {
 }
 
 TEST_F(CelonisAddTimeunitsCalendarTest, non_const_calendar) {
+    const bool treat_calendar_column_as_constant_in_calendar_functions = config::treat_calendar_column_as_constant_in_calendar_functions;
+    config::treat_calendar_column_as_constant_in_calendar_functions = false;
     Prepare();
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
     timestamp_column_->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
@@ -950,6 +952,39 @@ TEST_F(CelonisAddTimeunitsCalendarTest, non_const_calendar) {
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_EQ(TimestampValue::create(1970, 1, 2, 4, 0, 0), result->get(0).get_timestamp());
     EXPECT_EQ(TimestampValue::create(2018, 1, 4, 11, 0, 0), result->get(1).get_timestamp());
+    config::treat_calendar_column_as_constant_in_calendar_functions = treat_calendar_column_as_constant_in_calendar_functions;
+}
+
+TEST_F(CelonisAddTimeunitsCalendarTest, treat_calendar_column_as_constant_works) {
+    const bool treat_calendar_column_as_constant_in_calendar_functions = config::treat_calendar_column_as_constant_in_calendar_functions;
+    config::treat_calendar_column_as_constant_in_calendar_functions = true;
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(2018, 1, 1, 10, 0, 0));
+
+    add_value_column_->append_datum(26L);
+    add_value_column_->append_datum(17L);
+
+    time_unit_column_->append_datum("HOURS");
+    time_unit_column_->append_datum("HOURS");
+
+    calendar_column_->append_datum(DatumArray{});
+    calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
+                                              R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                              R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                              R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                              R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                              R"("saturday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                              R"(} })"});
+
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+
+    const auto result = Run().value();
+    ASSERT_EQ(timestamp_column_->size(), result->size());
+    EXPECT_EQ(TimestampValue::create(1970, 1, 2, 4, 0, 0), result->get(0).get_timestamp());
+    EXPECT_EQ(TimestampValue::create(2018, 1, 2, 3, 0, 0), result->get(1).get_timestamp());
+    config::treat_calendar_column_as_constant_in_calendar_functions = treat_calendar_column_as_constant_in_calendar_functions;
 }
 
 TEST_F(CelonisAddTimeunitsCalendarTest, const_null_calendar_column) {

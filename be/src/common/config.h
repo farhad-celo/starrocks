@@ -37,6 +37,16 @@
 #include "configbase.h"
 
 namespace starrocks::config {
+
+
+
+// Celonis configures
+// Set to true to change calendar functions to always treat calendar column as constant.
+CONF_mBool(treat_calendar_column_as_constant_in_calendar_functions, "false");
+
+
+
+
 // The cluster id.
 CONF_Int32(cluster_id, "-1");
 // The port on which ImpalaInternalService is exported.
