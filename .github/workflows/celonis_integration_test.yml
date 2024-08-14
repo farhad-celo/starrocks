@@ -13,11 +13,6 @@ on:
         description: "The image tag to build. Only take effect when above input is not empty. If empty, will construct one from the above input branch name"
         default: ''
 
-# This allows a subsequently queued workflow run to interrupt previous runs
-#concurrency:
-#  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
-#  cancel-in-progress: true
-
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.2
   BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-8107c630-locale-cpml2.177-ubuntu
@@ -60,77 +55,25 @@ jobs:
       - name: Checkout repository
         if: ${{inputs.branch_to_test == ''}}
         uses: actions/checkout@v4
-        # we need to ref a branch which is not the default one or ${LATEST_UPSTREAM_BRANCH} to make rebase work.
-        with:
-          ref: branch-3.0-c0d5082c-celo
-      - name: Remote add upstream
-        if: ${{inputs.branch_to_test == ''}}
-        run: |
-          git remote add upstream https://github.com/starrocks/starrocks.git
-        # skip error of remote upstream already exists
-        continue-on-error: true
-      - name: Fetch upstream and push
-        if: ${{inputs.branch_to_test == ''}}
-        run: |
-          git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
-          git push origin ${LATEST_UPSTREAM_BRANCH}
+
       - name: Rebase
-        id: rebase
         if: ${{inputs.branch_to_test == ''}}
+        id: rebase
         run: |
-          echo "start to rebase ..."
-
-          # get the latest commit
-          git fetch
-          git checkout ${LATEST_UPSTREAM_BRANCH}
-          latest_commit=$(git rev-parse --short=8 HEAD)
-          echo "the latest commit is ${latest_commit}"
-
-          # create the new default branch
-          newdefaultbranch=${LATEST_UPSTREAM_BRANCH}-${latest_commit}-celo
-          echo "The new default branch is: ${newdefaultbranch}"
-
-          # check if the branch exists
-          if git show-ref --verify --quiet refs/heads/${newdefaultbranch}; then
-              echo "branch '${newdefaultbranch}' already exists. Checking out..."
-              git checkout ${newdefaultbranch}
-          else
-              echo "branch '${newdefaultbranch}' does not exist. Creating and checking out and pushing to remote ..."
-              git checkout -b ${newdefaultbranch}
-              git push --set-upstream origin ${newdefaultbranch}
-          fi
-
-          # get the current default branch
-          default_branch=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
-          echo "the current default branch is ${default_branch}"
-
-          retries=5
-          count=0
-
-          run_rebase() {
-            git checkout ${default_branch} && \
-            timestamp=$(date +'%Y-%m-%dT%H-%M-%S') && \
-            testbranch=gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}-${timestamp} && \
-            git checkout -b $testbranch && \
-            git rebase ${newdefaultbranch}
-          }
-
-          until [ $count -ge $retries ]
+          chmod +x celonis/tools/rebase/rebase.sh
+          n=0
+          until [ "$n" -ge 3 ]
           do
-            echo "Attempt $((count+1))"
-            run_rebase && break
-            count=$((count+1))
-            echo "Rebase failed, retrying in 5 seconds..."
+            celonis/tools/rebase/rebase.sh && break
+            n=$((n+1))
+            echo "Retry $n/3..."
             sleep 5
           done
 
-          if [ $count -eq $retries ]; then
-            echo "Command failed after $retries attempts"
+          if [ "$n" -ge 3 ]; then
+            echo "All retries failed."
             exit 1
           fi
-
-          git push --set-upstream origin $testbranch
-          echo "test_branch=$testbranch" >> "$GITHUB_OUTPUT"
 
   presubmit-test:
     runs-on: [self-hosted, celostar]
