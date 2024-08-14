@@ -74,6 +74,14 @@ jobs:
             echo "All retries failed."
             exit 1
           fi
+      - name: Sum up
+        if: ${{inputs.branch_to_test == ''}}
+        shell: bash
+        run: |
+          {
+            echo "The new default branch is ${{env.new_default_branch}}"
+            echo "The test branch is ${{env.test_branch}}"
+          } >> $GITHUB_STEP_SUMMARY
 
   presubmit-test:
     runs-on: [self-hosted, celostar]

@@ -19,6 +19,7 @@ main() {
   newdefaultbranch=${LATEST_UPSTREAM_BRANCH}-${latest_commit}-celo
   echo "The new default branch is: ${newdefaultbranch}"
   echo "new_default_branch=${newdefaultbranch}" >> $GITHUB_ENV
+
   # check if the branch exists
   if git show-ref --verify --quiet refs/heads/${newdefaultbranch}; then
       echo "branch '${newdefaultbranch}' already exists. Checking out..."
@@ -33,13 +34,14 @@ main() {
   echo "the current default branch is ${default_branch}"
 
   echo "Start rebasing ..."
-  git checkout -B ${default_branch} && \
-  timestamp=$(date +'%Y-%m-%dT%H-%M-%S') && \
-  testbranch=gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}-${timestamp} && \
-  git checkout -b $testbranch && \
+  git checkout ${default_branch}
+  timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
+  testbranch=gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}-${timestamp}
+  git checkout -b $testbranch
   git rebase ${newdefaultbranch}
 
   git push --set-upstream origin $testbranch
+  echo "test_branch=$testbranch" >> "$GITHUB_ENV"
   echo "test_branch=$testbranch" >> "$GITHUB_OUTPUT"
 }
 
