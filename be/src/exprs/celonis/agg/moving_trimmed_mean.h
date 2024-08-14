@@ -7,6 +7,7 @@
 #include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "types/logical_type.h"
+#include "util/phmap/btree.h"
 
 namespace starrocks {
 
@@ -20,9 +21,9 @@ struct CelonisMovingTrimmedMeanAggregateState {
     // max(low) <= min(middle) <= max(middle) <= min(high)
     // low contains the low cutoff;
     // high contains the high cutoff.
-    std::multiset<CppType> low;
-    std::multiset<CppType> middle;
-    std::multiset<CppType> high;
+    phmap::btree_multiset<CppType> low;
+    phmap::btree_multiset<CppType> middle;
+    phmap::btree_multiset<CppType> high;
     CppType middle_sum = {};
     bool is_frame_init = false;
 
