@@ -274,6 +274,18 @@ TEST_F(CelonisClusterStringsTest, single_core) {
     Run(strings1, hashes1, strings2, hashes2, 1, "", 1, expected);
 }
 
+TEST_F(CelonisClusterStringsTest, strings_no_overlap) {
+    std::vector<std::optional<std::string>> strings1 = {"ABCDEFG", "HIGKLMN"};
+    std::vector<int128_t> hashes1 = {1, 2};
+    std::vector<std::optional<std::string>> strings2 = {"UVWXYZOPQ"};
+    std::vector<int128_t> hashes2 = {3};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "ABCDEFG"},
+                                                                             {2, "HIGKLMN"},
+                                                                             {3, "UVWXYZOPQ"}};
+
+    Run(strings1, hashes1, strings2, hashes2, 1, "", 1, expected);
+}
+
 TEST_F(CelonisClusterStringsTest, null_values) {
     std::vector<std::optional<std::string>> strings1 = {std::nullopt, std::nullopt};
     std::vector<int128_t> hashes1 = {1, 1};

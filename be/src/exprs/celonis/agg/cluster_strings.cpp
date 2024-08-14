@@ -41,7 +41,8 @@ int64_t get_cost(const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_
 }
 
 struct String {
-    std::vector<Char> chars;
+    std::vector<Char> chars = {};
+    std::unordered_set<Char> char_set = {};
     // number of chars which have non-zero cost.
     size_t real_len = 0;
 
@@ -59,6 +60,7 @@ struct String {
         for (auto i = 0; i < chars.size(); ++i) {
             if (get_cost(char_to_cost, chars[i]) != 0) {
                 ++real_len;
+                char_set.insert(chars[i]);
             }
         }
     }
@@ -160,7 +162,99 @@ struct StringClusterer {
         return cost;
     }
 
-    // TODO(y.zhang): Improve the efficiency
+    std::vector<std::vector<int>>
+    compute_char_sets(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
+        // compute char frequency
+        std::unordered_map<Char, size_t> char_counter;
+        const auto n = tuples.size();
+        for (auto i = 0; i < n; ++i) {
+            const auto& s = std::get<1>(tuples[i]);
+            for (const auto& ch: s.char_set) {
+                ++char_counter[ch];
+            }
+        }
+        std::vector<std::pair<Char, size_t>> char_cnt_pairs(char_counter.begin(), char_counter.end());
+        // Sort chars based on frequency. Char with low frequency comes first.
+        std::sort(char_cnt_pairs.begin(), char_cnt_pairs.end(),
+                  [](const auto& a, const auto& b) { return a.second < b.second; });
+        std::unordered_map<Char, int> char_to_index;
+        for (int i = 0; i < char_cnt_pairs.size(); ++i) {
+            char_to_index[char_cnt_pairs[i].first] = i;
+        }
+        std::vector<std::vector<int>> rv;
+        rv.reserve(n);
+        for (auto i = 0; i < n; ++i) {
+            const auto& s = std::get<1>(tuples[i]);
+            std::vector<int> chars;
+            chars.reserve(s.char_set.size());
+            for (const auto& ch: s.char_set) {
+                auto it = char_to_index.find(ch);
+                DCHECK(it != char_to_index.end());
+                chars.push_back(it->second);
+            }
+            std::sort(chars.begin(), chars.end());
+            rv.push_back(std::move(chars));
+        }
+        return rv;
+    }
+
+    std::unordered_map<int, std::vector<size_t>>
+    build_prefix_index(const std::vector<std::vector<int>>& char_sets) const {
+        std::unordered_map<int, std::vector<size_t>> char_to_indexes;
+        // Given two strings (s1 and s2), if their set difference is d, their edit distance is at least ceil(d / 2).
+        // Set n_tokens = 2 * edit_threshold + 2, if s1 and s2 do not have overlap in the first n_tokens chars in their
+        // char set, their edit distance is at least edit_threshold + 1.
+        const auto n_tokens = 2 * edit_threshold + 2;
+        for (auto index = 0; index < char_sets.size(); ++index) {
+            const auto& char_set = char_sets[index];
+            for (auto j = 0; j < n_tokens && j < char_set.size(); ++j) {
+                char_to_indexes[char_set[j]].push_back(index);
+            }
+        }
+        return char_to_indexes;
+    }
+
+    // Computes the neighbor indexes (< index) of the index-th string.
+    std::vector<size_t> get_neighbors(const std::vector<std::vector<int>>& char_sets,
+                                      const std::unordered_map<int, std::vector<size_t>>& char_to_indexes,
+                                      size_t index) const {
+        DCHECK(index >= 1);
+        const auto& char_set = char_sets[index];
+        const auto length = char_set.size();
+        const auto epsilon = 2 * edit_threshold + 1;
+        const auto max_length = length + epsilon;
+        const auto min_length = (length >= epsilon) ? (length - epsilon) : 0;
+        if (epsilon >= length) {
+            std::vector<size_t> rv;
+            rv.reserve(index);
+            for (auto j = static_cast<int>(index) - 1; j >= 0; --j) {
+                rv.push_back(j);
+            }
+            return rv;
+        } else {
+            HashSet<size_t> candidates = {};
+            for (auto i = 0; i < epsilon + 1 && i < char_set.size(); ++i) {
+                const auto& ch = char_set[i];
+                auto it = char_to_indexes.find(ch);
+                if (it == char_to_indexes.end()) {
+                    continue;
+                }
+                for (auto j: it->second) {
+                    // indexes is in ascending order.
+                    if (j >= index) {
+                        break;
+                    }
+                    if (char_sets[j].size() >= min_length && char_sets[j].size() <= max_length) {
+                        candidates.insert(j);
+                    }
+                }
+            }
+            std::vector<size_t> rv(candidates.begin(), candidates.end());
+            return rv;
+        }
+    }
+
+    // TODO(y.zhang): Improve the efficiency.
     std::optional<std::vector<std::vector<size_t>>>
     build_graph(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -170,9 +264,13 @@ struct StringClusterer {
         for (auto i = 0; i < n; ++i) {
             costs[i] = get_string_cost(std::get<1>(tuples[i]));
         }
+        std::vector<std::vector<int>> char_sets = compute_char_sets(tuples);
+        std::unordered_map<int, std::vector<size_t>> char_to_indexes = build_prefix_index(char_sets);
         for (auto i = 1; i < n; ++i) {
             auto length_i = std::get<1>(tuples[i]).real_length();
-            for (auto j = i - 1; j >= 0; --j) {
+            auto neighbors = get_neighbors(char_sets, char_to_indexes, i);
+            std::sort(neighbors.rbegin(), neighbors.rend());
+            for (auto j: neighbors) {
                 // edit_distance(s_i, s_j) >= abs(length_i - length_j)
                 if (length_i - std::get<1>(tuples[j]).real_length() > edit_threshold) {
                     break;
