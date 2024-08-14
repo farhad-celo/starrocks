@@ -8,7 +8,12 @@
 namespace starrocks {
 
 static StatusOr<NFA::TransitionType> type_from_string(const std::string& input) {
-    if (input == "UNMATCHED") {
+    // Previously, "UNMATCHED" was implemented as e-transition. While it has been fixed, we keep old value until
+    // migration is done.
+    // TODO(j.kim): Move "UNMATCHED" to NFA::UNMATCHED once input migration is done.
+    if (input == "UNMATCHED" || input == "E_TRANSITION") {
+        return NFA::E_TRANSITION;
+    } else if (input == "UNMATCHED2") {
         return NFA::UNMATCHED;
     } else if (input == "EXACT_MATCH") {
         return NFA::EXACT_MATCH;
@@ -74,12 +79,21 @@ NFAEvaluator::compute_updated_state(const std::string& activity, const std::vect
             continue;
         }
         const NFA::State& state = *nfa_->states[i];
-        for (const auto& transition : state.transitions) {
-            if (transition_matches_activity(activity, *transition)) {
-                for (int out : transition->to_states) {
-                    add_state_and_transitions(out, &new_state);
+        auto maybe_fire_transitions = [&](bool no_matches) -> bool {
+            bool any_matches = false;
+            for (const auto& transition : state.transitions) {
+                if ((no_matches && transition->type == NFA::UNMATCHED) ||
+                    transition_matches_activity(activity, *transition)) {
+                    any_matches = true;
+                    for (int out : transition->to_states) {
+                        add_state_and_transitions(out, &new_state);
+                    }
                 }
             }
+            return any_matches;
+        };
+        if (!maybe_fire_transitions(false)) {
+            maybe_fire_transitions(true);
         }
     }
     return new_state;
@@ -97,7 +111,7 @@ void NFAEvaluator::add_state_and_transitions(int new_state, std::vector<bool>* c
         auto back = to_visit.back();
         to_visit.pop_back();
         for (const auto& transition : nfa_->states[back]->transitions) {
-            if (transition->type == NFA::UNMATCHED) {
+            if (transition->type == NFA::E_TRANSITION) {
                 for (int out :  transition->to_states) {
                     if (!(*current_state)[out]) {
                         (*current_state)[out] = true;
@@ -155,6 +169,8 @@ StatusOr<std::string> convert_like_pattern(const std::string& pattern) {
 
 bool NFAEvaluator::transition_matches_activity(const std::string& activity, const NFA::Transition& transition) {
     switch (transition.type) {
+        case NFA::E_TRANSITION:
+            return false;
         case NFA::UNMATCHED:
             return false;
         case NFA::EXACT_MATCH:

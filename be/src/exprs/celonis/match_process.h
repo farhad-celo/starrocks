@@ -22,7 +22,7 @@ public:
 // Describes the NFA structure.
 struct NFA {
     enum TransitionType {
-        UNMATCHED = 0, EXACT_MATCH = 1, LIKE = 2, INVERSE_MATCH = 3
+        E_TRANSITION = 0, UNMATCHED = 1, EXACT_MATCH = 2, LIKE = 3, INVERSE_MATCH = 4
     };
 
     struct Transition {

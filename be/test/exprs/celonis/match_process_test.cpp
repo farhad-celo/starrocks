@@ -47,6 +47,63 @@ TEST_F(CelonisMatchProcessTest, celonis_match_b_a) {
                     "      \"toStates\" : [ 0 ],\n"
                     "      \"activityNames\" : [\"B\"]\n"
                     "    }, {\n"
+                    "      \"type\" : \"E_TRANSITION\",\n"
+                    "      \"toStates\" : [ 0 ],\n"
+                    "      \"activityNames\" : [ ]\n"
+                    "    }, {\n"
+                    "      \"type\" : \"EXACT_MATCH\",\n"
+                    "      \"toStates\" : [ 1, 0 ],\n"
+                    "      \"activityNames\" : [\"A\"]\n"
+                    "    } ],\n"
+                    "    \"final\" : false\n"
+                    "  }, {\n"
+                    "    \"transitions\" : [ {\n"
+                    "      \"type\" : \"EXACT_MATCH\",\n"
+                    "      \"toStates\" : [ 2 ],\n"
+                    "      \"activityNames\" : [\"B\"]\n"
+                    "    } ],\n"
+                    "    \"final\" : false\n"
+                    "  }, {\n"
+                    "    \"transitions\" : [ {\n"
+                    "      \"type\" : \"EXACT_MATCH\",\n"
+                    "      \"toStates\" : [ 2 ],\n"
+                    "      \"activityNames\" : [\"B\"]\n"
+                    "    }, {\n"
+                    "      \"type\" : \"E_TRANSITION\",\n"
+                    "      \"toStates\" : [ 2 ],\n"
+                    "      \"activityNames\" : [ ]\n"
+                    "    }, {\n"
+                    "      \"type\" : \"EXACT_MATCH\",\n"
+                    "      \"toStates\" : [ 2 ],\n"
+                    "      \"activityNames\" : [\"A\"]\n"
+                    "    } ],\n"
+                    "    \"final\" : true\n"
+                    "  } ],\n"
+                    "  \"initialState\" : 0\n"
+                    "}");
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+
+    array->append_datum(DatumArray{"A", "B"});
+    array->append_datum(DatumArray{"D"});
+
+    auto json_spec = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
+    json_spec->append_datum(Datum{jsonInput});
+
+    Columns input;
+    input.push_back(array);
+    input.push_back(json_spec);
+
+    match_process(input, {1, 0});
+}
+
+TEST_F(CelonisMatchProcessTest, celonis_match_b_a_old_unmatched) {
+    Slice jsonInput("{\n"
+                    "  \"states\" : [ {\n"
+                    "    \"transitions\" : [ {\n"
+                    "      \"type\" : \"EXACT_MATCH\",\n"
+                    "      \"toStates\" : [ 0 ],\n"
+                    "      \"activityNames\" : [\"B\"]\n"
+                    "    }, {\n"
                     "      \"type\" : \"UNMATCHED\",\n"
                     "      \"toStates\" : [ 0 ],\n"
                     "      \"activityNames\" : [ ]\n"
@@ -96,6 +153,58 @@ TEST_F(CelonisMatchProcessTest, celonis_match_b_a) {
     match_process(input, {1, 0});
 }
 
+TEST_F(CelonisMatchProcessTest, celonis_match_a_b_eventually) {
+    Slice jsonInput("{\n"
+                    "  \"states\" : [ {\n"
+                    "    \"transitions\" : [ {\n"
+                    "      \"type\" : \"EXACT_MATCH\",\n"
+                    "      \"toStates\" : [ 0, 1 ],\n"
+                    "      \"activityNames\" : [\"A\"]\n"
+                    "    }, {\n"
+                    "      \"type\" : \"UNMATCHED2\",\n"
+                    "      \"toStates\" : [ 0 ],\n"
+                    "      \"activityNames\" : [ ]\n"
+                    "    } ],\n"
+                    "    \"final\" : false\n"
+                    "  }, {\n"
+                    "    \"transitions\" : [ {\n"
+                    "      \"type\" : \"EXACT_MATCH\",\n"
+                    "      \"toStates\" : [ 1, 2 ],\n"
+                    "      \"activityNames\" : [\"B\"]\n"
+                    "    }, {\n"
+                    "      \"type\" : \"UNMATCHED2\",\n"
+                    "      \"toStates\" : [ 1 ],\n"
+                    "      \"activityNames\" : [ ]\n"
+                    "    } ],\n"
+                    "    \"final\" : false\n"
+                    "  }, {\n"
+                    "    \"transitions\" : [ {\n"
+                    "      \"type\" : \"UNMATCHED2\",\n"
+                    "      \"toStates\" : [ 2 ],\n"
+                    "      \"activityNames\" : [ ]\n"
+                    "    } ],\n"
+                    "    \"final\" : true\n"
+                    "  } ],\n"
+                    "  \"initialState\" : 0\n"
+                    "}");
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+
+    array->append_datum(DatumArray{"A", "B"});
+    array->append_datum(DatumArray{"D"});
+    array->append_datum(DatumArray{"A", "1", "B", "2"});
+    array->append_datum(DatumArray{"1", "A", "2", "3", "4", "B", "B"});
+    array->append_datum(DatumArray{"A", "A"});
+
+    auto json_spec = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
+    json_spec->append_datum(Datum{jsonInput});
+
+    Columns input;
+    input.push_back(array);
+    input.push_back(json_spec);
+
+    match_process(input, {1, 0, 1, 1, 0});
+}
+
 TEST_F(CelonisMatchProcessTest, celonis_match_b_a_like) {
     // Same as above but using LIKE
     Slice jsonInput("{\n"
@@ -105,7 +214,7 @@ TEST_F(CelonisMatchProcessTest, celonis_match_b_a_like) {
                     "      \"toStates\" : [ 0 ],\n"
                     "      \"activityNames\" : [\"B%\"]\n"
                     "    }, {\n"
-                    "      \"type\" : \"UNMATCHED\",\n"
+                    "      \"type\" : \"E_TRANSITION\",\n"
                     "      \"toStates\" : [ 0 ],\n"
                     "      \"activityNames\" : [ ]\n"
                     "    }, {\n"
@@ -127,7 +236,7 @@ TEST_F(CelonisMatchProcessTest, celonis_match_b_a_like) {
                     "      \"toStates\" : [ 2 ],\n"
                     "      \"activityNames\" : [\"BCD%\"]\n"
                     "    }, {\n"
-                    "      \"type\" : \"UNMATCHED\",\n"
+                    "      \"type\" : \"E_TRANSITION\",\n"
                     "      \"toStates\" : [ 2 ],\n"
                     "      \"activityNames\" : [ ]\n"
                     "    }, {\n"
@@ -166,7 +275,7 @@ TEST_F(CelonisMatchProcessTest, celonis_match_activities_inverse_match) {
                      "    \"final\" : false\n"
                      "  }, {\n"
                      "    \"transitions\" : [ {\n"
-                     "      \"type\" : \"UNMATCHED\",\n"
+                     "      \"type\" : \"E_TRANSITION\",\n"
                      "      \"toStates\" : [ 2 ],\n"
                      "      \"activityNames\" : [ ]\n"
                      "    } ],\n"
@@ -180,7 +289,7 @@ TEST_F(CelonisMatchProcessTest, celonis_match_activities_inverse_match) {
                      "    \"final\" : true\n"
                      "  }, {\n"
                      "    \"transitions\" : [ {\n"
-                     "      \"type\" : \"UNMATCHED\",\n"
+                     "      \"type\" : \"E_TRANSITION\",\n"
                      "      \"toStates\" : [ 2 ],\n"
                      "      \"activityNames\" : [ ]\n"
                      "    } ],\n"
