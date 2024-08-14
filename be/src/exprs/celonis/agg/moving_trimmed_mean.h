@@ -17,8 +17,13 @@ struct CelonisMovingTrimmedMeanAggregateState {
     using CppType = RunTimeCppType<LT>;
     using ColumnType = RunTimeColumnType<LT>;
 
-    std::multiset<CppType> window;
-    CppType sum = {};
+    // max(low) <= min(middle) <= max(middle) <= min(high)
+    // low contains the low cutoff;
+    // high contains the high cutoff.
+    std::multiset<CppType> low;
+    std::multiset<CppType> middle;
+    std::multiset<CppType> high;
+    CppType middle_sum = {};
     bool is_frame_init = false;
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
@@ -33,8 +38,49 @@ struct CelonisMovingTrimmedMeanAggregateState {
                 const auto* column = down_cast<const ColumnType*>(value_column);
                 to_add = column->get_data()[row_num];
             }
-            window.insert(to_add);
-            sum += to_add;
+            if ((low.empty() && high.empty()) || middle.empty() ||
+                (to_add >= *middle.begin() && to_add <= *middle.rbegin())) {
+                middle.insert(to_add);
+                middle_sum += to_add;
+            } else {
+                if (to_add < *middle.begin()) {
+                    low.insert(to_add);
+                } else {
+                    high.insert(to_add);
+                }
+            }
+            re_balance();
+        }
+    }
+
+    void re_balance() {
+        const auto cutoff_size = static_cast<size_t>(std::round(
+                (middle.size() + low.size() + high.size()) * DEFAULT_ONE_END_CUTOFF / 100.0));
+        if (low.size() < cutoff_size) {
+            // remove the lowest element of middle and insert it to low
+            auto element = *middle.begin();
+            low.insert(element);
+            middle.erase(middle.begin());
+            middle_sum -= element;
+        } else if (low.size() > cutoff_size) {
+            // remove the highest element of low and insert it to middle
+            auto element = *low.rbegin();
+            middle.insert(element);
+            middle_sum += element;
+            low.erase(std::prev(low.end()));
+        }
+        if (high.size() < cutoff_size) {
+            // remove the highest element of middle and insert it to high
+            auto element = *middle.rbegin();
+            high.insert(element);
+            middle.erase(std::prev(middle.end()));
+            middle_sum -= element;
+        } else if (high.size() > cutoff_size) {
+            // remove the lowest element of high and insert it to middle
+            auto element = *high.begin();
+            middle.insert(element);
+            middle_sum += element;
+            high.erase(high.begin());
         }
     }
 
@@ -50,35 +96,36 @@ struct CelonisMovingTrimmedMeanAggregateState {
                 const auto* column = down_cast<const ColumnType*>(value_column);
                 to_remove = column->get_data()[row_num];
             }
-            auto it = window.find(to_remove);
-            if (it != window.end()) {
-                window.erase(it);
-                sum -= to_remove;
+            bool removed = false;
+            auto it_middle = middle.find(to_remove);
+            if (it_middle != middle.end()) {
+                middle.erase(it_middle);
+                middle_sum -= to_remove;
+                removed = true;
             }
+            if (!removed) {
+                auto it_low = low.find(to_remove);
+                if (it_low != low.end()) {
+                    low.erase(it_low);
+                    removed = true;
+                }
+            }
+            if (!removed) {
+                auto it_high = high.find(to_remove);
+                if (it_high != high.end()) {
+                    high.erase(it_high);
+                }
+            }
+            re_balance();
         }
     }
 
-    // TODO(y.zhang): improve the implementation.
-    // Calculates the trimmed mean with a cut off of 10% for each window.
+    // Calculates the trimmed mean with a cutoff of 10% for each window.
     std::optional<double> get_trimmed_mean() const {
-        if (window.empty()) {
+        if (middle.empty()) {
             return std::nullopt;
         }
-        const auto num_trimmed = static_cast<size_t>(std::round(window.size() * DEFAULT_ONE_END_CUTOFF / 100.0));
-        if (num_trimmed == 0) {
-            return static_cast<double>(sum) / window.size();
-        }
-        DCHECK(num_trimmed <= window.size() / 2);
-        double total = static_cast<double>(sum);
-        auto low_it = window.begin();
-        for (auto i = 0; i < num_trimmed; ++low_it, ++i) {
-            total -= *low_it;
-        }
-        auto high_it = window.rbegin();
-        for (auto i = 0; i < num_trimmed; ++high_it, ++i) {
-            total -= *high_it;
-        }
-        return total / (window.size() - 2 * num_trimmed);
+        return static_cast<double>(middle_sum) / middle.size();
     }
 };
 
@@ -89,8 +136,10 @@ public:
     using CppType = RunTimeCppType<LT>;
 
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr state) const override {
-        this->data(state).window = {};
-        this->data(state).sum = {};
+        this->data(state).low = {};
+        this->data(state).middle = {};
+        this->data(state).high = {};
+        this->data(state).middle_sum = {};
         this->data(state).is_frame_init = false;
     }
 
