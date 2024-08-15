@@ -246,6 +246,7 @@ public:
 
     static AggregateFunctionPtr MakeCelonisClusterVariantsAggregateFunction();
 
+    template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisMovingCountDistinctWindowFunction();
 
     static AggregateFunctionPtr MakeCelonisEnumerateNodePathsAggregateFunction();
@@ -512,6 +513,11 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisBuildAbcModelAggregateFunction
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeCelonisMovingTrimmedMeanWindowFunction() {
     return std::make_shared<CelonisMovingTrimmedMeanAggregateFunction<LT>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisMovingCountDistinctWindowFunction() {
+    return std::make_shared<CelonisMovingCountDistinctAggregateFunction<LT>>();
 }
 
 template <LogicalType LT>

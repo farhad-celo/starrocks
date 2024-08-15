@@ -11,32 +11,93 @@
 
 namespace starrocks {
 
+template<LogicalType LT, typename = guard::Guard>
+struct DetailValueMap {
+};
+
+template<LogicalType LT>
+struct DetailValueMap<LT, FixedLengthLTGuard<LT>> {
+    using CppType = RunTimeCppValueType<LT>;
+    using KeyType = CppType;
+    using HashMap = phmap::flat_hash_map<KeyType, int64_t, StdHash<CppType>>;
+};
+
+template<LogicalType LT>
+struct DetailValueMap<LT, StringLTGuard<LT>> {
+    using CppType = RunTimeCppValueType<LT>;
+    using KeyType = std::string;
+    using HashMap = phmap::flat_hash_map<KeyType, int64_t, SliceHash>;
+};
+
+template<LogicalType LT>
 struct CelonisMovingCountDistinctAggregateState {
-    // TODO(y.zhang): Explore the possibility of using hash map.
-    phmap::btree_map<DatumKey, int64_t> frequency_map;
+    using CppType = RunTimeCppType<LT>;
+    using ColumnType = RunTimeColumnType<LT>;
+    using ValueHashMap = typename DetailStateMap<LT>::HashMap;
+    using HashMapKeyType = typename DetailStateMap<LT>::KeyType;
+
+    ValueHashMap frequency_map;
     bool is_frame_init = false;
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
         const Column* value_column = columns[0];
         if (!value_column->is_nullable() || !value_column->is_null(row_num)) {
-            const DatumKey datum_key = value_column->get(row_num).convert2DatumKey();
-            ++frequency_map[datum_key];
+            CppType to_add;
+            if (value_column->is_nullable()) {
+                const auto* nullable_column = down_cast<const NullableColumn*>(value_column);
+                const auto* data_column = down_cast<const ColumnType*>(nullable_column->data_column().get());
+                to_add = data_column->get_data()[row_num];
+            } else {
+                const auto* column = down_cast<const ColumnType*>(value_column);
+                to_add = column->get_data()[row_num];
+            }
+            auto to_add_key = _convert_to_key_type(to_add);
+            auto iter = frequency_map.find(to_add_key);
+            auto is_found = iter != frequency_map.end();
+            if (is_found) {
+                iter->second++;
+            } else {
+                frequency_map.emplace(to_add, 1);
+            }
         }
     }
 
     void retract(FunctionContext* ctx, const Column** columns, size_t row_num) {
         const Column* value_column = columns[0];
         if (!value_column->is_nullable() || !value_column->is_null(row_num)) {
-            const DatumKey datum_key = value_column->get(row_num).convert2DatumKey();
-            if (--frequency_map[datum_key] == 0) {
-                frequency_map.erase(datum_key);
+            CppType to_remove;
+            if (value_column->is_nullable()) {
+                const auto* nullable_column = down_cast<const NullableColumn*>(value_column);
+                const auto* data_column = down_cast<const ColumnType*>(nullable_column->data_column().get());
+                to_remove = data_column->get_data()[row_num];
+            } else {
+                const auto* column = down_cast<const ColumnType*>(value_column);
+                to_remove = column->get_data()[row_num];
             }
+            auto to_remove_key = _convert_to_key_type(to_remove);
+            auto iter = frequency_map.find(to_remove_key);
+            auto is_found = iter != frequency_map.end();
+            if (is_found) {
+                if (--iter->second == 0) {
+                    frequency_map.erase(iter);
+                }
+            }
+        }
+    }
+
+private:
+    HashMapKeyType _convert_to_key_type(CppType v) {
+        if constexpr (lt_is_string<LT>) {
+            return std::string(v.data, v.size);
+        } else {
+            return v;
         }
     }
 };
 
+template<LogicalType LT>
 class CelonisMovingCountDistinctAggregateFunction final
-        : public WindowFunction<CelonisMovingCountDistinctAggregateState> {
+        : public WindowFunction<CelonisMovingCountDistinctAggregateState<LT>> {
 public:
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr state) const override {
         this->data(state).frequency_map = {};
