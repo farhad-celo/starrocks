@@ -23,13 +23,19 @@ struct VariantHashesWithCount {
 struct Clusterer {
     int64_t min_pts;
     int64_t epsilon;
+    // prefix index
     phmap::flat_hash_map<Edge, std::vector<size_t>, HashOnEdge, EqualOnEdge> edge_to_indexes;
+    // two levels of bitmasks
+    // Bitmask can help quickly compute the symmetric difference of two sets.
+    // Each bit represents the presence or absence of an edge.
     std::vector<int64_t> prefix_bitmasks;
     std::vector<int64_t> second_prefix_bitmasks;
-    // true means the (prefix_bitmask + second_prefix_bitmask) is the exact bitmask
+    // true means the (prefix_bitmask + second_prefix_bitmask) is the exact bitmask.
     std::vector<bool> is_bitmask_exacts;
-    int64_t n_is_neighbor_checks;
-    int64_t n_shortcut_checks;
+    // the count of is_neighbor method calls.
+    int64_t n_is_neighbor_checks = 0;
+    // the count of is_neighbor checks using bitmasks.
+    int64_t n_shortcut_checks = 0;
 
     Clusterer(int64_t min_pts, int64_t epsilon) : min_pts(min_pts), epsilon(epsilon) {}
 
@@ -39,6 +45,9 @@ struct Clusterer {
         prefix_bitmasks.resize(n_points, 0);
         second_prefix_bitmasks.resize(n_points, 0);
         is_bitmask_exacts.resize(n_points, false);
+        // Suppose there are n unique edges in all edge sets, we pick the top min(128, n) frequent edges.
+        // prefix_bitmask represents the first min(64, n) edges.
+        // second_prefix_bitmask represents the next min(64, n - 64) edges.
         // compute the top (most) 2 * 64 frequent edges
         std::vector<std::pair<Edge, int64_t>> temp_edges(std::min(2 * sizeof(int64_t) * CHAR_BIT, edge_counter.size()));
         std::vector<std::pair<Edge, int64_t>> edge_cnts(edge_counter.begin(), edge_counter.end());
@@ -67,11 +76,16 @@ struct Clusterer {
                 }
             }
             second_prefix_bitmasks[i] = second_bitmask;
+            // If all the edges in the edge set are covered by prefix_bitmask and second_prefix_bitmask,
+            // is_bitmask_exact = true.
             is_bitmask_exacts[i] = ((__builtin_popcountll(bitmask) + __builtin_popcountll(second_bitmask)) ==
                                     cur_edges.size());
         }
     }
 
+    // Executes DBSCAN and returns cluster labels.
+    // points (i.e., edge_sets) are sorted based on length (from high to low).
+    // Each point (i.e., edge_set) is sorted based on edge frequency (from low frequency to high frequency).
     std::optional<std::vector<int64_t>> dbscan(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
                                                const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -124,6 +138,8 @@ struct Clusterer {
 
     void build_prefix_index(const std::vector<EdgeSet>& points) {
         edge_to_indexes.clear();
+        // Set n_tokens = epsilon + 1, if two sets s1 and s2 do not have overlap in the first n_tokens, then their
+        // symmetric difference is at least (epsilon + 1) > epsilon.
         const auto n_tokens = epsilon + 1;
         for (auto index = 0; index < points.size(); ++index) {
             // check the first n_tokens;
@@ -144,14 +160,16 @@ struct Clusterer {
 
     bool is_neighbor(const std::vector<EdgeSet>& points, size_t i, size_t j) {
         ++n_is_neighbor_checks;
-        // check prefix bitmask first
+        // Check bitmask first.
         int64_t xor_result = prefix_bitmasks[i] ^ prefix_bitmasks[j];
         int64_t second_xor_result = second_prefix_bitmasks[i] ^ second_prefix_bitmasks[j];
+        // prefix_distance <= distance
         const auto prefix_distance = __builtin_popcountll(xor_result) + __builtin_popcountll(second_xor_result);
         if ((prefix_distance > epsilon) || (is_bitmask_exacts[i] && is_bitmask_exacts[j])) {
             ++n_shortcut_checks;
             return prefix_distance <= epsilon;
         }
+        // Compute the symmetric difference.
         const auto& a = points[i];
         const auto& b = points[j];
         phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> unique_edges(a.edges.begin(), a.edges.end());
@@ -215,6 +233,7 @@ struct Clusterer {
                   const std::vector<bool>& is_isolated) {
         const auto& point = points[index];
         const auto length = point.size();
+        // Given two sets s1 and s2, if symmetric_difference(s1, s2) >= abs(len(s1) - len(s2)).
         const auto max_length = length + epsilon;
         const auto min_length = length >= epsilon ? (length - epsilon) : 0;
         HashSet<size_t> candidates = {};
@@ -420,7 +439,7 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         counts.push_back(entry.second.count);
         hashes_vec.emplace_back(std::move(entry.second.hashes));
     }
-    // Reorder the edges based on their frequency in each EdgeSet
+    // Reorder the edges based on their frequency in each EdgeSet. Edge with low frequency comes first.
     for (auto& point: points) {
         std::sort(point.edges.begin(), point.edges.end(),
                   [&edge_counter](const auto& a, const auto& b) { return edge_counter[a] < edge_counter[b]; });
