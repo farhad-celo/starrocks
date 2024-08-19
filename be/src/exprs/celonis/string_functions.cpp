@@ -51,6 +51,13 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                                                                XXHASH3_128_NULL_STRING.size(), seed);
                 } else {
                     Slice slice = strings[i];
+                    if (XXHASH3_128_NULL_STRING.size() == slice.size &&
+                        XXHASH3_128_NULL_STRING.compare(0, XXHASH3_128_NULL_STRING.size(), slice.data, slice.size) ==
+                        0) {
+                        return Status::InvalidArgument(
+                                ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
+                                 XXHASH3_128_NULL_STRING + "'.").c_str());
+                    }
                     seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
                 }
             }
@@ -69,6 +76,13 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                                                                XXHASH3_128_NULL_STRING.size(), seed);
                 } else {
                     auto slice = viewer.value(row);
+                    if (XXHASH3_128_NULL_STRING.size() == slice.size &&
+                        XXHASH3_128_NULL_STRING.compare(0, XXHASH3_128_NULL_STRING.size(), slice.data, slice.size) ==
+                        0) {
+                        return Status::InvalidArgument(
+                                ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
+                                 XXHASH3_128_NULL_STRING + "'.").c_str());
+                    }
                     seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
                 }
             }
