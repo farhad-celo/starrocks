@@ -43,7 +43,7 @@ int64_t get_cost(const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_
 struct String {
     std::vector<Char> chars = {};
     std::unordered_set<Char> char_set = {};
-    // number of chars which have non-zero cost.
+    // number of chars which have positive cost (cost must be non-negative).
     size_t real_len = 0;
 
     String(const std::string& s, const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_to_cost) {
@@ -93,28 +93,36 @@ int64_t weighted_edit_distance(const String& s1, const String& s2,
                                const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_to_cost) {
     size_t m = s1.length();
     size_t n = s2.length();
+    std::vector<int64_t> cost1(m, 0);
+    std::vector<int64_t> cost2(n, 0);
+    for (auto i = 0; i < m; ++i) {
+        cost1[i] = get_cost(char_to_cost, s1[i]);
+    }
+    for (auto j = 0; j < n; ++j) {
+        cost2[j] = get_cost(char_to_cost, s2[j]);
+    }
     std::vector<std::vector<int64_t>> dp(m + 1, std::vector<int64_t>(n + 1, 0));
     int64_t acc = 0;
     for (auto i = 0; i < m + 1; ++i) {
         dp[i][0] = acc;
         if (i < m) {
-            acc += get_cost(char_to_cost, s1[i]);
+            acc += cost1[i];
         }
     }
     acc = 0;
     for (auto j = 0; j < n + 1; ++j) {
         dp[0][j] = acc;
         if (j < n) {
-            acc += get_cost(char_to_cost, s2[j]);
+            acc += cost2[j];
         }
     }
     for (auto i = 1; i < m + 1; ++i) {
         for (auto j = 1; j < n + 1; ++j) {
-            int64_t delete_cost = dp[i - 1][j] + get_cost(char_to_cost, s1[i - 1]);
-            int64_t insert_cost = dp[i][j - 1] + get_cost(char_to_cost, s2[j - 1]);
+            int64_t delete_cost = dp[i - 1][j] + cost1[i - 1];
+            int64_t insert_cost = dp[i][j - 1] + cost2[j - 1];
             int64_t replace_cost = dp[i - 1][j - 1];
             if (s1[i - 1] != s2[j - 1]) {
-                replace_cost += std::max(get_cost(char_to_cost, s1[i - 1]), get_cost(char_to_cost, s2[j - 1]));
+                replace_cost += std::max(cost1[i - 1], cost2[j - 1]);
             }
             dp[i][j] = std::min(replace_cost, std::min(delete_cost, insert_cost));
         }

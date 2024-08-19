@@ -183,11 +183,11 @@ private:
  * @param: [ string_column, hash_column, EDIT_THRESHOLD, WEIGHTED_TOKENS, TOKEN_WEIGHT ]
  * @paramType columns: [ VARCHAR, LARGEINT, BIGINT, VARCHAR, BIGINT]
  * @return: STRUCT(hash: ARRAY_LARGEINT, cluster_representative: ARRAY_VARCHAR)
- * string_column : input string column.
+ * string_column : input string column (encoded in UTF-8).
  * hash_column: 128 bits hash of the string.
  * EDIT_THRESHOLD: The threshold which is used to define the cluster. If the edit distance between s1 and s2 is <=
  *                 EDIT_THRESHOLD, s1 and s2 are in the same cluster.
- * WEIGHTED_TOKENS: String of tokens for which an edit operation should have a user defined cost.
+ * WEIGHTED_TOKENS: String (encoded in UTF-8) of tokens for which an edit operation should have a user defined cost.
  * TOKEN_WEIGHT: cost of the weighted tokens. It must be >= 0. For the other tokens, the default weight is 1.
  *
  * cost(ch) = TOKEN_WEIGHT if ch in WEIGHTED_TOKENS else 1
@@ -196,7 +196,8 @@ private:
  * 3. Cost of replacing ch1 with ch2: max(cost(ch1), cost(ch2)).
  *
  * Clustering is transitive: if s1 and s2 are similar, s2 and s3 are similar, then s1, s2, s3 will end up in the same
- * cluster.
+ * cluster. If two strings do not have overlap, they are not in the same cluster (i.e., distance = infinite).
+ * NULL strings are put in the same cluster. It is guaranteed that no non-NULL string is similar to the NULL string.
  *
  * Used to support PQL CLUSTER_VARIANTS
  * https://docs.celonis.com/en/cluster_strings.html
