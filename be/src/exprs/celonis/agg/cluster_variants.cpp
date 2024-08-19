@@ -24,10 +24,15 @@ struct Clusterer {
     int64_t min_pts;
     int64_t epsilon;
     // prefix index
+    // An inverted index on the prefix tokens is used to retrieve candidate pairs efficiently. The inverted index maps
+    // prefix tokens to sets that contain that token in the prefix. A lookup of set s retrieves all lists of the prefix
+    // tokens of s. The union of these lists (except s itself) are the candidates of s.
     phmap::flat_hash_map<Edge, std::vector<size_t>, HashOnEdge, EqualOnEdge> edge_to_indexes;
     // two levels of bitmasks
-    // Bitmask can help quickly compute the symmetric difference of two sets.
-    // Each bit represents the presence or absence of an edge.
+    // Each bitmask is a 64 bits integer, each bit represents the presence or absence of an edge.
+    // To optimize the computation of symmetric differences between sets, we first calculate the XOR of their
+    // corresponding bitmasks. If the XOR value exceeds epsilon, we can immediately conclude that these sets cannot
+    // be neighbors, avoiding unnecessary further calculations.
     std::vector<int64_t> prefix_bitmasks;
     std::vector<int64_t> second_prefix_bitmasks;
     // true means the (prefix_bitmask + second_prefix_bitmask) is the exact bitmask.
@@ -117,6 +122,7 @@ struct Clusterer {
             }
             auto density = compute_density(counts, neighbors);
             if (density < min_pts) {
+                // noise
                 labels[index] = -1;
                 continue;
             }
@@ -163,7 +169,7 @@ struct Clusterer {
         // Check bitmask first.
         int64_t xor_result = prefix_bitmasks[i] ^ prefix_bitmasks[j];
         int64_t second_xor_result = second_prefix_bitmasks[i] ^ second_prefix_bitmasks[j];
-        // prefix_distance <= distance
+        // prefix_distance <= symmetric difference
         const auto prefix_distance = __builtin_popcountll(xor_result) + __builtin_popcountll(second_xor_result);
         if ((prefix_distance > epsilon) || (is_bitmask_exacts[i] && is_bitmask_exacts[j])) {
             ++n_shortcut_checks;

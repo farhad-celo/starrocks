@@ -396,9 +396,25 @@ private:
  * cluster_id = -2 for the below 3 cases
  * 1. variant is NULL
  * 2. variant is an empty array (i.e., [])
- * 3. variant does not contain non-NULL activities
- * The implementation assumes that case 2 and case 3 have the same hash value.
- * For the other clusters, cluster_id is a nonnegative integer (e.g., 0, 1, 2).
+ * 3. variant does not contain non-NULL activities (i.e., [NULL, NULL])
+ * For the other clusters, cluster_id is a non-negative integer (e.g., 0, 1, 2).
+ *
+ * Clustering is performed on the set representations of variants. The symmetric difference is then used to measure the
+ * distance between these set representations.
+ *
+ * The process of converting a variant to its set representation involves:
+ * 1. Filter out any NULL activities.
+ * 2. Introduce a placeholder source activity at the start and a placeholder target activity at the end.
+ * 3. Generate edges by considering each pair of adjacent activities.
+ * 4. Eliminate any duplicate edges.
+ *
+ * Two different variants may share the same set representation.
+ *
+ *  For example, given the following variant = [A, B, NULL, C, NULL, C, C, D, A, B].
+ * 1. NULL activity removal: [A, B, C, C, C, D, A, B]
+ * 2. Addition of placeholder 'SRC' and 'TGT' activity: [SRC, A, B, C, C, C, D, A, B, TGT]
+ * 3. Edge computation from adjacent activity pairs: [SRC-A, A-B, B-C, C-C, C-C, C-D, D-A, A-B, B-TGT]
+ * 4. Deduplication of edges: [SRC-A, A-B, B-C, C-C, C-D, D-A, B-TGT]
  *
  * Used to support PQL CLUSTER_VARIANTS
  * https://docs.celonis.com/en/cluster_variants.html

@@ -342,17 +342,18 @@ TEST_F(CelonisClusterVariantsTest, null_variant_with_different_hash) {
     std::vector<std::optional<DatumArray>> variants1 = {DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "C"},
                                                         DatumArray{"A", "B", "B", "C"}, DatumArray{"X", "Y", "Z"},
                                                         DatumArray{kNullDatum}, DatumArray{kNullDatum, kNullDatum}};
-    std::vector<int128_t> hashes1 = {1, 1, 3, 4, 5, 5};
+    std::vector<int128_t> hashes1 = {1, 1, 3, 4, 5, 7};
     std::vector<std::optional<DatumArray>> variants2 = {DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "C"},
                                                         DatumArray{"A", "B", "D"}, DatumArray{"A", "B", "D"},
                                                         std::nullopt, DatumArray{}};
-    std::vector<int128_t> hashes2 = {1, 1, 2, 2, 6, 5};
+    std::vector<int128_t> hashes2 = {1, 1, 2, 2, 6, 6};
     std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0},
                                                           {2, 1},
                                                           {3, 0},
                                                           {4, -1},
                                                           {5, -2},
-                                                          {6, -2}};
+                                                          {6, -2},
+                                                          {7, -2}};
 
     Run(variants1, hashes1, variants2, hashes2, 2, 2, expected);
 }
