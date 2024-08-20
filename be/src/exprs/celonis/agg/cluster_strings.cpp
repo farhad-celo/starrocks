@@ -32,21 +32,18 @@ static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
 
 using Char = std::variant<char, std::string>;
 
-int64_t get_cost(const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_to_cost, const Char& ch) {
-    auto it = char_to_cost.find(ch);
-    if (it == char_to_cost.end()) {
-        return 1;
-    }
-    return it->second;
-}
-
 struct String {
     std::vector<Char> chars = {};
-    std::unordered_set<Char> char_set = {};
-    // number of chars which have positive cost (cost must be non-negative).
-    size_t real_len = 0;
+    phmap::flat_hash_set<Char, StdHash<Char>> char_set = {};
+    std::vector<bool> is_weighted_chars = {};
+    // The weight for weighted chars, the weight for un-weighted char is 1.
+    int64_t char_weight = 0;
+    // number of chars which have positive weight (weight must be non-negative).
+    int64_t real_len = 0;
+    int64_t total_weight = 0;
 
-    String(const std::string& s, const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_to_cost) {
+    String(const std::string& s, const phmap::flat_hash_set<Char, StdHash<Char>>& weighted_chars, int64_t char_weight)
+            : char_weight(char_weight) {
         int char_size = 0;
         for (const char* str_p = s.data(), * str_end = str_p + s.size(); str_p < str_end; str_p += char_size) {
             char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
@@ -57,10 +54,19 @@ struct String {
             }
         }
         real_len = 0;
+        total_weight = 0;
+        is_weighted_chars.reserve(chars.size());
         for (auto i = 0; i < chars.size(); ++i) {
-            if (get_cost(char_to_cost, chars[i]) != 0) {
+            if (weighted_chars.find(chars[i]) != weighted_chars.end()) {
+                is_weighted_chars.push_back(true);
+                total_weight += char_weight;
+                if (char_weight != 0) {
+                    ++real_len;
+                }
+            } else {
+                is_weighted_chars.push_back(false);
                 ++real_len;
-                char_set.insert(chars[i]);
+                ++total_weight;
             }
         }
     }
@@ -69,7 +75,9 @@ struct String {
 
     size_t length() const { return chars.size(); }
 
-    size_t real_length() const { return real_len; }
+    int64_t real_length() const { return real_len; }
+
+    int64_t get_cost(size_t index) const { return is_weighted_chars[index] ? char_weight : 1; };
 
     const Char& operator[](size_t index) const {
         return chars[index];
@@ -89,40 +97,23 @@ bool have_overlap(const String& s1, const String& s2) {
     return false;
 }
 
-int64_t weighted_edit_distance(const String& s1, const String& s2,
-                               const phmap::flat_hash_map<Char, int64_t, StdHash<Char>>& char_to_cost) {
+int64_t weighted_edit_distance(const String& s1, const String& s2) {
     size_t m = s1.length();
     size_t n = s2.length();
-    std::vector<int64_t> cost1(m, 0);
-    std::vector<int64_t> cost2(n, 0);
-    for (auto i = 0; i < m; ++i) {
-        cost1[i] = get_cost(char_to_cost, s1[i]);
-    }
-    for (auto j = 0; j < n; ++j) {
-        cost2[j] = get_cost(char_to_cost, s2[j]);
-    }
     std::vector<std::vector<int64_t>> dp(m + 1, std::vector<int64_t>(n + 1, 0));
-    int64_t acc = 0;
-    for (auto i = 0; i < m + 1; ++i) {
-        dp[i][0] = acc;
-        if (i < m) {
-            acc += cost1[i];
-        }
+    for (auto i = 1; i < m + 1; ++i) {
+        dp[i][0] = dp[i - 1][0] + s1.get_cost(i - 1);
     }
-    acc = 0;
-    for (auto j = 0; j < n + 1; ++j) {
-        dp[0][j] = acc;
-        if (j < n) {
-            acc += cost2[j];
-        }
+    for (auto j = 1; j < n + 1; ++j) {
+        dp[0][j] = dp[0][j - 1] + s2.get_cost(j - 1);
     }
     for (auto i = 1; i < m + 1; ++i) {
         for (auto j = 1; j < n + 1; ++j) {
-            int64_t delete_cost = dp[i - 1][j] + cost1[i - 1];
-            int64_t insert_cost = dp[i][j - 1] + cost2[j - 1];
+            int64_t delete_cost = dp[i - 1][j] + s1.get_cost(i - 1);
+            int64_t insert_cost = dp[i][j - 1] + s2.get_cost(j - 1);
             int64_t replace_cost = dp[i - 1][j - 1];
             if (s1[i - 1] != s2[j - 1]) {
-                replace_cost += std::max(cost1[i - 1], cost2[j - 1]);
+                replace_cost += std::max(s1.get_cost(i - 1), s2.get_cost(j - 1));
             }
             dp[i][j] = std::min(replace_cost, std::min(delete_cost, insert_cost));
         }
@@ -152,28 +143,21 @@ get_cluster(const std::vector<std::vector<size_t>>& graph, size_t start, std::ve
 
 struct StringClusterer {
     int64_t edit_threshold;
-    phmap::flat_hash_map<Char, int64_t, StdHash<Char>> char_to_cost;
+    phmap::flat_hash_set<Char, StdHash<Char>> weighted_chars;
+    int64_t char_weight;
 
     StringClusterer(int64_t edit_threshold, const std::string& weighted_tokens, int64_t token_weight) : edit_threshold(
-            edit_threshold) {
-        String string_tokens(weighted_tokens, {});
+            edit_threshold), char_weight(token_weight) {
+        String string_tokens(weighted_tokens, {}, 0);
         for (auto i = 0; i < string_tokens.size(); ++i) {
-            char_to_cost.insert({string_tokens[i], token_weight});
+            weighted_chars.insert(string_tokens[i]);
         }
-    }
-
-    int64_t get_string_cost(const String& s) const {
-        int64_t cost = 0;
-        for (auto i = 0; i < s.length(); ++i) {
-            cost += get_cost(char_to_cost, s[i]);
-        }
-        return cost;
     }
 
     std::vector<std::vector<int>>
     compute_char_sets(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
         // compute char frequency
-        std::unordered_map<Char, size_t> char_counter;
+        phmap::flat_hash_map<Char, size_t, StdHash<Char>> char_counter;
         const auto n = tuples.size();
         for (auto i = 0; i < n; ++i) {
             const auto& s = std::get<1>(tuples[i]);
@@ -185,7 +169,7 @@ struct StringClusterer {
         // Sort chars based on frequency. Char with low frequency comes first.
         std::sort(char_cnt_pairs.begin(), char_cnt_pairs.end(),
                   [](const auto& a, const auto& b) { return a.second < b.second; });
-        std::unordered_map<Char, int> char_to_index;
+        phmap::flat_hash_map<Char, int, StdHash<Char>> char_to_index;
         for (int i = 0; i < char_cnt_pairs.size(); ++i) {
             char_to_index[char_cnt_pairs[i].first] = i;
         }
@@ -206,9 +190,9 @@ struct StringClusterer {
         return rv;
     }
 
-    std::unordered_map<int, std::vector<size_t>>
+    phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>>
     build_prefix_index(const std::vector<std::vector<int>>& char_sets) const {
-        std::unordered_map<int, std::vector<size_t>> char_to_indexes;
+        phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>> char_to_indexes;
         // Given two strings (s1 and s2), if their set difference is d, their edit distance is at least ceil(d / 2).
         // Set n_tokens = 2 * edit_threshold + 2, if s1 and s2 do not have overlap in the first n_tokens chars in their
         // char set, their edit distance is at least edit_threshold + 1.
@@ -224,7 +208,7 @@ struct StringClusterer {
 
     // Computes the neighbor indexes (< index) of the index-th string.
     std::vector<size_t> get_neighbors(const std::vector<std::vector<int>>& char_sets,
-                                      const std::unordered_map<int, std::vector<size_t>>& char_to_indexes,
+                                      const phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>>& char_to_indexes,
                                       size_t index) const {
         DCHECK(index >= 1);
         const auto& char_set = char_sets[index];
@@ -268,27 +252,24 @@ struct StringClusterer {
         auto start_time = std::chrono::high_resolution_clock::now();
         const auto n = tuples.size();
         std::vector<std::vector<size_t>> graph(n, std::vector<size_t>(0));
-        std::vector<int64_t> costs(n, 0);
-        for (auto i = 0; i < n; ++i) {
-            costs[i] = get_string_cost(std::get<1>(tuples[i]));
-        }
         std::vector<std::vector<int>> char_sets = compute_char_sets(tuples);
-        std::unordered_map<int, std::vector<size_t>> char_to_indexes = build_prefix_index(char_sets);
+        phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>> char_to_indexes = build_prefix_index(char_sets);
         for (auto i = 1; i < n; ++i) {
             auto length_i = std::get<1>(tuples[i]).real_length();
             auto neighbors = get_neighbors(char_sets, char_to_indexes, i);
             std::sort(neighbors.rbegin(), neighbors.rend());
             for (auto j: neighbors) {
-                // edit_distance(s_i, s_j) >= abs(length_i - length_j)
+                // edit_distance(s_i, s_j) >= abs(length_i - length_j), length_i >= length_j
                 if (length_i - std::get<1>(tuples[j]).real_length() > edit_threshold) {
                     break;
                 }
+                // If two strings do not have overlap, their edit distance is infinite (Same as what Saola does).
                 if (!have_overlap(std::get<1>(tuples[i]), std::get<1>(tuples[j]))) {
                     continue;
                 }
-                // edit_distance(s_i, s_j) <= cost(s_i) + cost(s_j)
-                if (edit_threshold >= costs[i] + costs[j] ||
-                    weighted_edit_distance(std::get<1>(tuples[i]), std::get<1>(tuples[j]), char_to_cost) <=
+                // edit_distance(s_i, s_j) <= total_weight(s_i) + total_weight(s_j)
+                if (edit_threshold >= std::get<1>(tuples[i]).total_weight + std::get<1>(tuples[j]).total_weight ||
+                    weighted_edit_distance(std::get<1>(tuples[i]), std::get<1>(tuples[j])) <=
                     edit_threshold) {
                     graph[i].push_back(j);
                     graph[j].push_back(i);
@@ -312,8 +293,8 @@ struct StringClusterer {
         std::vector<std::tuple<int128_t, String, std::string, int64_t>> tuples;
         tuples.reserve(n);
         for (const auto& [hash128, string_with_count]: hash_to_string_with_count) {
-            tuples.emplace_back(hash128, String(string_with_count.first, char_to_cost), string_with_count.first,
-                                string_with_count.second);
+            tuples.emplace_back(hash128, String(string_with_count.first, weighted_chars, char_weight),
+                                string_with_count.first, string_with_count.second);
         }
         // strings are sorted based on their real length in ascending order.
         std::sort(tuples.begin(), tuples.end(),
@@ -416,7 +397,7 @@ void ClusterStringsAggregateFunction::finalize_to_column(FunctionContext* ctx, C
         ctx->set_error(std::string("CELONIS_CLUSTER_STRINGS timeout").c_str(), false);
         return;
     }
-    // Write to output column
+    // write to output column
     LOG(INFO) << "CELONIS_CLUSTER_STRINGS: writing to column\n";
     auto& fields = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
     if (to->is_nullable()) {
