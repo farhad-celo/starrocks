@@ -33,8 +33,8 @@ struct Clusterer {
     // To optimize the computation of symmetric differences between sets, we first calculate the XOR of their
     // corresponding bitmasks. If the XOR value exceeds epsilon, we can immediately conclude that these sets cannot
     // be neighbors, avoiding unnecessary further calculations.
-    std::vector<int64_t> prefix_bitmasks;
-    std::vector<int64_t> second_prefix_bitmasks;
+    std::vector<uint64_t> prefix_bitmasks;
+    std::vector<uint64_t> second_prefix_bitmasks;
     // true means the (prefix_bitmask + second_prefix_bitmask) is the exact bitmask.
     std::vector<bool> is_bitmask_exacts;
     // the count of is_neighbor method calls.
@@ -54,7 +54,7 @@ struct Clusterer {
         // prefix_bitmask represents the first min(64, n) edges.
         // second_prefix_bitmask represents the next min(64, n - 64) edges.
         // compute the top (most) 2 * 64 frequent edges
-        std::vector<std::pair<Edge, int64_t>> temp_edges(std::min(2 * sizeof(int64_t) * CHAR_BIT, edge_counter.size()));
+        std::vector<std::pair<Edge, int64_t>> temp_edges(std::min(2 * sizeof(uint64_t) * CHAR_BIT, edge_counter.size()));
         std::vector<std::pair<Edge, int64_t>> edge_cnts(edge_counter.begin(), edge_counter.end());
         std::partial_sort_copy(edge_cnts.begin(), edge_cnts.end(), temp_edges.begin(), temp_edges.end(),
                                [](const auto& a, const auto& b) { return a.second > b.second; });
@@ -63,21 +63,20 @@ struct Clusterer {
             freq_edges.push_back(entry.first);
         }
         // compute the bitmasks
-        const int64_t one = 1;
         for (auto i = 0; i < points.size(); ++i) {
             const auto& point = points[i];
             phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> cur_edges(point.edges.begin(), point.edges.end());
             int64_t bitmask = 0;
-            for (auto j = 0; j < std::min(sizeof(int64_t) * CHAR_BIT, freq_edges.size()); ++j) {
+            for (auto j = 0; j < std::min(sizeof(uint64_t) * CHAR_BIT, freq_edges.size()); ++j) {
                 if (cur_edges.contains(freq_edges[j])) {
-                    bitmask |= (one << j);
+                    bitmask |= (1ULL << j);
                 }
             }
             prefix_bitmasks[i] = bitmask;
             int64_t second_bitmask = 0;
-            for (auto j = 64; j < std::min(2 * sizeof(int64_t) * CHAR_BIT, freq_edges.size()); ++j) {
+            for (auto j = 64; j < std::min(2 * sizeof(uint64_t) * CHAR_BIT, freq_edges.size()); ++j) {
                 if (cur_edges.contains(freq_edges[j])) {
-                    second_bitmask |= (one << (j - 64));
+                    second_bitmask |= (1ULL << (j - 64));
                 }
             }
             second_prefix_bitmasks[i] = second_bitmask;
