@@ -32,6 +32,42 @@ static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
 
 using Char = std::variant<char, std::string>;
 
+std::vector<Char> to_chars(const std::string& s) {
+    std::vector<Char> chars;
+    chars.reserve(s.size());
+    int char_size = 0;
+    for (const char* str_p = s.data(), * str_end = str_p + s.size(); str_p < str_end; str_p += char_size) {
+        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
+        if (char_size == 1) {
+            chars.emplace_back(*str_p);
+        } else {
+            chars.emplace_back(std::string(str_p, char_size));
+        }
+    }
+    chars.shrink_to_fit();
+    return chars;
+}
+
+uint64_t compute_alphanumeric_bitmask(const std::vector<Char>& chars) {
+    uint64_t bitmask = 0;
+    for (const auto& ch: chars) {
+        std::visit([&bitmask](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, char>) {
+                char c = arg;
+                if (c >= '0' && c <= '9') {
+                    bitmask |= 1ULL << (c - '0');
+                } else if (c >= 'a' && c <= 'z') {
+                    bitmask |= 1ULL << (c - 'a' + 10);
+                } else if (c >= 'A' && c <= 'Z') {
+                    bitmask |= 1ULL << (c - 'A' + 36);
+                }
+            }
+        }, ch);
+    }
+    return bitmask;
+}
+
 struct String {
     std::vector<Char> chars = {};
     phmap::flat_hash_set<Char, StdHash<Char>> char_set = {};
@@ -41,18 +77,11 @@ struct String {
     // number of chars which have positive weight (weight must be non-negative).
     int64_t real_len = 0;
     int64_t total_weight = 0;
+    uint64_t alphanumeric_bitmask = 0;
 
     String(const std::string& s, const phmap::flat_hash_set<Char, StdHash<Char>>& weighted_chars, int64_t char_weight)
             : char_weight(char_weight) {
-        int char_size = 0;
-        for (const char* str_p = s.data(), * str_end = str_p + s.size(); str_p < str_end; str_p += char_size) {
-            char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
-            if (char_size == 1) {
-                chars.emplace_back(*str_p);
-            } else {
-                chars.emplace_back(std::string(str_p, char_size));
-            }
-        }
+        chars = to_chars(s);
         real_len = 0;
         total_weight = 0;
         is_weighted_chars.reserve(chars.size());
@@ -69,6 +98,7 @@ struct String {
                 ++total_weight;
             }
         }
+        alphanumeric_bitmask = compute_alphanumeric_bitmask(chars);
     }
 
     size_t size() const { return chars.size(); }
@@ -84,7 +114,10 @@ struct String {
     }
 };
 
-bool have_overlap(const String& s1, const String& s2) {
+bool have_common_chars(const String& s1, const String& s2) {
+    if ((s1.alphanumeric_bitmask & s2.alphanumeric_bitmask) != 0) {
+        return true;
+    }
     HashSet<Char> set1;
     for (auto i = 0; i < s1.size(); ++i) {
         set1.insert(s1[i]);
@@ -148,9 +181,9 @@ struct StringClusterer {
 
     StringClusterer(int64_t edit_threshold, const std::string& weighted_tokens, int64_t token_weight) : edit_threshold(
             edit_threshold), char_weight(token_weight) {
-        String string_tokens(weighted_tokens, {}, 0);
-        for (auto i = 0; i < string_tokens.size(); ++i) {
-            weighted_chars.insert(string_tokens[i]);
+        std::vector<Char> tokens = to_chars(weighted_tokens);
+        for (const auto& token: tokens) {
+            weighted_chars.insert(token);
         }
     }
 
@@ -263,8 +296,9 @@ struct StringClusterer {
                 if (length_i - std::get<1>(tuples[j]).real_length() > edit_threshold) {
                     break;
                 }
-                // If two strings do not have overlap, their edit distance is infinite (Same as what Saola does).
-                if (!have_overlap(std::get<1>(tuples[i]), std::get<1>(tuples[j]))) {
+                // If two strings do not have any common chars, their edit distance is infinite (Same as what
+                // Saola does).
+                if (!have_common_chars(std::get<1>(tuples[i]), std::get<1>(tuples[j]))) {
                     continue;
                 }
                 // edit_distance(s_i, s_j) <= total_weight(s_i) + total_weight(s_j)

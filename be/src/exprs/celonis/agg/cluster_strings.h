@@ -196,7 +196,7 @@ private:
  * 3. Cost of replacing ch1 with ch2: max(cost(ch1), cost(ch2)).
  *
  * Clustering is transitive: if s1 and s2 are similar, s2 and s3 are similar, then s1, s2, s3 will end up in the same
- * cluster. If two strings do not have overlap, they are not in the same cluster (i.e., distance = infinite).
+ * cluster. If two strings do not have any common chars, they are not in the same cluster (i.e., distance = infinite).
  * NULL strings are put in the same cluster. It is guaranteed that no non-NULL string is similar to the NULL string.
  *
  * Used to support PQL CLUSTER_VARIANTS
