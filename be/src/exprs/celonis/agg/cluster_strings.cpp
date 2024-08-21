@@ -132,9 +132,14 @@ bool have_common_chars(const String& s1, const String& s2) {
     return false;
 }
 
-int64_t weighted_edit_distance(const String& s1, const String& s2) {
+// Returns true if the weighted_edit_distance between s1 and s2 is not greater than threshold.
+bool weighted_edit_distance_within_threshold(const String& s1, const String& s2, int64_t threshold) {
+    if (std::abs(s1.real_length() - s2.real_length()) > threshold) {
+        return false;
+    }
     size_t m = s1.length();
     size_t n = s2.length();
+    // dp[i][j] is the edit distance of s1[:i] and s2[:j].
     std::vector<std::vector<int64_t>> dp(m + 1, std::vector<int64_t>(n + 1, 0));
     for (auto i = 1; i < m + 1; ++i) {
         dp[i][0] = dp[i - 1][0] + s1.get_cost(i - 1);
@@ -143,6 +148,7 @@ int64_t weighted_edit_distance(const String& s1, const String& s2) {
         dp[0][j] = dp[0][j - 1] + s2.get_cost(j - 1);
     }
     for (auto i = 1; i < m + 1; ++i) {
+        int64_t min_in_row = dp[i][0];
         for (auto j = 1; j < n + 1; ++j) {
             int64_t delete_cost = dp[i - 1][j] + s1.get_cost(i - 1);
             int64_t insert_cost = dp[i][j - 1] + s2.get_cost(j - 1);
@@ -151,9 +157,14 @@ int64_t weighted_edit_distance(const String& s1, const String& s2) {
                 replace_cost += std::max(s1.get_cost(i - 1), s2.get_cost(j - 1));
             }
             dp[i][j] = std::min(replace_cost, std::min(delete_cost, insert_cost));
+            min_in_row = std::min(dp[i][j], min_in_row);
+        }
+        // dp[m][n] >= min_in_row
+        if (min_in_row > threshold) {
+            return false;
         }
     }
-    return dp[m][n];
+    return dp[m][n] <= threshold;
 }
 
 std::vector<size_t>
@@ -283,6 +294,10 @@ struct StringClusterer {
     }
 
     // TODO(y.zhang): Improve the efficiency.
+    // Some ideas:
+    // 1. For dense graph, using lazy exploration with union find approach is probably better.
+    // 2. Use a bounded window when computing edit distance.
+    // 2. Remove zero cost chars from chars in String.
     std::optional<std::vector<std::vector<size_t>>>
     build_graph(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -306,8 +321,8 @@ struct StringClusterer {
                 }
                 // edit_distance(s_i, s_j) <= total_weight(s_i) + total_weight(s_j)
                 if (edit_threshold >= std::get<1>(tuples[i]).total_weight + std::get<1>(tuples[j]).total_weight ||
-                    weighted_edit_distance(std::get<1>(tuples[i]), std::get<1>(tuples[j])) <=
-                    edit_threshold) {
+                    weighted_edit_distance_within_threshold(std::get<1>(tuples[i]), std::get<1>(tuples[j]),
+                                                            edit_threshold)) {
                     graph[i].push_back(j);
                     graph[j].push_back(i);
                 }
