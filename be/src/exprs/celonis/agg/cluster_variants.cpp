@@ -66,14 +66,14 @@ struct Clusterer {
         for (auto i = 0; i < points.size(); ++i) {
             const auto& point = points[i];
             phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> cur_edges(point.edges.begin(), point.edges.end());
-            int64_t bitmask = 0;
+            uint64_t bitmask = 0;
             for (auto j = 0; j < std::min(sizeof(uint64_t) * CHAR_BIT, freq_edges.size()); ++j) {
                 if (cur_edges.contains(freq_edges[j])) {
                     bitmask |= (1ULL << j);
                 }
             }
             prefix_bitmasks[i] = bitmask;
-            int64_t second_bitmask = 0;
+            uint64_t second_bitmask = 0;
             for (auto j = 64; j < std::min(2 * sizeof(uint64_t) * CHAR_BIT, freq_edges.size()); ++j) {
                 if (cur_edges.contains(freq_edges[j])) {
                     second_bitmask |= (1ULL << (j - 64));
@@ -166,8 +166,8 @@ struct Clusterer {
     bool is_neighbor(const std::vector<EdgeSet>& points, size_t i, size_t j) {
         ++n_is_neighbor_checks;
         // Check bitmask first.
-        int64_t xor_result = prefix_bitmasks[i] ^ prefix_bitmasks[j];
-        int64_t second_xor_result = second_prefix_bitmasks[i] ^ second_prefix_bitmasks[j];
+        const auto xor_result = prefix_bitmasks[i] ^ prefix_bitmasks[j];
+        const auto second_xor_result = second_prefix_bitmasks[i] ^ second_prefix_bitmasks[j];
         // prefix_distance <= symmetric difference
         const auto prefix_distance = __builtin_popcountll(xor_result) + __builtin_popcountll(second_xor_result);
         if ((prefix_distance > epsilon) || (is_bitmask_exacts[i] && is_bitmask_exacts[j])) {
