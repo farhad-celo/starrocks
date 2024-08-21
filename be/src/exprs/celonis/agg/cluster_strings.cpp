@@ -91,9 +91,11 @@ struct String {
                 total_weight += char_weight;
                 if (char_weight != 0) {
                     ++real_len;
+                    char_set.insert(chars[i]);
                 }
             } else {
                 is_weighted_chars.push_back(false);
+                char_set.insert(chars[i]);
                 ++real_len;
                 ++total_weight;
             }
@@ -236,6 +238,7 @@ struct StringClusterer {
                 char_to_indexes[char_set[j]].push_back(index);
             }
         }
+        LOG(INFO) << "CELONIS_CLUSTER_STRINGS: size of prefix_index is " << char_to_indexes.size() << std::endl;
         return char_to_indexes;
     }
 
