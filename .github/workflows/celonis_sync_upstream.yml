@@ -15,10 +15,10 @@ permissions:
 
 jobs:
   sync-branch:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on, runner=1cpu-linux-x64, "run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Remote add upstream
         id: remote-add

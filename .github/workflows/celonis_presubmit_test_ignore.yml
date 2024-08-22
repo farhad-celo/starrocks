@@ -16,6 +16,6 @@ on:
 
 jobs:
   presubmit-test:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on, runner=1cpu-linux-x64, "run-id=${{ github.run_id }}"]
     steps:
       - run: echo "No test needed"
