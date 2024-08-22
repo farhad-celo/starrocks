@@ -91,7 +91,7 @@ struct String {
 
     int64_t real_length() const { return real_len; }
 
-    int64_t get_cost(size_t index) const { return is_weighted_chars[index] ? char_weight : 1; };
+    inline int64_t get_cost(size_t index) const { return is_weighted_chars[index] ? char_weight : 1; };
 
     const Char& operator[](size_t index) const {
         return chars[index];
@@ -144,32 +144,37 @@ bool weighted_edit_distance_within_threshold(const String& s1, const String& s2,
     }
     size_t m = s1.length();
     size_t n = s2.length();
-    // dp[i][j] is the edit distance of s1[:i] and s2[:j].
-    std::vector<std::vector<int64_t>> dp(m + 1, std::vector<int64_t>(n + 1, 0));
-    for (auto i = 1; i < m + 1; ++i) {
-        dp[i][0] = dp[i - 1][0] + s1.get_cost(i - 1);
-    }
+    std::vector<int64_t> prev_row(n + 1, 0);
+    std::vector<int64_t> curr_row(n + 1, 0);
     for (auto j = 1; j < n + 1; ++j) {
-        dp[0][j] = dp[0][j - 1] + s2.get_cost(j - 1);
+        prev_row[j] = prev_row[j - 1] + s2.get_cost(j - 1);
     }
+    // keep track of cost of the prefix of s1.
+    int64_t acc = 0;
     for (auto i = 1; i < m + 1; ++i) {
-        int64_t min_in_row = dp[i][0];
+        const auto cost_ch1 = s1.get_cost(i - 1);
+        acc += cost_ch1;
+        curr_row[0] = acc;
+        int64_t min_in_row = curr_row[0];
+        const auto& ch1 = s1[i - 1];
         for (auto j = 1; j < n + 1; ++j) {
-            int64_t delete_cost = dp[i - 1][j] + s1.get_cost(i - 1);
-            int64_t insert_cost = dp[i][j - 1] + s2.get_cost(j - 1);
-            int64_t replace_cost = dp[i - 1][j - 1];
-            if (s1[i - 1] != s2[j - 1]) {
-                replace_cost += std::max(s1.get_cost(i - 1), s2.get_cost(j - 1));
+            const auto cost_ch2 = s2.get_cost(j - 1);
+            int64_t delete_cost = prev_row[j] + cost_ch1;
+            int64_t insert_cost = curr_row[j - 1] + cost_ch2;
+            int64_t replace_cost = prev_row[j - 1];
+            if (ch1 != s2[j - 1]) {
+                replace_cost += std::max(cost_ch1, cost_ch2);
             }
-            dp[i][j] = std::min(replace_cost, std::min(delete_cost, insert_cost));
-            min_in_row = std::min(dp[i][j], min_in_row);
+            curr_row[j] = std::min({replace_cost, delete_cost, insert_cost});
+            min_in_row = std::min(curr_row[j], min_in_row);
         }
-        // dp[m][n] >= min_in_row
+        // edit_distance(s1, s2) >= min_in_row
         if (min_in_row > threshold) {
             return false;
         }
+        std::swap(prev_row, curr_row);
     }
-    return dp[m][n] <= threshold;
+    return prev_row[n] <= threshold;
 }
 
 std::vector<size_t>
