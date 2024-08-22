@@ -449,6 +449,17 @@ TEST_F(CelonisClusterStringsTest, zero_token_weight) {
     Run(strings1, hashes1, strings2, hashes2, 0, "0123456789", 0, expected);
 }
 
+TEST_F(CelonisClusterStringsTest, zero_weight_char_not_considered_when_checking_common_chars) {
+    std::vector<std::optional<std::string>> strings1 = {"AB"};
+    std::vector<int128_t> hashes1 = {1};
+    std::vector<std::optional<std::string>> strings2 = {"AC"};
+    std::vector<int128_t> hashes2 = {2};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "AB"},
+                                                                             {2, "AC"}};
+    // Since the weight of 'A' is zero, "AB" and "AC" do not share any common chars. Their edit distance is infinite.
+    Run(strings1, hashes1, strings2, hashes2, 4, "A", 0, expected);
+}
+
 TEST_F(CelonisClusterStringsTest, unicode_weighted_tokens) {
     std::vector<std::optional<std::string>> strings1 = {"\u3082\u3076\u3089", "\u3082\u3077\u3089"};
     std::vector<int128_t> hashes1 = {1, 2};

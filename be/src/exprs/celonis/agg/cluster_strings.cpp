@@ -48,28 +48,9 @@ std::vector<Char> to_chars(const std::string& s) {
     return chars;
 }
 
-uint64_t compute_alphanumeric_bitmask(const std::vector<Char>& chars) {
-    uint64_t bitmask = 0;
-    for (const auto& ch: chars) {
-        std::visit([&bitmask](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, char>) {
-                char c = arg;
-                if (c >= '0' && c <= '9') {
-                    bitmask |= 1ULL << (c - '0');
-                } else if (c >= 'a' && c <= 'z') {
-                    bitmask |= 1ULL << (c - 'a' + 10);
-                } else if (c >= 'A' && c <= 'Z') {
-                    bitmask |= 1ULL << (c - 'A' + 36);
-                }
-            }
-        }, ch);
-    }
-    return bitmask;
-}
-
 struct String {
     std::vector<Char> chars = {};
+    // chars with non-zero weight.
     phmap::flat_hash_set<Char, StdHash<Char>> char_set = {};
     std::vector<bool> is_weighted_chars = {};
     // The weight for weighted chars, the weight for un-weighted char is 1.
@@ -77,6 +58,7 @@ struct String {
     // number of chars which have positive weight (weight must be non-negative).
     int64_t real_len = 0;
     int64_t total_weight = 0;
+    // Used to estimate if two strings contain common chars.
     uint64_t alphanumeric_bitmask = 0;
 
     String(const std::string& s, const phmap::flat_hash_set<Char, StdHash<Char>>& weighted_chars, int64_t char_weight)
@@ -100,7 +82,7 @@ struct String {
                 ++total_weight;
             }
         }
-        alphanumeric_bitmask = compute_alphanumeric_bitmask(chars);
+        set_alphanumeric_bitmask();
     }
 
     size_t size() const { return chars.size(); }
@@ -114,18 +96,35 @@ struct String {
     const Char& operator[](size_t index) const {
         return chars[index];
     }
+
+private:
+    void set_alphanumeric_bitmask() {
+        uint64_t bitmask = 0;
+        for (const auto& ch: char_set) {
+            std::visit([&bitmask](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, char>) {
+                    char c = arg;
+                    if (c >= '0' && c <= '9') {
+                        bitmask |= 1ULL << (c - '0');
+                    } else if (c >= 'a' && c <= 'z') {
+                        bitmask |= 1ULL << (c - 'a' + 10);
+                    } else if (c >= 'A' && c <= 'Z') {
+                        bitmask |= 1ULL << (c - 'A' + 36);
+                    }
+                }
+            }, ch);
+        }
+        alphanumeric_bitmask = bitmask;
+    }
 };
 
 bool have_common_chars(const String& s1, const String& s2) {
     if ((s1.alphanumeric_bitmask & s2.alphanumeric_bitmask) != 0) {
         return true;
     }
-    HashSet<Char> set1;
-    for (auto i = 0; i < s1.size(); ++i) {
-        set1.insert(s1[i]);
-    }
-    for (auto j = 0; j < s2.size(); ++j) {
-        if (set1.find(s2[j]) != set1.end()) {
+    for (const auto& ch1: s1.char_set) {
+        if (s2.char_set.find(ch1) != s2.char_set.end()) {
             return true;
         }
     }
@@ -239,9 +238,9 @@ struct StringClusterer {
     phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>>
     build_prefix_index(const std::vector<std::vector<int>>& char_sets) const {
         phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>> char_to_indexes;
-        // Given two strings (s1 and s2), if their set difference is d, their edit distance is at least ceil(d / 2).
-        // Set n_tokens = 2 * edit_threshold + 2, if s1 and s2 do not have overlap in the first n_tokens chars in their
-        // char set, their edit distance is at least edit_threshold + 1.
+        // Given two strings (s1 and s2), if their set symmetric difference is d, their edit distance is at least
+        // ceil(d / 2). Set n_tokens = 2 * edit_threshold + 2, if s1 and s2 do not have overlap in the first n_tokens
+        // chars in their char set, their edit distance is at least edit_threshold + 1.
         const auto n_tokens = 2 * edit_threshold + 2;
         for (auto index = 0; index < char_sets.size(); ++index) {
             const auto& char_set = char_sets[index];
