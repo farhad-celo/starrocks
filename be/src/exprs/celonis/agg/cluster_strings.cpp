@@ -136,6 +136,12 @@ bool weighted_edit_distance_within_threshold(const String& s1, const String& s2,
     if (std::abs(s1.real_length() - s2.real_length()) > threshold) {
         return false;
     }
+    const auto symmetric_diff_lower_bound = __builtin_popcountll(s1.alphanumeric_bitmask ^ s2.alphanumeric_bitmask);
+    // edit_distance >= (symmetric_difference / 2) >= (symmetric_diff_lower_bound / 2) > threshold
+    // If sym_diff_lower_bound > 2 * threshold, edit_distance > threshold.
+    if (symmetric_diff_lower_bound > 2 * threshold) {
+        return false;
+    }
     size_t m = s1.length();
     size_t n = s2.length();
     // dp[i][j] is the edit distance of s1[:i] and s2[:j].
@@ -292,11 +298,11 @@ struct StringClusterer {
         }
     }
 
-    // TODO(y.zhang): Improve the efficiency.
-    // Some ideas:
+    // Some improvement ideas:
     // 1. For dense graph, using lazy exploration with union find approach is probably better.
     // 2. Use a bounded window when computing edit distance.
-    // 2. Remove zero cost chars from chars in String.
+    // 3. Better estimate the lower bound and upper bound of edit distance without computing it.
+    // 4. Remove zero cost chars from chars in String in the beginning.
     std::optional<std::vector<std::vector<size_t>>>
     build_graph(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -305,7 +311,8 @@ struct StringClusterer {
         std::vector<std::vector<int>> char_sets = compute_char_sets(tuples);
         phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>> char_to_indexes = build_prefix_index(char_sets);
         for (auto i = 1; i < n; ++i) {
-            auto length_i = std::get<1>(tuples[i]).real_length();
+            const auto length_i = std::get<1>(tuples[i]).real_length();
+            const auto total_weight_i = std::get<1>(tuples[i]).total_weight;
             auto neighbors = get_neighbors(char_sets, char_to_indexes, i);
             std::sort(neighbors.rbegin(), neighbors.rend());
             for (auto j: neighbors) {
@@ -319,7 +326,7 @@ struct StringClusterer {
                     continue;
                 }
                 // edit_distance(s_i, s_j) <= total_weight(s_i) + total_weight(s_j)
-                if (edit_threshold >= std::get<1>(tuples[i]).total_weight + std::get<1>(tuples[j]).total_weight ||
+                if (edit_threshold >= total_weight_i + std::get<1>(tuples[j]).total_weight ||
                     weighted_edit_distance_within_threshold(std::get<1>(tuples[i]), std::get<1>(tuples[j]),
                                                             edit_threshold)) {
                     graph[i].push_back(j);
