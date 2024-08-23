@@ -30,9 +30,9 @@ env:
 
 jobs:
   presubmit-test:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=80,"run-id=${{ github.run_id }}"]
     steps:
-      - name: checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Pull dev env image
