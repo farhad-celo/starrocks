@@ -8,10 +8,29 @@
 
 namespace starrocks {
 
+template<typename T>
+std::optional<T> safe_square(const T& value) {
+    if constexpr (std::is_integral_v<T>) {
+        if (value == 0) {
+            return 0;
+        }
+        T pos_value = std::abs(value);
+        if (pos_value > std::numeric_limits<T>::max() / pos_value) {
+            return std::nullopt;
+        }
+        return pos_value * pos_value;
+    } else if constexpr (std::is_floating_point_v<T>) {
+        return value * value;
+    } else {
+        return std::nullopt;
+    }
+}
+
 template<LogicalType LT>
 StatusOr<ColumnPtr>
 CelonisMathFunctions<LT>::square([[maybe_unused]] starrocks::FunctionContext* context,
                                  const starrocks::Columns& columns) {
+    using CppType = RunTimeCppValueType<LT>;
     DCHECK_EQ(columns.size(), 1);
     ColumnViewer value_viewer = ColumnViewer<LT>(columns[0]);
 
@@ -22,7 +41,12 @@ CelonisMathFunctions<LT>::square([[maybe_unused]] starrocks::FunctionContext* co
             result.append_null();
             continue;
         }
-        result.append(value_viewer.value(row) * value_viewer.value(row));
+        auto square_value = safe_square<CppType>(value_viewer.value(row));
+        if (square_value.has_value()) {
+            result.append(square_value.value());
+        } else {
+            result.append_null();
+        }
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
