@@ -2184,9 +2184,9 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_empty_input_array) {
 
 TEST_F(CelonisArrayFunctionsTest, null_to_empty_null_input_array) {
     auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
-    input_array->append_datum(Datum{});
+    input_array->append_datum(kNullDatum);
     input_array->append_datum(DatumArray{3, 2});
-    input_array->append_datum(Datum{});
+    input_array->append_datum(kNullDatum);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
     ASSERT_EQ(3, result->size());
@@ -2199,9 +2199,9 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_null_input_array) {
 
 TEST_F(CelonisArrayFunctionsTest, null_to_empty_const_null_input_array) {
     auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
-    input_array->append_datum(Datum{});
-    input_array->append_datum(Datum{});
-    input_array->append_datum(Datum{});
+    input_array->append_datum(kNullDatum);
+    input_array->append_datum(kNullDatum);
+    input_array->append_datum(kNullDatum);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
     ASSERT_EQ(3, result->size());
@@ -2231,7 +2231,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_datetime) {
     input_array->append_datum(DatumArray{TimestampValue::create(2020, 8, 10, 1, 32, 32),
                                          TimestampValue::create(2020, 8, 10, 2, 32, 32),
                                          TimestampValue::create(2020, 8, 10, 3, 32, 32)});
-    input_array->append_datum(Datum());
+    input_array->append_datum(kNullDatum);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
     ASSERT_EQ(2, result->size());
@@ -2246,7 +2246,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_varchar) {
     auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     input_array->append_datum(DatumArray{"1", "2"});
     input_array->append_datum(DatumArray{});
-    input_array->append_datum(Datum());
+    input_array->append_datum(kNullDatum);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
     ASSERT_EQ(3, result->size());
