@@ -11,7 +11,7 @@
 
 namespace starrocks {
 
-static const double DEFAULT_ONE_END_CUTOFF = 5.0;
+static const double DEFAULT_ONE_END_CUTOFF = 10.0;
 
 template<LogicalType LT>
 struct CelonisMovingTrimmedMeanAggregateState {
@@ -55,7 +55,7 @@ struct CelonisMovingTrimmedMeanAggregateState {
     }
 
     void re_balance() {
-        const auto cutoff_size = static_cast<size_t>(std::round(
+        const auto cutoff_size = static_cast<size_t>(std::floor(
                 (middle.size() + low.size() + high.size()) * DEFAULT_ONE_END_CUTOFF / 100.0));
         if (low.size() < cutoff_size) {
             // remove the lowest element of middle and insert it to low
