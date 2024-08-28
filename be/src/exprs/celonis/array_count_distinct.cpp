@@ -29,13 +29,6 @@ using LHashSetType = typename LHashSet<LT>::LType;
 } // namespace
 
 template<LogicalType LT>
-struct InStateThreadLocal {
-    LHashSetType<LT> match_set;
-    bool match_has_null = false;
-    ScalarFunction function;
-};
-
-template<LogicalType LT>
 StatusOr<ColumnPtr>
 CelonisArrayCountDistinct<LT>::array_count_distinct([[maybe_unused]] starrocks::FunctionContext* context,
                                                     const starrocks::Columns& columns) {
