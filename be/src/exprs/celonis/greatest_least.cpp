@@ -18,6 +18,11 @@ inline constexpr bool always_false_v{false};
 
 template<ComparisonType CMP_TYPE, LogicalType LT>
 [[nodiscard]] ColumnPtr celonis_greatest_least_impl(FunctionContext* context, const Columns &columns) {
+    if (columns.size() == 1) {
+        return columns[0];
+    }
+
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     // If none of the columns contains a null value, we can simply defer the computation to the existing
     // Starrocks greatest/least implementation.
     if (const bool all_columns_without_null{std::none_of(columns.begin(), columns.end(), [](const ColumnPtr& column_ptr) {
@@ -36,7 +41,6 @@ template<ComparisonType CMP_TYPE, LogicalType LT>
 
     // Else, at least one column contains a null value. Thus, we use the 'custom' Celonis null behaviour.
     // The following was copied and slightly adapted from the 'greatest' implementation in expr/math_functions.h
-
     std::vector<ColumnViewer<LT>> column_views{};
     column_views.reserve(columns.size());
     std::transform(columns.begin(), columns.end(), std::back_inserter(column_views), [](const ColumnPtr& value) {
@@ -45,7 +49,7 @@ template<ComparisonType CMP_TYPE, LogicalType LT>
     });
 
     const std::size_t row_count{columns.front()->size()};
-    ColumnBuilder<LT> result{static_cast<int>(row_count)};
+    ColumnBuilder<LT> result{static_cast<int32_t>(row_count)};
     for (std::size_t row_idx{0}; row_idx < row_count; ++row_idx) {
         auto column_view_it{std::begin(column_views)};
         bool is_all_null{column_view_it->is_null(row_idx)};

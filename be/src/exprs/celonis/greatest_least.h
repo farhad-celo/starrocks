@@ -10,10 +10,16 @@ public:
      * @param: [column_1, column_2 [, ..., column_n]]
      * @paramType: columns: [VARCHAR | BIGINT | DOUBLE | DATETIME] (column_1 - column_n)
      * @return: column_1 type
-     * Supports PQL LIKE https://docs.celonis.com/en/greatest.html
+     * Supports PQL GREATEST: https://docs.celonis.com/en/greatest.html
      */
     DEFINE_VECTORIZED_FN(celonis_greatest);
-    /** Same as celonis_greatest but for PQL LEAST: https://docs.celonis.com/en/least.html */
+
+    /**
+     * @param: [column_1, column_2 [, ..., column_n]]
+     * @paramType: columns: [VARCHAR | BIGINT | DOUBLE | DATETIME] (column_1 - column_n)
+     * @return: column_1 type
+     * Supports PQL LEAST: https://docs.celonis.com/en/least.html
+     */
     DEFINE_VECTORIZED_FN(celonis_least);
 };
 
