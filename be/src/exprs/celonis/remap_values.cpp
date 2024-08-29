@@ -1,24 +1,84 @@
 #include "exprs/celonis/remap_values.h"
 
 #include "column/array_column.h"
+#include "column/column_hash.h"
 #include "column/column_helper.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
 
 namespace starrocks {
 
-struct RemapValuesStateFragmentLocal {
-    // TODO(y.zhang): Switch to use hash map.
-    DatumMap value_map;
-    ScalarFunction function;
+template<LogicalType LT, typename = guard::Guard>
+struct ValueMap {
 };
 
-Status CelonisRemapValues::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+template<LogicalType LT>
+struct ValueMap<LT, FixedLengthLTGuard<LT>> {
+    using CppType = RunTimeCppValueType<LT>;
+    using KeyType = CppType;
+    using HashMap = phmap::flat_hash_map<KeyType, Datum, StdHash<CppType>>;
+};
+
+template<LogicalType LT>
+struct ValueMap<LT, StringLTGuard<LT>> {
+    using CppType = RunTimeCppValueType<LT>;
+    using KeyType = std::string;
+    using HashMap = phmap::flat_hash_map<KeyType, Datum, SliceHash>;
+};
+
+template<LogicalType LT>
+struct RemapValuesStateFragmentLocal {
+    using ValueHashMap = typename ValueMap<LT>::HashMap;
+    using CppType = RunTimeCppType<LT>;
+    using HashMapKeyType = typename ValueMap<LT>::KeyType;
+
+    ValueHashMap value_map;
+    ScalarFunction function;
+    std::optional<Datum> null_value = std::nullopt;
+
+    void insert(const Datum& old_datum, const Datum& new_datum) {
+        if (old_datum.is_null()) {
+            null_value = new_datum;
+        } else {
+            const auto key = _convert_to_key_type(old_datum.get<CppType>());
+            value_map[key] = new_datum;
+        }
+    }
+
+    Datum get(const Datum& key_datum, const std::optional<Datum>& default_value) const {
+        if (key_datum.is_null()) {
+            if (null_value.has_value()) {
+                return null_value.value();
+            }
+            return default_value.has_value() ? default_value.value() : key_datum;
+        }
+        const auto key = _convert_to_key_type(key_datum.get<CppType>());
+        auto it = value_map.find(key);
+        if (it == value_map.end()) {
+            return default_value.has_value() ? default_value.value() : key_datum;
+        } else {
+            return it->second;
+        }
+    }
+
+private:
+    HashMapKeyType _convert_to_key_type(CppType v) const {
+        if constexpr (lt_is_string<LT>) {
+            return std::string(v.data, v.size);
+        } else {
+            return v;
+        }
+    }
+};
+
+template<LogicalType LT>
+Status CelonisRemapValues<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    using CppType = RunTimeCppValueType<LT>;
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
     }
 
-    auto state = new RemapValuesStateFragmentLocal();
+    auto state = new RemapValuesStateFragmentLocal<LT>();
     context->set_function_state(scope, state);
 
     auto old_value_column = context->get_constant_column(1);
@@ -43,23 +103,25 @@ Status CelonisRemapValues::prepare(FunctionContext* context, FunctionContext::Fu
     }
     const auto size = old_value_array.size();
     for (auto i = 0; i < size; ++i) {
-        state->value_map[old_value_array[i].convert2DatumKey()] = new_value_array[i];
+        state->insert(old_value_array[i], new_value_array[i]);
     }
     return Status::OK();
 }
 
-Status CelonisRemapValues::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+template<LogicalType LT>
+Status CelonisRemapValues<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
-        const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal*>(
+        const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
                 context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
         delete state;
     }
     return Status::OK();
 }
 
+template<LogicalType LT>
 StatusOr<ColumnPtr>
-CelonisRemapValues::remap_values_non_constant_value_map([[maybe_unused]]FunctionContext* context,
-                                                        const Columns& columns) {
+CelonisRemapValues<LT>::remap_values_non_constant_value_map([[maybe_unused]]FunctionContext* context,
+                                                            const Columns& columns) {
     const auto& value_column = columns[0];
     const auto& old_value_column = columns[1];
     const auto& new_value_column = columns[2];
@@ -88,29 +150,26 @@ CelonisRemapValues::remap_values_non_constant_value_map([[maybe_unused]]Function
             return Status::InvalidArgument("old value array must have the same length as new value array.");
         }
         const auto size = old_value_array.size();
-        DatumMap value_map;
+        auto state = RemapValuesStateFragmentLocal<LT>();
         for (auto i = 0; i < size; ++i) {
-            value_map[old_value_array[i].convert2DatumKey()] = new_value_array[i];
+            state.insert(old_value_array[i], new_value_array[i]);
         }
         auto value = value_column->get(row);
-        auto it = value_map.find(value.convert2DatumKey());
-        if (it == value_map.end()) {
-            result->append_datum(has_default ? columns[3]->get(row) : value);
-        } else {
-            result->append_datum(it->second);
-        }
+        result->append_datum(
+                state.get(value, has_default ? std::optional<Datum>(columns[3]->get(row)) : std::nullopt));
     }
     return result;
 }
 
-StatusOr<ColumnPtr> CelonisRemapValues::remap_values_constant_value_map([[maybe_unused]]FunctionContext* context,
-                                                                        const Columns& columns) {
+template<LogicalType LT>
+StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[maybe_unused]]FunctionContext* context,
+                                                                            const Columns& columns) {
     const auto& value_column = columns[0];
     const bool has_default = columns.size() == 4;
     auto unfolded_value_column = ColumnHelper::unfold_const_column(
             TypeDescriptor::from_logical_type(context->get_arg_type(0)->type), columns[0]->size(), columns[0]);
     auto result = NullableColumn::wrap_if_necessary(unfolded_value_column->clone_empty());
-    const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal*>(
+    const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
     auto num_rows = value_column->size();
@@ -119,21 +178,31 @@ StatusOr<ColumnPtr> CelonisRemapValues::remap_values_constant_value_map([[maybe_
     }
     for (int row = 0; row < num_rows; ++row) {
         auto value = value_column->get(row);
-        auto it = state->value_map.find(value.convert2DatumKey());
-        if (it == state->value_map.end()) {
-            result->append_datum(has_default ? columns[3]->get(row) : value);
-        } else {
-            result->append_datum(it->second);
-        }
+        result->append_datum(
+                state->get(value, has_default ? std::optional<Datum>(columns[3]->get(row)) : std::nullopt));
     }
     return result;
 }
 
-StatusOr<ColumnPtr> CelonisRemapValues::remap_values(FunctionContext* context, const Columns& columns) {
+template<LogicalType LT>
+StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values(FunctionContext* context, const Columns& columns) {
     DCHECK(columns.size() == 3 || columns.size() == 4);
-    const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal*>(
+    const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
+
+template
+class CelonisRemapValues<TYPE_BIGINT>;
+
+template
+class CelonisRemapValues<TYPE_DOUBLE>;
+
+template
+class CelonisRemapValues<TYPE_DATETIME>;
+
+template
+class CelonisRemapValues<TYPE_VARCHAR>;
+
 
 } // namespace starrocks
