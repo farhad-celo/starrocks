@@ -206,7 +206,7 @@ jobs:
           branch: ${test_branch}
 
   celostar-presubmit-test:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
     needs: build-allin1
     env:
       test_image_tag: ${{needs.build-allin1.outputs.allin1_image_tag}}
@@ -308,7 +308,7 @@ jobs:
         continue-on-error: true
 
   celostar-e2e-test:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
     needs: build-fe-be
     env:
       test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
@@ -378,7 +378,7 @@ jobs:
           branch: ${test_branch}
 
   celostar-compliance-test:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
     needs: build-asan-allin1
     env:
       test_image_tag: ${{needs.build-asan-allin1.outputs.allin1_image_tag}}
