@@ -7,17 +7,18 @@
 
 namespace starrocks {
 
-struct RemapValuesStateThreadLocal {
+struct RemapValuesStateFragmentLocal {
+    // TODO(y.zhang): Switch to use hash map.
     DatumMap value_map;
     ScalarFunction function;
 };
 
 Status CelonisRemapValues::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-    if (scope != FunctionContext::THREAD_LOCAL) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
     }
 
-    auto state = new RemapValuesStateThreadLocal();
+    auto state = new RemapValuesStateFragmentLocal();
     context->set_function_state(scope, state);
 
     auto old_value_column = context->get_constant_column(1);
@@ -48,9 +49,9 @@ Status CelonisRemapValues::prepare(FunctionContext* context, FunctionContext::Fu
 }
 
 Status CelonisRemapValues::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-    if (scope == FunctionContext::THREAD_LOCAL) {
-        const auto* state = reinterpret_cast<const RemapValuesStateThreadLocal*>(
-                context->get_function_state(FunctionContext::THREAD_LOCAL));
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal*>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
         delete state;
     }
     return Status::OK();
@@ -109,8 +110,8 @@ StatusOr<ColumnPtr> CelonisRemapValues::remap_values_constant_value_map([[maybe_
     auto unfolded_value_column = ColumnHelper::unfold_const_column(
             TypeDescriptor::from_logical_type(context->get_arg_type(0)->type), columns[0]->size(), columns[0]);
     auto result = NullableColumn::wrap_if_necessary(unfolded_value_column->clone_empty());
-    const auto* state = reinterpret_cast<const RemapValuesStateThreadLocal*>(
-            context->get_function_state(FunctionContext::THREAD_LOCAL));
+    const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
     auto num_rows = value_column->size();
     if (has_default) {
@@ -130,8 +131,8 @@ StatusOr<ColumnPtr> CelonisRemapValues::remap_values_constant_value_map([[maybe_
 
 StatusOr<ColumnPtr> CelonisRemapValues::remap_values(FunctionContext* context, const Columns& columns) {
     DCHECK(columns.size() == 3 || columns.size() == 4);
-    const auto* state = reinterpret_cast<const RemapValuesStateThreadLocal*>(
-            context->get_function_state(FunctionContext::THREAD_LOCAL));
+    const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
 
