@@ -17,7 +17,7 @@ namespace {
     return im_settings_builder_t{}                     //
             .im_policy_settings(                       //
                     infrequent_im_settings_builder_t{} //
-                            .edge_filter_frequency_threshold(imfd_frequency_threshold)
+                            .edges_filter_frequency_threshold(imfd_frequency_threshold)
                             .build()) // throws if the threshold was not in the valid range
             .build();
 }
