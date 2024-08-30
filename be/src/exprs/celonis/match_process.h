@@ -6,6 +6,7 @@
 #include "column/column_builder.h"
 #include "column/column_hash.h"
 #include "column/column_viewer.h"
+#include "column/hash_set.h"
 #include "exprs/function_context.h"
 #include "exprs/function_helper.h"
 #include "column/hash_set.h"
@@ -28,7 +29,7 @@ struct NFA {
     struct Transition {
         TransitionType type;
         std::vector<int> to_states;
-        std::unordered_set<std::string> activity_names;
+        HashSet<std::string> activity_names;
         // for transition of type LIKE, keep the precompiled regular expressions for matching.
         std::unique_ptr<RE2::Set> regex_patterns;
     };

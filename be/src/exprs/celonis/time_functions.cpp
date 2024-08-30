@@ -4,6 +4,7 @@
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "column/array_column.h"
+#include "column/hash_set.h"
 #include "exprs/base64.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
@@ -1060,7 +1061,7 @@ static Status validate_weekday_calendar(const celonis::accelerator::WeekdayCalen
 
 static Status
 validate_multi_weekday_calendar(const celonis::accelerator::MultiWeekdayCalendar& multi_weekday_calendar) {
-    std::unordered_set<std::string> calendar_ids;
+    HashSet<std::string> calendar_ids;
     int has_calendar_id = -1;
     for (const auto& weekday_calendar: multi_weekday_calendar.calendars()) {
         if (has_calendar_id == -1) {
@@ -1601,7 +1602,8 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
             ASSIGN_OR_RETURN(calendar_state,
                              CalendarState::create_calendar_state(calendar_array_column, row, false, false));
         }
-        ASSIGN_OR_RETURN(std::optional<bool> is_in, timestamp_in_calendar(timestamp, calendar_state.value(), calendar_id));
+        ASSIGN_OR_RETURN(std::optional<bool> is_in,
+                         timestamp_in_calendar(timestamp, calendar_state.value(), calendar_id));
         if (is_in.has_value()) {
             result.append(is_in.value() ? 1L : 0L);
         } else {
@@ -1780,7 +1782,7 @@ public:
 
 private:
 
-    void populate_filters(std::unordered_set<int64_t>& filters, size_t row, ColumnPtr column) {
+    void populate_filters(HashSet<int64_t>& filters, size_t row, ColumnPtr column) {
         DCHECK(row < column->size());
         ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(column->size(), column);
         UnnestedArrayData array_data = prepare_array_input(array_column.get());
@@ -1796,11 +1798,11 @@ private:
         }
     }
 
-    std::unordered_set<int64_t> years_;
-    std::unordered_set<int64_t> quarters_;
-    std::unordered_set<int64_t> months_;
-    std::unordered_set<int64_t> weeks_;
-    std::unordered_set<int64_t> days_;
+    HashSet<int64_t> years_;
+    HashSet<int64_t> quarters_;
+    HashSet<int64_t> months_;
+    HashSet<int64_t> weeks_;
+    HashSet<int64_t> days_;
 };
 
 struct DateMatchStateFragmentLocal {
@@ -1943,7 +1945,8 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
                              CalendarState::create_calendar_state(calendar_array_column, row, false, true));
         }
         ASSIGN_OR_RETURN(const std::optional<double> diff,
-                         timeunits_between(from_timestamp, to_timestamp, time_unit, calendar_state.value(), calendar_id));
+                         timeunits_between(from_timestamp, to_timestamp, time_unit, calendar_state.value(),
+                                           calendar_id));
         if (diff.has_value()) {
             result.append(diff.value());
         } else {
