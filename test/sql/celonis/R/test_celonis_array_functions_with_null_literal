@@ -1,0 +1,49 @@
+-- name: test_celonis_array_functions_with_null_literal
+SELECT CELONIS_ARRAY_FIRST(NULL);
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_FIRST(IF(rand(), NULL, NULL));
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_LAST(NULL);
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_LAST(IF(rand(), NULL, NULL));
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_AVG(NULL);
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_AVG(IF(rand(), NULL, NULL));
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_COUNT(NULL);
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_COUNT(IF(rand(), NULL, NULL));
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_COUNT_DISTINCT(NULL);
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_COUNT_DISTINCT(IF(rand(), NULL, NULL));
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_BOOL_OR(NULL);
+-- result:
+None
+-- !result
+SELECT CELONIS_ARRAY_BOOL_OR(IF(rand(), NULL, NULL));
+-- result:
+None
+-- !result
