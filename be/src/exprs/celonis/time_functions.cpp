@@ -21,7 +21,7 @@ namespace starrocks {
 namespace {
 static const int64_t NANOS_PER_MILLIS = 1000000;
 
-static const std::unordered_map<std::string, int64_t> TIME_UNIT_TO_MS = {
+static const phmap::flat_hash_map<std::string, int64_t, StdHash<std::string>> TIME_UNIT_TO_MS = {
         {"DAYS",         86400000L},
         {"WORKDAYS",     86400000L},
         {"HOURS",        3600000L},
@@ -449,8 +449,8 @@ public:
     }
 
 private:
-    using IdToTimeRangesMap = std::unordered_map<std::optional<std::string>, std::vector<TimeRange>>;
-    using IdToWeekdayMap = std::unordered_map<std::optional<std::string>, std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry>>;
+    using IdToTimeRangesMap = phmap::flat_hash_map<std::optional<std::string>, std::vector<TimeRange>, StdHash<std::optional<std::string>>>;
+    using IdToWeekdayMap = phmap::flat_hash_map<std::optional<std::string>, phmap::flat_hash_map<int, celonis::accelerator::WeekdayCalendarEntry, StdHash<int>>, StdHash<std::optional<std::string>>>;
 
     void set_time_from(const TimestampValue& ref_timestamp, TimestampValue& timestamp) const {
         int new_year, new_month, new_day, new_hour, new_minute, new_second, new_usec;
@@ -669,7 +669,7 @@ private:
                 }
                 const auto& index_to_weekday_2 = iter->second;
                 // both m1 and m2 have id
-                std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry> new_index_to_weekday;
+                phmap::flat_hash_map<int, celonis::accelerator::WeekdayCalendarEntry, StdHash<int>> new_index_to_weekday;
                 for (const auto& [index, weekday_1]: index_to_weekday_1) {
                     auto it = index_to_weekday_2.find(index);
                     if (it == index_to_weekday_2.end()) {
@@ -834,7 +834,7 @@ private:
     }
 
     IdToTimeRangesMap to_time_ranges(const celonis::accelerator::WorkdayCalendar& workday_calendar) {
-        std::unordered_map<std::optional<std::string>, std::map<int, std::bitset<366>>> year_to_bitset_by_id;
+        phmap::flat_hash_map<std::optional<std::string>, std::map<int, std::bitset<366>>, StdHash<std::optional<std::string>>> year_to_bitset_by_id;
         for (const auto& entry: workday_calendar.entries()) {
             auto year = entry.year();
             if (entry.has_calendar_id()) {
@@ -994,12 +994,12 @@ private:
 
     IdToTimeRangesMap id_to_time_ranges_;
     // suppose the time_ranges is [(-4, -2), (1, 2), (3, 6), (7, 11)], the cum_sum is [0, 2, 3, 6, 10].
-    std::unordered_map<std::optional<std::string>, std::vector<int64_t>> id_to_cum_sum_;
+    phmap::flat_hash_map<std::optional<std::string>, std::vector<int64_t>, StdHash<std::optional<std::string>>> id_to_cum_sum_;
     IdToTimeRangesMap id_to_round_time_ranges_;
-    std::unordered_map<std::optional<std::string>, std::vector<int64_t>> id_to_round_cum_sum_;
+    phmap::flat_hash_map<std::optional<std::string>, std::vector<int64_t>, StdHash<std::optional<std::string>>> id_to_round_cum_sum_;
     // no_weekly is set to true if all the time range in time_ranges is not weekly.
-    std::unordered_map<std::optional<std::string>, bool> id_to_no_weekly_;
-    std::unordered_map<std::optional<std::string>, std::optional<Scope>> id_to_scope_;
+    phmap::flat_hash_map<std::optional<std::string>, bool, StdHash<std::optional<std::string>>> id_to_no_weekly_;
+    phmap::flat_hash_map<std::optional<std::string>, std::optional<Scope>, StdHash<std::optional<std::string>>> id_to_scope_;
 };
 
 StatusOr<std::string> get_calendar_string(const ColumnPtr& calendar_column, int row) {
@@ -1104,7 +1104,7 @@ static int get_days_in_year(int64_t year) {
 static Status
 validate_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_calendar, bool reject_year_gap = false) {
     int has_calendar_id = -1; // not set
-    std::unordered_map<std::optional<std::string>, std::vector<int64_t>> id_to_years;
+    phmap::flat_hash_map<std::optional<std::string>, std::vector<int64_t>, StdHash<std::optional<std::string>>> id_to_years;
     for (const auto& entry: workday_calendar.entries()) {
         if (!entry.has_year()) {
             return Status::InvalidArgument("year is not set in a workday calendar entry.");

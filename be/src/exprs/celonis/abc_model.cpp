@@ -3,6 +3,7 @@
 #include "column/array_column.h"
 #include "column/column_viewer.h"
 #include "column/column_builder.h"
+#include "column/column_hash.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
 #include <boost/algorithm/string.hpp>
@@ -76,7 +77,7 @@ public:
         ranges[1] = std::make_pair(boundaries[0], boundaries[1]);
         ranges[2] = std::make_pair(boundaries[2], boundaries[3]);
         ranges[3] = std::make_pair(boundaries[4], boundaries[5]);
-        std::unordered_map<CppType, std::vector<double>> num_to_probs;
+        phmap::flat_hash_map<CppType, std::vector<double>, StdHash<CppType>> num_to_probs;
         if (!parts[1].empty()) {
             std::vector<std::string> num_section_strs;
             boost::split(num_section_strs, parts[1], boost::is_any_of(";"));
@@ -115,14 +116,14 @@ public:
 
 private:
     AbcModel(const std::vector<std::pair<CppType, CppType>>& ranges,
-             const std::unordered_map<CppType, std::vector<double>>& num_to_probs) : ranges_(ranges),
+             const phmap::flat_hash_map<CppType, std::vector<double>, StdHash<CppType>>& num_to_probs) : ranges_(ranges),
                                                                                      num_to_probs_(
                                                                                              num_to_probs) {}
 
     // [{0, 0}, {lo_1, hi_1}, {lo_2, hi_2}, {lo_3, hi_3}]
     std::vector<std::pair<CppType, CppType>> ranges_;
     // {num: [0.0, prob_1, prob_1 + prob_2]}
-    std::unordered_map<CppType, std::vector<double>> num_to_probs_;
+    phmap::flat_hash_map<CppType, std::vector<double>, StdHash<CppType>> num_to_probs_;
 };
 
 } // namespace
