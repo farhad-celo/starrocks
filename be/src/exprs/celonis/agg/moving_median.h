@@ -11,13 +11,33 @@
 
 namespace starrocks {
 
+template<LogicalType LT, typename = guard::Guard>
+struct TreeMultiSet {
+};
+
+template<LogicalType LT>
+struct TreeMultiSet<LT, FixedLengthLTGuard<LT>> {
+    using CppType = RunTimeCppValueType<LT>;
+    using KeyType = CppType;
+    using MultiSet = phmap::btree_multiset<KeyType>;
+};
+
+template<LogicalType LT>
+struct TreeMultiSet<LT, StringLTGuard<LT>> {
+    using CppType = RunTimeCppValueType<LT>;
+    using KeyType = std::string;
+    using MultiSet = phmap::btree_multiset<KeyType>;
+};
+
 template<LogicalType LT>
 struct CelonisMovingMedianAggregateState {
     using CppType = RunTimeCppType<LT>;
     using ColumnType = RunTimeColumnType<LT>;
+    using MultiSet = typename TreeMultiSet<LT>::MultiSet;
+    using MultiSetKeyType = typename TreeMultiSet<LT>::KeyType;
 
-    phmap::btree_multiset<CppType> lower_half;
-    phmap::btree_multiset<CppType> upper_half;
+    MultiSet lower_half;
+    MultiSet upper_half;
     bool is_frame_init = false;
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
@@ -32,10 +52,11 @@ struct CelonisMovingMedianAggregateState {
                 const auto* column = down_cast<const ColumnType*>(value_column);
                 to_add = column->get_data()[row_num];
             }
-            if (lower_half.empty() || to_add <= *lower_half.rbegin()) {
-                lower_half.insert(to_add);
+            auto to_add_key = _convert_to_key_type(to_add);
+            if (lower_half.empty() || to_add_key <= *lower_half.rbegin()) {
+                lower_half.insert(to_add_key);
             } else {
-                upper_half.insert(to_add);
+                upper_half.insert(to_add_key);
             }
             // Re-balance the halves if necessary
             if (lower_half.size() > upper_half.size() + 1) {
@@ -60,11 +81,12 @@ struct CelonisMovingMedianAggregateState {
                 const auto* column = down_cast<const ColumnType*>(value_column);
                 to_remove = column->get_data()[row_num];
             }
-            auto it_lower = lower_half.find(to_remove);
+            auto to_remove_key = _convert_to_key_type(to_remove);
+            auto it_lower = lower_half.find(to_remove_key);
             if (it_lower != lower_half.end()) {
                 lower_half.erase(it_lower);
             } else {
-                auto it_upper = upper_half.find(to_remove);
+                auto it_upper = upper_half.find(to_remove_key);
                 if (it_upper != upper_half.end()) {
                     upper_half.erase(it_upper);
                 }
@@ -80,6 +102,15 @@ struct CelonisMovingMedianAggregateState {
             return *lower_half.rbegin();
         }
         return *upper_half.begin();
+    }
+
+private:
+    MultiSetKeyType _convert_to_key_type(CppType v) {
+        if constexpr (lt_is_string<LT>) {
+            return std::string(v.data, v.size);
+        } else {
+            return v;
+        }
     }
 };
 
