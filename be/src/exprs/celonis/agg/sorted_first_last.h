@@ -175,8 +175,9 @@ public:
             }
 #define M(type) \
             case type: { \
-                auto value = *reinterpret_cast<const RunTimeCppType<type>*>(current_); \
-                current_ += sizeof(RunTimeCppType<type>);                                \
+                RunTimeCppType<type> value; \
+                memcpy(&value, current_, sizeof(RunTimeCppType<type>)); \
+                current_ += sizeof(RunTimeCppType<type>); \
                 return value; \
             }
 

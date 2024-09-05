@@ -227,6 +227,18 @@ TEST_F(CelonisSortedFirstLastTest, desc_nulls_last) {
     Run<TYPE_INT>(sort_column_types, input, 4, 2);
 }
 
+TEST_F(CelonisSortedFirstLastTest, int128_t) {
+    std::vector<SortColumnType> sort_column_types = {{TYPE_LARGEINT, true, true}};
+
+    std::vector<DatumStruct> input;
+    input.emplace_back(DatumStruct{kNullDatum, Datum(int128_t(1234567890123456781))});
+    input.emplace_back(DatumStruct{Datum(int128_t(0)), Datum(int128_t(1234567890123456784))});
+    input.emplace_back(DatumStruct{Datum(int128_t(1)), Datum(int128_t(1234567890123456783))});
+    input.emplace_back(DatumStruct{Datum(int128_t(2)), Datum(int128_t(1234567890123456782))});
+
+    Run<TYPE_LARGEINT>(sort_column_types, input, int128_t(2), int128_t(0));
+}
+
 TEST_F(CelonisSortedFirstLastTest, serialize_and_merge) {
     std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
                                                      {TYPE_VARCHAR, true, true}};
