@@ -30,7 +30,7 @@ env:
 
 jobs:
   presubmit-test:
-    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=80,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=80,"run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

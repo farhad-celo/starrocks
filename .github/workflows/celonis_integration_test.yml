@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   sync-and-rebase-upstream:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
     outputs:
       test_branch: ${{steps.rebase.outputs.test_branch || inputs.branch_to_test}}
       test_image_tag: ${{steps.rebase.outputs.test_branch || steps.image_tag_output.outputs.test_image_tag}}
@@ -73,6 +73,10 @@ jobs:
         id: rebase
         if: ${{inputs.branch_to_test == ''}}
         run: |
+          # Need this to avoid issue of "Committer identity unknown"
+          git config user.email "celostar-starrocks@noreply.github.com"
+          git config user.name "celostar-starrocks"
+
           echo "start to rebase ..."
 
           # get the latest commit
@@ -138,7 +142,7 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
 
   presubmit-test:
-    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=80,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=80,"run-id=${{ github.run_id }}"]
     # No need to run presubmit test on existing branch as the pull request of the branch will trigger it.
     if: inputs.branch_to_test == ''
     needs: sync-and-rebase-upstream
@@ -162,7 +166,7 @@ jobs:
           branch: ${{env.test_branch}}
 
   build-artifact:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
     needs: sync-and-rebase-upstream
     env:
       test_image_tag: ${{needs.sync-and-rebase-upstream.outputs.test_image_tag}}
@@ -185,7 +189,7 @@ jobs:
           branch: ${test_branch}
 
   build-allin1:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
     needs: build-artifact
     env:
       test_branch: ${{needs.build-artifact.outputs.test_branch}}
@@ -232,7 +236,7 @@ jobs:
         continue-on-error: true
 
   build-fe-be:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
     needs: build-artifact
     env:
       test_branch: ${{needs.build-artifact.outputs.test_branch}}
@@ -296,16 +300,17 @@ jobs:
           local_image: starrocks-be:${test_image_tag}
           remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${test_image_tag}
 
-      - name: clean up
-        if: ${{ always() }}
-        run: |
-          docker rmi -f $(docker images -q starrocks-fe:${test_image_tag}) || true
-          docker rmi -f $(docker images -q starrocks-be:${test_image_tag}) || true
-          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}) || true
-          docker system prune -f
-          docker volume prune -f
-          docker logout ghcr.io
-        continue-on-error: true
+# Skip this step as the current runs-on runners are ephemeral.
+#      - name: clean up
+#        if: ${{ always() }}
+#        run: |
+#          docker rmi -f $(docker images -q starrocks-fe:${test_image_tag}) || true
+#          docker rmi -f $(docker images -q starrocks-be:${test_image_tag}) || true
+#          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}) || true
+#          docker system prune -f
+#          docker volume prune -f
+#          docker logout ghcr.io
+#        continue-on-error: true
 
   celostar-e2e-test:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
@@ -334,7 +339,7 @@ jobs:
         continue-on-error: true
 
   build-asan-artifact:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
     needs: sync-and-rebase-upstream
     env:
       test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
@@ -357,7 +362,7 @@ jobs:
           branch: ${test_branch}
 
   build-asan-allin1:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
     needs: build-asan-artifact
     env:
       test_branch: ${{needs.build-asan-artifact.outputs.test_branch}}
