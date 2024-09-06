@@ -34,12 +34,13 @@ runs:
       run: |
           echo "The test branch is ${{inputs.branch}}" >> $GITHUB_STEP_SUMMARY
 
-    - name: clean up
-      if: ${{ always() }}
-      shell: bash
-      run: |
-        docker kill ${{ env.container_id }} || true
-        docker system prune -f
-        docker volume prune -f
-        docker logout ghcr.io
-      continue-on-error: true
+# Skip this step as we are using runs-on runner which is ephemeral.
+#    - name: clean up
+#      if: ${{ always() }}
+#      shell: bash
+#      run: |
+#        docker kill ${{ env.container_id }} || true
+#        docker system prune -f
+#        docker volume prune -f
+#        docker logout ghcr.io
+#      continue-on-error: true

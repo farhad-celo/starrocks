@@ -24,7 +24,7 @@ env:
 
 jobs:
   build-dev-env-image:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,13 +50,14 @@ jobs:
           local_image: starrocks-dev-env:${image_tag}
           remote_image: ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}
 
-      - name: Clean up
-        if: ${{ always() }}
-        run: |
-          docker logout ghcr.io
-          docker rmi -f $(docker images -q starrocks-dev-env:${image_tag})
-          
-          # Delete stopped containers, dangling images, dangling build cache, etc.
-          docker system prune -f
-          docker volume prune -f
-        continue-on-error: true
+# Skip this step as we are using runs-on runner which is ephemeral.
+#      - name: Clean up
+#        if: ${{ always() }}
+#        run: |
+#          docker logout ghcr.io
+#          docker rmi -f $(docker images -q starrocks-dev-env:${image_tag})
+#
+#          # Delete stopped containers, dangling images, dangling build cache, etc.
+#          docker system prune -f
+#          docker volume prune -f
+#        continue-on-error: true

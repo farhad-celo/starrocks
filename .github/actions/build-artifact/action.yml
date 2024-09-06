@@ -54,16 +54,17 @@ runs:
         local_image: starrocks-artifacts:${{inputs.image_tag}}
         remote_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{inputs.image_tag}}
 
-    - name: Clean up
-      if: ${{ always() }}
-      shell: bash
-      run: |
-        # If the artifact image is not pushing to remote, we assume it will be used for later steps.
-        if [[ "${{inputs.to_push}}" == "true" ]]; then
-          echo "Cleaning up artifact image locally"
-          docker rmi -f $(docker images -q starrocks-artifacts:${{inputs.image_tag}}) || true
-        fi
-        docker system prune -f
-        docker volume prune -f
-        docker logout ghcr.io
-      continue-on-error: true
+# Skip this step as we are using runs-on runner which is ephemeral.
+#    - name: Clean up
+#      if: ${{ always() }}
+#      shell: bash
+#      run: |
+#        # If the artifact image is not pushing to remote, we assume it will be used for later steps.
+#        if [[ "${{inputs.to_push}}" == "true" ]]; then
+#          echo "Cleaning up artifact image locally"
+#          docker rmi -f $(docker images -q starrocks-artifacts:${{inputs.image_tag}}) || true
+#        fi
+#        docker system prune -f
+#        docker volume prune -f
+#        docker logout ghcr.io
+#      continue-on-error: true

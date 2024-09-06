@@ -1,5 +1,5 @@
 name: Build golden allin1 for DIC
-run-name: Build golden allin1 ${{inputs.image_tag}}-dic
+run-name: Build golden allin1 - ${{inputs.image_tag}}-dic
 
 on:
   workflow_dispatch:
@@ -18,28 +18,24 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-ef2f161a-locale-cpml2.177-ubuntu-brpc1.8
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-8107c630-locale-cpml2.177-ubuntu
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
   image_tag: "${{inputs.image_tag}}-dic"
 
 jobs:
   build-allin1:
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build and push artifact image
+      - name: Build artifact image
         uses: ./.github/actions/build-artifact
         with:
           dev_env_image: ${BUILDER}
           image_tag: ${image_tag}
           to_push: false
-
-      - name: GHCR login
-        run: |
-          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
 
       - name: Build and push allin1 image
         uses: ./.github/actions/build-allin1

@@ -218,7 +218,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run celostar compliance test
+      - name: Run celostar presubmit test
         id: run-test
         uses: ./.github/actions/trigger-celostar-test
         with:

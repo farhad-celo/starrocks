@@ -17,15 +17,21 @@ concurrency:
 env:
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-ef2f161a-locale-cpml2.177-ubuntu-brpc1.8
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-8107c630-locale-cpml2.177-ubuntu
 
 jobs:
   # SAST
   static-analysis-java:
     if: ${{ inputs.executeStaticAnalysis || github.event_name == 'schedule' }}
-    runs-on: [self-hosted, celostar]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Pull dev env image
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+          docker pull ${BUILDER}
 
       - name: Build
         env:
@@ -59,11 +65,12 @@ jobs:
           vkey: "${{ secrets.VERACODE_API_SECRET }}"
           scantimeout: 240
 
-      - name: Clean up
-        run: |
-          rm -rf jars_for_static_scan
-          docker container stop ${{ env.container_id }}
-          docker rm ${{ env.container_id }}
-          docker system prune -f
-          docker volume prune -f
-        continue-on-error: true
+# Skip this step as we are using runs-on runner which is ephemeral.
+#      - name: Clean up
+#        run: |
+#          rm -rf jars_for_static_scan
+#          docker container stop ${{ env.container_id }}
+#          docker rm ${{ env.container_id }}
+#          docker system prune -f
+#          docker volume prune -f
+#        continue-on-error: true

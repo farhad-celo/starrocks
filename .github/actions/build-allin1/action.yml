@@ -70,19 +70,21 @@ runs:
         local_image: starrocks-allin1:${{inputs.image_tag}}
         remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${{inputs.image_tag}}
 
-    - name: Clean up artifact image
-      if: ${{inputs.clean_up_artifact_image == 'true'}}
-      shell: bash
-      run: |
-        docker rmi -f $(docker images -q ${{inputs.artifact_image}})
-      continue-on-error: true
+# Skip this step as we are using runs-on runner which is ephemeral.
+#    - name: Clean up artifact image
+#      if: ${{inputs.clean_up_artifact_image == 'true'}}
+#      shell: bash
+#      run: |
+#        docker rmi -f $(docker images -q ${{inputs.artifact_image}})
+#      continue-on-error: true
 
-    - name: Clean up
-      if: ${{ always() }}
-      shell: bash
-      run: |
-        docker rmi -f $(docker images -q starrocks-allin1:${{inputs.image_tag}}) || true
-        docker system prune -f
-        docker volume prune -f
-        docker logout ghcr.io
-      continue-on-error: true
+# Skip this step as we are using runs-on runner which is ephemeral.
+#    - name: Clean up
+#      if: ${{ always() }}
+#      shell: bash
+#      run: |
+#        docker rmi -f $(docker images -q starrocks-allin1:${{inputs.image_tag}}) || true
+#        docker system prune -f
+#        docker volume prune -f
+#        docker logout ghcr.io
+#      continue-on-error: true
