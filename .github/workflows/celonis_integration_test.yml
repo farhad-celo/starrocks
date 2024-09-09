@@ -149,10 +149,11 @@ jobs:
     env:
       test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
     steps:
-      - name: checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{env.test_branch}}
 
       - name: Pull dev env image
         run: |
@@ -163,7 +164,6 @@ jobs:
         uses: ./.github/actions/presubmit-test
         with:
           builder: ${BUILDER}
-          branch: ${{env.test_branch}}
 
   build-artifact:
     runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
@@ -175,18 +175,18 @@ jobs:
       test_branch: ${{env.test_branch}}
       artifact_image_tag: ${{env.test_image_tag}}
     steps:
-      - name: checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{env.test_branch}}
 
-      - name: build and push artifact image
+      - name: Build and push artifact image
         id: build-artifact
         uses: ./.github/actions/build-artifact
         with:
           dev_env_image: ${BUILDER}
           image_tag: ${test_image_tag}
-          branch: ${test_branch}
 
   build-allin1:
     runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
@@ -197,17 +197,17 @@ jobs:
     outputs:
       allin1_image_tag: ${{env.artifact_image_tag}}
     steps:
-      - name: checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{env.test_branch}}
 
-      - name: build and push allin1 image
+      - name: Build and push allin1 image
         uses: ./.github/actions/build-allin1
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${artifact_image_tag}
           image_tag: ${artifact_image_tag}
-          branch: ${test_branch}
 
   celostar-presubmit-test:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
@@ -248,6 +248,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{env.test_branch}}
 
       - name: Pull artifact image
         run: |
@@ -259,7 +260,6 @@ jobs:
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
           image_tag: ${test_image_tag}
-          branch: ${test_branch}
 
       - name: Push FE image to GHCR
         uses: ./.github/actions/push-to-registry
@@ -348,18 +348,18 @@ jobs:
       test_branch: ${{env.test_branch}}
       test_image_tag: ${{env.test_image_tag}}
     steps:
-      - name: checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{env.test_branch}}
 
-      - name: build and push artifact image
+      - name: Build and push artifact image
         uses: ./.github/actions/build-artifact
         with:
           dev_env_image: ${BUILDER}
           image_tag: ${test_image_tag}
           is_asan_mode: 'yes'
-          branch: ${test_branch}
 
   build-asan-allin1:
     runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
@@ -370,17 +370,17 @@ jobs:
     outputs:
       allin1_image_tag: ${{env.test_image_tag}}
     steps:
-      - name: checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{env.test_branch}}
 
-      - name: build and push asan allin1 image
+      - name: Build and push asan allin1 image
         uses: ./.github/actions/build-allin1
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
           image_tag: ${test_image_tag}
-          branch: ${test_branch}
 
   celostar-compliance-test:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]

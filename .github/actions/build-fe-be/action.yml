@@ -14,10 +14,7 @@ runs:
     - name: Build FE image
       shell: bash
       run: |
-        if [ -n "${{inputs.branch}}" ]; then
-          echo "Switching to branch ${{inputs.branch}}"
-          git checkout ${{inputs.branch}}
-        fi
+        git branch
 
         # Build image and always remove intermediate containers.
         DOCKER_BUILDKIT=1 docker build --force-rm=true --build-arg RUN_AS_USER=starrocks \

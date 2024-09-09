@@ -27,10 +27,7 @@ runs:
     - name: Build artifact docker image
       shell: bash
       run: |
-        if [ -n "${{inputs.branch}}" ]; then
-          echo "Switching to branch ${{inputs.branch}}"
-          git checkout ${{inputs.brash}}
-        fi
+        git branch
 
         if [ "${{inputs.is_asan_mode}}" = "yes" ]; then
           build_type="ASAN"

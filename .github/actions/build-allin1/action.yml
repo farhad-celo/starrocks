@@ -37,10 +37,7 @@ runs:
     - name: Build allin1 image
       shell: bash
       run: |
-        if [ -n "${{inputs.branch}}" ]; then
-          echo "Switching to branch ${{inputs.branch}}"
-          git checkout ${{inputs.branch}}
-        fi
+        git branch
 
         # Need to set the flag to make Celostar compliance test pass.
         echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf

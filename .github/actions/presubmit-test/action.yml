@@ -12,10 +12,7 @@ runs:
     - name: Start the dev env and run test
       shell: bash
       run: |
-        if [ -n "${{inputs.branch}}" ]; then
-          echo "Switching to branch ${{inputs.branch}}"
-          git checkout ${{inputs.branch}}
-        fi
+        git branch
 
         echo "starting the dev env container"
         container_id=$(docker run -d -v `pwd`:/celostar-starrocks \
