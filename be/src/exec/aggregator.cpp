@@ -181,6 +181,9 @@ void AggregatorParams::init() {
                     agg_fn_types[i].is_asc_order = fn.aggregate_fn.is_asc_order;
                     agg_fn_types[i].nulls_first = fn.aggregate_fn.nulls_first;
                 }
+            } else if (fn.name.function_name == "celonis_enumerate_transitive_edges" ||
+                       fn.name.function_name == "celonis_enumerate_node_paths") {
+                agg_fn_types[i].is_nullable = false;
             }
         }
     }

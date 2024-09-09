@@ -803,7 +803,6 @@ void CelonisEnumerateAggregateFunction::finalize_to_column(FunctionContext* ctx,
                                                            Column* to) const {
     auto& state_impl = this->data(state);
     if (state_impl.data_columns == nullptr || (*state_impl.data_columns)[0]->size() == 0) {
-        to->append_default();
         return;
     }
 
