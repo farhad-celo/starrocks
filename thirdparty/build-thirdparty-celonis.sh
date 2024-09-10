@@ -45,10 +45,36 @@ build_blake2() {
     cp -r $TP_SOURCE_DIR/$BLAKE2_SOURCE/ref/libblake2s.a $TP_LIB_DIR/
 }
 
+# CPML
+# TODO: consider to download CPML from release artifacts of cpm-query-engine repo
+build_cpml() {
+  echo "Start to download CPML"
+  CPML_RELEASE="CPML-2.177-ubuntu22"
+  CPML_RESOURCE="CPML-2.177-ubuntu22.tar.gz"
+  CPML_FOLDER="CPML"
+  CPML_MD5SUM="4b57fba407c6a7c2b8a1a91d91ee1294"
+
+  gh release download -R celonis/celostar-starrocks $CPML_RELEASE --pattern "${CPML_RESOURCE}"
+  md5=`md5sum ${CPML_RESOURCE}`
+  if [ "$md5" != "$CPML_MD5SUM  $CPML_RESOURCE" ]; then
+    echo "$CPML_RESOURCE md5sum check failed!"
+    echo -e "expect-md5 $CPML_MD5SUM \nactual-md5 $md5"
+    exit 1
+  fi
+
+  echo "Start to unpack CPML artifact"
+  tar -xzf ${CPML_RESOURCE}
+
+  echo "Start to copy CMPL artifact"
+  cp -r $CPML_FOLDER ${STARROCKS_THIRDPARTY}/installed/
+  echo "CPML is installed"
+}
+
 build_thirdparty_celonis() {
     build_namedtype
     build_nlohmann_json
     build_onetbb
     build_spdlog
     build_blake2
+    build_cpml
 }

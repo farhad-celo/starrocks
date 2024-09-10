@@ -24,7 +24,7 @@ env:
 
 jobs:
   build-dev-env-image:
-    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
           echo "The current branch is ${branch}"
 
           # Build image and always remove intermediate containers.
-          docker buildx build --force-rm=true --build-arg prebuild_maven=true \
+          docker buildx build --force-rm=true --build-arg prebuild_maven=true --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
             -f docker/dockerfiles/dev-env/dev-env.Dockerfile \
             -t starrocks-dev-env:${image_tag} .
 
