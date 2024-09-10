@@ -865,9 +865,13 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_count([[maybe_unused]] Function
         }
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
+        if (array_data.null_elements == nullptr) {
+            result.append(end - start);
+            continue;
+        }
         int64_t cnt = 0;
         for (auto i = start; i < end; ++i) {
-            if (array_data.null_elements != nullptr && (*array_data.null_elements)[i] != 0) {
+            if ((*array_data.null_elements)[i] != 0) {
                 continue;
             }
             ++cnt;

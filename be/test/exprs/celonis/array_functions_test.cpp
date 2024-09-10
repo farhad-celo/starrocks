@@ -3416,6 +3416,24 @@ TEST_F(CelonisArrayFunctionsTest, array_count_normal_case) {
     }
 }
 
+TEST_F(CelonisArrayFunctionsTest, array_count_non_null_case) {
+    auto arrays = ColumnHelper::create_column(TYPE_ARRAY_BOOLEAN, true);
+    arrays->append_datum(DatumArray{});
+    arrays->append_datum(kNullDatum);
+    arrays->append_datum(DatumArray{true, false, true, false});
+    arrays->append_datum(DatumArray{false, false, true});
+    arrays->append_datum(DatumArray{true, true});
+    arrays->append_datum(DatumArray{false});
+    const auto result = CelonisArrayFunctions::array_count(nullptr, {arrays}).value();
+    EXPECT_EQ(6, result->size());
+    EXPECT_EQ(0L, result->get(0).get_int64());
+    EXPECT_TRUE(result->get(1).is_null());
+    EXPECT_EQ(4L, result->get(2).get_int64());
+    EXPECT_EQ(3L, result->get(3).get_int64());
+    EXPECT_EQ(2L, result->get(4).get_int64());
+    EXPECT_EQ(1L, result->get(5).get_int64());
+}
+
 TEST_F(CelonisArrayFunctionsTest, array_bool_or_const_null_column) {
     {
         auto arrays = ColumnHelper::create_column(TYPE_ARRAY_BOOLEAN, true);
