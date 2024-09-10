@@ -192,4 +192,4 @@ BENCHMARK(BM_MatchActivitiesConstantLargeMatchesConfig)->ArgsProduct({{1000, 100
 } // namespace starrocks
 
 BENCHMARK_MAIN();
-:w
+
