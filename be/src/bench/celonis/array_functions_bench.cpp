@@ -13,7 +13,7 @@
 namespace starrocks {
 
 /*
-2024-09-10T18:17:07+00:00
+2024-09-11T14:11:52+00:00
 Running ./be/build_Release/src/bench/celonis/output/array_functions_bench
 Run on (32 X 2445.42 MHz CPU s)
 CPU Caches:
@@ -21,42 +21,54 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 2.45, 2.60, 2.54
+Load Average: 0.49, 0.59, 0.36
 -----------------------------------------------------------------------------------------------------
 Benchmark                                           Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------------------------
-BM_MergeSortedArraysVARCHAR/10000/5/5/15     29895865 ns     29895666 ns           23 RowInvRate=2.98957us
-BM_MergeSortedArraysVARCHAR/10000/10/5/15    65203523 ns     65198404 ns           11 RowInvRate=6.51984us
-BM_MergeSortedArraysVARCHAR/10000/20/5/15   153271899 ns    153247447 ns            5 RowInvRate=15.3247us
-BM_MergeSortedArraysVARCHAR/10000/30/5/15   252428850 ns    252429911 ns            3 RowInvRate=25.243us
-BM_MergeSortedArraysVARCHAR/10000/5/10/15    36730265 ns     36729305 ns           19 RowInvRate=3.67293us
-BM_MergeSortedArraysVARCHAR/10000/10/10/15   82790435 ns     82790756 ns            8 RowInvRate=8.27908us
-BM_MergeSortedArraysVARCHAR/10000/20/10/15  198173962 ns    198168523 ns            4 RowInvRate=19.8169us
-BM_MergeSortedArraysVARCHAR/10000/30/10/15  313915864 ns    313899504 ns            2 RowInvRate=31.39us
-BM_MergeSortedArraysVARCHAR/10000/5/5/30     46942489 ns     46942041 ns           15 RowInvRate=4.6942us
-BM_MergeSortedArraysVARCHAR/10000/10/5/30   107647206 ns    107644283 ns            6 RowInvRate=10.7644us
-BM_MergeSortedArraysVARCHAR/10000/20/5/30   255415161 ns    255405648 ns            3 RowInvRate=25.5406us
-BM_MergeSortedArraysVARCHAR/10000/30/5/30   433318432 ns    433292328 ns            2 RowInvRate=43.3292us
-BM_MergeSortedArraysVARCHAR/10000/5/10/30    54129188 ns     54126965 ns           13 RowInvRate=5.4127us
-BM_MergeSortedArraysVARCHAR/10000/10/10/30  126197221 ns    126191596 ns            6 RowInvRate=12.6192us
-BM_MergeSortedArraysVARCHAR/10000/20/10/30  308298382 ns    308284459 ns            2 RowInvRate=30.8284us
-BM_MergeSortedArraysVARCHAR/10000/30/10/30  502463786 ns    502405779 ns            1 RowInvRate=50.2406us
-BM_DedupSortedByVARCHAR/10000/5/5             1203026 ns      1202818 ns          595 RowInvRate=120.282ns
-BM_DedupSortedByVARCHAR/10000/10/5            2357028 ns      2355719 ns          300 RowInvRate=235.572ns
-BM_DedupSortedByVARCHAR/10000/5/10            1705175 ns      1704713 ns          413 RowInvRate=170.471ns
-BM_DedupSortedByVARCHAR/10000/10/10           4116546 ns      4115834 ns          168 RowInvRate=411.583ns
-BM_ArrayBoolOr/1000/1/10                         9664 ns         9594 ns        72109 RowInvRate=9.59415ns
-BM_ArrayBoolOr/10000/1/10                       85976 ns        85746 ns         8147 RowInvRate=8.57461ns
-BM_ArrayBoolOr/1000/10/10                        9754 ns         9672 ns        72358 RowInvRate=9.67204ns
-BM_ArrayBoolOr/10000/10/10                      85200 ns        84987 ns         8333 RowInvRate=8.49868ns
-BM_ArrayBoolOr/1000/50/10                        9624 ns         9563 ns        72443 RowInvRate=9.56305ns
-BM_ArrayBoolOr/10000/50/10                      85542 ns        85334 ns         8242 RowInvRate=8.53344ns
-BM_ArrayBoolOr/1000/1/20                         9936 ns         9833 ns        72616 RowInvRate=9.83323ns
-BM_ArrayBoolOr/10000/1/20                       85698 ns        85528 ns         8139 RowInvRate=8.55283ns
-BM_ArrayBoolOr/1000/10/20                        9868 ns         9780 ns        71009 RowInvRate=9.78042ns
-BM_ArrayBoolOr/10000/10/20                      85542 ns        85377 ns         8229 RowInvRate=8.53771ns
-BM_ArrayBoolOr/1000/50/20                        9872 ns         9776 ns        72249 RowInvRate=9.77591ns
-BM_ArrayBoolOr/10000/50/20                      85930 ns        85724 ns         8210 RowInvRate=8.5724ns
+BM_MergeSortedArraysVARCHAR/10000/5/5/15     30274727 ns     30271822 ns           23 RowInvRate=3.02718us
+BM_MergeSortedArraysVARCHAR/10000/10/5/15    66993149 ns     66986510 ns           10 RowInvRate=6.69865us
+BM_MergeSortedArraysVARCHAR/10000/20/5/15   154471575 ns    154461676 ns            5 RowInvRate=15.4462us
+BM_MergeSortedArraysVARCHAR/10000/30/5/15   256502281 ns    256480289 ns            3 RowInvRate=25.648us
+BM_MergeSortedArraysVARCHAR/10000/5/10/15    36959726 ns     36955486 ns           19 RowInvRate=3.69555us
+BM_MergeSortedArraysVARCHAR/10000/10/10/15   82913384 ns     82910422 ns            8 RowInvRate=8.29104us
+BM_MergeSortedArraysVARCHAR/10000/20/10/15  199408291 ns    199404237 ns            4 RowInvRate=19.9404us
+BM_MergeSortedArraysVARCHAR/10000/30/10/15  315578735 ns    315561648 ns            2 RowInvRate=31.5562us
+BM_MergeSortedArraysVARCHAR/10000/5/5/30     47109811 ns     47109102 ns           15 RowInvRate=4.71091us
+BM_MergeSortedArraysVARCHAR/10000/10/5/30   108553692 ns    108539168 ns            6 RowInvRate=10.8539us
+BM_MergeSortedArraysVARCHAR/10000/20/5/30   259084935 ns    259073816 ns            3 RowInvRate=25.9074us
+BM_MergeSortedArraysVARCHAR/10000/30/5/30   434000689 ns    433946350 ns            2 RowInvRate=43.3946us
+BM_MergeSortedArraysVARCHAR/10000/5/10/30    54278889 ns     54273074 ns           12 RowInvRate=5.42731us
+BM_MergeSortedArraysVARCHAR/10000/10/10/30  127947671 ns    127946689 ns            5 RowInvRate=12.7947us
+BM_MergeSortedArraysVARCHAR/10000/20/10/30  310458411 ns    310436073 ns            2 RowInvRate=31.0436us
+BM_MergeSortedArraysVARCHAR/10000/30/10/30  501227823 ns    501193049 ns            2 RowInvRate=50.1193us
+BM_DedupSortedByVARCHAR/10000/5/5             1283851 ns      1283690 ns          577 RowInvRate=128.369ns
+BM_DedupSortedByVARCHAR/10000/10/5            2472645 ns      2472358 ns          288 RowInvRate=247.236ns
+BM_DedupSortedByVARCHAR/10000/5/10            1793676 ns      1793378 ns          376 RowInvRate=179.338ns
+BM_DedupSortedByVARCHAR/10000/10/10           4298807 ns      4297674 ns          163 RowInvRate=429.767ns
+BM_ArrayBoolOr/1000/1/10                         9663 ns         9589 ns        72937 RowInvRate=9.58935ns
+BM_ArrayBoolOr/10000/1/10                       90758 ns        90622 ns         7677 RowInvRate=9.06225ns
+BM_ArrayBoolOr/1000/10/10                        9629 ns         9558 ns        73277 RowInvRate=9.55847ns
+BM_ArrayBoolOr/10000/10/10                      91137 ns        91015 ns         7689 RowInvRate=9.10153ns
+BM_ArrayBoolOr/1000/50/10                        9671 ns         9602 ns        73008 RowInvRate=9.60245ns
+BM_ArrayBoolOr/10000/50/10                      90226 ns        90089 ns         7687 RowInvRate=9.00894ns
+BM_ArrayBoolOr/1000/1/20                         9852 ns         9775 ns        71616 RowInvRate=9.77516ns
+BM_ArrayBoolOr/10000/1/20                       91316 ns        91206 ns         7740 RowInvRate=9.1206ns
+BM_ArrayBoolOr/1000/10/20                        9775 ns         9699 ns        71906 RowInvRate=9.69863ns
+BM_ArrayBoolOr/10000/10/20                      91009 ns        90907 ns         7654 RowInvRate=9.09073ns
+BM_ArrayBoolOr/1000/50/20                        9778 ns         9703 ns        72245 RowInvRate=9.70329ns
+BM_ArrayBoolOr/10000/50/20                      91774 ns        91654 ns         7746 RowInvRate=9.16537ns
+BM_ArrayCountVarchar/1000/0/20                  10189 ns        10018 ns        70563 RowInvRate=10.0181ns
+BM_ArrayCountVarchar/10000/0/20                 76125 ns        75995 ns         9177 RowInvRate=7.5995ns
+BM_ArrayCountVarchar/1000/10/20                 12395 ns        12322 ns        56389 RowInvRate=12.3221ns
+BM_ArrayCountVarchar/10000/10/20               107219 ns       107139 ns         6548 RowInvRate=10.7139ns
+BM_ArrayCountVarchar/1000/50/20                 12383 ns        12314 ns        56806 RowInvRate=12.3136ns
+BM_ArrayCountVarchar/10000/50/20               106852 ns       106777 ns         6532 RowInvRate=10.6777ns
+BM_ArrayCountVarchar/1000/0/100                 10398 ns        10196 ns        68845 RowInvRate=10.1963ns
+BM_ArrayCountVarchar/10000/0/100               153107 ns       152553 ns         4843 RowInvRate=15.2553ns
+BM_ArrayCountVarchar/1000/10/100                32832 ns        32514 ns        22831 RowInvRate=32.5138ns
+BM_ArrayCountVarchar/10000/10/100              284150 ns       284011 ns         2456 RowInvRate=28.4011ns
+BM_ArrayCountVarchar/1000/50/100                32918 ns        32547 ns        22675 RowInvRate=32.5474ns
+BM_ArrayCountVarchar/10000/50/100              300441 ns       299217 ns         2367 RowInvRate=29.9217ns
 */
 
 static void BM_MergeSortedArraysVARCHAR(benchmark::State& state) {
@@ -228,6 +240,49 @@ static void BM_ArrayBoolOr(benchmark::State& state) {
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
 
+static void BM_ArrayCountVarchar(benchmark::State& state) {
+    int num_rows = state.range(0);
+    bool null_probability = state.range(1) / 100.0;
+    int array_length = state.range(2);
+
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)))};
+    auto return_type =
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BIGINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::bernoulli_distribution dist(null_probability);
+
+    int total_rows = 0;
+    for (auto _: state) {
+        state.PauseTiming();
+        total_rows += num_rows;
+        auto input_column =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
+        for (int i = 0; i < num_rows; i++) {
+            DatumArray input_array;
+            for (int j = 0; j < array_length; j++) {
+                bool is_null = dist(gen);
+                if (is_null) {
+                    input_array.emplace_back(kNullDatum);
+                } else {
+                    input_array.emplace_back(Slice("value" + std::to_string(i)));
+                }
+            }
+            input_column->append_datum(input_array);
+        }
+
+        state.ResumeTiming();
+        auto result = CelonisArrayFunctions::array_count(ctx.get(), {input_column});
+
+        ASSERT_TRUE(result.ok()) << result.status().get_error_msg();
+    }
+    state.counters["RowInvRate"] =
+            benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
+}
+
 // Args: Number of rows / Number of arrays / Minimum size of inner array / Maximum size of inner array
 BENCHMARK(BM_MergeSortedArraysVARCHAR)->ArgsProduct({{10000}, {5, 10, 20, 30}, {5, 10}, {15, 30}});
 
@@ -236,6 +291,10 @@ BENCHMARK(BM_DedupSortedByVARCHAR)->ArgsProduct({{10000}, {5, 10}, {5, 10}});
 
 // Args: Number of rows / True percentage / Array length
 BENCHMARK(BM_ArrayBoolOr)->ArgsProduct({{1000, 10000}, {1, 10, 50}, {10, 20}});
+
+// Args: Number of rows / Null percentage / Array length
+BENCHMARK(BM_ArrayCountVarchar)->ArgsProduct({{1000, 10000}, {0, 10, 50}, {20, 100}});
+
 } // namespace starrocks
 
 BENCHMARK_MAIN();
