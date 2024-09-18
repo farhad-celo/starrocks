@@ -8,6 +8,8 @@ on:
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.2
+  BRANCH_3_3: branch-3.3
+  MAIN: main
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
 permissions:
@@ -15,7 +17,7 @@ permissions:
 
 jobs:
   sync-branch:
-    runs-on: [runs-on, runner=1cpu-linux-x64, "run-id=${{ github.run_id }}"]
+    runs-on: [runs-on, runner=1cpu-linux-x64, image=ubuntu22-full-x64, "run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,9 +36,16 @@ jobs:
           git push origin ${LATEST_UPSTREAM_BRANCH}
         continue-on-error: true
 
-      - name: Fetch upstream main
+      - name: Fetch upstream ${{env.MAIN}}
         run: |
           git remote -v
-          git fetch upstream main:main
-          git push origin main
+          git fetch upstream ${MAIN}:${MAIN}
+          git push origin ${MAIN}
+        continue-on-error: true
+
+      - name: Fetch upstream ${{env.BRANCH_3_3}}
+        run: |
+          git remote -v
+          git fetch upstream ${BRANCH_3_3}:${BRANCH_3_3}
+          git push origin ${BRANCH_3_3}
         continue-on-error: true
