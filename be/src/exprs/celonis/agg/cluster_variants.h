@@ -365,7 +365,7 @@ public:
     const phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>, StdHash<int128_t>>&
     edge_set_map() const { return edge_set_map_; }
 
-    const HashSet<int128_t> null_variant_hashes() const { return null_variant_hashes_; }
+    const HashSet<int128_t>& null_variant_hashes() const { return null_variant_hashes_; }
 
 private:
     // Adds an activity to the dictionary if it does not exist.
