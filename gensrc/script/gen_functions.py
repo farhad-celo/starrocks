@@ -83,6 +83,7 @@ ${license}
 #include "exprs/celonis/greatest_least.h"
 #include "exprs/celonis/in.h"
 #include "exprs/celonis/index_activity.h"
+#include "exprs/celonis/kmeans.h"
 #include "exprs/celonis/like.h"
 #include "exprs/celonis/linear_regression.h"
 #include "exprs/celonis/match_activities.h"

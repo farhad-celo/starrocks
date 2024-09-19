@@ -142,6 +142,7 @@ set(CELONIS_FILES
   celonis/greatest_least.cpp
   celonis/in.cpp
   celonis/index_activity.cpp
+  celonis/kmeans.cpp
   celonis/like.cpp
   celonis/linear_regression.cpp
   celonis/match_activities.cpp
