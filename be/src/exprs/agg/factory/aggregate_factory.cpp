@@ -106,6 +106,10 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisInductiveMinerAggregateFunctio
     return std::make_shared<InductiveMinerAggregateFunction>();
 }
 
+AggregateFunctionPtr AggregateFactory::MakeCelonisBuildKMeansModelAggregateFunction() {
+    return std::make_shared<CelonisKMeansAggregationFunction>();
+}
+
 AggregateFunctionPtr AggregateFactory::MakeCelonisBuildLinearRegressionModelAggregateFunction() {
     return std::make_shared<LinearRegressionAggregateFunction>();
 }

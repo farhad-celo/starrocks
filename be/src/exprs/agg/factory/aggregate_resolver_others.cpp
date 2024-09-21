@@ -89,6 +89,10 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_cluster_strings", false,
             AggregateFactory::MakeCelonisClusterStringsAggregateFunction());
 
+    add_aggregate_mapping_notnull<TYPE_ARRAY, TYPE_VARCHAR>(
+            "celonis_build_kmeans_model", false,
+            AggregateFactory::MakeCelonisBuildKMeansModelAggregateFunction());
+
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_inductive_miner");
 
     add_general_mapping_notnull("celonis_build_linear_regression_model", false,

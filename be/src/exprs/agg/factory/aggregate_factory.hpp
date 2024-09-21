@@ -65,6 +65,7 @@
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/celonis/agg/inductive_miner.h"
+#include "exprs/celonis/agg/kmeans.h"
 #include "exprs/celonis/agg/linear_regression.h"
 #include "exprs/celonis/agg/moving_count_distinct.h"
 #include "exprs/celonis/agg/moving_median.h"
@@ -257,6 +258,8 @@ public:
     static AggregateFunctionPtr MakeCelonisHistogramBoundariesAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisInductiveMinerAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisBuildKMeansModelAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisBuildLinearRegressionModelAggregateFunction();
 

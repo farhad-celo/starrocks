@@ -123,6 +123,7 @@ set(CELONIS_FILES
   celonis/agg/factory_calendar.cpp
   celonis/agg/workday_calendar.cpp
   celonis/agg/inductive_miner.cpp
+  celonis/agg/kmeans.cpp
   celonis/agg/linear_regression.cpp
   celonis/agg/mode.cpp
   celonis/agg/product.cpp
