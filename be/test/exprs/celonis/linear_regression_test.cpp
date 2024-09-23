@@ -49,7 +49,8 @@ private:
     StatusOr<ColumnPtr>
     RunConstantModel(const Datum& model) {
         model_column_->append_datum(model);
-        ctx_->set_constant_columns({nullptr, model_column_});
+        const auto nrows = x_column_->size();
+        ctx_->set_constant_columns({nullptr, ConstColumn::create(model_column_, nrows)});
         return Run();
     }
 

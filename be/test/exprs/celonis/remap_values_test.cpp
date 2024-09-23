@@ -73,7 +73,10 @@ private:
     RunConstantValueMap(const DatumArray& old_array, const DatumArray& new_array, bool has_default) {
         old_array_column_->append_datum(old_array);
         new_array_column_->append_datum(new_array);
-        ctx_->set_constant_columns({nullptr, old_array_column_, new_array_column_, nullptr});
+        const auto nrows = value_column_->size();
+        ctx_->set_constant_columns(
+                {nullptr, ConstColumn::create(old_array_column_, nrows), ConstColumn::create(new_array_column_, nrows),
+                 nullptr});
         return Run<LT>(has_default);
     }
 

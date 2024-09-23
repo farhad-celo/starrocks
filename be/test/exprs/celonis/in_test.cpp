@@ -50,9 +50,9 @@ private:
 
     template <LogicalType LT>
     StatusOr<ColumnPtr> RunConstantMatch(DatumArray match_array) {
-        EXPECT_FALSE(match_array_column_->is_constant());
         match_array_column_->append_datum(match_array);
-        ctx_->set_constant_columns({nullptr, match_array_column_});
+        const auto nrows = value_column_->size();
+        ctx_->set_constant_columns({nullptr, ConstColumn::create(match_array_column_, nrows)});
         return Run<LT>();
     }
 

@@ -81,9 +81,12 @@ private:
         excluding_nodes_column_->append_datum(excluding_nodes_array);
         excluding_all_nodes_column_->append_datum(excluding_all_nodes_array);
         any_nodes_column_->append_datum(any_nodes_array);
+        const auto nrows = activity_column_->size();
         ctx_->set_constant_columns(
-                {nullptr, starting_nodes_column_, nodes_column_, ending_nodes_column_, excluding_nodes_column_,
-                 excluding_all_nodes_column_, any_nodes_column_});
+                {nullptr, ConstColumn::create(starting_nodes_column_, nrows), ConstColumn::create(nodes_column_, nrows),
+                 ConstColumn::create(ending_nodes_column_, nrows), ConstColumn::create(excluding_nodes_column_, nrows),
+                 ConstColumn::create(excluding_all_nodes_column_, nrows),
+                 ConstColumn::create(any_nodes_column_, nrows)});
         return Run();
     }
 
