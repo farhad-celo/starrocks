@@ -43,12 +43,15 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
     SliceHashSet nodes_seen;
     nodes_seen.reserve(nodes.size());
     SliceHashSet excluding_nodes_seen;
-    bool has_exclude_node = false;
     // contain node in any_nodes
     bool has_any_node = false;
     bool has_non_null = false;
     size_t start = offsets[row];
     size_t end = offsets[row + 1];
+    const auto length = end - start;
+    if (length < nodes.size()) {
+        return 0L;
+    }
     std::optional<size_t> start_index = std::nullopt;
     std::optional<size_t> end_index = std::nullopt;
     for (size_t index = start; index < end; ++index) {
@@ -58,6 +61,9 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         }
         if (!start_index.has_value()) {
             start_index = index;
+            if (!start_nodes.empty() && start_nodes.find(activities[start_index.value()]) == start_nodes.end()) {
+                return 0L;
+            }
         }
         end_index = index;
         const auto& value = activities[index];
@@ -65,29 +71,25 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         if (nodes.count(value)) {
             nodes_seen.insert(value);
         }
-        if (excluding_all_nodes.count(value)) {
+        if (excluding_all_nodes.find(value) != excluding_all_nodes.end()) {
             excluding_nodes_seen.insert(value);
         }
-        if (any_nodes.count(value)) {
+        if (any_nodes.find(value) != any_nodes.end()) {
             has_any_node = true;
         }
-        if (excluding_nodes.count(value)) {
-            has_exclude_node = true;
-            break;
+        if (excluding_nodes.find(value) != excluding_nodes.end()) {
+            return 0L;
         }
     }
-    if (!start_nodes.empty() &&
-        (!start_index.has_value() || !start_nodes.count(activities[start_index.value()]))) {
+    // No non-NULL activities.
+    if (!start_nodes.empty() && !start_index.has_value()) {
         return 0L;
     }
     if (!end_nodes.empty() &&
-        (!end_index.has_value() || !end_nodes.count(activities[end_index.value()]))) {
+        (!end_index.has_value() || end_nodes.find(activities[end_index.value()]) == end_nodes.end())) {
         return 0L;
     }
     if (!any_nodes.empty() && !has_any_node) {
-        return 0L;
-    }
-    if (has_exclude_node) {
         return 0L;
     }
     if (!excluding_all_nodes.empty() && excluding_nodes_seen.size() == excluding_all_nodes.size()) {
@@ -161,7 +163,7 @@ Status CelonisMatchActivitiesFunctions::close(FunctionContext* context,
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(starrocks::FunctionContext* context,
                                                                               const starrocks::Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
     size_t n_rows = columns[0]->size();
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
@@ -199,7 +201,7 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(st
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starrocks::FunctionContext* context,
                                                                           const starrocks::Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
     size_t n_rows = columns[0]->size();
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
