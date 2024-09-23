@@ -31,8 +31,12 @@ private:
     }
 
     void
-    AddRow(const DatumArray& point, const Datum& model) {
-        point_column_->append_datum(point);
+    AddRow(const std::optional<DatumArray>& point, const Datum& model) {
+        if (point.has_value()) {
+            point_column_->append_datum(point.value());
+        } else {
+            point_column_->append_datum(kNullDatum);
+        }
         model_column_->append_datum(model);
     }
 
@@ -49,7 +53,8 @@ private:
     StatusOr<ColumnPtr>
     RunConstantModel(const Datum& model) {
         model_column_->append_datum(model);
-        ctx_->set_constant_columns({nullptr, model_column_});
+        const auto nrows = point_column_->size();
+        ctx_->set_constant_columns({nullptr, ConstColumn::create(model_column_, nrows)});
         return Run();
     }
 
@@ -57,6 +62,12 @@ private:
     ColumnPtr point_column_;
     ColumnPtr model_column_;
 };
+
+TEST_F(CelonisKmeansTest, empty_input) {
+    Prepare();
+    const auto result = RunConstantModel("0.0;1.0").value();
+    ASSERT_EQ(0, result->size());
+}
 
 TEST_F(CelonisKmeansTest, null_const_column) {
     {
@@ -125,14 +136,14 @@ TEST_F(CelonisKmeansTest, single_feature_const_invalid_model) {
 
 TEST_F(CelonisKmeansTest, single_feature_nonconst_model) {
     Prepare();
-    AddRow({2.0}, "2.0;2.5");
-    AddRow({4.0}, "3.5;4.0");
-    AddRow({kNullDatum}, "1.0;2.0");
-    AddRow({2.5}, "3.5;4.0");
-    AddRow({2.5}, "3.5#4.0");
-    AddRow({0.5}, "HELLO");
-    AddRow({kNullDatum}, kNullDatum);
-    AddRow({0.0}, "1.5;9.3");
+    AddRow(DatumArray{2.0}, "2.0;2.5");
+    AddRow(DatumArray{4.0}, "3.5;4.0");
+    AddRow(DatumArray{kNullDatum}, "1.0;2.0");
+    AddRow(DatumArray{2.5}, "3.5;4.0");
+    AddRow(DatumArray{2.5}, "3.5#4.0");
+    AddRow(DatumArray{0.5}, "HELLO");
+    AddRow(DatumArray{kNullDatum}, kNullDatum);
+    AddRow(DatumArray{0.0}, "1.5;9.3");
     const auto result = Run().value();
     ASSERT_EQ(point_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
@@ -195,12 +206,12 @@ TEST_F(CelonisKmeansTest, double_features_const_invalid_model) {
 
 TEST_F(CelonisKmeansTest, double_features_nonconst_model) {
     Prepare();
-    AddRow({2.0, 3.0}, "2.0,3.5;1.5,2.0;2.0,3.0");
-    AddRow({3.0, 2.5}, "3.5:4.0");
-    AddRow({kNullDatum, 3.0}, "1.0:2.0:1.5");
-    AddRow({0.5, 1.5}, "HELLO");
-    AddRow({1.0, 2.2}, kNullDatum);
-    AddRow({0.0, 1.5}, "1.5,9.3;2.4,3.5");
+    AddRow(DatumArray{2.0, 3.0}, "2.0,3.5;1.5,2.0;2.0,3.0");
+    AddRow(DatumArray{3.0, 2.5}, "3.5:4.0");
+    AddRow(DatumArray{kNullDatum, 3.0}, "1.0:2.0:1.5");
+    AddRow(DatumArray{0.5, 1.5}, "HELLO");
+    AddRow(DatumArray{1.0, 2.2}, kNullDatum);
+    AddRow(DatumArray{0.0, 1.5}, "1.5,9.3;2.4,3.5");
     const auto result = Run().value();
     ASSERT_EQ(point_column_->size(), result->size());
     EXPECT_EQ(2L, result->get(0).get_int64());
@@ -224,6 +235,48 @@ TEST_F(CelonisKmeansTest, three_features_const_valid_model) {
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
     EXPECT_EQ(1L, result->get(2).get_int64());
+}
+
+TEST_F(CelonisKmeansTest, null_point) {
+    {
+        Prepare();
+        point_column_->append_datum(kNullDatum);
+        point_column_->append_datum(DatumArray{0.2});
+        const auto result = RunConstantModel("0.0;1.0").value();
+        ASSERT_EQ(point_column_->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_EQ(0L, result->get(1).get_int64());
+    }
+    {
+        Prepare();
+        AddRow(DatumArray{0.0, 1.5}, "1.5,9.3;2.4,3.5");
+        AddRow(std::nullopt, "0.0;1.0");
+        const auto result = Run().value();
+        ASSERT_EQ(point_column_->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
+}
+
+TEST_F(CelonisKmeansTest, model_dimension_inconsistent_with_point_dimension) {
+    {
+        Prepare();
+        point_column_->append_datum(DatumArray{0.1, 0.2});
+        point_column_->append_datum(DatumArray{0.2});
+        const auto result = RunConstantModel("0.0;1.0").value();
+        ASSERT_EQ(point_column_->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        EXPECT_EQ(0L, result->get(1).get_int64());
+    }
+    {
+        Prepare();
+        AddRow(DatumArray{0.0, 1.5}, "1.5,9.3;2.4,3.5");
+        AddRow(DatumArray{0.0, 1.2}, "0.0;1.0");
+        const auto result = Run().value();
+        ASSERT_EQ(point_column_->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_TRUE(result->get(1).is_null());
+    }
 }
 
 } // namespace starrocks
