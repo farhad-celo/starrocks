@@ -15,6 +15,26 @@ namespace starrocks {
 namespace {
 
 static const double MAX_KMEANS_SECONDS = 3.5 * 60.0; // 3.5 mins
+static const int MAX_KMEANS_ITERATIONS = 100;
+
+std::string to_string(double value) {
+    std::string decimal_str = std::to_string(value);
+    size_t decimal_point = decimal_str.find('.');
+
+    if (decimal_point == std::string::npos) {
+        return decimal_str;
+    }
+
+    size_t last_non_zero = decimal_str.find_last_not_of('0');
+
+    // If the last non-zero character is the decimal point itself, remove it as well
+    if (last_non_zero == decimal_point) {
+        return decimal_str.substr(0, decimal_point);
+    }
+
+    // Otherwise, return the string up to the last non-zero character
+    return decimal_str.substr(0, last_non_zero + 1);
+}
 
 std::string to_model(const std::vector<std::vector<double>>& centroids) {
     std::vector<std::string> row_strs;
@@ -23,7 +43,7 @@ std::string to_model(const std::vector<std::vector<double>>& centroids) {
         std::vector<std::string> value_strs;
         value_strs.reserve(centroid.size());
         for (double value: centroid) {
-            value_strs.push_back(std::to_string(value));
+            value_strs.push_back(to_string(value));
         }
         row_strs.push_back(boost::algorithm::join(value_strs, ","));
     }
@@ -151,11 +171,11 @@ public:
     KMeansPlusPlus(const std::vector<std::vector<double>>& input_points, int64_t num_clusters, unsigned int seed)
             : points(input_points), k(num_clusters), gen(seed) {}
 
-    void run(int max_iterations = 100) {
+    void run() {
         auto start_time = std::chrono::high_resolution_clock::now();
         initialize_centroids();
 
-        for (int iter = 0; iter < max_iterations; ++iter) {
+        for (int iter = 0; iter < MAX_KMEANS_ITERATIONS; ++iter) {
             assign_points_to_clusters();
             update_centroids();
             auto cur_time = std::chrono::high_resolution_clock::now();
@@ -170,9 +190,6 @@ public:
         return centroids;
     }
 
-    int get_actual_k() const {
-        return k;
-    }
 };
 
 } // namespace
@@ -242,6 +259,7 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
         kmeans.run();
         centroids = kmeans.get_centroids();
     }
+    // TODO(y.zhang): Make sure the output size is less than the size limit.
     std::string model = to_model(centroids);
     to->append_datum(model.c_str());
 }
