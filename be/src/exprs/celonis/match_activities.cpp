@@ -43,6 +43,7 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
     SliceHashSet nodes_seen;
     nodes_seen.reserve(nodes.size());
     SliceHashSet excluding_nodes_seen;
+    excluding_nodes_seen.reserve(excluding_all_nodes.size());
     // contain node in any_nodes
     bool has_any_node = false;
     bool has_non_null = false;
@@ -59,22 +60,22 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         if (null_elements != nullptr && (*null_elements)[index] != 0) {
             continue;
         }
+        has_non_null = true;
         if (!start_index.has_value()) {
             start_index = index;
-            if (!start_nodes.empty() && start_nodes.find(activities[start_index.value()]) == start_nodes.end()) {
+            if (!start_nodes.empty() && start_nodes.find(activities[index]) == start_nodes.end()) {
                 return 0L;
             }
         }
         end_index = index;
         const auto& value = activities[index];
-        has_non_null = true;
         if (nodes.count(value)) {
             nodes_seen.insert(value);
         }
         if (excluding_all_nodes.find(value) != excluding_all_nodes.end()) {
             excluding_nodes_seen.insert(value);
         }
-        if (any_nodes.find(value) != any_nodes.end()) {
+        if (!has_any_node && any_nodes.find(value) != any_nodes.end()) {
             has_any_node = true;
         }
         if (excluding_nodes.find(value) != excluding_nodes.end()) {
