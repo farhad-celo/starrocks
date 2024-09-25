@@ -47,3 +47,11 @@ SELECT CELONIS_ARRAY_BOOL_OR(IF(rand(), NULL, NULL));
 -- result:
 None
 -- !result
+SELECT CELONIS_APPLY_KMEANS_MODEL(NULL, "1.0");
+-- result:
+None
+-- !result
+SELECT CELONIS_APPLY_KMEANS_MODEL(IF(rand(), NULL, NULL), "1.0");
+-- result:
+None
+-- !result
