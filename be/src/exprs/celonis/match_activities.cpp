@@ -72,6 +72,12 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         if (nodes.count(value)) {
             nodes_seen.insert(value);
         }
+
+        // activity array does not contain all the activities in nodes, return early.
+        if (nodes_seen.size() + end - index - 1 < nodes.size()) {
+            return 0L;
+        }
+
         if (excluding_all_nodes.find(value) != excluding_all_nodes.end()) {
             excluding_nodes_seen.insert(value);
         }
