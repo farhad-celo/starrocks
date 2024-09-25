@@ -244,7 +244,7 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
     int random_seed = state_impl.random_seed();
     int64_t num_clusters = state_impl.num_clusters();
 
-    if (points.empty()) {
+    if (points.empty() || state_impl.inconsistent_dimension() || state_impl.num_features() == 0) {
         to->append_default();
         return;
     }

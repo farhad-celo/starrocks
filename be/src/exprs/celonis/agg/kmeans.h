@@ -16,6 +16,9 @@ namespace starrocks {
 struct CelonisKMeansModelAggregateState {
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
+        if (inconsistent_dimension_) {
+            return;
+        }
         if (ctx->is_notnull_constant_column(1)) {
             num_clusters_ = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(1));
         }
@@ -28,7 +31,7 @@ struct CelonisKMeansModelAggregateState {
             return;
         }
         if (seed_ < 0) {
-            std::string msg = "random seed must be non-negative, however it is " + std::to_string(seed_);
+            std::string msg = "Random seed must be non-negative, however it is " + std::to_string(seed_);
             ctx->set_error(msg.c_str(), false);
             return;
         }
@@ -36,36 +39,35 @@ struct CelonisKMeansModelAggregateState {
             return;
         }
         auto array = columns[0]->get(row_num).get_array();
+        if (num_features_ <= 0) {
+            num_features_ = array.size();
+        } else {
+            if (num_features_ != array.size()) {
+                inconsistent_dimension_ = true;
+                return;
+            }
+        }
         std::vector<double> point;
         for (auto i = 0; i < array.size(); ++i) {
             if (array[i].is_null()) {
+                // ignore point with NULL value(s).
                 return;
             } else {
                 point.push_back(array[i].get<double>());
             }
         }
-        if (!points_.empty() && points_.back().size() != point.size()) {
-            std::string msg = "All points must have the same number of dimensions.";
-            ctx->set_error(msg.c_str(), false);
-            return;
-        }
-        if (point.empty()) {
-            std::string msg = "The point must have positive number of dimensions.";
-            ctx->set_error(msg.c_str(), false);
-            return;
-        }
         ++num_points_;
-        num_features_ = point.size();
         points_.push_back(point);
     }
 
     // Returns the total size in bytes required to encode this object.
     size_t serialized_size() const {
         size_t result = 0;
+        result += sizeof(uint8_t);                    // inconsistent_dimension_
         result += sizeof(int64_t);                    // num_clusters_
         result += sizeof(int);                        // seed_
-        result += sizeof(size_t);                     // num_points_
         result += sizeof(size_t);                     // num_features_
+        result += sizeof(size_t);                     // num_points_
         size_t num_values = num_points_ * num_features_;
         result += sizeof(double) * num_values;        // items in points_
         return result;
@@ -73,13 +75,15 @@ struct CelonisKMeansModelAggregateState {
 
     // Writes and binary encoded version of the object to dst.
     void serialize(uint8_t* dst) const {
+        memcpy(dst, &inconsistent_dimension_, sizeof(uint8_t));
+        dst += sizeof(uint8_t);
         memcpy(dst, &num_clusters_, sizeof(int64_t));
         dst += sizeof(double);
         memcpy(dst, &seed_, sizeof(int));
         dst += sizeof(int);
-        memcpy(dst, &num_points_, sizeof(size_t));
-        dst += sizeof(size_t);
         memcpy(dst, &num_features_, sizeof(size_t));
+        dst += sizeof(size_t);
+        memcpy(dst, &num_points_, sizeof(size_t));
         dst += sizeof(size_t);
         for (const auto& point: points_) {
             for (auto num: point) {
@@ -92,22 +96,32 @@ struct CelonisKMeansModelAggregateState {
     // Deserializes a CelonisKMeansModelAggregateState object and merges it with the current state.
     void deserialize_and_merge(const uint8_t* src, size_t len) {
         const uint8_t* end = src + len;
+        bool inconsistent_dimension = false;
+        memcpy(&inconsistent_dimension, src, sizeof(uint8_t));
+        src += sizeof(uint8_t);
+        if (inconsistent_dimension) {
+            inconsistent_dimension_ = true;
+            return;
+        }
         memcpy(&num_clusters_, src, sizeof(int64_t));
         src += sizeof(int64_t);
         memcpy(&seed_, src, sizeof(int));
         src += sizeof(int);
+        size_t num_features;
+        memcpy(&num_features, src, sizeof(size_t));
+        src += sizeof(size_t);
+        if (num_features_ <= 0) {
+            num_features_ = num_features;
+        } else {
+            if (num_features_ != num_features) {
+                inconsistent_dimension_ = true;
+                return;
+            }
+        }
         size_t num_points = 0;
         memcpy(&num_points, src, sizeof(size_t));
         src += sizeof(size_t);
         num_points_ += num_points;
-        size_t num_features;
-        memcpy(&num_features, src, sizeof(size_t));
-        src += sizeof(size_t);
-        if (num_features_ == 0) {
-            num_features_ = num_features;
-        } else {
-            DCHECK_EQ(num_features_, num_features) << "All points must have the same number of dimensions.";
-        }
         for (auto i = 0; i < num_points; ++i) {
             std::vector<double> point;
             point.reserve(num_features_);
@@ -130,6 +144,14 @@ struct CelonisKMeansModelAggregateState {
         return num_clusters_;
     }
 
+    size_t num_features() const {
+        return num_features_;
+    }
+
+    bool inconsistent_dimension() const {
+        return inconsistent_dimension_;
+    }
+
     int random_seed() const {
         return seed_;
     }
@@ -139,6 +161,7 @@ struct CelonisKMeansModelAggregateState {
     }
 
 private:
+    bool inconsistent_dimension_ = false;
     int64_t num_clusters_ = -1;
     int seed_ = 0;
     size_t num_points_ = 0;
@@ -152,12 +175,12 @@ private:
  * @return: VARCHAR
  * point_column: Each row represents a point. All points must have the same number of dimensions.
  * NUM_CLUSTERS: Number of clusters (must be constant).
- * RANDOM_SEED: Random seed used to make the implementation deterministic.
+ * RANDOM_SEED: Random seed used to make the implementation deterministic (must be constant).
  * This function (CELONIS_BUILD_KMEANS_MODEL) implements k-means++ algorithm to train a model (finding the centroids of
  * the clusters). It returns the model encoded in a string in the below format:
  * x_11,x_12,...,x_1m;x_21,x_22,...,x_2m;...;x_k1,x_k2,...,x_km
- * If a point contains a NULL value, it is ignored in the training.
- *
+ * If a point is NULL or contains a NULL value, it is ignored in the training.
+ * If NUM_CLUSTERS > # of valid points, we set num of clusters to min(NUM_CLUSTERS, # of valid points).
  */
 class CelonisKMeansAggregationFunction final
         : public AggregateFunctionBatchHelper<CelonisKMeansModelAggregateState,

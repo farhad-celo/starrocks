@@ -339,5 +339,19 @@ TEST_F(CelonisBuildKMeansModelTest, no_valid_points) {
     Run(points, num_clusters, random_seed, {}, true);
 }
 
+TEST_F(CelonisBuildKMeansModelTest, zero_point_dimension) {
+    auto points = DatumArray{DatumArray{}, DatumArray{}};
+    int64_t num_clusters = 1;
+    double random_seed = 0;
+    Run(points, num_clusters, random_seed, {}, true);
+}
+
+TEST_F(CelonisBuildKMeansModelTest, inconsistent_point_dimension) {
+    auto points = DatumArray{DatumArray{1.0}, DatumArray{2.0, 3.0}};
+    int64_t num_clusters = 1;
+    double random_seed = 0;
+    Run(points, num_clusters, random_seed, {}, true);
+}
+
 } // namespace starrocks
 
