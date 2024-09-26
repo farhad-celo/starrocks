@@ -16,6 +16,7 @@ namespace {
 
 static const double MAX_KMEANS_SECONDS = 3.5 * 60.0; // 3.5 mins
 static const int MAX_KMEANS_ITERATIONS = 100;
+static const uint64_t MAX_KMEANS_MODEL_SIZE = (100LL << 20); // 100M
 
 std::string to_string(double value) {
     std::string decimal_str = std::to_string(value);
@@ -36,8 +37,9 @@ std::string to_string(double value) {
     return decimal_str.substr(0, last_non_zero + 1);
 }
 
-std::string to_model(const std::vector<std::vector<double>>& centroids) {
+std::optional<std::string> to_model(const std::vector<std::vector<double>>& centroids) {
     std::vector<std::string> row_strs;
+    uint64_t size = 0;
     row_strs.reserve(centroids.size());
     for (const auto& centroid: centroids) {
         std::vector<std::string> value_strs;
@@ -45,7 +47,12 @@ std::string to_model(const std::vector<std::vector<double>>& centroids) {
         for (double value: centroid) {
             value_strs.push_back(to_string(value));
         }
-        row_strs.push_back(boost::algorithm::join(value_strs, ","));
+        const auto row_str = boost::algorithm::join(value_strs, ",");
+        size += row_str.size() + 1;
+        if (size > MAX_KMEANS_MODEL_SIZE) {
+            return std::nullopt;
+        }
+        row_strs.push_back(row_str);
     }
     return boost::algorithm::join(row_strs, ";");
 }
@@ -243,6 +250,7 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
     const auto& points = state_impl.points();
     int random_seed = state_impl.random_seed();
     int64_t num_clusters = state_impl.num_clusters();
+    LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: # of points is " << points.size() << std::endl;
 
     if (points.empty() || state_impl.inconsistent_dimension() || state_impl.num_features() == 0) {
         to->append_default();
@@ -255,13 +263,23 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
         centroids = points;
         std::sort(centroids.begin(), centroids.end());
     } else {
+        LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: started k-means clustering.\n";
         KMeansPlusPlus kmeans(points, num_clusters, static_cast<unsigned int>(random_seed));
         kmeans.run();
+        LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: done k-means clustering.\n";
         centroids = kmeans.get_centroids();
     }
-    // TODO(y.zhang): Make sure the output size is less than the size limit.
-    std::string model = to_model(centroids);
-    to->append_datum(model.c_str());
+    LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: started to_model.\n";
+    const auto model = to_model(centroids);
+    LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: done to_model.\n";
+    if (model.has_value()) {
+        to->append_datum(model->c_str());
+    } else {
+        ctx->set_error(
+                std::string("CELONIS_BUILD_KMEANS_MODEL: output model string size exceeds the limit (100M)").c_str(),
+                false);
+        to->append_default();
+    }
 }
 
 std::string CelonisKMeansAggregationFunction::get_name() const { return "celonis_build_kmeans_model"; }
