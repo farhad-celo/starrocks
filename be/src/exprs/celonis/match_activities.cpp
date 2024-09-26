@@ -47,34 +47,46 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
     // contain node in any_nodes
     bool has_any_node = false;
     bool has_non_null = false;
-    size_t start = offsets[row];
-    size_t end = offsets[row + 1];
-    const auto length = end - start;
+    const size_t offset_start = offsets[row];
+    const size_t offset_end = offsets[row + 1];
+    const auto length = offset_end - offset_start;
     if (length < nodes.size()) {
         return 0L;
     }
-    std::optional<size_t> start_index = std::nullopt;
-    std::optional<size_t> end_index = std::nullopt;
-    for (size_t index = start; index < end; ++index) {
+    std::optional<int64_t> first_visit_index = std::nullopt;
+    std::optional<int64_t> last_visit_index = std::nullopt;
+    // If true, traverse the activity array from left to right.
+    bool left_to_right = true;
+    if (start_nodes.empty() && !end_nodes.empty()) {
+        left_to_right = false;
+    } else if (!start_nodes.empty() && !end_nodes.empty()) {
+        left_to_right = start_nodes.size() <= end_nodes.size();
+    }
+    const int64_t start = left_to_right ? static_cast<int64_t>(offset_start) : static_cast<int64_t>(offset_end) - 1;
+    const int64_t end = left_to_right ? static_cast<int64_t>(offset_end) : static_cast<int64_t>(offset_start) - 1;
+    const int64_t delta_index = left_to_right ? 1 : -1;
+    const SliceHashSet& first_visit_nodes = left_to_right ? start_nodes : end_nodes;
+    const SliceHashSet& last_visit_nodes = left_to_right ? end_nodes : start_nodes;
+    for (auto index = start; index != end; index += delta_index) {
         // Nulls are ignored
         if (null_elements != nullptr && (*null_elements)[index] != 0) {
             continue;
         }
         has_non_null = true;
-        if (!start_index.has_value()) {
-            start_index = index;
-            if (!start_nodes.empty() && start_nodes.find(activities[index]) == start_nodes.end()) {
+        if (!first_visit_index.has_value()) {
+            first_visit_index = index;
+            if (!first_visit_nodes.empty() && first_visit_nodes.find(activities[index]) == first_visit_nodes.end()) {
                 return 0L;
             }
         }
-        end_index = index;
+        last_visit_index = index;
         const auto& value = activities[index];
-        if (nodes.count(value)) {
+        if (nodes.find(value) != nodes.end()) {
             nodes_seen.insert(value);
         }
 
         // activity array does not contain all the activities in nodes, return early.
-        if (nodes_seen.size() + end - index - 1 < nodes.size()) {
+        if (nodes_seen.size() + std::abs(end - index) - 1 < nodes.size()) {
             return 0L;
         }
 
@@ -89,11 +101,12 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         }
     }
     // No non-NULL activities.
-    if (!start_nodes.empty() && !start_index.has_value()) {
+    if (!first_visit_nodes.empty() && !first_visit_index.has_value()) {
         return 0L;
     }
-    if (!end_nodes.empty() &&
-        (!end_index.has_value() || end_nodes.find(activities[end_index.value()]) == end_nodes.end())) {
+    if (!last_visit_nodes.empty() &&
+        (!last_visit_index.has_value() ||
+         last_visit_nodes.find(activities[last_visit_index.value()]) == last_visit_nodes.end())) {
         return 0L;
     }
     if (!any_nodes.empty() && !has_any_node) {

@@ -184,6 +184,53 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_with_only_excluding_
     EXPECT_EQ(1, result->get(3).get_int64());
 }
 
+TEST_F(CelonisMatchActivitiesTest, with_only_end_nodes) {
+    Prepare();
+    activity_column_->append_datum(DatumArray{});
+    activity_column_->append_datum(DatumArray{"start1", "end2"});
+    activity_column_->append_datum(DatumArray{"start1", "start2", "end1", kNullDatum});
+    activity_column_->append_datum(DatumArray{"start2", "excluding_activity", "end1"});
+    activity_column_->append_datum(DatumArray{"start1", "end2", "end3"});
+    activity_column_->append_datum(DatumArray{"start1", "start2", "end4"});
+    activity_column_->append_datum(DatumArray{"start1", "start2", "end4", kNullDatum});
+    activity_column_->append_datum(DatumArray{});
+    auto end_nodes_array = DatumArray{"end1", "end2"};
+    auto empty_array = DatumArray{};
+    const auto result = RunConstantConfig(empty_array, empty_array, end_nodes_array, empty_array,
+                                          empty_array,
+                                          empty_array).value();
+    ASSERT_EQ(activity_column_->size(), result->size());
+    EXPECT_EQ(0L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+    EXPECT_EQ(1L, result->get(3).get_int64());
+    EXPECT_EQ(0L, result->get(4).get_int64());
+    EXPECT_EQ(0L, result->get(5).get_int64());
+    EXPECT_EQ(0L, result->get(6).get_int64());
+    EXPECT_EQ(0L, result->get(7).get_int64());
+}
+
+TEST_F(CelonisMatchActivitiesTest, with_nodes_and_end_nodes) {
+    Prepare();
+    activity_column_->append_datum(DatumArray{"start1", "end2"});
+    activity_column_->append_datum(DatumArray{"start1", "start2", "end1"});
+    activity_column_->append_datum(DatumArray{"start2", "excluding_activity", "end1"});
+    activity_column_->append_datum(DatumArray{"start1", "end2", "end3"});
+    activity_column_->append_datum(DatumArray{"start1", "start2", "end2"});
+    auto nodes_array = DatumArray{"start1", "end2"};
+    auto end_nodes_array = DatumArray{"end1", "end2"};
+    auto empty_array = DatumArray{};
+    const auto result = RunConstantConfig(empty_array, nodes_array, end_nodes_array, empty_array,
+                                          empty_array,
+                                          empty_array).value();
+    ASSERT_EQ(activity_column_->size(), result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(0L, result->get(1).get_int64());
+    EXPECT_EQ(0L, result->get(2).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+    EXPECT_EQ(1L, result->get(4).get_int64());
+}
+
 TEST_F(CelonisMatchActivitiesTest, with_start_and_end_nodes) {
     Prepare();
     activity_column_->append_datum(DatumArray{"start1", "end2"});
