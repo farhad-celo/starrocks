@@ -82,11 +82,15 @@ private:
         excluding_all_nodes_column_->append_datum(excluding_all_nodes_array);
         any_nodes_column_->append_datum(any_nodes_array);
         const auto nrows = activity_column_->size();
+        starting_nodes_column_ = ConstColumn::create(starting_nodes_column_, nrows);
+        nodes_column_ = ConstColumn::create(nodes_column_, nrows);
+        ending_nodes_column_ = ConstColumn::create(ending_nodes_column_, nrows);
+        excluding_nodes_column_ = ConstColumn::create(excluding_nodes_column_, nrows);
+        excluding_all_nodes_column_ = ConstColumn::create(excluding_all_nodes_column_, nrows);
+        any_nodes_column_ = ConstColumn::create(any_nodes_column_, nrows);
         ctx_->set_constant_columns(
-                {nullptr, ConstColumn::create(starting_nodes_column_, nrows), ConstColumn::create(nodes_column_, nrows),
-                 ConstColumn::create(ending_nodes_column_, nrows), ConstColumn::create(excluding_nodes_column_, nrows),
-                 ConstColumn::create(excluding_all_nodes_column_, nrows),
-                 ConstColumn::create(any_nodes_column_, nrows)});
+                {nullptr, starting_nodes_column_, nodes_column_, ending_nodes_column_, excluding_nodes_column_,
+                 excluding_all_nodes_column_, any_nodes_column_});
         return Run();
     }
 

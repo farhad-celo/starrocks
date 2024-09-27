@@ -54,7 +54,8 @@ private:
     RunConstantModel(const Datum& model) {
         model_column_->append_datum(model);
         const auto nrows = point_column_->size();
-        ctx_->set_constant_columns({nullptr, ConstColumn::create(model_column_, nrows)});
+        model_column_ = ConstColumn::create(model_column_, nrows);
+        ctx_->set_constant_columns({nullptr, model_column_});
         return Run();
     }
 

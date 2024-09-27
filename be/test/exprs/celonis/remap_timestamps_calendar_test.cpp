@@ -62,8 +62,8 @@ private:
             calendar_array.emplace_back(calendar_str.c_str());
         }
         calendar_column_->append_datum(calendar_array);
-        ctx_->set_constant_columns(
-                {nullptr, nullptr, ConstColumn::create(calendar_column_, timestamp_column_->size()), nullptr});
+        calendar_column_ = ConstColumn::create(calendar_column_, timestamp_column_->size());
+        ctx_->set_constant_columns({nullptr, nullptr, calendar_column_, nullptr});
         return Run();
     }
 

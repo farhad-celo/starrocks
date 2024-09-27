@@ -74,10 +74,13 @@ private:
         weeks_column_->append_datum(weeks_array);
         days_column_->append_datum(days_array);
         const auto nrows = timestamp_column_->size();
+        years_column_ = ConstColumn::create(years_column_, nrows);
+        quarters_column_ = ConstColumn::create(quarters_column_, nrows);
+        months_column_ = ConstColumn::create(months_column_, nrows);
+        weeks_column_ = ConstColumn::create(weeks_column_, nrows);
+        days_column_ = ConstColumn::create(days_column_, nrows);
         ctx_->set_constant_columns(
-                {nullptr, ConstColumn::create(years_column_, nrows), ConstColumn::create(quarters_column_, nrows),
-                 ConstColumn::create(months_column_, nrows), ConstColumn::create(weeks_column_, nrows),
-                 ConstColumn::create(days_column_, nrows)});
+                {nullptr, years_column_, quarters_column_, months_column_, weeks_column_, days_column_});
         return Run();
     }
 

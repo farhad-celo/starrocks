@@ -57,8 +57,8 @@ private:
             calendar_array.emplace_back(calendar_str.c_str());
         }
         calendar_column_->append_datum(calendar_array);
-        ctx_->set_constant_columns(
-                {nullptr, ConstColumn::create(calendar_column_, timestamp_column_->size()), nullptr});
+        calendar_column_ = ConstColumn::create(calendar_column_, timestamp_column_->size());
+        ctx_->set_constant_columns({nullptr, calendar_column_, nullptr});
         return Run();
     }
 
@@ -134,7 +134,8 @@ TEST_F(CelonisInCalendarTest, const_factory_calendar) {
     for (auto i = 0; i < timestamp_column_->size(); ++i) {
         calendar_id_column_->append_datum(kNullDatum);
     }
-    const auto result = RunConstantCalendar({R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
+    const auto result = RunConstantCalendar(
+            {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());

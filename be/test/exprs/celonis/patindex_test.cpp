@@ -55,11 +55,11 @@ private:
         } else {
             pattern_column_->append_datum(kNullDatum);
         }
+        pattern_column_ = ConstColumn::create(pattern_column_, string_column_->size());
         if (without_occurrence) {
-            ctx_->set_constant_columns({nullptr, ConstColumn::create(pattern_column_, string_column_->size())});
+            ctx_->set_constant_columns({nullptr, pattern_column_});
         } else {
-            ctx_->set_constant_columns(
-                    {nullptr, ConstColumn::create(pattern_column_, string_column_->size()), nullptr});
+            ctx_->set_constant_columns({nullptr, pattern_column_, nullptr});
         }
         return Run(without_occurrence);
     }

@@ -74,9 +74,9 @@ private:
         old_array_column_->append_datum(old_array);
         new_array_column_->append_datum(new_array);
         const auto nrows = value_column_->size();
-        ctx_->set_constant_columns(
-                {nullptr, ConstColumn::create(old_array_column_, nrows), ConstColumn::create(new_array_column_, nrows),
-                 nullptr});
+        old_array_column_ = ConstColumn::create(old_array_column_, nrows);
+        new_array_column_ = ConstColumn::create(new_array_column_, nrows);
+        ctx_->set_constant_columns({nullptr, old_array_column_, new_array_column_, nullptr});
         return Run<LT>(has_default);
     }
 

@@ -52,7 +52,8 @@ private:
     StatusOr<ColumnPtr> RunConstantMatch(DatumArray match_array) {
         match_array_column_->append_datum(match_array);
         const auto nrows = value_column_->size();
-        ctx_->set_constant_columns({nullptr, ConstColumn::create(match_array_column_, nrows)});
+        match_array_column_ = ConstColumn::create(match_array_column_, nrows);
+        ctx_->set_constant_columns({nullptr, match_array_column_});
         return Run<LT>();
     }
 

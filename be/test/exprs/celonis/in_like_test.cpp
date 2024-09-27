@@ -48,7 +48,8 @@ private:
     RunConstantPatterns(const DatumArray& patterns) {
         patterns_column_->append_datum(patterns);
         const auto nrows = string_column_->size();
-        ctx_->set_constant_columns({nullptr, ConstColumn::create(patterns_column_, nrows)});
+        patterns_column_ = ConstColumn::create(patterns_column_, nrows);
+        ctx_->set_constant_columns({nullptr, patterns_column_});
         return Run();
     }
 
