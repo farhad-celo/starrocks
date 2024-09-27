@@ -185,6 +185,7 @@ set(EXEC_FILES
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/linear_regression_test.cpp
         ./exprs/celonis/match_activities_test.cpp
+        ./exprs/celonis/match_strings_test.cpp
         ./exprs/celonis/match_process_test.cpp
         ./exprs/celonis/math_functions_test.cpp
         ./exprs/celonis/mo_bpmn_graph_test.cpp

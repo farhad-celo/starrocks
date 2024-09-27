@@ -10,6 +10,7 @@
 #include "column/column_builder.h"
 #include "column/column_hash.h"
 #include "column/column_viewer.h"
+#include "column/hash_set.h"
 #include "util/phmap/phmap.h"
 #include "util/utf8.h"
 #include "exprs/celonis/util.h"
@@ -957,8 +958,59 @@ static int edit_distance(const std::string& str1, const std::string& str2) {
     return prev_row[len2];
 }
 
+struct CelonisMatchStringsState {
+    CelonisMatchStringsState() {}
+
+    HashSet<std::string> match_strings;
+    bool is_null = false;
+    ScalarFunction function;
+};
+
+Status
+CelonisStringFunctions::match_strings_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+
+    auto state = new CelonisMatchStringsState();
+    context->set_function_state(scope, state);
+
+    auto match_strings_column = context->get_constant_column(1);
+    if (match_strings_column == nullptr) {
+        state->function = match_strings_non_constant;
+        return Status::OK();
+    }
+    state->function = match_strings_constant;
+    if (match_strings_column->empty()) {
+        return Status::OK();
+    }
+    if (match_strings_column->is_null(0)) {
+        state->is_null = true;
+        return Status::OK();
+    }
+    auto match_string_array = match_strings_column->get(0).get_array();
+    for (const auto& match_string: match_string_array) {
+        if (match_string.is_null()) {
+            continue;
+        }
+        const std::string match_str = match_string.get_slice().to_string();
+        state->match_strings.insert(match_str);
+    }
+    return Status::OK();
+}
+
+Status
+CelonisStringFunctions::match_strings_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        auto* state = reinterpret_cast<CelonisMatchStringsState*>(context->get_function_state(scope));
+        delete state;
+    }
+    return Status::OK();
+}
+
 StatusOr<ColumnPtr>
-CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionContext* context,
+                                                   const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
     DCHECK_EQ(columns.size(), 4);
     size_t n_rows = columns[0]->size();
@@ -977,11 +1029,11 @@ CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context,
             continue;
         }
         const std::string input_string = input_string_viewer.value(row).to_string();
-        std::unordered_set<char> char_set(input_string.begin(), input_string.end());
+        HashSet<char> char_set(input_string.begin(), input_string.end());
         const std::string chars(char_set.begin(), char_set.end());
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
-        std::unordered_set<std::string> match_string_set;
+        HashSet<std::string> match_string_set;
         std::vector<std::pair<int, std::string>> pairs;
         for (auto i = start; i < end; ++i) {
             if (match_string_data.null_elements != nullptr && (*match_string_data.null_elements)[i] != 0) {
@@ -996,8 +1048,8 @@ CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context,
             pairs.emplace_back(edit_distance(input_string, match_string), match_string);
         }
         std::sort(pairs.begin(), pairs.end());
-        int top_k = columns[2]->is_null(row) ? 1 : top_k_viewer.value(row);
-        const std::string separator = columns[3]->is_null(row) ? ", " : separator_viewer.value(row).to_string();
+        int top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
+        const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
         std::string sep = "";
         std::string joined = "";
         for (const auto& p: pairs) {
@@ -1010,6 +1062,56 @@ CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context,
         result.append(joined);
     }
     return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr>
+CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext* context,
+                                               const starrocks::Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
+    DCHECK_EQ(columns.size(), 4);
+    size_t n_rows = columns[0]->size();
+    ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+    const auto* state = reinterpret_cast<const CelonisMatchStringsState*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    ColumnViewer top_k_viewer = ColumnViewer<TYPE_INT>(columns[2]);
+    ColumnViewer separator_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
+    ColumnBuilder<TYPE_VARCHAR> result(n_rows);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row) || state->is_null) {
+            result.append_null();
+            continue;
+        }
+        const std::string input_string = input_string_viewer.value(row).to_string();
+        std::unordered_set<char> char_set(input_string.begin(), input_string.end());
+        const std::string chars(char_set.begin(), char_set.end());
+        std::vector<std::pair<int, std::string>> pairs;
+        for (const auto& match_string: state->match_strings) {
+            if (match_string.find_first_of(chars) != std::string::npos) {
+                pairs.emplace_back(edit_distance(input_string, match_string), match_string);
+            }
+        }
+        std::sort(pairs.begin(), pairs.end());
+        int top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
+        const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
+        std::string sep = "";
+        std::string joined = "";
+        for (const auto& p: pairs) {
+            if (top_k-- > 0) {
+                joined += sep;
+                joined += p.second;
+            }
+            sep = separator;
+        }
+        result.append(joined);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr>
+CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+    const auto* state = reinterpret_cast<const CelonisMatchStringsState*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return state->function(context, columns);
 }
 
 } // namespace starrocks

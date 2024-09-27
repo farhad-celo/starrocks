@@ -98,9 +98,15 @@ public:
     static Status in_like_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status in_like_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
+    static Status match_strings_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status match_strings_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
 private:
     DEFINE_VECTORIZED_FN(in_like_constant_patterns);
     DEFINE_VECTORIZED_FN(in_like_non_constant_patterns);
+
+    DEFINE_VECTORIZED_FN(match_strings_constant);
+    DEFINE_VECTORIZED_FN(match_strings_non_constant);
 };
 
 }  // namespace starrocks
