@@ -377,7 +377,7 @@ void ClusterVariantsAggregateFunction::convert_to_serialize_format(FunctionConte
                                                                    size_t chunk_size,
                                                                    ColumnPtr* dst) const {
     // Used for streaming aggregation. Not implemented.
-    throw std::runtime_error("variant aggregate: convert_to_serialize_format not supported");
+    throw std::runtime_error("celonis_cluster_variants: convert_to_serialize_format not supported");
 }
 
 void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,

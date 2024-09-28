@@ -434,7 +434,7 @@ void ClusterStringsAggregateFunction::convert_to_serialize_format(FunctionContex
                                                                   size_t chunk_size,
                                                                   ColumnPtr* dst) const {
     // Used for streaming aggregation. Not implemented.
-    throw std::runtime_error("ClusterStrings: convert_to_serialize_format not supported");
+    throw std::runtime_error("celonis_cluster_strings: convert_to_serialize_format not supported");
 }
 
 void ClusterStringsAggregateFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
