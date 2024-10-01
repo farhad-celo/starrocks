@@ -1018,6 +1018,30 @@ CelonisStringFunctions::match_strings_close(FunctionContext* context, FunctionCo
     return Status::OK();
 }
 
+std::string
+get_match_strings_result(const std::string& input_string, const HashSet<std::string>& match_strings, int top_k,
+                         const std::string& separator) {
+    HashSet<char> char_set(input_string.begin(), input_string.end());
+    const std::string chars(char_set.begin(), char_set.end());
+    std::vector<std::pair<int, std::string>> pairs;
+    for (const auto& match_string: match_strings) {
+        if (match_string.find_first_of(chars) != std::string::npos) {
+            pairs.emplace_back(edit_distance(input_string, match_string), match_string);
+        }
+    }
+    std::sort(pairs.begin(), pairs.end());
+    std::string sep = "";
+    std::string joined = "";
+    for (const auto& p: pairs) {
+        if (top_k-- > 0) {
+            joined += sep;
+            joined += p.second;
+        }
+        sep = separator;
+    }
+    return joined;
+}
+
 StatusOr<ColumnPtr>
 CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionContext* context,
                                                    const starrocks::Columns& columns) {
@@ -1039,37 +1063,19 @@ CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionCont
             continue;
         }
         const std::string input_string = input_string_viewer.value(row).to_string();
-        HashSet<char> char_set(input_string.begin(), input_string.end());
-        const std::string chars(char_set.begin(), char_set.end());
+        int top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
+        const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
         HashSet<std::string> match_string_set;
-        std::vector<std::pair<int, std::string>> pairs;
+        match_string_set.reserve(end - start);
         for (auto i = start; i < end; ++i) {
             if (match_string_data.null_elements != nullptr && (*match_string_data.null_elements)[i] != 0) {
                 continue;
             }
-            const std::string match_string = match_strings[i].to_string();
-            if (match_string.find_first_of(chars) != std::string::npos) {
-                match_string_set.insert(match_string);
-            }
+            match_string_set.insert(match_strings[i].to_string());
         }
-        for (const auto& match_string: match_string_set) {
-            pairs.emplace_back(edit_distance(input_string, match_string), match_string);
-        }
-        std::sort(pairs.begin(), pairs.end());
-        int top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
-        const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
-        std::string sep = "";
-        std::string joined = "";
-        for (const auto& p: pairs) {
-            if (top_k-- > 0) {
-                joined += sep;
-                joined += p.second;
-            }
-            sep = separator;
-        }
-        result.append(joined);
+        result.append(get_match_strings_result(input_string, match_string_set, top_k, separator));
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
@@ -1092,27 +1098,9 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
             continue;
         }
         const std::string input_string = input_string_viewer.value(row).to_string();
-        std::unordered_set<char> char_set(input_string.begin(), input_string.end());
-        const std::string chars(char_set.begin(), char_set.end());
-        std::vector<std::pair<int, std::string>> pairs;
-        for (const auto& match_string: state->match_strings) {
-            if (match_string.find_first_of(chars) != std::string::npos) {
-                pairs.emplace_back(edit_distance(input_string, match_string), match_string);
-            }
-        }
-        std::sort(pairs.begin(), pairs.end());
         int top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
         const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
-        std::string sep = "";
-        std::string joined = "";
-        for (const auto& p: pairs) {
-            if (top_k-- > 0) {
-                joined += sep;
-                joined += p.second;
-            }
-            sep = separator;
-        }
-        result.append(joined);
+        result.append(get_match_strings_result(input_string, state->match_strings, top_k, separator));
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
