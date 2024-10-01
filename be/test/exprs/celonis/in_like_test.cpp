@@ -247,6 +247,28 @@ TEST_F(CelonisInLikeTest, const_patterns_with_null_pattern) {
     EXPECT_EQ(0L, result->get(7).get_int64());
 }
 
+TEST_F(CelonisInLikeTest, const_patterns_with_duplicate_patterns) {
+    Prepare();
+    string_column_->append_datum("asddqqW_A_W");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("fdsn_B");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("fdskjd_B_dsa");
+    string_column_->append_datum("dsaksdj");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("a");
+    const auto result = RunConstantPatterns(DatumArray{"%A%", "%B%", "%A%", kNullDatum, kNullDatum, "%B%"}).value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+    EXPECT_EQ(1L, result->get(3).get_int64());
+    EXPECT_EQ(1L, result->get(4).get_int64());
+    EXPECT_EQ(0L, result->get(5).get_int64());
+    EXPECT_EQ(1L, result->get(6).get_int64());
+    EXPECT_EQ(0L, result->get(7).get_int64());
+}
+
 TEST_F(CelonisInLikeTest, const_null_patterns) {
     Prepare();
     string_column_->append_datum("asddqqW_A_W");
@@ -286,6 +308,7 @@ TEST_F(CelonisInLikeTest, non_const_patterns) {
     AddRow("b%a", DatumArray{"B\\%"});
     AddRow("b_a", DatumArray{"B\\_"});
     AddRow("b\\a", DatumArray{"B\\\\"});
+    AddRow("asddqqW_A_W", DatumArray{"%A%", "%B%", "%A%", "%B%"});
     const auto result = Run().value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
@@ -303,6 +326,7 @@ TEST_F(CelonisInLikeTest, non_const_patterns) {
     EXPECT_EQ(1L, result->get(12).get_int64());
     EXPECT_EQ(1L, result->get(13).get_int64());
     EXPECT_EQ(1L, result->get(14).get_int64());
+    EXPECT_EQ(1L, result->get(15).get_int64());
 }
 
 } // namespace starrocks

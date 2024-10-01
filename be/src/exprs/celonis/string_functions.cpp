@@ -819,12 +819,17 @@ Status CelonisStringFunctions::in_like_prepare(FunctionContext* context, Functio
         return Status::OK();
     }
     auto pattern_array = pattern_column->get(0).get_array();
+    HashSet<std::string> pattern_seen;
     for (const auto& pattern_datum: pattern_array) {
         if (pattern_datum.is_null()) {
             state->has_null = true;
             continue;
         }
         const std::string raw_pattern = pattern_datum.get_slice().to_string();
+        bool seen = !pattern_seen.insert(raw_pattern).second;
+        if (seen) {
+            continue;
+        }
         const bool has_wildcard = contains_wildcard(raw_pattern);
         bool case_insensitive = !has_wildcard;
         const std::string modified_pattern = has_wildcard ? raw_pattern : to_lower_utf8(remove_escape(raw_pattern));
@@ -874,11 +879,16 @@ CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext
         }
         const std::string input_string = input_string_viewer.value(row).to_string();
         int64_t found_match = 0L;
+        HashSet<std::string> pattern_seen;
         for (auto i = start; i < end; ++i) {
             if (pattern_data.null_elements != nullptr && (*pattern_data.null_elements)[i] != 0) {
                 continue;
             }
             const std::string pattern = patterns[i].to_string();
+            bool seen = !pattern_seen.insert(pattern).second;
+            if (seen) {
+                continue;
+            }
             if (string_match(input_string, pattern)) {
                 found_match = 1L;
                 break;
