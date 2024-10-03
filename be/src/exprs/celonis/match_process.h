@@ -13,10 +13,22 @@
 
 namespace starrocks {
 
+struct VectorBoolHash {
+    std::size_t operator()(const std::vector<bool>& vec) const {
+        std::size_t hash = 0;
+        for (bool b: vec) {
+            hash ^= std::hash<bool>{}(b) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        }
+        return hash;
+    }
+};
+
 class CelonisMatchProcess {
 public:
     DEFINE_VECTORIZED_FN(celonis_match_process);
+
     static Status match_process_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
     static Status match_process_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
 
@@ -47,6 +59,7 @@ struct NFA {
 class NFAEvaluator {
 public:
     NFAEvaluator(const NFA* nfa);
+
     bool matches(const std::vector<std::string>& activities);
 
 private:
@@ -75,7 +88,7 @@ private:
 
     std::unordered_map<TransitionKey, int, TransitionKeyHasher> dfa_transitions_;
 
-    std::unordered_map<std::vector<bool>, int> nfa_states_to_dfa_state_;
+    std::unordered_map<std::vector<bool>, int, VectorBoolHash> nfa_states_to_dfa_state_;
 
     std::unordered_map<int, std::vector<bool>> dfa_state_to_nfa_states_;
 
