@@ -138,6 +138,28 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_4) {
     EXPECT_EQ("Sweatpants, T-Shirt", result->get(1).get_slice());
 }
 
+TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_5) {
+    Prepare();
+    string_column_->append_datum("Shirt");
+    string_column_->append_datum("Pants");
+    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 10,
+                                         kNullDatum).value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ("T-Shirt, Sweatpants", result->get(0).get_slice());
+    EXPECT_EQ("Sweatpants, T-Shirt", result->get(1).get_slice());
+}
+
+TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_6) {
+    Prepare();
+    string_column_->append_datum("Shirt");
+    string_column_->append_datum("Pants");
+    const auto result = RunConstantMatch(DatumArray{"BSP", "CSP", "DSP", "ASP"}, 10,
+                                         kNullDatum).value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(0).get_slice());
+    EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(1).get_slice());
+}
+
 TEST_F(CelonisMatchStringsTest, null_input_string_and_const_match_strings) {
     Prepare();
     string_column_->append_datum("Shirt");
@@ -173,10 +195,12 @@ TEST_F(CelonisMatchStringsTest, non_const_match_strings_normal_case) {
     Prepare();
     AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2, "#");
     AddRow("", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2, "%");
+    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 10, ";");
     const auto result = Run().value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt#Sweatpants", result->get(0).get_slice());
     EXPECT_EQ("", result->get(1).get_slice());
+    EXPECT_EQ("T-Shirt;Sweatpants", result->get(2).get_slice());
 }
 
 } // namespace starrocks

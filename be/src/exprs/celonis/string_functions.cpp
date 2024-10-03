@@ -1029,13 +1029,16 @@ get_match_strings_result(const std::string& input_string, const HashSet<std::str
             pairs.emplace_back(edit_distance(input_string, match_string), match_string);
         }
     }
-    std::sort(pairs.begin(), pairs.end());
+    top_k = std::min(top_k, static_cast<int>(pairs.size()));
+    std::partial_sort(pairs.begin(), pairs.begin() + top_k, pairs.end());
     std::string sep = "";
     std::string joined = "";
     for (const auto& p: pairs) {
         if (top_k-- > 0) {
             joined += sep;
             joined += p.second;
+        } else {
+            break;
         }
         sep = separator;
     }

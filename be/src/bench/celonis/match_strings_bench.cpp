@@ -13,55 +13,55 @@
 namespace starrocks {
 
 /*
-2024-09-26T16:24:47+00:00
+2024-10-01T17:00:48+00:00
 Running ./be/build_Release/src/bench/celonis/output/match_strings_bench
-Run on (32 X 2876.67 MHz CPU s)
+Run on (32 X 2650 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 0.05, 0.65, 0.86
+Load Average: 0.59, 3.02, 3.45
 // Args: Number of rows / Number of possible strings / Size of match string / Value of top_k
 -----------------------------------------------------------------------------------------------------
 Benchmark                                           Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------------------------
-BM_MatchStringsNonConstant/1000/20/20/3       4175839 ns      4175546 ns          172 RowInvRate=4.17555us
-BM_MatchStringsNonConstant/10000/20/20/3     44193428 ns     44190683 ns           17 RowInvRate=4.41907us
-BM_MatchStringsNonConstant/100000/20/20/3   411945827 ns    411906716 ns            2 RowInvRate=4.11907us
-BM_MatchStringsNonConstant/1000/40/20/3       4732275 ns      4731876 ns          143 RowInvRate=4.73188us
-BM_MatchStringsNonConstant/10000/40/20/3     52504918 ns     52501247 ns           10 RowInvRate=5.25012us
-BM_MatchStringsNonConstant/100000/40/20/3   529819698 ns    529776210 ns            2 RowInvRate=5.29776us
-BM_MatchStringsNonConstant/1000/60/20/3       5365858 ns      5364983 ns          130 RowInvRate=5.36498us
-BM_MatchStringsNonConstant/10000/60/20/3     52673197 ns     52646358 ns           13 RowInvRate=5.26464us
-BM_MatchStringsNonConstant/100000/60/20/3   512695362 ns    512663737 ns            1 RowInvRate=5.12664us
-BM_MatchStringsNonConstant/1000/20/100/3      9997537 ns      9992363 ns           74 RowInvRate=9.99236us
-BM_MatchStringsNonConstant/10000/20/100/3   112187659 ns    112172669 ns            7 RowInvRate=11.2173us
-BM_MatchStringsNonConstant/100000/20/100/3 1103976267 ns   1103867022 ns            1 RowInvRate=11.0387us
-BM_MatchStringsNonConstant/1000/40/100/3     13661360 ns     13655006 ns           48 RowInvRate=13.655us
-BM_MatchStringsNonConstant/10000/40/100/3   152148038 ns    152126095 ns            5 RowInvRate=15.2126us
-BM_MatchStringsNonConstant/100000/40/100/3 1464362873 ns   1464188045 ns            1 RowInvRate=14.6419us
-BM_MatchStringsNonConstant/1000/60/100/3     16687628 ns     16680334 ns           40 RowInvRate=16.6803us
-BM_MatchStringsNonConstant/10000/60/100/3   182615112 ns    182584308 ns            4 RowInvRate=18.2584us
-BM_MatchStringsNonConstant/100000/60/100/3 1795416274 ns   1795218873 ns            1 RowInvRate=17.9522us
-BM_MatchStringsConstant/1000/20/20/3          2774392 ns      2774225 ns          210 RowInvRate=2.77423us
-BM_MatchStringsConstant/10000/20/20/3        30695186 ns     30690903 ns           25 RowInvRate=3.06909us
-BM_MatchStringsConstant/100000/20/20/3      263345315 ns    263329524 ns            2 RowInvRate=2.6333us
-BM_MatchStringsConstant/1000/40/20/3          3457420 ns      3456959 ns          198 RowInvRate=3.45696us
-BM_MatchStringsConstant/10000/40/20/3        34045369 ns     34028996 ns           20 RowInvRate=3.4029us
-BM_MatchStringsConstant/100000/40/20/3      385076932 ns    384946191 ns            2 RowInvRate=3.84946us
-BM_MatchStringsConstant/1000/60/20/3          4070630 ns      4070441 ns          185 RowInvRate=4.07044us
-BM_MatchStringsConstant/10000/60/20/3        38671301 ns     38668644 ns           17 RowInvRate=3.86686us
-BM_MatchStringsConstant/100000/60/20/3      390859561 ns    390807240 ns            2 RowInvRate=3.90807us
-BM_MatchStringsConstant/1000/20/100/3         3914847 ns      3914611 ns          163 RowInvRate=3.91461us
-BM_MatchStringsConstant/10000/20/100/3       42305379 ns     42298491 ns           16 RowInvRate=4.22985us
-BM_MatchStringsConstant/100000/20/100/3     436665729 ns    436627519 ns            2 RowInvRate=4.36628us
-BM_MatchStringsConstant/1000/40/100/3         8108558 ns      8107876 ns           81 RowInvRate=8.10788us
-BM_MatchStringsConstant/10000/40/100/3       84170709 ns     84159631 ns            8 RowInvRate=8.41596us
-BM_MatchStringsConstant/100000/40/100/3     880085632 ns    879954234 ns            1 RowInvRate=8.79954us
-BM_MatchStringsConstant/1000/60/100/3        10828970 ns     10827920 ns           65 RowInvRate=10.8279us
-BM_MatchStringsConstant/10000/60/100/3      106959002 ns    106947559 ns            6 RowInvRate=10.6948us
-BM_MatchStringsConstant/100000/60/100/3    1060738646 ns   1060632189 ns            1 RowInvRate=10.6063us
+BM_MatchStringsNonConstant/1000/20/20/3       3910418 ns      3910047 ns          190 RowInvRate=3.91005us
+BM_MatchStringsNonConstant/10000/20/20/3     36747999 ns     36744463 ns           19 RowInvRate=3.67445us
+BM_MatchStringsNonConstant/100000/20/20/3   382428397 ns    382396318 ns            2 RowInvRate=3.82396us
+BM_MatchStringsNonConstant/1000/40/20/3       4443978 ns      4443027 ns          162 RowInvRate=4.44303us
+BM_MatchStringsNonConstant/10000/40/20/3     44085068 ns     44082455 ns           16 RowInvRate=4.40825us
+BM_MatchStringsNonConstant/100000/40/20/3   444623347 ns    444525434 ns            2 RowInvRate=4.44525us
+BM_MatchStringsNonConstant/1000/60/20/3       4417671 ns      4416925 ns          153 RowInvRate=4.41692us
+BM_MatchStringsNonConstant/10000/60/20/3     46689367 ns     46685581 ns           16 RowInvRate=4.66856us
+BM_MatchStringsNonConstant/100000/60/20/3   485687728 ns    485640781 ns            2 RowInvRate=4.85641us
+BM_MatchStringsNonConstant/1000/20/100/3      7702253 ns      7701822 ns           92 RowInvRate=7.70182us
+BM_MatchStringsNonConstant/10000/20/100/3    73771281 ns     73765158 ns            9 RowInvRate=7.37652us
+BM_MatchStringsNonConstant/100000/20/100/3  838247406 ns    838154603 ns            1 RowInvRate=8.38155us
+BM_MatchStringsNonConstant/1000/40/100/3     10763699 ns     10762699 ns           66 RowInvRate=10.7627us
+BM_MatchStringsNonConstant/10000/40/100/3   113814546 ns    113783921 ns            6 RowInvRate=11.3784us
+BM_MatchStringsNonConstant/100000/40/100/3 1229956296 ns   1229694897 ns            1 RowInvRate=12.2969us
+BM_MatchStringsNonConstant/1000/60/100/3     13093055 ns     13091084 ns           53 RowInvRate=13.0911us
+BM_MatchStringsNonConstant/10000/60/100/3   134178551 ns    134165948 ns            5 RowInvRate=13.4166us
+BM_MatchStringsNonConstant/100000/60/100/3 1435772549 ns   1435626564 ns            1 RowInvRate=14.3563us
+BM_MatchStringsConstant/1000/20/20/3          2617683 ns      2616650 ns          238 RowInvRate=2.61665us
+BM_MatchStringsConstant/10000/20/20/3        26938524 ns     26930692 ns           27 RowInvRate=2.69307us
+BM_MatchStringsConstant/100000/20/20/3      284414585 ns    284397574 ns            2 RowInvRate=2.84398us
+BM_MatchStringsConstant/1000/40/20/3          3273119 ns      3273065 ns          210 RowInvRate=3.27307us
+BM_MatchStringsConstant/10000/40/20/3        35643987 ns     35641192 ns           20 RowInvRate=3.56412us
+BM_MatchStringsConstant/100000/40/20/3      319904667 ns    319885696 ns            2 RowInvRate=3.19886us
+BM_MatchStringsConstant/1000/60/20/3          3480782 ns      3480459 ns          199 RowInvRate=3.48046us
+BM_MatchStringsConstant/10000/60/20/3        33330024 ns     33328099 ns           19 RowInvRate=3.33281us
+BM_MatchStringsConstant/100000/60/20/3      351914629 ns    351879510 ns            2 RowInvRate=3.5188us
+BM_MatchStringsConstant/1000/20/100/3         4047871 ns      4047412 ns          177 RowInvRate=4.04741us
+BM_MatchStringsConstant/10000/20/100/3       39964576 ns     39959383 ns           17 RowInvRate=3.99594us
+BM_MatchStringsConstant/100000/20/100/3     418867087 ns    418804426 ns            2 RowInvRate=4.18804us
+BM_MatchStringsConstant/1000/40/100/3         6773855 ns      6773162 ns          103 RowInvRate=6.77316us
+BM_MatchStringsConstant/10000/40/100/3       74858035 ns     74847214 ns           10 RowInvRate=7.48472us
+BM_MatchStringsConstant/100000/40/100/3     684165213 ns    684065306 ns            1 RowInvRate=6.84065us
+BM_MatchStringsConstant/1000/60/100/3         9043068 ns      9042523 ns           80 RowInvRate=9.04252us
+BM_MatchStringsConstant/10000/60/100/3       91517197 ns     91506408 ns            8 RowInvRate=9.15064us
+BM_MatchStringsConstant/100000/60/100/3     904520705 ns    904420683 ns            1 RowInvRate=9.04421us
 */
 
 enum MatchType {
