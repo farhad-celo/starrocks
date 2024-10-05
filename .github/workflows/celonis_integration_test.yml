@@ -166,7 +166,12 @@ jobs:
           builder: ${BUILDER}
 
   build-artifact:
-    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
+    #    runs-on: [self-hosted, celostar, ec2-sr]
+    runs-on:
+      - runs-on
+      - image=ubuntu22-full-x64
+      - "run-id=${{ github.run_id }}"
+      - family=c6gd.8xlarge+c5ad.8xlarge
     needs: sync-and-rebase-upstream
     env:
       test_image_tag: ${{needs.sync-and-rebase-upstream.outputs.test_image_tag}}
@@ -175,6 +180,14 @@ jobs:
       test_branch: ${{env.test_branch}}
       artifact_image_tag: ${{env.test_image_tag}}
     steps:
+      - name: update docker data root
+        run: |
+          echo '{"data-root": "/home/runner/_work/docker"}' | sudo tee /etc/docker/daemon.json > /dev/null
+          sudo systemctl restart docker
+          sudo cat /etc/docker/daemon.json
+      - name: df -Th
+        run: |
+          df -Th
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -187,6 +200,10 @@ jobs:
         with:
           dev_env_image: ${BUILDER}
           image_tag: ${test_image_tag}
+      - name: df -Th
+        run: |
+          df -Th
+        
 
   build-allin1:
     runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
