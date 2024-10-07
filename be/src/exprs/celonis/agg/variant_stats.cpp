@@ -357,7 +357,7 @@ VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& activity_top_va
             }
             *statistics_proto.add_top() = entry;
         }
-        LOG(INFO) << "CELONIS_VARIANT_STATS: total number of variants = " << total_variants << "\n";
+        LOG(INFO) << "CELONIS_VARIANT_STATS: total number of top variants = " << total_variants << "\n";
     }
     // Happy path
     celonis::accelerator::VariantCountPair count_pair;
@@ -404,8 +404,6 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     std::vector<size_t> a_lastseen(activity_map_.size());
     std::map<std::pair<int32_t, int32_t>, std::pair<int32_t, int32_t>> edge_stats;
     LOG(INFO) << "CELONIS_VARIANT_STATS: started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
-    LOG(INFO) << "CELONIS_VARIANT_STATS: size of activity_stats_ = " << activity_stats_.size() << "\n";
-    LOG(INFO) << "CELONIS_VARIANT_STATS: size of edge_map_ = " << edge_map_.size() << "\n";
     for (const auto& [variant, count]: variant_map_) {
         for (int i = 0; i < variant.data.size(); i++) {
             auto activity_id = variant.data[i];
