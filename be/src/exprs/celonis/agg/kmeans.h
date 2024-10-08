@@ -178,7 +178,7 @@ private:
  * RANDOM_SEED: Random seed used to make the implementation deterministic (must be constant).
  * This function (CELONIS_BUILD_KMEANS_MODEL) implements k-means++ algorithm to train a model (finding the centroids of
  * the clusters). It returns the model encoded in a string in the below format:
- * x_11,x_12,...,x_1m;x_21,x_22,...,x_2m;...;x_k1,x_k2,...,x_km
+ * "min_1,max_1;...;min_m,max_m:x_11,x_12,...,x_1m;x_21,x_22,...,x_2m;...;x_k1,x_k2,...,x_km"
  * If a point is NULL or contains a NULL value, it is ignored in the training.
  * If NUM_CLUSTERS > # of valid points, we set num of clusters to min(NUM_CLUSTERS, # of valid points).
  */

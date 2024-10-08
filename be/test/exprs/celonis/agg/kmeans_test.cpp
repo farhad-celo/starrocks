@@ -96,9 +96,36 @@ protected:
         return {std::move(local_ctx), std::move(state), func};
     }
 
-    bool parse_model(const std::string& model, std::vector<std::vector<double>>& centroids) {
+    bool parse_model(const std::string& model, std::vector<std::pair<double, double>>& limits,
+                     std::vector<std::vector<double>>& centroids) {
+        std::vector<std::string> parts;
+        boost::split(parts, model, boost::is_any_of(":"));
+        if (parts.size() != 2) {
+            return false;
+        }
+        const std::string& limits_str = parts[0];
+        const std::string& centroids_str = parts[1];
+        std::vector<std::string> limit_rows;
+        boost::split(limit_rows, limits_str, boost::is_any_of(";"));
+        limits.clear();
+        for (size_t row = 0; row < limit_rows.size(); ++row) {
+            std::vector<std::string> values;
+            boost::split(values, limit_rows[row], boost::is_any_of(","));
+            if (values.size() != 2) {
+                return false;
+            }
+            double min_value, max_value;
+            try {
+                min_value = boost::lexical_cast<double>(values[0]);
+                max_value = boost::lexical_cast<double>(values[1]);
+            } catch (const boost::bad_lexical_cast& e) {
+                return false;
+            }
+            limits.emplace_back(min_value, max_value);
+        }
+        const auto nfeatures = limits.size();
         std::vector<std::string> rows;
-        boost::split(rows, model, boost::is_any_of(";"));
+        boost::split(rows, centroids_str, boost::is_any_of(";"));
         centroids.clear();
         for (size_t row = 0; row < rows.size(); ++row) {
             std::vector<std::string> values;
@@ -106,7 +133,7 @@ protected:
             if (!centroids.empty() && values.size() != centroids.back().size()) {
                 return false;
             }
-            if (values.empty()) {
+            if (values.size() != nfeatures) {
                 return false;
             }
             std::vector<double> centroid;
@@ -125,6 +152,7 @@ protected:
     }
 
     void Run(const DatumArray& points, int64_t num_clusters, int random_seed,
+             const std::vector<std::pair<double, double>>& expected_limits,
              const std::vector<std::vector<double>>& expected_centroids, bool is_null = false) {
         auto [local_ctx, state, func] = RunUpdate(points, num_clusters, random_seed);
 
@@ -135,15 +163,23 @@ protected:
             EXPECT_TRUE(result->get(0).is_null());
         } else {
             const std::string model = result->get(0).get_slice().to_string();
-            match_model(model, expected_centroids);
+            match_model(model, expected_limits, expected_centroids);
         }
     }
 
-    void match_model(const std::string& model, const std::vector<std::vector<double>>& expected_centroids) {
+    void match_model(const std::string& model, const std::vector<std::pair<double, double>>& expected_limits,
+                     const std::vector<std::vector<double>>& expected_centroids) {
         std::vector<std::vector<double>> centroids;
-        ASSERT_TRUE(parse_model(model, centroids));
+        std::vector<std::pair<double, double>> limits;
+        ASSERT_TRUE(parse_model(model, limits, centroids));
+        const auto nfeatures = expected_limits.size();
+        EXPECT_EQ(nfeatures, limits.size());
         const auto nrows = expected_centroids.size();
         EXPECT_EQ(nrows, centroids.size());
+        for (auto i = 0; i < nfeatures; ++i) {
+            EXPECT_NEAR(limits[i].first, expected_limits[i].first, ABS_ERROR);
+            EXPECT_NEAR(limits[i].second, expected_limits[i].second, ABS_ERROR);
+        }
         if (expected_centroids.empty()) {
             return;
         }
@@ -180,11 +216,12 @@ TEST_F(CelonisBuildKMeansModelTest, one_feature_large_k) {
     auto result = ColumnHelper::create_column(get_return_type(), true);
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
-    std::vector<std::vector<double>> expected_centroids = {{1},
-                                                           {2},
-                                                           {3},
-                                                           {4}};
-    match_model(result->get(0).get_slice().to_string(), expected_centroids);
+    std::vector<std::vector<double>> expected_centroids = {{0},
+                                                           {0.333333},
+                                                           {0.666667},
+                                                           {1}};
+    std::vector<std::pair<double, double>> expected_limits = {{1, 4}};
+    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, one_feature_small_k) {
@@ -207,8 +244,9 @@ TEST_F(CelonisBuildKMeansModelTest, one_feature_small_k) {
     auto result = ColumnHelper::create_column(get_return_type(), true);
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
-    std::vector<std::vector<double>> expected_centroids = {{2.5}};
-    match_model(result->get(0).get_slice().to_string(), expected_centroids);
+    std::vector<std::vector<double>> expected_centroids = {{0.5}};
+    std::vector<std::pair<double, double>> expected_limits = {{1, 4}};
+    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, two_features_large_k) {
@@ -235,7 +273,9 @@ TEST_F(CelonisBuildKMeansModelTest, two_features_large_k) {
                                                            {0.0, 1.0},
                                                            {1.0, 0.0},
                                                            {1.0, 1.0}};
-    match_model(result->get(0).get_slice().to_string(), expected_centroids);
+    std::vector<std::pair<double, double>> expected_limits = {{0.0, 1.0},
+                                                              {0.0, 1.0}};
+    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, two_features_small_k) {
@@ -259,7 +299,9 @@ TEST_F(CelonisBuildKMeansModelTest, two_features_small_k) {
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
     std::vector<std::vector<double>> expected_centroids = {{0.5, 0.5}};
-    match_model(result->get(0).get_slice().to_string(), expected_centroids);
+    std::vector<std::pair<double, double>> expected_limits = {{0.0, 1.0},
+                                                              {0.0, 1.0}};
+    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, two_features_null_rows_ignored) {
@@ -284,7 +326,8 @@ TEST_F(CelonisBuildKMeansModelTest, two_features_null_rows_ignored) {
 
     std::vector<std::vector<double>> expected_centroids = {{0.666667, 0.333333},
                                                            {0,        1}};
-    match_model(result->get(0).get_slice().to_string(), expected_centroids);
+    std::vector<std::pair<double, double>> expected_limits = {{0, 1}, {0, 1}};
+    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, two_features_null_values_ignored) {
@@ -308,49 +351,50 @@ TEST_F(CelonisBuildKMeansModelTest, two_features_null_values_ignored) {
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
     std::vector<std::vector<double>> expected_centroids = {{0.5, 0.5}};
-    match_model(result->get(0).get_slice().to_string(), expected_centroids);
+    std::vector<std::pair<double, double>> expected_limits = {{0, 1}, {0, 1}};
+    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, negative_num_clusters) {
     auto points = DatumArray{DatumArray{1.0}, DatumArray{2.0}};
     int64_t num_clusters = -1;
     double random_seed = 0;
-    Run(points, num_clusters, random_seed, {}, true);
+    Run(points, num_clusters, random_seed, {}, {}, true);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, zero_num_clusters) {
     auto points = DatumArray{DatumArray{1.0}, DatumArray{2.0}};
     int64_t num_clusters = 0;
     double random_seed = 0;
-    Run(points, num_clusters, random_seed, {}, true);
+    Run(points, num_clusters, random_seed, {}, {}, true);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, negative_random_seed) {
     auto points = DatumArray{DatumArray{1.0}, DatumArray{2.0}};
     int64_t num_clusters = 1;
     double random_seed = -1;
-    Run(points, num_clusters, random_seed, {}, true);
+    Run(points, num_clusters, random_seed, {}, {}, true);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, no_valid_points) {
     auto points = DatumArray{DatumArray{1.0, kNullDatum}, DatumArray{kNullDatum, 2.0}};
     int64_t num_clusters = 1;
     double random_seed = 0;
-    Run(points, num_clusters, random_seed, {}, true);
+    Run(points, num_clusters, random_seed, {}, {}, true);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, zero_point_dimension) {
     auto points = DatumArray{DatumArray{}, DatumArray{}};
     int64_t num_clusters = 1;
     double random_seed = 0;
-    Run(points, num_clusters, random_seed, {}, true);
+    Run(points, num_clusters, random_seed, {}, {}, true);
 }
 
 TEST_F(CelonisBuildKMeansModelTest, inconsistent_point_dimension) {
     auto points = DatumArray{DatumArray{1.0}, DatumArray{2.0, 3.0}};
     int64_t num_clusters = 1;
     double random_seed = 0;
-    Run(points, num_clusters, random_seed, {}, true);
+    Run(points, num_clusters, random_seed, {}, {}, true);
 }
 
 } // namespace starrocks

@@ -18,6 +18,56 @@ static const double MAX_KMEANS_SECONDS = 3.5 * 60.0; // 3.5 mins
 static const int MAX_KMEANS_ITERATIONS = 100;
 static const uint64_t MAX_KMEANS_MODEL_SIZE = (100LL << 20); // 100M
 
+std::vector<std::pair<double, double>> get_limits(const std::vector<std::vector<double>>& points) {
+    if (points.empty()) {
+        return {};
+    }
+    const auto npoints = points.size();
+    const auto nfeatures = points[0].size();
+    std::vector<std::pair<double, double>> limits;
+    limits.reserve(nfeatures);
+    DCHECK(nfeatures != 0);
+    for (auto i = 0; i < nfeatures; ++i) {
+        std::vector<double> values;
+        values.reserve(npoints);
+        for (auto j = 0; j < npoints; ++j) {
+            values.push_back(points[j][i]);
+        }
+        auto result = std::minmax_element(values.begin(), values.end());
+        limits.emplace_back(*result.first, *result.second);
+    }
+    return limits;
+}
+
+// Applies min-max scaling normalization. It returns {limits, normalized_points}.
+// when min == max, set all values of the feature to 0.
+std::pair<std::vector<std::pair<double, double>>, std::vector<std::vector<double>>>
+normalize_points(const std::vector<std::vector<double>>& points) {
+    if (points.empty()) {
+        return {};
+    }
+    const auto npoints = points.size();
+    const auto nfeatures = points[0].size();
+    const auto limits = get_limits(points);
+    const double epsilon = 1e-9;
+    std::vector<std::vector<double>> rv = points;
+    for (auto i = 0; i < nfeatures; ++i) {
+        auto [min_value, max_value] = limits[i];
+        if (max_value - min_value < epsilon) {
+            // set value to zero
+            for (auto j = 0; j < npoints; ++j) {
+                rv[j][i] = 0.0;
+            }
+        } else {
+            double value_range = max_value - min_value;
+            for (auto j = 0; j < npoints; ++j) {
+                rv[j][i] = (rv[j][i] - min_value) / value_range;
+            }
+        }
+    }
+    return {limits, rv};
+}
+
 std::string to_string(double value) {
     std::string decimal_str = std::to_string(value);
     size_t decimal_point = decimal_str.find('.');
@@ -37,9 +87,20 @@ std::string to_string(double value) {
     return decimal_str.substr(0, last_non_zero + 1);
 }
 
-std::optional<std::string> to_model(const std::vector<std::vector<double>>& centroids) {
-    std::vector<std::string> row_strs;
+std::optional<std::string>
+to_model(const std::vector<std::pair<double, double>>& limits, const std::vector<std::vector<double>>& centroids) {
     uint64_t size = 0;
+    std::vector<std::string> limit_strs;
+    limit_strs.reserve(limits.size());
+    for (const auto& [min_value, max_value]: limits) {
+        std::string limit_str = to_string(min_value) + "," + to_string(max_value);
+        size += limit_str.size() + 1;
+        if (size > MAX_KMEANS_MODEL_SIZE) {
+            return std::nullopt;
+        }
+        limit_strs.push_back(limit_str);
+    }
+    std::vector<std::string> row_strs;
     row_strs.reserve(centroids.size());
     for (const auto& centroid: centroids) {
         std::vector<std::string> value_strs;
@@ -54,7 +115,7 @@ std::optional<std::string> to_model(const std::vector<std::vector<double>>& cent
         }
         row_strs.push_back(row_str);
     }
-    return boost::algorithm::join(row_strs, ";");
+    return boost::algorithm::join(limit_strs, ";") + ":" + boost::algorithm::join(row_strs, ";");
 }
 
 class KMeansPlusPlus {
@@ -259,18 +320,19 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
 
     DCHECK_GT(num_clusters, 0);
     std::vector<std::vector<double>> centroids;
-    if (num_clusters >= points.size()) {
-        centroids = points;
+    const auto& [limits, normalized_points] = normalize_points(points);
+    if (num_clusters >= normalized_points.size()) {
+        centroids = normalized_points;
         std::sort(centroids.begin(), centroids.end());
     } else {
         LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: started k-means clustering.\n";
-        KMeansPlusPlus kmeans(points, num_clusters, static_cast<unsigned int>(random_seed));
+        KMeansPlusPlus kmeans(normalized_points, num_clusters, static_cast<unsigned int>(random_seed));
         kmeans.run();
         LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: done k-means clustering.\n";
         centroids = kmeans.get_centroids();
     }
     LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: started to_model.\n";
-    const auto model = to_model(centroids);
+    const auto model = to_model(limits, centroids);
     LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: done to_model.\n";
     if (model.has_value()) {
         to->append_datum(model->c_str());

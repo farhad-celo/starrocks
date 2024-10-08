@@ -11,7 +11,7 @@
 
 namespace starrocks {
 
-class CelonisKmeansTest : public ::testing::Test {
+class CelonisApplyKMeansModelTest : public ::testing::Test {
 protected:
     void SetUp() override {}
 
@@ -64,18 +64,18 @@ private:
     ColumnPtr model_column_;
 };
 
-TEST_F(CelonisKmeansTest, empty_input) {
+TEST_F(CelonisApplyKMeansModelTest, empty_input) {
     Prepare();
-    const auto result = RunConstantModel("0.0;1.0").value();
+    const auto result = RunConstantModel("0,10:0.0;1.0").value();
     ASSERT_EQ(0, result->size());
 }
 
-TEST_F(CelonisKmeansTest, null_const_column) {
+TEST_F(CelonisApplyKMeansModelTest, null_const_column) {
     {
         Prepare();
         point_column_->append_datum(kNullDatum);
         point_column_ = ConstColumn::create(point_column_, 2);
-        const auto result = RunConstantModel("2.0,2.5;1.2,1.3").value();
+        const auto result = RunConstantModel("0,10;0,20:0.2,0.25;0.12,0.13").value();
         ASSERT_EQ(point_column_->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
         EXPECT_TRUE(result->get(1).is_null());
@@ -84,8 +84,8 @@ TEST_F(CelonisKmeansTest, null_const_column) {
         Prepare();
         point_column_->append_datum(kNullDatum);
         point_column_ = ConstColumn::create(point_column_, 2);
-        model_column_->append_datum("2.0,2.5");
-        model_column_->append_datum("2.0,2.5");
+        model_column_->append_datum("0,10;0,10:0.2,0.25");
+        model_column_->append_datum("0,10;0,10:0.2,0.25");
         const auto result = Run().value();
         ASSERT_EQ(point_column_->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
@@ -93,7 +93,7 @@ TEST_F(CelonisKmeansTest, null_const_column) {
     }
 }
 
-TEST_F(CelonisKmeansTest, single_feature_const_valid_model) {
+TEST_F(CelonisApplyKMeansModelTest, single_feature_const_valid_model) {
     Prepare();
     point_column_->append_datum(DatumArray{kNullDatum});
     point_column_->append_datum(DatumArray{2.0});
@@ -105,7 +105,7 @@ TEST_F(CelonisKmeansTest, single_feature_const_valid_model) {
     point_column_->append_datum(DatumArray{kNullDatum});
     point_column_->append_datum(DatumArray{3.0});
 
-    const auto result = RunConstantModel("1.0;5.0").value();
+    const auto result = RunConstantModel("0,10:0.1;0.5").value();
     ASSERT_EQ(point_column_->size(), result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_EQ(0L, result->get(1).get_int64());
@@ -118,7 +118,7 @@ TEST_F(CelonisKmeansTest, single_feature_const_valid_model) {
     EXPECT_EQ(0L, result->get(8).get_int64());
 }
 
-TEST_F(CelonisKmeansTest, single_feature_const_invalid_model) {
+TEST_F(CelonisApplyKMeansModelTest, single_feature_const_invalid_model) {
     Prepare();
     point_column_->append_datum(DatumArray{kNullDatum});
     point_column_->append_datum(DatumArray{2.0});
@@ -135,16 +135,16 @@ TEST_F(CelonisKmeansTest, single_feature_const_invalid_model) {
     }
 }
 
-TEST_F(CelonisKmeansTest, single_feature_nonconst_model) {
+TEST_F(CelonisApplyKMeansModelTest, single_feature_nonconst_model) {
     Prepare();
-    AddRow(DatumArray{2.0}, "2.0;2.5");
-    AddRow(DatumArray{4.0}, "3.5;4.0");
-    AddRow(DatumArray{kNullDatum}, "1.0;2.0");
-    AddRow(DatumArray{2.5}, "3.5;4.0");
-    AddRow(DatumArray{2.5}, "3.5#4.0");
+    AddRow(DatumArray{2.0}, "0,10:0.2;0.25");
+    AddRow(DatumArray{4.0}, "0,10:0.35;0.40");
+    AddRow(DatumArray{kNullDatum}, "0,10:0.10;0.2");
+    AddRow(DatumArray{2.5}, "0,10:0.35;0.4");
+    AddRow(DatumArray{2.5}, "0,10:3.5#4.0");
     AddRow(DatumArray{0.5}, "HELLO");
     AddRow(DatumArray{kNullDatum}, kNullDatum);
-    AddRow(DatumArray{0.0}, "1.5;9.3");
+    AddRow(DatumArray{0.0}, "0,10:0.15;0.93");
     const auto result = Run().value();
     ASSERT_EQ(point_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
@@ -157,7 +157,7 @@ TEST_F(CelonisKmeansTest, single_feature_nonconst_model) {
     EXPECT_EQ(0L, result->get(7).get_int64());
 }
 
-TEST_F(CelonisKmeansTest, double_features_const_valid_model) {
+TEST_F(CelonisApplyKMeansModelTest, double_features_const_valid_model) {
     Prepare();
     // NULL 1.2
     // 1.5 2.5
@@ -173,7 +173,7 @@ TEST_F(CelonisKmeansTest, double_features_const_valid_model) {
     point_column_->append_datum(DatumArray{3.0, 4.5});
     point_column_->append_datum(DatumArray{1.2, kNullDatum});
     point_column_->append_datum(DatumArray{0.6, 2.0});
-    const auto result = RunConstantModel("2.0,2.5;0.5,2.0").value();
+    const auto result = RunConstantModel("0,10;0,10:0.2,0.25;0.05,0.2").value();
     ASSERT_EQ(point_column_->size(), result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_EQ(0L, result->get(1).get_int64());
@@ -184,7 +184,7 @@ TEST_F(CelonisKmeansTest, double_features_const_valid_model) {
     EXPECT_EQ(1L, result->get(6).get_int64());
 }
 
-TEST_F(CelonisKmeansTest, double_features_const_invalid_model) {
+TEST_F(CelonisApplyKMeansModelTest, double_features_const_invalid_model) {
     Prepare();
     // NULL 1.2
     // 1.5 2.5
@@ -198,21 +198,21 @@ TEST_F(CelonisKmeansTest, double_features_const_invalid_model) {
     point_column_->append_datum(DatumArray{kNullDatum, kNullDatum});
     point_column_->append_datum(DatumArray{3.0, 4.5});
     point_column_->append_datum(DatumArray{1.2, kNullDatum});
-    const auto result = RunConstantModel("2.0,2.5;0.5").value();
+    const auto result = RunConstantModel(":4.0,2.0,2.5;0.5").value();
     ASSERT_EQ(point_column_->size(), result->size());
     for (auto i = 0; i < result->size(); ++i) {
         EXPECT_TRUE(result->get(i).is_null());
     }
 }
 
-TEST_F(CelonisKmeansTest, double_features_nonconst_model) {
+TEST_F(CelonisApplyKMeansModelTest, double_features_nonconst_model) {
     Prepare();
-    AddRow(DatumArray{2.0, 3.0}, "2.0,3.5;1.5,2.0;2.0,3.0");
+    AddRow(DatumArray{2.0, 3.0}, "0,10;0,10:0.20,0.35;0.15,0.20;0.20,0.30");
     AddRow(DatumArray{3.0, 2.5}, "3.5:4.0");
     AddRow(DatumArray{kNullDatum, 3.0}, "1.0:2.0:1.5");
     AddRow(DatumArray{0.5, 1.5}, "HELLO");
     AddRow(DatumArray{1.0, 2.2}, kNullDatum);
-    AddRow(DatumArray{0.0, 1.5}, "1.5,9.3;2.4,3.5");
+    AddRow(DatumArray{0.0, 1.5}, "0,10;0,10:0.15,0.93;0.24,0.35");
     const auto result = Run().value();
     ASSERT_EQ(point_column_->size(), result->size());
     EXPECT_EQ(2L, result->get(0).get_int64());
@@ -223,7 +223,7 @@ TEST_F(CelonisKmeansTest, double_features_nonconst_model) {
     EXPECT_EQ(1L, result->get(5).get_int64());
 }
 
-TEST_F(CelonisKmeansTest, three_features_const_valid_model) {
+TEST_F(CelonisApplyKMeansModelTest, three_features_const_valid_model) {
     Prepare();
     // 2.0 2.4 0.5
     // 1.5 2.5 2.0
@@ -231,27 +231,27 @@ TEST_F(CelonisKmeansTest, three_features_const_valid_model) {
     point_column_->append_datum(DatumArray{2.0, 2.4, 0.5});
     point_column_->append_datum(DatumArray{1.5, 2.5, 2.0});
     point_column_->append_datum(DatumArray{2.0, 4.5, 3.0});
-    const auto result = RunConstantModel("2.0,2.5,0.5;0.1,2.5,2.0").value();
+    const auto result = RunConstantModel("0,10;0,10;0,10:0.20,0.25,0.05;0.01,0.25,0.20").value();
     ASSERT_EQ(point_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
     EXPECT_EQ(1L, result->get(2).get_int64());
 }
 
-TEST_F(CelonisKmeansTest, null_point) {
+TEST_F(CelonisApplyKMeansModelTest, null_point) {
     {
         Prepare();
         point_column_->append_datum(kNullDatum);
         point_column_->append_datum(DatumArray{0.2});
-        const auto result = RunConstantModel("0.0;1.0").value();
+        const auto result = RunConstantModel("0,1:0.0;1.0").value();
         ASSERT_EQ(point_column_->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
         EXPECT_EQ(0L, result->get(1).get_int64());
     }
     {
         Prepare();
-        AddRow(DatumArray{0.0, 1.5}, "1.5,9.3;2.4,3.5");
-        AddRow(std::nullopt, "0.0;1.0");
+        AddRow(DatumArray{0.0, 1.5}, "0,10;0,10:0.15,0.93;0.24,0.35");
+        AddRow(std::nullopt, "0,1:0.0;1.0");
         const auto result = Run().value();
         ASSERT_EQ(point_column_->size(), result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
@@ -259,20 +259,20 @@ TEST_F(CelonisKmeansTest, null_point) {
     }
 }
 
-TEST_F(CelonisKmeansTest, model_dimension_inconsistent_with_point_dimension) {
+TEST_F(CelonisApplyKMeansModelTest, model_dimension_inconsistent_with_point_dimension) {
     {
         Prepare();
         point_column_->append_datum(DatumArray{0.1, 0.2});
         point_column_->append_datum(DatumArray{0.2});
-        const auto result = RunConstantModel("0.0;1.0").value();
+        const auto result = RunConstantModel("0,10:0.0;1.0").value();
         ASSERT_EQ(point_column_->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
         EXPECT_EQ(0L, result->get(1).get_int64());
     }
     {
         Prepare();
-        AddRow(DatumArray{0.0, 1.5}, "1.5,9.3;2.4,3.5");
-        AddRow(DatumArray{0.0, 1.2}, "0.0;1.0");
+        AddRow(DatumArray{0.0, 1.5}, "0,10;1,10:0.15,0.93;0.24,0.35");
+        AddRow(DatumArray{0.0, 1.2}, "0,10:0.0;1.0");
         const auto result = Run().value();
         ASSERT_EQ(point_column_->size(), result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
