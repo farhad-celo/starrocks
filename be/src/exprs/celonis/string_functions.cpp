@@ -1078,6 +1078,9 @@ CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionCont
             }
             match_string_set.insert(match_strings[i].to_string());
         }
+        if (top_k <= 0) {
+            return Status::InvalidArgument("CELONIS_MATCH_STRINGS: top_k must be positive.");
+        }
         result.append(get_match_strings_result(input_string, match_string_set, top_k, separator));
     }
     return result.build(ColumnHelper::is_all_const(columns));
@@ -1103,6 +1106,9 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
         const std::string input_string = input_string_viewer.value(row).to_string();
         int top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
         const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
+        if (top_k <= 0) {
+            return Status::InvalidArgument("CELONIS_MATCH_STRINGS: top_k must be positive.");
+        }
         result.append(get_match_strings_result(input_string, state->match_strings, top_k, separator));
     }
     return result.build(ColumnHelper::is_all_const(columns));
