@@ -17,7 +17,7 @@ concurrency:
 env:
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-692bdf7d
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:transplant3.3
 
 jobs:
   # SAST
@@ -47,7 +47,7 @@ jobs:
           echo "container_id=$container_id" >> $GITHUB_ENV
           
           docker exec ${container_id} bash -c "$(cat celonis/tools/veracode/static_analysis.sh)"
-          
+
       - name: Determine current date
         id: current_date_and_time
         run: |
