@@ -178,7 +178,7 @@ TEST_F(CelonisGenerateRangeTest, bigint_invalid_range) {
     EXPECT_EQ(table_state->processed_rows(), 0);
     EXPECT_EQ(results[0]->size(), 0);
     ASSERT_TRUE(table_state->status().is_invalid_argument());
-    EXPECT_TRUE(table_state->status().get_error_msg().find("range_end must") != std::string::npos);
+    EXPECT_TRUE(table_state->status().message().find("range_end must") != std::string::npos);
 
     function->close(nullptr, table_state);
 }
