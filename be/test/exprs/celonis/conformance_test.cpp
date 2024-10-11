@@ -33,7 +33,7 @@ protected:
             ASSERT_EQ(result_array.size(), expected_array.size());
             for (int j = 0; j < result_array.size(); j++) {
                 EXPECT_EQ(result_array[j].get_int64(), expected_array[j].get_int64())
-                                << "row index: " << i << ", element index: " << j;
+                                    << "row index: " << i << ", element index: " << j;
             }
         }
     }
@@ -44,13 +44,17 @@ protected:
         context->set_constant_columns(columns);
 
         DeferOp close_fragment_local([&context] {
-            CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+            CelonisConformance::conformance_close(context,
+                                                  FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
         });
-        RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        RETURN_IF_ERROR(
+                CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
         DeferOp close_thread_local([&context] {
-            CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL);
+            CelonisConformance::conformance_close(context,
+                                                  FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL);
         });
-        RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
+        RETURN_IF_ERROR(
+                CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
 
         const auto result = CelonisConformance::conformance(context, columns).value();
         evaluate(result.get(), expected);
@@ -117,10 +121,12 @@ TEST_F(CelonisConformanceTest, pql_conformance_examples) {
     expected->append_datum(DatumArray{0L, /*A is followed by A*/ (id_A << 32) + id_A});
 
     array->append_datum(DatumArray{"B", "A", "B"});
-    expected->append_datum(DatumArray{/*B executed as start activity */ (MISSING_START_ACTIVITY_KEY << 32) + id_B, 0L, 0L});
+    expected->append_datum(
+            DatumArray{/*B executed as start activity */ (MISSING_START_ACTIVITY_KEY << 32) + id_B, 0L, 0L});
 
     array->append_datum(DatumArray{"A", "C", "A"});
-    expected->append_datum(DatumArray{0L, /*C is an undesired activity*/ -id_C, /*A is followed by A*/(id_A << 32) + id_A});
+    expected->append_datum(
+            DatumArray{0L, /*C is an undesired activity*/ -id_C, /*A is followed by A*/(id_A << 32) + id_A});
 
     // NULL handling. A NULL value conforms with any Petri net.
     array->append_datum(DatumArray{"A", Datum{}, "B"});
@@ -148,7 +154,7 @@ TEST_F(CelonisConformanceTest, invalid_json_spec) {
     input.push_back(nullptr);
     input.push_back(json_spec);
 
-    EXPECT_THAT(conform(input, nullptr).message().to_string(), testing::HasSubstr("does not contain 'mapping'."));
+    EXPECT_THAT(std::string(conform(input, nullptr).message()), testing::HasSubstr("does not contain 'mapping'."));
 }
 
 class CelonisReadableConformanceTest : public ::testing::Test {
@@ -178,13 +184,17 @@ protected:
         context->set_constant_columns(columns);
 
         DeferOp close_fragment_local([&context] {
-            CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+            CelonisConformance::conformance_close(context,
+                                                  FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
         });
-        RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        RETURN_IF_ERROR(
+                CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
         DeferOp close_thread_local([&context] {
-            CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL);
+            CelonisConformance::conformance_close(context,
+                                                  FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL);
         });
-        RETURN_IF_ERROR(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
+        RETURN_IF_ERROR(
+                CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
 
         const auto result = CelonisConformance::readable_conformance(context, columns).value();
         evaluate(result.get(), expected);
