@@ -589,7 +589,7 @@ TEST_F(CelonisMoBpmnGraphTest, invalid_json_spec) {
 
     auto result = run({no_statistics});
     EXPECT_TRUE(result.status().is_invalid_argument());
-    EXPECT_THAT(result.status().message().to_string(), testing::HasSubstr("does not contain 'statistics'."));
+    EXPECT_THAT(std::string(result.status().message()), testing::HasSubstr("does not contain 'statistics'."));
 }
 
 TEST_F(CelonisMoBpmnGraphTest, null_input) {
