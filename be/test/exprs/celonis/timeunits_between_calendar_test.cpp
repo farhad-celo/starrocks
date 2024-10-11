@@ -439,7 +439,7 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, invalid_input) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
+        EXPECT_EQ(result.status().message(), "Calendar array can not contain null values.");
     }
     {
         Prepare();
@@ -454,7 +454,7 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, invalid_input) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "time unit must be one of DAYS/WORKDAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
     }
     {
@@ -466,7 +466,7 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, invalid_input) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
+        EXPECT_EQ(result.status().message(), "Calendar array can not contain null values.");
     }
     {
         Prepare();
@@ -477,7 +477,7 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, invalid_input) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "[prepare] Calendar specification column is malformed.");
+        EXPECT_EQ(result.status().message(), "[prepare] Calendar specification column is malformed.");
     }
 }
 
@@ -548,7 +548,7 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, year_gaps_in_workday_calendar) {
         calendar_id_column_->append_datum("id1");
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Year gaps are found in the workday calendar configuration.");
+        EXPECT_EQ(result.status().message(), "Year gaps are found in the workday calendar configuration.");
     }
     {
         Prepare();

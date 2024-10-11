@@ -204,7 +204,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_timestamp) {
            DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "timestamp_array should not have NULL elements.");
+    EXPECT_EQ(result.status().message(), "timestamp_array should not have NULL elements.");
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, null_size) {
@@ -222,7 +222,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_size) {
            DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "size_array should not have NULL elements.");
+    EXPECT_EQ(result.status().message(), "size_array should not have NULL elements.");
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, null_priority) {
@@ -240,7 +240,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_priority) {
            DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "priority_array should not have NULL elements.");
+    EXPECT_EQ(result.status().message(), "priority_array should not have NULL elements.");
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, null_secondary_order) {
@@ -258,7 +258,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_secondary_order) {
            DatumArray{"a", "a", "c", "c", "b", kNullDatum, "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "If provided, secondary_order_array should not have NULL elements.");
+    EXPECT_EQ(result.status().message(), "If provided, secondary_order_array should not have NULL elements.");
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, input_array_size_different_from_timestamp_size) {
@@ -276,7 +276,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, input_array_size_different_from_timest
            DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "The size of input_array and timestamp_array should not be different.");
+    EXPECT_EQ(result.status().message(), "The size of input_array and timestamp_array should not be different.");
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, size_array_size_different_from_priority_size) {
@@ -294,7 +294,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, size_array_size_different_from_priorit
            DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "The size of size_array and priority_array should not be different.");
+    EXPECT_EQ(result.status().message(), "The size of size_array and priority_array should not be different.");
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, wrong_size_array) {
@@ -312,7 +312,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, wrong_size_array) {
            DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(),
+    EXPECT_EQ(result.status().message(),
               "The size of input_array and timestamp_array should not be different than the sum of size_array.");
 }
 

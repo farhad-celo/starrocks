@@ -303,7 +303,7 @@ TEST_F(CelonisInCalendarTest, const_invalid_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar({"UNKNOWN"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "[prepare] Calendar specification column is malformed.");
+        EXPECT_EQ(result.status().message(), "[prepare] Calendar specification column is malformed.");
     }
     {
         Prepare();
@@ -315,7 +315,7 @@ TEST_F(CelonisInCalendarTest, const_invalid_calendar) {
                                                         celonis::get_is_workdays_str(366, {0}).c_str(),
                                                         R"( } }})"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
     }
 }
@@ -370,7 +370,7 @@ TEST_F(CelonisInCalendarTest, non_const_invalid_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
+        EXPECT_EQ(result.status().message(), "Calendar array can not contain null values.");
     }
     {
         Prepare();
@@ -379,7 +379,7 @@ TEST_F(CelonisInCalendarTest, non_const_invalid_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar specification column is malformed.");
+        EXPECT_EQ(result.status().message(), "Calendar specification column is malformed.");
     }
     {
         Prepare();
@@ -392,7 +392,7 @@ TEST_F(CelonisInCalendarTest, non_const_invalid_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
     }
 }

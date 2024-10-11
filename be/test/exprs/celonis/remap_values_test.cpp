@@ -100,7 +100,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_const_inconsist_value_map) {
     const auto result = RunConstantValueMap<LT>(old_array, new_array, true);
     EXPECT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ("[prepare] old value array must have the same length as new value array.",
-              result.status().get_error_msg());
+              result.status().message());
 }
 
 TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_const_inconsist_value_map) {
@@ -112,7 +112,7 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_const_inconsist_value_ma
     const auto result = Run<LT>(true);
     EXPECT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ("old value array must have the same length as new value array.",
-              result.status().get_error_msg());
+              result.status().message());
 }
 
 TEST_F(CelonisRemapValuesTest, celonis_remap_values_empty_value_column) {

@@ -396,7 +396,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_array) {
 
         const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "The size of input_array and key_array should not be different.");
+        EXPECT_EQ(result.status().message(), "The size of input_array and key_array should not be different.");
     }
 }
 
@@ -429,7 +429,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_elements) {
 
     const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "key_array should not have null elements.");
+    EXPECT_EQ(result.status().message(), "key_array should not have null elements.");
 }
 
 TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_array_size_mismatch) {
@@ -441,7 +441,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_array_size_mismatch) {
 
     const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(),
+    EXPECT_EQ(result.status().message(),
               "The size of input_array and key_array should not be different.");
 }
 
@@ -633,7 +633,7 @@ TEST_F(CelonisArrayFunctionsTest, array_lag_negative_offset) {
 
     const auto result = CelonisArrayFunctions::array_lag(nullptr, {input_array, offset_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "offset must be a positive integer.");
+    EXPECT_EQ(result.status().message(), "offset must be a positive integer.");
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_lag_zero_offset) {
@@ -645,7 +645,7 @@ TEST_F(CelonisArrayFunctionsTest, array_lag_zero_offset) {
 
     const auto result = CelonisArrayFunctions::array_lag(nullptr, {input_array, offset_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "offset must be a positive integer.");
+    EXPECT_EQ(result.status().message(), "offset must be a positive integer.");
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_lag_null_offset) {
@@ -657,7 +657,7 @@ TEST_F(CelonisArrayFunctionsTest, array_lag_null_offset) {
 
     const auto result = CelonisArrayFunctions::array_lag(nullptr, {input_array, offset_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "offset column must not contain null.");
+    EXPECT_EQ(result.status().message(), "offset column must not contain null.");
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_lag_input_array_contains_null) {
@@ -886,7 +886,7 @@ TEST_F(CelonisArrayFunctionsTest, array_lead_negative_offset) {
 
     const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "offset must be a positive integer.");
+    EXPECT_EQ(result.status().message(), "offset must be a positive integer.");
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_lead_zero_offset) {
@@ -898,7 +898,7 @@ TEST_F(CelonisArrayFunctionsTest, array_lead_zero_offset) {
 
     const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "offset must be a positive integer.");
+    EXPECT_EQ(result.status().message(), "offset must be a positive integer.");
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_lead_null_offset) {
@@ -910,7 +910,7 @@ TEST_F(CelonisArrayFunctionsTest, array_lead_null_offset) {
 
     const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "offset column must not contain null.");
+    EXPECT_EQ(result.status().message(), "offset column must not contain null.");
 }
 
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_int) {
@@ -1091,7 +1091,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_varchar) {
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(5, result->get(0).get_array().size());
@@ -1183,7 +1183,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_priority_size_mismatch_wit
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array, limit_column});
-    EXPECT_EQ(rs.status().get_error_msg(),
+    EXPECT_EQ(rs.status().message(),
               "When limit is set and priority_array is not NULL literal, priority_array (length = 3) should have the same length as timestamp_array (length = 7).");
 }
 
@@ -1231,7 +1231,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_priority_column_works
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array, limit_column});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     // only keep 3 out of 7 elements
@@ -1317,7 +1317,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_limit_works) {
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array, limit_column});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(4, result->size());
     // only keep 3 out of 7 elements
@@ -1368,7 +1368,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_negative_limit) {
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array, limit_column});
 
-    EXPECT_EQ(rs.status().get_error_msg(), "limit must not be negative.");
+    EXPECT_EQ(rs.status().message(), "limit must not be negative.");
 }
 
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_bigint_secondary_order) {
@@ -1412,7 +1412,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_bigint_secondary_order) {
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(7, result->get(0).get_array().size());
@@ -1470,7 +1470,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_int_secondary_order) {
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(7, result->get(0).get_array().size());
@@ -1531,7 +1531,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_in_input_array) {
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(7, result->get(0).get_array().size());
@@ -1591,7 +1591,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_double_secondary_order) {
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(7, result->get(0).get_array().size());
@@ -1650,7 +1650,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_string_secondary_order) {
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(7, result->get(0).get_array().size());
@@ -1704,7 +1704,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_priority) {
 
     const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
             nullptr, {input_array, timestamp_array, size_array, priority_array});
-    ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(7, result->get(0).get_array().size());
@@ -1753,7 +1753,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_array) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "timestamp_array should not be NULL.");
+        EXPECT_EQ(result.status().message(), "timestamp_array should not be NULL.");
     }
     {
         // priority_array is NULL.
@@ -1781,7 +1781,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_array) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "priority_array should not be NULL.");
+        EXPECT_EQ(result.status().message(), "priority_array should not be NULL.");
     }
 }
 
@@ -1812,7 +1812,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_elements) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "timestamp_array should not have NULL elements.");
+        EXPECT_EQ(result.status().message(), "timestamp_array should not have NULL elements.");
     }
     {
         // size_array has NULL elements.
@@ -1841,7 +1841,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_elements) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "size_array should not have NULL elements.");
+        EXPECT_EQ(result.status().message(), "size_array should not have NULL elements.");
     }
     {
         // priority_array has NULL elements.
@@ -1869,7 +1869,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_elements) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "priority_array should not have NULL elements.");
+        EXPECT_EQ(result.status().message(), "priority_array should not have NULL elements.");
     }
     {
         // secondary_order_array has NULL elements
@@ -1912,7 +1912,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_elements) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "If provided, secondary_order_array should not have NULL elements.");
+        EXPECT_EQ(result.status().message(), "If provided, secondary_order_array should not have NULL elements.");
     }
 }
 
@@ -1943,7 +1943,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_array_size_mismatch) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "The size of input_array and timestamp_array should not be different.");
     }
     {
@@ -1987,7 +1987,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_array_size_mismatch) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "If provided, the size of secondary_order_array and timestamp_array should not be different.");
     }
     {
@@ -2019,7 +2019,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_array_size_mismatch) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "The size of input_array and timestamp_array should not be different than the sum of size_array.");
     }
     {
@@ -2051,7 +2051,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_array_size_mismatch) {
         const auto result = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "If provided, priority_array (length = 4) should have the same length as size_array (length = 3).");
     }
 }
@@ -2092,7 +2092,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_empty_arrays) {
 
         const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
-        ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+        ASSERT_TRUE(rs.ok()) << rs.status().message();
         const auto& result = rs.value();
         ASSERT_EQ(3, result->size());
         ASSERT_EQ(7, result->get(0).get_array().size());
@@ -2144,7 +2144,7 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_empty_arrays) {
 
         const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
                 nullptr, {input_array, timestamp_array, size_array, priority_array});
-        ASSERT_TRUE(rs.ok()) << rs.status().get_error_msg();
+        ASSERT_TRUE(rs.ok()) << rs.status().message();
         const auto& result = rs.value();
         ASSERT_EQ(3, result->size());
         ASSERT_EQ(5, result->get(0).get_array().size());
@@ -2749,7 +2749,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_invalid_input) {
                                                              {activity, begin_activity, begin_mode, end_activity,
                                                               end_mode});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "begin range mode must be FIRST/LAST/ALL.");
+        EXPECT_EQ(result.status().message(), "begin range mode must be FIRST/LAST/ALL.");
     }
     {
         auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
@@ -2768,7 +2768,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_invalid_input) {
                                                              {activity, begin_activity, begin_mode, end_activity,
                                                               end_mode});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "end range mode must be FIRST/LAST/ALL.");
+        EXPECT_EQ(result.status().message(), "end range mode must be FIRST/LAST/ALL.");
     }
 }
 
@@ -3264,7 +3264,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_to_null_invalid_input) {
                                                                       end_activity,
                                                                       end_mode});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "begin range mode must be FIRST/LAST/ALL.");
+        EXPECT_EQ(result.status().message(), "begin range mode must be FIRST/LAST/ALL.");
     }
     {
         auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
@@ -3284,7 +3284,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_to_null_invalid_input) {
                                                                       end_activity,
                                                                       end_mode});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "end range mode must be FIRST/LAST/ALL.");
+        EXPECT_EQ(result.status().message(), "end range mode must be FIRST/LAST/ALL.");
     }
 }
 

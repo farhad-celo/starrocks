@@ -194,7 +194,7 @@ TEST_F(CelonisGetCalendarEntryStartTest, non_const_calendar) {
     calendar_id_column_->append_datum("UK");
     const auto result = Run();
     ASSERT_TRUE(result.status().is_not_supported());
-    EXPECT_EQ(result.status().get_error_msg(), "Non-const calendar is not supported in get_calendar_entry_start.");
+    EXPECT_EQ(result.status().message(), "Non-const calendar is not supported in get_calendar_entry_start.");
 }
 
 } // namespace starrocks

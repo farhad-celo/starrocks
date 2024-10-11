@@ -186,7 +186,7 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_zero_top_k) {
     string_column_->append_datum("Shirt");
     const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 0, "##");
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
+    EXPECT_EQ(result.status().message(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
 }
 
 TEST_F(CelonisMatchStringsTest, const_match_strings_negative_top_k) {
@@ -194,7 +194,7 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_negative_top_k) {
     string_column_->append_datum("Shirt");
     const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, -1, "##");
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
+    EXPECT_EQ(result.status().message(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
 }
 
 TEST_F(CelonisMatchStringsTest, null_input_string_and_non_const_match_strings) {
@@ -224,7 +224,7 @@ TEST_F(CelonisMatchStringsTest, non_const_match_strings_zero_top_k) {
     AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 0, "#");
     const auto result = Run();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
+    EXPECT_EQ(result.status().message(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
 }
 
 TEST_F(CelonisMatchStringsTest, non_const_match_strings_negative_top_k) {
@@ -232,7 +232,7 @@ TEST_F(CelonisMatchStringsTest, non_const_match_strings_negative_top_k) {
     AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, -2, "#");
     const auto result = Run();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
+    EXPECT_EQ(result.status().message(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
 }
 
 } // namespace starrocks

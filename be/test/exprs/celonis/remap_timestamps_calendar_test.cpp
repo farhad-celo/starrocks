@@ -815,7 +815,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
                                                  celonis::get_is_workdays_str(366, {0, 2, 3}).c_str(),
                                                  R"( } }})"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
     }
     {
@@ -829,7 +829,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
                                                   R"( } }})"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
     }
     {
@@ -842,7 +842,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
                                                  celonis::get_is_workdays_str(365, {0, 2, 3}).c_str(),
                                                  R"( } }})"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "year is not set in a workday calendar entry.");
+        EXPECT_EQ(result.status().message(), "year is not set in a workday calendar entry.");
     }
     {
         Prepare();
@@ -856,7 +856,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
                                                   R"( } }})"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "year is not set in a workday calendar entry.");
+        EXPECT_EQ(result.status().message(), "year is not set in a workday calendar entry.");
     }
 }
 
@@ -868,7 +868,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_intersect_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar({R"({"intersect_calendar": {}})"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Intersect calendar must set both calendar1 and calendar2.");
+        EXPECT_EQ(result.status().message(), "Intersect calendar must set both calendar1 and calendar2.");
     }
     {
         Prepare();
@@ -878,7 +878,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_intersect_calendar) {
         calendar_column_->append_datum(DatumArray{R"({"intersect_calendar": {}})"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Intersect calendar must set both calendar1 and calendar2.");
+        EXPECT_EQ(result.status().message(), "Intersect calendar must set both calendar1 and calendar2.");
     }
 }
 
@@ -890,7 +890,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_provided_when_not_need) {
     calendar_id_column_->append_datum("CalendarID");
     const auto result = Run();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(),
+    EXPECT_EQ(result.status().message(),
               "Calendar ID column should not be set when calendar specification is not set.");
 }
 
@@ -905,7 +905,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_multi_weekday_calendar) {
                                                  R"("calendars": {"friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
                                                  R"(} })"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "In MultiWeekdayCalendar, ensure that the calendar_id is either set or not set in all calendars.");
     }
     {
@@ -918,7 +918,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_multi_weekday_calendar) {
                                                  R"("calendars": {"friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
                                                  R"(} })"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "In MultiWeekdayCalendar, two calendars must not share the same calendar_id.");
     }
     {
@@ -931,7 +931,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_multi_weekday_calendar) {
                                                  R"("calendars": {"friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
                                                  R"(} })"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "In MultiWeekdayCalendar, two calendars must not share the same calendar_id.");
     }
 }
@@ -1066,7 +1066,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, invalid_time_unit) {
     calendar_id_column_->append_datum(kNullDatum);
     const auto result = RunConstantCalendar({});
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(),
+    EXPECT_EQ(result.status().message(),
               "time unit must be one of WORKDAYS/DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
 }
 
@@ -1083,7 +1083,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                 R"(} })"});
         const auto result = RunConstantCalendar();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
+        EXPECT_EQ(result.status().message(), "Calendar array can not contain null values.");
     }
     {
         Prepare();
@@ -1097,7 +1097,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                 R"(} })"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
+        EXPECT_EQ(result.status().message(), "Calendar array can not contain null values.");
     }
     {
         Prepare();
@@ -1108,7 +1108,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                                                  R"("unknown_day": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
                                                  R"(} })"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "[prepare] Calendar specification column is malformed.");
+        EXPECT_EQ(result.status().message(), "[prepare] Calendar specification column is malformed.");
     }
     {
         Prepare();
@@ -1121,7 +1121,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                 R"(} })"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar specification column is malformed.");
+        EXPECT_EQ(result.status().message(), "Calendar specification column is malformed.");
     }
     // mixed calendar_id entry and no-calendar_id entry
     {
@@ -1136,7 +1136,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                                                   R"( }})"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "In FactoryCalendar, ensure that the calendar_id is either set or not set in all entries.");
     }
     {
@@ -1158,7 +1158,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                 R"( }})"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "In WorkdayCalendar, ensure that the calendar_id is either set or not set in all entries.");
     }
 }
@@ -1190,7 +1190,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_provided_when_not_needed)
     calendar_id_column_->append_datum("CalendarID");
     const auto result = Run();
     ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(),
+    EXPECT_EQ(result.status().message(),
               "Calendar ID column should not be set when calendar specification is not set.");
 }
 
@@ -1203,7 +1203,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_not_provided_when_needed)
         const auto result = RunConstantCalendar(
                 {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar ID column not provided.");
+        EXPECT_EQ(result.status().message(), "Calendar ID column not provided.");
     }
     {
         Prepare();
@@ -1222,7 +1222,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_not_provided_when_needed)
                                                  R"(, calendar_id: "id1"},)",
                                                  R"( }})"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar ID column not provided.");
+        EXPECT_EQ(result.status().message(), "Calendar ID column not provided.");
     }
 }
 
@@ -1237,7 +1237,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, invalid_weekday_calendar) {
                  R"("monday": {"use_day": true, "shift": {"begin": 0, "end": 1000} }, "calendar_id": "id" )",
                  R"(} })"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "calendar_id should not be set in WeekdayCalendar.");
+        EXPECT_EQ(result.status().message(), "calendar_id should not be set in WeekdayCalendar.");
     }
     {
         Prepare();
@@ -1249,7 +1249,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, invalid_weekday_calendar) {
                  R"("monday": {"use_day": true, "shift": {"begin": -1, "end": 1000} })",
                  R"(} })"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "shift begin is negative in weekday calendar.");
+        EXPECT_EQ(result.status().message(), "shift begin is negative in weekday calendar.");
     }
     {
         Prepare();
@@ -1261,7 +1261,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, invalid_weekday_calendar) {
                  R"("monday": {"use_day": true, "shift": {"begin": 2000, "end": 1000} })",
                  R"(} })"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "shift begin is greater than shift end in weekday calendar.");
+        EXPECT_EQ(result.status().message(), "shift begin is greater than shift end in weekday calendar.");
     }
     {
         Prepare();
@@ -1273,7 +1273,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, invalid_weekday_calendar) {
                  R"("monday": {"use_day": true, "shift": {"begin": 1000, "end": 86400005} })",
                  R"(} })"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "shift end is greater than 86400000 milliseconds in weekday calendar.");
     }
 }

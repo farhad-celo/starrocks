@@ -52,7 +52,7 @@ private:
     void run_test(const TypeDescriptor& array_type_desc, const std::string& mode,
                   const std::string& direction, ColumnPtr input) {
         auto result = run(array_type_desc, mode, direction, std::move(input));
-        ASSERT_TRUE(result.ok()) << result.status().get_error_msg();
+        ASSERT_TRUE(result.ok()) << result.status().message();
         evaluator_.evaluate(result.value());
     }
 

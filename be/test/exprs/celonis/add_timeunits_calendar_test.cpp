@@ -800,7 +800,7 @@ TEST_F(CelonisAddTimeunitsCalendarTest, invalid_time_unit) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "time unit must be one of WORKDAYS/DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
     }
     {
@@ -811,7 +811,7 @@ TEST_F(CelonisAddTimeunitsCalendarTest, invalid_time_unit) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar({});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(),
+        EXPECT_EQ(result.status().message(),
                   "time unit must be one of WORKDAYS/DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
     }
 }
@@ -825,7 +825,7 @@ TEST_F(CelonisAddTimeunitsCalendarTest, const_malformed_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar({"UNKNOWN"});
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "[prepare] Calendar specification column is malformed.");
+        EXPECT_EQ(result.status().message(), "[prepare] Calendar specification column is malformed.");
     }
     {
         Prepare();
@@ -836,7 +836,7 @@ TEST_F(CelonisAddTimeunitsCalendarTest, const_malformed_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
+        EXPECT_EQ(result.status().message(), "Calendar array can not contain null values.");
     }
 }
 
@@ -850,7 +850,7 @@ TEST_F(CelonisAddTimeunitsCalendarTest, non_const_malformed_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar specification column is malformed.");
+        EXPECT_EQ(result.status().message(), "Calendar specification column is malformed.");
     }
     {
         Prepare();
@@ -861,7 +861,7 @@ TEST_F(CelonisAddTimeunitsCalendarTest, non_const_malformed_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
+        EXPECT_EQ(result.status().message(), "Calendar array can not contain null values.");
     }
 }
 
