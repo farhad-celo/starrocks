@@ -171,4 +171,4 @@ main() {
   trigger_workflow_and_wait
 }
 
-main $1 $2 $3 $4
+main "$1" "$2" "$3" "$4"

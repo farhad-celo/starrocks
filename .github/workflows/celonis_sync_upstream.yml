@@ -27,25 +27,21 @@ jobs:
         run: |
           git branch
           git remote add upstream https://github.com/StarRocks/starrocks.git
-        continue-on-error: true
 
       - name: Fetch upstream ${{env.LATEST_UPSTREAM_BRANCH}}
         run: |
           git remote -v
           git fetch upstream ${LATEST_UPSTREAM_BRANCH}:${LATEST_UPSTREAM_BRANCH}
           git push origin ${LATEST_UPSTREAM_BRANCH}
-        continue-on-error: true
 
       - name: Fetch upstream ${{env.MAIN}}
         run: |
           git remote -v
           git fetch upstream ${MAIN}:${MAIN}
           git push origin ${MAIN}
-        continue-on-error: true
 
       - name: Fetch upstream ${{env.BRANCH_3_3}}
         run: |
           git remote -v
           git fetch upstream ${BRANCH_3_3}:${BRANCH_3_3}
           git push origin ${BRANCH_3_3}
-        continue-on-error: true
