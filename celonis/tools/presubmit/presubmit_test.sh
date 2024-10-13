@@ -23,4 +23,4 @@ export LD_LIBRARY_PATH=/var/local/thirdparty/installed/lib
 export GTEST_PARALLEL=celonis/tools/gtest-parallel/gtest-parallel
 export PYTHON=python3
 
-./run-be-ut.sh --clean
+./run-be-ut.sh -j `nproc` --clean

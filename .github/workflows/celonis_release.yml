@@ -28,11 +28,20 @@ env:
 
 jobs:
   build-image:
-    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
+    runs-on:
+      - runs-on
+      - image=ubuntu22-full-x64
+      - "run-id=${{ github.run_id }}"
+      - family=c5ad.8xlarge
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: update docker data root
+        run: |
+          echo '{"data-root": "/home/runner/_work/docker"}' | sudo tee /etc/docker/daemon.json > /dev/null
+          sudo systemctl restart docker
+          sudo cat /etc/docker/daemon.json
 
       - name: Pull dev env image
         run: |
