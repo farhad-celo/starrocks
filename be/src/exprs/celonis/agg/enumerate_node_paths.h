@@ -29,6 +29,90 @@ struct ColumnsKey {
 
     // If o is -1, it constructs a key with all NULLs.
     ColumnsKey(CommonInfo* ci, int32_t o) : info(ci), offset(o) {
+        if (has_any_null()) {
+            // Special key with any NULL
+            for (int i = 0; i < info->num_columns; ++i) {
+                HashUtil::hash_combine(hash, 0);
+            }
+            return;
+        }
+        bool any_null = false;
+        for (int i = 0; i < info->num_columns; ++i) {
+            if (info->columns[i]->is_null(offset)) {
+                HashUtil::hash_combine(hash, 0);
+                any_null = true;
+                continue;
+            }
+            const auto type = info->types[i];
+            switch (type) {
+                case TYPE_VARCHAR:
+                    HashUtil::hash_combine(hash, SliceHash()(info->columns[i]->get(offset).get_slice()));
+                    break;
+#define M(type) \
+                case type: \
+                    HashUtil::hash_combine(hash, StdHash<RunTimeCppType<type>>()(info->columns[i]->get(offset).get<RunTimeCppType<type>>())); \
+                    break;
+
+                APPLY_FOR_ALL_NUMBER_TYPE(M)
+                M(TYPE_DATETIME)
+#undef M
+                default:
+                    throw std::runtime_error(fmt::format("Type {} not supported", type));
+            }
+        }
+        if (any_null) {
+            offset = -1;
+            hash = 0;
+            for (int i = 0; i < info->num_columns; ++i) {
+                HashUtil::hash_combine(hash, 0);
+            }
+        }
+    }
+
+    Datum get(int idx) const {
+        if (has_any_null()) {
+            return kNullDatum;
+        }
+        return info->columns[idx]->get(offset);
+    }
+
+    bool has_any_null() const {
+        return offset == -1;
+    }
+};
+
+struct EqualOnColumnsKey {
+    bool operator()(const ColumnsKey& x, const ColumnsKey& y) const {
+        DCHECK_EQ(x.info->num_columns, y.info->num_columns);
+        if (x.hash != y.hash) return false;
+        if (x.has_any_null()) {
+            return y.has_any_null();
+        } else if (y.has_any_null()) {
+            return false;
+        } else {
+            for (int i = 0; i < x.info->num_columns; ++i) {
+                if (x.info->columns[i]->equals(x.offset, *y.info->columns[i], y.offset) != Column::EQUALS_TRUE) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+};
+
+struct HashOnColumnsKey {
+    std::size_t operator()(const ColumnsKey& x) const { return x.hash; }
+};
+
+struct DedupColumnsKey {
+    size_t hash{0};
+    ColumnsKey::CommonInfo* info;
+    int32_t offset;
+
+    DedupColumnsKey() = default;
+
+    // If o is -1, it constructs a key with all NULLs.
+    DedupColumnsKey(ColumnsKey::CommonInfo* ci, int32_t o) : info(ci), offset(o) {
         if (is_all_nulls()) {
             // Special key with all NULLs
             for (int i = 0; i < info->num_columns; ++i) {
@@ -77,8 +161,8 @@ struct ColumnsKey {
     }
 };
 
-struct EqualOnColumnsKey {
-    bool operator()(const ColumnsKey& x, const ColumnsKey& y) const {
+struct EqualOnDedupColumnsKey {
+    bool operator()(const DedupColumnsKey& x, const DedupColumnsKey& y) const {
         DCHECK_EQ(x.info->num_columns, y.info->num_columns);
         if (x.hash != y.hash) return false;
         if (x.is_all_nulls()) {
@@ -96,12 +180,13 @@ struct EqualOnColumnsKey {
     }
 };
 
-struct HashOnColumnsKey {
-    std::size_t operator()(const ColumnsKey& x) const { return x.hash; }
+struct HashOnDedupColumnsKey {
+    std::size_t operator()(const DedupColumnsKey& x) const { return x.hash; }
 };
 
 using ColumnsKeyHashMap = phmap::flat_hash_map<ColumnsKey, int32_t, HashOnColumnsKey, EqualOnColumnsKey>;
 using ColumnsKeyHashSet = phmap::flat_hash_set<ColumnsKey, HashOnColumnsKey, EqualOnColumnsKey>;
+using DedupColumnsKeyHashSet = phmap::flat_hash_set<DedupColumnsKey, HashOnDedupColumnsKey, EqualOnDedupColumnsKey>;
 
 // input columns result in intermediate result: struct{array[outCol.field0], array[outCol.field1], ...,
 // array[inCol.field0], ..., array[pkCol.fieldN], array[col3]... array[col8], varbinary}
@@ -129,7 +214,7 @@ struct CelonisEnumerateAggregateState {
 
     // To deduplicate rows by (OUT_COLUMNS, IN_COLUMNS, [PK_COLUMNS]).
     ColumnsKey::CommonInfo columns_key_info;
-    std::unique_ptr<ColumnsKeyHashSet> hash_set = nullptr;
+    std::unique_ptr<DedupColumnsKeyHashSet> hash_set = nullptr;
 
     // Options with constant columns
     bool allow_cycles = false;

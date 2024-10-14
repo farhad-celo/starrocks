@@ -349,6 +349,38 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_fields) {
     Run(value_lts, input1, input2, max_len, expected);
 }
 
+TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_fields_any_null_1) {
+    auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR, LogicalType::TYPE_BIGINT};
+
+    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B"}, DatumArray{1L, 2L}},
+                                                   {DatumArray{kNullDatum, "C"}, DatumArray{10L, 3L}}};
+    std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"C"}, DatumArray{3L}},
+                                                   {DatumArray{"D"}, DatumArray{4L}}};
+    int max_len = 10;
+
+    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"A", "B", "B", "B", "C", "C", "D"},
+                                                             DatumArray{1L, 2L, 2L, 2L, 3L, 3L, 4L}},
+                                                     {DatumArray{"A", "B", "C", "D", "C", "D", "D"},
+                                                             DatumArray{1L, 2L, 3L, 4L, 3L, 4L, 4L}}};
+    Run(value_lts, input1, input2, max_len, expected);
+}
+
+TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_fields_any_null_2) {
+    auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR, LogicalType::TYPE_BIGINT};
+
+    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B"}, DatumArray{1L, 2L}},
+                                                   {DatumArray{"A", "C"}, DatumArray{kNullDatum, 3L}}};
+    std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"C"}, DatumArray{3L}},
+                                                   {DatumArray{"D"}, DatumArray{4L}}};
+    int max_len = 10;
+
+    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"A", "B", "B", "B", "C", "C", "D"},
+                                                             DatumArray{1L, 2L, 2L, 2L, 3L, 3L, 4L}},
+                                                     {DatumArray{"A", "B", "C", "D", "C", "D", "D"},
+                                                             DatumArray{1L, 2L, 3L, 4L, 3L, 4L, 4L}}};
+    Run(value_lts, input1, input2, max_len, expected);
+}
+
 TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_chunks) {
     auto old_vector_chunk_size = config::vector_chunk_size;
     config::vector_chunk_size = 10;

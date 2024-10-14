@@ -348,14 +348,14 @@ TEST_F(CelonisEnumerateNodePathsTest, ex3_all) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
     auto pk_lts = std::vector<LogicalType>{LogicalType::TYPE_BIGINT};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "C"}},
-                                                   {DatumArray{kNullDatum, "C", "D", "E"}}};
+    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "C", kNullDatum}},
+                                                   {DatumArray{kNullDatum, "C", "D", "E", "I"}}};
     std::vector<DatumArray> options1 = {DatumArray{},
                                         DatumArray{},
                                         DatumArray{},
                                         DatumArray{},
-                                        DatumArray{true, true, true, true},
-                                        DatumArray{true, true, false, true}};
+                                        DatumArray{true, true, true, true, true},
+                                        DatumArray{true, true, false, true, true}};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"D", "D", "E", "E", "F"}},
                                                    {DatumArray{"F", "G", "G", "H", "G"}}};
     std::vector<DatumArray> options2 = {DatumArray{},
@@ -364,12 +364,14 @@ TEST_F(CelonisEnumerateNodePathsTest, ex3_all) {
                                         DatumArray{},
                                         DatumArray{false, false, true, true, true},
                                         DatumArray{true, true, true, true, true}};
+
     bool allow_cycles = false;
     std::string lc = "LESS_EQUAL";
     int len = 10;
 
     std::vector<std::vector<DatumArray>> expected = {
             {
+                    DatumArray{"I"},
                     DatumArray{"B", "C", "E", "H"},
                     DatumArray{"B", "C", "E", "G"},
                     DatumArray{"A"},

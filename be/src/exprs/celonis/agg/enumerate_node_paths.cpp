@@ -538,7 +538,7 @@ void CelonisEnumerateAggregateState::update(FunctionContext* ctx, const Column**
             .columns = const_cast<Column**>(columns), .types = logical_types->data(), .num_columns = key_col_num};
     for (int32_t offset = row_num; offset < row_num + size; ++offset) {
         // Deduplicate rows.
-        ColumnsKey tmp_key{&input_columns_key_info, offset};
+        DedupColumnsKey tmp_key{&input_columns_key_info, offset};
         if (hash_set->contains(tmp_key)) {
             continue;
         }
@@ -671,7 +671,7 @@ void CelonisEnumerateAggregateFunction::create_impl(FunctionContext* ctx, Celoni
     state.columns_key_info.columns = state.data_raw_columns->data();
     state.columns_key_info.types = state.logical_types->data();
     state.columns_key_info.num_columns = state.key_col_num;
-    state.hash_set = std::make_unique<ColumnsKeyHashSet>();
+    state.hash_set = std::make_unique<DedupColumnsKeyHashSet>();
 }
 
 void CelonisEnumerateAggregateFunction::reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state)
