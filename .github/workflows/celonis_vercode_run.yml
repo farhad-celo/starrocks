@@ -23,7 +23,7 @@ jobs:
   # SAST
   static-analysis-java:
     if: ${{ inputs.executeStaticAnalysis || github.event_name == 'schedule' }}
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,hdd=16,"run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
