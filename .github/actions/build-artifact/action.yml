@@ -37,7 +37,7 @@ runs:
         echo "Build type is ${build_type}"
 
         # Build image and always remove intermediate containers.
-        DOCKER_BUILDKIT=1 docker buildx build --force-rm=true \
+        DOCKER_BUILDKIT=1 docker buildx build -q --force-rm=true \
           --build-arg RELEASE_VERSION=${{inputs.image_tag}} \
           --build-arg builder=${{inputs.dev_env_image}} \
           --build-arg BUILD_TYPE=${build_type} \

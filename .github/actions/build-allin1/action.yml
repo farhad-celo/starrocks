@@ -55,7 +55,7 @@ runs:
         fi
 
         # Build image and always remove intermediate containers.
-        DOCKER_BUILDKIT=1 docker buildx build --force-rm=true \
+        DOCKER_BUILDKIT=1 docker buildx build -q --force-rm=true \
           --build-arg WITH_DEBUG_INFO=true \
           --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
           -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile \
