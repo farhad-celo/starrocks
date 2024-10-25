@@ -34,7 +34,8 @@ private:
         return struct_type;
     }
 
-    TypeDescriptor get_return_type(const TypeDescriptor& key_struct_type) {
+    TypeDescriptor
+    get_return_type(const TypeDescriptor& left_key_struct_type, const TypeDescriptor& right_key_struct_type) {
         TypeDescriptor struct_type;
         struct_type.type = LogicalType::TYPE_STRUCT;
 
@@ -42,35 +43,40 @@ private:
         struct_type.field_names.emplace_back("left");
         struct_type.children.emplace_back(LogicalType::TYPE_STRUCT);
         struct_type.field_names.emplace_back("right");
+        DCHECK_EQ(left_key_struct_type.children.size(), right_key_struct_type.children.size());
 
-        for (auto i = 0; i < key_struct_type.children.size(); ++i) {
-            struct_type.children[0].field_names.emplace_back(StrCat("Col ", key_struct_type.field_names[i]));
-            struct_type.children[0].children.emplace_back(key_struct_type.children[i]);
-            struct_type.children[1].field_names.emplace_back(StrCat("Col ", key_struct_type.field_names[i]));
-            struct_type.children[1].children.emplace_back(key_struct_type.children[i]);
+        for (auto i = 0; i < left_key_struct_type.children.size(); ++i) {
+            struct_type.children[0].field_names.emplace_back(StrCat("Col ", left_key_struct_type.field_names[i]));
+            struct_type.children[0].children.emplace_back(left_key_struct_type.children[i]);
+            struct_type.children[1].field_names.emplace_back(StrCat("Col ", right_key_struct_type.field_names[i]));
+            struct_type.children[1].children.emplace_back(right_key_struct_type.children[i]);
         }
         return struct_type;
     }
 
-    std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& key_struct_type) {
+    std::unique_ptr<FunctionContext>
+    get_ctx(const TypeDescriptor& left_key_struct_type, const TypeDescriptor& right_key_struct_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(key_struct_type),
+                AnyValUtil::column_type_to_type_desc(left_key_struct_type),
                 AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_DATETIME),
-                AnyValUtil::column_type_to_type_desc(key_struct_type),
+                AnyValUtil::column_type_to_type_desc(right_key_struct_type),
                 AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_DATETIME),
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN))
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type(key_struct_type));
+        auto return_type = AnyValUtil::column_type_to_type_desc(
+                get_return_type(left_key_struct_type, right_key_struct_type));
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
 
-    void Prepare(const std::vector<LogicalType>& logical_types) {
-        auto key_struct_type = logical_types_to_struct_type(logical_types);
-        ctx_ = get_ctx(key_struct_type);
-        left_primary_keys_column_ = ColumnHelper::create_column(key_struct_type, true);
+    void
+    Prepare(const std::vector<LogicalType>& left_logical_types, const std::vector<LogicalType>& right_logical_types) {
+        auto left_key_struct_type = logical_types_to_struct_type(left_logical_types);
+        auto right_key_struct_type = logical_types_to_struct_type(right_logical_types);
+        ctx_ = get_ctx(left_key_struct_type, right_key_struct_type);
+        left_primary_keys_column_ = ColumnHelper::create_column(left_key_struct_type, true);
         left_timestamps_column_ = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, true);
-        right_primary_keys_column_ = ColumnHelper::create_column(key_struct_type, true);
+        right_primary_keys_column_ = ColumnHelper::create_column(right_key_struct_type, true);
         right_timestamps_column_ = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, true);
         first_last_only_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_BOOLEAN), true);
     }
@@ -165,14 +171,14 @@ private:
 };
 
 TEST_F(CelonisTransitsInterleavedTest, empty_input) {
-    Prepare({TYPE_VARCHAR});
+    Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
     const auto result = Run().value();
     ASSERT_TRUE(result->empty());
 }
 
 TEST_F(CelonisTransitsInterleavedTest, null_column_input) {
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1"}};
         AddRow(std::nullopt,
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
@@ -182,7 +188,7 @@ TEST_F(CelonisTransitsInterleavedTest, null_column_input) {
         EXPECT_TRUE(result->get(0).is_null());
     }
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"}};
         AddRow(left_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt,
@@ -192,7 +198,7 @@ TEST_F(CelonisTransitsInterleavedTest, null_column_input) {
         EXPECT_TRUE(result->get(0).is_null());
     }
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1"}};
         AddRow(left_keys_arrays,
@@ -203,7 +209,7 @@ TEST_F(CelonisTransitsInterleavedTest, null_column_input) {
         EXPECT_TRUE(result->get(0).is_null());
     }
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1"}};
         AddRow(left_keys_arrays,
@@ -214,7 +220,7 @@ TEST_F(CelonisTransitsInterleavedTest, null_column_input) {
         EXPECT_TRUE(result->get(0).is_null());
     }
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1"}};
         AddRow(left_keys_arrays,
@@ -228,22 +234,24 @@ TEST_F(CelonisTransitsInterleavedTest, null_column_input) {
 
 TEST_F(CelonisTransitsInterleavedTest, different_key_length) {
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"}};
         AddRow(left_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
-               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0), TimestampValue::create(1970, 1, 7, 0, 0, 0)}, false);
+               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0), TimestampValue::create(1970, 1, 7, 0, 0, 0)},
+               false);
         const auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1"}}, {DatumArray{"R1"}});
     }
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1"}};
         AddRow(left_keys_arrays,
-               DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0), TimestampValue::create(1970, 1, 6, 0, 0, 0)}, right_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0), TimestampValue::create(1970, 1, 6, 0, 0, 0)},
+               right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 7, 0, 0, 0)}, false);
         const auto result = Run().value();
         ASSERT_EQ(1, result->size());
@@ -253,7 +261,7 @@ TEST_F(CelonisTransitsInterleavedTest, different_key_length) {
 
 TEST_F(CelonisTransitsInterleavedTest, inconsistent_keys_length) {
     {
-        Prepare({TYPE_VARCHAR, TYPE_BIGINT});
+        Prepare({TYPE_VARCHAR, TYPE_BIGINT}, {TYPE_VARCHAR, TYPE_BIGINT});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"},
                                                                                           DatumArray{1L, 2L}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"},
@@ -267,7 +275,7 @@ TEST_F(CelonisTransitsInterleavedTest, inconsistent_keys_length) {
         EXPECT_TRUE(result->get(0).is_null());
     }
     {
-        Prepare({TYPE_VARCHAR, TYPE_BIGINT});
+        Prepare({TYPE_VARCHAR, TYPE_BIGINT}, {TYPE_VARCHAR, TYPE_BIGINT});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"},
                                                                                           DatumArray{1L, 2L}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"},
@@ -285,7 +293,7 @@ TEST_F(CelonisTransitsInterleavedTest, inconsistent_keys_length) {
 
 TEST_F(CelonisTransitsInterleavedTest, null_timestamp) {
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"}};
         AddRow(left_keys_arrays,
@@ -297,7 +305,7 @@ TEST_F(CelonisTransitsInterleavedTest, null_timestamp) {
         EXPECT_TRUE(result->get(0).is_null());
     }
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"}};
         AddRow(left_keys_arrays,
@@ -312,7 +320,7 @@ TEST_F(CelonisTransitsInterleavedTest, null_timestamp) {
 
 TEST_F(CelonisTransitsInterleavedTest, wrong_timestamps_length) {
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"}};
         AddRow(left_keys_arrays,
@@ -324,7 +332,7 @@ TEST_F(CelonisTransitsInterleavedTest, wrong_timestamps_length) {
         EXPECT_TRUE(result->get(0).is_null());
     }
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"}};
         AddRow(left_keys_arrays,
@@ -339,7 +347,7 @@ TEST_F(CelonisTransitsInterleavedTest, wrong_timestamps_length) {
 }
 
 TEST_F(CelonisTransitsInterleavedTest, empty_keys) {
-    Prepare({TYPE_VARCHAR});
+    Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
     std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{}};
     std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{}};
     AddRow(left_keys_arrays, DatumArray{}, right_keys_arrays, DatumArray{}, false);
@@ -348,9 +356,42 @@ TEST_F(CelonisTransitsInterleavedTest, empty_keys) {
     Validate(result, 0, {DatumArray{}}, {DatumArray{}});
 }
 
+TEST_F(CelonisTransitsInterleavedTest, different_left_key_type_and_right_key_type) {
+    {
+        Prepare({TYPE_VARCHAR}, {TYPE_BIGINT});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
+                DatumArray{"L1", "L2", "L3"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
+                DatumArray{1L, 2L, 3L}};
+        AddRow(left_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 3, 0, 0, 0),
+                          TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
+                          TimestampValue::create(1970, 1, 6, 0, 0, 0)}, false);
+        const auto result = Run().value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{"L1", "L2", "L2", "L3", "L3"}}, {DatumArray{1L, 1L, 2L, 2L, 3L}});
+    }
+    {
+        Prepare({TYPE_BIGINT}, {TYPE_VARCHAR});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
+                DatumArray{1L, 2L, 3L}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
+                DatumArray{"R1", "R2", "R3"}};
+        AddRow(left_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 3, 0, 0, 0),
+                          TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
+                          TimestampValue::create(1970, 1, 6, 0, 0, 0)}, false);
+        const auto result = Run().value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{1L, 2L, 2L, 3L, 3L}}, {DatumArray{"R1", "R1", "R2", "R2", "R3"}});
+    }
+}
+
 TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
                 DatumArray{"L1", "L2", "L3"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
@@ -365,7 +406,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
         Validate(result, 0, {DatumArray{"L1", "L2", "L2", "L3", "L3"}}, {DatumArray{"R1", "R1", "R2", "R2", "R3"}});
     }
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
                 DatumArray{"L1", "L2", "L3"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
@@ -380,7 +421,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
         Validate(result, 0, {DatumArray{"L2", "L3"}}, {DatumArray{"R1", "R3"}});
     }
     {
-        Prepare({TYPE_VARCHAR, TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR, TYPE_VARCHAR}, {TYPE_VARCHAR, TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"},
                                                                                           DatumArray{"W", "X"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"},
@@ -396,7 +437,23 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
                  {DatumArray{"R1", "R1", "R2"}, DatumArray{"Y", "Y", "Z"}});
     }
     {
-        Prepare({TYPE_VARCHAR, TYPE_BIGINT});
+        Prepare({TYPE_VARCHAR, TYPE_VARCHAR}, {TYPE_VARCHAR, TYPE_BIGINT});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"},
+                                                                                          DatumArray{"W", "X"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"},
+                                                                                           DatumArray{1L, 2L}};
+        AddRow(left_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 3, 0, 0, 0)},
+               right_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0)},
+               false);
+        const auto result = Run().value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{"L1", "L2", "L2"}, DatumArray{"W", "X", "X"}},
+                 {DatumArray{"R1", "R1", "R2"}, DatumArray{1L, 1L, 2L}});
+    }
+    {
+        Prepare({TYPE_VARCHAR, TYPE_BIGINT}, {TYPE_VARCHAR, TYPE_BIGINT});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1", "L2"},
                                                                                           DatumArray{1L, 2L}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1", "R2"},
@@ -416,7 +473,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
 TEST_F(CelonisTransitsInterleavedTest, first_last_only) {
     // result array length = 0
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{}};
         AddRow(left_keys_arrays, DatumArray{}, right_keys_arrays, DatumArray{}, true);
@@ -426,7 +483,7 @@ TEST_F(CelonisTransitsInterleavedTest, first_last_only) {
     }
     // result array length = 1
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{"R1"}};
         AddRow(left_keys_arrays,
@@ -436,9 +493,21 @@ TEST_F(CelonisTransitsInterleavedTest, first_last_only) {
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1"}}, {DatumArray{"R1"}});
     }
+    // result array length = 1
+    {
+        Prepare({TYPE_VARCHAR}, {TYPE_BIGINT});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{"L1"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{2L}};
+        AddRow(left_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
+               DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0)}, true);
+        const auto result = Run().value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{"L1"}}, {DatumArray{2L}});
+    }
     // result array length = 2
     {
-        Prepare({TYPE_VARCHAR});
+        Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
                 DatumArray{"L1", "L2", "L3"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
@@ -455,7 +524,7 @@ TEST_F(CelonisTransitsInterleavedTest, first_last_only) {
 }
 
 TEST_F(CelonisTransitsInterleavedTest, multiple_rows) {
-    Prepare({TYPE_VARCHAR});
+    Prepare({TYPE_VARCHAR}, {TYPE_VARCHAR});
     std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
             DatumArray{"L1", "L2", "L3"}};
     std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
