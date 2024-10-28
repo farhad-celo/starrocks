@@ -43,16 +43,20 @@ AppendNode(const Node& node, const Columns& left_key_fields, const Columns& righ
 void
 AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const Columns& right_key_fields,
          Columns& res_left_fields, Columns& res_right_fields, NullableColumn* null_column, size_t row) {
-    const auto n_fields = left_key_fields.size();
+    const auto n_left_fields = left_key_fields.size();
+    const auto n_right_fields = right_key_fields.size();
     std::vector<DatumArray> left_arrays;
     std::vector<DatumArray> right_arrays;
-    for (auto i = 0; i < n_fields; ++i) {
+    for (auto i = 0; i < n_left_fields; ++i) {
         DatumArray array;
         array.reserve(edges.size());
         left_arrays.push_back(array);
+    }
+    for (auto i = 0; i < n_right_fields; ++i) {
+        DatumArray array;
+        array.reserve(edges.size());
         right_arrays.push_back(array);
     }
-
     for (const auto& edge: edges) {
         if (edge.start.from_left) {
             DCHECK(!edge.end.from_left);
@@ -65,8 +69,10 @@ AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const C
         }
     }
     null_column->null_column_data().emplace_back(0);
-    for (auto i = 0; i < n_fields; ++i) {
+    for (auto i = 0; i < n_left_fields; ++i) {
         res_left_fields[i]->append_datum(left_arrays[i]);
+    }
+    for (auto i = 0; i < n_right_fields; ++i) {
         res_right_fields[i]->append_datum(right_arrays[i]);
     }
 }
@@ -112,7 +118,6 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
     const auto& right_timestamps_offsets = right_timestamps_data.offsets->get_data().data();
 
     ColumnViewer first_last_only_viewer = ColumnViewer<TYPE_BOOLEAN>(columns[4]);
-    const auto n_fields = left_key_fields.size();
     ColumnPtr res = context->create_column(context->get_return_type(), true);
     auto null_column = down_cast<NullableColumn*>(res.get());
     StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
@@ -124,14 +129,14 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
     auto res_right_fields = res_right_column->fields_column();
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
-            columns[3]->is_null(row) || columns[4]->is_null(row) || right_key_fields.size() != n_fields ||
-            n_fields == 0) {
+            columns[3]->is_null(row) || columns[4]->is_null(row) || left_key_fields.size() == 0 ||
+            right_key_fields.size() == 0) {
             res->append_nulls(1);
             continue;
         }
         const auto left_length = left_key_fields[0]->get(row).get_array().size();
         bool inconsistent_left_length = false;
-        for (auto i = 0; i < n_fields; ++i) {
+        for (auto i = 0; i < left_key_fields.size(); ++i) {
             if (left_key_fields[i]->get(row).get_array().size() != left_length) {
                 inconsistent_left_length = true;
                 break;
@@ -144,7 +149,7 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
 
         const auto right_length = right_key_fields[0]->get(row).get_array().size();
         bool inconsistent_right_length = false;
-        for (auto i = 0; i < n_fields; ++i) {
+        for (auto i = 0; i < right_key_fields.size(); ++i) {
             if (right_key_fields[i]->get(row).get_array().size() != right_length) {
                 inconsistent_right_length = true;
                 break;
@@ -158,6 +163,8 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
         const auto left_end = left_timestamps_offsets[row + 1];
         const auto right_start = right_timestamps_offsets[row];
         const auto right_end = right_timestamps_offsets[row + 1];
+        // The length of left_timestamps must match length of the struct elements of left_primary_keys.
+        // The length of right_timestamps must match length of the struct elements of right_primary_keys.
         if (left_length != left_end - left_start || right_length != right_end - right_start) {
             res->append_nulls(1);
             continue;
