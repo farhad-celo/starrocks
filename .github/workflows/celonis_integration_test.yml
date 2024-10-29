@@ -167,11 +167,7 @@ jobs:
 
   build-artifact:
     #    runs-on: [self-hosted, celostar, ec2-sr]
-    runs-on:
-      - runs-on
-      - image=ubuntu22-full-x64
-      - "run-id=${{ github.run_id }}"
-      - family=c5ad.8xlarge
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
     needs: sync-and-rebase-upstream
     env:
       test_image_tag: ${{needs.sync-and-rebase-upstream.outputs.test_image_tag}}
