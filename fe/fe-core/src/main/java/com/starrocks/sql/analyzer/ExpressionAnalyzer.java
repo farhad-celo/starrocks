@@ -1182,13 +1182,6 @@ public class ExpressionAnalyzer {
                                 " should be a struct, but real type is " +
                                 node.getChild(2).getType().toSql(), node.getPos());
                     }
-                    if (!node.getChild(0).getType().matchesType(node.getChild(2).getType())) {
-                        throw new SemanticException(fnName + "'s first input " + node.getChild(0).toSql() +
-                                " and third input " + node.getChild(2).toSql() +
-                                " should be the same struct types, but real types are " +
-                                node.getChild(0).getType().toSql() + " and " +
-                                node.getChild(2).getType().toSql(), node.getPos());
-                    }
                     if (node.getChild(1).getType().isNull()) {
                         throw new SemanticException(fnName + "'s 2th input leftMatch should not be NULL", node.getPos());
                     }
