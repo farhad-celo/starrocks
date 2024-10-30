@@ -537,6 +537,35 @@ TEST_F(CelonisTransitsMatchTest, empty_keys) {
     }
 }
 
+TEST_F(CelonisTransitsMatchTest, number_of_left_fields_different_from_right_fields) {
+    {
+        Prepare<TYPE_VARCHAR>({TYPE_BIGINT, TYPE_VARCHAR}, {TYPE_VARCHAR});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
+                DatumArray{1L, 2L, 3L}, DatumArray{"L1", "L2", "L3"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
+                DatumArray{"R1", "R2", "R3"}};
+        AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
+               DatumArray{"foo", "baz", "foo"});
+        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{1L, 1L, 3L, 3L}, DatumArray{"L1", "L1", "L3", "L3"}},
+                 {DatumArray{"R1", "R3", "R1", "R3"}});
+    }
+    {
+        Prepare<TYPE_VARCHAR>({TYPE_VARCHAR}, {TYPE_VARCHAR, TYPE_BIGINT});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
+                DatumArray{"L1", "L2", "L3"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
+                DatumArray{"R1", "R2", "R3"}, DatumArray{1L, 2L, 3L}};
+        AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
+               DatumArray{"foo", "baz", "foo"});
+        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}},
+                 {DatumArray{"R1", "R3", "R1", "R3"}, DatumArray{1L, 3L, 1L, 3L}});
+    }
+}
+
 TEST_F(CelonisTransitsMatchTest, different_left_key_type_and_right_key_type) {
     {
         Prepare<TYPE_VARCHAR>({TYPE_BIGINT}, {TYPE_VARCHAR});
@@ -652,6 +681,33 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
         const auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{"R1", "R3", "R1", "R3"}});
+    }
+    {
+        Prepare<TYPE_VARCHAR>({TYPE_VARCHAR, TYPE_BIGINT}, {TYPE_VARCHAR});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
+                DatumArray{"L1", "L2", "L3"}, DatumArray{11L, 22L, 33L}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{
+                DatumArray{"R1", "R2", "R3"}};
+        AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
+               DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
+        const auto result = Run().value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}, DatumArray{11L, 11L, 33L, 33L}},
+                 {DatumArray{"R1", "R3", "R1", "R3"}});
+    }
+    {
+        Prepare<TYPE_VARCHAR>({TYPE_VARCHAR}, {TYPE_BIGINT, TYPE_VARCHAR});
+        std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
+                DatumArray{"L1", "L2", "L3"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{11L, 22L, 33L},
+                                                                                           DatumArray{"R1", "R2",
+                                                                                                      "R3"}};
+        AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
+               DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
+        const auto result = Run().value();
+        ASSERT_EQ(1, result->size());
+        Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}},
+                 {DatumArray{11L, 33L, 11L, 33L}, DatumArray{"R1", "R3", "R1", "R3"}});
     }
     {
         Prepare<TYPE_VARCHAR>({TYPE_VARCHAR}, {TYPE_VARCHAR});

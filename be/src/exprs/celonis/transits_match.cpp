@@ -34,23 +34,29 @@ void AppendFields(const Columns& source_fields, std::vector<DatumArray>& arrays,
 void
 AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const Columns& right_key_fields,
          Columns& res_left_fields, Columns& res_right_fields, NullableColumn* null_column, size_t row) {
-    const auto n_fields = left_key_fields.size();
+    const auto n_left_fields = left_key_fields.size();
+    const auto n_right_fields = right_key_fields.size();
     std::vector<DatumArray> left_arrays;
     std::vector<DatumArray> right_arrays;
-    for (auto i = 0; i < n_fields; ++i) {
+    for (auto i = 0; i < n_left_fields; ++i) {
         DatumArray array;
         array.reserve(edges.size());
         left_arrays.push_back(array);
+    }
+    for (auto i = 0; i < n_right_fields; ++i) {
+        DatumArray array;
+        array.reserve(edges.size());
         right_arrays.push_back(array);
     }
-
     for (const auto& edge: edges) {
         AppendFields(left_key_fields, left_arrays, row, edge.left_index);
         AppendFields(right_key_fields, right_arrays, row, edge.right_index);
     }
     null_column->null_column_data().emplace_back(0);
-    for (auto i = 0; i < n_fields; ++i) {
+    for (auto i = 0; i < n_left_fields; ++i) {
         res_left_fields[i]->append_datum(left_arrays[i]);
+    }
+    for (auto i = 0; i < n_right_fields; ++i) {
         res_right_fields[i]->append_datum(right_arrays[i]);
     }
 }
@@ -164,7 +170,6 @@ CelonisTransitsMatch::transits_match_non_constant_manual([[maybe_unused]] starro
     auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();
 
-    const auto n_fields = left_key_fields.size();
     ColumnPtr res = context->create_column(context->get_return_type(), true);
     auto null_column = down_cast<NullableColumn*>(res.get());
     StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
@@ -176,7 +181,7 @@ CelonisTransitsMatch::transits_match_non_constant_manual([[maybe_unused]] starro
     auto res_right_fields = res_right_column->fields_column();
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
-            columns[3]->is_null(row) || right_key_fields.size() != n_fields || n_fields == 0 ||
+            columns[3]->is_null(row) || left_key_fields.size() == 0 || right_key_fields.size() == 0 ||
             (columns[4]->is_null(row) != columns[5]->is_null(row))) {
             res->append_nulls(1);
             continue;
@@ -184,7 +189,7 @@ CelonisTransitsMatch::transits_match_non_constant_manual([[maybe_unused]] starro
 
         const auto left_length = left_key_fields[0]->get(row).get_array().size();
         bool inconsistent_left_length = false;
-        for (auto i = 0; i < n_fields; ++i) {
+        for (auto i = 0; i < left_key_fields.size(); ++i) {
             if (left_key_fields[i]->get(row).get_array().size() != left_length) {
                 inconsistent_left_length = true;
                 break;
@@ -197,7 +202,7 @@ CelonisTransitsMatch::transits_match_non_constant_manual([[maybe_unused]] starro
 
         const auto right_length = right_key_fields[0]->get(row).get_array().size();
         bool inconsistent_right_length = false;
-        for (auto i = 0; i < n_fields; ++i) {
+        for (auto i = 0; i < right_key_fields.size(); ++i) {
             if (right_key_fields[i]->get(row).get_array().size() != right_length) {
                 inconsistent_right_length = true;
                 break;
@@ -288,7 +293,6 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
     auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();
 
-    const auto n_fields = left_key_fields.size();
     ColumnPtr res = context->create_column(context->get_return_type(), true);
     auto null_column = down_cast<NullableColumn*>(res.get());
     StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
@@ -304,14 +308,15 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
 
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
-            columns[3]->is_null(row) || right_key_fields.size() != n_fields || n_fields == 0 || state->is_malformed) {
+            columns[3]->is_null(row) || left_key_fields.size() == 0 || right_key_fields.size() == 0 ||
+            state->is_malformed) {
             res->append_nulls(1);
             continue;
         }
 
         const auto left_length = left_key_fields[0]->get(row).get_array().size();
         bool inconsistent_left_length = false;
-        for (auto i = 0; i < n_fields; ++i) {
+        for (auto i = 0; i < left_key_fields.size(); ++i) {
             if (left_key_fields[i]->get(row).get_array().size() != left_length) {
                 inconsistent_left_length = true;
                 break;
@@ -324,7 +329,7 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
 
         const auto right_length = right_key_fields[0]->get(row).get_array().size();
         bool inconsistent_right_length = false;
-        for (auto i = 0; i < n_fields; ++i) {
+        for (auto i = 0; i < right_key_fields.size(); ++i) {
             if (right_key_fields[i]->get(row).get_array().size() != right_length) {
                 inconsistent_right_length = true;
                 break;
