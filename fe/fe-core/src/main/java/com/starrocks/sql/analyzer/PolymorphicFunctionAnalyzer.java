@@ -129,7 +129,7 @@ public class PolymorphicFunctionAnalyzer {
             for (StructField structField : structType1.getFields()) {
                 sf1.add(new StructField(structField.getName(), structField.getType()));
             }
-            StructType structType2 = (StructType) types[2];
+            StructType structType2 = (StructType) types[3];
             ArrayList<StructField> sf2 = Lists.newArrayList();
             for (StructField structField : structType2.getFields()) {
                 sf2.add(new StructField(structField.getName(), structField.getType()));

@@ -1455,7 +1455,7 @@ celostar_functions = [
     [1001000, 'celonis_multi_in',     True, False, 'BOOLEAN', ['ANY_STRUCT', 'ANY_STRUCT'], 'CelonisMultiIn::multi_in', 'CelonisMultiIn::prepare', 'CelonisMultiIn::close'],
     [1001101, 'celonis_adjust_daily_timestamps', True, False, 'ANY_STRUCT', ['ARRAY_DATETIME', 'ARRAY_BOOLEAN', 'ARRAY_BIGINT'], 'CelonisAdjustDailyTimestamps::celonis_adjust_daily_timestamps'],
     [1001102, 'celonis_adjust_daily_timestamps', True, False, 'ANY_STRUCT', ['ARRAY_DATETIME', 'ARRAY_BOOLEAN'], 'CelonisAdjustDailyTimestamps::celonis_adjust_daily_timestamps'],
-    [1001200, 'celonis_transits_interleaved', True, False, 'ANY_STRUCT', ['ANY_STRUCT', 'ARRAY_DATETIME', 'ANY_STRUCT', 'ARRAY_DATETIME', 'BOOLEAN'], 'CelonisTransitsInterleaved::transits_interleaved'],
+    [1001200, 'celonis_transits_interleaved', True, False, 'ANY_STRUCT', ['ANY_STRUCT', 'ARRAY_DATETIME', 'ANY_ARRAY', 'ANY_STRUCT', 'ARRAY_DATETIME', 'ANY_ARRAY', 'BOOLEAN'], 'CelonisTransitsInterleaved::transits_interleaved'],
     [1001300, 'celonis_transits_match', True, False, 'ANY_STRUCT', ['ANY_STRUCT', 'ANY_ARRAY', 'ANY_STRUCT', 'ANY_ARRAY', 'ANY_ARRAY', 'ANY_ARRAY'], 'CelonisTransitsMatch::transits_match', 'CelonisTransitsMatch::prepare', 'CelonisTransitsMatch::close'],
 
     # Array functions

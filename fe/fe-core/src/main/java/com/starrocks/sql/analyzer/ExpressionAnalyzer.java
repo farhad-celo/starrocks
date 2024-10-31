@@ -1139,30 +1139,35 @@ public class ExpressionAnalyzer {
                     }
                     break;
                 case FunctionSet.CELONIS_TRANSITS_INTERLEAVED:
-                    if (node.getChildren().size() != 5) {
-                        throw new SemanticException(fnName + " should have 5 inputs, but really have "
-                                + node.getChildren().size() + " inputs. 5 inputs are STRUCT leftPrimaryKeys, "
-                                + "ARRAY_DATETIME leftTimestamps, STRUCT rightPrimaryKeys, "
-                                + "ARRAY_DATETIME rightTimestamps and BOOLEAN firstLastOnly", node.getPos());
+                    if (node.getChildren().size() != 7) {
+                        throw new SemanticException(fnName + " should have 7 inputs, but really have "
+                                + node.getChildren().size() + " inputs. 7 inputs are STRUCT leftPrimaryKeys, "
+                                + "ARRAY_DATETIME leftTimestamps, ANY_ARRAY leftSortings, STRUCT rightPrimaryKeys, "
+                                + "ARRAY_DATETIME rightTimestamps, ANY_ARRAY rightSortings, and BOOLEAN firstLastOnly",
+                                node.getPos());
                     }
                     if (!node.getChild(0).getType().isStructType()) {
                         throw new SemanticException(fnName + "'s first input outColumns " + node.getChild(0).toSql() +
                                 " should be a struct, but real type is " +
                                 node.getChild(0).getType().toSql(), node.getPos());
                     }
-                    if (!node.getChild(2).getType().isStructType()) {
-                        throw new SemanticException(fnName + "'s third input inColumns " + node.getChild(2).toSql() +
+                    if (!node.getChild(3).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s fourth input inColumns " + node.getChild(3).toSql() +
                                 " should be a struct, but real type is " +
-                                node.getChild(2).getType().toSql(), node.getPos());
+                                node.getChild(3).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(2).getType().matchesType(node.getChild(5).getType())) {
+                        throw new SemanticException(fnName + "'s 3rd input leftSortings should have the same type "
+                                + "as 6th input rightSortings.", node.getPos());
                     }
                     if (node.getChild(1).getType().isNull()) {
-                        throw new SemanticException(fnName + "'s 2th input leftTimestamps should not be NULL", node.getPos());
-                    }
-                    if (node.getChild(3).getType().isNull()) {
-                        throw new SemanticException(fnName + "'s 4th input rightTimestamps should not be NULL", node.getPos());
+                        throw new SemanticException(fnName + "'s 2nd input leftTimestamps should not be NULL", node.getPos());
                     }
                     if (node.getChild(4).getType().isNull()) {
-                        throw new SemanticException(fnName + "'s 5th input firstLastOnly should not be NULL", node.getPos());
+                        throw new SemanticException(fnName + "'s 5th input rightTimestamps should not be NULL", node.getPos());
+                    }
+                    if (node.getChild(6).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 6th input firstLastOnly should not be NULL", node.getPos());
                     }
                     break;
                 case FunctionSet.CELONIS_TRANSITS_MATCH:

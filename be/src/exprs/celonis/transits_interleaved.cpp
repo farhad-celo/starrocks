@@ -3,7 +3,6 @@
 #include "column/array_column.h"
 #include "column/column_viewer.h"
 #include "column/struct_column.h"
-#include "column/column_builder.h"
 #include "column/column_helper.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
@@ -97,11 +96,10 @@ std::vector<Edge> keep_first_and_last(const std::vector<Edge>& edges) {
 StatusOr<ColumnPtr>
 CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::FunctionContext* context,
                                                  const starrocks::Columns& columns) {
-    DCHECK_EQ(5, columns.size());
-    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+    DCHECK_EQ(7, columns.size());
     const size_t n_rows = columns[0]->size();
     auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
-    auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();
+    auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[3].get()))->fields();
 
     ColumnPtr left_timestamps_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[1]);
     UnnestedArrayData left_timestamps_data = prepare_array_input(left_timestamps_column.get());
@@ -110,14 +108,41 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
             down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*left_timestamps_data.elements).get_data().data();
     const auto& left_timestamps_offsets = left_timestamps_data.offsets->get_data().data();
 
-    ColumnPtr right_timestamps_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[3]);
+    ColumnPtr right_timestamps_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[4]);
     UnnestedArrayData right_timestamps_data = prepare_array_input(right_timestamps_column.get());
     DCHECK(right_timestamps_data.elements->is_timestamp());
     const auto& right_timestamps =
             down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*right_timestamps_data.elements).get_data().data();
     const auto& right_timestamps_offsets = right_timestamps_data.offsets->get_data().data();
 
-    ColumnViewer first_last_only_viewer = ColumnViewer<TYPE_BOOLEAN>(columns[4]);
+    // Use sorting columns when both left_sortings and right_sortings are not NULL literal.
+    const bool has_sorting_columns = (!columns[2]->has_null()) && (!columns[5]->has_null());
+    ColumnPtr left_sortings_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[2]);
+    ColumnPtr right_sortings_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[5]);
+    if (has_sorting_columns) {
+        UnnestedArrayData left_sortings_array_data = prepare_array_input(left_sortings_column.get());
+        const auto& left_sortings_offsets = left_sortings_array_data.offsets->get_data().data();
+        for (auto row = 0; row < n_rows; ++row) {
+            const auto start = left_timestamps_offsets[row];
+            const auto end = left_timestamps_offsets[row + 1];
+            if (left_sortings_offsets[row] != start || left_sortings_offsets[row + 1] != end) {
+                return Status::InvalidArgument(
+                        "If provided, the size of left_sortings_array and left_timestamps_array should not be different.");
+            }
+        }
+        UnnestedArrayData right_sortings_array_data = prepare_array_input(right_sortings_column.get());
+        const auto& right_sortings_offsets = right_sortings_array_data.offsets->get_data().data();
+        for (auto row = 0; row < n_rows; ++row) {
+            const auto start = right_timestamps_offsets[row];
+            const auto end = right_timestamps_offsets[row + 1];
+            if (right_sortings_offsets[row] != start || right_sortings_offsets[row + 1] != end) {
+                return Status::InvalidArgument(
+                        "If provided, the size of right_sortings_array and right_timestamps_array should not be different.");
+            }
+        }
+    }
+
+    ColumnViewer first_last_only_viewer = ColumnViewer<TYPE_BOOLEAN>(columns[6]);
     ColumnPtr res = context->create_column(context->get_return_type(), true);
     auto null_column = down_cast<NullableColumn*>(res.get());
     StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
@@ -128,8 +153,8 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
     auto res_left_fields = res_left_column->fields_column();
     auto res_right_fields = res_right_column->fields_column();
     for (auto row = 0; row < n_rows; ++row) {
-        if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
-            columns[3]->is_null(row) || columns[4]->is_null(row) || left_key_fields.size() == 0 ||
+        if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[3]->is_null(row) ||
+            columns[4]->is_null(row) || columns[6]->is_null(row) || left_key_fields.size() == 0 ||
             right_key_fields.size() == 0) {
             res->append_nulls(1);
             continue;
@@ -187,6 +212,30 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
             res->append_nulls(1);
             continue;
         }
+        DatumArray left_sortings;
+        DatumArray right_sortings;
+        if (has_sorting_columns) {
+            left_sortings = left_sortings_column->get(row).get_array();
+            right_sortings = right_sortings_column->get(row).get_array();
+            bool has_null_sorting = false;
+            for (const auto& item: left_sortings) {
+                if (item.is_null()) {
+                    has_null_sorting = true;
+                    break;
+                }
+            }
+            for (const auto& item: right_sortings) {
+                if (item.is_null()) {
+                    has_null_sorting = true;
+                    break;
+                }
+            }
+            if (has_null_sorting) {
+                res->append_nulls(1);
+                continue;
+            }
+        }
+
         if (fields[0]->is_nullable()) {
             auto null_column_1 = down_cast<NullableColumn*>(fields[0].get());
             null_column_1->null_column_data().emplace_back(0);
@@ -201,14 +250,35 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
         size_t right_i = 0;
         while (left_i < left_length || right_i < right_length) {
             Node node = {false, 0};
+            // Make sure left_primary_keys are ordered based on left_timestamps and left_sortings.
             if (left_i < left_length && left_i > 0) {
-                DCHECK(left_timestamps[left_i + left_start] >= left_timestamps[left_i - 1 + left_start]);
+                if (has_sorting_columns) {
+                    DCHECK((left_timestamps[left_i - 1 + left_start] < left_timestamps[left_i + left_start]) ||
+                           (left_timestamps[left_i - 1 + left_start] == left_timestamps[left_i + left_start] &&
+                            !(left_sortings[left_i - 1].convert2DatumKey() >
+                              left_sortings[left_i].convert2DatumKey())));
+                } else {
+                    DCHECK(left_timestamps[left_i - 1 + left_start] <= left_timestamps[left_i + left_start]);
+                }
             }
+            // Make sure right_primary_keys are ordered based on right_timestamps and right_sortings.
             if (right_i < right_length && right_i > 0) {
-                DCHECK(right_timestamps[right_i + right_start] >= right_timestamps[right_i - 1 + right_start]);
+                if (has_sorting_columns) {
+                    DCHECK((right_timestamps[right_i - 1 + right_start] < right_timestamps[right_i + right_start]) ||
+                           (right_timestamps[right_i - 1 + right_start] == right_timestamps[right_i + right_start] &&
+                            !(right_sortings[right_i - 1].convert2DatumKey() >
+                              right_sortings[right_i].convert2DatumKey())));
+                } else {
+                    DCHECK(right_timestamps[right_i - 1 + right_start] <= right_timestamps[right_i + right_start]);
+                }
             }
             if (left_i < left_length && right_i < right_length) {
-                if (left_timestamps[left_i + left_start] <= right_timestamps[right_i + right_start]) {
+                if ((!has_sorting_columns &&
+                     left_timestamps[left_i + left_start] <= right_timestamps[right_i + right_start]) ||
+                    (has_sorting_columns &&
+                     ((left_timestamps[left_i + left_start] < right_timestamps[right_i + right_start]) ||
+                      (left_timestamps[left_i + left_start] == right_timestamps[right_i + right_start] &&
+                       !(left_sortings[left_i].convert2DatumKey() > right_sortings[right_i].convert2DatumKey()))))) {
                     node.from_left = true;
                     node.index = left_i++;
                 } else {
