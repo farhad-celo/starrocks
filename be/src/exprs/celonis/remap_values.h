@@ -16,7 +16,13 @@ public:
      */
     DEFINE_VECTORIZED_FN(remap_values);
 
+    // This function provides a specialized version of remap_values.
+    // It treats old_value_array and new_value_array columns as constant.
+    DEFINE_VECTORIZED_FN(remap_values_const);
+
     static Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status prepare_const(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
@@ -24,6 +30,8 @@ private:
     DEFINE_VECTORIZED_FN(remap_values_constant_value_map);
 
     DEFINE_VECTORIZED_FN(remap_values_non_constant_value_map);
+
+    DEFINE_VECTORIZED_FN(remap_values_const_non_constant_value_map);
 };
 
 } // namespace starrocks

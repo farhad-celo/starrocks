@@ -72,7 +72,9 @@ private:
 };
 
 template<LogicalType LT>
-Status CelonisRemapValues<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+Status prepare_helper(FunctionContext* context, FunctionContext::FunctionStateScope
+scope, StatusOr<ColumnPtr> (* func_const)(FunctionContext*, const starrocks::Columns&),
+                      StatusOr<ColumnPtr>(* func_general)(FunctionContext*, const starrocks::Columns&)) {
     using CppType = RunTimeCppValueType<LT>;
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
@@ -87,10 +89,10 @@ Status CelonisRemapValues<LT>::prepare(FunctionContext* context, FunctionContext
     // 2024-01-30 it returns false for Array Literal while get_constant_column(i) returns non nullptr.
     // For the same reason, columns[i]->is_constant() must not be used in celonis_remap_values().
     if (old_value_column == nullptr || new_value_column == nullptr) {
-        state->function = remap_values_non_constant_value_map;
+        state->function = func_general;
         return Status::OK();
     }
-    state->function = remap_values_constant_value_map;
+    state->function = func_const;
 
     if (old_value_column->is_null(0) || new_value_column->is_null(0)) {
         return Status::OK();
@@ -109,6 +111,17 @@ Status CelonisRemapValues<LT>::prepare(FunctionContext* context, FunctionContext
 }
 
 template<LogicalType LT>
+Status CelonisRemapValues<LT>::prepare_const(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    return prepare_helper<LT>(context, scope, remap_values_constant_value_map,
+                              remap_values_const_non_constant_value_map);
+}
+
+template<LogicalType LT>
+Status CelonisRemapValues<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    return prepare_helper<LT>(context, scope, remap_values_constant_value_map, remap_values_non_constant_value_map);
+}
+
+template<LogicalType LT>
 Status CelonisRemapValues<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
@@ -116,6 +129,50 @@ Status CelonisRemapValues<LT>::close(FunctionContext* context, FunctionContext::
         delete state;
     }
     return Status::OK();
+}
+
+template<LogicalType LT>
+StatusOr<ColumnPtr>
+CelonisRemapValues<LT>::remap_values_const_non_constant_value_map([[maybe_unused]]FunctionContext* context,
+                                                                  const Columns& columns) {
+    const auto& value_column = columns[0];
+    const auto& old_value_column = columns[1];
+    const auto& new_value_column = columns[2];
+    const bool has_default = columns.size() == 4;
+    auto num_rows = value_column->size();
+
+    auto unfolded_value_column = ColumnHelper::unfold_const_column(
+            TypeDescriptor::from_logical_type(context->get_arg_type(0)->type), columns[0]->size(), columns[0]);
+    auto result = NullableColumn::wrap_if_necessary(unfolded_value_column->clone_empty());
+
+    if (num_rows == 0) {
+        return result;
+    }
+
+    // Assume old_value_array and new_value_array columns are constant, use the first row to construct the map.
+    auto old_value_datum = old_value_column->get(0);
+    auto new_value_datum = new_value_column->get(0);
+    if (old_value_datum.is_null() || new_value_datum.is_null()) {
+        result->append_nulls(num_rows);
+        return result;
+    }
+    const auto& old_value_array = old_value_datum.get_array();
+    const auto& new_value_array = new_value_datum.get_array();
+    if (old_value_array.size() != new_value_array.size()) {
+        return Status::InvalidArgument("old value array must have the same length as new value array.");
+    }
+    const auto size = old_value_array.size();
+    auto state = RemapValuesStateFragmentLocal<LT>();
+    for (auto i = 0; i < size; ++i) {
+        state.insert(old_value_array[i], new_value_array[i]);
+    }
+
+    for (int row = 0; row < num_rows; ++row) {
+        auto value = value_column->get(row);
+        result->append_datum(
+                state.get(value, has_default ? std::optional<Datum>(columns[3]->get(row)) : std::nullopt));
+    }
+    return result;
 }
 
 template<LogicalType LT>
@@ -190,6 +247,14 @@ StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[ma
 
 template<LogicalType LT>
 StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values(FunctionContext* context, const Columns& columns) {
+    DCHECK(columns.size() == 3 || columns.size() == 4);
+    const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return state->function(context, columns);
+}
+
+template<LogicalType LT>
+StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_const(FunctionContext* context, const Columns& columns) {
     DCHECK(columns.size() == 3 || columns.size() == 4);
     const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
