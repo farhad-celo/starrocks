@@ -316,6 +316,23 @@ TEST_F(CelonisRemapValuesTest, celonis_remap_values_non_constant_string) {
         const LogicalType LT = TYPE_VARCHAR;
         Prepare<LT>();
 
+        AddRow(kNullDatum, DatumArray{"string1", kNullDatum}, DatumArray{"string2", "NULL"}, "default");
+        AddRow("string", DatumArray{"string", "string", "string1"},
+               DatumArray{"string-new-1", "string-new-2", kNullDatum}, "default");
+        AddRow("NULL", DatumArray{"string1", kNullDatum}, DatumArray{"string2", "NULL"}, kNullDatum);
+        AddRow("string", DatumArray{}, DatumArray{}, kNullDatum);
+
+        const auto result = Run<LT>(true).value();
+        ASSERT_EQ(4, result->size());
+        EXPECT_EQ("NULL", result->get(0).get_slice());
+        EXPECT_EQ("string-new-2", result->get(1).get_slice());
+        EXPECT_TRUE(result->get(2).is_null());
+        EXPECT_TRUE(result->get(3).is_null());
+    }
+    {
+        const LogicalType LT = TYPE_VARCHAR;
+        Prepare<LT>();
+
         AddRow("string", DatumArray{"string1", "string"}, DatumArray{"string2", "new-string"}, "default");
         AddRow("string3", DatumArray{"string1", "string"}, DatumArray{"string2", "new-string"}, "default");
 

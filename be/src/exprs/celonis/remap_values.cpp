@@ -127,11 +127,6 @@ CelonisRemapValues<LT>::remap_values_non_constant_value_map([[maybe_unused]]Func
     const auto& new_value_column = columns[2];
     const bool has_default = columns.size() == 4;
     auto num_rows = value_column->size();
-    DCHECK_EQ(old_value_column->size(), num_rows);
-    DCHECK_EQ(new_value_column->size(), num_rows);
-    if (has_default) {
-        DCHECK_EQ(columns[3]->size(), num_rows);
-    }
 
     auto unfolded_value_column = ColumnHelper::unfold_const_column(
             TypeDescriptor::from_logical_type(context->get_arg_type(0)->type), columns[0]->size(), columns[0]);
@@ -149,14 +144,26 @@ CelonisRemapValues<LT>::remap_values_non_constant_value_map([[maybe_unused]]Func
         if (old_value_array.size() != new_value_array.size()) {
             return Status::InvalidArgument("old value array must have the same length as new value array.");
         }
-        const auto size = old_value_array.size();
-        auto state = RemapValuesStateFragmentLocal<LT>();
-        for (auto i = 0; i < size; ++i) {
-            state.insert(old_value_array[i], new_value_array[i]);
+        const auto value = value_column->get(row);
+        const auto value_key = value.convert2DatumKey();
+        const int size = static_cast<int>(old_value_array.size());
+        bool found = false;
+        // Note that if a value is remapped in multiple pairs, only the last pair is used. So we traverse the remap
+        // pairs reversely.
+        for (int i = size - 1; i >= 0; --i) {
+            if (value_key == old_value_array[i].convert2DatumKey()) {
+                found = true;
+                result->append_datum(new_value_array[i]);
+                break;
+            }
         }
-        auto value = value_column->get(row);
-        result->append_datum(
-                state.get(value, has_default ? std::optional<Datum>(columns[3]->get(row)) : std::nullopt));
+        if (!found) {
+            if (has_default) {
+                result->append_datum(columns[3]->get(row));
+            } else {
+                result->append_datum(value);
+            }
+        }
     }
     return result;
 }
@@ -173,9 +180,6 @@ StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[ma
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
     auto num_rows = value_column->size();
-    if (has_default) {
-        DCHECK_EQ(columns[3]->size(), num_rows);
-    }
     for (int row = 0; row < num_rows; ++row) {
         auto value = value_column->get(row);
         result->append_datum(
