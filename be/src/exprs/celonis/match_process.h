@@ -25,6 +25,12 @@ struct VectorBoolHash {
 
 class CelonisMatchProcess {
 public:
+    /**
+     * @param: [activity_list, nfa_json_spec]
+     * @paramType: [ARRAY_VARCHAR, VARCHAR]
+     * @return: BIGINT
+     * Implements PQL MATCH_PROCESS: https://docs.celonis.com/en/match_process.html
+     */
     DEFINE_VECTORIZED_FN(celonis_match_process);
 
     static Status match_process_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
