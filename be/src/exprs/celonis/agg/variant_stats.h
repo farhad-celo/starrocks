@@ -6,7 +6,9 @@
 #include "rapidjson/document.h"
 #include "variant.h"
 #include "variant_agg.h"
+#include "util/uuid_generator.h"
 #include <boost/functional/hash.hpp>
+#include <chrono>
 
 namespace starrocks {
 
@@ -50,6 +52,9 @@ public:
     }
 
     size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len) override {
+        auto start = std::chrono::high_resolution_clock::now();
+        merging_bytes_ += len;
+        ++merging_states_;
         memcpy(&edge_count_, src, sizeof(int64_t));
         src += sizeof(int64_t);
         len -= sizeof(int64_t);
@@ -59,7 +64,11 @@ public:
         memcpy(&enable_proto_encoding_, src, sizeof(uint8_t));
         src += sizeof(uint8_t);
         len -= sizeof(uint8_t);
-        return VariantAggregateState::deserialize_and_merge(mem_pool, src, len);
+        auto rv = VariantAggregateState::deserialize_and_merge(mem_pool, src, len);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        merging_microseconds_ += duration.count();
+        return rv;
     }
 
     int64_t edge_count() const { return edge_count_; }
@@ -68,10 +77,20 @@ public:
 
     bool enable_proto_encoding() const { return enable_proto_encoding_; }
 
+    uint64_t merging_microseconds() const { return merging_microseconds_; }
+
+    uint64_t merging_bytes() const { return merging_bytes_; }
+
+    uint64_t merging_states() const { return merging_states_; }
+
+
 private:
     int64_t edge_count_ = (1LL << 32); // very large number to output all edges.
     bool disable_top_variant_stats_ = false;
     bool enable_proto_encoding_ = false;
+    uint64_t merging_microseconds_ = 0;
+    uint64_t merging_bytes_ = 0;
+    uint64_t merging_states_ = 0;
 };
 
 // Basic statistics on an Edge.
@@ -114,7 +133,11 @@ public:
               activity_stats_(activity_map_.size()),
               edge_count_(state.edge_count()),
               disable_top_variant_stats_(state.disable_top_variant_stats()),
-              enable_proto_encoding_(state.enable_proto_encoding()) {}
+              enable_proto_encoding_(state.enable_proto_encoding()),
+              uuid_string_(ThreadLocalUUIDGenerator::next_uuid_string()),
+              merging_microseconds_(state.merging_microseconds()),
+              merging_states_(state.merging_states()),
+              merging_bytes_(state.merging_bytes()) {}
 
     std::optional<std::string> finalize(FunctionContext* ctx) override;
 
@@ -127,22 +150,31 @@ private:
 
     std::optional<std::string> json_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
 
-    std::optional<std::string> base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
+    std::optional<std::string> base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy,
+                                                     std::optional<std::string> query_id) const;
 
-    std::optional<std::string> to_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
+    std::optional<std::string>
+    to_string(std::vector<VList>& activity_top_variants, VRef& happy, std::optional<std::string> query_id) const;
+
+    std::string log_prefix(std::optional<std::string> query_id) const;
 
     // Computes the variant that starts and ends with the most common start/end activities,
     // otherwise returns the top most frequent activity.
     int compute_happy_variant(const std::vector<VRef>& sorted) const;
 
     // Computes top-10 variants for each activity and happy variant.
-    void compute_top_variants(std::vector<VList>& activity_top_variants, VRef& happy) const;
+    void compute_top_variants(std::vector<VList>& activity_top_variants, VRef& happy,
+                              std::optional<std::string> query_id) const;
 
     std::vector<ActivityStats> activity_stats_;
     EdgeHashMap edge_map_;
     const int64_t edge_count_;
     const bool disable_top_variant_stats_;
     const bool enable_proto_encoding_;
+    const std::string uuid_string_;
+    const uint64_t merging_microseconds_;
+    const uint64_t merging_states_;
+    const uint64_t merging_bytes_;
 };
 
 // Extends VariantAggregateFunction and calculates statistics of activities and edges.
