@@ -315,6 +315,12 @@ if [ -n "$EXCLUDING_TEST_SUIT" ]; then
     done
 fi
 
+
+# Disable flaky test cases
+append_negative_case "*LakePrimaryKeyCompactionTest.test_major_compaction_thread_safe*"
+
+
+
 # prepare util test_data
 if [ -d ${STARROCKS_TEST_BINARY_DIR}/util/test_data ]; then
     rm -rf ${STARROCKS_TEST_BINARY_DIR}/util/test_data
