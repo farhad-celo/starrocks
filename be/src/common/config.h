@@ -44,7 +44,9 @@ namespace starrocks::config {
 // Set to true to change calendar functions to always treat calendar column as constant.
 CONF_mBool(treat_calendar_column_as_constant_in_calendar_functions, "false");
 
-
+// Set to true to fail the query when expensive (CELONIS_IN, CELONIS_MATCH_ACTIVITIES) non-const version implementation
+// is called.
+CONF_mBool(fail_query_when_expensive_non_const_impl_is_called, "false");
 
 
 // The cluster id.

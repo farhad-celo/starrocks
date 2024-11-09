@@ -50,6 +50,9 @@ Status CelonisIn<LT>::prepare(FunctionContext* context, FunctionContext::Functio
     // For the same reason, columns[1]->is_constant() must not be used in celonis_in().
     if (match_column == nullptr) {
         state->function = in_non_constant_match;
+        if (config::fail_query_when_expensive_non_const_impl_is_called) {
+            return Status::InvalidArgument("The non-const version of CELONIS_IN should not be called.");
+        }
         return Status::OK();
     }
     state->function = in_constant_match;

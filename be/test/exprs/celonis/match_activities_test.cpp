@@ -426,4 +426,22 @@ TEST_F(CelonisMatchActivitiesTest, null_in_non_const_filters) {
     EXPECT_EQ(0L, result->get(3).get_int64());
 }
 
+TEST_F(CelonisMatchActivitiesTest, ban_non_const_config_works) {
+    const bool fail_query_when_expensive_non_const_impl_is_called = config::fail_query_when_expensive_non_const_impl_is_called;
+    config::fail_query_when_expensive_non_const_impl_is_called = true;
+    Prepare();
+    AddRow(DatumArray{"start1", "end2"}, DatumArray{kNullDatum, "start1", kNullDatum}, DatumArray{}, DatumArray{},
+           DatumArray{}, DatumArray{},
+           DatumArray{});
+    AddRow(DatumArray{"start2", "end1"}, DatumArray{kNullDatum, "start2"}, DatumArray{}, DatumArray{"end1"},
+           DatumArray{},
+           DatumArray{}, DatumArray{});
+
+    const auto result = Run();
+    EXPECT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ("The non-const version of CELONIS_MATCH_ACTIVITIES should not be called.",
+              result.status().message());
+    config::fail_query_when_expensive_non_const_impl_is_called = fail_query_when_expensive_non_const_impl_is_called;
+}
+
 } // namespace starrocks

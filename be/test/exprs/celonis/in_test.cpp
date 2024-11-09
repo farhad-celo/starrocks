@@ -4,6 +4,7 @@
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
+#include "util/defer_op.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -17,7 +18,7 @@ protected:
     void TearDown() override {}
 
 private:
-    template <LogicalType LT>
+    template<LogicalType LT>
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT)),
@@ -38,17 +39,21 @@ private:
         match_array_column_->append_datum(match_array);
     }
 
-    template <LogicalType LT>
+    template<LogicalType LT>
     StatusOr<ColumnPtr> Run() {
+        DeferOp close_fragment_local([this] {
+            CelonisIn<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisIn<LT>::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([this] {
+            CelonisIn<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisIn<LT>::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         auto result = CelonisIn<LT>::in(ctx_.get(), {value_column_, match_array_column_});
-        RETURN_IF_ERROR(CelonisIn<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL));
-        RETURN_IF_ERROR(CelonisIn<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
         return result;
     }
 
-    template <LogicalType LT>
+    template<LogicalType LT>
     StatusOr<ColumnPtr> RunConstantMatch(DatumArray match_array) {
         match_array_column_->append_datum(match_array);
         const auto nrows = value_column_->size();
@@ -236,6 +241,21 @@ TEST_F(CelonisInTest, celonis_in_non_constant_int) {
     EXPECT_EQ(true, result->get(2).get_uint8());
     EXPECT_EQ(false, result->get(3).get_uint8());
     EXPECT_EQ(true, result->get(4).get_uint8());
+}
+
+TEST_F(CelonisInTest, ban_non_const_config_works) {
+    const bool fail_query_when_expensive_non_const_impl_is_called = config::fail_query_when_expensive_non_const_impl_is_called;
+    config::fail_query_when_expensive_non_const_impl_is_called = true;
+    const LogicalType LT = TYPE_INT;
+    Prepare<LT>();
+
+    AddRow(1, {10, 20, 30});
+    AddRow(100, {100, 200, 300, Datum{}});
+
+    const auto result = Run<LT>();
+    EXPECT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ("The non-const version of CELONIS_IN should not be called.", result.status().message());
+    config::fail_query_when_expensive_non_const_impl_is_called = fail_query_when_expensive_non_const_impl_is_called;
 }
 
 } // namespace starrocks

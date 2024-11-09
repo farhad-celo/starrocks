@@ -153,6 +153,9 @@ Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* cont
     if (start_nodes_column == nullptr || nodes_column == nullptr || end_nodes_column == nullptr ||
         excluding_nodes_column == nullptr || excluding_all_nodes_column == nullptr || any_nodes_column == nullptr) {
         state->function = celonis_match_activities_non_constant_config;
+        if (config::fail_query_when_expensive_non_const_impl_is_called) {
+            return Status::InvalidArgument("The non-const version of CELONIS_MATCH_ACTIVITIES should not be called.");
+        }
         return Status::OK();
     }
     state->function = celonis_match_activities_constant_config;
