@@ -5,6 +5,7 @@
 #include "exprs/anyval_util.h"
 #include "testutil/function_utils.h"
 #include "util.h"
+#include "util/defer_op.h"
 
 #include <gtest/gtest.h>
 
@@ -40,10 +41,16 @@ protected:
         auto input_struct_col = StructColumn(input_fields).create(input_fields);
         auto match_struct_col = StructColumn(match_fields).create(match_fields);
         utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr});
+        DeferOp close_fragment_local([&utils] {
+            CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisMultiIn::prepare(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([&utils] {
+            CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::THREAD_LOCAL);
+        });
+        RETURN_IF_ERROR(CelonisMultiIn::prepare(utils->get_fn_ctx(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result = CelonisMultiIn::multi_in(utils->get_fn_ctx(),
                                                               {input_struct_col, match_struct_col});
-        RETURN_IF_ERROR(CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL));
         return result;
     }
 

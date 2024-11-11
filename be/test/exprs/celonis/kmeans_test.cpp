@@ -5,6 +5,7 @@
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
+#include "util/defer_op.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -41,12 +42,16 @@ private:
     }
 
     StatusOr<ColumnPtr> Run() {
+        DeferOp close_fragment_local([this] {
+            CelonisKmeans::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisKmeans::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([this] {
+            CelonisKmeans::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisKmeans::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result = CelonisKmeans::apply_kmeans_model(ctx_.get(),
                                                                        {point_column_, model_column_});
-        RETURN_IF_ERROR(CelonisKmeans::close(ctx_.get(), FunctionContext::THREAD_LOCAL));
-        RETURN_IF_ERROR(CelonisKmeans::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
         return result;
     }
 

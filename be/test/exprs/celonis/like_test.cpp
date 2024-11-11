@@ -4,7 +4,7 @@
 #include "column/column_viewer.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
-#include "util.h"
+#include "util/defer_op.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -31,11 +31,15 @@ private:
         columns.push_back(input);
         columns.push_back(pattern);
         ctx->set_constant_columns(columns);
+        DeferOp close_fragment_local([&ctx] {
+            CelonisLike::like_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisLike::like_prepare(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([&ctx] {
+            CelonisLike::like_close(ctx.get(), FunctionContext::THREAD_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisLike::like_prepare(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
         auto result = CelonisLike::like(ctx.get(), columns);
-        RETURN_IF_ERROR(CelonisLike::like_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
-        RETURN_IF_ERROR(CelonisLike::like_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
         return result;
     }
 

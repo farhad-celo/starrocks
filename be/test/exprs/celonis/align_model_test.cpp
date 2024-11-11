@@ -11,6 +11,7 @@
 #include "testutil/assert.h"
 #include "testutil/function_utils.h"
 #include "util.h"
+#include "util/defer_op.h"
 #include "util/slice.h"
 
 namespace starrocks {
@@ -135,8 +136,14 @@ private:
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types_), return_type_));
         ctx->set_constant_columns(columns);
 
+        DeferOp close_fragment_local([&ctx] {
+            CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL);
+        });
         ASSERT_OK(CelonisAlignModel::align_model_prepare(
                 ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([&ctx] {
+            CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::THREAD_LOCAL);
+        });
         ASSERT_OK(CelonisAlignModel::align_model_prepare(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
 
         const auto result = CelonisAlignModel::align_model(ctx.get(), columns).value();
@@ -144,9 +151,6 @@ private:
         StructColumn* st = down_cast<StructColumn*>(result.get());
         Evaluator evaluator(*st, expected, return_type_);
         evaluator.evaluate();
-
-        ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
-        ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
     }
 
     std::vector<FunctionContext::TypeDesc> arg_types_;

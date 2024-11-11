@@ -4,6 +4,7 @@
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
+#include "util/defer_op.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -40,13 +41,17 @@ private:
     }
 
     StatusOr<ColumnPtr> Run() {
+        DeferOp close_fragment_local([this] {
+            CelonisStringFunctions::match_strings_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisStringFunctions::match_strings_prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([this] {
+            CelonisStringFunctions::match_strings_close(ctx_.get(), FunctionContext::THREAD_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisStringFunctions::match_strings_prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         auto result = CelonisStringFunctions::match_strings(ctx_.get(),
                                                             {string_column_, match_strings_column_, top_k_column_,
                                                              separator_column_});
-        RETURN_IF_ERROR(CelonisStringFunctions::match_strings_close(ctx_.get(), FunctionContext::THREAD_LOCAL));
-        RETURN_IF_ERROR(CelonisStringFunctions::match_strings_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
         return result;
     }
 

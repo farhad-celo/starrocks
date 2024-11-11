@@ -3,6 +3,7 @@
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
+#include "util/defer_op.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -39,12 +40,16 @@ private:
 
     template<LogicalType LT>
     StatusOr<ColumnPtr> Run() {
+        DeferOp close_fragment_local([this] {
+            CelonisAbcModel<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisAbcModel<LT>::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([this] {
+            CelonisAbcModel<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
+        });
         RETURN_IF_ERROR(CelonisAbcModel<LT>::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
         result = CelonisAbcModel<LT>::apply_abc_model(ctx_.get(), {value_column_, pk_hash_column_, model_column_});
-        RETURN_IF_ERROR(CelonisAbcModel<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL));
-        RETURN_IF_ERROR(CelonisAbcModel<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
         return result;
     }
 
