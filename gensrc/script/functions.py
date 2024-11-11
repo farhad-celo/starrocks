@@ -1527,6 +1527,7 @@ celostar_functions = [
     [2000257, 'celonis_peek_merged_sorted_arrays', True, False, 'BIGINT', ['ARRAY_BIGINT', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR'], 'CelonisPeekMergedSortedArrays<TYPE_BIGINT>::peek_merged_sorted_arrays'],
     [2000258, 'celonis_peek_merged_sorted_arrays', True, False, 'DOUBLE', ['ARRAY_DOUBLE', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR'], 'CelonisPeekMergedSortedArrays<TYPE_DOUBLE>::peek_merged_sorted_arrays'],
     [2000259, 'celonis_peek_merged_sorted_arrays', True, False, 'VARCHAR', ['ARRAY_VARCHAR', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR'], 'CelonisPeekMergedSortedArrays<TYPE_VARCHAR>::peek_merged_sorted_arrays'],
+    [2000260, 'celonis_encode_variant', True, False, 'ARRAY_INT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisEncodeVariant::encode_variant', 'CelonisEncodeVariant::prepare', 'CelonisEncodeVariant::close'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis',            True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],

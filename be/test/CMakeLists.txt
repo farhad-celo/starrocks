@@ -170,6 +170,7 @@ set(EXEC_FILES
         ./exprs/celonis/array_count_distinct_test.cpp
         ./exprs/celonis/array_end_finder_test.cpp
         ./exprs/celonis/array_functions_test.cpp
+        ./exprs/celonis/encode_variant_test.cpp
         ./exprs/celonis/calc_throughput_test.cpp
         ./exprs/celonis/calculate_range_end_test.cpp
         ./exprs/celonis/conformance_test.cpp
