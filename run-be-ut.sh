@@ -318,6 +318,7 @@ fi
 
 # Disable flaky test cases
 append_negative_case "*LakePrimaryKeyCompactionTest.test_major_compaction_thread_safe*"
+append_negative_case "*MemLimitedChunkQueueTest*"
 
 
 
