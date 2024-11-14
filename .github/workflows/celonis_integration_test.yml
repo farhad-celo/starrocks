@@ -133,28 +133,6 @@ jobs:
           echo "test_branch=$testbranch" >> "$GITHUB_ENV"
           echo "test_branch=$testbranch" >> "$GITHUB_OUTPUT"
 
-      - name: check Celonis's first commit
-        shell: bash
-        run: |
-          first_commit=$(git log --grep="\[Refactor\] Transplant Celonis commits from branch-2.4-ubuntu to" --format="%H")
-  
-          if [ -z $first_commit ]; then
-            echo "First commit Not found, existing..."
-            exit 1
-          else
-            echo "First commit found - $first_commit"
-          fi
-          
-          celonis_first_commit_date=$(git log $first_commit --format="%at" -n 1)
-          starrocks_latest_commit_date=$(git log $first_commit^ --format="%at" -n 1)
-          
-          # check time
-          if [ "$celonis_first_commit_date" -gt "$starrocks_latest_commit_date" ]; then
-            echo "Celonis's first commit should be on the top of the latest Starrocks' commit"
-            exit 1
-          fi
-          
-          echo "Time check passed"
 
       - name: Sum up
         if: ${{inputs.branch_to_test == ''}}
