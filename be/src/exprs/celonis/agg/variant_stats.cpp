@@ -13,48 +13,6 @@
 
 namespace starrocks {
 
-rapidjson::Value Edge::to_json(rapidjson::Document::AllocatorType& allocator) const {
-    rapidjson::Value obj(rapidjson::kObjectType);
-    obj.AddMember("src", src, allocator);
-    obj.AddMember("dst", dst, allocator);
-    return obj;
-}
-
-std::string Edge::debug_string() const {
-    std::stringstream ss;
-    ss << "src " << src << " dst " << dst;
-    return ss.str();
-}
-
-rapidjson::Value EdgeStats::to_json(rapidjson::Document::AllocatorType& allocator) const {
-    rapidjson::Value obj(rapidjson::kObjectType);
-    obj.AddMember("count", count, allocator);
-    obj.AddMember("count_case", count_case, allocator);
-    return obj;
-}
-
-std::string EdgeStats::debug_string() const {
-    std::stringstream ss;
-    ss << "count " << count << " count_case " << count_case;
-    return ss.str();
-}
-
-rapidjson::Value ActivityStats::to_json(rapidjson::Document::AllocatorType& allocator) const {
-    rapidjson::Value obj(rapidjson::kObjectType);
-    obj.AddMember("count", count, allocator);
-    obj.AddMember("count_case", count_case, allocator);
-    obj.AddMember("count_start", count_start, allocator);
-    obj.AddMember("count_end", count_end, allocator);
-    return obj;
-}
-
-std::string ActivityStats::debug_string() const {
-    std::stringstream ss;
-    ss << "count " << count << " count_case " << count_case << " count_start " << count_start << " count_end "
-       << count_end;
-    return ss.str();
-}
-
 int VariantStatsFinalizer::compute_happy_variant(const std::vector<VRef>& sorted) const {
     // Happy path
     // find top start activity
@@ -159,10 +117,8 @@ void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_to
     }
 }
 
-// std::string
-
 std::optional<std::string>
-VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_variants, VRef& happy) const {
+VariantStatsFinalizer::json_string(const std::vector<VList>& activity_top_variants, const VRef& happy) const {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
@@ -273,7 +229,7 @@ VariantStatsFinalizer::json_string(std::vector<VList>& activity_top_variants, VR
 }
 
 std::optional<std::string>
-VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy,
+VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
                                              std::optional<std::string> query_id) const {
     celonis::accelerator::Statistics statistics_proto;
     // construct proto
@@ -382,7 +338,7 @@ VariantStatsFinalizer::base64_encoded_string(std::vector<VList>& activity_top_va
 }
 
 std::optional<std::string>
-VariantStatsFinalizer::to_string(std::vector<VList>& activity_top_variants, VRef& happy,
+VariantStatsFinalizer::to_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
                                  std::optional<std::string> query_id) const {
     if (enable_proto_encoding_) {
         return base64_encoded_string(activity_top_variants, happy, query_id);
@@ -420,7 +376,6 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
         return enable_proto_encoding_ ? "" : "{}";
     }
 
-    std::vector<VList> activity_top_variants;
     std::vector<size_t> a_lastseen(activity_map_.size());
     std::map<std::pair<int32_t, int32_t>, std::pair<int32_t, int32_t>> edge_stats;
     LOG(INFO) << log_prefix(query_id) << ": started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
@@ -455,8 +410,9 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
               << activity_stats_.size() << "\n";
     LOG(INFO) << log_prefix(query_id) << ": (done traversing variant_map) size of edge_map_ = " << edge_map_.size()
               << "\n";
-    VRef happy;
     LOG(INFO) << log_prefix(query_id) << ": started finding top\n";
+    std::vector<VList> activity_top_variants;
+    VRef happy;
     compute_top_variants(activity_top_variants, happy, query_id);
     LOG(INFO) << log_prefix(query_id) << ": done finding top (activity_top_variants size = "
               << activity_top_variants.size()

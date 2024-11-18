@@ -239,6 +239,9 @@ public:
             } else if (name == "celonis_variant_stats") {
                 auto variant_stats = AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
                 return AggregateFactory::MakeNullableAggregateFunctionVariadic<VariantStatsState>(variant_stats);
+            } else if (name == "celonis_variant_stats_v2") {
+                auto variant_stats_v2 = AggregateFactory::MakeCelonisVariantStatsV2AggregateFunction();
+                return AggregateFactory::MakeNullableAggregateFunctionVariadic<CelonisVariantStatsAggregateV2State>(variant_stats_v2);
             } else if (name == "celonis_cluster_variants") {
                 // cluster_variants accepts NULL variant
                 return AggregateFactory::MakeCelonisClusterVariantsAggregateFunction();
@@ -248,6 +251,8 @@ public:
                 return AggregateFactory::MakeCelonisInductiveMinerAggregateFunction();
             } else if (name == "celonis_variant_stats") {
                 return AggregateFactory::MakeCelonisVariantStatsAggregateFunction();
+            } else if (name == "celonis_variant_stats_v2") {
+                return AggregateFactory::MakeCelonisVariantStatsV2AggregateFunction();
             } else if (name == "celonis_cluster_variants") {
                 return AggregateFactory::MakeCelonisClusterVariantsAggregateFunction();
             }

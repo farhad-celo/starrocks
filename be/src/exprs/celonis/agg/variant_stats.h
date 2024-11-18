@@ -2,6 +2,7 @@
 
 #include "column/column_helper.h"
 #include "column/hash_set.h"
+#include "exprs/celonis/agg/variant_util.h"
 #include "exprs/function_context.h"
 #include "rapidjson/document.h"
 #include "variant.h"
@@ -93,36 +94,6 @@ private:
     uint64_t merging_states_ = 0;
 };
 
-// Basic statistics on an Edge.
-struct EdgeStats {
-    size_t count{0};      // Number of times this edge appears
-    size_t count_case{0}; // Number distinct cases this edge appears in
-    const Variant* last_variant = nullptr; // last variant to update count_case
-
-    bool equal(const EdgeStats& other) { return count == other.count && count_case == other.count_case; }
-
-    rapidjson::Value to_json(rapidjson::Document::AllocatorType& allocator) const;
-
-    std::string debug_string() const;
-};
-
-// Basic statistics on an activity.
-struct ActivityStats {
-    size_t count{0};       // Number of times the activity appears (can be > 1 per case)
-    size_t count_case{0};  // Number of distinct cases that contain the activity.
-    size_t count_start{0}; // Number of times the activity appears at the start of a case
-    size_t count_end{0};   // Number of times the activity appears at the end of a case
-
-    bool equal(const ActivityStats& other) {
-        return count == other.count && count_case == other.count_case && count_start == other.count_start &&
-               count_end == other.count_end;
-    }
-
-    rapidjson::Value to_json(rapidjson::Document::AllocatorType& allocator) const;
-
-    std::string debug_string() const;
-};
-
 class VariantStatsFinalizer : public VariantAggregateFinalizer {
 public:
     using EdgeHashMap = phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
@@ -148,13 +119,14 @@ private:
     // List of variant references, used to hold top-k variants per activity.
     using VList = std::vector<VRef>;
 
-    std::optional<std::string> json_string(std::vector<VList>& activity_top_variants, VRef& happy) const;
+    std::optional<std::string> json_string(const std::vector<VList>& activity_top_variants, const VRef& happy) const;
 
-    std::optional<std::string> base64_encoded_string(std::vector<VList>& activity_top_variants, VRef& happy,
+    std::optional<std::string> base64_encoded_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
                                                      std::optional<std::string> query_id) const;
 
     std::optional<std::string>
-    to_string(std::vector<VList>& activity_top_variants, VRef& happy, std::optional<std::string> query_id) const;
+    to_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
+              std::optional<std::string> query_id) const;
 
     std::string log_prefix(std::optional<std::string> query_id) const;
 
@@ -177,16 +149,15 @@ private:
     const uint64_t merging_bytes_;
 };
 
-// Extends VariantAggregateFunction and calculates statistics of activities and edges.
-// TODO(hagonzal): add option to compute approximate top-k variants, now it returns exact top-k.
 /**
  * @param: [ input_column, weight_column [, edge_count [, disable_top_variant_stats [, enable_proto_encoding ] ] ] ]
  * @paramType columns: [ ARRAY_VARCHAR, BIGINT [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
  * @return: json or base64 encoded binary proto string
- * weight_column : Indicates the frequency of the input(variant)
- * edge_count (optional) : Limits the size of the edge table. if edge_count <= 0, edge stats is not populated and output.
- * disable_top_variant_stats (optional) : Disables top variant stats
- * enable_proto_encoding (optional): Enable base64 encoded binary proto output
+ * variant_column: variant column.
+ * weight_column: Indicates the frequency of the input (variant).
+ * edge_count (optional): Limits the size of the edge table. if edge_count <= 0, edge stats is not populated and output. default = 1LL << 32 to output all the edges.
+ * disable_top_variant_stats (optional): Disables top variant stats, default = false.
+ * enable_proto_encoding (optional): Enable base64 encoded binary proto output, default = false.
  *
  * Used to support PQL EXPLORE_PROCESS and GRAPH
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245719/EXPLORE+PROCESS

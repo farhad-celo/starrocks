@@ -127,9 +127,11 @@ set(CELONIS_FILES
   celonis/agg/linear_regression.cpp
   celonis/agg/mode.cpp
   celonis/agg/product.cpp
+  celonis/agg/variant_util.cpp
   celonis/agg/util.cpp
   celonis/agg/variant_agg.cpp
   celonis/agg/variant_stats.cpp
+  celonis/agg/variant_stats_v2.cpp
   celonis/abc_model.cpp
   celonis/adjust_daily_timestamps.cpp
   celonis/align_model.cpp

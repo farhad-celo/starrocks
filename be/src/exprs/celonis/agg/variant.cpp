@@ -40,4 +40,17 @@ std::string Variant::debug_string() const {
     return ss.str();
 }
 
+rapidjson::Value Edge::to_json(rapidjson::Document::AllocatorType& allocator) const {
+    rapidjson::Value obj(rapidjson::kObjectType);
+    obj.AddMember("src", src, allocator);
+    obj.AddMember("dst", dst, allocator);
+    return obj;
+}
+
+std::string Edge::debug_string() const {
+    std::stringstream ss;
+    ss << "src " << src << " dst " << dst;
+    return ss.str();
+}
+
 } // namespace starrocks

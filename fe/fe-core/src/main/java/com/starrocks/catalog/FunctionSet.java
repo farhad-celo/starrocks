@@ -321,6 +321,7 @@ public class FunctionSet {
     public static final String CELONIS_SORTED_LAST = "celonis_sorted_last";
     public static final String CELONIS_TRIMMED_MEAN = "celonis_trimmed_mean";
     public static final String CELONIS_VARIANT_STATS = "celonis_variant_stats";
+    public static final String CELONIS_VARIANT_STATS_V2 = "celonis_variant_stats_v2";
     public static final String CELONIS_MAKE_FACTORY_CALENDAR = "celonis_make_factory_calendar";
     public static final String CELONIS_MAKE_WEEKDAY_CALENDAR = "celonis_make_weekday_calendar";
     public static final String CELONIS_MAKE_WORKDAY_CALENDAR = "celonis_make_workday_calendar";
@@ -1211,6 +1212,19 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS,
                     Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT, Type.BIGINT, Type.BOOLEAN, Type.BOOLEAN), Type.VARCHAR, Type.VARCHAR,
                     false, false, false));
+        // celonis_variant_stats_v2
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS_V2,
+                    Lists.newArrayList(Type.ARRAY_INT, Type.BIGINT, Type.ARRAY_VARCHAR), Type.VARCHAR, Type.VARCHAR,
+                    false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS_V2,
+                    Lists.newArrayList(Type.ARRAY_INT, Type.BIGINT, Type.ARRAY_VARCHAR, Type.BIGINT), Type.VARCHAR, Type.VARCHAR,
+                    false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS_V2,
+                    Lists.newArrayList(Type.ARRAY_INT, Type.BIGINT, Type.ARRAY_VARCHAR, Type.BIGINT, Type.BOOLEAN), Type.VARCHAR,
+                    Type.VARCHAR, false, false, false));
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_VARIANT_STATS_V2,
+                    Lists.newArrayList(Type.ARRAY_INT, Type.BIGINT, Type.ARRAY_VARCHAR, Type.BIGINT, Type.BOOLEAN, Type.BOOLEAN),
+                    Type.VARCHAR, Type.VARCHAR, false, false, false));
         // celonis_trimmed_mean
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_TRIMMED_MEAN,
                 Lists.newArrayList(Type.BIGINT, Type.INT, Type.INT), Type.DOUBLE, Type.VARBINARY,
