@@ -216,6 +216,26 @@ public class Log4jConfig extends XmlConfiguration {
             "<!--REPLACED BY AUDIT AND VERBOSE MODULE NAMES-->" +
             "  </Loggers>\n" +
             "</Configuration>";
+
+
+
+
+    // celonis start
+    private static final String COMBINED_LOGGER_TEMPLATE = "  <Loggers>\n" +
+            "    <Root level=\"${sys_log_level}\">\n" +
+            "      <AppenderRef ref=\"ConsoleErr\"/>\n" +
+            "    </Root>\n" +
+            "    <Logger name=\"audit\" level=\"ERROR\" additivity=\"false\">\n" +
+            "      <AppenderRef ref=\"Auditfile\"/>\n" +
+            "      <AppenderRef ref=\"ConsoleErr\"/>\n" +
+            "    </Logger>\n" +
+            "<!--REPLACED BY AUDIT AND VERBOSE MODULE NAMES-->" +
+            "  </Loggers>\n" +
+            "</Configuration>";
+    // celonis end
+
+
+
     private static StrSubstitutor strSub;
     private static String sysLogLevel;
     private static String[] verboseModules;
@@ -445,7 +465,12 @@ public class Log4jConfig extends XmlConfiguration {
         }
 
         String newXmlConfTemplate = APPENDER_TEMPLATE;
-        newXmlConfTemplate += log2Console ? CONSOLE_LOGGER_TEMPLATE : FILE_LOGGER_TEMPLATE;
+//        newXmlConfTemplate += log2Console ? CONSOLE_LOGGER_TEMPLATE : FILE_LOGGER_TEMPLATE;
+
+        // celonis start
+        newXmlConfTemplate += log2Console ? COMBINED_LOGGER_TEMPLATE : FILE_LOGGER_TEMPLATE;
+        // celonis end
+
         newXmlConfTemplate = newXmlConfTemplate.replaceAll("<!--REPLACED BY AUDIT AND VERBOSE MODULE NAMES-->",
                 sb.toString());
         return newXmlConfTemplate;
