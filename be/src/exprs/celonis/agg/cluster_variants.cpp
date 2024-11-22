@@ -348,11 +348,11 @@ void ClusterVariantsAggregateFunction::update(FunctionContext* ctx, const Column
 void ClusterVariantsAggregateFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,
                                              size_t row_num) const {
     // merge internal state with column[row_num]
-    // the column type is binary
-    const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
-    if (input_column->is_null(row_num)) {
+    if (column->is_null(row_num)) {
         return;
     }
+    // the column type is binary
+    const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
     Slice slice = input_column->get_slice(row_num);
     size_t mem_usage = 0;
     mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*) slice.data, slice.size);
