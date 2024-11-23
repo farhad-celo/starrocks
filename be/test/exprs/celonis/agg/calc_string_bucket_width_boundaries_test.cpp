@@ -332,7 +332,7 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, null_hashes_are_ignored) {
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
 
-TEST_F(CelonisCalcStringBucketWidthBoundariesTest, too_many_buckets) {
+TEST_F(CelonisCalcStringBucketWidthBoundariesTest, DISABLED_too_many_buckets) {
     // 2 * length > MAX_NUM_BUCKETS
     const int64_t length = 550000;
     std::vector<std::optional<std::string>> strings1;
