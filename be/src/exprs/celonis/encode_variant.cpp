@@ -1,7 +1,6 @@
 #include "exprs/celonis/encode_variant.h"
 
 #include "column/array_column.h"
-#include "column/column_builder.h"
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "column/hash_set.h"
@@ -11,20 +10,23 @@
 
 namespace starrocks {
 
+namespace {
+
 struct EncodeVariantStateFragmentLocal {
-    phmap::flat_hash_map<std::string, int32_t, StdHash<std::string>> activity_map;
+    phmap::flat_hash_map<Slice, int32_t, SliceHashWithSeed<PhmapSeed1>, SliceEqual> activity_map;
     bool null_map = false;
     ScalarFunction function;
 
-    void insert(const std::string& activity) {
+    void insert(const Slice& activity) {
         activity_map.try_emplace(activity, activity_map.size());
     }
 
-    int32_t get(const std::string& activity) const {
+    int32_t get(const Slice& activity) const {
         auto it = activity_map.find(activity);
         return it != activity_map.end() ? it->second : -1;
     }
 };
+}
 
 Status CelonisEncodeVariant::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
@@ -56,7 +58,7 @@ Status CelonisEncodeVariant::prepare(FunctionContext* context, FunctionContext::
         if (activity.is_null()) {
             continue;
         } else {
-            state->insert(activity.get_slice().to_string());
+            state->insert(activity.get_slice());
         }
     }
 
@@ -97,13 +99,13 @@ StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_non_constant_map([[mayb
         }
         null_column->append(0);
         // construct activity_map
-        phmap::flat_hash_map<std::string, int32_t, StdHash<std::string>> activity_map;
+        phmap::flat_hash_map<Slice, int32_t, SliceHashWithSeed<PhmapSeed1>, SliceEqual> activity_map;
         auto activity_array = columns[1]->get(row).get_array();
         for (const auto& activity_datum: activity_array) {
             if (activity_datum.is_null()) {
                 continue;
             } else {
-                activity_map.try_emplace(activity_datum.get_slice().to_string(), activity_map.size());
+                activity_map.try_emplace(activity_datum.get_slice(), activity_map.size());
             }
         }
         // encode variant
@@ -115,7 +117,7 @@ StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_non_constant_map([[mayb
                 continue;
             }
             ++count;
-            auto it = activity_map.find(activities[i].to_string());
+            auto it = activity_map.find(activities[i]);
             auto idx = (it != activity_map.end() ? it->second : -1);
             array_index_column->append(idx);
         }
@@ -163,7 +165,7 @@ CelonisEncodeVariant::encode_variant_constant_map([[maybe_unused]]FunctionContex
                 continue;
             }
             ++count;
-            array_index_column->append(state->get(activities[i].to_string()));
+            array_index_column->append(state->get(activities[i]));
         }
         offset += count;
     }

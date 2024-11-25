@@ -13,7 +13,7 @@
 namespace starrocks {
 
 /*
-2024-11-23T02:45:53+00:00
+2024-11-23T12:20:48+00:00
 Running ./be/build_Release/src/bench/celonis/output/encode_variant_bench
 Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
@@ -21,23 +21,23 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 1.25, 1.41, 1.32
+Load Average: 1.43, 3.52, 3.35
 // Args: Number of rows / Variant Length / Length of Activity Array
 ------------------------------------------------------------------------------------------
 Benchmark                                Time             CPU   Iterations UserCounters...
 ------------------------------------------------------------------------------------------
-BM_EncodeVariant/1000/40/40        1270617 ns      1270593 ns          550 RowInvRate=1.27059us
-BM_EncodeVariant/10000/40/40      12735570 ns     12735574 ns           55 RowInvRate=1.27356us
-BM_EncodeVariant/100000/40/40    134634732 ns    134632898 ns            5 RowInvRate=1.34633us
-BM_EncodeVariant/1000/100/40       3140049 ns      3139970 ns          223 RowInvRate=3.13997us
-BM_EncodeVariant/10000/100/40     32908212 ns     32907580 ns           21 RowInvRate=3.29076us
-BM_EncodeVariant/100000/100/40   338497701 ns    338478045 ns            2 RowInvRate=3.38478us
-BM_EncodeVariant/1000/40/200       1238816 ns      1238730 ns          563 RowInvRate=1.23873us
-BM_EncodeVariant/10000/40/200     12329917 ns     12328506 ns           56 RowInvRate=1.23285us
-BM_EncodeVariant/100000/40/200   131398282 ns    131388887 ns            5 RowInvRate=1.31389us
-BM_EncodeVariant/1000/100/200      3043848 ns      3043840 ns          230 RowInvRate=3.04384us
-BM_EncodeVariant/10000/100/200    31645312 ns     31644061 ns           22 RowInvRate=3.16441us
-BM_EncodeVariant/100000/100/200  331774231 ns    331767153 ns            2 RowInvRate=3.31767us
+BM_EncodeVariant/1000/40/40         310426 ns       310410 ns         2254 RowInvRate=310.41ns
+BM_EncodeVariant/10000/40/40       3060730 ns      3060380 ns          227 RowInvRate=306.038ns
+BM_EncodeVariant/100000/40/40     38697460 ns     38696395 ns           18 RowInvRate=386.964ns
+BM_EncodeVariant/1000/100/40        740395 ns       740376 ns          946 RowInvRate=740.376ns
+BM_EncodeVariant/10000/100/40      8772977 ns      8772944 ns           80 RowInvRate=877.294ns
+BM_EncodeVariant/100000/100/40   103935592 ns    103932745 ns            7 RowInvRate=1039.33ns
+BM_EncodeVariant/1000/40/200        353023 ns       353006 ns         1981 RowInvRate=353.006ns
+BM_EncodeVariant/10000/40/200      3426689 ns      3426489 ns          205 RowInvRate=342.649ns
+BM_EncodeVariant/100000/40/200    43296710 ns     43290908 ns           16 RowInvRate=432.909ns
+BM_EncodeVariant/1000/100/200       833927 ns       833799 ns          844 RowInvRate=833.799ns
+BM_EncodeVariant/10000/100/200     9656947 ns      9655715 ns           73 RowInvRate=965.572ns
+BM_EncodeVariant/100000/100/200  111497055 ns    111489981 ns            6 RowInvRate=1.1149us
 */
 
 static void do_bench(benchmark::State& state) {
