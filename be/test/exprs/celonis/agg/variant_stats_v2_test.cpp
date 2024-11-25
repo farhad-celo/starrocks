@@ -223,7 +223,7 @@ protected:
 
 };
 
-// TODO(y.zhang): Add more tests (e.g., empty variant, NULL and duplicates in activity array, duplicate edges).
+// TODO(y.zhang): Add more unit tests.
 TEST_F(CelonisVariantStatsV2Test, normal_case) {
     std::vector<std::optional<DatumArray>> variants1 = {DatumArray{0, 1, 2, 3}};
     std::vector<int64_t> counts1 = {2};
@@ -234,6 +234,42 @@ TEST_F(CelonisVariantStatsV2Test, normal_case) {
              {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":3,\"count_case\":3,\"count_start\":2,\"count_end\":1,\"id\":0},{\"count\":5,\"count_case\":5,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":5,\"count_case\":5,\"count_start\":1,\"count_end\":2,\"id\":2},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":2,\"id\":3}],\"e_count\":5,\"e_stats\":[{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":1},{\"count\":1,\"count_case\":1,\"src\":1,\"dst\":0},{\"count\":4,\"count_case\":4,\"src\":1,\"dst\":2},{\"count\":1,\"count_case\":1,\"src\":2,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":3}],\"happy\":{\"variant\":[0,1,2,3],\"count\":2}}"""});
     RunMergeNew(variants1, counts1, variants2, counts2, activity_array, 1000, true, false,
                 {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":3,\"count_case\":3,\"count_start\":2,\"count_end\":1,\"id\":0},{\"count\":5,\"count_case\":5,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":5,\"count_case\":5,\"count_start\":1,\"count_end\":2,\"id\":2},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":2,\"id\":3}],\"e_count\":5,\"e_stats\":[{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":1},{\"count\":1,\"count_case\":1,\"src\":1,\"dst\":0},{\"count\":4,\"count_case\":4,\"src\":1,\"dst\":2},{\"count\":1,\"count_case\":1,\"src\":2,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":3}],\"happy\":{\"variant\":[0,1,2,3],\"count\":2}}"""});
+}
+
+TEST_F(CelonisVariantStatsV2Test, normal_case_with_empty_variants) {
+    std::vector<std::optional<DatumArray>> variants1 = {DatumArray{0, 1, 2, 3}, DatumArray{}};
+    std::vector<int64_t> counts1 = {2, 1};
+    std::vector<std::optional<DatumArray>> variants2 = {DatumArray{2, 1, 0}, DatumArray{1, 2}, DatumArray{}};
+    std::vector<int64_t> counts2 = {1, 2, 1};
+    DatumArray activity_array = {"A", "B", "C", "D"};
+    RunMerge(variants1, counts1, variants2, counts2, activity_array, 1000, true, false,
+             {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":3,\"count_case\":3,\"count_start\":2,\"count_end\":1,\"id\":0},{\"count\":5,\"count_case\":5,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":5,\"count_case\":5,\"count_start\":1,\"count_end\":2,\"id\":2},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":2,\"id\":3}],\"e_count\":5,\"e_stats\":[{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":1},{\"count\":1,\"count_case\":1,\"src\":1,\"dst\":0},{\"count\":4,\"count_case\":4,\"src\":1,\"dst\":2},{\"count\":1,\"count_case\":1,\"src\":2,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":3}],\"happy\":{\"variant\":[0,1,2,3],\"count\":2}}"""});
+    RunMergeNew(variants1, counts1, variants2, counts2, activity_array, 1000, true, false,
+                {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":3,\"count_case\":3,\"count_start\":2,\"count_end\":1,\"id\":0},{\"count\":5,\"count_case\":5,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":5,\"count_case\":5,\"count_start\":1,\"count_end\":2,\"id\":2},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":2,\"id\":3}],\"e_count\":5,\"e_stats\":[{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":1},{\"count\":1,\"count_case\":1,\"src\":1,\"dst\":0},{\"count\":4,\"count_case\":4,\"src\":1,\"dst\":2},{\"count\":1,\"count_case\":1,\"src\":2,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":3}],\"happy\":{\"variant\":[0,1,2,3],\"count\":2}}"""});
+}
+
+TEST_F(CelonisVariantStatsV2Test, duplicate_activities_in_activity_array) {
+    std::vector<std::optional<DatumArray>> variants1 = {DatumArray{0, 1, 2, 3}, DatumArray{}};
+    std::vector<int64_t> counts1 = {2, 1};
+    std::vector<std::optional<DatumArray>> variants2 = {DatumArray{2, 1, 0}, DatumArray{1, 2}, DatumArray{}};
+    std::vector<int64_t> counts2 = {1, 2, 1};
+    DatumArray activity_array = {"A", "B", "A", "C", "B", kNullDatum, "D", "D"};
+    RunMerge(variants1, counts1, variants2, counts2, activity_array, 1000, true, false,
+             {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":3,\"count_case\":3,\"count_start\":2,\"count_end\":1,\"id\":0},{\"count\":5,\"count_case\":5,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":5,\"count_case\":5,\"count_start\":1,\"count_end\":2,\"id\":2},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":2,\"id\":3}],\"e_count\":5,\"e_stats\":[{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":1},{\"count\":1,\"count_case\":1,\"src\":1,\"dst\":0},{\"count\":4,\"count_case\":4,\"src\":1,\"dst\":2},{\"count\":1,\"count_case\":1,\"src\":2,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":3}],\"happy\":{\"variant\":[0,1,2,3],\"count\":2}}"""});
+    RunMergeNew(variants1, counts1, variants2, counts2, activity_array, 1000, true, false,
+                {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":3,\"count_case\":3,\"count_start\":2,\"count_end\":1,\"id\":0},{\"count\":5,\"count_case\":5,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":5,\"count_case\":5,\"count_start\":1,\"count_end\":2,\"id\":2},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":2,\"id\":3}],\"e_count\":5,\"e_stats\":[{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":1},{\"count\":1,\"count_case\":1,\"src\":1,\"dst\":0},{\"count\":4,\"count_case\":4,\"src\":1,\"dst\":2},{\"count\":1,\"count_case\":1,\"src\":2,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":3}],\"happy\":{\"variant\":[0,1,2,3],\"count\":2}}"""});
+}
+
+TEST_F(CelonisVariantStatsV2Test, duplicate_edges) {
+    std::vector<std::optional<DatumArray>> variants1 = {DatumArray{0, 1, 2, 3}};
+    std::vector<int64_t> counts1 = {2};
+    std::vector<std::optional<DatumArray>> variants2 = {DatumArray{2, 1, 0, 1, 2, 1, 2}, DatumArray{1, 2}};
+    std::vector<int64_t> counts2 = {1, 2};
+    DatumArray activity_array = {"A", "B", "C", "D"};
+    RunMerge(variants1, counts1, variants2, counts2, activity_array, 1000, true, false,
+             {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":3,\"count_case\":3,\"count_start\":2,\"count_end\":0,\"id\":0},{\"count\":7,\"count_case\":5,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":7,\"count_case\":5,\"count_start\":1,\"count_end\":3,\"id\":2},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":2,\"id\":3}],\"e_count\":5,\"e_stats\":[{\"count\":3,\"count_case\":3,\"src\":0,\"dst\":1},{\"count\":1,\"count_case\":1,\"src\":1,\"dst\":0},{\"count\":6,\"count_case\":5,\"src\":1,\"dst\":2},{\"count\":2,\"count_case\":1,\"src\":2,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":3}],\"happy\":{\"variant\":[0,1,2,3],\"count\":2}}"""});
+    RunMergeNew(variants1, counts1, variants2, counts2, activity_array, 1000, true, false,
+                {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":3,\"count_case\":3,\"count_start\":2,\"count_end\":0,\"id\":0},{\"count\":7,\"count_case\":5,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":7,\"count_case\":5,\"count_start\":1,\"count_end\":3,\"id\":2},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":2,\"id\":3}],\"e_count\":5,\"e_stats\":[{\"count\":3,\"count_case\":3,\"src\":0,\"dst\":1},{\"count\":1,\"count_case\":1,\"src\":1,\"dst\":0},{\"count\":6,\"count_case\":5,\"src\":1,\"dst\":2},{\"count\":2,\"count_case\":1,\"src\":2,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":3}],\"happy\":{\"variant\":[0,1,2,3],\"count\":2}}"""});
 }
 
 TEST_F(CelonisVariantStatsV2Test, normal_case_with_top_variant_stats) {

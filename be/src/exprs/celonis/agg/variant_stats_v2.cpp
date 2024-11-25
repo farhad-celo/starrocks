@@ -24,6 +24,8 @@ size_t CelonisVariantStatsAggregateV2State::compute_happy_variant(const std::vec
 
     int top_start = 0;
     size_t count_start = 0;
+    // Note that the below implementation tries to find the first start_activity with the largest count. It is possible
+    // that there are other activities with the largest count.
     for (int i = 0; i < activity_stats_.size(); i++) {
         if (activity_stats_[i].count_start > count_start) {
             count_start = activity_stats_[i].count_start;
