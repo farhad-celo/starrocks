@@ -465,10 +465,10 @@ public class Log4jConfig extends XmlConfiguration {
         }
 
         String newXmlConfTemplate = APPENDER_TEMPLATE;
-        newXmlConfTemplate += log2Console ? CONSOLE_LOGGER_TEMPLATE : FILE_LOGGER_TEMPLATE;
+//        newXmlConfTemplate += log2Console ? CONSOLE_LOGGER_TEMPLATE : FILE_LOGGER_TEMPLATE;
 
         // celonis start
-//        newXmlConfTemplate += log2Console ? COMBINED_LOGGER_TEMPLATE : FILE_LOGGER_TEMPLATE;
+        newXmlConfTemplate += log2Console ? COMBINED_LOGGER_TEMPLATE : FILE_LOGGER_TEMPLATE;
         // celonis end
 
         newXmlConfTemplate = newXmlConfTemplate.replaceAll("<!--REPLACED BY AUDIT AND VERBOSE MODULE NAMES-->",
