@@ -22,7 +22,6 @@ template<ComparisonType CMP_TYPE, LogicalType LT>
         return columns[0];
     }
 
-    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     // If none of the columns contains a null value, we can simply defer the computation to the existing
     // Starrocks greatest/least implementation.
     if (const bool all_columns_without_null{std::none_of(columns.begin(), columns.end(), [](const ColumnPtr& column_ptr) {
