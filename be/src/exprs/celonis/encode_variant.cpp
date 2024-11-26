@@ -12,19 +12,32 @@ namespace starrocks {
 
 namespace {
 
-struct EncodeVariantStateFragmentLocal {
-    phmap::flat_hash_map<Slice, int32_t, SliceHashWithSeed<PhmapSeed1>, SliceEqual> activity_map;
-    bool null_map = false;
-    ScalarFunction function;
+class ActivityMap {
+public:
+    ActivityMap() = default;
 
-    void insert(const Slice& activity) {
-        activity_map.try_emplace(activity, activity_map.size());
+    explicit ActivityMap(const DatumArray& array) {
+        for (const auto& activity: array) {
+            if (activity.is_null()) {
+                continue;
+            }
+            map_.try_emplace(activity.get_slice(), map_.size());
+        }
     }
 
     int32_t get(const Slice& activity) const {
-        auto it = activity_map.find(activity);
-        return it != activity_map.end() ? it->second : -1;
+        auto it = map_.find(activity);
+        return it != map_.end() ? it->second : -1;
     }
+
+private:
+    phmap::flat_hash_map<Slice, int32_t, SliceHashWithSeed<PhmapSeed1>, SliceEqual> map_;
+};
+
+struct EncodeVariantStateFragmentLocal {
+    ActivityMap activity_map;
+    bool null_map = false;
+    ScalarFunction function;
 };
 }
 
@@ -46,22 +59,12 @@ Status CelonisEncodeVariant::prepare(FunctionContext* context, FunctionContext::
         return Status::OK();
     }
     state->function = encode_variant_constant_map;
-
     if (activity_array_column->is_null(0)) {
         state->null_map = true;
         return Status::OK();
     }
-
     state->null_map = false;
-    auto activity_array = activity_array_column->get(0).get_array();
-    for (const auto& activity: activity_array) {
-        if (activity.is_null()) {
-            continue;
-        } else {
-            state->insert(activity.get_slice());
-        }
-    }
-
+    state->activity_map = ActivityMap(activity_array_column->get(0).get_array());
     return Status::OK();
 }
 
@@ -98,16 +101,7 @@ StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_non_constant_map([[mayb
             continue;
         }
         null_column->append(0);
-        // construct activity_map
-        phmap::flat_hash_map<Slice, int32_t, SliceHashWithSeed<PhmapSeed1>, SliceEqual> activity_map;
-        auto activity_array = columns[1]->get(row).get_array();
-        for (const auto& activity_datum: activity_array) {
-            if (activity_datum.is_null()) {
-                continue;
-            } else {
-                activity_map.try_emplace(activity_datum.get_slice(), activity_map.size());
-            }
-        }
+        ActivityMap activity_map(columns[1]->get(row).get_array());
         // encode variant
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
@@ -117,9 +111,7 @@ StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_non_constant_map([[mayb
                 continue;
             }
             ++count;
-            auto it = activity_map.find(activities[i]);
-            auto idx = (it != activity_map.end() ? it->second : -1);
-            array_index_column->append(idx);
+            array_index_column->append(activity_map.get(activities[i]));
         }
         offset += count;
     }
@@ -165,7 +157,7 @@ CelonisEncodeVariant::encode_variant_constant_map([[maybe_unused]]FunctionContex
                 continue;
             }
             ++count;
-            array_index_column->append(state->get(activities[i]));
+            array_index_column->append(state->activity_map.get(activities[i]));
         }
         offset += count;
     }
