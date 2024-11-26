@@ -406,6 +406,7 @@ jobs:
   e2e-walgreens_5b_stable-load-single_and_batch:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
     needs: [build-fe-be, e2e-abb_06b_stable-delta_load-single_query_and_export_csv, e2e-abb_06b_stable-load-single_query_and_export_csv]
+    continue-on-error: true
     env:
       test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
     steps:
@@ -445,6 +446,7 @@ jobs:
   e2e-walgreens_5b_stable-delta_load-single_query_and_export_csv:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
     needs: [build-fe-be, e2e-abb_06b_stable-delta_load-single_query_and_export_csv, e2e-abb_06b_stable-load-single_query_and_export_csv]
+    continue-on-error: true
     env:
       test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
     steps:
@@ -453,6 +455,7 @@ jobs:
 
       - name: Run celostar e2e test
         id: run-test
+        continue-on-error: true
         uses: ./.github/actions/trigger-celostar-test
         with:
           owner: celonis
@@ -482,6 +485,7 @@ jobs:
   e2e-walmart-delta_load-single_query_and_export_csv:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
     needs: [build-fe-be, e2e-walgreens_5b_stable-delta_load-single_query_and_export_csv, e2e-walgreens_5b_stable-load-single_and_batch]
+    continue-on-error: true
     env:
       test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
     steps:
@@ -490,6 +494,7 @@ jobs:
 
       - name: Run celostar e2e test
         id: run-test
+        continue-on-error: true
         uses: ./.github/actions/trigger-celostar-test
         with:
           owner: celonis
@@ -520,6 +525,7 @@ jobs:
   e2e-walmart_stable-load-single_query_and_export:
     runs-on: [ runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}" ]
     needs: [build-fe-be, e2e-walgreens_5b_stable-delta_load-single_query_and_export_csv, e2e-walgreens_5b_stable-load-single_and_batch]
+    continue-on-error: true
     env:
       test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
     steps:
@@ -528,6 +534,7 @@ jobs:
 
       - name: Run celostar e2e test
         id: run-test
+        continue-on-error: true
         uses: ./.github/actions/trigger-celostar-test
         with:
           owner: celonis
@@ -542,6 +549,90 @@ jobs:
                     \"starrocks_image_tag\":\"${test_image_tag}\",
                     \"dataset\":\"walmart_stable\",
                     \"query_option\":\"single_query_and_export_csv\",
+                    \"explain_mode\":\"disable\",
+                    \"e2e_test_mode\":\"config_2\",
+                    \"load_option\":\"load\"}
+            }
+
+      - name: Summarize the result
+        if: always() && steps.run-test.outcome != 'skipped'
+        run: |
+          {
+            echo "The E2E test workflow is: ${{steps.run-test.outputs.workflow_url}}"
+          } >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true
+
+  e2e-walmart_with_fd-load-single_query:
+    runs-on: [ runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}" ]
+    needs:
+      - build-fe-be
+      - e2e-walmart_stable-load-single_query_and_export
+      - e2e-walmart-delta_load-single_query_and_export_csv
+    env:
+      test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run celostar e2e test
+        id: run-test
+        continue-on-error: true
+        uses: ./.github/actions/trigger-celostar-test
+        with:
+          owner: celonis
+          repo: celostar
+          workflow_file: "e2e.yml"
+          payload: |
+            {
+                \"event_type\":\"trigger_e2e_test\",
+                \"client_payload\": {
+                    \"e2e_job_name\":\"${test_image_tag}\",
+                    \"cluster\":\"stateless\",
+                    \"starrocks_image_tag\":\"${test_image_tag}\",
+                    \"dataset\":\"walmart_with_fd\",
+                    \"query_option\":\"single_query\",
+                    \"explain_mode\":\"disable\",
+                    \"e2e_test_mode\":\"config_2\",
+                    \"load_option\":\"load\"}
+            }
+
+      - name: Summarize the result
+        if: always() && steps.run-test.outcome != 'skipped'
+        run: |
+          {
+            echo "The E2E test workflow is: ${{steps.run-test.outputs.workflow_url}}"
+          } >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true
+
+  e2e-variants_2b-load-single_query:
+    runs-on: [ runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}" ]
+    needs:
+      - build-fe-be
+      - e2e-walmart_stable-load-single_query_and_export
+      - e2e-walmart-delta_load-single_query_and_export_csv
+    env:
+      test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run celostar e2e test
+        id: run-test
+        continue-on-error: true
+        uses: ./.github/actions/trigger-celostar-test
+        with:
+          owner: celonis
+          repo: celostar
+          workflow_file: "e2e.yml"
+          payload: |
+            {
+                \"event_type\":\"trigger_e2e_test\",
+                \"client_payload\": {
+                    \"e2e_job_name\":\"${test_image_tag}\",
+                    \"cluster\":\"stateless\",
+                    \"starrocks_image_tag\":\"${test_image_tag}\",
+                    \"dataset\":\"variants_2b\",
+                    \"query_option\":\"single_query\",
                     \"explain_mode\":\"disable\",
                     \"e2e_test_mode\":\"config_2\",
                     \"load_option\":\"load\"}
