@@ -76,6 +76,60 @@ template<typename T>
     return ret;
 }
 
+TEST_F(CelonisGreatestLeastTest, celonis_least_single_argument) {
+    // GIVEN
+    using T = std::int64_t;
+    Prepare(TYPE_BIGINT, /* number_of_columns */ 1);
+
+    AddRow({1L});
+    AddRow({kNullDatum});
+
+    const auto [expected_size, expected_nulls, expected_values]{make_expected<T>({1L, kNullDatum})};
+
+    // WHEN
+    const auto result{RunLeast().value()};
+
+    // THEN
+    EXPECT_EQ(expected_size, result->size());
+    for (std::size_t row_idx{0}; row_idx < expected_size; ++row_idx) {
+        const bool expected_is_null{expected_nulls.at(row_idx)};
+        const bool actual_is_null{result->get(row_idx).is_null()};
+        EXPECT_EQ(expected_is_null, actual_is_null);
+        if (!actual_is_null) {
+            const auto& expected_value{expected_values.at(row_idx)};
+            const auto actual_value{result->get(row_idx).get<T>()};
+            EXPECT_EQ(expected_value, actual_value);
+        }
+    }
+}
+
+TEST_F(CelonisGreatestLeastTest, celonis_greatest_single_argument) {
+    // GIVEN
+    using T = double;
+    Prepare(TYPE_DOUBLE, /* number_of_columns */ 1);
+
+    AddRow({1.5});
+    AddRow({kNullDatum});
+
+    const auto [expected_size, expected_nulls, expected_values]{make_expected<T>({1.5, kNullDatum})};
+
+    // WHEN
+    const auto result{RunGreatest().value()};
+
+    // THEN
+    EXPECT_EQ(expected_size, result->size());
+    for (std::size_t row_idx{0}; row_idx < expected_size; ++row_idx) {
+        const bool expected_is_null{expected_nulls.at(row_idx)};
+        const bool actual_is_null{result->get(row_idx).is_null()};
+        EXPECT_EQ(expected_is_null, actual_is_null);
+        if (!actual_is_null) {
+            const auto& expected_value{expected_values.at(row_idx)};
+            const auto actual_value{result->get(row_idx).get<T>()};
+            EXPECT_EQ(expected_value, actual_value);
+        }
+    }
+}
+
 TEST_F(CelonisGreatestLeastTest, celonis_greatest_int_data_mixed_nulls) {
     // GIVEN
     using T = std::int64_t;
