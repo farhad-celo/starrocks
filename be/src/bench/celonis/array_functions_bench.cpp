@@ -139,7 +139,7 @@ static void BM_MergeSortedArraysVARCHAR(benchmark::State& state) {
         state.ResumeTiming();
         auto result = CelonisMergeSortedArrays::process(
                 {input_column, timestamp_column, size_column, priority_column});
-        ASSERT_TRUE(result.ok()) << result.status().get_error_msg();
+        ASSERT_TRUE(result.ok()) << result.status().message();
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
@@ -196,7 +196,7 @@ static void BM_DedupSortedByVARCHAR(benchmark::State& state) {
 
         state.ResumeTiming();
         auto result = CelonisDedupSortedBy::process({input_column, key_column});
-        ASSERT_TRUE(result.ok()) << result.status().get_error_msg();
+        ASSERT_TRUE(result.ok()) << result.status().message();
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
@@ -234,7 +234,7 @@ static void BM_ArrayBoolOr(benchmark::State& state) {
         state.ResumeTiming();
         auto result = CelonisArrayFunctions::array_bool_or(ctx.get(), {input_column});
 
-        ASSERT_TRUE(result.ok()) << result.status().get_error_msg();
+        ASSERT_TRUE(result.ok()) << result.status().message();
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
@@ -277,7 +277,7 @@ static void BM_ArrayCountVarchar(benchmark::State& state) {
         state.ResumeTiming();
         auto result = CelonisArrayFunctions::array_count(ctx.get(), {input_column});
 
-        ASSERT_TRUE(result.ok()) << result.status().get_error_msg();
+        ASSERT_TRUE(result.ok()) << result.status().message();
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
