@@ -1569,6 +1569,10 @@ celostar_functions = [
     [5000401, 'celonis_apply_abc_model', True, False, 'BIGINT', ['BIGINT', 'BIGINT', 'VARCHAR'], 'CelonisAbcModel<TYPE_BIGINT>::apply_abc_model', 'CelonisAbcModel<TYPE_BIGINT>::prepare', 'CelonisAbcModel<TYPE_BIGINT>::close'],
     [5000402, 'celonis_apply_abc_model', True, False, 'BIGINT', ['DOUBLE', 'BIGINT', 'VARCHAR'], 'CelonisAbcModel<TYPE_DOUBLE>::apply_abc_model', 'CelonisAbcModel<TYPE_DOUBLE>::prepare', 'CelonisAbcModel<TYPE_DOUBLE>::close'],
     [5000500, 'celonis_apply_kmeans_model', True, False, 'BIGINT', ['ARRAY_DOUBLE', 'VARCHAR'], 'CelonisKmeans::apply_kmeans_model', 'CelonisKmeans::prepare', 'CelonisKmeans::close'],
+    [5000601, 'celonis_to_double', True, False, 'DOUBLE', ['DOUBLE'], 'CelonisToDouble<TYPE_DOUBLE>::to_double'],
+    [5000602, 'celonis_to_double', True, False, 'DOUBLE', ['INT'], 'CelonisToDouble<TYPE_INT>::to_double'],
+    [5000603, 'celonis_to_double', True, False, 'DOUBLE', ['BIGINT'], 'CelonisToDouble<TYPE_BIGINT>::to_double'],
+    [5000604, 'celonis_to_double', True, False, 'DOUBLE', ['DATETIME'], 'CelonisToDouble<TYPE_DATETIME>::to_double'],
 ]
 
 vectorized_functions.extend(celostar_functions)
