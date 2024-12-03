@@ -57,4 +57,12 @@ UnnestedArrayData prepare_array_input(const Column* input_array) {
     }
     return result;
 }
+
+std::string double_to_string(double value, int precision) {
+    std::ostringstream oss;
+    oss.precision(precision);
+    oss << std::fixed << value;
+    return oss.str();
+}
+
 } // namespace starrocks

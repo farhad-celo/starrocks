@@ -64,4 +64,6 @@ struct UnnestedArrayData {
 
 UnnestedArrayData prepare_array_input(const Column* input_array);
 
+std::string double_to_string(double value, int precision);
+
 } // namespace starrocks

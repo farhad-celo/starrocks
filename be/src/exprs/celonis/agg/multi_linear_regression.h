@@ -20,6 +20,9 @@ namespace {
 
 using namespace boost::numeric::ublas;
 
+// precision used when converting doubles to string during generating model string.
+static const int PRECISION = 17;
+
 // Performs in-place LU factorization and then solve for X in AX=B
 bool lu_solve(const matrix<double>& A, const vector<double>& B, vector<double>& X) {
     matrix<double> A_lu(A);
@@ -34,7 +37,7 @@ bool lu_solve(const matrix<double>& A, const vector<double>& B, vector<double>& 
 std::string to_model_str(const vector<double>& beta) {
     std::vector<std::string> beta_strs;
     for (double v: beta) {
-        beta_strs.push_back(std::to_string(v));
+        beta_strs.push_back(double_to_string(v, PRECISION));
     }
     return boost::algorithm::join(beta_strs, ":");
 }

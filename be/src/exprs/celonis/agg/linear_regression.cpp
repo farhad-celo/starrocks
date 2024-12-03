@@ -14,6 +14,7 @@
 
 #include "linear_regression.h"
 #include "exprs/celonis/agg/util.h"
+#include "exprs/celonis/util.h"
 #include "modules/query/calendars.pb.h"
 #include <google/protobuf/util/json_util.h>
 #include <boost/numeric/ublas/matrix.hpp>
@@ -27,6 +28,9 @@ namespace starrocks {
 using namespace boost::numeric::ublas;
 
 namespace {
+
+// precision used when converting doubles to string during generating model string.
+static const int PRECISION = 17;
 
 // Performs in-place LU factorization and then solve for X in AX=B
 bool lu_solve(const matrix<double>& A, const vector<double>& B, vector<double>& X) {
@@ -44,7 +48,7 @@ std::string to_model_str(const vector<double>& beta) {
     std::string rv = "";
     for (double v: beta) {
         rv += sep;
-        rv += std::to_string(v);
+        rv += double_to_string(v, PRECISION);
         sep = ":";
     }
     return rv;
