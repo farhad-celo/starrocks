@@ -77,6 +77,8 @@ ${license}
 #include "exprs/celonis/array_count_distinct.h"
 #include "exprs/celonis/array_end_finder.h"
 #include "exprs/celonis/array_functions.h"
+#include "exprs/celonis/decode_string.h"
+#include "exprs/celonis/encode_string.h"
 #include "exprs/celonis/encode_variant.h"
 #include "exprs/celonis/calc_throughput.h"
 #include "exprs/celonis/calculate_range_end.h"

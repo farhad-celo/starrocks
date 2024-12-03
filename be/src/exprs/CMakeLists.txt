@@ -142,6 +142,8 @@ set(CELONIS_FILES
   celonis/calc_throughput.cpp
   celonis/calculate_range_end.cpp
   celonis/conformance.cpp
+  celonis/decode_string.cpp
+  celonis/encode_string.cpp
   celonis/encode_variant.cpp
   celonis/greatest_least.cpp
   celonis/in.cpp
