@@ -144,7 +144,7 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
 
   presubmit-test:
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=80,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
     # No need to run presubmit test on existing branch as the pull request of the branch will trigger it.
     if: inputs.branch_to_test == ''
     needs: sync-and-rebase-upstream
@@ -169,7 +169,7 @@ jobs:
 
   build-artifact:
     #    runs-on: [self-hosted, celostar, ec2-sr]
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
     needs: sync-and-rebase-upstream
     env:
       test_image_tag: ${{needs.sync-and-rebase-upstream.outputs.test_image_tag}}
@@ -204,7 +204,7 @@ jobs:
         
 
   build-allin1:
-    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,disk=default,"run-id=${{ github.run_id }}"]
     needs: build-artifact
     env:
       test_branch: ${{needs.build-artifact.outputs.test_branch}}
@@ -251,7 +251,7 @@ jobs:
         continue-on-error: true
 
   build-fe-be:
-    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,disk=default,"run-id=${{ github.run_id }}"]
     needs: build-artifact
     env:
       test_branch: ${{needs.build-artifact.outputs.test_branch}}
@@ -647,7 +647,7 @@ jobs:
         continue-on-error: true
 
   build-asan-artifact:
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
     needs: sync-and-rebase-upstream
     env:
       test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
@@ -670,7 +670,7 @@ jobs:
           is_asan_mode: 'yes'
 
   build-asan-allin1:
-    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,hdd=40,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,disk=default,"run-id=${{ github.run_id }}"]
     needs: build-asan-artifact
     env:
       test_branch: ${{needs.build-asan-artifact.outputs.test_branch}}

@@ -28,7 +28,7 @@ env:
 
 jobs:
   build-image:
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
 
     steps:
       - name: Checkout repository
@@ -130,7 +130,7 @@ jobs:
 #        continue-on-error: true
 
   build-asan-allin1-image:
-    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,hdd=100,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
 
     steps:
       - name: Checkout repository
