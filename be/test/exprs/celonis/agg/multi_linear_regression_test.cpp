@@ -136,7 +136,7 @@ protected:
         auto local_ctx = get_ctx(logical_type);
 
         const AggregateFunction* func =
-                get_aggregate_function("celonis_build_multi_linear_regression_model", logical_type, TYPE_VARCHAR,
+                get_aggregate_function("celonis_build_multi_linear_regression_model", TYPE_ARRAY, TYPE_VARCHAR,
                                        false);
 
         auto x_col = ColumnHelper::create_column(celonis::array_type(logical_type), true);
@@ -208,11 +208,11 @@ protected:
 };
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, bigint_single_dimension_merge) {
-    auto logical_type = TYPE_BIGINT;
-    auto x1 = DatumArray{DatumArray{1L}, DatumArray{1L}, DatumArray{2L}};
-    auto x2 = DatumArray{DatumArray{3L}, DatumArray{4L}};
-    auto y1 = DatumArray{100L, 300L, 400L};
-    auto y2 = DatumArray{300L, 500L};
+    auto logical_type = TYPE_DOUBLE;
+    auto x1 = DatumArray{DatumArray{1.0}, DatumArray{1.0}, DatumArray{2.0}};
+    auto x2 = DatumArray{DatumArray{3.0}, DatumArray{4.0}};
+    auto y1 = DatumArray{100.0, 300.0, 400.0};
+    auto y2 = DatumArray{300.0, 500.0};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, x1, y1);
     auto [local_ctx2, state2, func2] = RunUpdate(logical_type, x2, y2);
@@ -228,7 +228,7 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, bigint_single_dimension_merge
     auto result = ColumnHelper::create_column(get_return_type(), true);
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
-    auto expected_beta = ComputeExpectedBeta({x1, x2}, {y1, y2}, true);
+    auto expected_beta = ComputeExpectedBeta({x1, x2}, {y1, y2}, false);
     ASSERT_TRUE(expected_beta.has_value());
     ValidateModel(expected_beta.value(), result->get(0).get_slice().to_string());
 }
@@ -274,21 +274,13 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, double_multi_dimensions_merge
     ValidateModel(expected_beta.value(), result->get(0).get_slice().to_string());
 }
 
-TEST_F(CelonisBuildMultiLinearRegressionModelTest, bigint_run) {
-    auto x = DatumArray{DatumArray{1L}, DatumArray{1L}, DatumArray{2L}, DatumArray{3L}, DatumArray{4L}};
-    auto y = DatumArray{100L, 300L, 400L, 300L, 500L};
-    auto expected_beta = ComputeExpectedBeta({x}, {y}, true);
-    ASSERT_TRUE(expected_beta.has_value());
-    Run<TYPE_BIGINT>(x, y, expected_beta.value(), false);
-}
-
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, 3_features) {
-    auto x = DatumArray{DatumArray{1L, 2L, 3L}, DatumArray{1L, 2L, 3L}, DatumArray{2L, 3L, 4L}, DatumArray{3L, 4L, 5L},
-                        DatumArray{4L, 5L, 6L}};
-    auto y = DatumArray{100L, 300L, 400L, 300L, 500L};
-    auto expected_beta = ComputeExpectedBeta({x}, {y}, true);
+    auto x = DatumArray{DatumArray{1.0, 2.0, 3.0}, DatumArray{1.0, 2.0, 3.0}, DatumArray{2.0, 3.0, 4.0}, DatumArray{3.0, 4.0, 5.0},
+                        DatumArray{4.0, 5.0, 6.0}};
+    auto y = DatumArray{100.0, 300.0, 400.0, 300.0, 500.0};
+    auto expected_beta = ComputeExpectedBeta({x}, {y}, false);
     ASSERT_TRUE(expected_beta.has_value());
-    Run<TYPE_BIGINT>(x, y, expected_beta.value(), false);
+    Run<TYPE_DOUBLE>(x, y, expected_beta.value(), false);
 }
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, double_run) {
@@ -310,27 +302,27 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, double_run) {
 }
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, null_x_or_y) {
-    auto x = DatumArray{kNullDatum, DatumArray{1L}, DatumArray{1L}, kNullDatum, DatumArray{2L}, DatumArray{3L},
-                        DatumArray{4L}, DatumArray{5L}};
-    auto y = DatumArray{10L, 100L, 300L, kNullDatum, 400L, 300L, 500L, kNullDatum};
-    auto expected_beta = ComputeExpectedBeta({x}, {y}, true);
+    auto x = DatumArray{kNullDatum, DatumArray{1.0}, DatumArray{1.0}, kNullDatum, DatumArray{2.0}, DatumArray{3.0},
+                        DatumArray{4.0}, DatumArray{5.0}};
+    auto y = DatumArray{10.0, 100.0, 300.0, kNullDatum, 400.0, 300.0, 500.0, kNullDatum};
+    auto expected_beta = ComputeExpectedBeta({x}, {y}, false);
     ASSERT_TRUE(expected_beta.has_value());
-    Run<TYPE_BIGINT>(x, y, expected_beta.value(), false);
+    Run<TYPE_DOUBLE>(x, y, expected_beta.value(), false);
 }
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, null_in_x_array) {
-    auto x = DatumArray{DatumArray{1L}, DatumArray{1L}, DatumArray{3L, kNullDatum}, DatumArray{2L}, DatumArray{3L},
-                        DatumArray{4L}};
-    auto y = DatumArray{100L, 300L, 200L, 400L, 300L, 500L};
-    auto expected_beta = ComputeExpectedBeta({x}, {y}, true);
+    auto x = DatumArray{DatumArray{1.0}, DatumArray{1.0}, DatumArray{3.0, kNullDatum}, DatumArray{2.0}, DatumArray{3.0},
+                        DatumArray{4.0}};
+    auto y = DatumArray{100.0, 300.0, 200.0, 400.0, 300.0, 500.0};
+    auto expected_beta = ComputeExpectedBeta({x}, {y}, false);
     ASSERT_TRUE(expected_beta.has_value());
-    Run<TYPE_BIGINT>(x, y, expected_beta.value(), false);
+    Run<TYPE_DOUBLE>(x, y, expected_beta.value(), false);
 }
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, not_enough_data_points) {
-    auto x = DatumArray{DatumArray{1L}};
-    auto y = DatumArray{100L};
-    Run<TYPE_BIGINT>(x, y, {}, true);
+    auto x = DatumArray{DatumArray{1.0}};
+    auto y = DatumArray{100.0};
+    Run<TYPE_DOUBLE>(x, y, {}, true);
 }
 
 } // namespace starrocks

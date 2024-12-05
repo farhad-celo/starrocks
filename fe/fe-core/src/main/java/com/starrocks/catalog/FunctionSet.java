@@ -1128,13 +1128,9 @@ public class FunctionSet {
     }
 
     private void initCelonisAggregateBuiltins() {
-        // celonis_build_multi_linear_regression_model (bigint)
+        // celonis_build_multi_linear_regression_model
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL,
-                    Lists.newArrayList(Type.BIGINT, Type.BIGINT), Type.VARCHAR, Type.VARBINARY,
-                    true, false, true));
-        // celonis_build_multi_linear_regression_model (double)
-        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL,
-                    Lists.newArrayList(Type.DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.VARBINARY,
+                    Lists.newArrayList(Type.ARRAY_DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.VARBINARY,
                     true, false, true));
 
         // celonis_cluster_strings
