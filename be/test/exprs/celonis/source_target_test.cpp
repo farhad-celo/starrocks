@@ -205,6 +205,30 @@ TEST_F(CelonisSourceTargetTest, source_target_const_null_column) {
             ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
 }
 
+TEST_F(CelonisSourceTargetTest, source_target_const_column) {
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    array->append_datum(DatumArray{1, 2, 3, 4});
+    auto const_array_col = ConstColumn::create(array, 3);
+
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    evaluator_sources.add_expected(DatumArray{1, 2, 3});
+    evaluator_targets.add_expected(DatumArray{2, 3, 4});
+
+    evaluator_sources.add_expected(DatumArray{1, 2, 3});
+    evaluator_targets.add_expected(DatumArray{2, 3, 4});
+    
+    evaluator_sources.add_expected(DatumArray{1, 2, 3});
+    evaluator_targets.add_expected(DatumArray{2, 3, 4});
+
+    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, const_array_col).value();
+    evaluator_sources.evaluate(result_sources);
+
+    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, const_array_col).value();
+    evaluator_targets.evaluate(result_targets);
+}
+
 TEST_F(CelonisSourceTargetTest, array_celonis_source_unsupported_mode) {
     // "any->all" is not supported.
     auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
@@ -317,6 +341,33 @@ TEST_F(CelonisSourceTargetTest, array_celonis_sources_targets_with_group) {
     evaluator_sources.evaluate(result_sources);
 
     auto result_targets = run_celonis_array_targets(TYPE_ARRAY_VARCHAR, array, group).value();
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, source_target_const_column_with_group) {
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+    array->append_datum(DatumArray{10, 11, 12, 13, 20, 21, 22, 30, 31});
+    auto group = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+    group->append_datum(DatumArray{1L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L});
+    auto const_array_col = ConstColumn::create(array, 3);
+    auto const_group_col = ConstColumn::create(group, 3);
+
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    evaluator_sources.add_expected(DatumArray{10, 11, 12, 20, 21, 30});
+    evaluator_targets.add_expected(DatumArray{11, 12, 13, 21, 22, 31});
+
+    evaluator_sources.add_expected(DatumArray{10, 11, 12, 20, 21, 30});
+    evaluator_targets.add_expected(DatumArray{11, 12, 13, 21, 22, 31});
+
+    evaluator_sources.add_expected(DatumArray{10, 11, 12, 20, 21, 30});
+    evaluator_targets.add_expected(DatumArray{11, 12, 13, 21, 22, 31});
+
+    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, const_array_col, const_group_col).value();
+    evaluator_sources.evaluate(result_sources);
+
+    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, const_array_col, const_group_col).value();
     evaluator_targets.evaluate(result_targets);
 }
 

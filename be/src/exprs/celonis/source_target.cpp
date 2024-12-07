@@ -216,8 +216,9 @@ StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_sources(Function
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
 
-    const Column *array = columns[0].get();
-    UnnestedArrayData array_data = prepare_array_input(array);
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
+    ColumnPtr group_column;
     UnnestedArrayData group_array_data;
     if (columns.size() == 3) {
         if (columns[2]->only_null()) {
@@ -225,13 +226,14 @@ StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_sources(Function
             // ignore the column instead of trying returning empty arrays which is the behavior when a single array of
             // columns[2] is NULL.
         } else {
-            group_array_data = prepare_array_input(columns[2].get());
+            group_column = ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]);
+            group_array_data = prepare_array_input(group_column.get());
         }
     }
 
     auto result = _celonis_array_sources_targets_impl</*is_source=*/true>(array_data, group_array_data);
     if (array_data.null_arrays != nullptr) {
-        return NullableColumn::create(std::move(result), down_cast<const NullableColumn *>(array)->null_column());
+        return NullableColumn::create(std::move(result), down_cast<const NullableColumn *>(array_column.get())->null_column());
     }
     return result;
 }
@@ -240,8 +242,9 @@ StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_targets(Function
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
 
-    const Column* array = columns[0].get();
-    UnnestedArrayData array_data = prepare_array_input(array);
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
+    ColumnPtr group_column;
     UnnestedArrayData group_array_data;
     if (columns.size() == 3) {
         if (columns[2]->only_null()) {
@@ -249,13 +252,14 @@ StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_targets(Function
             // ignore the column instead of trying returning empty arrays which is the behavior when a single array of
             // columns[2] is NULL.
         } else {
-            group_array_data = prepare_array_input(columns[2].get());
+            group_column = ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]);
+            group_array_data = prepare_array_input(group_column.get());
         }
     }
 
     auto result = _celonis_array_sources_targets_impl</*is_source=*/false>(array_data, group_array_data);
     if (array_data.null_arrays != nullptr) {
-        return NullableColumn::create(std::move(result), down_cast<const NullableColumn*>(array)->null_column());
+        return NullableColumn::create(std::move(result), down_cast<const NullableColumn *>(array_column.get())->null_column());
     }
     return result;
 }
