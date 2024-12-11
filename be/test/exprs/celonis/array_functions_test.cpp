@@ -445,6 +445,30 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_array_size_mismatch) {
               "The size of input_array and key_array should not be different.");
 }
 
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_only_null) {
+    {
+        auto input_array = ColumnHelper::create_const_null_column(2);
+        auto key_array = ColumnHelper::create_const_null_column(2);
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_TRUE(result->is_null(0));
+        ASSERT_TRUE(result->is_null(1));
+    }
+    {
+        auto input_array = ColumnHelper::create_const_null_column(2);
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        key_array->append_datum(DatumArray{"e1", "e2"});
+        key_array->append_datum(DatumArray{"e1", "e2", "e2", "e4"});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_TRUE(result->is_null(0));
+        ASSERT_TRUE(result->is_null(1));
+    }
+}
+
 TEST_F(CelonisArrayFunctionsTest, array_lag_datetime) {
     auto input_array = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, false);
     input_array->append_datum(DatumArray{TimestampValue::create(2020, 8, 10, 1, 32, 32),
@@ -554,6 +578,18 @@ TEST_F(CelonisArrayFunctionsTest, array_lag_all_null) {
     EXPECT_TRUE(result->get(0).get_array()[1].is_null());
     EXPECT_TRUE(result->get(0).get_array()[2].is_null());
     EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lag_only_null) {
+    auto input_array = ColumnHelper::create_const_null_column(4);
+    auto offset_array = ColumnHelper::create_const_null_column(4);
+
+    const auto result = CelonisArrayFunctions::array_lag(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(4, result->size());
+    ASSERT_TRUE(result->is_null(0));
+    ASSERT_TRUE(result->is_null(1));
+    ASSERT_TRUE(result->is_null(2));
+    ASSERT_TRUE(result->is_null(3));
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_lag_empty_column) {
@@ -787,6 +823,18 @@ TEST_F(CelonisArrayFunctionsTest, array_lead_all_null) {
     EXPECT_TRUE(result->get(0).get_array()[1].is_null());
     EXPECT_TRUE(result->get(0).get_array()[2].is_null());
     EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_only_null) {
+    auto input_array = ColumnHelper::create_const_null_column(4);
+    auto offset_array = ColumnHelper::create_const_null_column(4);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(4, result->size());
+    ASSERT_TRUE(result->is_null(0));
+    ASSERT_TRUE(result->is_null(1));
+    ASSERT_TRUE(result->is_null(2));
+    ASSERT_TRUE(result->is_null(3));
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_lead_empty_column) {

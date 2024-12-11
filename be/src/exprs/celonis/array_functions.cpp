@@ -412,9 +412,7 @@ class CelonisDedupSortedBy {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
         DCHECK_EQ(columns.size(), 2);
-        if (columns[0]->only_null() || columns[1]->only_null()) {
-            return Status::InvalidArgument("The arrays should not be null.");
-        }
+        RETURN_IF_COLUMNS_ONLY_NULL(columns);
 
         size_t chunk_size = columns[0]->size();
 
@@ -510,9 +508,7 @@ class CelonisArrayLag {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
         DCHECK_EQ(columns.size(), 2);
-        if (columns[0]->only_null() || columns[1]->only_null()) {
-            return Status::InvalidArgument("The input array and offset should not be null.");
-        }
+        RETURN_IF_COLUMNS_ONLY_NULL(columns);
 
         size_t chunk_size = columns[0]->size();
         ColumnViewer offset_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
@@ -594,9 +590,7 @@ class CelonisArrayLead {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
         DCHECK_EQ(columns.size(), 2);
-        if (columns[0]->only_null() || columns[1]->only_null()) {
-            return Status::InvalidArgument("The input array and offset should not be null.");
-        }
+        RETURN_IF_COLUMNS_ONLY_NULL(columns);
 
         size_t chunk_size = columns[0]->size();
         ColumnViewer offset_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
