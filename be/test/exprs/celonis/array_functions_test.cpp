@@ -2,6 +2,7 @@
 
 #include "column/column_helper.h"
 #include "column/const_column.h"
+#include "exprs/anyval_util.h"
 #include "runtime/types.h"
 #include "util.h"
 
@@ -2325,6 +2326,18 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_null_elements_in_array) {
     EXPECT_EQ("HELLO", result->get(2).get_array()[1].get_slice());
     ASSERT_EQ(1, result->get(3).get_array().size());
     EXPECT_TRUE(result->get(3).get_array()[0].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, null_to_empty_only_null) {
+    auto input_array = ColumnHelper::create_const_null_column(2);
+
+    std::vector<FunctionContext::TypeDesc> arg_types = { AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT) };
+    auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT);
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    const auto result = CelonisArrayFunctions::null_to_empty(ctx.get(), {input_array}).value();
+    ASSERT_EQ(2, result->size());
+    ASSERT_EQ(0, result->get(0).get_array().size());
+    ASSERT_EQ(0, result->get(1).get_array().size());
 }
 
 TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {

@@ -534,6 +534,7 @@ public class FunctionSet {
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";
     public static final String CELONIS_MULTI_IN = "celonis_multi_in";
+    public static final String CELONIS_NULL_TO_EMPTY = "celonis_null_to_empty";
     public static final String CELONIS_TRANSITS_INTERLEAVED = "celonis_transits_interleaved";
     public static final String CELONIS_TRANSITS_MATCH = "celonis_transits_match";
     public static final String CELONIS_XX_HASH3_128 = "celonis_xx_hash3_128";
@@ -677,6 +678,7 @@ public class FunctionSet {
             ImmutableSet.<String>builder()
                     .add(FunctionSet.CELONIS_GREATEST)
                     .add(FunctionSet.CELONIS_LEAST)
+                    .add(FunctionSet.CELONIS_NULL_TO_EMPTY)
                     .add(FunctionSet.CELONIS_XX_HASH3_128)
                     .build();
 

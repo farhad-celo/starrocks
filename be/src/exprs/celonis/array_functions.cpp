@@ -680,7 +680,6 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_lead([[maybe_unused]] FunctionC
 class CelonisNullToEmpty {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
-        DCHECK_EQ(columns.size(), 1);
         if (!columns[0]->is_nullable() || !columns[0]->has_null()) {
             return columns[0]->clone();
         }
@@ -709,6 +708,12 @@ public:
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] FunctionContext* context,
                                                          const Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    if (columns[0]->only_null()) {
+        auto result_column = context->create_column(context->get_return_type(), columns[0]->is_nullable());
+        result_column->append_datum(DatumArray{});
+        return ConstColumn::create(std::move(result_column), columns[0]->size());
+    }
     return CelonisNullToEmpty::process(columns);
 }
 
