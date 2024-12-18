@@ -69,7 +69,9 @@ TEST_F(CelonisPeekMergedSortedArraysTest, empty_input) {
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_BIGINT;
     Prepare<InputLT, SecondaryLT>();
-    const auto result = Run<InputLT>().value();
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+    const auto& result = rs.value();
     ASSERT_EQ(0, result->size());
 }
 
@@ -97,7 +99,9 @@ TEST_F(CelonisPeekMergedSortedArraysTest, datetime_input_and_bigint_secondary_or
                    TimestampValue::create(2023, 1, 1, 0, 0, 10),
                    TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
            DatumArray{2L, 2L, 1L, 1L});
-    const auto result = Run<InputLT>().value();
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+    const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     EXPECT_EQ(TimestampValue::create(2110, 1, 1, 0, 0, 0), result->get(0).get_timestamp());
     EXPECT_EQ(TimestampValue::create(2010, 1, 1, 0, 0, 0), result->get(1).get_timestamp());
@@ -122,7 +126,9 @@ TEST_F(CelonisPeekMergedSortedArraysTest, int_input_and_bigint_secondary_order) 
                    TimestampValue::create(2023, 1, 1, 0, 0, 10),
                    TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
            DatumArray{2L, 2L, 1L, 1L});
-    const auto result = Run<InputLT>().value();
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+    const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     EXPECT_EQ(110, result->get(0).get_int32());
     EXPECT_EQ(2010, result->get(1).get_int32());
@@ -147,10 +153,12 @@ TEST_F(CelonisPeekMergedSortedArraysTest, double_input_and_varchar_secondary_ord
                    TimestampValue::create(2023, 1, 1, 0, 0, 10),
                    TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
            DatumArray{"bus", "bus", "apple", "apple"});
-    const auto result = Run<InputLT>().value();
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+    const auto& result = rs.value();
     ASSERT_EQ(2, result->size());
     EXPECT_EQ(110.5, result->get(0).get_double());
-    EXPECT_TRUE(result->get(1).is_null());
+    EXPECT_EQ(1010.5, result->get(1).get_double());
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, varchar_input_and_varchar_secondary_order) {
@@ -172,10 +180,32 @@ TEST_F(CelonisPeekMergedSortedArraysTest, varchar_input_and_varchar_secondary_or
                    TimestampValue::create(2023, 1, 1, 0, 0, 10),
                    TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
            DatumArray{"b", "b", "a", "a"});
-    const auto result = Run<InputLT>().value();
-    ASSERT_EQ(2, result->size());
-    EXPECT_TRUE(result->get(0).is_null());
+    AddRow(DatumArray{kNullDatum, kNullDatum, kNullDatum, "d", kNullDatum, "foo", "g"}, DatumArray{
+                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
+           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum}, DatumArray{
+                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
+           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+    const auto& result = rs.value();
+    ASSERT_EQ(4, result->size());
+    EXPECT_EQ("e", result->get(0).get_slice().to_string());
     EXPECT_EQ("cat", result->get(1).get_slice().to_string());
+    EXPECT_EQ("foo", result->get(2).get_slice().to_string());
+    EXPECT_TRUE(result->get(3).is_null());
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, empty_input_arrays) {
@@ -184,7 +214,9 @@ TEST_F(CelonisPeekMergedSortedArraysTest, empty_input_arrays) {
     Prepare<InputLT, SecondaryLT>();
     AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1},
            DatumArray{});
-    const auto result = Run<InputLT>().value();
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+    const auto& result = rs.value();
     ASSERT_EQ(1, result->size());
     EXPECT_TRUE(result->get(0).is_null());
 }

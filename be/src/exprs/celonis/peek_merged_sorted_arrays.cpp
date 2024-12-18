@@ -109,39 +109,44 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::Function
                         "The size of input_array and timestamp_array should not be different than the sum of "
                         "size_array.");
             }
-            if (start == next) {
-                // Skip empty arrays.
+            size_t non_null_start = start;
+            // find the first non-null value
+            while (non_null_start < next && array_data.null_elements != nullptr &&
+                   (*array_data.null_elements)[non_null_start] == 1) {
+                non_null_start++;
+            }
+            start = next;
+            if (non_null_start == next) {
+                // Skip empty or all null arrays
                 continue;
             }
             if (first_index == -1) {
-                first_index = start;
+                first_index = non_null_start;
             } else {
-                if (timestamps[start] != timestamps[first_index]) {
-                    if (timestamps[start] < timestamps[first_index]) {
-                        first_index = start;
+                if (timestamps[non_null_start] != timestamps[first_index]) {
+                    if (timestamps[non_null_start] < timestamps[first_index]) {
+                        first_index = non_null_start;
                         priority_index = i;
                     }
-                } else if (!has_secondary_order || secondary_orders[start] == secondary_orders[first_index]) {
+                } else if (!has_secondary_order || secondary_orders[non_null_start] == secondary_orders[first_index]) {
                     if (priorities[i] > priorities[priority_index]) {
-                        first_index = start;
+                        first_index = non_null_start;
                         priority_index = i;
                     }
                 } else {
-                    if (secondary_orders[start] < secondary_orders[first_index]) {
-                        first_index = start;
+                    if (secondary_orders[non_null_start] < secondary_orders[first_index]) {
+                        first_index = non_null_start;
                         priority_index = i;
                     }
                 }
             }
-            start = next;
         }
         if (next != src_timestamp_end) {
             return Status::InvalidArgument(
                     "The size of input_array and timestamp_array should not be different than the sum of "
                     "size_array.");
         }
-        if (first_index != -1 &&
-            (array_data.null_elements == nullptr || (*array_data.null_elements)[first_index] == 0)) {
+        if (first_index != -1) {
             result.append(src_elements[first_index]);
         } else {
             result.append_null();

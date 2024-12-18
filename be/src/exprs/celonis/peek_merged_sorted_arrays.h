@@ -17,7 +17,8 @@ public:
      * timestamp_array, size_array and priority_array should not be NULL and should not have NULL elements.
      * secondary_order_array column can be a NULL literal, when it is not, secondary_order_array has the same length as
      * the corresponding input_array.
-     * This function is equivalent to array_first(merge_sorted_arrays(...)).
+     * This function is equivalent to celonis_array_first(celonis_merge_sorted_arrays(...)).
+     * Note that celonis_array_first ignores leading NULLs in the input array.
      */
     DEFINE_VECTORIZED_FN(peek_merged_sorted_arrays);
 };
