@@ -179,12 +179,7 @@ public:
             return Status::InvalidArgument("timestamp_array should not be NULL.");
         }
         UnnestedArrayData timestamp_array_data = prepare_array_input(timestamp_column.get());
-        if (timestamp_array_data.null_elements != nullptr) {
-            return Status::InvalidArgument("timestamp_array should not have NULL elements.");
-        }
         DCHECK(timestamp_array_data.elements->is_timestamp());
-        const auto& timestamps =
-                down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*timestamp_array_data.elements).get_data().data();
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
 
         std::vector<DatumKey> secondary_orders;
@@ -193,9 +188,6 @@ public:
             secondary_orders.reserve(timestamp_offsets[chunk_size]);
             ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
             UnnestedArrayData secondary_order_array_data = prepare_array_input(secondary_order_column.get());
-            if (secondary_order_array_data.null_elements != nullptr) {
-                return Status::InvalidArgument("If provided, secondary_order_array should not have NULL elements.");
-            }
             const auto& secondary_order_offsets = secondary_order_array_data.offsets->get_data().data();
             for (auto row = 0; row < chunk_size; ++row) {
                 const auto start = timestamp_offsets[row];
@@ -326,15 +318,24 @@ public:
             size_t size_start = size_offsets[row];
             size_t size_end = size_offsets[row + 1];
 
+            vector<DatumKey> timestamp_keys;
+            timestamp_keys.reserve(timestamp_offsets[row + 1] - timestamp_offsets[row]);
+
+            auto array = timestamp_column->get(row).get_array();
+            for (const auto& item: array) {
+                timestamp_keys.push_back(item.convert2DatumKey());
+            }
+
             struct Array {
-                Array(size_t start, size_t end, const TimestampValue* timestamp, const DatumKey* secondary_order,
+                Array(size_t start, size_t end, const DatumKey* timestamp, const DatumKey* secondary_order,
                       int* priority)
                         : index(start), end(end), timestamp(timestamp), secondary_order(secondary_order),
                           priority(priority) {}
 
                 size_t index;
                 size_t end;
-                const TimestampValue* timestamp;
+                // The corresponding DatumKey of NULL is std::monostate which is less than any other DatumKey.
+                const DatumKey* timestamp;
                 const DatumKey* secondary_order;
                 int* priority;
             };
@@ -369,9 +370,11 @@ public:
                     continue;
                 }
                 if (has_secondary_order) {
-                    pq.emplace(start, next, timestamps + start, secondary_orders.data() + start, priorities.data() + start);
+                    pq.emplace(start, next, timestamp_keys.data() + start - src_timestamp_start,
+                               secondary_orders.data() + start, priorities.data() + start);
                 } else {
-                    pq.emplace(start, next, timestamps + start, nullptr, priorities.data() + start);
+                    pq.emplace(start, next, timestamp_keys.data() + start - src_timestamp_start, nullptr,
+                               priorities.data() + start);
                 }
                 start = next;
             }

@@ -13,12 +13,13 @@ public:
     * @paramType: [ANY_ARRAY, ARRAY_TIMESTAMP, ARRAY_INT, ARRAY_INT, ARRAY_INT | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_STRING, BIGINT]
     * @return: input_array type
     * input_array and timestamp_array should have the same number of elements which is equal to the sum of size_array.
-    * timestamp_array, size_array and priority_array should not be NULL and should not have NULL elements.
+    * size_array and priority_array should not be NULL and should not have NULL elements.
     * If limit is set and it is not NULL, only output the first limit elements.
     * If limit is set, priority_array can be a NULL literal and if it is set, it should have the same number of
     * elements as input/timestamp_array. Otherwise priority_array should have the same number of elements as size_array.
     * secondary_order_array column can be a NULL literal, when it is not, secondary_order_array has the same length as
     * the corresponding input_array.
+    * NULL values are placed at the first during ordering.
     */
     DEFINE_VECTORIZED_FN(merge_sorted_arrays);
 
