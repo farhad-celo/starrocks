@@ -8,6 +8,8 @@
 
 namespace starrocks {
 
+namespace {
+
 template<LogicalType LT, typename = guard::Guard>
 struct ValueMap {
 };
@@ -27,21 +29,27 @@ struct ValueMap<LT, StringLTGuard<LT>> {
 };
 
 template<LogicalType LT>
-struct RemapValuesStateFragmentLocal {
-    using ValueHashMap = typename ValueMap<LT>::HashMap;
+struct ValueHashMap {
     using CppType = RunTimeCppType<LT>;
     using HashMapKeyType = typename ValueMap<LT>::KeyType;
+    using HashMap = typename ValueMap<LT, guard::Guard>::HashMap;
 
-    ValueHashMap value_map;
-    ScalarFunction function;
+    HashMap value_map;
     std::optional<Datum> null_value = std::nullopt;
 
-    void insert(const Datum& old_datum, const Datum& new_datum) {
-        if (old_datum.is_null()) {
-            null_value = new_datum;
-        } else {
-            const auto key = _convert_to_key_type(old_datum.get<CppType>());
-            value_map[key] = new_datum;
+    ValueHashMap() = default;
+
+    explicit ValueHashMap(const DatumArray& old_array, const DatumArray& new_array) {
+        const auto size = old_array.size();
+        for (auto i = 0; i < size; ++i) {
+            const auto& old_datum = old_array[i];
+            const auto& new_datum = new_array[i];
+            if (old_datum.is_null()) {
+                null_value = new_datum;
+            } else {
+                const auto key = _convert_to_key_type(old_datum.get<CppType>());
+                value_map[key] = new_datum;
+            }
         }
     }
 
@@ -72,6 +80,12 @@ private:
 };
 
 template<LogicalType LT>
+struct RemapValuesStateFragmentLocal {
+    ValueHashMap<LT> value_map;
+    ScalarFunction function;
+};
+
+template<LogicalType LT>
 Status prepare_helper(FunctionContext* context, FunctionContext::FunctionStateScope
 scope, StatusOr<ColumnPtr> (* func_const)(FunctionContext*, const starrocks::Columns&),
                       StatusOr<ColumnPtr>(* func_general)(FunctionContext*, const starrocks::Columns&)) {
@@ -98,17 +112,15 @@ scope, StatusOr<ColumnPtr> (* func_const)(FunctionContext*, const starrocks::Col
         return Status::OK();
     }
 
-    auto old_value_array = old_value_column->get(0).get_array();
-    auto new_value_array = new_value_column->get(0).get_array();
+    const DatumArray old_value_array = old_value_column->get(0).get_array();
+    const DatumArray new_value_array = new_value_column->get(0).get_array();
     if (old_value_array.size() != new_value_array.size()) {
         return Status::InvalidArgument("[prepare] old value array must have the same length as new value array.");
     }
-    const auto size = old_value_array.size();
-    for (auto i = 0; i < size; ++i) {
-        state->insert(old_value_array[i], new_value_array[i]);
-    }
+    state->value_map = ValueHashMap<LT>(old_value_array, new_value_array);
     return Status::OK();
 }
+} // namespace
 
 template<LogicalType LT>
 Status CelonisRemapValues<LT>::prepare_const(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
@@ -161,16 +173,11 @@ CelonisRemapValues<LT>::remap_values_const_non_constant_value_map([[maybe_unused
     if (old_value_array.size() != new_value_array.size()) {
         return Status::InvalidArgument("old value array must have the same length as new value array.");
     }
-    const auto size = old_value_array.size();
-    auto state = RemapValuesStateFragmentLocal<LT>();
-    for (auto i = 0; i < size; ++i) {
-        state.insert(old_value_array[i], new_value_array[i]);
-    }
-
+    ValueHashMap<LT> value_map(old_value_array, new_value_array);
     for (int row = 0; row < num_rows; ++row) {
         auto value = value_column->get(row);
         result->append_datum(
-                state.get(value, has_default ? std::optional<Datum>(columns[3]->get(row)) : std::nullopt));
+                value_map.get(value, has_default ? std::optional<Datum>(columns[3]->get(row)) : std::nullopt));
     }
     return result;
 }
@@ -240,7 +247,7 @@ StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[ma
     for (int row = 0; row < num_rows; ++row) {
         auto value = value_column->get(row);
         result->append_datum(
-                state->get(value, has_default ? std::optional<Datum>(columns[3]->get(row)) : std::nullopt));
+                state->value_map.get(value, has_default ? std::optional<Datum>(columns[3]->get(row)) : std::nullopt));
     }
     return result;
 }
