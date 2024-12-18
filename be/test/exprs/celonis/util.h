@@ -29,7 +29,7 @@ public:
 
     void add_expected(Datum expected) { expected_.push_back(std::move(expected)); }
 
-    void evaluate(ColumnPtr result) const {
+    void evaluate(const ColumnPtr& result) const {
         ASSERT_EQ(result->size(), expected_.size());
         for (int row = 0; row < result->size(); row++) {
             if (result->get(row).is_null() || expected_[row].is_null()) {

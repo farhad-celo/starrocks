@@ -69,7 +69,7 @@ private:
         return Run();
     }
 
-    void Validate(ColumnPtr result, size_t row, const std::optional<std::vector<int32_t>>& expected) {
+    void Validate(const ColumnPtr& result, size_t row, const std::optional<std::vector<int32_t>>& expected) {
         ASSERT_LT(row, result->size());
         if (!expected.has_value()) {
             EXPECT_TRUE(result->is_null(row));

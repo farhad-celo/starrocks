@@ -165,7 +165,7 @@ private:
         }
     }
 
-    void Validate(ColumnPtr res, size_t row, const std::vector<DatumArray>& expected_left_arrays,
+    void Validate(const ColumnPtr& res, size_t row, const std::vector<DatumArray>& expected_left_arrays,
                   const std::vector<DatumArray>& expected_right_arrays) {
         ASSERT_LT(row, res->size());
         StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
