@@ -158,22 +158,28 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_6) {
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum("Pants");
+    string_column_->append_datum("Pants");
+    string_column_->append_datum("Shirt");
     const auto result = RunConstantMatch(DatumArray{"BSP", "CSP", "DSP", "ASP"}, 10,
                                          kNullDatum).value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(0).get_slice());
     EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(1).get_slice());
+    EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(2).get_slice());
+    EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(3).get_slice());
 }
 
 TEST_F(CelonisMatchStringsTest, null_input_string_and_const_match_strings) {
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("Shirt");
     const auto result = RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2,
                                          "##").value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt##Sweatshirt", result->get(0).get_slice());
     EXPECT_TRUE(result->get(1).is_null());
+    EXPECT_EQ("T-Shirt##Sweatshirt", result->get(2).get_slice());
 }
 
 TEST_F(CelonisMatchStringsTest, null_input_string_and_null_const_match_strings) {

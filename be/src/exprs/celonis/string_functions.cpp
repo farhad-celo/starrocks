@@ -1098,6 +1098,7 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
     ColumnViewer top_k_viewer = ColumnViewer<TYPE_INT>(columns[2]);
     ColumnViewer separator_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
     ColumnBuilder<TYPE_VARCHAR> result(n_rows);
+    phmap::flat_hash_map<std::tuple<std::string, std::string, int>, std::string> cache;
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || state->is_null) {
             result.append_null();
@@ -1109,7 +1110,15 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
         if (top_k <= 0) {
             return Status::InvalidArgument("CELONIS_MATCH_STRINGS: top_k must be positive.");
         }
-        result.append(get_match_strings_result(input_string, state->match_strings, top_k, separator));
+        const auto key = std::make_tuple(input_string, separator, top_k);
+        auto it = cache.find(key);
+        if (it == cache.end()) {
+            const auto match_result = get_match_strings_result(input_string, state->match_strings, top_k, separator);
+            cache.insert({key, match_result});
+            result.append(match_result);
+        } else {
+            result.append(it->second);
+        }
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
