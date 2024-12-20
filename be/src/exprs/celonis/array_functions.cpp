@@ -182,11 +182,10 @@ public:
         DCHECK(timestamp_array_data.elements->is_timestamp());
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
 
-        std::vector<DatumKey> secondary_orders;
         const bool has_secondary_order = (columns.size() >= 5) && (!columns[4]->has_null());
+        ColumnPtr secondary_order_column = has_secondary_order ? ColumnHelper::unpack_and_duplicate_const_column(
+                chunk_size, columns[4]) : nullptr;
         if (has_secondary_order) {
-            secondary_orders.reserve(timestamp_offsets[chunk_size]);
-            ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
             UnnestedArrayData secondary_order_array_data = prepare_array_input(secondary_order_column.get());
             const auto& secondary_order_offsets = secondary_order_array_data.offsets->get_data().data();
             for (auto row = 0; row < chunk_size; ++row) {
@@ -195,12 +194,6 @@ public:
                 if (secondary_order_offsets[row] != start || secondary_order_offsets[row + 1] != end) {
                     return Status::InvalidArgument(
                             "If provided, the size of secondary_order_array and timestamp_array should not be different.");
-                }
-            }
-            for (auto row = 0; row < chunk_size; ++row) {
-                auto array = secondary_order_column->get(row).get_array();
-                for (const auto& item: array) {
-                    secondary_orders.push_back(item.convert2DatumKey());
                 }
             }
         }
@@ -318,12 +311,21 @@ public:
             size_t size_start = size_offsets[row];
             size_t size_end = size_offsets[row + 1];
 
-            vector<DatumKey> timestamp_keys;
+            std::vector<DatumKey> timestamp_keys;
             timestamp_keys.reserve(timestamp_offsets[row + 1] - timestamp_offsets[row]);
 
-            auto array = timestamp_column->get(row).get_array();
-            for (const auto& item: array) {
+            auto timestamp_array = timestamp_column->get(row).get_array();
+            for (const auto& item: timestamp_array) {
                 timestamp_keys.push_back(item.convert2DatumKey());
+            }
+
+            std::vector<DatumKey> sorting_keys;
+            if (has_secondary_order) {
+                sorting_keys.reserve(timestamp_offsets[row + 1] - timestamp_offsets[row]);
+                auto secondary_order_array = secondary_order_column->get(row).get_array();
+                for (const auto& item: secondary_order_array) {
+                    sorting_keys.push_back(item.convert2DatumKey());
+                }
             }
 
             struct Array {
@@ -369,12 +371,12 @@ public:
                     // Skip empty arrays.
                     continue;
                 }
+                auto local_start = start - src_timestamp_start;
                 if (has_secondary_order) {
-                    pq.emplace(start, next, timestamp_keys.data() + start - src_timestamp_start,
-                               secondary_orders.data() + start, priorities.data() + start);
-                } else {
-                    pq.emplace(start, next, timestamp_keys.data() + start - src_timestamp_start, nullptr,
+                    pq.emplace(start, next, timestamp_keys.data() + local_start, sorting_keys.data() + local_start,
                                priorities.data() + start);
+                } else {
+                    pq.emplace(start, next, timestamp_keys.data() + local_start, nullptr, priorities.data() + start);
                 }
                 start = next;
             }

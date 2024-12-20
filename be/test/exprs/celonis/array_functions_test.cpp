@@ -1156,6 +1156,52 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_varchar) {
     EXPECT_EQ("0eight", result->get(1).get_array()[3].get_slice());
 }
 
+TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_order_determined_by_secondary_orders) {
+    auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), true);
+    input_array->append_datum(DatumArray{110, 120, 215, 225, 310, 315, 320});
+
+    auto timestamp_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)),
+                                                       false);
+    // all the timestamps are the same.
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+    });
+    auto secondary_order_array = ColumnHelper::create_column(
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BIGINT)),
+            false);
+    secondary_order_array->append_datum(DatumArray{1L, 2L, 7L, 8L, 4L, 5L, 6L});
+
+    auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                  false);
+    size_array->append_datum(DatumArray{2, 2, 3});
+
+    auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      true);
+    priority_array->append_datum(DatumArray{1, 1, 1, 1, 1, 1, 1});
+
+    auto limit_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+    limit_column->append_datum(100L);
+
+    const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
+            nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array, limit_column});
+    const auto& result = rs.value();
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(7, result->get(0).get_array().size());
+    EXPECT_EQ(110, result->get(0).get_array()[0].get_int32());
+    EXPECT_EQ(120, result->get(0).get_array()[1].get_int32());
+    EXPECT_EQ(310, result->get(0).get_array()[2].get_int32());
+    EXPECT_EQ(315, result->get(0).get_array()[3].get_int32());
+    EXPECT_EQ(320, result->get(0).get_array()[4].get_int32());
+    EXPECT_EQ(215, result->get(0).get_array()[5].get_int32());
+    EXPECT_EQ(225, result->get(0).get_array()[6].get_int32());
+}
+
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_element_wise_priority_works) {
     auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), true);
     input_array->append_datum(DatumArray{110, 120, 215, 225, 310, 315, 320});
