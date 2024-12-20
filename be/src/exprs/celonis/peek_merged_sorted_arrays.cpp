@@ -19,12 +19,6 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::Function
         return Status::InvalidArgument("timestamp_array should not be NULL.");
     }
     UnnestedArrayData timestamp_array_data = prepare_array_input(timestamp_column.get());
-    if (timestamp_array_data.null_elements != nullptr) {
-        return Status::InvalidArgument("timestamp_array should not have NULL elements.");
-    }
-    DCHECK(timestamp_array_data.elements->is_timestamp());
-    const auto& timestamps =
-            down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*timestamp_array_data.elements).get_data().data();
     const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
 
     std::vector<DatumKey> secondary_orders;
@@ -33,9 +27,6 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::Function
         secondary_orders.reserve(timestamp_offsets[chunk_size]);
         ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
         UnnestedArrayData secondary_order_array_data = prepare_array_input(secondary_order_column.get());
-        if (secondary_order_array_data.null_elements != nullptr) {
-            return Status::InvalidArgument("If provided, secondary_order_array should not have NULL elements.");
-        }
         const auto& secondary_order_offsets = secondary_order_array_data.offsets->get_data().data();
         for (auto row = 0; row < chunk_size; ++row) {
             const auto start = timestamp_offsets[row];
@@ -98,6 +89,12 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::Function
         if (priority_offsets[row + 1] != size_priority_end) {
             return Status::InvalidArgument("The size of size_array and priority_array should not be different.");
         }
+        std::vector<DatumKey> timestamp_keys;
+        timestamp_keys.reserve(timestamp_offsets[row + 1] - timestamp_offsets[row]);
+        auto array = timestamp_column->get(row).get_array();
+        for (const auto& item: array) {
+            timestamp_keys.push_back(item.convert2DatumKey());
+        }
         size_t start = src_timestamp_start;
         size_t next = 0;
         size_t first_index = -1;
@@ -123,8 +120,10 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::Function
             if (first_index == -1) {
                 first_index = non_null_start;
             } else {
-                if (timestamps[non_null_start] != timestamps[first_index]) {
-                    if (timestamps[non_null_start] < timestamps[first_index]) {
+                if (timestamp_keys[non_null_start - src_timestamp_start] !=
+                    timestamp_keys[first_index - src_timestamp_start]) {
+                    if (timestamp_keys[non_null_start - src_timestamp_start] <
+                        timestamp_keys[first_index - src_timestamp_start]) {
                         first_index = non_null_start;
                         priority_index = i;
                     }

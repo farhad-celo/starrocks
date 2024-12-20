@@ -222,6 +222,47 @@ TEST_F(CelonisPeekMergedSortedArraysTest, empty_input_arrays) {
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, null_timestamp) {
+    {
+        const LogicalType InputLT = TYPE_VARCHAR;
+        const LogicalType SecondaryLT = TYPE_VARCHAR;
+        Prepare<InputLT, SecondaryLT>();
+        AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
+                       TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                       TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                       kNullDatum,
+                       TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                       TimestampValue::create(2023, 1, 1, 0, 0, 10),
+                       TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                       TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
+               DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+        const auto rs = Run<InputLT>();
+        ASSERT_TRUE(rs.ok()) << rs.status().message();
+        const auto& result = rs.value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("c", result->get(0).get_slice().to_string());
+    }
+    {
+        const LogicalType InputLT = TYPE_VARCHAR;
+        const LogicalType SecondaryLT = TYPE_VARCHAR;
+        Prepare<InputLT, SecondaryLT>();
+        AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
+                       kNullDatum,
+                       TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                       kNullDatum,
+                       TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                       kNullDatum,
+                       TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                       TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
+               DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+        const auto rs = Run<InputLT>();
+        ASSERT_TRUE(rs.ok()) << rs.status().message();
+        const auto& result = rs.value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("a", result->get(0).get_slice().to_string());
+    }
+}
+
+TEST_F(CelonisPeekMergedSortedArraysTest, null_secondary_order) {
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
@@ -229,14 +270,16 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_timestamp) {
                    TimestampValue::create(2023, 1, 1, 0, 0, 10),
                    TimestampValue::create(2023, 1, 1, 0, 0, 20),
                    TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   kNullDatum,
+                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
                    TimestampValue::create(2023, 1, 1, 0, 0, 10),
                    TimestampValue::create(2023, 1, 1, 0, 0, 15),
                    TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
-    const auto result = Run<InputLT>();
-    ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().message(), "timestamp_array should not have NULL elements.");
+           DatumArray{"a", "a", "c", "c", kNullDatum, "e", "b"});
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+    const auto& result = rs.value();
+    ASSERT_EQ(1, result->size());
+    EXPECT_EQ("e", result->get(0).get_slice().to_string());
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, null_size) {
@@ -273,24 +316,6 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_priority) {
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "priority_array should not have NULL elements.");
-}
-
-TEST_F(CelonisPeekMergedSortedArraysTest, null_secondary_order) {
-    const LogicalType InputLT = TYPE_VARCHAR;
-    const LogicalType SecondaryLT = TYPE_VARCHAR;
-    Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", kNullDatum, "b"});
-    const auto result = Run<InputLT>();
-    ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().message(), "If provided, secondary_order_array should not have NULL elements.");
 }
 
 TEST_F(CelonisPeekMergedSortedArraysTest, input_array_size_different_from_timestamp_size) {
