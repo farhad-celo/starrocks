@@ -25,26 +25,6 @@ Load Average: 0.49, 0.59, 0.36
 -----------------------------------------------------------------------------------------------------
 Benchmark                                           Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------------------------
-BM_MergeSortedArraysVARCHAR/10000/5/5/15     30274727 ns     30271822 ns           23 RowInvRate=3.02718us
-BM_MergeSortedArraysVARCHAR/10000/10/5/15    66993149 ns     66986510 ns           10 RowInvRate=6.69865us
-BM_MergeSortedArraysVARCHAR/10000/20/5/15   154471575 ns    154461676 ns            5 RowInvRate=15.4462us
-BM_MergeSortedArraysVARCHAR/10000/30/5/15   256502281 ns    256480289 ns            3 RowInvRate=25.648us
-BM_MergeSortedArraysVARCHAR/10000/5/10/15    36959726 ns     36955486 ns           19 RowInvRate=3.69555us
-BM_MergeSortedArraysVARCHAR/10000/10/10/15   82913384 ns     82910422 ns            8 RowInvRate=8.29104us
-BM_MergeSortedArraysVARCHAR/10000/20/10/15  199408291 ns    199404237 ns            4 RowInvRate=19.9404us
-BM_MergeSortedArraysVARCHAR/10000/30/10/15  315578735 ns    315561648 ns            2 RowInvRate=31.5562us
-BM_MergeSortedArraysVARCHAR/10000/5/5/30     47109811 ns     47109102 ns           15 RowInvRate=4.71091us
-BM_MergeSortedArraysVARCHAR/10000/10/5/30   108553692 ns    108539168 ns            6 RowInvRate=10.8539us
-BM_MergeSortedArraysVARCHAR/10000/20/5/30   259084935 ns    259073816 ns            3 RowInvRate=25.9074us
-BM_MergeSortedArraysVARCHAR/10000/30/5/30   434000689 ns    433946350 ns            2 RowInvRate=43.3946us
-BM_MergeSortedArraysVARCHAR/10000/5/10/30    54278889 ns     54273074 ns           12 RowInvRate=5.42731us
-BM_MergeSortedArraysVARCHAR/10000/10/10/30  127947671 ns    127946689 ns            5 RowInvRate=12.7947us
-BM_MergeSortedArraysVARCHAR/10000/20/10/30  310458411 ns    310436073 ns            2 RowInvRate=31.0436us
-BM_MergeSortedArraysVARCHAR/10000/30/10/30  501227823 ns    501193049 ns            2 RowInvRate=50.1193us
-BM_DedupSortedByVARCHAR/10000/5/5             1283851 ns      1283690 ns          577 RowInvRate=128.369ns
-BM_DedupSortedByVARCHAR/10000/10/5            2472645 ns      2472358 ns          288 RowInvRate=247.236ns
-BM_DedupSortedByVARCHAR/10000/5/10            1793676 ns      1793378 ns          376 RowInvRate=179.338ns
-BM_DedupSortedByVARCHAR/10000/10/10           4298807 ns      4297674 ns          163 RowInvRate=429.767ns
 BM_ArrayBoolOr/1000/1/10                         9663 ns         9589 ns        72937 RowInvRate=9.58935ns
 BM_ArrayBoolOr/10000/1/10                       90758 ns        90622 ns         7677 RowInvRate=9.06225ns
 BM_ArrayBoolOr/1000/10/10                        9629 ns         9558 ns        73277 RowInvRate=9.55847ns
@@ -70,80 +50,6 @@ BM_ArrayCountVarchar/10000/10/100              284150 ns       284011 ns        
 BM_ArrayCountVarchar/1000/50/100                32918 ns        32547 ns        22675 RowInvRate=32.5474ns
 BM_ArrayCountVarchar/10000/50/100              300441 ns       299217 ns         2367 RowInvRate=29.9217ns
 */
-
-static void BM_MergeSortedArraysVARCHAR(benchmark::State& state) {
-    int num_rows = state.range(0);
-    int num_arrays = state.range(1);
-    int min_elements = state.range(2);
-    int max_elements = state.range(3);
-
-    using UniformInt = std::uniform_int_distribution<int32_t>;
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    int num_values = num_arrays * min_elements; // Some number. This doesn't matter much.
-    UniformInt uniform_value(0, num_values - 1);
-    UniformInt uniform_element(min_elements, max_elements - 1);
-    UniformInt uniform_timestamp_increase(1, 100);
-    UniformInt uniform_priority(0, num_arrays * 10 - 1); // Some number. This doesn't matter much.
-
-    std::vector<std::string> values;
-    values.reserve(num_values);
-    for (int i = 0; i < num_values; i++) {
-        values.push_back("value" + std::to_string(i));
-    }
-
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)))};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)));
-
-    TimestampValue timestamp;
-    int total_rows = 0;
-    for (auto _ : state) {
-        state.PauseTiming();
-        total_rows += num_rows;
-        auto input_column =
-                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
-        auto timestamp_column =
-                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)), true);
-        auto size_column =
-                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), true);
-        auto priority_column =
-                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), true);
-        for (int i = 0; i < num_rows; i++) {
-            DatumArray input_array;
-            DatumArray timestamp_array;
-            DatumArray size_array;
-            DatumArray priority_array;
-            for (int j = 0; j < num_arrays; j++) {
-                int num_elements = uniform_element(rng);
-                int64_t unix_timestamp = 1672560000; // 2023-01-01
-                for (int k = 0; k < num_elements; k++) {
-                    input_array.emplace_back(Slice(values[uniform_value(rng)]));
-                    unix_timestamp += uniform_timestamp_increase(rng);
-                    timestamp.from_unix_second(unix_timestamp);
-                    timestamp_array.emplace_back(timestamp);
-                }
-                size_array.emplace_back(num_elements);
-                priority_array.emplace_back(uniform_priority(rng));
-            }
-            input_column->append_datum(input_array);
-            timestamp_column->append_datum(timestamp_array);
-            size_column->append_datum(size_array);
-            priority_column->append_datum(priority_array);
-        }
-
-        state.ResumeTiming();
-        auto result = CelonisMergeSortedArrays::process(
-                {input_column, timestamp_column, size_column, priority_column});
-        ASSERT_TRUE(result.ok()) << result.status().message();
-    }
-    state.counters["RowInvRate"] =
-            benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
-}
 
 static void BM_DedupSortedByVARCHAR(benchmark::State& state) {
     int num_rows = state.range(0);
@@ -282,9 +188,6 @@ static void BM_ArrayCountVarchar(benchmark::State& state) {
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
-
-// Args: Number of rows / Number of arrays / Minimum size of inner array / Maximum size of inner array
-BENCHMARK(BM_MergeSortedArraysVARCHAR)->ArgsProduct({{10000}, {5, 10, 20, 30}, {5, 10}, {15, 30}});
 
 // Args: Number of rows / Number of unique elements / Max number of duplicates per unique element
 BENCHMARK(BM_DedupSortedByVARCHAR)->ArgsProduct({{10000}, {5, 10}, {5, 10}});
