@@ -55,6 +55,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::Function
     const auto& sizes = down_cast<const RunTimeColumnType<TYPE_INT>&>(*size_array_data.elements).get_data().data();
     const auto& size_offsets = size_array_data.offsets->get_data().data();
 
+    // TODO(y.zhang): Support NULL priority column.
     ColumnPtr priority_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[3]);
     if (priority_column->has_null()) {
         return Status::InvalidArgument("priority_array should not be NULL.");
@@ -86,6 +87,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::Function
         }
         size_t size_priority_start = size_offsets[row];
         size_t size_priority_end = size_offsets[row + 1];
+        // TODO(y.zhang): Change the implementation to support priority array has the same size as timestamp array.
         if (priority_offsets[row + 1] != size_priority_end) {
             return Status::InvalidArgument("The size of size_array and priority_array should not be different.");
         }
@@ -119,6 +121,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::Function
             }
             if (first_index == -1) {
                 first_index = non_null_start;
+                priority_index = i;
             } else {
                 if (timestamp_keys[non_null_start - src_timestamp_start] !=
                     timestamp_keys[first_index - src_timestamp_start]) {
