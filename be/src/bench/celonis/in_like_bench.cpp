@@ -14,90 +14,91 @@
 namespace starrocks {
 
 /*
-Note that the performance is highly affected by how wildcards are placed in the pattern.
-Run on (32 X 2650 MHz CPU s)
+2024-12-29T22:37:53+00:00
+Running ./be/build_Release/src/bench/celonis/output/in_like_bench
+Run on (32 X 3201.71 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 0.29, 1.29, 20.03
-Args: Number of rows / maximum input string length / pattern string length / number of patterns
--------------------------------------------------------------------------------------
-Benchmark                                           Time             CPU   Iterations
--------------------------------------------------------------------------------------
-BM_InLikeConstantWildcard/1000/20/5/1           98838 ns        98828 ns         7100
-BM_InLikeConstantWildcard/10000/20/5/1         970702 ns       970649 ns          720
-BM_InLikeConstantWildcard/100000/20/5/1       9644094 ns      9643218 ns           72
-BM_InLikeConstantWildcard/1000/60/5/1          202401 ns       202378 ns         3447
-BM_InLikeConstantWildcard/10000/60/5/1        1997487 ns      1997335 ns          351
-BM_InLikeConstantWildcard/100000/60/5/1      19959426 ns     19957845 ns           35
-BM_InLikeConstantWildcard/1000/20/15/1          98152 ns        98141 ns         7135
-BM_InLikeConstantWildcard/10000/20/15/1        972548 ns       972514 ns          718
-BM_InLikeConstantWildcard/100000/20/15/1      9640126 ns      9639451 ns           73
-BM_InLikeConstantWildcard/1000/60/15/1         203312 ns       203301 ns         3474
-BM_InLikeConstantWildcard/10000/60/15/1       2006945 ns      2006744 ns          351
-BM_InLikeConstantWildcard/100000/60/15/1     20023272 ns     20022093 ns           35
-BM_InLikeConstantWildcard/1000/20/5/3          188449 ns       188426 ns         3728
-BM_InLikeConstantWildcard/10000/20/5/3        1879731 ns      1879648 ns          372
-BM_InLikeConstantWildcard/100000/20/5/3      18739574 ns     18737594 ns           38
-BM_InLikeConstantWildcard/1000/60/5/3          426869 ns       426819 ns         1640
-BM_InLikeConstantWildcard/10000/60/5/3        4215056 ns      4214201 ns          166
-BM_InLikeConstantWildcard/100000/60/5/3      42035737 ns     42031112 ns           17
-BM_InLikeConstantWildcard/1000/20/15/3         189685 ns       189686 ns         3708
-BM_InLikeConstantWildcard/10000/20/15/3       1855448 ns      1855236 ns          372
-BM_InLikeConstantWildcard/100000/20/15/3     18590638 ns     18588756 ns           38
-BM_InLikeConstantWildcard/1000/60/15/3         424426 ns       424381 ns         1648
-BM_InLikeConstantWildcard/10000/60/15/3       4221851 ns      4221412 ns          166
-BM_InLikeConstantWildcard/100000/60/15/3     42050310 ns     42047400 ns           17
-BM_InLikeConstantNoWildcard/1000/20/5/1        100450 ns       100437 ns         6974
-BM_InLikeConstantNoWildcard/10000/20/5/1       983994 ns       983905 ns          712
-BM_InLikeConstantNoWildcard/100000/20/5/1     9760020 ns      9758696 ns           71
-BM_InLikeConstantNoWildcard/1000/60/5/1        192545 ns       192524 ns         3624
-BM_InLikeConstantNoWildcard/10000/60/5/1      1898969 ns      1898773 ns          368
-BM_InLikeConstantNoWildcard/100000/60/5/1    18953532 ns     18951805 ns           37
-BM_InLikeConstantNoWildcard/1000/20/15/1       103632 ns       103628 ns         6758
-BM_InLikeConstantNoWildcard/10000/20/15/1     1015831 ns      1015760 ns          686
-BM_InLikeConstantNoWildcard/100000/20/15/1   10171095 ns     10170143 ns           69
-BM_InLikeConstantNoWildcard/1000/60/15/1       188696 ns       188677 ns         3701
-BM_InLikeConstantNoWildcard/10000/60/15/1     1873032 ns      1872866 ns          376
-BM_InLikeConstantNoWildcard/100000/60/15/1   18596174 ns     18594437 ns           38
-BM_InLikeConstantNoWildcard/1000/20/5/3        161163 ns       161158 ns         4363
-BM_InLikeConstantNoWildcard/10000/20/5/3      1580504 ns      1580333 ns          441
-BM_InLikeConstantNoWildcard/100000/20/5/3    15735106 ns     15733753 ns           45
-BM_InLikeConstantNoWildcard/1000/60/5/3        231284 ns       231269 ns         3027
-BM_InLikeConstantNoWildcard/10000/60/5/3      2271435 ns      2271349 ns          303
-BM_InLikeConstantNoWildcard/100000/60/5/3    22981104 ns     22979490 ns           30
-BM_InLikeConstantNoWildcard/1000/20/15/3       197970 ns       197956 ns         3535
-BM_InLikeConstantNoWildcard/10000/20/15/3     1954126 ns      1953915 ns          358
-BM_InLikeConstantNoWildcard/100000/20/15/3   19444393 ns     19442645 ns           36
-BM_InLikeConstantNoWildcard/1000/60/15/3       256243 ns       256221 ns         2733
-BM_InLikeConstantNoWildcard/10000/60/15/3     2550547 ns      2550217 ns          276
-BM_InLikeConstantNoWildcard/100000/60/15/3   24886402 ns     24884481 ns           29
-BM_InLikeNonConstant/1000/20/5/1               157540 ns       157523 ns         4444
-BM_InLikeNonConstant/10000/20/5/1             1559431 ns      1559298 ns          449
-BM_InLikeNonConstant/100000/20/5/1           15608992 ns     15607576 ns           45
-BM_InLikeNonConstant/1000/60/5/1               264129 ns       264120 ns         2650
-BM_InLikeNonConstant/10000/60/5/1             2620801 ns      2620504 ns          267
-BM_InLikeNonConstant/100000/60/5/1           26151616 ns     26149280 ns           27
-BM_InLikeNonConstant/1000/20/15/1              227814 ns       227802 ns         3070
-BM_InLikeNonConstant/10000/20/15/1            2264963 ns      2264759 ns          309
-BM_InLikeNonConstant/100000/20/15/1          22720007 ns     22716925 ns           31
-BM_InLikeNonConstant/1000/60/15/1              322742 ns       322720 ns         2168
-BM_InLikeNonConstant/10000/60/15/1            3210153 ns      3209847 ns          218
-BM_InLikeNonConstant/100000/60/15/1          32026991 ns     32024694 ns           22
-BM_InLikeNonConstant/1000/20/5/3               382296 ns       382264 ns         1835
-BM_InLikeNonConstant/10000/20/5/3             3806612 ns      3806082 ns          184
-BM_InLikeNonConstant/100000/20/5/3           37954007 ns     37950458 ns           18
-BM_InLikeNonConstant/1000/60/5/3               519450 ns       519395 ns         1366
-BM_InLikeNonConstant/10000/60/5/3             5102853 ns      5102296 ns          138
-BM_InLikeNonConstant/100000/60/5/3           51229396 ns     51224445 ns           13
-BM_InLikeNonConstant/1000/20/15/3              625072 ns       625060 ns         1122
-BM_InLikeNonConstant/10000/20/15/3            6217535 ns      6216998 ns          113
-BM_InLikeNonConstant/100000/20/15/3          62326206 ns     62321442 ns           11
-BM_InLikeNonConstant/1000/60/15/3              704269 ns       704207 ns          991
-BM_InLikeNonConstant/10000/60/15/3            7017819 ns      7017285 ns          100
-BM_InLikeNonConstant/100000/60/15/3          70763116 ns     70756963 ns           10
+Load Average: 3.18, 3.68, 2.56
+// Args: Number of rows / Maximum input string length / Pattern string length / Number of patterns
+-----------------------------------------------------------------------------------------------------
+Benchmark                                           Time             CPU   Iterations UserCounters...
+-----------------------------------------------------------------------------------------------------
+BM_InLikeConstantWildcard/1000/20/5/1           31347 ns        31296 ns        22060 RowInvRate=31.2956ns
+BM_InLikeConstantWildcard/10000/20/5/1         301837 ns       301827 ns         2321 RowInvRate=30.1827ns
+BM_InLikeConstantWildcard/100000/20/5/1       2988319 ns      2985067 ns          234 RowInvRate=29.8507ns
+BM_InLikeConstantWildcard/1000/60/5/1           40288 ns        40272 ns        17343 RowInvRate=40.2721ns
+BM_InLikeConstantWildcard/10000/60/5/1         388936 ns       388840 ns         1802 RowInvRate=38.884ns
+BM_InLikeConstantWildcard/100000/60/5/1       3842472 ns      3842415 ns          182 RowInvRate=38.4241ns
+BM_InLikeConstantWildcard/1000/20/15/1          31562 ns        31551 ns        22169 RowInvRate=31.5505ns
+BM_InLikeConstantWildcard/10000/20/15/1        304372 ns       304346 ns         2302 RowInvRate=30.4346ns
+BM_InLikeConstantWildcard/100000/20/15/1      3016206 ns      3016073 ns          231 RowInvRate=30.1607ns
+BM_InLikeConstantWildcard/1000/60/15/1          40583 ns        40569 ns        17274 RowInvRate=40.5694ns
+BM_InLikeConstantWildcard/10000/60/15/1        392790 ns       392759 ns         1780 RowInvRate=39.2759ns
+BM_InLikeConstantWildcard/100000/60/15/1      3874952 ns      3874678 ns          181 RowInvRate=38.7468ns
+BM_InLikeConstantWildcard/1000/20/5/3           31620 ns        31604 ns        22188 RowInvRate=31.6039ns
+BM_InLikeConstantWildcard/10000/20/5/3         303963 ns       303974 ns         2291 RowInvRate=30.3974ns
+BM_InLikeConstantWildcard/100000/20/5/3       3005294 ns      3005203 ns          231 RowInvRate=30.052ns
+BM_InLikeConstantWildcard/1000/60/5/3           40937 ns        40918 ns        17119 RowInvRate=40.9184ns
+BM_InLikeConstantWildcard/10000/60/5/3         392902 ns       392836 ns         1782 RowInvRate=39.2836ns
+BM_InLikeConstantWildcard/100000/60/5/3       3866018 ns      3865852 ns          182 RowInvRate=38.6585ns
+BM_InLikeConstantWildcard/1000/20/15/3          31895 ns        31882 ns        21988 RowInvRate=31.8823ns
+BM_InLikeConstantWildcard/10000/20/15/3        304370 ns       304366 ns         2306 RowInvRate=30.4366ns
+BM_InLikeConstantWildcard/100000/20/15/3      3010005 ns      3009904 ns          230 RowInvRate=30.099ns
+BM_InLikeConstantWildcard/1000/60/15/3          40842 ns        40826 ns        17171 RowInvRate=40.8257ns
+BM_InLikeConstantWildcard/10000/60/15/3        391674 ns       391620 ns         1783 RowInvRate=39.162ns
+BM_InLikeConstantWildcard/100000/60/15/3      3877537 ns      3877452 ns          181 RowInvRate=38.7745ns
+BM_InLikeConstantNoWildcard/1000/20/5/1         71157 ns        71148 ns         9848 RowInvRate=71.1476ns
+BM_InLikeConstantNoWildcard/10000/20/5/1       692443 ns       692434 ns         1012 RowInvRate=69.2434ns
+BM_InLikeConstantNoWildcard/100000/20/5/1     6842710 ns      6842736 ns          102 RowInvRate=68.4274ns
+BM_InLikeConstantNoWildcard/1000/60/5/1        118233 ns       118219 ns         5926 RowInvRate=118.219ns
+BM_InLikeConstantNoWildcard/10000/60/5/1      1157186 ns      1157088 ns          605 RowInvRate=115.709ns
+BM_InLikeConstantNoWildcard/100000/60/5/1    11476971 ns     11476873 ns           61 RowInvRate=114.769ns
+BM_InLikeConstantNoWildcard/1000/20/15/1        66909 ns        66900 ns        10407 RowInvRate=66.9003ns
+BM_InLikeConstantNoWildcard/10000/20/15/1      655812 ns       655837 ns         1069 RowInvRate=65.5837ns
+BM_InLikeConstantNoWildcard/100000/20/15/1    6498595 ns      6498594 ns          108 RowInvRate=64.9859ns
+BM_InLikeConstantNoWildcard/1000/60/15/1       116429 ns       116414 ns         6028 RowInvRate=116.414ns
+BM_InLikeConstantNoWildcard/10000/60/15/1     1141968 ns      1141846 ns          615 RowInvRate=114.185ns
+BM_InLikeConstantNoWildcard/100000/60/15/1   11365963 ns     11365036 ns           62 RowInvRate=113.65ns
+BM_InLikeConstantNoWildcard/1000/20/5/3         80858 ns        80847 ns         8621 RowInvRate=80.8468ns
+BM_InLikeConstantNoWildcard/10000/20/5/3       774886 ns       774823 ns          905 RowInvRate=77.4823ns
+BM_InLikeConstantNoWildcard/100000/20/5/3     7651468 ns      7650887 ns           92 RowInvRate=76.5089ns
+BM_InLikeConstantNoWildcard/1000/60/5/3        124434 ns       124429 ns         5630 RowInvRate=124.429ns
+BM_InLikeConstantNoWildcard/10000/60/5/3      1206962 ns      1206865 ns          578 RowInvRate=120.686ns
+BM_InLikeConstantNoWildcard/100000/60/5/3    11996447 ns     11996087 ns           59 RowInvRate=119.961ns
+BM_InLikeConstantNoWildcard/1000/20/15/3        74217 ns        74206 ns         9430 RowInvRate=74.206ns
+BM_InLikeConstantNoWildcard/10000/20/15/3      721773 ns       721755 ns          968 RowInvRate=72.1755ns
+BM_InLikeConstantNoWildcard/100000/20/15/3    7106935 ns      7106853 ns           99 RowInvRate=71.0685ns
+BM_InLikeConstantNoWildcard/1000/60/15/3       122065 ns       122055 ns         5738 RowInvRate=122.055ns
+BM_InLikeConstantNoWildcard/10000/60/15/3     1191961 ns      1191914 ns          589 RowInvRate=119.191ns
+BM_InLikeConstantNoWildcard/100000/60/15/3   11837586 ns     11836886 ns           59 RowInvRate=118.369ns
+BM_InLikeNonConstant/1000/20/5/1               152458 ns       152447 ns         4618 RowInvRate=152.447ns
+BM_InLikeNonConstant/10000/20/5/1             1518557 ns      1518520 ns          460 RowInvRate=151.852ns
+BM_InLikeNonConstant/100000/20/5/1           15205253 ns     15204858 ns           46 RowInvRate=152.049ns
+BM_InLikeNonConstant/1000/60/5/1               178204 ns       178184 ns         3928 RowInvRate=178.184ns
+BM_InLikeNonConstant/10000/60/5/1             1765868 ns      1765799 ns          396 RowInvRate=176.58ns
+BM_InLikeNonConstant/100000/60/5/1           17595687 ns     17594785 ns           40 RowInvRate=175.948ns
+BM_InLikeNonConstant/1000/20/15/1              177225 ns       177201 ns         3931 RowInvRate=177.201ns
+BM_InLikeNonConstant/10000/20/15/1            1763678 ns      1763561 ns          398 RowInvRate=176.356ns
+BM_InLikeNonConstant/100000/20/15/1          17469755 ns     17468819 ns           40 RowInvRate=174.688ns
+BM_InLikeNonConstant/1000/60/15/1              206093 ns       206091 ns         3404 RowInvRate=206.091ns
+BM_InLikeNonConstant/10000/60/15/1            2039256 ns      2039056 ns          345 RowInvRate=203.906ns
+BM_InLikeNonConstant/100000/60/15/1          20294726 ns     20293768 ns           35 RowInvRate=202.938ns
+BM_InLikeNonConstant/1000/20/5/3               360358 ns       360342 ns         1944 RowInvRate=360.342ns
+BM_InLikeNonConstant/10000/20/5/3             3571632 ns      3571605 ns          196 RowInvRate=357.161ns
+BM_InLikeNonConstant/100000/20/5/3           35627446 ns     35627401 ns           20 RowInvRate=356.274ns
+BM_InLikeNonConstant/1000/60/5/3               352260 ns       352236 ns         1996 RowInvRate=352.236ns
+BM_InLikeNonConstant/10000/60/5/3             3480948 ns      3480879 ns          201 RowInvRate=348.088ns
+BM_InLikeNonConstant/100000/60/5/3           34647400 ns     34645758 ns           20 RowInvRate=346.458ns
+BM_InLikeNonConstant/1000/20/15/3              470924 ns       470914 ns         1483 RowInvRate=470.914ns
+BM_InLikeNonConstant/10000/20/15/3            4704155 ns      4704001 ns          149 RowInvRate=470.4ns
+BM_InLikeNonConstant/100000/20/15/3          46953312 ns     46949945 ns           15 RowInvRate=469.499ns
+BM_InLikeNonConstant/1000/60/15/3              450782 ns       450762 ns         1553 RowInvRate=450.762ns
+BM_InLikeNonConstant/10000/60/15/3            4481334 ns      4481080 ns          157 RowInvRate=448.108ns
+BM_InLikeNonConstant/100000/60/15/3          44524654 ns     44523404 ns           16 RowInvRate=445.234ns
 */
 
 enum PatternType {
@@ -140,8 +141,10 @@ static void do_bench(benchmark::State& state, PatternType pattern_type) {
     auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
+    int total_rows = 0;
     for (auto _: state) {
         state.PauseTiming();
+        total_rows += num_rows;
         ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         for (int i = 0; i < num_rows; i++) {
             input_column->append_datum(gen_rand_str(1, max_str_length, false));
@@ -194,6 +197,8 @@ static void do_bench(benchmark::State& state, PatternType pattern_type) {
         ASSERT_OK(
                 CelonisStringFunctions::in_like_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
     }
+    state.counters["RowInvRate"] =
+            benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
 
 static void BM_InLikeConstantWildcard(benchmark::State& state) {
