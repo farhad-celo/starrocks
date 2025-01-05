@@ -455,7 +455,7 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, invalid_input) {
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
-                  "time unit must be one of DAYS/WORKDAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
+                  "time unit must be one of WORKDAYS/DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
     }
     {
         Prepare();

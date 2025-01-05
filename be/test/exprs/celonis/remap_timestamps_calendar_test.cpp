@@ -74,6 +74,28 @@ private:
         return Run();
     }
 
+    StatusOr<ColumnPtr>
+    RunConstantCalendarAndTimeUnit(const std::vector<std::string>& calendar_strs, const std::string& time_unit) {
+        DatumArray calendar_array;
+        for (const auto& calendar_str: calendar_strs) {
+            calendar_array.emplace_back(calendar_str.c_str());
+        }
+        calendar_column_->append_datum(calendar_array);
+        calendar_column_ = ConstColumn::create(calendar_column_, timestamp_column_->size());
+        time_unit_column_->append_datum(Slice(time_unit));
+        time_unit_column_ = ConstColumn::create(time_unit_column_, timestamp_column_->size());
+        ctx_->set_constant_columns({nullptr, time_unit_column_, calendar_column_, nullptr});
+        return Run();
+    }
+
+    StatusOr<ColumnPtr>
+    RunConstantCalendarAndTimeUnit() {
+        ctx_->set_constant_columns(
+                {nullptr, ConstColumn::create(time_unit_column_, timestamp_column_->size()),
+                 ConstColumn::create(calendar_column_, timestamp_column_->size()), nullptr});
+        return Run();
+    }
+
     std::unique_ptr<FunctionContext> ctx_;
     ColumnPtr timestamp_column_;
     ColumnPtr time_unit_column_;
@@ -135,9 +157,8 @@ TEST_F(CelonisRemapTimestampsCalendarTest, without_calendar) {
 TEST_F(CelonisRemapTimestampsCalendarTest, empty_calendar) {
     Prepare();
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-    time_unit_column_->append_datum("DAYS");
     calendar_id_column_->append_datum(kNullDatum);
-    const auto result = RunConstantCalendar({}).value();
+    const auto result = RunConstantCalendarAndTimeUnit({}, "DAYS").value();
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
 }
@@ -149,7 +170,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, null_calendar) {
         time_unit_column_->append_datum("DAYS");
         calendar_id_column_->append_datum(kNullDatum);
         calendar_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar().value();
+        const auto result = RunConstantCalendarAndTimeUnit().value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -168,13 +189,12 @@ TEST_F(CelonisRemapTimestampsCalendarTest, null_calendar) {
 TEST_F(CelonisRemapTimestampsCalendarTest, multi_weekday_calendar_without_id) {
     Prepare();
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-    time_unit_column_->append_datum("HOURS");
     calendar_id_column_->append_datum(kNullDatum);
-    const auto result = RunConstantCalendar(
+    const auto result = RunConstantCalendarAndTimeUnit(
             {R"({"multi_weekday_calendar": {)",
              R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
              R"(} })"
-            }).value();
+            }, "HOURS").value();
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_EQ(9L, result->get(0).get_int64());
 }
@@ -183,25 +203,23 @@ TEST_F(CelonisRemapTimestampsCalendarTest, multi_weekday_calendar_with_id) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id1");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"multi_weekday_calendar": {)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
-                 R"(} })"}).value();
+                 R"(} })"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id2");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"multi_weekday_calendar": {)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 0, "end": 61200000}}, "calendar_id": "id2"},)",
-                 R"(} })"}).value();
+                 R"(} })"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(17L, result->get(0).get_int64());
     }
@@ -211,9 +229,8 @@ TEST_F(CelonisRemapTimestampsCalendarTest, intersect_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id2");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"intersect_calendar": {"calendar1": {"multi_weekday_calendar": {)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 0, "end": 61200000}}, "calendar_id": "id2"},)",
@@ -221,16 +238,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, intersect_calendar) {
                  R"("calendar2": {"multi_weekday_calendar": {)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
                  R"(}})",
-                 R"(}})"}).value();
+                 R"(}})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id2");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"intersect_calendar": {"calendar1": {"multi_weekday_calendar": {)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
                  R"( }}, )",
@@ -238,16 +254,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, intersect_calendar) {
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 0, "end": 61200000}}, "calendar_id": "id2"},)",
                  R"(}})",
-                 R"(}})"}).value();
+                 R"(}})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id2");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
                  R"("entries": {"start_date": 10000000, "end_date": 61200000, "calendar_id": "id1"}, )",
                  R"("entries": {"start_date": 0, "end_date": 61200000, "calendar_id": "id2"}, )",
@@ -255,16 +270,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, intersect_calendar) {
                  R"("calendar2": {"multi_weekday_calendar": {)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
                  R"(}})",
-                 R"(}})"}).value();
+                 R"(}})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id2");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"intersect_calendar": {"calendar1": {"multi_weekday_calendar": {)",
                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
                  R"( }}, )",
@@ -272,7 +286,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, intersect_calendar) {
                  R"("entries": {"start_date": 10000000, "end_date": 61200000, "calendar_id": "id1"}, )",
                  R"("entries": {"start_date": 0, "end_date": 61200000, "calendar_id": "id2"}, )",
                  R"(}})",
-                 R"(}})"}).value();
+                 R"(}})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
@@ -282,19 +296,17 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("SECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("SECONDS");
         calendar_id_column_->append_datum(kNullDatum);
         ::celonis::accelerator::Calendar calendar_proto;
         google::protobuf::TextFormat::ParseFromString(R"(
@@ -311,14 +323,13 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
         }
         )", &calendar_proto);
         std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto);
-        const auto result = RunConstantCalendar({encoded_string.c_str()}).value();
+        const auto result = RunConstantCalendarAndTimeUnit({encoded_string.c_str()}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("SECONDS");
         calendar_id_column_->append_datum(kNullDatum);
         ::celonis::accelerator::Calendar calendar_proto;
         google::protobuf::TextFormat::ParseFromString(R"(
@@ -337,59 +348,55 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
         std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto);
         std::string first_half = encoded_string.substr(0, encoded_string.length() / 2);
         std::string second_half = encoded_string.substr(encoded_string.length() / 2);
-        const auto result = RunConstantCalendar({first_half.c_str(), second_half.c_str()}).value();
+        const auto result = RunConstantCalendarAndTimeUnit({first_half.c_str(), second_half.c_str()}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [8:00 am, 5:00 pm] = 9 hours
                                                         R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
                                                         // use_day = false
                                                         R"("friday": {"use_day": false, "shift": {"begin": 28800000, "end": 61200000} })",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [8:00 am, 5:00 pm] = 9 hours
                                                         R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
                                                         R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} })",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(11L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
-        time_unit_column_->append_datum("MINUTES");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [8:00 am, 5:00 pm] = 9 hours
                                                         R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
                                                         R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} })",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "MINUTES").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(660L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 8, 0, 0, 0));
-        time_unit_column_->append_datum("MINUTES");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [8:00 am, 5:00 pm] = 540 mins
                                                         R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
@@ -402,16 +409,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
                                                         R"("friday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
                                                         R"("saturday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
                                                         R"("sunday": {"use_day": false, "shift": {"begin": 0, "end": 0} } )",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "MINUTES").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(2160L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 8, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [8:00 am, 9:00 am] = 1h
                                                         R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 32400000} }, )",
@@ -425,16 +431,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
                                                         R"("saturday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
                                                         // [9:00 am, 12:00 pm] = 3h
                                                         R"("sunday": {"use_day": true, "shift": {"begin": 32400000, "end": 43200000} } )",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(13L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 13, 10, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [8:00 am, 5:00 pm] = 540 mins
                                                         R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
@@ -447,42 +452,39 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
                                                         R"("friday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
                                                         R"("saturday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
                                                         R"("sunday": {"use_day": false, "shift": {"begin": 0, "end": 0} } )",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "MILLISECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(201600000L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
-        time_unit_column_->append_datum("SECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [12:00 am, 8:00 am]
                                                         R"("wednesday": {"use_day": true, "shift": {"begin": 0, "end": 28800000} })",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(-28800L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [12:00 am, 8:00 am]
                                                         R"("wednesday": {"use_day": true, "shift": {"begin": 0, "end": 28800000} })",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(-8L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 1, 1, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
+        const auto result = RunConstantCalendarAndTimeUnit({
                                                         R"({"weekday_calendar": {)",
                                                         // [8:00 am, 5:00 pm] = 540 mins
                                                         R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
@@ -495,7 +497,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
                                                         R"("friday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
                                                         R"("saturday": {"use_day": false, "shift": {"begin": 0, "end": 0} }, )",
                                                         R"("sunday": {"use_day": false, "shift": {"begin": 0, "end": 0} } )",
-                                                        R"(} })"}).value();
+                                                        R"(} })"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(-1881L, result->get(0).get_int64());
     }
@@ -505,81 +507,74 @@ TEST_F(CelonisRemapTimestampsCalendarTest, factory_calendar_without_id) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
         // 01/01/1970 [8:00 am, 5:00 pm]
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
+        const auto result = RunConstantCalendarAndTimeUnit(
+                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(0L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
         // 01/01/1970 [8:00 am, 5:00 pm]
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
+        const auto result = RunConstantCalendarAndTimeUnit(
+                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 10, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
         // 01/01/1970 [8:00 am, 5:00 pm]
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
+        const auto result = RunConstantCalendarAndTimeUnit(
+                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(2L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 10, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"factory_calendar": {}})"}).value();
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"factory_calendar": {}})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(0L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"factory_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"factory_calendar": {)",
                                                  R"("entries": {"start_date": 1, "end_date": 11}, )",
                                                  R"("entries": {"start_date": 7, "end_date": 21}, )",
                                                  R"("entries": {"start_date": 500, "end_date": 600}, )",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "MILLISECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(120L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"factory_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"factory_calendar": {)",
                                                  R"("entries": {"start_date": 1000, "end_date": 2000}, )",
                                                  R"("entries": {"start_date": 1200, "end_date": 1400}, )",
                                                  R"("entries": {"start_date": 100, "end_date": 200}, )",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "MILLISECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(1100L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"factory_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"factory_calendar": {)",
                                                  R"("entries": {"start_date": -11, "end_date": -1}, )",
                                                  R"("entries": {"start_date": -40, "end_date": -20}, )",
                                                  R"("entries": {"start_date": -300, "end_date": -20}, )",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "MILLISECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(-290L, result->get(0).get_int64());
     }
@@ -589,62 +584,57 @@ TEST_F(CelonisRemapTimestampsCalendarTest, factory_calendar_with_id) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id");
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"}).value();
+        const auto result = RunConstantCalendarAndTimeUnit(
+                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("new_id");
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"}).value();
+        const auto result = RunConstantCalendarAndTimeUnit(
+                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(0L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum("id2");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"factory_calendar": {)",
                  R"("entries": {"start_date": -11, "end_date": -1, "calendar_id": "id1"}, )",
                  R"("entries": {"start_date": -40, "end_date": -20, "calendar_id": "id2"}, )",
                  R"("entries": {"start_date": -300, "end_date": -20, "calendar_id": "id2"}, )",
-                 R"( }})"}).value();
+                 R"( }})"}, "MILLISECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(-280L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
-        time_unit_column_->append_datum("SECONDS");
         calendar_id_column_->append_datum("id1");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"factory_calendar": {)",
                  R"("entries": {"start_date": -1000, "end_date": 2000, "calendar_id": "id1"}, )",
                  R"("entries": {"start_date": 3000, "end_date": 4000, "calendar_id": "id1"}, )",
                  R"("entries": {"start_date": 5000, "end_date": 6000, "calendar_id": "id1"}, )",
-                 R"( }})"}).value();
+                 R"( }})"}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(-1L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("SECONDS");
         calendar_id_column_->append_datum("id1");
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"factory_calendar": {)",
                  R"("entries": {"start_date": -1000, "end_date": 2000, "calendar_id": "id1"}, )",
                  R"("entries": {"start_date": 3000, "end_date": 4000, "calendar_id": "id1"}, )",
                  R"("entries": {"start_date": 5000, "end_date": 6000, "calendar_id": "id1"}, )",
-                 R"( }})"}).value();
+                 R"( }})"}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(4L, result->get(0).get_int64());
     }
@@ -654,45 +644,41 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"workday_calendar": )",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0}).c_str(),
-                                                 R"( } }})"}).value();
+                                                 R"( } }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(24L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"workday_calendar": )",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {1}).c_str(),
-                                                 R"( } }})"}).value();
+                                                 R"( } }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(0L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 10, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"workday_calendar": )",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {1}).c_str(),
-                                                 R"( } }})"}).value();
+                                                 R"( } }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(10L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1971, 2, 1, 0, 0, 0));
-        time_unit_column_->append_datum("DAYS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  "},",
@@ -702,16 +688,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
                                                  R"("entries": { "year": 1971, )",
                                                  celonis::get_is_workdays_str(365, {5, 7}).c_str(),
                                                  "},",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(8L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 12, 15, 0, 0, 0));
-        time_unit_column_->append_datum("DAYS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1969, )",
                                                  celonis::get_is_workdays_str(365, {0, 4, 10, 100, 360, 361, 362,
                                                                                     364}).c_str(),
@@ -719,16 +704,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
                                                  R"("entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0, 1, 2}).c_str(),
                                                  "},",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(-4L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1968, 12, 15, 0, 0, 0));
-        time_unit_column_->append_datum("DAYS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  "},",
@@ -738,7 +722,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
                                                  R"("entries": { "year": 1968, )",
                                                  celonis::get_is_workdays_str(366, {5, 7, 364, 365}).c_str(),
                                                  "},",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(-8L, result->get(0).get_int64());
     }
@@ -748,9 +732,8 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_with_id) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1971, 2, 1, 0, 0, 0));
-        time_unit_column_->append_datum("DAYS");
         calendar_id_column_->append_datum("id1");
-        const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
@@ -760,16 +743,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_with_id) {
                                                  R"("entries": { "year": 1971, )",
                                                  celonis::get_is_workdays_str(365, {5, 7}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(7L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1971, 2, 1, 0, 0, 0));
-        time_unit_column_->append_datum("DAYS");
         calendar_id_column_->append_datum("id3");
-        const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
@@ -779,16 +761,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_with_id) {
                                                  R"("entries": { "year": 1971, )",
                                                  celonis::get_is_workdays_str(365, {5, 7}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(0L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1990, 2, 1, 0, 0, 0));
-        time_unit_column_->append_datum("SECONDS");
         calendar_id_column_->append_datum("id2");
-        const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
@@ -798,7 +779,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_with_id) {
                                                  R"("entries": { "year": 1971, )",
                                                  celonis::get_is_workdays_str(365, {5, 7}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
-                                                 R"( }})"}).value();
+                                                 R"( }})"}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(432000L, result->get(0).get_int64());
     }
@@ -808,12 +789,11 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id");
-        const auto result = RunConstantCalendar({R"({"workday_calendar": )",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": {"year": 1989,)",
                                                  celonis::get_is_workdays_str(366, {0, 2, 3}).c_str(),
-                                                 R"( } }})"});
+                                                 R"( } }})"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
                   "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
@@ -835,12 +815,11 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id");
-        const auto result = RunConstantCalendar({R"({"workday_calendar": )",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": {)",
                                                  celonis::get_is_workdays_str(365, {0, 2, 3}).c_str(),
-                                                 R"( } }})"});
+                                                 R"( } }})"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "year is not set in a workday calendar entry.");
     }
@@ -864,9 +843,8 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_intersect_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"intersect_calendar": {}})"});
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"intersect_calendar": {}})"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "Intersect calendar must set both calendar1 and calendar2.");
     }
@@ -898,12 +876,11 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_multi_weekday_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"multi_weekday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"multi_weekday_calendar": {)",
                                                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
                                                  R"("calendars": {"friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
-                                                 R"(} })"});
+                                                 R"(} })"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
                   "In MultiWeekdayCalendar, ensure that the calendar_id is either set or not set in all calendars.");
@@ -911,12 +888,11 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_multi_weekday_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"multi_weekday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"multi_weekday_calendar": {)",
                                                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
                                                  R"("calendars": {"friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}, "calendar_id": "id1"},)",
-                                                 R"(} })"});
+                                                 R"(} })"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
                   "In MultiWeekdayCalendar, two calendars must not share the same calendar_id.");
@@ -924,12 +900,11 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_multi_weekday_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"multi_weekday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"multi_weekday_calendar": {)",
                                                  R"("calendars": {"thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
                                                  R"("calendars": {"friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000}}},)",
-                                                 R"(} })"});
+                                                 R"(} })"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
                   "In MultiWeekdayCalendar, two calendars must not share the same calendar_id.");
@@ -1038,22 +1013,20 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_is_ignored) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id1");
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
+        const auto result = RunConstantCalendarAndTimeUnit(
+                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(9L, result->get(0).get_int64());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum("id1");
-        const auto result = RunConstantCalendar({R"({"workday_calendar": )",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0}).c_str(),
-                                                 R"( } }})"}).value();
+                                                 R"( } }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(24L, result->get(0).get_int64());
     }
@@ -1062,9 +1035,8 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_is_ignored) {
 TEST_F(CelonisRemapTimestampsCalendarTest, invalid_time_unit) {
     Prepare();
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-    time_unit_column_->append_datum("YEARS");
     calendar_id_column_->append_datum(kNullDatum);
-    const auto result = RunConstantCalendar({});
+    const auto result = RunConstantCalendarAndTimeUnit({}, "YEARS");
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(),
               "time unit must be one of WORKDAYS/DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
@@ -1081,7 +1053,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
                 kNullDatum,
                 R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
                 R"(} })"});
-        const auto result = RunConstantCalendar();
+        const auto result = RunConstantCalendarAndTimeUnit();
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "Calendar array can not contain null values.");
     }
@@ -1102,11 +1074,10 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("HOURS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"weekday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"weekday_calendar": {)",
                                                  R"("unknown_day": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
-                                                 R"(} })"});
+                                                 R"(} })"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "[prepare] Calendar specification column is malformed.");
     }
@@ -1166,10 +1137,8 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
 TEST_F(CelonisRemapTimestampsCalendarTest, invalid_factory_calendar_entries_are_ignored) {
     Prepare();
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-    time_unit_column_->append_datum("MILLISECONDS");
-
     calendar_id_column_->append_datum("id1");
-    const auto result = RunConstantCalendar({R"({"factory_calendar": {)",
+    const auto result = RunConstantCalendarAndTimeUnit({R"({"factory_calendar": {)",
                                                     // missing start_date
                                              R"("entries": {"end_date": 2000, "calendar_id": "id1"}, )",
                                                     // missing end_date
@@ -1177,7 +1146,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, invalid_factory_calendar_entries_are_
                                                     // start_date >end_date
                                              R"("entries": {"start_date": 8000, "end_date": 6000, "calendar_id": "id1"}, )",
                                              R"("entries": {"start_date": 1000, "end_date": 6000, "calendar_id": "id1"}, )",
-                                             R"( }})"}).value();
+                                             R"( }})"}, "MILLISECONDS").value();
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_EQ(5000L, result->get(0).get_int64());
 }
@@ -1198,19 +1167,17 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_not_provided_when_needed)
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"});
+        const auto result = RunConstantCalendarAndTimeUnit(
+                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"}, "MILLISECONDS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "Calendar ID column not provided.");
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
+        const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
                                                  celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
@@ -1220,7 +1187,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_not_provided_when_needed)
                                                  R"("entries": { "year": 1971, )",
                                                  celonis::get_is_workdays_str(365, {5, 7}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
-                                                 R"( }})"});
+                                                 R"( }})"}, "MILLISECONDS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "Calendar ID column not provided.");
     }
@@ -1230,48 +1197,44 @@ TEST_F(CelonisRemapTimestampsCalendarTest, invalid_weekday_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"weekday_calendar": {)",
                  R"("monday": {"use_day": true, "shift": {"begin": 0, "end": 1000} }, "calendar_id": "id" )",
-                 R"(} })"});
+                 R"(} })"}, "MILLISECONDS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "calendar_id should not be set in WeekdayCalendar.");
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"weekday_calendar": {)",
                  R"("monday": {"use_day": true, "shift": {"begin": -1, "end": 1000} })",
-                 R"(} })"});
+                 R"(} })"}, "MILLISECONDS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "shift begin is negative in weekday calendar.");
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"weekday_calendar": {)",
                  R"("monday": {"use_day": true, "shift": {"begin": 2000, "end": 1000} })",
-                 R"(} })"});
+                 R"(} })"}, "MILLISECONDS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "shift begin is greater than shift end in weekday calendar.");
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
-        time_unit_column_->append_datum("MILLISECONDS");
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar(
+        const auto result = RunConstantCalendarAndTimeUnit(
                 {R"({"weekday_calendar": {)",
                  R"("monday": {"use_day": true, "shift": {"begin": 1000, "end": 86400005} })",
-                 R"(} })"});
+                 R"(} })"}, "MILLISECONDS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
                   "shift end is greater than 86400000 milliseconds in weekday calendar.");
