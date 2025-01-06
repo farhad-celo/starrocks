@@ -8,16 +8,24 @@ namespace starrocks {
 class CelonisStringFunctions {
 public:
     /**
-     * @param: [string_value, ...]
-     * @paramType: [BinaryColumn, ...]
-     * @return LargeIntColumn
+     * @param: [string_value, ...] or [string_array]
+     * @paramType: [VARCHAR, ...] or [ARRAY_VARCHAR]
+     * @return LARGEINT
+     * celonis_xx_hash3_128(NULL) != NULL
+     * celonis_xx_hash3_128(NULL) == celonis_xx_hash3_128(NULL)
+     * celonis_xx_hash3_128(NULL) != celonis_xx_hash3_128(NULL, NULL)
+     * celonis_xx_hash3_128(NULL array) != celonis_xx_hash3_128([NULL]) (NULL array means the type is array and the array is NULL)
+     * celonis_xx_hash3_128([NULL, NULL]) != celonis_xx_hash3_128([NULL])
      */
     DEFINE_VECTORIZED_FN(xx_hash3_128);
 
     /**
-     * @param: [string_value, ...]
-     * @paramType: [BinaryColumn, ...]
-     * @return LargeIntColumn
+     * @param: [string_value, ...] or [string_array]
+     * @paramType: [VARCHAR, ...] or [ARRAY_VARCHAR]
+     * @return LARGEINT
+     * celonis_xx_hash3_128_nullable(NULL, ...) == NULL
+     * celonis_xx_hash3_128_nullable([NULL, ...]) == NULL
+     * celonis_xx_hash3_128_nullable(NULL array) == NULL (NULL array means the type is array and the array is NULL)
      */
     DEFINE_VECTORIZED_FN(xx_hash3_128_nullable);
 
