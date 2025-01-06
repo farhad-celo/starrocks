@@ -13,35 +13,35 @@
 namespace starrocks {
 
 /*
-2024-12-23T11:39:20+00:00
+2024-12-24T12:05:33+00:00
 Running ./be/build_Release/src/bench/celonis/output/merge_sorted_arrays_bench
-Run on (32 X 3103.76 MHz CPU s)
+Run on (32 X 3246.15 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 3.08, 20.43, 21.77
+Load Average: 24.25, 45.18, 24.05
 // Args: Number of rows / Number of arrays / Minimum size of inner array / Maximum size of inner array
 -----------------------------------------------------------------------------------------------------
 Benchmark                                           Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------------------------
-BM_MergeSortedArraysVARCHAR/10000/5/5/15    114987735 ns    114986325 ns            6 RowInvRate=11.4986us
-BM_MergeSortedArraysVARCHAR/10000/10/5/15   246864011 ns    246859778 ns            3 RowInvRate=24.686us
-BM_MergeSortedArraysVARCHAR/10000/20/5/15   523808849 ns    523797228 ns            1 RowInvRate=52.3797us
-BM_MergeSortedArraysVARCHAR/10000/30/5/15   803198764 ns    803184186 ns            1 RowInvRate=80.3184us
-BM_MergeSortedArraysVARCHAR/10000/5/10/15   143594028 ns    143589423 ns            5 RowInvRate=14.3589us
-BM_MergeSortedArraysVARCHAR/10000/10/10/15  313437440 ns    313419760 ns            2 RowInvRate=31.342us
-BM_MergeSortedArraysVARCHAR/10000/20/10/15  687854245 ns    687845945 ns            1 RowInvRate=68.7846us
-BM_MergeSortedArraysVARCHAR/10000/30/10/15 1015780832 ns   1015738483 ns            1 RowInvRate=101.574us
-BM_MergeSortedArraysVARCHAR/10000/5/5/30    190764673 ns    190761177 ns            4 RowInvRate=19.0761us
-BM_MergeSortedArraysVARCHAR/10000/10/5/30   428756034 ns    428741785 ns            2 RowInvRate=42.8742us
-BM_MergeSortedArraysVARCHAR/10000/20/5/30   935325935 ns    935309365 ns            1 RowInvRate=93.5309us
-BM_MergeSortedArraysVARCHAR/10000/30/5/30  1499677409 ns   1499643231 ns            1 RowInvRate=149.964us
-BM_MergeSortedArraysVARCHAR/10000/5/10/30   224878688 ns    224870152 ns            3 RowInvRate=22.487us
-BM_MergeSortedArraysVARCHAR/10000/10/10/30  502482485 ns    502482334 ns            1 RowInvRate=50.2482us
-BM_MergeSortedArraysVARCHAR/10000/20/10/30 1090062221 ns   1090029198 ns            1 RowInvRate=109.003us
-BM_MergeSortedArraysVARCHAR/10000/30/10/30 1731291089 ns   1731222435 ns            1 RowInvRate=173.122us
+BM_MergeSortedArraysVARCHAR/10000/5/5/15     38543265 ns     38539125 ns           18 RowInvRate=3.85391us
+BM_MergeSortedArraysVARCHAR/10000/10/5/15    85761846 ns     85761825 ns            8 RowInvRate=8.57618us
+BM_MergeSortedArraysVARCHAR/10000/20/5/15   194172794 ns    194168967 ns            4 RowInvRate=19.4169us
+BM_MergeSortedArraysVARCHAR/10000/30/5/15   315139152 ns    315131251 ns            2 RowInvRate=31.5131us
+BM_MergeSortedArraysVARCHAR/10000/5/10/15    49366269 ns     49365647 ns           14 RowInvRate=4.93656us
+BM_MergeSortedArraysVARCHAR/10000/10/10/15  108618257 ns    108618447 ns            6 RowInvRate=10.8618us
+BM_MergeSortedArraysVARCHAR/10000/20/10/15  253029560 ns    252994298 ns            3 RowInvRate=25.2994us
+BM_MergeSortedArraysVARCHAR/10000/30/10/15  399865560 ns    399810317 ns            2 RowInvRate=39.981us
+BM_MergeSortedArraysVARCHAR/10000/5/5/30     67706690 ns     67705017 ns           10 RowInvRate=6.7705us
+BM_MergeSortedArraysVARCHAR/10000/10/5/30   150088201 ns    150074886 ns            5 RowInvRate=15.0075us
+BM_MergeSortedArraysVARCHAR/10000/20/5/30   346365470 ns    346348110 ns            2 RowInvRate=34.6348us
+BM_MergeSortedArraysVARCHAR/10000/30/5/30   582136758 ns    582136593 ns            1 RowInvRate=58.2137us
+BM_MergeSortedArraysVARCHAR/10000/5/10/30    78986687 ns     78985763 ns            9 RowInvRate=7.89858us
+BM_MergeSortedArraysVARCHAR/10000/10/10/30  178265578 ns    178258473 ns            4 RowInvRate=17.8258us
+BM_MergeSortedArraysVARCHAR/10000/20/10/30  414543331 ns    414518474 ns            2 RowInvRate=41.4518us
+BM_MergeSortedArraysVARCHAR/10000/30/10/30  683521896 ns    683474160 ns            1 RowInvRate=68.3474us
 */
 
 static void BM_MergeSortedArraysVARCHAR(benchmark::State& state) {
