@@ -1,6 +1,7 @@
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/string_to_int_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/string_to_double_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/array_functions_bench)
+ADD_BE_BENCH(${SRC_DIR}/bench/celonis/array_lead_lag_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/calc_throughput_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/count_edges_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/in_bench)
