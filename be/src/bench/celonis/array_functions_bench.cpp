@@ -161,6 +161,11 @@ static void BM_ArrayCountVarchar(benchmark::State& state) {
     std::mt19937 gen(rd());
     std::bernoulli_distribution dist(null_probability);
 
+    std::vector<std::string> strings;
+    strings.reserve(array_length);
+    for (int j = 0; j < array_length; ++j) {
+        strings.emplace_back("value" + std::to_string(j));
+    }
     int total_rows = 0;
     for (auto _: state) {
         state.PauseTiming();
@@ -174,7 +179,7 @@ static void BM_ArrayCountVarchar(benchmark::State& state) {
                 if (is_null) {
                     input_array.emplace_back(kNullDatum);
                 } else {
-                    input_array.emplace_back(Slice("value" + std::to_string(i)));
+                    input_array.emplace_back(Slice(strings[j]));
                 }
             }
             input_column->append_datum(input_array);
