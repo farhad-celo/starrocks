@@ -972,7 +972,9 @@ struct CelonisMatchStringsState {
     CelonisMatchStringsState() {}
 
     HashSet<std::string> match_strings;
-    bool is_null = false;
+    bool null_match_array = false;
+    int top_k = 1;
+    std::string separator = ", ";
     ScalarFunction function;
 };
 
@@ -986,7 +988,9 @@ CelonisStringFunctions::match_strings_prepare(FunctionContext* context, Function
     context->set_function_state(scope, state);
 
     auto match_strings_column = context->get_constant_column(1);
-    if (match_strings_column == nullptr) {
+    auto top_k_column = context->get_constant_column(2);
+    auto separator_column = context->get_constant_column(3);
+    if (match_strings_column == nullptr || top_k_column == nullptr || separator_column == nullptr) {
         state->function = match_strings_non_constant;
         return Status::OK();
     }
@@ -994,8 +998,17 @@ CelonisStringFunctions::match_strings_prepare(FunctionContext* context, Function
     if (match_strings_column->empty()) {
         return Status::OK();
     }
+    if (!top_k_column->is_null(0)) {
+        state->top_k = ColumnHelper::get_const_value<TYPE_INT>(top_k_column);
+    }
+    if (state->top_k <= 0) {
+        return Status::InvalidArgument("CELONIS_MATCH_STRINGS: top_k must be positive.");
+    }
+    if (!separator_column->is_null(0)) {
+        state->separator = ColumnHelper::get_const_value<TYPE_VARCHAR>(separator_column).to_string();
+    }
     if (match_strings_column->is_null(0)) {
-        state->is_null = true;
+        state->null_match_array = true;
         return Status::OK();
     }
     auto match_string_array = match_strings_column->get(0).get_array();
@@ -1098,23 +1111,20 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
     ColumnViewer top_k_viewer = ColumnViewer<TYPE_INT>(columns[2]);
     ColumnViewer separator_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
     ColumnBuilder<TYPE_VARCHAR> result(n_rows);
-    phmap::flat_hash_map<std::tuple<std::string, std::string, int>, std::string> cache;
+    phmap::flat_hash_map<Slice, std::string, SliceHashWithSeed<PhmapSeed1>, SliceEqual> cache;
+    const int top_k = state->top_k;
+    const std::string& separator = state->separator;
     for (size_t row = 0; row < n_rows; ++row) {
-        if (columns[0]->is_null(row) || state->is_null) {
+        if (columns[0]->is_null(row) || state->null_match_array) {
             result.append_null();
             continue;
         }
-        const std::string input_string = input_string_viewer.value(row).to_string();
-        int top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
-        const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
-        if (top_k <= 0) {
-            return Status::InvalidArgument("CELONIS_MATCH_STRINGS: top_k must be positive.");
-        }
-        const auto key = std::make_tuple(input_string, separator, top_k);
-        auto it = cache.find(key);
+        auto input_slice = input_string_viewer.value(row);
+        auto it = cache.find(input_slice);
         if (it == cache.end()) {
-            const auto match_result = get_match_strings_result(input_string, state->match_strings, top_k, separator);
-            cache.insert({key, match_result});
+            const auto match_result = get_match_strings_result(input_slice.to_string(), state->match_strings, top_k,
+                                                               separator);
+            cache.insert({input_slice, match_result});
             result.append(match_result);
         } else {
             result.append(it->second);
