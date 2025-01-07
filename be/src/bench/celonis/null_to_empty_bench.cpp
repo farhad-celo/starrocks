@@ -13,7 +13,7 @@
 namespace starrocks {
 
 /*
-2025-01-04T02:38:49+00:00
+2025-01-06T21:46:21+00:00
 Running ./be/build_Release/src/bench/celonis/output/null_to_empty_bench
 Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
@@ -21,23 +21,23 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 5.03, 2.98, 2.54
+Load Average: 8.47, 8.21, 5.03
 // Args: Number of rows / Array length / Null percentage
----------------------------------------------------------------------------------------
-Benchmark                             Time             CPU   Iterations UserCounters...
----------------------------------------------------------------------------------------
-BM_NullToEmpty/1000/10/0           8509 ns         8451 ns        87879 RowInvRate=8.4512ns
-BM_NullToEmpty/10000/10/0         57290 ns        57301 ns        10773 RowInvRate=5.73006ns
-BM_NullToEmpty/100000/10/0       746438 ns       746379 ns          884 RowInvRate=7.46379ns
-BM_NullToEmpty/1000/100/0         57436 ns        57458 ns        13279 RowInvRate=57.4582ns
-BM_NullToEmpty/10000/100/0       800042 ns       799747 ns          937 RowInvRate=79.9747ns
-BM_NullToEmpty/100000/100/0    21862323 ns     21860091 ns           28 RowInvRate=218.601ns
-BM_NullToEmpty/1000/10/10          5827 ns         5820 ns       119250 RowInvRate=5.82025ns
-BM_NullToEmpty/10000/10/10        45090 ns        45090 ns        15464 RowInvRate=4.50903ns
-BM_NullToEmpty/100000/10/10      432955 ns       432984 ns         1618 RowInvRate=4.32984ns
-BM_NullToEmpty/1000/100/10         5805 ns         5799 ns       118075 RowInvRate=5.79939ns
-BM_NullToEmpty/10000/100/10       45163 ns        45161 ns        15469 RowInvRate=4.51613ns
-BM_NullToEmpty/100000/100/10     433237 ns       433249 ns         1613 RowInvRate=4.33249ns
+-------------------------------------------------------------------------------------------------------
+Benchmark                                             Time             CPU   Iterations UserCounters...
+-------------------------------------------------------------------------------------------------------
+BM_NullToEmpty/1000/10/0/iterations:2000           1905 ns         1808 ns         2000 RowInvRate=1.80776ns
+BM_NullToEmpty/10000/10/0/iterations:2000          2985 ns         2787 ns         2000 RowInvRate=278.706ps
+BM_NullToEmpty/100000/10/0/iterations:2000         6093 ns         5636 ns         2000 RowInvRate=56.3634ps
+BM_NullToEmpty/1000/100/0/iterations:2000          2785 ns         2609 ns         2000 RowInvRate=2.60858ns
+BM_NullToEmpty/10000/100/0/iterations:2000        43420 ns        42894 ns         2000 RowInvRate=4.28937ns
+BM_NullToEmpty/100000/100/0/iterations:2000      491110 ns       489838 ns         2000 RowInvRate=4.89838ns
+BM_NullToEmpty/1000/10/10/iterations:2000          6122 ns         6045 ns         2000 RowInvRate=6.04522ns
+BM_NullToEmpty/10000/10/10/iterations:2000        46332 ns        46340 ns         2000 RowInvRate=4.634ns
+BM_NullToEmpty/100000/10/10/iterations:2000      432625 ns       432665 ns         2000 RowInvRate=4.32665ns
+BM_NullToEmpty/1000/100/10/iterations:2000         5856 ns         5858 ns         2000 RowInvRate=5.85778ns
+BM_NullToEmpty/10000/100/10/iterations:2000       45701 ns        45702 ns         2000 RowInvRate=4.57015ns
+BM_NullToEmpty/100000/100/10/iterations:2000     433832 ns       433863 ns         2000 RowInvRate=4.33863ns
 */
 
 static void BM_NullToEmpty(benchmark::State& state) {
@@ -89,7 +89,7 @@ static void BM_NullToEmpty(benchmark::State& state) {
 }
 
 // Args: Number of rows / Array length / Null percentage
-BENCHMARK(BM_NullToEmpty)->ArgsProduct({{1000, 10000, 100000}, {10, 100}, {0, 10}});
+BENCHMARK(BM_NullToEmpty)->ArgsProduct({{1000, 10000, 100000}, {10, 100}, {0, 10}})->Iterations(2000);
 
 } // namespace starrocks
 
