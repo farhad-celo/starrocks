@@ -1986,6 +1986,85 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_sortings) {
     EXPECT_EQ(10, result->get(2).get_array()[4].get_int32());
 }
 
+TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_monostate_index) {
+    // The implementation (order NULL sorting before non-NULL sorting) relies on
+    // the fact that std::monostate is the first type in the DatumKey variant.
+    DatumKey monostate_value{std::monostate{}};
+    EXPECT_EQ(monostate_value.index(), 0);
+}
+
+TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_varchar_sortings) {
+    auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                   false);
+    input_array->append_datum(DatumArray{210, 220, 410, 415, 420});
+    input_array->append_datum(DatumArray{2010, 2020, 3010, 3020});
+    input_array->append_datum(DatumArray{2, 4, 6, 8, 10});
+
+    auto timestamp_array =
+            ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)), true);
+    timestamp_array->append_datum(DatumArray{
+            Datum{},
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+            Datum{},
+            TimestampValue::create(2023, 1, 1, 0, 0, 40),
+            TimestampValue::create(2023, 1, 1, 0, 0, 50),
+    });
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+    });
+    timestamp_array->append_datum(DatumArray{
+            Datum{},
+            Datum{},
+            Datum{},
+            Datum{},
+            Datum{},
+    });
+
+    auto secondary_order_array =
+            ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
+    secondary_order_array->append_datum(DatumArray{"a", "b", "c", "d", "e"});
+    secondary_order_array->append_datum(DatumArray{"a", "b", Datum{}, "d"});
+    secondary_order_array->append_datum(DatumArray{"a", "b", "c", "d", "e"});
+
+    auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                  false);
+    size_array->append_datum(DatumArray{2, 3});
+    size_array->append_datum(DatumArray{2, 2});
+    size_array->append_datum(DatumArray{2, 3});
+
+    auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+    priority_array->append_datum(DatumArray{2, 1});
+    priority_array->append_datum(DatumArray{1, 2});
+    priority_array->append_datum(DatumArray{2, 1});
+
+    const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
+            nullptr, {input_array, timestamp_array, size_array, priority_array, secondary_order_array});
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+    const auto& result = rs.value();
+    ASSERT_EQ(3, result->size());
+    ASSERT_EQ(5, result->get(0).get_array().size());
+    EXPECT_EQ(210, result->get(0).get_array()[0].get_int32());
+    EXPECT_EQ(410, result->get(0).get_array()[1].get_int32());
+    EXPECT_EQ(220, result->get(0).get_array()[2].get_int32());
+    EXPECT_EQ(415, result->get(0).get_array()[3].get_int32());
+    EXPECT_EQ(420, result->get(0).get_array()[4].get_int32());
+    ASSERT_EQ(4, result->get(1).get_array().size());
+    EXPECT_EQ(3010, result->get(1).get_array()[0].get_int32());
+    EXPECT_EQ(2010, result->get(1).get_array()[1].get_int32());
+    EXPECT_EQ(2020, result->get(1).get_array()[2].get_int32());
+    EXPECT_EQ(3020, result->get(1).get_array()[3].get_int32());
+    ASSERT_EQ(5, result->get(2).get_array().size());
+    EXPECT_EQ(2, result->get(2).get_array()[0].get_int32());
+    EXPECT_EQ(4, result->get(2).get_array()[1].get_int32());
+    EXPECT_EQ(6, result->get(2).get_array()[2].get_int32());
+    EXPECT_EQ(8, result->get(2).get_array()[3].get_int32());
+    EXPECT_EQ(10, result->get(2).get_array()[4].get_int32());
+}
+
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_elements) {
     {
         // size_array has NULL elements.

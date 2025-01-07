@@ -187,6 +187,7 @@ public:
                 chunk_size, columns[4]) : nullptr;
         UnnestedArrayData secondary_order_array_data;
         const Column* sorting_keys = nullptr;
+        const NullColumn::Container* null_sorting_keys = nullptr;
         if (has_secondary_order) {
             secondary_order_array_data = prepare_array_input(secondary_order_column.get());
             if (timestamp_array_data.offsets->get_data() != secondary_order_array_data.offsets->get_data()) {
@@ -194,6 +195,7 @@ public:
                         "If provided, the size of secondary_order_array and timestamp_array should not be different.");
             }
             sorting_keys = secondary_order_array_data.elements;
+            null_sorting_keys = secondary_order_array_data.null_elements;
         }
 
         ColumnPtr size_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[2]);
@@ -323,7 +325,11 @@ public:
             };
             struct CompareArrayElement {
                 const Column* sorting_keys;
-                explicit CompareArrayElement(const Column* sorting_keys) : sorting_keys(sorting_keys) {}
+                const NullColumn::Container* null_sorting_keys;
+
+                explicit CompareArrayElement(const Column* sorting_keys, const NullColumn::Container* null_sorting_keys)
+                        : sorting_keys(sorting_keys), null_sorting_keys(null_sorting_keys) {}
+
                 bool operator()(const Array& lhs, const Array& rhs) {
                     if (*lhs.timestamp != *rhs.timestamp) {
                         return *lhs.timestamp > *rhs.timestamp;
@@ -331,16 +337,24 @@ public:
                     if (lhs.secondary_order_index == -1 || rhs.secondary_order_index == -1) {
                         return lhs.priority == nullptr || (*lhs.priority < *rhs.priority);
                     }
-                    // The corresponding DatumKey of NULL is std::monostate which is less than any other DatumKey.
-                    DatumKey lhs_key = sorting_keys->get(lhs.secondary_order_index).convert2DatumKey();
-                    DatumKey rhs_key = sorting_keys->get(rhs.secondary_order_index).convert2DatumKey();
+                    DatumKey lhs_key = get_sorting_key(lhs.secondary_order_index);
+                    DatumKey rhs_key = get_sorting_key(rhs.secondary_order_index);
                     if (lhs_key == rhs_key) {
                         return lhs.priority == nullptr || (*lhs.priority < *rhs.priority);
                     }
                     return lhs_key > rhs_key;
                 }
+
+                // The corresponding DatumKey of NULL is std::monostate which is less than any other DatumKey.
+                DatumKey get_sorting_key(size_t index) {
+                    if (null_sorting_keys != nullptr && (*null_sorting_keys)[index] != 0) {
+                        return std::monostate();
+                    }
+                    return sorting_keys->get(index).convert2DatumKey();
+                }
             };
-            std::priority_queue<Array, std::vector<Array>, CompareArrayElement> pq((CompareArrayElement(sorting_keys)));
+            std::priority_queue<Array, std::vector<Array>, CompareArrayElement> pq(
+                    (CompareArrayElement(sorting_keys, null_sorting_keys)));
             size_t start = src_timestamp_start;
             size_t next = 0;
             for (size_t i = size_start; i < size_end; i++) {
