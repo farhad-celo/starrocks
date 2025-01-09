@@ -598,6 +598,12 @@ public class ExpressionStatisticCalculator {
             double nullsFraction = columnStatistic.getNullsFraction();
             final boolean minMaxValueInfinite = Double.isInfinite(minValue) || Double.isInfinite(maxValue);
             switch (callOperator.getFnName().toLowerCase()) {
+                // Begin CELONIS cases
+                case FunctionSet.CELONIS_XX_HASH3_128:
+                    minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
+                    maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
+                    break;
+                // End CELONIS cases
                 case FunctionSet.SIGN:
                     minValue = -1;
                     maxValue = 1;
