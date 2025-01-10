@@ -14,7 +14,7 @@
 namespace starrocks {
 
 /*
-2025-01-04T20:26:16+00:00
+2025-01-06T18:01:11+00:00
 Running ./be/build_Release/src/bench/celonis/output/string_to_double_bench
 Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
@@ -22,14 +22,14 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 6.46, 4.31, 2.90
+Load Average: 5.74, 42.80, 37.79
 // Number of rows
 -----------------------------------------------------------------------------------
 Benchmark                         Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------
-BM_StringToDouble/1000      2156457 ns      2156444 ns          324 RowInvRate=2.15644us
-BM_StringToDouble/10000    21501217 ns     21500180 ns           33 RowInvRate=2.15002us
-BM_StringToDouble/100000  214926013 ns    214923592 ns            3 RowInvRate=2.14924us
+BM_StringToDouble/1000       401807 ns       401798 ns         1742 RowInvRate=401.798ns
+BM_StringToDouble/10000     3980656 ns      3980435 ns          176 RowInvRate=398.044ns
+BM_StringToDouble/100000   39788945 ns     39788097 ns           18 RowInvRate=397.881ns
 */
 
 static void BM_StringToDouble(benchmark::State& state) {

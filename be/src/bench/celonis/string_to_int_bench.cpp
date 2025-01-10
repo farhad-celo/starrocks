@@ -14,7 +14,7 @@
 namespace starrocks {
 
 /*
-2025-01-04T17:45:08+00:00
+2025-01-06T18:00:18+00:00
 Running ./be/build_Release/src/bench/celonis/output/string_to_int_bench
 Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
@@ -22,14 +22,14 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 3.26, 1.74, 1.06
+Load Average: 13.15, 50.59, 39.88
 // Number or rows
 --------------------------------------------------------------------------------
 Benchmark                      Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------------
-BM_StringToInt/1000       147978 ns       147970 ns         4728 RowInvRate=147.97ns
-BM_StringToInt/10000     1471965 ns      1471893 ns          477 RowInvRate=147.189ns
-BM_StringToInt/100000   14748936 ns     14748430 ns           47 RowInvRate=147.484ns
+BM_StringToInt/1000       106130 ns       106120 ns         6598 RowInvRate=106.12ns
+BM_StringToInt/10000     1051672 ns      1051630 ns          665 RowInvRate=105.163ns
+BM_StringToInt/100000   10488983 ns     10488687 ns           67 RowInvRate=104.887ns
 */
 
 static void BM_StringToInt(benchmark::State& state) {

@@ -1,6 +1,7 @@
 #include "exprs/celonis/string_functions.h"
 
 #include <boost/locale/utf.hpp>
+#include <charconv>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -563,21 +564,22 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
     return res.build(ColumnHelper::is_all_const(columns));
 }
 
-// Trims leading and trailing spaces from a string
-static std::string trim(const std::string& input) {
-    std::string result = input;
+std::string_view trim_spaces(const std::string_view& str) {
+    // Find the first non-space character from the beginning
+    auto start = std::find_if_not(str.begin(), str.end(), [](char c) {
+        return std::isspace(c);
+    });
 
-    // Left trim
-    result.erase(result.begin(), std::find_if(result.begin(), result.end(), [](unsigned char ch) {
-        return !std::isspace(ch);
-    }));
+    // Find the first non-space character from the end (reverse iteration)
+    auto end = std::find_if_not(str.rbegin(), str.rend(), [](char c) {
+        return std::isspace(c);
+    }).base(); // .base() converts reverse_iterator back to iterator
 
-    // Right trim
-    result.erase(std::find_if(result.rbegin(), result.rend(), [](unsigned char ch) {
-        return !std::isspace(ch);
-    }).base(), result.end());
+    if (start >= end) {
+        return "";
+    }
 
-    return result;
+    return std::string_view(&*start, std::distance(start, end));
 }
 
 struct comma_separator_facet : std::numpunct<char> {
@@ -596,15 +598,12 @@ static const std::locale& get_locale() {
 }
 
 
-static std::optional<double> to_double(const std::string& input_string) {
-    // std::stringstream is about 2.5x faster than atof on large inputs
-    std::stringstream ss{};
-    const std::locale& en_us_utf8_locale = get_locale();
-    std::locale loc_with_thousands_sep{en_us_utf8_locale, new comma_separator_facet};
-    // Set the numeric locale to "en_US.UTF-8" for proper parsing
-    ss.imbue(loc_with_thousands_sep);
-
-    std::string trimmed_input_string = trim(input_string);
+static std::optional<double> to_double(std::stringstream& ss, const std::string_view& input_string) {
+    std::string_view trimmed_input_string = trim_spaces(input_string);
+    ss.clear();   // Clear any existing error flags
+    ss.str("");   // Clear the content of the internal buffer
+    ss.seekp(0);  // Reset the put pointer to the beginning of the stream
+    ss.seekg(0);  // Reset the get pointer to the beginning of the stream
     // Leading whitespaces should already be trimmed.
     ss << std::noskipws << trimmed_input_string;
 
@@ -624,17 +623,20 @@ static std::optional<double> to_double(const std::string& input_string) {
     }
 }
 
-std::optional<int64_t> to_int64(const std::string& str) {
+std::optional<int64_t> to_int64(const std::string_view& str) {
     if (str.empty() || std::isspace(str.front()) || std::isspace(str.back())) {
         return std::nullopt;
     }
-    char* end;
-    errno = 0;
-    int64_t number = std::strtoll(str.data(), &end, 10);
-    if ((errno == ERANGE && (number == LLONG_MIN || number == LLONG_MAX)) || (number == 0 && end == str.data())) {
+
+    int64_t result;
+    auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result, 10);
+
+    if (ec == std::errc::invalid_argument || ptr == str.data()) {
+        return std::nullopt;
+    } else if (ec == std::errc::result_out_of_range) {
         return std::nullopt;
     } else {
-        return number;
+        return result;
     }
 }
 
@@ -650,7 +652,7 @@ CelonisStringFunctions::string_to_int([[maybe_unused]] FunctionContext* context,
             res.append_null();
             continue;
         }
-        std::string input_string = input_string_viewer.value(i).to_string();
+        std::string_view input_string = std::string_view(input_string_viewer.value(i));
         if (input_string.find_first_of("eE") != std::string::npos) {
             res.append_null();
             continue;
@@ -672,13 +674,19 @@ CelonisStringFunctions::string_to_double(FunctionContext* context, const starroc
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     size_t size = columns[0]->size();
     ColumnBuilder<TYPE_DOUBLE> res(size);
+    // std::stringstream is about 2.5x faster than atof on large inputs
+    std::stringstream ss{};
+    const std::locale& en_us_utf8_locale = get_locale();
+    std::locale loc_with_thousands_sep{en_us_utf8_locale, new comma_separator_facet};
+    // Set the numeric locale to "en_US.UTF-8" for proper parsing
+    ss.imbue(loc_with_thousands_sep);
     for (int i = 0; i < size; ++i) {
         if (input_string_viewer.is_null(i)) {
             res.append_null();
             continue;
         }
-        std::string input_string = input_string_viewer.value(i).to_string();
-        std::optional<double> result = to_double(input_string);
+        std::string_view input_string = std::string_view(input_string_viewer.value(i));
+        std::optional<double> result = to_double(ss, input_string);
         if (result.has_value()) {
             res.append(std::move(result.value()));
         } else {
