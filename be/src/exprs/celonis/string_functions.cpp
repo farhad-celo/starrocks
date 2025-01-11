@@ -41,6 +41,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
         const auto& offsets = string_data.offsets->get_data().data();
         for (size_t row = 0; row < row_size; ++row) {
             if (columns[0]->is_null(row)) {
+                seeds_vec[row] = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_ARRAY_STRING.data(),
+                                                           XXHASH3_128_NULL_ARRAY_STRING.size(), seeds_vec[row]);
                 continue;
             }
             const auto start = offsets[row];
@@ -59,6 +61,13 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                         return Status::InvalidArgument(
                                 ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
                                  XXHASH3_128_NULL_STRING + "'.").c_str());
+                    }
+                    if (XXHASH3_128_NULL_ARRAY_STRING.size() == slice.size &&
+                        XXHASH3_128_NULL_ARRAY_STRING.compare(0, XXHASH3_128_NULL_ARRAY_STRING.size(), slice.data,
+                                                              slice.size) == 0) {
+                        return Status::InvalidArgument(
+                                ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL array string '" +
+                                 XXHASH3_128_NULL_ARRAY_STRING + "'.").c_str());
                     }
                     seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
                 }

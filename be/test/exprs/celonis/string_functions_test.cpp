@@ -132,7 +132,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {column}).value();
         ASSERT_EQ(3, result->size());
         EXPECT_EQ("113354056479506190712662670385450615649", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("0", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("-55107912451276212254785155889373354613", int128_to_string(result->get(1).get_int128()));
         EXPECT_EQ("140510453822038601413216693103982955033", int128_to_string(result->get(2).get_int128()));
     }
     {
@@ -155,6 +155,14 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
         const auto result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {column});
         EXPECT_EQ(result.status().message(),
                   "CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{XXHASH3_128_NULL_ARRAY_STRING.c_str()});
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        const auto result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {column});
+        EXPECT_EQ(result.status().message(),
+                  "CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL array string '_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
     }
 }
 

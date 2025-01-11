@@ -7,8 +7,11 @@ namespace starrocks {
 
 const uint128_t XXHASH3_128_SEED = 0;
 // TODO: Think of a better way to handle this.
-// used to represent NULL when computing hash value.
+// used to represent NULL scalar value when computing hash value.
 const std::string XXHASH3_128_NULL_STRING = "_$CeL0nIs_ReSeRvEd_NuLl_";
+// used to represent NULL array when computing hash value.
+const std::string XXHASH3_128_NULL_ARRAY_STRING = "_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_";
+
 const double EPS = 1e-9;
 // maximum number of buckets output by CALC_(STRING_)BUCKET_COUNT/WIDTH_BOUNDARIES
 const int64_t MAX_NUM_BUCKETS = 1000000;
