@@ -123,7 +123,8 @@ ColumnPtr CelonisCalcThroughputFunctions::_celonis_calc_throughput_impl(const Ac
 
     if (activity_offsets.size() != timestamp_offsets.size()) {
         std::stringstream error;
-        error << "unmatched activity and timestamp offsets in celonis_calc_throughput" << std::endl;
+        error << "unmatched activity offsets (" << activity_offsets.size() << ") and timestamp offsets ("
+              << timestamp_offsets.size() << ") in celonis_calc_throughput" << std::endl;
         throw std::runtime_error(error.str());
     }
 
