@@ -134,6 +134,7 @@ void AggregateFuncResolver::register_celonis() {
 
     add_product_aggregate_mapping.template operator()<TYPE_BIGINT>();
     add_product_aggregate_mapping.template operator()<TYPE_DOUBLE>();
+    add_general_mapping_notnull("multi_array_agg", false, AggregateFactory::MakeMultiArrayAggAggregateFunction());
 }
 
 struct PercentileDiscDispatcher {

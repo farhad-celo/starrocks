@@ -12,9 +12,11 @@
 #include "exprs/base64.h"
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/linear_regression.h"
+#include "exprs/celonis/agg/multi_array_agg.h"
 #include "exprs/celonis/agg/weekday_calendar.h"
 #include "exprs/celonis/agg/workday_calendar.h"
 #include "exprs/function_context.h"
+#include "gutil/strings/strcat.h"
 #include "modules/query/calendars.pb.h"
 #include "runtime/mem_pool.h"
 #include "testutil/function_utils.h"
@@ -2076,6 +2078,278 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_NEAR(345.540087, coefficients[0], abs_error);
         EXPECT_NEAR(-250.146571, coefficients[1], abs_error);
     }
+}
+
+TypeDescriptor logical_types_to_struct_type(const std::vector<LogicalType>& logical_types) {
+    TypeDescriptor struct_type;
+    struct_type.type = LogicalType::TYPE_STRUCT;
+    for (int i = 0; i < logical_types.size(); ++i) {
+        TypeDescriptor array_type;
+        array_type.type = LogicalType::TYPE_ARRAY;
+        array_type.children.emplace_back(logical_types[i]);
+        struct_type.children.emplace_back(array_type);
+        struct_type.field_names.emplace_back(StrCat("col", i));
+    }
+    return struct_type;
+}
+
+TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+
+    auto return_type = AnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR}));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    std::vector<bool> is_asc_order{0};
+    std::vector<bool> nulls_first{1};
+    local_ctx->set_is_asc_order(is_asc_order);
+    local_ctx->set_nulls_first(nulls_first);
+    local_ctx->set_runtime_state(runtime_state.get());
+
+    const AggregateFunction* array_agg_func = get_aggregate_function("multi_array_agg", TYPE_BIGINT, TYPE_STRUCT,
+                                                                     false);
+    auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+
+    // nullable columns input
+    {
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto char_column = ColumnHelper::create_column(char_type, true);
+        char_column->append_datum(Datum());
+        char_column->append_datum("bcd");
+        char_column->append_datum("cdrdfe");
+        char_column->append_datum(Datum());
+        char_column->append_datum("esfg");
+
+        auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
+        auto int_column = ColumnHelper::create_column(int_type, true);
+        int_column->append_datum(Datum());
+        int_column->append_datum(9);
+        int_column->append_datum(Datum());
+        int_column->append_datum(7);
+        int_column->append_datum(6);
+
+        std::vector<const Column*> raw_columns;
+        std::vector<ColumnPtr> columns;
+        columns.push_back(char_column);
+        columns.push_back(int_column);
+        raw_columns.resize(2);
+        raw_columns[0] = char_column.get();
+        raw_columns[1] = int_column.get();
+
+        // test update
+        array_agg_func->update_batch_single_state(local_ctx.get(), int_column->size(), raw_columns.data(),
+                                                  state->state());
+        auto agg_state = (MultiArrayAggAggregateState*) (state->state());
+        ASSERT_EQ(agg_state->data_columns.size(), 2);
+        // data_columns in state are nullable
+        ASSERT_EQ((agg_state->data_columns)[0]->debug_string(), char_column->debug_string());
+        ASSERT_EQ((agg_state->data_columns)[1]->debug_string(), int_column->debug_string());
+
+        TypeDescriptor type_array_char;
+        type_array_char.type = LogicalType::TYPE_ARRAY;
+        type_array_char.children.emplace_back(TypeDescriptor(LogicalType::TYPE_VARCHAR));
+
+        TypeDescriptor type_array_int;
+        type_array_int.type = LogicalType::TYPE_ARRAY;
+        type_array_int.children.emplace_back(TypeDescriptor(LogicalType::TYPE_INT));
+
+        TypeDescriptor type_struct_char_int;
+        type_struct_char_int.type = LogicalType::TYPE_STRUCT;
+        type_struct_char_int.children.emplace_back(type_array_char);
+        type_struct_char_int.children.emplace_back(type_array_int);
+        type_struct_char_int.field_names.emplace_back("vchar");
+        type_struct_char_int.field_names.emplace_back("int");
+        auto serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
+        array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
+        ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+                         "[{vchar:[NULL,'bcd','cdrdfe',NULL,'esfg'],int:[NULL,9,NULL,7,6]}]"), 0);
+
+        state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+        array_agg_func->merge_batch_single_state(local_ctx.get(), state->state(), serialized_col.get(), 0,
+                                                 serialized_col->size());
+
+        serialized_col->resize(0);
+        array_agg_func->convert_to_serialize_format(local_ctx.get(), columns, int_column->size(), &serialized_col);
+        ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+                         "[{vchar:[NULL],int:[NULL]}, {vchar:['bcd'],int:[9]}, {vchar:['cdrdfe'],int:[NULL]}, "
+                         "{vchar:[NULL],int:[7]}, {vchar:['esfg'],int:[6]}]"),
+                  0);
+
+        auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR}), true);
+        array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
+        ASSERT_EQ(strcmp(res_col->debug_string().c_str(), "[{col0:[NULL,'cdrdfe','bcd',NULL,'esfg']}]"), 0);
+    }
+    // nullable columns input with cancelled
+    {
+        auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto char_column = ColumnHelper::create_column(char_type, true);
+        char_column->append_datum(Datum());
+        char_column->append_datum("bcd");
+        char_column->append_datum("cdrdfe");
+        char_column->append_datum(Datum());
+        char_column->append_datum("esfg");
+
+        auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
+        auto int_column = ColumnHelper::create_column(int_type, true);
+        int_column->append_datum(Datum());
+        int_column->append_datum(9);
+        int_column->append_datum(Datum());
+        int_column->append_datum(7);
+        int_column->append_datum(6);
+
+        std::vector<const Column*> raw_columns;
+        std::vector<ColumnPtr> columns;
+        columns.push_back(char_column);
+        columns.push_back(int_column);
+        raw_columns.resize(2);
+        raw_columns[0] = char_column.get();
+        raw_columns[1] = int_column.get();
+
+        // test update
+        array_agg_func->update_batch_single_state(local_ctx.get(), int_column->size(), raw_columns.data(),
+                                                  state->state());
+        auto agg_state = (MultiArrayAggAggregateState*) (state->state());
+        ASSERT_EQ(agg_state->data_columns.size(), 2);
+        // data_columns in state are nullable
+        ASSERT_EQ((agg_state->data_columns)[0]->debug_string(), char_column->debug_string());
+        ASSERT_EQ((agg_state->data_columns)[1]->debug_string(), int_column->debug_string());
+
+        TypeDescriptor type_array_char;
+        type_array_char.type = LogicalType::TYPE_ARRAY;
+        type_array_char.children.emplace_back(TypeDescriptor(LogicalType::TYPE_VARCHAR));
+
+        TypeDescriptor type_array_int;
+        type_array_int.type = LogicalType::TYPE_ARRAY;
+        type_array_int.children.emplace_back(TypeDescriptor(LogicalType::TYPE_INT));
+
+        TypeDescriptor type_struct_char_int;
+        type_struct_char_int.type = LogicalType::TYPE_STRUCT;
+        type_struct_char_int.children.emplace_back(type_array_char);
+        type_struct_char_int.children.emplace_back(type_array_int);
+        type_struct_char_int.field_names.emplace_back("vchar");
+        type_struct_char_int.field_names.emplace_back("int");
+        auto serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
+        array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
+        ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+                         "[{vchar:[NULL,'bcd','cdrdfe',NULL,'esfg'],int:[NULL,9,NULL,7,6]}]"), 0);
+
+        state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+        array_agg_func->merge_batch_single_state(local_ctx.get(), state->state(), serialized_col.get(), 0,
+                                                 serialized_col->size());
+        serialized_col->resize(0);
+        array_agg_func->convert_to_serialize_format(local_ctx.get(), columns, int_column->size(), &serialized_col);
+        ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+                         "[{vchar:[NULL],int:[NULL]}, {vchar:['bcd'],int:[9]}, {vchar:['cdrdfe'],int:[NULL]}, "
+                         "{vchar:[NULL],int:[7]}, {vchar:['esfg'],int:[6]}]"), 0);
+
+        auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR}), false);
+        local_ctx->state()->set_is_cancelled(true);
+        array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
+        ASSERT_TRUE(local_ctx->has_error());
+    }
+}
+
+TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+
+    auto return_type = AnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    std::vector<bool> is_asc_order{0};
+    std::vector<bool> nulls_first{1};
+    local_ctx->set_is_asc_order(is_asc_order);
+    local_ctx->set_nulls_first(nulls_first);
+    local_ctx->set_runtime_state(runtime_state.get());
+
+    const AggregateFunction* array_agg_func = get_aggregate_function("multi_array_agg", TYPE_VARCHAR, TYPE_STRUCT,
+                                                                     false);
+    auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+
+    auto char_type = TypeDescriptor::create_varchar_type(30);
+    auto char_column_1 = ColumnHelper::create_column(char_type, true);
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("bcd");
+    char_column_1->append_datum("cdrdfe");
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("esfg");
+
+    auto char_column_2 = ColumnHelper::create_column(char_type, true);
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("bcd2");
+    char_column_2->append_datum("cdrdfe2");
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("esfg2");
+
+    auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
+    auto int_column = ColumnHelper::create_column(int_type, true);
+    int_column->append_datum(Datum());
+    int_column->append_datum(9);
+    int_column->append_datum(Datum());
+    int_column->append_datum(7);
+    int_column->append_datum(6);
+
+    std::vector<const Column*> raw_columns;
+    std::vector<ColumnPtr> columns;
+    columns.push_back(char_column_1);
+    columns.push_back(char_column_2);
+    columns.push_back(int_column);
+    raw_columns.resize(3);
+    raw_columns[0] = char_column_1.get();
+    raw_columns[1] = char_column_2.get();
+    raw_columns[2] = int_column.get();
+
+    // test update
+    array_agg_func->update_batch_single_state(local_ctx.get(), int_column->size(), raw_columns.data(),
+                                              state->state());
+    auto agg_state = (MultiArrayAggAggregateState*) (state->state());
+    ASSERT_EQ(agg_state->data_columns.size(), 3);
+    // data_columns in state are nullable
+    ASSERT_EQ((agg_state->data_columns)[0]->debug_string(), char_column_1->debug_string());
+    ASSERT_EQ((agg_state->data_columns)[1]->debug_string(), char_column_2->debug_string());
+    ASSERT_EQ((agg_state->data_columns)[2]->debug_string(), int_column->debug_string());
+
+    TypeDescriptor type_array_char;
+    type_array_char.type = LogicalType::TYPE_ARRAY;
+    type_array_char.children.emplace_back(TypeDescriptor(LogicalType::TYPE_VARCHAR));
+
+    TypeDescriptor type_array_int;
+    type_array_int.type = LogicalType::TYPE_ARRAY;
+    type_array_int.children.emplace_back(TypeDescriptor(LogicalType::TYPE_INT));
+
+    TypeDescriptor type_struct_char_char_int;
+    type_struct_char_char_int.type = LogicalType::TYPE_STRUCT;
+    type_struct_char_char_int.children.emplace_back(type_array_char);
+    type_struct_char_char_int.children.emplace_back(type_array_char);
+    type_struct_char_char_int.children.emplace_back(type_array_int);
+    type_struct_char_char_int.field_names.emplace_back("vchar1");
+    type_struct_char_char_int.field_names.emplace_back("vchar2");
+    type_struct_char_char_int.field_names.emplace_back("int");
+    auto serialized_col = ColumnHelper::create_column(type_struct_char_char_int, true);
+    array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
+    ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+                     "[{vchar1:[NULL,'bcd','cdrdfe',NULL,'esfg'],"
+                     "vchar2:[NULL,'bcd2','cdrdfe2',NULL,'esfg2'],int:[NULL,9,NULL,7,6]}]"), 0);
+
+    state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+    array_agg_func->merge_batch_single_state(local_ctx.get(), state->state(), serialized_col.get(), 0,
+                                             serialized_col->size());
+
+    serialized_col->resize(0);
+    array_agg_func->convert_to_serialize_format(local_ctx.get(), columns, int_column->size(), &serialized_col);
+    ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+                     "[{vchar1:[NULL],vchar2:[NULL],int:[NULL]}, {vchar1:['bcd'],vchar2:['bcd2'],int:[9]}, "
+                     "{vchar1:['cdrdfe'],vchar2:['cdrdfe2'],int:[NULL]}, {vchar1:[NULL],vchar2:[NULL],int:[7]}, "
+                     "{vchar1:['esfg'],vchar2:['esfg2'],int:[6]}]"), 0);
+
+    auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}), true);
+    array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
+    ASSERT_EQ(strcmp(res_col->debug_string().c_str(),
+                     "[{col0:[NULL,'cdrdfe','bcd',NULL,'esfg'],col1:[NULL,'cdrdfe2','bcd2',NULL,'esfg2']}]"), 0);
 }
 
 } // namespace starrocks

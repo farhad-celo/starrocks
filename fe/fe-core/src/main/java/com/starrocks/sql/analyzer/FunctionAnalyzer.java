@@ -846,6 +846,49 @@ public class FunctionAnalyzer {
                 sf.add(new StructField(literal.getStringValue(), node.getChild(i + 1).getType()));
             }
             fn.setRetType(new StructType(sf));
+        } else if (fnName.equals(FunctionSet.MULTI_ARRAY_AGG)) {
+            // move order by expr to node child, and extract is_asc and null_first information.
+            fn = Expr.getBuiltinFunction(fnName, new Type[] {argumentTypes[0]},
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            List<OrderByElement> orderByElements = node.getParams().getOrderByElements();
+            List<Boolean> isAscOrder = new ArrayList<>();
+            List<Boolean> nullsFirst = new ArrayList<>();
+            if (orderByElements != null) {
+                for (OrderByElement elem : orderByElements) {
+                    isAscOrder.add(elem.getIsAsc());
+                    nullsFirst.add(elem.getNullsFirstParam());
+                }
+            }
+            Type[] argsTypes = new Type[argumentTypes.length];
+            for (int i = 0; i < argumentTypes.length; ++i) {
+                // copied from ARRAY_AGG, MULTI_ARRAY_AGG does not handle NULL literal.
+                argsTypes[i] = argumentTypes[i] == Type.NULL ? Type.BOOLEAN : argumentTypes[i];
+            }
+            fn.setArgsType(argsTypes); // as accepting various types
+            ArrayList<Type> structTypes = new ArrayList<>(argsTypes.length);
+            for (Type t : argsTypes) {
+                structTypes.add(new ArrayType(t));
+            }
+            ((AggregateFunction) fn).setIntermediateType(new StructType(structTypes));
+            ((AggregateFunction) fn).setIsAscOrder(isAscOrder);
+            ((AggregateFunction) fn).setNullsFirst(nullsFirst);
+            var numColumns = node.getChildren().size() - isAscOrder.size();
+            ArrayList<Type> retStructTypes = new ArrayList<>(numColumns);
+            for (int i = 0; i < numColumns; ++i) {
+                retStructTypes.add(new ArrayType(argsTypes[i]));
+            }
+            boolean outputConst = true;
+            fn.setRetType(new StructType(retStructTypes));
+            for (int i = 0; i < numColumns; ++i) {
+                if (!node.getChild(i).isConstant()) {
+                    outputConst = false;
+                    break;
+                }
+            }
+            // need to distinct output columns in finalize phase
+            ((AggregateFunction) fn).setIsDistinct(node.getParams().isDistinct() &&
+                    (!isAscOrder.isEmpty() || outputConst));
         } else if (FunctionSet.CELONIS_MULTI_IN.equals(fnName)) {
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_MULTI_IN, argumentTypes,
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);

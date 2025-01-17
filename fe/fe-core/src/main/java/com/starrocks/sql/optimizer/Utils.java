@@ -784,6 +784,10 @@ public class Utils {
                     if (children.size() > 1 || children.get(0).getType().isDecimalOfAnyVersion()) {
                         return true;
                     }
+                } else if (FunctionSet.MULTI_ARRAY_AGG.equalsIgnoreCase(fnName)) {
+                    if (children.size() > 1 || children.get(0).getType().isDecimalOfAnyVersion()) {
+                        return true;
+                    }
                 }
             }
         }

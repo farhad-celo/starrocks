@@ -529,6 +529,7 @@ public class FunctionSet {
 
 
     // Celonis functions:
+    public static final String MULTI_ARRAY_AGG = "multi_array_agg";
     public static final String CELONIS_ADJUST_DAILY_TIMESTAMPS = "celonis_adjust_daily_timestamps";
     public static final String CELONIS_ALIGN_MODEL = "celonis_align_model";
     public static final String CELONIS_GREATEST = "celonis_greatest";
@@ -1263,6 +1264,11 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_SORTED_LAST,
                 Lists.newArrayList(Type.ANY_ELEMENT), Type.ANY_ELEMENT, Type.VARBINARY, true,
                 false, false, false));
+        // MULTI_ARRAY_AGG (implemented by Celonis)
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.MULTI_ARRAY_AGG,
+                Lists.newArrayList(Type.ANY_ELEMENT), Type.ANY_STRUCT, Type.ANY_STRUCT, true,
+                false, false, false));
+
         // celonis_histogram_boundaries
         for (Type type : CELONIS_TYPES) {
             ArrayList<StructField> sf = Lists.newArrayList();

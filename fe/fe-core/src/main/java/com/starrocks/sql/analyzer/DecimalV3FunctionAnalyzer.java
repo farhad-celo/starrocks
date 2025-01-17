@@ -67,6 +67,7 @@ public class DecimalV3FunctionAnalyzer {
                     .add(FunctionSet.LEAD).add(FunctionSet.LAG)
                     .add(FunctionSet.FIRST_VALUE).add(FunctionSet.LAST_VALUE)
                     .add(FunctionSet.ANY_VALUE)
+                    .add(FunctionSet.MULTI_ARRAY_AGG)
                     .add(FunctionSet.ANY_VALUE)
                     .add(FunctionSet.APPROX_TOP_K)
                     .add(FunctionSet.HISTOGRAM)

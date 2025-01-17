@@ -410,6 +410,7 @@ public class PolymorphicFunctionAnalyzer {
 
         // common deduce
         ArrayType typeArray;
+        StructType typeStruct;
         Type typeElement;
 
         List<Type> allRealElementType = Lists.newArrayList();
@@ -446,14 +447,18 @@ public class PolymorphicFunctionAnalyzer {
             }
             commonType = replaceNullType2Boolean(commonType);
             typeArray = new ArrayType(commonType);
+            typeStruct = new StructType(List.of(typeArray));
             typeElement = commonType;
         } else {
             typeElement = Type.BOOLEAN;
             typeArray = new ArrayType(Type.BOOLEAN);
+            typeStruct = new StructType(List.of(typeArray));
         }
 
         if (retType instanceof AnyArrayType) {
             retType = typeArray;
+        } else if (retType instanceof AnyStructType) {
+            retType = typeStruct;
         } else if (retType instanceof AnyElementType) {
             retType = typeElement;
         } else {

@@ -1,0 +1,159 @@
+-- name: testCelonisMultiArrayAgg
+CREATE TABLE `ss` (
+  `id` int(11) NULL COMMENT "",
+  `name` varchar(255) NULL COMMENT "",
+  `subject` varchar(255) NULL COMMENT "",
+  `score` int(11) NULL COMMENT "",
+   arr array<int>,
+   mmap map<int,varchar(20)>
+) ENGINE=OLAP
+DUPLICATE KEY(`id`)
+DISTRIBUTED BY HASH(`id`) BUCKETS 4
+PROPERTIES (
+"replication_num" = "1",
+"enable_persistent_index" = "false",
+"replicated_storage" = "true",
+"compression" = "LZ4"
+);
+-- result:
+-- !result
+insert into ss values (1,"Tom","English",90, [1,2],map{2:'name'});
+-- result:
+-- !result
+insert into ss values (1,"Tom","Math",80, [1,2], map{2:'name'});
+-- result:
+-- !result
+insert into ss values (2,"Tom","English",NULL,[], map{});
+-- result:
+-- !result
+insert into ss values (2,"Tom",NULL,NULL,null,null);
+-- result:
+-- !result
+insert into ss values (3,"May",NULL,NULL,[2],map{3:'3',4:'4'});
+-- result:
+-- !result
+insert into ss values (3,"Ti","English",98, [null],map{null:null});
+-- result:
+-- !result
+insert into ss values (4,NULL,NULL,NULL,null,null);
+-- result:
+-- !result
+insert into ss values (NULL,NULL,NULL,NULL,null,null);
+-- result:
+-- !result
+insert into ss values (NULL,"Ti","物理Phy",99,[3,4],map{9:''});
+-- result:
+-- !result
+insert into ss values (11,"张三此地无银三百两","英文English",98,[0,2], map{});
+-- result:
+-- !result
+insert into ss values (11,"张三掩耳盗铃","Math数学欧拉方程",78,[],map{7:'y'});
+-- result:
+-- !result
+insert into ss values (12,"李四大闹天空","英语外语美誉",NULL,[89], map{6:'6'});
+-- result:
+-- !result
+insert into ss values (2,"王武程咬金","语文北京上海",22,[23],map{8:''});
+-- result:
+-- !result
+insert into ss values (3,"欧阳诸葛方程","数学大不列颠",NULL,[],null);
+-- result:
+-- !result
+select max(id),multi_array_agg(name), multi_array_agg(name,score order by 1,2) from ss where id < 2  order by 1;
+-- result:
+1	{"col1":["Tom","Tom"]}	{"col1":["Tom","Tom"],"col2":[80,90]}
+-- !result
+select id, multi_array_agg(name), multi_array_agg(name,score order by 1,2) from ss where id < 2 group by id order by 1;
+-- result:
+1	{"col1":["Tom","Tom"]}	{"col1":["Tom","Tom"],"col2":[80,90]}
+-- !result
+select score, multi_array_agg(name), multi_array_agg(name,score order by 1,2) from ss where id < 2 group by score order by 1;
+-- result:
+80	{"col1":["Tom"]}	{"col1":["Tom"],"col2":[80]}
+90	{"col1":["Tom"]}	{"col1":["Tom"],"col2":[90]}
+-- !result
+select id, multi_array_agg(name), multi_array_agg(name order by 1) from ss where id < 2 group by rollup(id) order by 1;
+-- result:
+None	{"col1":["Tom","Tom"]}	{"col1":["Tom","Tom"]}
+1	{"col1":["Tom","Tom"]}	{"col1":["Tom","Tom"]}
+-- !result
+select multi_array_agg(name order by 1 asc), multi_array_agg(name order by 1 desc) from ss group by id order by id;
+-- result:
+{"col1":[null,"Ti"]}	{"col1":["Ti",null]}
+{"col1":["Tom","Tom"]}	{"col1":["Tom","Tom"]}
+{"col1":["Tom","Tom","王武程咬金"]}	{"col1":["王武程咬金","Tom","Tom"]}
+{"col1":["May","Ti","欧阳诸葛方程"]}	{"col1":["欧阳诸葛方程","Ti","May"]}
+{"col1":[null]}	{"col1":[null]}
+{"col1":["张三掩耳盗铃","张三此地无银三百两"]}	{"col1":["张三此地无银三百两","张三掩耳盗铃"]}
+{"col1":["李四大闹天空"]}	{"col1":["李四大闹天空"]}
+-- !result
+select multi_array_agg(name order by 1 desc nulls first), multi_array_agg(name order by 1 desc nulls last) from ss group by id order by id;
+-- result:
+{"col1":[null,"Ti"]}	{"col1":["Ti",null]}
+{"col1":["Tom","Tom"]}	{"col1":["Tom","Tom"]}
+{"col1":["王武程咬金","Tom","Tom"]}	{"col1":["王武程咬金","Tom","Tom"]}
+{"col1":["欧阳诸葛方程","Ti","May"]}	{"col1":["欧阳诸葛方程","Ti","May"]}
+{"col1":[null]}	{"col1":[null]}
+{"col1":["张三此地无银三百两","张三掩耳盗铃"]}	{"col1":["张三此地无银三百两","张三掩耳盗铃"]}
+{"col1":["李四大闹天空"]}	{"col1":["李四大闹天空"]}
+-- !result
+select multi_array_agg(name order by 1 desc nulls first), multi_array_agg(name order by 1 desc nulls last) from ss group by id order by id;
+-- result:
+{"col1":[null,"Ti"]}	{"col1":["Ti",null]}
+{"col1":["Tom","Tom"]}	{"col1":["Tom","Tom"]}
+{"col1":["王武程咬金","Tom","Tom"]}	{"col1":["王武程咬金","Tom","Tom"]}
+{"col1":["欧阳诸葛方程","Ti","May"]}	{"col1":["欧阳诸葛方程","Ti","May"]}
+{"col1":[null]}	{"col1":[null]}
+{"col1":["张三此地无银三百两","张三掩耳盗铃"]}	{"col1":["张三此地无银三百两","张三掩耳盗铃"]}
+{"col1":["李四大闹天空"]}	{"col1":["李四大闹天空"]}
+-- !result
+select multi_array_agg(name order by 1 nulls first), multi_array_agg(name order by 1 nulls last) from ss group by id order by id;
+-- result:
+{"col1":[null,"Ti"]}	{"col1":["Ti",null]}
+{"col1":["Tom","Tom"]}	{"col1":["Tom","Tom"]}
+{"col1":["Tom","Tom","王武程咬金"]}	{"col1":["Tom","Tom","王武程咬金"]}
+{"col1":["May","Ti","欧阳诸葛方程"]}	{"col1":["May","Ti","欧阳诸葛方程"]}
+{"col1":[null]}	{"col1":[null]}
+{"col1":["张三掩耳盗铃","张三此地无银三百两"]}	{"col1":["张三掩耳盗铃","张三此地无银三百两"]}
+{"col1":["李四大闹天空"]}	{"col1":["李四大闹天空"]}
+-- !result
+select multi_array_agg(name order by 1 asc), multi_array_agg(name order by 1 desc) from ss order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg(name order by 1 desc nulls first), multi_array_agg(name order by 1 desc nulls last) from ss order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg(name order by 1 desc nulls first), multi_array_agg(name order by 1 desc nulls last) from ss order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg(name order by 1 nulls first), multi_array_agg(name order by 1 nulls last) from ss order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg( null order by score,4.00) from ss group by id order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg( score order by 1) from ss group by id order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg( score order by 1,name) from ss group by id order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg( null order by score,4.00) from ss order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg( score order by 1) from ss order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result
+select multi_array_agg( score order by 1,name) from ss order by 1;
+-- result:
+E: (1064, 'Getting analyzing error. Detail message: Type (nested) percentile/hll/bitmap/json/struct/map not support order-by.')
+-- !result

@@ -7592,6 +7592,8 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
         } else if (context.aggregationFunction().ARRAY_AGG_DISTINCT() != null) { // alias to ARRAY_AGG
             functionName = FunctionSet.ARRAY_AGG;
             isDistinct = true;
+        } else if (context.aggregationFunction().MULTI_ARRAY_AGG() != null) {
+            functionName = FunctionSet.MULTI_ARRAY_AGG;
         } else if (context.aggregationFunction().CELONIS_SORTED_FIRST() != null) {
             functionName = FunctionSet.CELONIS_SORTED_FIRST;
         } else if (context.aggregationFunction().CELONIS_SORTED_LAST() != null) {

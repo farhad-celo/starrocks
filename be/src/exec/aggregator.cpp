@@ -195,7 +195,8 @@ void AggregatorParams::init() {
                     agg_fn_types[i].is_distinct = fn.aggregate_fn.is_distinct;
                 }
             } else if (fn.name.function_name == "celonis_sorted_first" ||
-                       fn.name.function_name == "celonis_sorted_last") {
+                       fn.name.function_name == "celonis_sorted_last" ||
+                       fn.name.function_name == "multi_array_agg") {
                 // set order by info
                 if (fn.aggregate_fn.__isset.is_asc_order && fn.aggregate_fn.__isset.nulls_first &&
                     !fn.aggregate_fn.is_asc_order.empty()) {

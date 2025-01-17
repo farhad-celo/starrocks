@@ -70,6 +70,7 @@
 #include "exprs/celonis/agg/moving_count_distinct.h"
 #include "exprs/celonis/agg/moving_median.h"
 #include "exprs/celonis/agg/moving_trimmed_mean.h"
+#include "exprs/celonis/agg/multi_array_agg.h"
 #include "exprs/celonis/agg/multi_linear_regression.h"
 #include "exprs/celonis/agg/product.h"
 #include "exprs/celonis/agg/sorted_first_last.h"
@@ -140,6 +141,10 @@ public:
 
     static AggregateFunctionPtr MakeArrayAggAggregateFunctionV2() {
         return std::make_shared<ArrayAggAggregateFunctionV2>();
+    }
+
+    static AggregateFunctionPtr MakeMultiArrayAggAggregateFunction() {
+        return std::make_shared<MultiArrayAggAggregateFunction>();
     }
 
     static AggregateFunctionPtr MakeGroupConcatAggregateFunctionV2() {
