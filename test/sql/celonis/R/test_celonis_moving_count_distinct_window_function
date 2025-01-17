@@ -1,7 +1,6 @@
 -- name: test_celonis_moving_count_distinct_window_function
 DROP TABLE IF EXISTS `moving_count_distinct_test`;
 -- result:
-[]
 -- !result
 CREATE TABLE IF NOT EXISTS `moving_count_distinct_test` (
   k1 INT,
@@ -18,7 +17,6 @@ PROPERTIES(
   "replication_num" = "1"
 );
 -- result:
-[]
 -- !result
 INSERT INTO `moving_count_distinct_test` (k1, k2, v1, v2, v3, v4)
 VALUES (1, 10, 15, 2.5, '2023-01-01', 'apple'),
@@ -77,7 +75,6 @@ VALUES (1, 10, 15, 2.5, '2023-01-01', 'apple'),
        (17, 4, 60, 13.5, null, 'cloudberry'),
        (17, 3, 60, 14.5, '2023-02-28', 'dewberry');
 -- result:
-[]
 -- !result
 SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v1) OVER (PARTITION BY k1) AS nunique_k1_v1 FROM moving_count_distinct_test ORDER BY k1;
 -- result:
@@ -708,5 +705,4 @@ SELECT k1, CELONIS_MOVING_COUNT_DISTINCT(v3) OVER (PARTITION BY k1 ORDER BY v1 R
 -- !result
 DROP TABLE IF EXISTS `moving_count_distinct_test`;
 -- result:
-[]
 -- !result
