@@ -4,16 +4,18 @@
 
 namespace starrocks {
 
+template <LogicalType ActivityLT>
 class CelonisCalcThroughputFunctions {
 public:
+    /**
+     * @param: [activity_array, timestamp_array, start_activity, end_activity, start_label, end_label]
+     * @paramType: [ARRAY_ActivityLT, ARRAY_BIGINT, ActivityLT, ActivityLT, VARCHAR, VARCHAR]
+     * @return: BIGINT
+     * ActivityLT is INT | BIGINT | VARCHAR.
+     * activity_array and timestamp_array should have the same number of elements.
+     * Implements PQL CALC_THROUGHPUT https://docs.celonis.com/en/calc_throughput.html
+     */
     DEFINE_VECTORIZED_FN(celonis_calc_throughput);
-private:
-    template<typename ActivityColumn, LogicalType ActivityType>
-    static ColumnPtr
-    _celonis_calc_throughput_impl(const ActivityColumn& activity_elements, const UInt32Column& activity_offsets,
-                                  const NullColumn::Container* activity_nulls,
-                                  const NullColumn::Container* activity_array_nulls, ColumnPtr timestamp_array,
-                                  ColumnPtr start_activity, ColumnPtr end_activity, ColumnPtr start_label, ColumnPtr end_label);
 };
 
 } // namespace starrocks

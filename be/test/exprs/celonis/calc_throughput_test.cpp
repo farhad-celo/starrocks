@@ -51,7 +51,7 @@ protected:
         auto end_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
         end_label_col->append_datum(Slice(end_label));
 
-        const auto result = CelonisCalcThroughputFunctions::celonis_calc_throughput(
+        const auto result = CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
                 nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col,
                           end_label_col}).value();
         ASSERT_EQ(1, result->size());
@@ -88,7 +88,7 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstInt) {
 
     auto end_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     end_label_col->append_datum(Slice("first"));
-    const auto result = CelonisCalcThroughputFunctions::celonis_calc_throughput(
+    const auto result = CelonisCalcThroughputFunctions<TYPE_BIGINT>::celonis_calc_throughput(
             nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
     ASSERT_EQ(1, result->size());
     EXPECT_EQ(9L, result->get(0).get_int64());
@@ -110,7 +110,7 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstInt32) {
 
     auto end_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     end_label_col->append_datum(Slice("first"));
-    const auto result = CelonisCalcThroughputFunctions::celonis_calc_throughput(
+    const auto result = CelonisCalcThroughputFunctions<TYPE_INT>::celonis_calc_throughput(
             nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
     ASSERT_EQ(1, result->size());
     EXPECT_EQ(9L, result->get(0).get_int64());
@@ -125,7 +125,7 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstNonMatchingArraySizes) {
 
     ColumnPtr start_activity_col, end_activity_col, start_label_col, end_label_col;
     create_const_params(&start_activity_col, &end_activity_col, &start_label_col, &end_label_col);
-    EXPECT_THROW((void) CelonisCalcThroughputFunctions::celonis_calc_throughput(
+    EXPECT_THROW((void) CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
                          nullptr, {
     activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col
 }
@@ -142,7 +142,7 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstNullInput) {
 
     ColumnPtr start_activity_col, end_activity_col, start_label_col, end_label_col;
     create_const_params(&start_activity_col, &end_activity_col, &start_label_col, &end_label_col);
-    const auto result = CelonisCalcThroughputFunctions::celonis_calc_throughput(
+    const auto result = CelonisCalcThroughputFunctions<TYPE_INT>::celonis_calc_throughput(
             nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
 
     ASSERT_EQ(1, result->size());
@@ -167,7 +167,7 @@ TEST_F(CelonisCalcThroughputTest, InvalidLabel) {
     ColumnPtr end_label = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     end_label->append_datum(Slice("first"));
 
-    EXPECT_THROW((void) CelonisCalcThroughputFunctions::celonis_calc_throughput(
+    EXPECT_THROW((void) CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
                          nullptr, {
     activity_array, timestamp_array, start_activity, end_activity, start_label, end_label
 }
@@ -204,7 +204,7 @@ TEST_F(CelonisCalcThroughputTest, InputArrayIsSometimesNull) {
     timestamp_array->append_datum(Datum());
 
     // Only row 2 has non-NULL data in both activity and timestamp columns.
-    const auto result = CelonisCalcThroughputFunctions::celonis_calc_throughput(
+    const auto result = CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
             nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
 
     ASSERT_EQ(4, result->size());
@@ -291,7 +291,7 @@ TEST_F(CelonisCalcThroughputTest, MultipleRows) {
     auto end_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     end_label_col->append_datum(Slice("last"));
 
-    const auto result = CelonisCalcThroughputFunctions::celonis_calc_throughput(
+    const auto result = CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
             nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
     ASSERT_EQ(4, result->size());
     EXPECT_TRUE(result->get(0).is_null());

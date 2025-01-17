@@ -1410,9 +1410,9 @@ celostar_functions = [
     [1000116, 'celonis_array_targets', True, False, 'ARRAY_BIGINT', ['ARRAY_BIGINT', 'VARCHAR', 'ARRAY_BIGINT'], 'CelonisSourceTargetFunctions::celonis_array_targets', 'CelonisSourceTargetFunctions::celonis_array_targets_prepare', 'CelonisSourceTargetFunctions::celonis_array_targets_close'],
     [1000117, 'celonis_array_targets', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'VARCHAR', 'ARRAY_BIGINT'], 'CelonisSourceTargetFunctions::celonis_array_targets', 'CelonisSourceTargetFunctions::celonis_array_targets_prepare', 'CelonisSourceTargetFunctions::celonis_array_targets_close'],
 
-    [1000201, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_INT', 'ARRAY_BIGINT', 'INT', 'INT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
-    [1000202, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT', 'BIGINT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
-    [1000203, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
+    [1000201, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_INT', 'ARRAY_BIGINT', 'INT', 'INT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions<TYPE_INT>::celonis_calc_throughput'],
+    [1000202, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT', 'BIGINT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions<TYPE_BIGINT>::celonis_calc_throughput'],
+    [1000203, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput'],
 
     [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities', 'CelonisMatchActivitiesFunctions::prepare', 'CelonisMatchActivitiesFunctions::close'],
     [1000302, 'celonis_remap_timestamp_weekday', True, False, 'BIGINT', ['DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday_scalar'],
