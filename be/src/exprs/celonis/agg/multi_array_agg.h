@@ -31,6 +31,13 @@ namespace starrocks {
 
 // input columns result in intermediate result: struct{array[col0], array[col1], array[col2]... array[coln]}
 struct MultiArrayAggAggregateState {
+
+    MultiArrayAggAggregateState(): size_limit(config::array_agg_size_limit) {}
+
+    bool size_limit_reached() const {
+        return !data_columns.empty() && data_columns[0]->size() > size_limit;
+    }
+
     void update(const Column& column, size_t index, size_t offset, size_t count) {
         data_columns[index]->append(column, offset, count);
     }
@@ -71,6 +78,7 @@ struct MultiArrayAggAggregateState {
     // using pointer rather than vector to avoid variadic size
     // array_agg(a, b order by c, d), the a,b,c,d are put into data_columns in order.
     Columns data_columns;
+    int64_t size_limit;
 };
 
 class MultiArrayAggAggregateFunction
@@ -101,6 +109,11 @@ public:
 
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
                 size_t row_num) const override {
+        if (UNLIKELY(this->data(state).size_limit_reached())) {
+            ctx->set_error(("size limit (" + std::to_string(config::array_agg_size_limit) +
+                            ") of multi_array_agg is reached").c_str());
+            return;
+        }
         for (auto i = 0; i < ctx->get_num_args(); ++i) {
             if (UNLIKELY(columns[i]->size() <= row_num)) {
                 ctx->set_error(std::string(get_name() + "'s update row number overflow").c_str(), false);

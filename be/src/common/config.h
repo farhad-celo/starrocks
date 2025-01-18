@@ -48,6 +48,11 @@ CONF_mBool(treat_calendar_column_as_constant_in_calendar_functions, "false");
 // is called.
 CONF_mBool(fail_query_when_expensive_non_const_impl_is_called, "false");
 
+// When the number of elements of (multi_)array_agg exceeds this limit, fail the query.
+CONF_mInt64(array_agg_size_limit, "4294967296"); // 2^32
+
+// End of Celonis configures
+
 
 // The cluster id.
 CONF_Int32(cluster_id, "-1");
