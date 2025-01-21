@@ -58,7 +58,7 @@ int VariantStatsFinalizer::compute_happy_variant(const std::vector<VRef>& sorted
 }
 
 void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_top_variants, VRef& happy,
-                                                 std::optional<std::string> query_id) const {
+                                                 const std::string& query_id) const {
     if (variant_map_.empty() || activity_map_.empty()) {
         // No data.
         return;
@@ -230,7 +230,7 @@ VariantStatsFinalizer::json_string(const std::vector<VList>& activity_top_varian
 
 std::optional<std::string>
 VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
-                                             std::optional<std::string> query_id) const {
+                                             const std::string& query_id) const {
     celonis::accelerator::Statistics statistics_proto;
     // construct proto
     // Dictionary
@@ -339,7 +339,7 @@ VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_
 
 std::optional<std::string>
 VariantStatsFinalizer::to_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
-                                 std::optional<std::string> query_id) const {
+                                 const std::string& query_id) const {
     if (enable_proto_encoding_) {
         return base64_encoded_string(activity_top_variants, happy, query_id);
     } else {
@@ -347,18 +347,12 @@ VariantStatsFinalizer::to_string(const std::vector<VList>& activity_top_variants
     }
 }
 
-std::string VariantStatsFinalizer::log_prefix(std::optional<std::string> query_id) const {
-    if (query_id.has_value()) {
-        return "CELONIS_VARIANT_STATS (" + query_id.value() + ")";
-    }
-    return "CELONIS_VARIANT_STATS (" + uuid_string_ + ")";
+std::string VariantStatsFinalizer::log_prefix(const std::string& query_id) const {
+    return "CELONIS_VARIANT_STATS (" + query_id + ")";
 }
 
 std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx) {
-    std::optional<std::string> query_id = std::nullopt;
-    if (ctx->state() != nullptr) {
-        query_id = print_id(ctx->state()->query_id());
-    }
+    const std::string query_id = print_id(ctx->state()->query_id());
     LOG(INFO) << log_prefix(query_id) << ": merging_seconds = " << merging_microseconds_ / 1000000.0 << " seconds."
               << std::endl;
     LOG(INFO) << log_prefix(query_id) << ": merging_bytes = " << merging_bytes_ << " bytes." << std::endl;
@@ -404,6 +398,10 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
                 }
             }
         }
+    }
+    if (UNLIKELY(ctx->state()->cancelled_ref())) {
+        ctx->set_error("variant_stats detects cancelled.", false);
+        return std::nullopt;
     }
     LOG(INFO) << log_prefix(query_id) << ": done traversing variant_map_\n";
     LOG(INFO) << log_prefix(query_id) << ": (done traversing variant_map) size of activity_stats_ = "

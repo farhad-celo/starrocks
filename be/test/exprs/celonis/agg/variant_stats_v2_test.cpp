@@ -6,6 +6,7 @@
 #include "exprs/agg/nullable_aggregate.h"
 #include "modules/query/variantstats.pb.h"
 #include "exprs/anyval_util.h"
+#include "runtime/runtime_state.h"
 #include "../util.h"
 #include "google/protobuf/util/json_util.h"
 #include "gutil/strings/strcat.h"
@@ -85,9 +86,11 @@ protected:
                         TypeDescriptor::from_logical_type(TYPE_BOOLEAN))    // enable_proto_encoding
         };
         auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
-        auto mem_pool = new MemPool();
+        mem_pools_.emplace_back(std::make_unique<MemPool>());
+        runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(nullptr, mem_pool, return_type, std::move(arg_types)));
+                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(), return_type,
+                                                std::move(arg_types)));
     }
 
     std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
@@ -176,8 +179,6 @@ protected:
 
         // std::cerr << result->debug_string() << std::endl;
         Evaluate(result.get(), expected, enable_proto_encoding);
-        delete local_ctx1->mem_pool();
-        delete local_ctx2->mem_pool();
     }
 
     void RunMergeNew(const std::vector<std::optional<DatumArray>>& variants1, const std::vector<int64_t>& counts1,
@@ -206,9 +207,6 @@ protected:
         func->finalize_to_column(local_ctx3.get(), state3->state(), result.get());
 
         Evaluate(result.get(), expected, enable_proto_encoding);
-        delete local_ctx1->mem_pool();
-        delete local_ctx2->mem_pool();
-        delete local_ctx3->mem_pool();
     }
 
     void Run(const std::vector<std::optional<DatumArray>>& variants1, const std::vector<int64_t>& counts1,
@@ -221,6 +219,8 @@ protected:
                     enable_proto_encoding, expected);
     }
 
+    std::vector<std::unique_ptr<MemPool>> mem_pools_;
+    std::vector<std::unique_ptr<RuntimeState>> runtime_states_;
 };
 
 // TODO(y.zhang): Add more unit tests.

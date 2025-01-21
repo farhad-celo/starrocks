@@ -13,6 +13,8 @@
 #include "exprs/arithmetic_operation.h"
 #include "exprs/base64.h"
 #include "exprs/celonis/agg/variant_stats.h"
+#include "exprs/function_context.h"
+#include "runtime/runtime_state.h"
 #include "google/protobuf/util/json_util.h"
 #include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
@@ -353,11 +355,18 @@ public:
     CelonisVariantStatsTest() = default;
 
     void SetUp() override {
-        utils = new FunctionUtils();
+        runtime_state = new RuntimeState();
+        utils = new FunctionUtils(runtime_state);
         ctx = utils->get_fn_ctx();
     }
 
-    void TearDown() override { delete utils; }
+    void TearDown() override {
+        delete utils;
+        // FunctionUtils does not delete runtime_state.
+        if (runtime_state != nullptr) {
+            delete runtime_state;
+        }
+    }
 
     ArrayColumn::Ptr build_variant_column(const std::vector<std::vector<std::string>>& rows) {
         ColumnBuilder<TYPE_VARCHAR> builder(config::vector_chunk_size);
@@ -452,6 +461,7 @@ public:
 private:
     FunctionUtils* utils{};
     FunctionContext* ctx{};
+    RuntimeState* runtime_state{};
 };
 
 TEST_F(CelonisVariantStatsTest, test_equality) {
@@ -2094,6 +2104,34 @@ TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding_empty) {
     Slice slice = result->get_slice(0);
     std::string encoded_string = slice.to_string();
     EXPECT_EQ("", encoded_string);
+}
+
+TEST_F(CelonisVariantStatsTest, test_cancellation_work) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
+                                      {"a1", "a2", "a1", "a2"}});
+
+    auto weights = build_weight_column({1, 10});
+    auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());
+    auto disable_top = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
+    auto enable_proto_encoding = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
+    std::vector<const Column*> raw_columns;
+    raw_columns.resize(5);
+    raw_columns[0] = col1.get();
+    raw_columns[1] = weights.get();
+    raw_columns[2] = edge_count.get();
+    raw_columns[3] = disable_top.get();
+    raw_columns[4] = enable_proto_encoding.get();
+    ctx->set_constant_columns({nullptr, nullptr, edge_count, disable_top, enable_proto_encoding});
+    auto state1 = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
+
+    auto result = BinaryColumn::create();
+    // set is_cancelled to true
+    ctx->state()->set_is_cancelled(true);
+    func->finalize_to_column(ctx, state1->state(), result.get());
+    ASSERT_TRUE(ctx->has_error());
 }
 
 } // namespace starrocks

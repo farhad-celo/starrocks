@@ -11,6 +11,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
+#include "util/defer_op.h"
 
 namespace starrocks {
 
@@ -361,12 +362,8 @@ CelonisVariantStatsAggregateV2State::to_string(const std::vector<std::vector<siz
     }
 }
 
-
-std::string CelonisVariantStateV2AggregationFunction::log_prefix(std::optional<std::string> query_id) const {
-    if (query_id.has_value()) {
-        return "CELONIS_VARIANT_STATS_V2 (" + query_id.value() + ")";
-    }
-    return "CELONIS_VARIANT_STATS_V2";
+std::string CelonisVariantStateV2AggregationFunction::log_prefix(const std::string& query_id) const {
+    return "CELONIS_VARIANT_STATS_V2 (" + query_id + ")";
 }
 
 void CelonisVariantStateV2AggregationFunction::update(FunctionContext* ctx, const Column** columns, AggDataPtr state,
@@ -412,11 +409,13 @@ void CelonisVariantStateV2AggregationFunction::convert_to_serialize_format(Funct
 void
 CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
                                                              Column* to) const {
+    auto defer = DeferOp([&]() {
+        if (ctx->has_error() && to != nullptr) {
+            to->append_default();
+        }
+    });
     auto& state_impl = this->data(state);
-    std::optional<std::string> query_id = std::nullopt;
-    if (ctx->state() != nullptr) {
-        query_id = print_id(ctx->state()->query_id());
-    }
+    const std::string query_id = print_id(ctx->state()->query_id());
     LOG(INFO) << log_prefix(query_id) << ": merging_seconds = " << state_impl.merging_microseconds() / 1000000.0
               << " seconds." << std::endl;
     LOG(INFO) << log_prefix(query_id) << ": merging_bytes = " << state_impl.merging_bytes() << " bytes." << std::endl;
@@ -438,6 +437,10 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
         down_cast<BinaryColumn*>(to)->append(output);
         return;
     }
+    if (UNLIKELY(ctx->state()->cancelled_ref())) {
+        ctx->set_error("variant_stats_v2 detects cancelled.", false);
+        return;
+    }
     LOG(INFO) << log_prefix(query_id) << ": started finding top\n";
     std::vector<std::vector<size_t>> activity_top_variants;
     size_t happy;
@@ -453,6 +456,7 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
     } else {
         ctx->set_error(std::string("CELONIS_VARIANT_STATS_V2: output string size exceeds the limit (100M)").c_str(),
                        false);
+        return;
     }
     down_cast<BinaryColumn*>(to)->append(output);
 }

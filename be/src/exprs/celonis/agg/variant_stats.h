@@ -122,13 +122,13 @@ private:
     std::optional<std::string> json_string(const std::vector<VList>& activity_top_variants, const VRef& happy) const;
 
     std::optional<std::string> base64_encoded_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
-                                                     std::optional<std::string> query_id) const;
+                                                     const std::string& query_id) const;
 
     std::optional<std::string>
     to_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
-              std::optional<std::string> query_id) const;
+              const std::string& query_id) const;
 
-    std::string log_prefix(std::optional<std::string> query_id) const;
+    std::string log_prefix(const std::string& query_id) const;
 
     // Computes the variant that starts and ends with the most common start/end activities,
     // otherwise returns the top most frequent activity.
@@ -136,7 +136,7 @@ private:
 
     // Computes top-10 variants for each activity and happy variant.
     void compute_top_variants(std::vector<VList>& activity_top_variants, VRef& happy,
-                              std::optional<std::string> query_id) const;
+                              const std::string& query_id) const;
 
     std::vector<ActivityStats> activity_stats_;
     EdgeHashMap edge_map_;

@@ -496,7 +496,7 @@ public:
 
 private:
 
-    std::string log_prefix(std::optional<std::string> query_id) const;
+    std::string log_prefix(const std::string& query_id) const;
 
 };
 
