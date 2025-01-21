@@ -1415,8 +1415,7 @@ celostar_functions = [
     [1000203, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput'],
 
     [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities', 'CelonisMatchActivitiesFunctions::prepare', 'CelonisMatchActivitiesFunctions::close'],
-    [1000302, 'celonis_remap_timestamp_weekday', True, False, 'BIGINT', ['DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday_scalar'],
-    [1000303, 'celonis_remap_timestamp_weekday', True, False, 'ARRAY_BIGINT', ['ARRAY_DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday'],
+    [1000302, 'celonis_remap_timestamp_weekday', True, False, 'BIGINT', ['DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday'],
     # TODO(j.kim): Remove celonis_index_activity_order() after pql2sql is migrated to celonis_index_activity().
     [1000304, 'celonis_index_activity_order', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivity::celonis_index_activity', 'CelonisIndexActivity::celonis_index_activity_prepare', 'CelonisIndexActivity::celonis_index_activity_close'],
     [1000305, 'celonis_match_process', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisMatchProcess::celonis_match_process', 'CelonisMatchProcess::match_process_prepare', 'CelonisMatchProcess::match_process_close'],
