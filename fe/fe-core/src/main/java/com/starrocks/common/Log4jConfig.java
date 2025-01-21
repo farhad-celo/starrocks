@@ -229,6 +229,14 @@ public class Log4jConfig extends XmlConfiguration {
             "      <AppenderRef ref=\"Auditfile\"/>\n" +
             "      <AppenderRef ref=\"ConsoleErr\"/>\n" +
             "    </Logger>\n" +
+
+            // TODO: Once SR team provides a way to configure logging completely, we will remove this and use that
+            // celonis start
+
+            "<!--REPLACED BY PROFILE LOGGER-->" +
+
+            // celonis end
+
             "<!--REPLACED BY AUDIT AND VERBOSE MODULE NAMES-->" +
             "  </Loggers>\n" +
             "</Configuration>";
@@ -473,6 +481,20 @@ public class Log4jConfig extends XmlConfiguration {
 
         newXmlConfTemplate = newXmlConfTemplate.replaceAll("<!--REPLACED BY AUDIT AND VERBOSE MODULE NAMES-->",
                 sb.toString());
+
+
+        // celonis start
+
+        if (log2Console && Config.enable_profile_log) {
+            String profileLogger = "    <Logger name=\"profile\" level=\"INFO\" additivity=\"false\">\n" +
+                    "      <AppenderRef ref=\"ProfileFile\"/>\n" +
+                    "    </Logger>\n";
+            newXmlConfTemplate = newXmlConfTemplate.replaceAll("<!--REPLACED BY PROFILE LOGGER-->", profileLogger);
+        }
+
+        // celonis end
+
+
         return newXmlConfTemplate;
     }
 
