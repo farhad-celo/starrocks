@@ -870,7 +870,9 @@ CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext
     DCHECK_EQ(columns.size(), 2);
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    UnnestedArrayData pattern_data = prepare_array_input(columns[1].get());
+    // Handle constant patterns column here. SR may send a const patterns column chunk to this function.
+    ColumnPtr patterns_column = ColumnHelper::unpack_and_duplicate_const_column(columns[1]->size(), columns[1]);
+    UnnestedArrayData pattern_data = prepare_array_input(patterns_column.get());
     const auto& patterns = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*pattern_data.elements).get_data().data();
     const auto& offsets = pattern_data.offsets->get_data().data();
     size_t n_rows = columns[0]->size();

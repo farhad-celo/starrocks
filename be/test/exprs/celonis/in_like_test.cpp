@@ -334,4 +334,17 @@ TEST_F(CelonisInLikeTest, non_const_patterns) {
     EXPECT_EQ(1L, result->get(15).get_int64());
 }
 
+TEST_F(CelonisInLikeTest, non_const_patterns_with_const_pattern_column) {
+    Prepare();
+    AddRow("asddqqW_A_W", DatumArray{"%A%", "%B%"});
+    string_column_ = ConstColumn::create(string_column_, 3);
+    // SR may send a const patterns column chunk to this function.
+    patterns_column_ = ConstColumn::create(patterns_column_, 3);
+    const auto result = Run().value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+}
+
 } // namespace starrocks
