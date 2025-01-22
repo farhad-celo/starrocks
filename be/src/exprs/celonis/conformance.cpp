@@ -280,6 +280,7 @@ ColumnPtr CelonisConformance::conformance_internal(const PetriNet& petri_net,
         size_t array_size = offsets_ptr[i + 1] - offsets_ptr[i];
         if ((null_arrays != nullptr && (*null_arrays)[i]) || array_size == 0) {
             // If null_array_offset[i] is true, the current array is NULL.
+            // TODO(j.kim): Fix the inconsistency of NULL behavior. Returning an empty array here vs Null for Null literal.
             // If array_size is 0, the current array is empty.
             result_offsets.push_back(new_offset);
             continue;
@@ -338,18 +339,22 @@ Status CelonisConformance::conformance_close(FunctionContext* context, FunctionC
 }
 
 StatusOr<ColumnPtr> CelonisConformance::conformance(FunctionContext* context, const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
     const auto* state =
             reinterpret_cast<const ConformanceState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    UnnestedArrayData array_data = prepare_array_input(columns[0].get());
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
     return conformance_internal</*readable=*/false>(*state->petri_net,
             *down_cast<const RunTimeColumnType<TYPE_VARCHAR>*>(array_data.elements),
             *array_data.offsets, array_data.null_elements, array_data.null_arrays);
 }
 
 StatusOr<ColumnPtr> CelonisConformance::readable_conformance(FunctionContext* context, const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
     const auto* state =
             reinterpret_cast<const ConformanceState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    UnnestedArrayData array_data = prepare_array_input(columns[0].get());
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
     return conformance_internal</*readable=*/true>(*state->petri_net,
             *down_cast<const RunTimeColumnType<TYPE_VARCHAR>*>(array_data.elements),
             *array_data.offsets, array_data.null_elements, array_data.null_arrays);
