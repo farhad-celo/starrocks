@@ -11,7 +11,9 @@ namespace starrocks {
 
 namespace {
 // See https://docs.google.com/document/d/1q_MDFvi3Y9VP_HlAud7Nf--KXi_uB-FU0OODWO1pgJU/edit#.
-static int weekday[] = {0, 1, 2, 2, 2, 3, 4};
+// 1970-01-01 is a Thursday.
+static int post_epoch_weekday[] = {0, 1, 2, 2, 2, 3, 4};
+static int pre_epoch_weekday[] = {0, 1, 2, 3, 3, 3, 4};
 
 // Number of days since the start of the unix epoch.
 static constexpr JulianDate UNIX_EPOCH_JULIAN = 2440588;
@@ -19,7 +21,11 @@ static constexpr JulianDate UNIX_EPOCH_JULIAN = 2440588;
 static int64_t convert_timestamp_to_weekday(long timestamp_val) {
     JulianDate year_in_days = timestamp::to_julian(timestamp_val);
     int64_t days_from_unix_epoch = year_in_days - UNIX_EPOCH_JULIAN;
-    return (days_from_unix_epoch / 7) * 5 + weekday[days_from_unix_epoch % 7];
+    if (days_from_unix_epoch >= 0) {
+        return (days_from_unix_epoch / 7) * 5 + post_epoch_weekday[days_from_unix_epoch % 7];
+    }
+    days_from_unix_epoch = -days_from_unix_epoch;
+    return -((days_from_unix_epoch / 7) * 5 + pre_epoch_weekday[days_from_unix_epoch % 7]);
 }
 }
 
