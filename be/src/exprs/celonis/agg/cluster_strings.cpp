@@ -6,6 +6,7 @@
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
 #include "runtime/mem_pool.h"
+#include "runtime/runtime_state.h"
 
 namespace starrocks {
 
@@ -444,6 +445,10 @@ void ClusterStringsAggregateFunction::finalize_to_column(FunctionContext* ctx, C
                                    " finalize_to_column() is not struct, but is " + to->get_name())
                                .c_str(),
                        false);
+        return;
+    }
+    if (UNLIKELY(ctx->state()->cancelled_ref())) {
+        ctx->set_error("cluster_strings detects cancelled.", false);
         return;
     }
     auto& state_impl = this->data(state);

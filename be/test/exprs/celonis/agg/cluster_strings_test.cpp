@@ -5,6 +5,7 @@
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
+#include "runtime/runtime_state.h"
 #include "../util.h"
 #include "gutil/strings/strcat.h"
 #include "testutil/function_utils.h"
@@ -68,9 +69,12 @@ protected:
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))    // token_weight
         };
         auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type());
-        auto mem_pool = new MemPool();
+        mem_pools_.emplace_back(std::make_unique<MemPool>());
+        runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(nullptr, mem_pool, return_type, std::move(arg_types)));
+                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(), return_type,
+                                                std::move(arg_types)));
+
     }
 
     std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
@@ -166,8 +170,6 @@ protected:
         func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
         Evaluate(result.get(), expected);
-        delete local_ctx1->mem_pool();
-        delete local_ctx2->mem_pool();
     }
 
     void RunMergeToNew(const std::vector<std::optional<std::string>>& strings1, const std::vector<int128_t>& hashes1,
@@ -194,9 +196,6 @@ protected:
         func->finalize_to_column(local_ctx3.get(), state3->state(), result.get());
 
         Evaluate(result.get(), expected);
-        delete local_ctx1->mem_pool();
-        delete local_ctx2->mem_pool();
-        delete local_ctx3->mem_pool();
     }
 
     void Run(const std::vector<std::optional<std::string>>& strings1, const std::vector<int128_t>& hashes1,
@@ -207,7 +206,39 @@ protected:
         RunMergeToNew(strings1, hashes1, strings2, hashes2, edit_threshold, weighted_tokens, token_weight, expected);
     }
 
+    std::vector<std::unique_ptr<MemPool>> mem_pools_;
+    std::vector<std::unique_ptr<RuntimeState>> runtime_states_;
 };
+
+TEST_F(CelonisClusterStringsTest, cancellation_work) {
+    std::vector<std::optional<std::string>> strings1 = {"chocolate", "cocolate"};
+    std::vector<int128_t> hashes1 = {1, 2};
+    std::vector<std::optional<std::string>> strings2 = {"cholate", "chocolate", "chocolaet"};
+    std::vector<int128_t> hashes2 = {3, 1, 4};
+    int64_t edit_threshold = 2;
+    std::string weighted_tokens = "";
+    int64_t token_weight = 1;
+    auto [local_ctx1, state1, func] = RunUpdate(strings1, hashes1, edit_threshold, weighted_tokens, token_weight);
+    auto [local_ctx2, state2, func2] = RunUpdate(strings2, hashes2, edit_threshold, weighted_tokens, token_weight);
+    auto local_ctx3 = get_ctx();
+
+    // Serialize state1 and state2
+    // Use nullable, because SR prepares nullable *to* column for serialize_to_column.
+    auto serde_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    func->serialize_to_column(local_ctx1.get(), state1->state(), serde_col.get());
+    func->serialize_to_column(local_ctx2.get(), state2->state(), serde_col.get());
+
+    // Merge to a new state
+    auto state3 = ManagedAggrState::create(local_ctx3.get(), func);
+    func->merge(local_ctx3.get(), serde_col.get(), state3->state(), 0);
+    func->merge(local_ctx3.get(), serde_col.get(), state3->state(), 1);
+
+    // Get the result
+    auto result = local_ctx3->create_column(local_ctx3->get_return_type(), false);
+    local_ctx3->state()->set_is_cancelled(true);
+    func->finalize_to_column(local_ctx3.get(), state3->state(), result.get());
+    ASSERT_TRUE(local_ctx3->has_error());
+}
 
 TEST_F(CelonisClusterStringsTest, simple) {
     std::vector<std::optional<std::string>> strings1 = {"chocolate", "cocolate"};
