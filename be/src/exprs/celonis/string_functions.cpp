@@ -25,17 +25,18 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
     const size_t row_size = columns[0]->size();
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
     std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
-    bool is_array_input = false;
-    if (columns[0]->is_nullable()) {
-        if (!columns[0]->only_null()) {
-            auto nullable_array = down_cast<const NullableColumn*>(columns[0].get());
-            is_array_input = nullable_array->data_column().get()->is_array();
+    if (context->get_arg_type(0)->type == TYPE_ARRAY) {
+        // columns[0] is NULL literal
+        if (columns[0]->only_null()) {
+            const auto null_array_hash = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_ARRAY_STRING.data(),
+                                                                   XXHASH3_128_NULL_ARRAY_STRING.size(),
+                                                                   default_xxhash_seed);
+            auto result_column = context->create_column(context->get_return_type(), false);
+            result_column->append_datum(null_array_hash);
+            return ConstColumn::create(std::move(result_column), row_size);
         }
-    } else {
-        is_array_input = columns[0]->is_array();
-    }
-    if (is_array_input) {
-        UnnestedArrayData string_data = prepare_array_input(columns[0].get());
+        ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+        UnnestedArrayData string_data = prepare_array_input(array_column.get());
         const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
                 *string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
@@ -109,23 +110,15 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::FunctionContext* context,
                                                                   const starrocks::Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     size_t row_size = columns[0]->size();
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
     std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
     std::vector<bool> is_null_vec(row_size, false);
 
-    bool is_array_input = false;
-    if (columns[0]->is_nullable()) {
-        if (!columns[0]->only_null()) {
-            auto nullable_array = down_cast<const NullableColumn*>(columns[0].get());
-            is_array_input = nullable_array->data_column().get()->is_array();
-        }
-    } else {
-        is_array_input = columns[0]->is_array();
-    }
-
-    if (is_array_input) {
-        UnnestedArrayData string_data = prepare_array_input(columns[0].get());
+    if (context->get_arg_type(0)->type == TYPE_ARRAY) {
+        ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+        UnnestedArrayData string_data = prepare_array_input(array_column.get());
         const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
                 *string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
@@ -148,12 +141,10 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
         }
     } else {
         std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
-
         column_viewers.reserve(columns.size());
         for (const auto& column: columns) {
             column_viewers.emplace_back(column);
         }
-
         for (const auto& viewer: column_viewers) {
             for (size_t row = 0; row < row_size; ++row) {
                 if (is_null_vec[row]) {
