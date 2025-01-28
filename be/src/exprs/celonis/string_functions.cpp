@@ -43,8 +43,8 @@ Status validate_slice(const Slice& slice, const std::string& reserved_str, const
 
 }
 
-StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,
-                                                         const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v2(starrocks::FunctionContext* context,
+                                                            const starrocks::Columns& columns) {
     DCHECK(columns.size() >= 1);
     const size_t row_size = columns[0]->size();
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
@@ -53,7 +53,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
     for (size_t i = 0; i < row_size; i++) {
         XXH_errorcode code = XXH3_128bits_reset_withSeed(&(states[i]), default_xxhash_seed);
         if (UNLIKELY(code != XXH_OK)) {
-            return Status::InternalError("CELONIS_XX_HASH3_128: init xxh3 state failed");
+            return Status::InternalError("CELONIS_XX_HASH3_128_V2: init xxh3 state failed");
         }
     }
 
@@ -64,10 +64,10 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
             XXH3_state_t null_array_hash;
             XXH_errorcode reset_code = XXH3_128bits_reset_withSeed(&null_array_hash, default_xxhash_seed);
             if (reset_code != XXH_OK) {
-                return Status::InternalError("CELONIS_XX_HASH3_128: init xxh3 state failed");
+                return Status::InternalError("CELONIS_XX_HASH3_128_V2: init xxh3 state failed");
             }
             RETURN_IF_ERROR(xxh3_128bits_update(&null_array_hash, XXHASH3_128_NULL_ARRAY_STRING.data(),
-                                                XXHASH3_128_NULL_ARRAY_STRING.size(), "CELONIS_XX_HASH3_128"));
+                                                XXHASH3_128_NULL_ARRAY_STRING.size(), "CELONIS_XX_HASH3_128_V2"));
             XXH128_hash_t value = XXH3_128bits_digest(&null_array_hash);
             int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
             auto result_column = context->create_column(context->get_return_type(), false);
@@ -82,7 +82,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
         for (size_t row = 0; row < row_size; ++row) {
             if (columns[0]->is_null(row)) {
                 RETURN_IF_ERROR(xxh3_128bits_update(&states[row], XXHASH3_128_NULL_ARRAY_STRING.data(),
-                                                    XXHASH3_128_NULL_ARRAY_STRING.size(), "CELONIS_XX_HASH3_128"));
+                                                    XXHASH3_128_NULL_ARRAY_STRING.size(), "CELONIS_XX_HASH3_128_V2"));
                 continue;
             }
             const auto start = offsets[row];
@@ -93,12 +93,12 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                 if (!is_null) {
                     slice = slices[i];
                     // validate that the input string does not conflict with the reserved null string.
-                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_STRING, "CELONIS_XX_HASH3_128"));
-                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_ARRAY_STRING, "CELONIS_XX_HASH3_128"));
+                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_STRING, "CELONIS_XX_HASH3_128_V2"));
+                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_ARRAY_STRING, "CELONIS_XX_HASH3_128_V2"));
                 } else {
                     slice = Slice(XXHASH3_128_NULL_STRING);
                 }
-                RETURN_IF_ERROR(xxh3_128bits_update(&states[row], slice.data, slice.size, "CELONIS_XX_HASH3_128"));
+                RETURN_IF_ERROR(xxh3_128bits_update(&states[row], slice.data, slice.size, "CELONIS_XX_HASH3_128_V2"));
             }
         }
     } else {
@@ -114,11 +114,11 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                 Slice slice;
                 if (!viewer.is_null(row)) {
                     slice = viewer.value(row);
-                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_STRING, "CELONIS_XX_HASH3_128"));
+                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_STRING, "CELONIS_XX_HASH3_128_V2"));
                 } else {
                     slice = null_string_slice;
                 }
-                RETURN_IF_ERROR(xxh3_128bits_update(&(states[row]), slice.data, slice.size, "CELONIS_XX_HASH3_128"));
+                RETURN_IF_ERROR(xxh3_128bits_update(&(states[row]), slice.data, slice.size, "CELONIS_XX_HASH3_128_V2"));
             }
         }
     }
@@ -128,6 +128,94 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
         XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
         int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
         builder.append(res, is_null_vec[row]);
+    }
+    return builder.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,
+                                                         const starrocks::Columns& columns) {
+    const size_t row_size = columns[0]->size();
+    const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
+    std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
+    if (context->get_arg_type(0)->type == TYPE_ARRAY) {
+        // columns[0] is NULL literal
+        if (columns[0]->only_null()) {
+            const auto null_array_hash = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_ARRAY_STRING.data(),
+                                                                   XXHASH3_128_NULL_ARRAY_STRING.size(),
+                                                                   default_xxhash_seed);
+            auto result_column = context->create_column(context->get_return_type(), false);
+            result_column->append_datum(null_array_hash);
+            return ConstColumn::create(std::move(result_column), row_size);
+        }
+        ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+        UnnestedArrayData string_data = prepare_array_input(array_column.get());
+        const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+                *string_data.elements).get_data().data();
+        const auto& offsets = string_data.offsets->get_data().data();
+        for (size_t row = 0; row < row_size; ++row) {
+            if (columns[0]->is_null(row)) {
+                seeds_vec[row] = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_ARRAY_STRING.data(),
+                                                           XXHASH3_128_NULL_ARRAY_STRING.size(), seeds_vec[row]);
+                continue;
+            }
+            const auto start = offsets[row];
+            const auto end = offsets[row + 1];
+            for (auto i = start; i < end; ++i) {
+                const bool is_null = string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0;
+                uint128_t seed = seeds_vec[row];
+                if (is_null) {
+                    seeds_vec[row] = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_STRING.data(),
+                                                               XXHASH3_128_NULL_STRING.size(), seed);
+                } else {
+                    Slice slice = strings[i];
+                    if (XXHASH3_128_NULL_STRING.size() == slice.size &&
+                        XXHASH3_128_NULL_STRING.compare(0, XXHASH3_128_NULL_STRING.size(), slice.data, slice.size) ==
+                        0) {
+                        return Status::InvalidArgument(
+                                ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
+                                 XXHASH3_128_NULL_STRING + "'.").c_str());
+                    }
+                    if (XXHASH3_128_NULL_ARRAY_STRING.size() == slice.size &&
+                        XXHASH3_128_NULL_ARRAY_STRING.compare(0, XXHASH3_128_NULL_ARRAY_STRING.size(), slice.data,
+                                                              slice.size) == 0) {
+                        return Status::InvalidArgument(
+                                ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL array string '" +
+                                 XXHASH3_128_NULL_ARRAY_STRING + "'.").c_str());
+                    }
+                    seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+                }
+            }
+        }
+    } else {
+        std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
+        column_viewers.reserve(columns.size());
+        for (const auto& column: columns) {
+            column_viewers.emplace_back(column);
+        }
+        for (const auto& viewer: column_viewers) {
+            for (size_t row = 0; row < row_size; ++row) {
+                uint128_t seed = seeds_vec[row];
+                if (viewer.is_null(row)) {
+                    seeds_vec[row] = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_STRING.data(),
+                                                               XXHASH3_128_NULL_STRING.size(), seed);
+                } else {
+                    auto slice = viewer.value(row);
+                    if (XXHASH3_128_NULL_STRING.size() == slice.size &&
+                        XXHASH3_128_NULL_STRING.compare(0, XXHASH3_128_NULL_STRING.size(), slice.data, slice.size) ==
+                        0) {
+                        return Status::InvalidArgument(
+                                ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
+                                 XXHASH3_128_NULL_STRING + "'.").c_str());
+                    }
+                    seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+                }
+            }
+        }
+    }
+    ColumnBuilder<TYPE_LARGEINT> builder(row_size);
+    std::vector<bool> is_null_vec(row_size, false);
+    for (int row = 0; row < row_size; ++row) {
+        builder.append(seeds_vec[row], is_null_vec[row]);
     }
     return builder.build(ColumnHelper::is_all_const(columns));
 }
