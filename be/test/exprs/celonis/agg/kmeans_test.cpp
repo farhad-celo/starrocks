@@ -7,6 +7,7 @@
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
+#include "runtime/runtime_state.h"
 #include "exprs/celonis/util.h"
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
@@ -63,8 +64,10 @@ protected:
         };
         auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
         mem_pools_.emplace_back(std::make_unique<MemPool>());
+        runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(nullptr, mem_pools_.back().get(), return_type, std::move(arg_types)));
+                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(), return_type,
+                                                std::move(arg_types)));
     }
 
     std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
@@ -193,6 +196,7 @@ protected:
     }
 
     std::vector<std::unique_ptr<MemPool>> mem_pools_;
+    std::vector<std::unique_ptr<RuntimeState>> runtime_states_;
 };
 
 // TODO(y.zhang): Add more tests.
@@ -222,6 +226,30 @@ TEST_F(CelonisBuildKMeansModelTest, one_feature_large_k) {
                                                            {1}};
     std::vector<std::pair<double, double>> expected_limits = {{1, 4}};
     match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
+}
+
+TEST_F(CelonisBuildKMeansModelTest, cancellation_work) {
+    auto points1 = DatumArray{DatumArray{1.0}, DatumArray{2.0}};
+    auto points2 = DatumArray{DatumArray{3.0}, DatumArray{4.0}};
+    int64_t num_clusters = 2;
+    double random_seed = 0;
+
+    auto [local_ctx1, state1, func] = RunUpdate(points1, num_clusters, random_seed);
+    auto [local_ctx2, state2, func2] = RunUpdate(points2, num_clusters, random_seed);
+
+    // Serialize state2
+    ColumnPtr serialize_col = BinaryColumn::create();
+    func->serialize_to_column(local_ctx2.get(), state2->state(), serialize_col.get());
+
+    // Merge state2 into state1
+    func->merge(local_ctx1.get(), serialize_col.get(), state1->state(), 0);
+
+    // Get the result
+    auto result = ColumnHelper::create_column(get_return_type(), true);
+    // set is_cancelled to true
+    local_ctx1->state()->set_is_cancelled(true);
+    func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
+    ASSERT_TRUE(local_ctx1->has_error());
 }
 
 TEST_F(CelonisBuildKMeansModelTest, one_feature_small_k) {

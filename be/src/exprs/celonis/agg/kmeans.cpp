@@ -9,6 +9,7 @@
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
 #include "runtime/mem_pool.h"
+#include "runtime/runtime_state.h"
 
 namespace starrocks {
 
@@ -317,7 +318,11 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
         to->append_default();
         return;
     }
-
+    if (UNLIKELY(ctx->state()->cancelled_ref())) {
+        ctx->set_error("celonis_build_kmeans_model detects cancelled.", false);
+        to->append_default();
+        return;
+    }
     DCHECK_GT(num_clusters, 0);
     std::vector<std::vector<double>> centroids;
     const auto& [limits, normalized_points] = normalize_points(points);
