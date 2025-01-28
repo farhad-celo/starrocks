@@ -54,7 +54,7 @@ private:
     }
 
     template<LogicalType LT>
-    StatusOr<ColumnPtr> RunConstantMatch(DatumArray match_array) {
+    StatusOr<ColumnPtr> RunConstantMatch(const DatumArray& match_array) {
         match_array_column_->append_datum(match_array);
         const auto nrows = value_column_->size();
         match_array_column_ = ConstColumn::create(match_array_column_, nrows);

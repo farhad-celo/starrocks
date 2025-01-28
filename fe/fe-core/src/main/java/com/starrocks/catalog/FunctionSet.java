@@ -539,6 +539,7 @@ public class FunctionSet {
     public static final String CELONIS_TRANSITS_INTERLEAVED = "celonis_transits_interleaved";
     public static final String CELONIS_TRANSITS_MATCH = "celonis_transits_match";
     public static final String CELONIS_XX_HASH3_128 = "celonis_xx_hash3_128";
+    public static final String CELONIS_IN_JSON = "celonis_in_json";
 
     // Celonis window functions:
     public static final String CELONIS_MOVING_TRIMMED_MEAN = "celonis_moving_trimmed_mean";
@@ -681,6 +682,7 @@ public class FunctionSet {
                     .add(FunctionSet.CELONIS_LEAST)
                     .add(FunctionSet.CELONIS_NULL_TO_EMPTY)
                     .add(FunctionSet.CELONIS_XX_HASH3_128)
+                    .add(FunctionSet.CELONIS_IN_JSON)
                     .build();
 
     public static final Set<String> alwaysReturnNonNullableFunctions =

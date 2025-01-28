@@ -85,6 +85,7 @@ ${license}
 #include "exprs/celonis/conformance.h"
 #include "exprs/celonis/greatest_least.h"
 #include "exprs/celonis/in.h"
+#include "exprs/celonis/in_json.h"
 #include "exprs/celonis/index_activity.h"
 #include "exprs/celonis/kmeans.h"
 #include "exprs/celonis/like.h"

@@ -147,6 +147,7 @@ set(CELONIS_FILES
   celonis/encode_variant.cpp
   celonis/greatest_least.cpp
   celonis/in.cpp
+  celonis/in_json.cpp
   celonis/index_activity.cpp
   celonis/kmeans.cpp
   celonis/like.cpp

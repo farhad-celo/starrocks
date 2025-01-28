@@ -184,6 +184,7 @@ set(EXEC_FILES
         ./exprs/celonis/in_calendar_test.cpp
         ./exprs/celonis/in_test.cpp
         ./exprs/celonis/in_like_test.cpp
+        ./exprs/celonis/in_json_test.cpp
         ./exprs/celonis/index_activity_test.cpp
         ./exprs/celonis/kmeans_test.cpp
         ./exprs/celonis/like_test.cpp

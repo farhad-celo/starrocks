@@ -1465,6 +1465,11 @@ celostar_functions = [
     [1001200, 'celonis_transits_interleaved', True, False, 'ANY_STRUCT', ['ANY_STRUCT', 'ARRAY_DATETIME', 'ANY_ARRAY', 'ANY_STRUCT', 'ARRAY_DATETIME', 'ANY_ARRAY', 'BOOLEAN'], 'CelonisTransitsInterleaved::transits_interleaved'],
     [1001300, 'celonis_transits_match', True, False, 'ANY_STRUCT', ['ANY_STRUCT', 'ANY_ARRAY', 'ANY_STRUCT', 'ANY_ARRAY', 'ANY_ARRAY', 'ANY_ARRAY'], 'CelonisTransitsMatch::transits_match', 'CelonisTransitsMatch::prepare', 'CelonisTransitsMatch::close'],
 
+    [1001401, 'celonis_in_json', False, False, 'BOOLEAN', ['INT', 'VARCHAR'], 'CelonisInJson<TYPE_INT>::in_json', 'CelonisInJson<TYPE_INT>::prepare', 'CelonisInJson<TYPE_INT>::close'],
+    [1001402, 'celonis_in_json', False, False, 'BOOLEAN', ['BIGINT', 'VARCHAR'], 'CelonisInJson<TYPE_BIGINT>::in_json', 'CelonisInJson<TYPE_BIGINT>::prepare', 'CelonisInJson<TYPE_BIGINT>::close'],
+    [1001403, 'celonis_in_json', False, False, 'BOOLEAN', ['DOUBLE', 'VARCHAR'], 'CelonisInJson<TYPE_DOUBLE>::in_json', 'CelonisInJson<TYPE_DOUBLE>::prepare', 'CelonisInJson<TYPE_DOUBLE>::close'],
+    [1001404, 'celonis_in_json', False, False, 'BOOLEAN', ['VARCHAR', 'VARCHAR'], 'CelonisInJson<TYPE_VARCHAR>::in_json', 'CelonisInJson<TYPE_VARCHAR>::prepare', 'CelonisInJson<TYPE_VARCHAR>::close'],
+
     # Array functions
     [2000100, 'celonis_array_is_sorted',     True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
     [2000110, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
