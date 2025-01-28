@@ -171,9 +171,16 @@ class CelonisMergeSortedArrays {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
         DCHECK(columns.size() == 4 || columns.size() == 5 || columns.size() == 6);
-
+        if (columns[0]->only_null()) {
+            return Status::InvalidArgument("input_array column should not be NULL literal.");
+        }
+        if (columns[1]->only_null()) {
+            return Status::InvalidArgument("timestamp_array column should not be NULL literal.");
+        }
+        if (columns[2]->only_null()) {
+            return Status::InvalidArgument("size_array column should not be NULL literal.");
+        }
         size_t chunk_size = columns[0]->size();
-
         ColumnPtr timestamp_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[1]);
         if (timestamp_column->has_null()) {
             return Status::InvalidArgument("timestamp_array should not be NULL.");

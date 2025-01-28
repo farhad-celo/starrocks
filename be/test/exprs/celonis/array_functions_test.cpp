@@ -962,6 +962,64 @@ TEST_F(CelonisArrayFunctionsTest, array_lead_null_offset) {
     EXPECT_EQ(result.status().message(), "offset column must not contain null.");
 }
 
+TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_literal_input) {
+    // input_array column is NULL literal
+    {
+        auto input_array = ColumnHelper::create_const_null_column(1);
+        auto timestamp_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)), false);
+        timestamp_array->append_datum(DatumArray{});
+        auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+        size_array->append_datum(DatumArray{});
+
+        auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                          false);
+        priority_array->append_datum(DatumArray{});
+
+        const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
+                nullptr, {input_array, timestamp_array, size_array, priority_array});
+        EXPECT_EQ(rs.status().message(), "input_array column should not be NULL literal.");
+    }
+    // timestamp_array column is NULL literal
+    {
+        auto input_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), false);
+        input_array->append_datum(DatumArray{});
+        auto timestamp_array = ColumnHelper::create_const_null_column(1);
+        auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+        size_array->append_datum(DatumArray{});
+
+        auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                          false);
+        priority_array->append_datum(DatumArray{});
+
+        const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
+                nullptr, {input_array, timestamp_array, size_array, priority_array});
+        EXPECT_EQ(rs.status().message(), "timestamp_array column should not be NULL literal.");
+    }
+    // size_array column is NULL literal
+    {
+        auto input_array =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), false);
+        input_array->append_datum(DatumArray{});
+        auto timestamp_array = ColumnHelper::create_column(
+                TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)),
+                false);
+        timestamp_array->append_datum(DatumArray{});
+        auto size_array = ColumnHelper::create_const_null_column(1);
+
+        auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                          false);
+        priority_array->append_datum(DatumArray{});
+
+        const auto rs = CelonisArrayFunctions::merge_sorted_arrays(
+                nullptr, {input_array, timestamp_array, size_array, priority_array});
+        EXPECT_EQ(rs.status().message(), "size_array column should not be NULL literal.");
+    }
+}
+
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_int) {
     {
         auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
