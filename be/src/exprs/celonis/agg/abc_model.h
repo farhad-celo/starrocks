@@ -8,6 +8,7 @@
 #include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "runtime/mem_pool.h"
+#include "runtime/runtime_state.h"
 #include <set>
 #include <boost/algorithm/string/join.hpp>
 
@@ -202,6 +203,10 @@ public:
 
     void finalize_to_column(FunctionContext* ctx __attribute__((unused)), ConstAggDataPtr __restrict state,
                             Column* to) const override {
+        if (UNLIKELY(ctx->state()->cancelled_ref())) {
+            ctx->set_error("celonis_build_abc_model detects cancelled.", false);
+            return;
+        }
         auto& state_impl = this->data(state);
         if (!state_impl.initialized) {
             to->append_default();

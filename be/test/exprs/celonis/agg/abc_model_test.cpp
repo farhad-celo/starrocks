@@ -7,6 +7,7 @@
 #include "exprs/celonis/agg/abc_model.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
+#include "runtime/runtime_state.h"
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -64,8 +65,10 @@ protected:
         };
         auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
         mem_pools_.emplace_back(std::make_unique<MemPool>());
+        runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(nullptr, mem_pools_.back().get(), return_type, std::move(arg_types)));
+                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(), return_type,
+                                                std::move(arg_types)));
     }
 
     std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
@@ -198,7 +201,35 @@ protected:
     }
 
     std::vector<std::unique_ptr<MemPool>> mem_pools_;
+    std::vector<std::unique_ptr<RuntimeState>> runtime_states_;
 };
+
+TEST_F(CelonisBuildAbcModelTest, cancellation_work) {
+    auto logical_type = TYPE_BIGINT;
+    auto input1 = DatumArray{50L, 30L};
+    auto input2 = DatumArray{8L, 7L, 5L};
+    auto pk_hash1 = DatumArray{1L, 2L};
+    auto pk_hash2 = DatumArray{3L, 4L, 5L};
+    double sample_ratio = 1.0;
+    double ratio_a = 0.8;
+    double ratio_b = 0.15;
+
+    auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, pk_hash1, sample_ratio, ratio_a, ratio_b);
+    auto [local_ctx2, state2, func2] = RunUpdate(logical_type, input2, pk_hash2, sample_ratio, ratio_a, ratio_b);
+
+    // Serialize state2
+    ColumnPtr serialize_col = BinaryColumn::create();
+    func->serialize_to_column(local_ctx2.get(), state2->state(), serialize_col.get());
+
+    // Merge state2 into state1
+    func->merge(local_ctx1.get(), serialize_col.get(), state1->state(), 0);
+
+    // Get the result
+    auto result = ColumnHelper::create_column(get_return_type(), true);
+    local_ctx1->state()->set_is_cancelled(true);
+    func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
+    ASSERT_TRUE(local_ctx1->has_error());
+}
 
 TEST_F(CelonisBuildAbcModelTest, bigint_unique_values_merge) {
     auto logical_type = TYPE_BIGINT;
