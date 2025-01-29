@@ -56,7 +56,7 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
     using TimestampColumn = RunTimeColumnType<TYPE_BIGINT>;
 
     if (columns[0]->only_null() || columns[1]->only_null()) {
-        return columns[0];
+        return ColumnHelper::create_const_null_column(columns[0]->size());
     }
     if (UNLIKELY(columns[0]->size() != columns[1]->size())) {
         std::stringstream error;
