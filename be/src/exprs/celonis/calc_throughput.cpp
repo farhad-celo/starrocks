@@ -55,9 +55,8 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
     using ActivityColumn = RunTimeColumnType<ActivityLT>;
     using TimestampColumn = RunTimeColumnType<TYPE_BIGINT>;
 
-    if (columns[0]->only_null() || columns[1]->only_null()) {
-        return ColumnHelper::create_const_null_column(columns[0]->size());
-    }
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
+    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
     if (UNLIKELY(columns[0]->size() != columns[1]->size())) {
         std::stringstream error;
         error << "unmatched activity offsets (" << columns[0]->size() << ") and timestamp offsets ("
