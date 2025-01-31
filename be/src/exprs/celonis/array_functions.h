@@ -6,8 +6,6 @@ namespace starrocks {
 
 class CelonisArrayFunctions {
 public:
-    DEFINE_VECTORIZED_FN(array_is_sorted);
-
     /**
     * @param: [input_array, timestamp_array, size_array, priority_array, secondary_order_array, limit]
     * @paramType: [ANY_ARRAY, ARRAY_TIMESTAMP, ARRAY_INT, ARRAY_INT, ARRAY_INT | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_STRING, BIGINT]

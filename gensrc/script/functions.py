@@ -1471,7 +1471,7 @@ celostar_functions = [
     [1001404, 'celonis_in_json', False, False, 'BOOLEAN', ['VARCHAR', 'VARCHAR'], 'CelonisInJson<TYPE_VARCHAR>::in_json', 'CelonisInJson<TYPE_VARCHAR>::prepare', 'CelonisInJson<TYPE_VARCHAR>::close'],
 
     # Array functions
-    [2000100, 'celonis_array_is_sorted',     True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
+    #2000100 removed, see https://github.com/celonis/celostar-starrocks/pull/1478
     [2000110, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
     [2000111, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
     [2000112, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR'], 'CelonisArrayFunctions::merge_sorted_arrays'],
