@@ -52,7 +52,7 @@ size_t CelonisVariantStatsAggregateV2State::compute_happy_variant(const std::vec
         if (lo == hi) {
             continue;
         }
-        if (activities_[lo] == top_start && activities_[hi - 1] == top_end) {
+        if (get_activity(lo) == top_start && get_activity(hi - 1) == top_end) {
             happy = i;
             break;
         }
@@ -100,7 +100,7 @@ void CelonisVariantStatsAggregateV2State::compute_top_variants(std::vector<std::
         auto [lo, hi] = get_offsets(sorted_indexes[i]);
         std::vector<int8_t> a_seen(activity_array_.size(), 0);
         for (auto j = lo; j < hi; ++j) {
-            auto idx = activities_[j];
+            auto idx = get_activity(j);
             if (a_done[idx] == 0 && a_seen[idx] == 0) {
                 a_seen[idx] = 1;
                 activity_top_variants[idx].push_back(sorted_indexes[i]);
@@ -210,7 +210,7 @@ CelonisVariantStatsAggregateV2State::json_string(const std::vector<std::vector<s
                 rapidjson::Value act(rapidjson::kArrayType);
                 auto [lo, hi] = get_offsets(activity_top_variants[i][j]);
                 for (size_t idx = lo; idx < hi; idx++) {
-                    act.PushBack(activities_[idx], allocator);
+                    act.PushBack(get_activity(idx), allocator);
                 }
 
                 var_obj.AddMember("variant", act, allocator);
@@ -229,7 +229,7 @@ CelonisVariantStatsAggregateV2State::json_string(const std::vector<std::vector<s
     rapidjson::Value happy_var(rapidjson::kArrayType);
     auto [lo, hi] = get_offsets(happy);
     for (size_t i = lo; i < hi; i++) {
-        happy_var.PushBack(activities_[i], allocator);
+        happy_var.PushBack(get_activity(i), allocator);
     }
     happy_obj.AddMember("variant", happy_var, allocator);
     happy_obj.AddMember("count", happy_count, allocator);
@@ -327,7 +327,7 @@ CelonisVariantStatsAggregateV2State::base64_encoded_string(
                 count_pair.set_count(count);
                 auto [lo, hi] = get_offsets(activity_top_variants[i][j]);
                 for (auto idx = lo; idx < hi; ++idx) {
-                    count_pair.add_variant(activities_[idx]);
+                    count_pair.add_variant(get_activity(idx));
                 }
                 *entry.add_top() = count_pair;
             }
@@ -340,7 +340,7 @@ CelonisVariantStatsAggregateV2State::base64_encoded_string(
     count_pair.set_count(happy_count);
     auto [lo, hi] = get_offsets(happy);
     for (auto i = lo; i < hi; ++i) {
-        count_pair.add_variant(activities_[i]);
+        count_pair.add_variant(get_activity(i));
     }
     *statistics_proto.mutable_happy() = count_pair;
 
@@ -421,7 +421,7 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
     LOG(INFO) << log_prefix(query_id) << ": merging_bytes = " << state_impl.merging_bytes() << " bytes." << std::endl;
     LOG(INFO) << log_prefix(query_id) << ": number of states merged = " << state_impl.merging_states() << std::endl;
 
-    if (state_impl.activity_array().size() > std::numeric_limits<int16_t>::max()) {
+    if (state_impl.activity_array().size() > static_cast<size_t>(std::numeric_limits<int16_t>::max())) {
         ctx->set_error(std::string(
                                "CELONIS_VARIANT_STATS_V2: the number of unique activities is " +
                                std::to_string(state_impl.activity_array().size()) +

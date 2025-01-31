@@ -62,6 +62,7 @@ struct CelonisVariantStatsAggregateV2State {
                     activity_array_.push_back(activity);
                 }
             }
+            use_16bit_activity_ = activity_array_.size() <= static_cast<size_t>(std::numeric_limits<int16_t>::max());
             activity_stats_.clear();
             activity_stats_.resize(activity_array_.size());
         }
@@ -110,7 +111,12 @@ struct CelonisVariantStatsAggregateV2State {
             lengths_.push_back(variant.size());
             offsets_.push_back(offsets_.back() + variant.size());
             counts_.push_back(count);
-            activities_.insert(activities_.end(), variant.begin(), variant.end());
+            if (use_16bit_activity_) {
+                std::transform(variant.begin(), variant.end(), std::back_inserter(activities_16bit_),
+                               [](int32_t val) { return static_cast<int16_t>(val); });
+            } else {
+                activities_.insert(activities_.end(), variant.begin(), variant.end());
+            }
             std::vector<bool> activity_updated_count_cases(activity_array_.size(), false);
             phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> edge_updated_count_cases;
             // update activity_stats_ and edge_stats_
@@ -165,8 +171,8 @@ struct CelonisVariantStatsAggregateV2State {
         const size_t num_variants = lengths_.size();
         result += num_variants * sizeof(size_t);  // length1, length2, ...
         result += num_variants * sizeof(int64_t); // count1, count2, ...
-        const size_t total = activities_.size();
-        result += total * sizeof(int32_t);        // activities
+        const size_t total = num_activities();
+        result += total * activity_serialized_size();        // activities
         return result;
     }
 
@@ -241,7 +247,7 @@ struct CelonisVariantStatsAggregateV2State {
         dst += sizeof(uint8_t);
         const size_t num_variants = lengths_.size();
         DCHECK_EQ(num_variants, counts_.size());
-        const size_t total = activities_.size();
+        const size_t total = num_activities();
         memcpy(dst, &num_variants, sizeof(size_t));
         dst += sizeof(size_t);
         memcpy(dst, &total, sizeof(size_t));
@@ -250,8 +256,12 @@ struct CelonisVariantStatsAggregateV2State {
         dst += sizeof(size_t) * lengths_.size();
         memcpy(dst, counts_.data(), sizeof(int64_t) * counts_.size());
         dst += sizeof(int64_t) * counts_.size();
-        memcpy(dst, activities_.data(), sizeof(int32_t) * activities_.size());
-        dst += sizeof(int32_t) * activities_.size();
+        if (use_16bit_activity_) {
+            memcpy(dst, activities_16bit_.data(), sizeof(int16_t) * activities_16bit_.size());
+        } else {
+            memcpy(dst, activities_.data(), sizeof(int32_t) * activities_.size());
+        }
+        dst += activity_serialized_size() * num_activities();
     }
 
     // Deserializes a CelonisVariantStatsV2AggregateState object and merges it with the current state.
@@ -279,6 +289,7 @@ struct CelonisVariantStatsAggregateV2State {
                 src += string_value.size() + 1;
                 activity_array_.push_back(string_value);
             }
+            use_16bit_activity_ = activity_array_.size() <= static_cast<size_t>(std::numeric_limits<int16_t>::max());
             activity_stats_.clear();
             activity_stats_.resize(activity_array_length);
         }
@@ -355,11 +366,16 @@ struct CelonisVariantStatsAggregateV2State {
         memcpy(counts_.data() + old_counts_size, src, num_variants * sizeof(int64_t));
         src += num_variants * sizeof(int64_t);
 
-        auto old_activities_size = activities_.size();
-        activities_.resize(old_activities_size + total_activities);
-        memcpy(activities_.data() + old_activities_size, src, total_activities * sizeof(int32_t));
-        src += total_activities * sizeof(int32_t);
-
+        auto old_activities_size = num_activities();
+        if (use_16bit_activity_) {
+            activities_16bit_.resize(old_activities_size + total_activities);
+            memcpy(activities_16bit_.data() + old_activities_size, src, total_activities * sizeof(int16_t));
+            src += total_activities * sizeof(int16_t);
+        } else {
+            activities_.resize(old_activities_size + total_activities);
+            memcpy(activities_.data() + old_activities_size, src, total_activities * sizeof(int32_t));
+            src += total_activities * sizeof(int32_t);
+        }
         DCHECK_EQ(src, end);
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
@@ -391,7 +407,9 @@ struct CelonisVariantStatsAggregateV2State {
 
     const std::vector<int64_t>& counts() const { return counts_; }
 
-    const std::vector<int32_t>& activities() const { return activities_; }
+    int32_t get_activity(size_t index) const {
+        return use_16bit_activity_ ? static_cast<int32_t>(activities_16bit_.at(index)) : activities_.at(index);
+    }
 
     const std::vector<std::string>& activity_array() const { return activity_array_; }
 
@@ -423,6 +441,14 @@ struct CelonisVariantStatsAggregateV2State {
 
 private:
 
+    size_t activity_serialized_size() const {
+        return use_16bit_activity_ ? sizeof(int16_t) : sizeof(int32_t);
+    }
+
+    size_t num_activities() const {
+        return use_16bit_activity_ ? activities_16bit_.size() : activities_.size();
+    }
+
     size_t activity_array_serialized_size() const {
         size_t result = 0;
         for (const auto& activity: activity_array_) {
@@ -441,10 +467,12 @@ private:
     std::vector<size_t> offsets_ = {0};
     // count of each variant
     std::vector<int64_t> counts_;
-    // TODO(y.zhang): Change the type from int32_t to a smaller type if the number of distinct activities is small.
-    // The activities of i-th variant are in [offsets[i], offsets[i + 1]) of activities_.
+    // when use_16bit_activity_ is true, activities_16bit_ is populated, otherwise activities_ is populated.
+    // The activities of i-th variant are in [offsets[i], offsets[i + 1]) of activities_ or activities_16bit_.
     std::vector<int32_t> activities_;
+    std::vector<int16_t> activities_16bit_;
     std::vector<std::string> activity_array_;
+    bool use_16bit_activity_ = false;
     // Since all the variants are assumed to be unique, we can compute activity and edge stats on leaves.
     std::vector<ActivityStats> activity_stats_;
     EdgeHashMap edge_stats_;

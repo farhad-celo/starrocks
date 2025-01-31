@@ -224,6 +224,26 @@ protected:
 };
 
 // TODO(y.zhang): Add more unit tests.
+TEST_F(CelonisVariantStatsV2Test, use_32bits_activity_work) {
+    std::vector<std::optional<DatumArray>> variants1 = {DatumArray{0, 1, 2, 3}};
+    std::vector<int64_t> counts1 = {2};
+    std::vector<std::optional<DatumArray>> variants2 = {DatumArray{2, 1, 0}, DatumArray{1, 2}};
+    std::vector<int64_t> counts2 = {1, 2};
+    DatumArray activity_array = {};
+    std::vector<std::string> activities;
+    size_t n = static_cast<size_t>(std::numeric_limits<int16_t>::max()) + 10;
+    activities.resize(n);
+    for (size_t i = 0; i < n; ++i) {
+        activities.push_back(std::to_string(i));
+    }
+    for (const auto& activity: activities) {
+        activity_array.emplace_back(Slice(activity));
+    }
+    // Currently finalize_to_column directly returns if activity_array().size() > std::numeric_limits<int16_t>::max().
+    RunMerge(variants1, counts1, variants2, counts2, activity_array, 1000, true, false, {""""""});
+    RunMergeNew(variants1, counts1, variants2, counts2, activity_array, 1000, true, false, {""""""});
+}
+
 TEST_F(CelonisVariantStatsV2Test, normal_case) {
     std::vector<std::optional<DatumArray>> variants1 = {DatumArray{0, 1, 2, 3}};
     std::vector<int64_t> counts1 = {2};
