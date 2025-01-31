@@ -222,6 +222,45 @@ TEST_F(CelonisPeekMergedSortedArraysTest, varchar_input_and_varchar_secondary_or
     EXPECT_TRUE(result->get(3).is_null());
 }
 
+TEST_F(CelonisPeekMergedSortedArraysTest, null_literal_input_array_column) {
+    const LogicalType InputLT = TYPE_INT;
+    const LogicalType SecondaryLT = TYPE_BIGINT;
+    Prepare<InputLT, SecondaryLT>();
+    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1},
+           DatumArray{});
+    // Set input array column to NULL literal.
+    input_column_ = ColumnHelper::create_const_null_column(1);
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.status().is_invalid_argument());
+    EXPECT_EQ(rs.status().message(), "input_array column should not be NULL literal.");
+}
+
+TEST_F(CelonisPeekMergedSortedArraysTest, null_literal_timestamp_array_column) {
+    const LogicalType InputLT = TYPE_INT;
+    const LogicalType SecondaryLT = TYPE_BIGINT;
+    Prepare<InputLT, SecondaryLT>();
+    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1},
+           DatumArray{});
+    // Set timestamp array column to NULL literal.
+    timestamp_column_ = ColumnHelper::create_const_null_column(1);
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.status().is_invalid_argument());
+    EXPECT_EQ(rs.status().message(), "timestamp_array column should not be NULL literal.");
+}
+
+TEST_F(CelonisPeekMergedSortedArraysTest, null_literal_size_array_column) {
+    const LogicalType InputLT = TYPE_INT;
+    const LogicalType SecondaryLT = TYPE_BIGINT;
+    Prepare<InputLT, SecondaryLT>();
+    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1},
+           DatumArray{});
+    // Set size array column to NULL literal.
+    size_column_ = ColumnHelper::create_const_null_column(1);
+    const auto rs = Run<InputLT>();
+    ASSERT_TRUE(rs.status().is_invalid_argument());
+    EXPECT_EQ(rs.status().message(), "size_array column should not be NULL literal.");
+}
+
 TEST_F(CelonisPeekMergedSortedArraysTest, empty_input_arrays) {
     const LogicalType InputLT = TYPE_INT;
     const LogicalType SecondaryLT = TYPE_BIGINT;

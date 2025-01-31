@@ -10,8 +10,17 @@ namespace starrocks {
 
 template<LogicalType LT>
 StatusOr<ColumnPtr>
-CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(starrocks::FunctionContext* context,
+CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]starrocks::FunctionContext* context,
                                                              const starrocks::Columns& columns) {
+    if (columns[0]->only_null()) {
+        return Status::InvalidArgument("input_array column should not be NULL literal.");
+    }
+    if (columns[1]->only_null()) {
+        return Status::InvalidArgument("timestamp_array column should not be NULL literal.");
+    }
+    if (columns[2]->only_null()) {
+        return Status::InvalidArgument("size_array column should not be NULL literal.");
+    }
     DCHECK(columns.size() == 4 || columns.size() == 5);
     size_t chunk_size = columns[0]->size();
     ColumnPtr timestamp_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[1]);
