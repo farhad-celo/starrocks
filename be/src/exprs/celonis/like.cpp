@@ -72,7 +72,7 @@ Status CelonisLike::like_close(FunctionContext* context, FunctionContext::Functi
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         delete like_state_fragment_local;
     } else if (like_state_fragment_local->function == LikePredicate::like) {
-        LikePredicate::like_close(context, scope);
+        return LikePredicate::like_close(context, scope);
     }
     return Status::OK();
 }
