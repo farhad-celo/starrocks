@@ -122,10 +122,10 @@ private:
         return ArrayColumn::create(data_col, offsets);
     }
 
-    std::string inductive_miner(const VariantRows& variant_rows) {
+    std::string inductive_miner(const VariantRows& variant_rows, int64_t weight = 1L) {
         const AggregateFunction* func = get_aggregate_function("celonis_inductive_miner", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto variant_column = build_variant_column(variant_rows);
-        auto weight_column = ColumnHelper::create_const_column<TYPE_BIGINT>(1L, variant_rows.size());
+        auto weight_column = ColumnHelper::create_const_column<TYPE_BIGINT>(weight, variant_rows.size());
         auto threshold_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(0.0, variant_rows.size());
 
         FunctionUtils utils;
@@ -581,6 +581,22 @@ TEST_F(CelonisMoBpmnGraphTest, tiny_mo_scenario_repeated_traces_with_inductive_m
 
     e.evaluate<std::string>("bpmn_activities", "ACTIVITY_NAME", {"A", "B", "C", "D"});
     e.evaluate<int>("bpmn_activities", "NODE_ID", {4, 5, 6, 7});
+}
+
+TEST_F(CelonisMoBpmnGraphTest, tiny_mo_scenario_with_inductive_miner_high_variant_count) {
+    VariantRows variants = {{"A", "B"}, {"C"}, {"D"}};
+
+    auto result = run({Slice(inductive_miner(variants, 10'000'000'000L))});
+    ASSERT_TRUE(result.ok());
+
+    TestJsonEvaluator e(result.value());
+    e.evaluate<int>("bpmn_edges", "SOURCE_ID", {0, 2, 4, 5, 2, 6, 2, 7, 3});
+    e.evaluate<int>("bpmn_edges", "TARGET_ID", {2, 4, 5, 3, 6, 3, 7, 3, 1});
+    e.evaluate<int>("bpmn_nodes", "NODE_ID", {0, 1, 2, 3, 4, 5, 6, 7});
+    int64_t oc1 = 10'000'000'000L;
+    int64_t oc3 = 30'000'000'000L;
+    e.evaluate<int64_t>("bpmn_edges", "OBJECT_COUNT", {oc3, oc1, oc1, oc1, oc1, oc1, oc1, oc1, oc3});
+    e.evaluate<std::string>("bpmn_activities", "ACTIVITY_NAME", {"A", "B", "C", "D"});
 }
 
 TEST_F(CelonisMoBpmnGraphTest, high_object_count) {

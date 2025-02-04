@@ -42,7 +42,7 @@ private:
 class CelonisVariantAggTest : public testing::Test {
 public:
     using Rows = std::vector<std::vector<std::string>>;
-    using Weights = std::vector<int>;
+    using Weights = std::vector<size_t>;
     using DistinctVariant = std::vector<Slice>;
     using DistinctVariantMap = std::map<DistinctVariant, int32_t>;
 
@@ -118,7 +118,7 @@ public:
         return ArrayColumn::create(data_col, offsets);
     }
 
-    Column::Ptr build_weight_column(const std::vector<int>& weight) {
+    Column::Ptr build_weight_column(const std::vector<size_t>& weight) {
         ColumnBuilder<TYPE_BIGINT> builder(config::vector_chunk_size);
 
         for (int i = 0; i < weight.size(); i++) {
@@ -291,6 +291,43 @@ TEST_F(CelonisVariantAggTest, test_merge_weights) {
                                    {{"a3", "a4"}, 25},
                                    {{"a1", "a4", "a0"}, 20},
                                    {{"a1", "a2", "a2", "a2", "a5"}, 1}};
+    match(*state1, expected);
+}
+
+TEST_F(CelonisVariantAggTest, test_merge_very_large_weights) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col1 = build_variant_column({{"a1", "a2"},
+                                      {"a1", "a2", "a3"},
+                                      {"a3", "a4"}});
+    auto weights1 = build_weight_column({10'000'000'000L, 100'000'000'000L, 20'000'000'000L});
+    std::vector<const Column*> raw_columns{col1.get(), weights1.get()};
+    auto state1 = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col1->size(), raw_columns.data(), state1->state());
+
+    auto part1 = BinaryColumn::create();
+    func->serialize_to_column(ctx, state1->state(), part1.get());
+
+    auto col2 = build_variant_column({{"a1", "a4", "a0"},
+                                      {"a1", "a2", "a3"},
+                                      {"a3", "a4"},
+                                      {"a1", "a2", "a2", "a2", "a5"}});
+    auto weights2 = build_weight_column({20'000'000'000L, 50'000'000'000L, 50L, 1L});
+
+    std::vector<const Column*> raw_columns2{col2.get(), weights2.get()};
+    auto state2 = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col2->size(), raw_columns2.data(), state2->state());
+    auto part2 = BinaryColumn::create();
+    func->serialize_to_column(ctx, state2->state(), part2.get());
+
+    // Merge part1 and part2
+    func->merge(ctx, part2.get(), state1->state(), 0);
+
+    DistinctVariantMap expected = {{{"a1", "a2"}, 10'000'000'000L},
+                                   {{"a1", "a2", "a3"}, 150'000'000'000L},
+                                   {{"a3", "a4"}, 20'000'000'050L},
+                                   {{"a1", "a4", "a0"}, 20'000'000'000L},
+                                   {{"a1", "a2", "a2", "a2", "a5"}, 1L}};
     match(*state1, expected);
 }
 

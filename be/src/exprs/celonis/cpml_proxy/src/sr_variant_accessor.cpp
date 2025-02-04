@@ -31,7 +31,7 @@ sr_variant_accessor::value_type sr_variant_accessor::operator[](variant_id_t id)
 }
 
 std::size_t sr_variant_accessor::count(variant_id_t id) const {
-    return as_unsigned(sr_variants_[as_unsigned(id.get())].count);
+    return sr_variants_[as_unsigned(id.get())].count;
 }
 
 } // namespace cpml_proxy
