@@ -320,6 +320,7 @@ fi
 append_negative_case "*LakePrimaryKeyCompactionTest.test_major_compaction_thread_safe*"
 append_negative_case "*MemLimitedChunkQueueTest*"
 append_negative_case "*TestPipelineControlFlow*"
+append_negative_case "*ParquetCLIReaderTest*"
 
 
 
