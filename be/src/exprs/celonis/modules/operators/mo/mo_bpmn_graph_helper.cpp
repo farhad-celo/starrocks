@@ -102,13 +102,13 @@ build(const std::string& process_tree_json, int id, const common::execution_cont
         auto process_tree_type = vertex_values[i]["process_tree_type"].GetInt();
         switch (process_tree_type) {
             case 0: {
-                size_t object_count = vertex_values[i]["object_count"].GetInt();
+                size_t object_count = vertex_values[i]["object_count"].GetInt64();
                 nodes.emplace_back(process_tree{process_tree::tau{object_count}});
                 break;
             }
             case 1: {
                 row_id activity_id = col_ptrs_ac[activity_indexes[i]];
-                size_t object_count = vertex_values[i]["object_count"].GetInt();
+                size_t object_count = vertex_values[i]["object_count"].GetInt64();
                 nodes.emplace_back(process_tree{process_tree::activity{activity_id, object_count}});
                 break;
             }

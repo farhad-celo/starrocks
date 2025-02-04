@@ -59,10 +59,13 @@ public:
                     << "table: " << table << ", column: " << column << ", row: " << i;
             if constexpr (std::is_same_v<T, int>) {
                 EXPECT_EQ(table_values[i][column].GetInt(), values[i])
-                        << "table: " << table << ", column: " << column << ", row: " << i;
+                                    << "table: " << table << ", column: " << column << ", row: " << i;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                EXPECT_EQ(table_values[i][column].GetInt64(), values[i])
+                                    << "table: " << table << ", column: " << column << ", row: " << i;
             } else if constexpr (std::is_same_v<T, std::string>) {
                 EXPECT_EQ(table_values[i][column].GetString(), values[i])
-                        << "table: " << table << ", column: " << column << ", row: " << i;
+                                    << "table: " << table << ", column: " << column << ", row: " << i;
             }
         }
     }
@@ -580,6 +583,340 @@ TEST_F(CelonisMoBpmnGraphTest, tiny_mo_scenario_repeated_traces_with_inductive_m
     e.evaluate<int>("bpmn_activities", "NODE_ID", {4, 5, 6, 7});
 }
 
+TEST_F(CelonisMoBpmnGraphTest, high_object_count) {
+    Slice input1(
+            R"json({
+            "vertex_properties": [
+                {
+                    "process_tree_type": 3,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "A",
+                    "object_count": 200000000000
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "B",
+                    "object_count": 200000000000
+                },
+                {
+                    "process_tree_type": 2,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "C",
+                    "object_count": 100000000000
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "D",
+                    "object_count": 100000000000
+                }
+            ],
+            "edge_properties": [
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 1
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 2
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 3
+                },
+                {
+                    "edge_source_id": 3,
+                    "edge_target_id": 4
+                },
+                {
+                    "edge_source_id": 3,
+                    "edge_target_id": 5
+                }
+            ],
+            "statistics": [
+                {
+                    "key":"m2a_precision_times_1E4",
+                    "value":"0"
+                },
+                {
+                    "key":"flower_fallback_count",
+                    "value":"0"
+                },
+                {
+                    "key":"has_seq_xor",
+                    "value":"0"
+                },
+                {
+                    "key":"slack_tau_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_once_per_trace_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_subfinds_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_find_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_par_count",
+                    "value":"0"
+                },
+                {
+                    "key":"tree_size",
+                    "value":"0"
+                },
+                {
+                    "key":"strict_tau_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"empty_traces_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"par_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_xor_count",
+                    "value":"0"
+                },
+                {
+                    "key":"tau_transitions_count",
+                    "value":"0"
+                },
+                {
+                    "key":"empty_log_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_single_activity_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"single_activity_base_case_count",
+                    "value":"4"
+                },
+                {
+                    "key":"xor_count",
+                    "value":"1"
+                },
+                {
+                    "key":"noisy_seq_count",
+                    "value":"0"
+                },
+                {
+                    "key":"seq_count",
+                    "value":"1"
+                },
+                {
+                    "key":"loop_count",
+                    "value":"0"
+                }
+            ]
+        })json");
+
+    Slice input2(
+            R"json({
+            "vertex_properties": [
+                {
+                    "process_tree_type": 3,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 2,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "B",
+                    "object_count": 2
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "C",
+                    "object_count": 2
+                },
+                {
+                    "process_tree_type": 0,
+                    "activity": null,
+                    "object_count": 1
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "E",
+                    "object_count": 1
+                }
+            ],
+            "edge_properties": [
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 1
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 2
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 3
+                },
+                {
+                    "edge_source_id": 1,
+                    "edge_target_id": 4
+                },
+                {
+                    "edge_source_id": 1,
+                    "edge_target_id": 5
+                }
+            ],
+            "statistics": [
+                {
+                    "key":"m2a_precision_times_1E4",
+                    "value":"0"
+                },
+                {
+                    "key":"flower_fallback_count",
+                    "value":"0"
+                },
+                {
+                    "key":"has_seq_xor",
+                    "value":"0"
+                },
+                {
+                    "key":"slack_tau_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_once_per_trace_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_subfinds_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_find_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_par_count",
+                    "value":"0"
+                },
+                {
+                    "key":"tree_size",
+                    "value":"0"
+                },
+                {
+                    "key":"strict_tau_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"empty_traces_base_case_count",
+                    "value":"1"
+                },
+                {
+                    "key":"par_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_xor_count",
+                    "value":"0"
+                },
+                {
+                    "key":"tau_transitions_count",
+                    "value":"0"
+                },
+                {
+                    "key":"empty_log_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_single_activity_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"single_activity_base_case_count",
+                    "value":"3"
+                },
+                {
+                    "key":"xor_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_seq_count",
+                    "value":"0"
+                },
+                {
+                    "key":"seq_count",
+                    "value":"1"
+                },
+                {
+                    "key":"loop_count",
+                    "value":"0"
+                }
+            ]
+        })json");
+
+    auto result = run({input1, input2});
+    ASSERT_TRUE(result.ok());
+
+    TestJsonEvaluator e(result.value());
+
+    e.evaluate<int>("bpmn_edges", "SOURCE_ID", {0, 2, 3, 4, 6, 4, 7, 5, 8, 10, 10, 12, 11, 3, 6});
+    e.evaluate<int>("bpmn_edges", "TARGET_ID", {2, 3, 4, 6, 5, 7, 5, 1, 10, 11, 12, 11, 3, 6, 9});
+    e.evaluate<int>("bpmn_edges", "OBJECT_ID", {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1});
+    int64_t oc1 = 100000000000L;
+    int64_t oc2 = 200000000000L;
+    e.evaluate<int64_t>("bpmn_edges", "OBJECT_COUNT", {oc2, oc2, oc2, oc1, oc1, oc1, oc1, oc2, 2, 1, 1, 1, 2, 2, 2});
+
+    e.evaluate<int>("bpmn_nodes", "NODE_ID", {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
+    e.evaluate<int>("bpmn_nodes", "NODE_TYPE", {1, 2, 0, 0, 3, 3, 0, 0, 1, 2, 3, 3, 0});
+
+    e.evaluate<std::string>("bpmn_activities", "ACTIVITY_NAME", {"A", "B", "C", "D", "E"});
+    e.evaluate<int>("bpmn_activities", "NODE_ID", {2, 3, 6, 7, 12});
+
+    e.evaluate<int>("bpmn_model_descriptions", "OBJECT_ID", {0, 1});
+    e.evaluate<std::string>("bpmn_model_descriptions", "BPMN_MODEL_DESCRIPTION", {
+            "[[0 BPMN_START][1 BPMN_END][2 BPMN_TASK 'A'][3 BPMN_TASK 'B'][4 BPMN_EXCLUSIVE_CHOICE][5 "
+            "BPMN_EXCLUSIVE_CHOICE][6 BPMN_TASK 'C'][7 BPMN_TASK 'D']],[[0 2][2 3][3 4][4 6][4 7][5 1][6 5][7 5]]",
+            "[[3 BPMN_TASK 'B'][6 BPMN_TASK 'C'][8 BPMN_START][9 BPMN_END][10 BPMN_EXCLUSIVE_CHOICE][11 "
+            "BPMN_EXCLUSIVE_CHOICE][12 BPMN_TASK 'E']],[[3 6][6 9][8 10][10 11][10 12][11 3][12 11]]"});
+}
 TEST_F(CelonisMoBpmnGraphTest, invalid_json_spec) {
     Slice no_statistics(
             R"json({
