@@ -43,13 +43,17 @@ struct CelonisVariantStatsAggregateV2State {
             enable_proto_encoding_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(5));
         }
 
-        DCHECK(ctx->is_notnull_constant_column(2));
+        // DCHECK(ctx->is_notnull_constant_column(2));
+        // treat columns[2] as constant.
         if (!activity_array_initialized_) {
+            DCHECK(!columns[2]->empty());
+            if (columns[2]->is_null(0)) {
+              return;
+            }
             // initialize activity_array: ignore NULLs and dedup.
             activity_array_initialized_ = true;
             HashSet<std::string> seen;
             activity_array_.clear();
-            DCHECK(!columns[2]->empty());
             auto array = columns[2]->get(0).get_array();
             activity_array_.reserve(array.size());
             for (const auto& datum: array) {
