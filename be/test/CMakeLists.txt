@@ -171,6 +171,7 @@ set(EXEC_FILES
         ./exprs/celonis/array_count_distinct_test.cpp
         ./exprs/celonis/array_end_finder_test.cpp
         ./exprs/celonis/array_functions_test.cpp
+        ./exprs/celonis/array_trimmed_mean_test.cpp
         ./exprs/celonis/decode_string_test.cpp
         ./exprs/celonis/encode_string_test.cpp
         ./exprs/celonis/encode_variant_test.cpp

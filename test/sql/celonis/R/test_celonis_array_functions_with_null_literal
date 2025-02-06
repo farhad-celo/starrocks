@@ -55,3 +55,7 @@ SELECT CELONIS_APPLY_KMEANS_MODEL(IF(rand(), NULL, NULL), "1.0");
 -- result:
 None
 -- !result
+SELECT CELONIS_ARRAY_TRIMMED_MEAN(NULL, NULL, NULL);
+-- result:
+None
+-- !result

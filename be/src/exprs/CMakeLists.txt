@@ -139,6 +139,7 @@ set(CELONIS_FILES
   celonis/array_count_distinct.cpp
   celonis/array_end_finder.cpp
   celonis/array_functions.cpp
+  celonis/array_trimmed_mean.cpp
   celonis/calc_throughput.cpp
   celonis/calculate_range_end.cpp
   celonis/conformance.cpp
