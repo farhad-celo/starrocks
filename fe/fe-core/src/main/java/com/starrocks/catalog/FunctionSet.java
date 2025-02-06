@@ -540,6 +540,7 @@ public class FunctionSet {
     public static final String CELONIS_TRANSITS_MATCH = "celonis_transits_match";
     public static final String CELONIS_XX_HASH3_128 = "celonis_xx_hash3_128";
     public static final String CELONIS_XX_HASH3_128_V2 = "celonis_xx_hash3_128_v2";
+    public static final String CELONIS_XX_HASH3_128_V3 = "celonis_xx_hash3_128_v3";
     public static final String CELONIS_IN_JSON = "celonis_in_json";
 
     // Celonis window functions:
@@ -684,6 +685,7 @@ public class FunctionSet {
                     .add(FunctionSet.CELONIS_NULL_TO_EMPTY)
                     .add(FunctionSet.CELONIS_XX_HASH3_128)
                     .add(FunctionSet.CELONIS_XX_HASH3_128_V2)
+                    .add(FunctionSet.CELONIS_XX_HASH3_128_V3)
                     .add(FunctionSet.CELONIS_IN_JSON)
                     .build();
 

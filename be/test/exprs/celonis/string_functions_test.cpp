@@ -59,6 +59,243 @@ protected:
     }
 };
 
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_collision) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    Columns columns;
+    auto column1 = BinaryColumn::create();
+    column1->append("70B5E8DAF8BF1EEE91CC8D383DB5A16E");
+    column1->append("78AC441C9BB21EDEB483CA3CB88FDC57");
+
+    auto column2 = BinaryColumn::create();
+    column2->append("010");
+    column2->append("010");
+
+    columns.emplace_back(column1);
+    columns.emplace_back(column2);
+
+    ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+
+    ASSERT_EQ(2, result->size());
+    EXPECT_EQ("95534194333898912524556646770114125019", int128_to_string(result->get(0).get_int128()));
+    EXPECT_EQ("-15604239156722706735822034149563619436", int128_to_string(result->get(1).get_int128()));
+}
+
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_concat_collision) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    Columns columns;
+    auto column1 = BinaryColumn::create();
+    column1->append("22");
+    column1->append("2");
+    column1->append("1");
+    column1->append("11111111111");
+
+    auto column2 = BinaryColumn::create();
+    column2->append("44");
+    column2->append("244");
+    column2->append("1111111111");
+    column2->append("");
+
+    columns.emplace_back(column1);
+    columns.emplace_back(column2);
+
+    ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+
+    ASSERT_EQ(4, result->size());
+    EXPECT_EQ("-116423615381574681252646068740447308930", int128_to_string(result->get(0).get_int128()));
+    EXPECT_EQ("79912828542332434191845536781608325267", int128_to_string(result->get(1).get_int128()));
+    EXPECT_EQ("149327305336444856090942449101198044171", int128_to_string(result->get(2).get_int128()));
+    EXPECT_EQ("31751105303156399554110410960461273213", int128_to_string(result->get(3).get_int128()));
+}
+
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column}).value();
+        ASSERT_EQ(0, result->size());
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{"hello"});
+        column->append_datum(DatumArray{"starrocks"});
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-39860275131497362562110746998887222515", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), false);
+        column->append_datum(DatumArray{"hello"});
+        column->append_datum(DatumArray{"starrocks"});
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-39860275131497362562110746998887222515", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{"hello", "world"});
+        column->append_datum(DatumArray{"hello", "starrocks"});
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("144019643735392052535165383538110996661", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-133694396197743686302797954021954852834", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), false);
+        column->append_datum(DatumArray{"hello", "world"});
+        column->append_datum(DatumArray{"hello", "starrocks"});
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("144019643735392052535165383538110996661", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-133694396197743686302797954021954852834", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{"hello", kNullDatum, "world"});
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("18679293785523661598860211660857963851", int128_to_string(result->get(0).get_int128()));
+    }
+    {
+        Columns columns;
+        auto column1 = ColumnHelper::create_const_null_column(1);
+        columns.emplace_back(column1);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("39062573314113587086746376608795509816", int128_to_string(result->get(0).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{"Celonis"});
+        column->append_datum(kNullDatum);
+        column->append_datum(DatumArray{kNullDatum});
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column}).value();
+        ASSERT_EQ(3, result->size());
+        EXPECT_EQ("62891042711506979871088750514650369910", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("39062573314113587086746376608795509816", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("-94392335423945087845847157094108824607", int128_to_string(result->get(2).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), false);
+        column->append_datum(DatumArray{"Celonis", kNullDatum});
+        column->append_datum(DatumArray{kNullDatum, "Celonis"});
+        column->append_datum(DatumArray{kNullDatum});
+        column->append_datum(DatumArray{kNullDatum, kNullDatum});
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column}).value();
+        ASSERT_EQ(4, result->size());
+        EXPECT_NE(int128_to_string(result->get(0).get_int128()), int128_to_string(result->get(1).get_int128()));
+        EXPECT_NE(int128_to_string(result->get(1).get_int128()), int128_to_string(result->get(2).get_int128()));
+        EXPECT_NE(int128_to_string(result->get(2).get_int128()), int128_to_string(result->get(3).get_int128()));
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{XXHASH3_128_NULL_STRING.c_str()});
+        const auto result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column});
+        std::cerr << result.status().message() << std::endl;
+        EXPECT_EQ(result.status().message(),
+                  "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+    }
+    {
+        auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
+        column->append_datum(DatumArray{XXHASH3_128_NULL_ARRAY_STRING.c_str()});
+        const auto result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column});
+        std::cerr << result.status().message() << std::endl;
+        EXPECT_EQ(result.status().message(),
+                  "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
+    }
+}
+
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    {
+        Columns columns;
+        auto column = BinaryColumn::create();
+        columns.emplace_back(column);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+        ASSERT_EQ(0, result->size());
+    }
+    {
+        Columns columns;
+        auto column = BinaryColumn::create();
+        column->append("hello");
+        column->append("starrocks");
+        columns.emplace_back(column);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-39860275131497362562110746998887222515", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        Columns columns;
+        auto column1 = BinaryColumn::create();
+        column1->append("hello");
+        column1->append("hello");
+        auto column2 = BinaryColumn::create();
+        column2->append("world");
+        column2->append("starrocks");
+        columns.emplace_back(column1);
+        columns.emplace_back(column2);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("144019643735392052535165383538110996661", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-133694396197743686302797954021954852834", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        Columns columns;
+        auto column1 = BinaryColumn::create();
+        column1->append("hello");
+        auto column2 = ColumnHelper::create_const_null_column(1);
+        auto column3 = BinaryColumn::create();
+        column3->append("world");
+        columns.emplace_back(column1);
+        columns.emplace_back(column2);
+        columns.emplace_back(column3);
+
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("18679293785523661598860211660857963851", int128_to_string(result->get(0).get_int128()));
+    }
+    {
+        Columns columns;
+        auto column1 = ColumnHelper::create_const_null_column(1);
+        columns.emplace_back(column1);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("-94392335423945087845847157094108824607", int128_to_string(result->get(0).get_int128()));
+    }
+    {
+        auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        strings->append_datum("Celonis");
+        strings->append_datum(kNullDatum);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {strings}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("62891042711506979871088750514650369910", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-94392335423945087845847157094108824607", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        strings->append_datum(XXHASH3_128_NULL_STRING.c_str());
+        strings->append_datum(kNullDatum);
+        const auto result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {strings});
+        EXPECT_EQ(result.status().message(),
+                  "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+    }
+}
+
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};

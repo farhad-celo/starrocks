@@ -601,6 +601,7 @@ public class ExpressionStatisticCalculator {
                 // Begin CELONIS cases
                 case FunctionSet.CELONIS_XX_HASH3_128:
                 case FunctionSet.CELONIS_XX_HASH3_128_V2:
+                case FunctionSet.CELONIS_XX_HASH3_128_V3:
                     minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
                     maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
                     break;

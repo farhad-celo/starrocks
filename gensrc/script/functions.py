@@ -1570,6 +1570,8 @@ celostar_functions = [
     [4001300, 'celonis_stringhash', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringhash::stringhash'],
     [4001401, 'celonis_xx_hash3_128_v2', True, False, 'LARGEINT', ['VARCHAR', '...'], 'CelonisStringFunctions::xx_hash3_128_v2'],
     [4001402, 'celonis_xx_hash3_128_v2', True, False, 'LARGEINT', ['ARRAY_VARCHAR'], 'CelonisStringFunctions::xx_hash3_128_v2'],
+    [4001501, 'celonis_xx_hash3_128_v3', True, False, 'LARGEINT', ['VARCHAR', '...'], 'CelonisStringFunctions::xx_hash3_128_v3'],
+    [4001502, 'celonis_xx_hash3_128_v3', True, False, 'LARGEINT', ['ARRAY_VARCHAR'], 'CelonisStringFunctions::xx_hash3_128_v3'],
 
     # Math functions
     [5000101, 'celonis_square', True, False, 'INT', ['INT'], 'CelonisMathFunctions<TYPE_INT>::square'],

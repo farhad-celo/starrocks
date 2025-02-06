@@ -35,6 +35,20 @@ public:
      * @param: [string_value, ...] or [string_array]
      * @paramType: [VARCHAR, ...] or [ARRAY_VARCHAR]
      * @return LARGEINT
+     * celonis_xx_hash3_128_v3(NULL) != NULL
+     * celonis_xx_hash3_128_v3(NULL) == celonis_xx_hash3_128_v3(NULL)
+     * celonis_xx_hash3_128_v3(NULL) != celonis_xx_hash3_128_v3(NULL, NULL)
+     * celonis_xx_hash3_128_v3(NULL array) != celonis_xx_hash3_128_v3([NULL]) (NULL array means the type is array and the array is NULL)
+     * celonis_xx_hash3_128_v3([NULL, NULL]) != celonis_xx_hash3_128_v3([NULL])
+     * Unlike celonis_xx_hash3_128_v2, celonis_xx_hash3_128_v3 does not suffer from the "concat" issue.
+     * celonis_xx_hash3_128_v3("22", "44") != celonis_xx_hash3_128_v3("2", "244")
+     */
+    DEFINE_VECTORIZED_FN(xx_hash3_128_v3);
+
+    /**
+     * @param: [string_value, ...] or [string_array]
+     * @paramType: [VARCHAR, ...] or [ARRAY_VARCHAR]
+     * @return LARGEINT
      * celonis_xx_hash3_128_nullable(NULL, ...) == NULL
      * celonis_xx_hash3_128_nullable([NULL, ...]) == NULL
      * celonis_xx_hash3_128_nullable(NULL array) == NULL (NULL array means the type is array and the array is NULL)
