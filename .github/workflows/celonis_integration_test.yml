@@ -37,7 +37,7 @@ jobs:
           branch=${{inputs.branch_to_test}}
           echo "The branch to test is: ${branch}"
           if [[ -n "${{inputs.image_to_build}}" ]]; then
-            image_tag="${{inputs.image_to_build}}"
+            image_tag="${{inputs.image_to_build}}_$(date +%Y%m%d%H%M%S)"
             # Check if the tag contains only valid characters
             if ! [[ "$image_tag" =~ ^[a-zA-Z0-9._-]+$ ]]; then
               echo "Invalid image tag: must contain only lowercase and uppercase letters, digits, underscores (_), periods (.), and dashes (-)."
@@ -47,7 +47,7 @@ jobs:
               exit 1
             fi
           else
-            image_tag="${branch//\//_}"
+              image_tag="${branch//\//_}_$(date +%Y%m%d%H%M%S)"
           fi
           echo "The test image tag to build is: ${image_tag}"
           echo "test_image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
