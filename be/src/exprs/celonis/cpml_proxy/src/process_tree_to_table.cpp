@@ -1,6 +1,7 @@
 #include "process_tree_to_table.h"
 
 #include <cpml/model/process_tree.h>
+#include <cpml/model/pt/node_to_counts_mapping.h>
 
 #include <numeric>
 #include <queue>
@@ -63,9 +64,9 @@ constexpr inline std::int64_t vertex_code_of<process_tree::redo>{5};
 // Copied and modified from process_tree.cpp.
 void fill_result_tables(ResultColumn<int64_t>& vertex_pt_types, NullableResultColumn<int64_t>& vertex_activities,
                         NullableResultColumn<int64_t>& vertex_object_counts, ResultColumn<int64_t>& edge_source_ids,
-                        ResultColumn<int64_t>& edge_target_ids, const process_tree& pt) {
+                        ResultColumn<int64_t>& edge_target_ids, const cpml::model::pt::tree_and_counts_mapping& pt_and_counts) {
     std::queue<const process_tree*> buffer;
-    buffer.push(&pt);
+    buffer.push(&pt_and_counts.root());
 
     std::int64_t current_vertex_id{0};
     std::int64_t current_edge_id{0};
@@ -76,11 +77,11 @@ void fill_result_tables(ResultColumn<int64_t>& vertex_pt_types, NullableResultCo
         vertex_pt_types[current_vertex_id] = to_vertex_code(current_node);
         std::visit(ctl::overloaded{[&](const process_tree::activity& a) {
                                        vertex_activities[current_vertex_id] = a.activity_id;
-                                       vertex_object_counts[current_vertex_id] = a.object_count;
+                                       vertex_object_counts[current_vertex_id] = pt_and_counts.node_count_or_throw(current_node);
                                    },
                                    [&](const process_tree::tau& t) {
                                        vertex_activities.set_null(current_vertex_id);
-                                       vertex_object_counts[current_vertex_id] = t.object_count;
+                                       vertex_object_counts[current_vertex_id] = pt_and_counts.node_count_or_throw(current_node);
                                    },
                                    [&](const process_tree::parent& p) {
                                        vertex_activities.set_null(current_vertex_id);
@@ -103,8 +104,8 @@ void fill_result_tables(ResultColumn<int64_t>& vertex_pt_types, NullableResultCo
 
 } // anonymous namespace
 
-pt_as_tables convert_pt_to_tables(const process_tree& pt) {
-    const table_sizes sizes{pt};
+pt_as_tables convert_pt_to_tables(const cpml::model::pt::tree_and_counts_mapping& pt_and_counts) {
+    const table_sizes sizes{pt_and_counts.root()};
 
     auto vertex_table = std::make_unique<ResultTable>("vertex_properties", sizes.node_size());
     auto& vertex_pt_types = vertex_table->AddColumn<int64_t>("process_tree_type");
@@ -115,7 +116,7 @@ pt_as_tables convert_pt_to_tables(const process_tree& pt) {
     auto& edge_source_ids = edge_table->AddColumn<int64_t>("edge_source_id");
     auto& edge_target_ids = edge_table->AddColumn<int64_t>("edge_target_id");
 
-    fill_result_tables(vertex_pt_types, vertex_activities, vertex_object_counts, edge_source_ids, edge_target_ids, pt);
+    fill_result_tables(vertex_pt_types, vertex_activities, vertex_object_counts, edge_source_ids, edge_target_ids, pt_and_counts);
 
     return {std::move(vertex_table), std::move(edge_table)};
 }

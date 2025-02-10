@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:transplant3.3
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:cpml-new-source
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
   image_tag: "${{inputs.image_tag}}-dic"

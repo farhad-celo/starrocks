@@ -2,32 +2,56 @@ project(cpml_proxy DESCRIPTION "CPML proxy to hide glue code internals from SR c
 
 set(CMAKE_CXX_STANDARD 20)
 
-# Import the pre-built CPML
+# Set the root path to the CPML directory
+set(CPML_DIR_PATH "${THIRDPARTY_DIR}CPML") # Must match with the naming used in 'dev-env.Dockerfile'
+# Set paths for each library's include and build directories
+set(CPML_CONCURRENCY_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-concurrency-library/include")
+set(CPML_CONCURRENCY_PATH "${CPML_DIR_PATH}/celonis-concurrency-library/build/libconcurrency.a")
 
-set(CPML_DIR_NAME "CPML") # Must match with the naming used in 'dev-env.Dockerfile'
-set(CPML_DIR_PATH "${THIRDPARTY_DIR}/${CPML_DIR_NAME}")
-set(CPML_COMBINED_STATIC_LIBARY_NAME "cpml_combined_library.a")
-set(CPML_STATIC_LIBRARY_PATH "${CPML_DIR_PATH}/lib/${CPML_COMBINED_STATIC_LIBARY_NAME}")
-set(CPML_INCLUDE_PATH "${CPML_DIR_PATH}/include/")
+set(CPML_FORMATTING_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-formatting-library/include")
+set(CPML_FORMATTING_PATH "${CPML_DIR_PATH}/celonis-formatting-library/build/libformat.a")
 
-IF(NOT EXISTS "${CPML_DIR_PATH}")
-    message( FATAL_ERROR "Path to CPML '${CPML_DIR_PATH}' does not exist" )
-ELSEIF(NOT EXISTS "${CPML_STATIC_LIBRARY_PATH}")
-    message( FATAL_ERROR "Path to CPML static library artifact '${CPML_STATIC_LIBRARY_PATH}' does not exist" )
-ELSEIF(NOT EXISTS "${CPML_INCLUDE_PATH}")
-    message( FATAL_ERROR "Path to CPML includes '${CPML_INCLUDE_PATH}' does not exist" )
-ENDIF()
+set(CPML_PROCESS_MINNING_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-process-mining-library/include")
+set(CPML_PROCESS_MINNING_PATH "${CPML_DIR_PATH}/celonis-process-mining-library/build/libcpml.a")
 
-add_library(cpml STATIC IMPORTED)
-set_target_properties(cpml PROPERTIES
-        IMPORTED_LOCATION "${CPML_STATIC_LIBRARY_PATH}"
-        INTERFACE_INCLUDE_DIRECTORIES "${CPML_INCLUDE_PATH}"
+set(CPML_TEMPLATE_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-template-library/include")
+set(CPML_TEMPLATE_PATH "${CPML_DIR_PATH}/celonis-template-library/build/libctl.a")
+
+# For additional libraries, add them here:
+
+# Celonis Concurrency Library
+add_library(cpml_concurrency STATIC IMPORTED)
+set_target_properties(cpml_concurrency PROPERTIES
+    IMPORTED_LOCATION "${CPML_CONCURRENCY_PATH}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CPML_CONCURRENCY_INCLUDE_PATH}"
+)
+
+# Celonis Formatting Library
+add_library(cpml_formatting STATIC IMPORTED)
+set_target_properties(cpml_formatting PROPERTIES
+    IMPORTED_LOCATION "${CPML_FORMATTING_PATH}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CPML_FORMATTING_INCLUDE_PATH}"
+)
+
+# Celonis Process Mining Library
+add_library(cpml_process_mining STATIC IMPORTED)
+set_target_properties(cpml_process_mining PROPERTIES
+    IMPORTED_LOCATION "${CPML_PROCESS_MINNING_PATH}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CPML_PROCESS_MINNING_INCLUDE_PATH}"
+)
+
+# Celonis Template Library
+add_library(cpml_template STATIC IMPORTED)
+set_target_properties(cpml_template PROPERTIES
+    IMPORTED_LOCATION "${CPML_TEMPLATE_PATH}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CPML_TEMPLATE_INCLUDE_PATH}"
 )
 
 # Define the CPML proxy library
 add_library(${PROJECT_NAME} STATIC)
 add_library(celonis::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
+# Set the source files for the proxy library
 target_sources(${PROJECT_NAME}
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src/inductive_miner_proxy.cpp
@@ -36,6 +60,7 @@ target_sources(${PROJECT_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/src/sr_variant_accessor.cpp
 )
 
+# Set the include directories for the proxy library
 target_include_directories(${PROJECT_NAME}
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}/include/
@@ -43,4 +68,10 @@ target_include_directories(${PROJECT_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/src/
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE cpml)
+# Link all the libraries to the proxy library
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    cpml_concurrency
+    cpml_formatting
+    cpml_process_mining
+    cpml_template
+)

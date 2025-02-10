@@ -44,6 +44,20 @@ ARG GITHUB_TOKEN
 ARG BUILD_ROOT
 
 COPY . $BUILD_ROOT
+
+RUN apt-get update && \
+    apt-get -y install wget lsb-release wget software-properties-common gnupg unzip gh && \
+    apt-get -y install build-essential python3-dev autotools-dev libicu-dev libbz2-dev gcc-12 g++-12 cmake && \
+    apt-get -y install libfmt-dev nlohmann-json3-dev
+
+RUN wget https://apt.llvm.org/llvm.sh && chmod +x ./llvm.sh && ./llvm.sh 17 all
+
+ENV CC=clang-17 \
+    CXX=clang++-17 \
+    LINKER=lld \
+    CFLAGS="-march=haswell" \
+    CXXFLAGS="-march=haswell"
+
 RUN if test "x$predownload_thirdparty" = "xtrue" ; then \
         wget --progress=dot:mega --tries=3 --read-timeout=60 --connect-timeout=15 --no-check-certificate ${thirdparty_url} -O thirdparty.tar ; \
         mkdir -p ${BUILD_ROOT}/thirdparty/src && tar -xf thirdparty.tar -C ${BUILD_ROOT}/thirdparty/src ; \
