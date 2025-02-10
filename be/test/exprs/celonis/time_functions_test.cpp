@@ -49,18 +49,20 @@ TEST_F(CelonisTimeFunctionsTest, timestamp_millis) {
     col->append_datum(0L);  // 1970-01-01 00:00:00.000 UTC
     col->append_datum(123L);   // 1970-01-01 00:00:00.123 UTC
     col->append_datum(Datum());  // NULL
-    col->append_datum(-1L);  // NULL
+    col->append_datum(-11676096000000L);  // 1600-01-01 00:00:00
     col->append_datum(61123L);    // 1970-01-01 00:01:01.123 UTC
     col->append_datum(172800000L);  // 1970-01-03 00:00:00
+    col->append_datum(-11676182400000L);  // 1599-12-31 00:00:00
 
     const auto result = CelonisTimeFunctions::timestamp_millis(nullptr, {col}).value();
     ASSERT_EQ(result->size(), col->size());
     EXPECT_EQ(result->get(0).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0));
     EXPECT_EQ(result->get(1).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0, 123000));
     EXPECT_TRUE(result->get(2).is_null());
-    EXPECT_TRUE(result->get(3).is_null());
+    EXPECT_EQ(result->get(3).get_timestamp(), TimestampValue::create(1600, 1, 1, 0, 0, 0, 0));
     EXPECT_EQ(result->get(4).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 1, 1, 123000));
     EXPECT_EQ(result->get(5).get_timestamp(), TimestampValue::create(1970, 1, 3, 0, 0, 0));
+    EXPECT_EQ(result->get(6).get_timestamp(), TimestampValue::create(1599, 12, 31, 0, 0, 0, 0));
 }
 
 TEST_F(CelonisTimeFunctionsTest, date_between) {

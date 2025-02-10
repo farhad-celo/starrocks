@@ -1377,11 +1377,8 @@ CelonisTimeFunctions::millis_timestamp([[maybe_unused]] FunctionContext* context
 StatusOr<ColumnPtr>
 CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
-
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-
     ColumnViewer<TYPE_BIGINT> data_column(columns[0]);
-
     auto size = columns[0]->size();
     ColumnBuilder<TYPE_DATETIME> result(size);
     for (int row = 0; row < size; ++row) {
@@ -1389,27 +1386,9 @@ CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context
             result.append_null();
             continue;
         }
-
         auto unix_millis = data_column.value(row);
-        if (unix_millis < 0) {
-            result.append_null();
-            continue;
-        }
-
-        int64 seconds = unix_millis / 1000;
-        int64 millis = unix_millis % 1000;
-        int64 nanoseconds = millis * NANOS_PER_MILLIS;
-
-        Timestamp t;
-        int days = seconds / SECS_PER_DAY;
-        JulianDate jd = days + date::UNIX_EPOCH_JULIAN;
-        t = timestamp::from_julian_and_time(jd,
-                                            seconds % SECS_PER_DAY * USECS_PER_SEC + nanoseconds / NANOSECS_PER_USEC);
-        TimestampValue ts;
-        ts.set_timestamp(t);
-        result.append(ts);
+        result.append(add_timeunits_helper(EPOCH, "MILLISECONDS", unix_millis));
     }
-
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
