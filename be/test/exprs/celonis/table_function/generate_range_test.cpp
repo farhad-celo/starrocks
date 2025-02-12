@@ -168,18 +168,15 @@ TEST_F(CelonisGenerateRangeTest, bigint_invalid_step) {
     function->close(nullptr, table_state);
 }
 
-TEST_F(CelonisGenerateRangeTest, bigint_invalid_range) {
+TEST_F(CelonisGenerateRangeTest, bigint_start_greater_than_end) {
     const auto LT = TYPE_BIGINT;
     std::vector<TestCase> test_cases{{1L, 3L, 0L, {}}};
 
     auto [table_state, function] = Prepare<LT, LT>(test_cases);
     auto [results, offset] = function->process(rt_state_.get(), table_state);
 
-    EXPECT_EQ(table_state->processed_rows(), 0);
+    EXPECT_EQ(table_state->processed_rows(), 1);
     EXPECT_EQ(results[0]->size(), 0);
-    ASSERT_TRUE(table_state->status().is_invalid_argument());
-    EXPECT_TRUE(table_state->status().message().find("range_end must") != std::string::npos);
-
     function->close(nullptr, table_state);
 }
 

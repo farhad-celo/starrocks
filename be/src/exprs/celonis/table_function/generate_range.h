@@ -62,9 +62,8 @@ public:
                 auto range_start = arg_range_start.value(curr_row);
                 auto range_end = arg_range_end.value(curr_row);
                 if (range_start > range_end) {
-                    state->set_status(
-                            Status::InvalidArgument("range_end must be greater or equal than range_range_start"));
-                    break;
+                    move_to_next_row();
+                    continue;
                 }
                 auto step = arg_step.value(curr_row);
                 auto current = range_start;
