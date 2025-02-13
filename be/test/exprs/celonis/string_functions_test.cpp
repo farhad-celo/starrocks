@@ -201,7 +201,6 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
         column->append_datum(DatumArray{XXHASH3_128_NULL_STRING.c_str()});
         const auto result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column});
-        std::cerr << result.status().message() << std::endl;
         EXPECT_EQ(result.status().message(),
                   "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
     }
@@ -209,7 +208,6 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
         column->append_datum(DatumArray{XXHASH3_128_NULL_ARRAY_STRING.c_str()});
         const auto result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column});
-        std::cerr << result.status().message() << std::endl;
         EXPECT_EQ(result.status().message(),
                   "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
     }

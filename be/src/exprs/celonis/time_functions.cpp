@@ -1267,12 +1267,15 @@ timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue
         milliseconds = millis_between(from_timestamp, to_timestamp);
     } else {
         if (calendar_state.calendar.requires_calendar_id() && !calendar_id.has_value()) {
-            return Status::InvalidArgument("Calendar ID column not provided.");
+            milliseconds = std::nullopt;
+        } else {
+            if (!calendar_state.calendar.requires_calendar_id()) {
+                // If calendar does not require calendar_id, ignore calendar_id by setting it to std::nullopt.
+                // This is consistent with Saola's behavior.
+                calendar_id = std::nullopt;
+            }
+            milliseconds = calendar_state.calendar.millis_between(from_timestamp, to_timestamp, calendar_id, round_to_day);
         }
-        if (!calendar_state.calendar.requires_calendar_id()) {
-            calendar_id = std::nullopt;
-        }
-        milliseconds = calendar_state.calendar.millis_between(from_timestamp, to_timestamp, calendar_id, round_to_day);
     }
     if (milliseconds.has_value()) {
         return convert_time_unit_float(time_unit, milliseconds.value());
