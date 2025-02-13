@@ -1039,6 +1039,21 @@ TEST_F(CelonisStringFunctionsTest, translate_multi_char_symbol_char_combination)
     translate(columns, {"Z+", "+Z", "ZOO+BAR"});
 }
 
+TEST_F(CelonisStringFunctionsTest, translate_empty_pattern) {
+    Columns columns;
+
+    auto str = BinaryColumn::create();
+    std::string strs[] = {"0123456789", "9876 543210", "abc", "0ÄäA 0ÖöO 0ÜüU ZZ", ""};
+    for (int i = 0; i < sizeof(strs) / sizeof(strs[0]); ++i) {
+        str->append(strs[i]);
+    }
+    columns.emplace_back(str);
+    columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("", 1));
+    columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("", 1));
+
+    translate(columns, {"0123456789", "9876 543210", "abc", "0ÄäA 0ÖöO 0ÜüU ZZ", ""});
+}
+
 TEST_F(CelonisStringFunctionsTest, translate_multi_char_digit_2_char) {
     Columns columns;
 

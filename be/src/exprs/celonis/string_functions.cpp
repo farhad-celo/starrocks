@@ -334,15 +334,9 @@ Status CelonisStringFunctions::translate_prepare(FunctionContext* context, Funct
     }
     const auto pattern_col = context->get_constant_column(1);
     Slice pattern = ColumnHelper::get_const_value<TYPE_VARCHAR>(pattern_col);
-    if (pattern.empty()) {
-        return Status::InvalidArgument("The second parameter should not be empty string");
-    }
 
     const auto replace_col = context->get_constant_column(2);
     Slice replace = ColumnHelper::get_const_value<TYPE_VARCHAR>(replace_col);
-    if (replace.empty()) {
-        return Status::InvalidArgument("The third parameter should not be empty string");
-    }
 
     auto* state = new CelonisTranslateState(pattern, replace);
     context->set_function_state(scope, state);
@@ -381,9 +375,13 @@ Status CelonisStringFunctions::translate_close(FunctionContext* context, Functio
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(3, columns.size());
     const auto* state = reinterpret_cast<const CelonisTranslateState*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     DCHECK(state != nullptr);
+    if (state->pattern_chars.empty()) {
+        return columns[0];
+    }
     const auto& translate_mapping = state->translate_mapping;
 
     auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
