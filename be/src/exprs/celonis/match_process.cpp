@@ -308,6 +308,22 @@ Status CelonisMatchProcess::match_process_prepare(FunctionContext* context, Func
     return Status::OK();
 }
 
+Status CelonisMatchProcess::match_process_prepare_benchmark_only(FunctionContext* context, std::unique_ptr<NFA> nfa, FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+    if (context->get_num_constant_columns() != 1) {
+        return Status::InvalidArgument(
+                "celonis_match_process needs 1 parameter: column");
+    }
+
+    auto *state = new MatchProcessState();
+    state->nfa = std::move(nfa);
+    context->set_function_state(scope, state);
+
+    return Status::OK();
+}
+
 Status CelonisMatchProcess::match_process_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         auto* state = reinterpret_cast<MatchProcessState*>(context->get_function_state(scope));

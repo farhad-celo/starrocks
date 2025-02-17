@@ -1,7 +1,9 @@
 #pragma once
 
 #include <re2/set.h>
+
 #include <string>
+
 #include "column/array_column.h"
 #include "column/column_builder.h"
 #include "column/column_hash.h"
@@ -9,19 +11,22 @@
 #include "column/hash_set.h"
 #include "exprs/function_context.h"
 #include "exprs/function_helper.h"
-#include "column/hash_set.h"
+#include "util/hash.h"
+#include "util/phmap/phmap.h"
 
 namespace starrocks {
 
 struct VectorBoolHash {
     std::size_t operator()(const std::vector<bool>& vec) const {
         std::size_t hash = 0;
-        for (bool b: vec) {
+        for (bool b : vec) {
             hash ^= std::hash<bool>{}(b) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         }
         return hash;
     }
 };
+
+struct NFA;
 
 class CelonisMatchProcess {
 public:
@@ -36,13 +41,14 @@ public:
     static Status match_process_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status match_process_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    /// Instead of preparing the NFA from context's json column, prepare it from @param nfa. Only used in the benchmarks.
+    static Status match_process_prepare_benchmark_only(FunctionContext* context, std::unique_ptr<NFA> nfa, FunctionContext::FunctionStateScope scope);
 };
 
 // Describes the NFA structure.
 struct NFA {
-    enum TransitionType {
-        E_TRANSITION = 0, UNMATCHED = 1, EXACT_MATCH = 2, LIKE = 3, INVERSE_MATCH = 4
-    };
+    enum TransitionType { E_TRANSITION = 0, UNMATCHED = 1, EXACT_MATCH = 2, LIKE = 3, INVERSE_MATCH = 4 };
 
     struct Transition {
         TransitionType type;
@@ -76,27 +82,27 @@ private:
         int current_dfa_state;
         std::string input_symbol;
 
-        TransitionKey(int current_state, const std::string& input_symbol) : current_dfa_state(current_state),
-                                                                            input_symbol(input_symbol) {};
+        TransitionKey(int current_state, const std::string& input_symbol)
+                : current_dfa_state(current_state), input_symbol(input_symbol){};
 
         bool operator==(const TransitionKey& other) const {
-            return (current_dfa_state == other.current_dfa_state
-                    && input_symbol == other.input_symbol);
+            return (current_dfa_state == other.current_dfa_state && input_symbol == other.input_symbol);
         }
     };
 
     struct TransitionKeyHasher {
         std::size_t operator()(const TransitionKey& k) const {
-            return ((std::hash<int>()(k.current_dfa_state)
-                     ^ (std::hash<std::string>()(k.input_symbol) << 1)) >> 1);
+            return ((std::hash<int>()(k.current_dfa_state) ^ (std::hash<std::string>()(k.input_symbol) << 1)) >> 1);
         }
     };
 
-    std::unordered_map<TransitionKey, int, TransitionKeyHasher> dfa_transitions_;
+    // Based on the benchmark, phmap::flat_hash_map has better performance (up to 36% latency reduction)
+    // than std::unordered_map when the number nfa states is small.
+    phmap::flat_hash_map<TransitionKey, int, TransitionKeyHasher> dfa_transitions_;
 
-    std::unordered_map<std::vector<bool>, int, VectorBoolHash> nfa_states_to_dfa_state_;
+    phmap::flat_hash_map<std::vector<bool>, int, VectorBoolHash> nfa_states_to_dfa_state_;
 
-    std::unordered_map<int, std::vector<bool>> dfa_state_to_nfa_states_;
+    phmap::flat_hash_map<int, std::vector<bool>, StdHash<int>> dfa_state_to_nfa_states_;
 
     std::vector<bool> final_dfa_states_;
 
