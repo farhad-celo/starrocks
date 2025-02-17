@@ -109,6 +109,13 @@ jobs:
           local_image: starrocks-be:${IMAGE_TAG}
           remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${IMAGE_TAG}
 
+      - name: Publish FE artifacts to GitHub Packages
+        uses: ./.github/actions/publish-fe-artifacts
+        with:
+          artifact_image: starrocks-artifacts:${IMAGE_TAG}
+          token_for_artifact_publishing: ${{ secrets.GITHUB_TOKEN }}
+          token_for_artifact_deletion: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+
 # Skip this as the runs-on runner is ephemeral.
 #      - name: Clean up
 #        if: ${{ always() }}

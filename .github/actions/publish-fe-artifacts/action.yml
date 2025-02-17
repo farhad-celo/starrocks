@@ -1,0 +1,78 @@
+name: "Publish FE artifacts to GitHub packages"
+
+inputs:
+  artifact_image:
+    required: true
+  token_for_artifact_publishing:
+    required: true
+  token_for_artifact_deletion:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        server-password: ${{ inputs.token_for_artifact_publishing }}
+        server-id: 'github'
+
+    - name: Extract and Publish FE artifacts
+      shell: bash
+      working-directory: fe
+      env:
+          TOKEN_FOR_ARTIFACT_DELETION: ${{ inputs.token_for_artifact_deletion }}
+      run: |
+        function delete_artifact() {
+          MODULE_DIRECTORY=$1
+
+          PACKAGE_NAME=$(cd "$MODULE_DIRECTORY" && mvn --quiet -Dexec.executable="echo" -Dexec.args='${project.groupId}.${project.artifactId}' --non-recursive exec:exec)
+          PACKAGE_VERSION=$(cd "$MODULE_DIRECTORY" && mvn --quiet -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+
+          ID=$(curl -s -X POST \
+              -H "Accept: json" \
+              -H "Authorization: Bearer ${TOKEN_FOR_ARTIFACT_DELETION}" \
+              -d "{\"query\":\"query {repository(owner:\\\"celonis\\\", name:\\\"maven-internal\\\") {packages(first:1, names:\\\"$PACKAGE_NAME\\\") {edges{node{id, version(version: \\\"$PACKAGE_VERSION\\\"){version, id}}}}}}\"}" \
+              https://api.github.com/graphql | jq -r '.data.repository.packages.edges[0].node.version.id')
+
+          if [[ $ID != "null" ]]; then
+            curl -s -X POST \
+                -H "Accept: application/vnd.github.package-deletes-preview+json" \
+                -H "Authorization: Bearer ${TOKEN_FOR_ARTIFACT_DELETION}" \
+                -d "{\"query\":\"mutation {deletePackageVersion(input:{packageVersionId:\\\"$ID\\\"}) { success }}\"}" \
+                https://api.github.com/graphql
+          fi
+        }
+
+        publish_artifact() {
+          FILE_NAME=$1
+          POM_FILE=$2
+
+          mvn deploy:deploy-file --batch-mode -Dfile="$FILE_NAME" \
+              -DrepositoryId=github \
+              -Durl=https://maven.pkg.github.com/celonis/maven-internal \
+              -DpomFile="$POM_FILE"
+        }
+
+        extract_and_publish_fe_artifact() {
+          CONTAINER_ID=$1
+          MODULE_DIRECTORY=$2
+
+          FINAL_NAME=$(cd "$MODULE_DIRECTORY" && mvn --quiet -Dexec.executable="echo" -Dexec.args='${project.build.finalName}' --non-recursive exec:exec)
+
+          mkdir --parents "$MODULE_DIRECTORY/target"
+          docker cp "$CONTAINER_ID:/release/fe_artifacts/fe/lib/$FINAL_NAME.jar" "$MODULE_DIRECTORY/target/$FINAL_NAME.jar"
+          publish_artifact "$PWD/$MODULE_DIRECTORY/target/$FINAL_NAME.jar" "$PWD/$MODULE_DIRECTORY/pom.xml"
+        }
+
+        CONTAINER_ID=$(docker create "${{ inputs.artifact_image }}")
+        trap 'docker rm "$CONTAINER_ID" > /dev/null' EXIT
+
+        delete_artifact "fe-core"
+        delete_artifact "spark-dpp"
+        delete_artifact "."
+
+        publish_artifact "$PWD/pom.xml" "pom.xml"
+        extract_and_publish_fe_artifact "$CONTAINER_ID" "spark-dpp"
+        extract_and_publish_fe_artifact "$CONTAINER_ID" "fe-core"
