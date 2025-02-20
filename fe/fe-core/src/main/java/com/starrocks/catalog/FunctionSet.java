@@ -547,6 +547,7 @@ public class FunctionSet {
     public static final String CELONIS_MOVING_TRIMMED_MEAN = "celonis_moving_trimmed_mean";
     public static final String CELONIS_MOVING_COUNT_DISTINCT = "celonis_moving_count_distinct";
     public static final String CELONIS_MOVING_MEDIAN = "celonis_moving_median";
+    public static final String CELONIS_ARRAY_LAG_WINDOW = "celonis_array_lag_window";
 
     // JSON functions
     public static final Function JSON_QUERY_FUNC = new Function(
@@ -782,6 +783,7 @@ public class FunctionSet {
             .add(FunctionSet.CELONIS_MOVING_TRIMMED_MEAN)
             .add(FunctionSet.CELONIS_MOVING_COUNT_DISTINCT)
             .add(FunctionSet.CELONIS_MOVING_MEDIAN)
+            .add(FunctionSet.CELONIS_ARRAY_LAG_WINDOW)
             .build();
 
     public static final Set<String> VARIANCE_FUNCTIONS = ImmutableSet.<String>builder()
@@ -1380,6 +1382,12 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_MEDIAN,
                     Lists.newArrayList(Type.VARCHAR), Type.VARCHAR, Type.VARBINARY));
 
+        // celonis_array_lag_window
+        for (var type : CELONIS_TYPES) {
+            var array_type = new ArrayType(type);
+            addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_ARRAY_LAG_WINDOW,
+                    Lists.newArrayList(array_type, Type.BIGINT), array_type, Type.VARBINARY));
+        }
     }
 
     // Populate all the aggregate builtins in the globalStateMgr.

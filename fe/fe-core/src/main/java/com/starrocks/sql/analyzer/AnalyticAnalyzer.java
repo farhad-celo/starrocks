@@ -30,6 +30,7 @@ import com.starrocks.catalog.Type;
 import com.starrocks.common.AnalysisException;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 import static com.starrocks.catalog.FunctionSet.STATISTIC_FUNCTIONS;
 
@@ -81,6 +82,21 @@ public class AnalyticAnalyzer {
                         e.getPos());
             } else if (e.getType().isPercentile()) {
                 throw new SemanticException("window functions don't support percentile type", e.getPos());
+            }
+        }
+
+        if (analyticFunction.getFn().functionName().equalsIgnoreCase(AnalyticExpr.CELONIS_ARRAY_LAG_WINDOW)) {
+            final Optional<Long> k = celonisGetConstantInteger(analyticFunction.getChild(1));
+            if (k.isEmpty() || k.get() < 1) {
+                throw new SemanticException(
+                        "The k parameter of CELONIS_ARRAY_LAG_WINDOW must be a constant positive integer: "
+                                + analyticFunction.toSql(), analyticFunction.getPos());
+            }
+            final long THRESHOLD = 100_000;
+            if (k.get() > THRESHOLD) {
+                throw new SemanticException(
+                        "The k parameter of CELONIS_ARRAY_LAG_WINDOW exceeds the threshold (" + THRESHOLD + ")."
+                                + analyticFunction.toSql(), analyticFunction.getPos());
             }
         }
 
@@ -172,7 +188,8 @@ public class AnalyticAnalyzer {
 
         if (analyticExpr.getWindow() != null) {
             if ((isRankingFn(analyticFunction.getFn()) || isCumeFn(analyticFunction.getFn()) ||
-                    isOffsetFn(analyticFunction.getFn()) || isHllAggFn(analyticFunction.getFn()))) {
+                    isOffsetFn(analyticFunction.getFn()) || isHllAggFn(analyticFunction.getFn()) ||
+                    analyticFunction.getFn().functionName().equalsIgnoreCase(AnalyticExpr.CELONIS_ARRAY_LAG_WINDOW))) {
                 throw new SemanticException("Windowing clause not allowed with '" + analyticFunction.toSql() + "'",
                         analyticExpr.getPos());
             }
@@ -414,5 +431,17 @@ public class AnalyticAnalyzer {
             return ((LiteralExpr) offset).getLongValue() > 0;
         }
         return false;
+    }
+
+    private static Optional<Long> celonisGetConstantInteger(Expr expr) {
+        if (expr instanceof UserVariableExpr) {
+            expr = ((UserVariableExpr) expr).getValue();
+        }
+
+        if (expr instanceof LiteralExpr && expr.getType().isFixedPointType()) {
+            return Optional.of(((LiteralExpr) expr).getLongValue());
+        }
+
+        return Optional.empty();
     }
 }

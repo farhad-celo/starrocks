@@ -196,7 +196,8 @@ Status Analytor::prepare(RuntimeState* state, ObjectPool* pool, RuntimeProfile* 
               fn.name.function_name == "max" || fn.name.function_name == "min" ||
               fn.name.function_name == "celonis_moving_count_distinct" ||
               fn.name.function_name == "celonis_moving_median" ||
-              fn.name.function_name == "celonis_moving_trimmed_mean")) {
+              fn.name.function_name == "celonis_moving_trimmed_mean" ||
+              fn.name.function_name == "celonis_array_lag_window")) {
             _use_removable_cumulative_process = false;
         }
 

@@ -2676,6 +2676,7 @@ windowFunction
     | name = CELONIS_MOVING_TRIMMED_MEAN '(' expression ')'
     | name = CELONIS_MOVING_COUNT_DISTINCT '(' expression ')'
     | name = CELONIS_MOVING_MEDIAN '(' expression ')'
+    | name = CELONIS_ARRAY_LAG_WINDOW '(' expression ',' expression ')'
     | name = CUME_DIST '(' ')'
     | name = PERCENT_RANK '(' ')'
     | name = NTILE  '(' expression? ')'

@@ -126,6 +126,7 @@ public class AnalyticExpr extends Expr {
     public static String CELONIS_MOVING_TRIMMED_MEAN = "CELONIS_MOVING_TRIMMED_MEAN";
     public static String CELONIS_MOVING_COUNT_DISTINCT = "CELONIS_MOVING_COUNT_DISTINCT";
     public static String CELONIS_MOVING_MEDIAN = "CELONIS_MOVING_MEDIAN";
+    public static String CELONIS_ARRAY_LAG_WINDOW = "CELONIS_ARRAY_LAG_WINDOW";
 
     public AnalyticExpr(FunctionCallExpr fnCall, List<Expr> partitionExprs, List<OrderByElement> orderByElements,
                         AnalyticWindow window, List<String> hints) {

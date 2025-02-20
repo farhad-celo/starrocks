@@ -97,6 +97,10 @@ void AggregateFuncResolver::register_celonis_window() {
                                                                 AggregateFactory::MakeCelonisMovingMedianWindowFunction<TYPE_DATETIME>());
     add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_VARCHAR>("celonis_moving_median", true,
                                                               AggregateFactory::MakeCelonisMovingMedianWindowFunction<TYPE_VARCHAR>());
+
+    // celonis_array_lag_window
+    add_aggregate_mapping_notnull<TYPE_ARRAY, TYPE_ARRAY>("celonis_array_lag_window", true,
+                                                          AggregateFactory::MakeCelonisArrayLagWindowFunction());
 }
 
 } // namespace starrocks

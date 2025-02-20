@@ -55,6 +55,7 @@
 #include "exprs/agg/window.h"
 #include "exprs/agg/window_funnel.h"
 #include "exprs/celonis/agg/abc_model.h"
+#include "exprs/celonis/agg/array_lead_lag_window.h"
 #include "exprs/celonis/agg/calc_bucket_boundaries.h"
 #include "exprs/celonis/agg/calc_bucket_width_boundaries.h"
 #include "exprs/celonis/agg/calc_string_bucket_boundaries.h"
@@ -280,6 +281,8 @@ public:
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisModeAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisArrayLagWindowFunction();
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeProductAggregateFunction();
