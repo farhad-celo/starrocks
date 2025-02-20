@@ -23,8 +23,8 @@ env:
   image_tag: ${{inputs.image_tag}}
 
 jobs:
-  build-dev-env-image:
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
+  build-dev-env-image-amd:
+    runs-on: [runs-on,runner=64cpu-linux-x64, image=ubuntu24-full-x64, disk=large, "run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,15 +40,57 @@ jobs:
           echo "The current branch is ${branch}"
 
           # Build image and always remove intermediate containers.
-          docker buildx build --force-rm=true --build-arg prebuild_maven=true --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+          docker buildx build --force-rm=true -q --build-arg prebuild_maven=true --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
             -f docker/dockerfiles/dev-env/dev-env.Dockerfile \
-            -t starrocks-dev-env:${image_tag} .
+            -t ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}-amd . --push
 
-      - name: Push to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-dev-env:${image_tag}
-          remote_image: ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}
+  build-dev-env-image-arm:
+    runs-on: [runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: GitHub Docker login
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+
+      - name: Build dev env image
+        run: |
+          # Check the current branch.
+          branch=`git branch --show-current`
+          echo "The current branch is ${branch}"
+
+          # Build image and always remove intermediate containers.
+          DOCKER_BUILDKIT=1 docker buildx build -q --force-rm=true --build-arg prebuild_maven=true \
+            --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+            -f docker/dockerfiles/dev-env/dev-env.Dockerfile \
+            -t ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}-arm \
+            --push .
+
+  build-mul-arch-manifest:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: [build-dev-env-image-arm, build-dev-env-image-amd]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: GitHub Docker login
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin 
+
+      - name: build manifest
+        shell: bash
+        run:
+          export DOCKER_CLI_EXPERIMENTAL=enabled
+          
+          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}"
+          arm_tag="ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}-arm"
+          amd_tag="ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}-amd"
+
+          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$amd_tag"
+          
+          docker manifest push "$mul_arch_tag"
+
 
 # Skip this step as we are using runs-on runner which is ephemeral.
 #      - name: Clean up
