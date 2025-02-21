@@ -174,6 +174,7 @@ set(CELONIS_FILES
   celonis/to_double.cpp
   celonis/transits_interleaved.cpp
   celonis/transits_match.cpp
+  celonis/trim.cpp
   celonis/util.cpp
 )
 

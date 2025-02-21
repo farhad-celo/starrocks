@@ -109,6 +109,7 @@ ${license}
 #include "exprs/celonis/to_double.h"
 #include "exprs/celonis/transits_interleaved.h"
 #include "exprs/celonis/transits_match.h"
+#include "exprs/celonis/trim.h"
 #include "exprs/map_functions.h"
 #include "exprs/struct_functions.h"
 #include "exprs/math_functions.h"

@@ -1572,6 +1572,8 @@ celostar_functions = [
     [4001402, 'celonis_xx_hash3_128_v2', True, False, 'LARGEINT', ['ARRAY_VARCHAR'], 'CelonisStringFunctions::xx_hash3_128_v2'],
     [4001501, 'celonis_xx_hash3_128_v3', True, False, 'LARGEINT', ['VARCHAR', '...'], 'CelonisStringFunctions::xx_hash3_128_v3'],
     [4001502, 'celonis_xx_hash3_128_v3', True, False, 'LARGEINT', ['ARRAY_VARCHAR'], 'CelonisStringFunctions::xx_hash3_128_v3'],
+    [4001503, 'celonis_ltrim', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR'], 'CelonisTrim::ltrim', 'CelonisTrim::ltrim_prepare', 'CelonisTrim::trim_close'],
+    [4001504, 'celonis_rtrim', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR'], 'CelonisTrim::rtrim', 'CelonisTrim::rtrim_prepare', 'CelonisTrim::trim_close'],
 
     # Math functions
     [5000101, 'celonis_square', True, False, 'INT', ['INT'], 'CelonisMathFunctions<TYPE_INT>::square'],
