@@ -679,10 +679,11 @@ public class FunctionSet {
                     SUBSTRING, SUBSTRING_INDEX,
                     TRIM, UPPER, IF);
 
+    private final ImmutableSet<String> celonisNotAlwaysNullResultWithNullParamFunctions =
+            ImmutableSet.of(CELONIS_GREATEST, CELONIS_LEAST);
+
     public static final Set<String> celonisAlwaysReturnNonNullableFunctions =
             ImmutableSet.<String>builder()
-                    .add(FunctionSet.CELONIS_GREATEST)
-                    .add(FunctionSet.CELONIS_LEAST)
                     .add(FunctionSet.CELONIS_NULL_TO_EMPTY)
                     .add(FunctionSet.CELONIS_XX_HASH3_128)
                     .add(FunctionSet.CELONIS_XX_HASH3_128_V2)
@@ -963,6 +964,7 @@ public class FunctionSet {
     public boolean isNotAlwaysNullResultWithNullParamFunctions(String funcName) {
         return notAlwaysNullResultWithNullParamFunctions.contains(funcName)
                 || alwaysReturnNonNullableFunctions.contains(funcName)
+                || celonisNotAlwaysNullResultWithNullParamFunctions.contains(funcName)
                 || celonisAlwaysReturnNonNullableFunctions.contains(funcName);
     }
 
