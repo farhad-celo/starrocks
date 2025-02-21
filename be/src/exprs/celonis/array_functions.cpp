@@ -526,21 +526,18 @@ public:
         }
         size_t n_rows = columns[0]->size();
         ColumnPtr input_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
-        ColumnPtr output_column = input_column->clone_empty();
 
         const auto* input_nullable_column = down_cast<const NullableColumn*>(input_column.get());
         const auto& input_data_column = input_nullable_column->data_column_ref();
 
-        auto* output_nullable_column = down_cast<NullableColumn*>(output_column.get());
-        auto* output_data_column = output_nullable_column->mutable_data_column();
-        auto* output_null_column = output_nullable_column->mutable_null_column();
-        output_null_column->get_data().resize(n_rows, 0);
-        output_nullable_column->set_has_null(false);
+        // It should return a non-nullable column because it is registered in celonisAlwaysReturnNonNullableFunctions.
+        ColumnPtr output_column = input_data_column.clone_empty();
+
         for (size_t i = 0; i < n_rows; ++i) {
             if (input_column->is_null(i)) {
-                output_data_column->append_default();
+                output_column->append_default();
             } else {
-                output_data_column->append(input_data_column, i, 1);
+                output_column->append(input_data_column, i, 1);
             }
         }
         return output_column;
@@ -551,7 +548,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] Functi
                                                          const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     if (columns[0]->only_null()) {
-        auto result_column = context->create_column(context->get_return_type(), columns[0]->is_nullable());
+        auto result_column = context->create_column(context->get_return_type(), false);
         result_column->append_datum(DatumArray{});
         return ConstColumn::create(std::move(result_column), columns[0]->size());
     }

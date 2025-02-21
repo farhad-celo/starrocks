@@ -2226,6 +2226,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_empty_input_array_column) {
     auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(0, result->size());
 }
 
@@ -2235,6 +2236,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_empty_input_array) {
     input_array->append_datum(DatumArray{3, 2});
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(0, result->get(0).get_array().size());
     ASSERT_EQ(2, result->get(1).get_array().size());
@@ -2249,6 +2251,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_null_input_array) {
     input_array->append_datum(kNullDatum);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(3, result->size());
     ASSERT_EQ(0, result->get(0).get_array().size());
     ASSERT_EQ(2, result->get(1).get_array().size());
@@ -2264,6 +2267,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_const_null_input_array) {
     input_array->append_datum(kNullDatum);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(3, result->size());
     ASSERT_EQ(0, result->get(0).get_array().size());
     ASSERT_EQ(0, result->get(1).get_array().size());
@@ -2276,6 +2280,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_nonnull_array) {
     input_array->append_datum(DatumArray{3, 2});
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(3, result->get(0).get_array().size());
     EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
@@ -2294,6 +2299,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_datetime) {
     input_array->append_datum(kNullDatum);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(3, result->get(0).get_array().size());
     EXPECT_EQ(TimestampValue::create(2020, 8, 10, 1, 32, 32), result->get(0).get_array()[0].get_timestamp());
@@ -2309,6 +2315,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_varchar) {
     input_array->append_datum(kNullDatum);
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(3, result->size());
     ASSERT_EQ(2, result->get(0).get_array().size());
     EXPECT_EQ("1", result->get(0).get_array()[0].get_slice());
@@ -2325,6 +2332,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_null_elements_in_array) {
     input_array->append_datum(DatumArray{kNullDatum});
 
     const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(4, result->size());
     ASSERT_EQ(2, result->get(0).get_array().size());
     EXPECT_EQ("1", result->get(0).get_array()[0].get_slice());
@@ -2346,6 +2354,7 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_only_null) {
     auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     const auto result = CelonisArrayFunctions::null_to_empty(ctx.get(), {input_array}).value();
+    EXPECT_FALSE(result->is_nullable());
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(0, result->get(0).get_array().size());
     ASSERT_EQ(0, result->get(1).get_array().size());
