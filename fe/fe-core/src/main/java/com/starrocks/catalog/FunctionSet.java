@@ -538,6 +538,7 @@ public class FunctionSet {
     public static final String CELONIS_NULL_TO_EMPTY = "celonis_null_to_empty";
     public static final String CELONIS_TRANSITS_INTERLEAVED = "celonis_transits_interleaved";
     public static final String CELONIS_TRANSITS_MATCH = "celonis_transits_match";
+    public static final String CELONIS_TRANSPOSE_ARRAY_OF_STRUCT = "celonis_transpose_array_of_struct";
     public static final String CELONIS_XX_HASH3_128 = "celonis_xx_hash3_128";
     public static final String CELONIS_XX_HASH3_128_V2 = "celonis_xx_hash3_128_v2";
     public static final String CELONIS_XX_HASH3_128_V3 = "celonis_xx_hash3_128_v3";

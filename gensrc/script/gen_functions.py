@@ -107,6 +107,7 @@ ${license}
 #include "exprs/celonis/string_functions.h"
 #include "exprs/celonis/time_functions.h"
 #include "exprs/celonis/to_double.h"
+#include "exprs/celonis/transpose_array_of_struct.h"
 #include "exprs/celonis/transits_interleaved.h"
 #include "exprs/celonis/transits_match.h"
 #include "exprs/celonis/trim.h"

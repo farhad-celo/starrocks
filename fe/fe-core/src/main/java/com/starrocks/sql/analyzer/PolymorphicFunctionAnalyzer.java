@@ -141,6 +141,19 @@ public class PolymorphicFunctionAnalyzer {
         }
     }
 
+    private static class CelonisTransposeArrayOfStructDeduce implements java.util.function.Function<Type[], Type> {
+        @Override
+        public Type apply(Type[] types) {
+            ArrayType arrayType = (ArrayType) types[0];
+            StructType structType = (StructType) arrayType.getItemType();
+            ArrayList<Type> structTypes = new ArrayList<>(structType.getFields().size());
+            for (StructField structField : structType.getFields()) {
+                structTypes.add(new ArrayType(structField.getType()));
+            }
+            return new StructType(structTypes);
+        }
+    }
+
     private static class CelonisTransitsMatchDeduce implements java.util.function.Function<Type[], Type> {
         @Override
         public Type apply(Type[] types) {
@@ -268,6 +281,7 @@ public class PolymorphicFunctionAnalyzer {
             .put(FunctionSet.CELONIS_ENUMERATE_TRANSITIVE_EDGES, new CelonisEnumerateTransitiveEdgesDeduce())
             .put(FunctionSet.CELONIS_TRANSITS_INTERLEAVED, new CelonisTransitsInterleavedDeduce())
             .put(FunctionSet.CELONIS_TRANSITS_MATCH, new CelonisTransitsMatchDeduce())
+            .put(FunctionSet.CELONIS_TRANSPOSE_ARRAY_OF_STRUCT, new CelonisTransposeArrayOfStructDeduce())
             .put(FunctionSet.MAP_KEYS, new MapKeysDeduce())
             .put(FunctionSet.MAP_VALUES, new MapValuesDeduce())
             .put(FunctionSet.MAP_FROM_ARRAYS, new MapFromArraysDeduce())

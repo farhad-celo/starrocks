@@ -172,6 +172,7 @@ set(CELONIS_FILES
   celonis/table_function/count_edges.cpp
   celonis/time_functions.cpp
   celonis/to_double.cpp
+  celonis/transpose_array_of_struct.cpp
   celonis/transits_interleaved.cpp
   celonis/transits_match.cpp
   celonis/trim.cpp

@@ -1207,6 +1207,23 @@ public class ExpressionAnalyzer {
                         throw new SemanticException(fnName + "'s 4th input rightMatch should not be NULL", node.getPos());
                     }
                     break;
+                case FunctionSet.CELONIS_TRANSPOSE_ARRAY_OF_STRUCT:
+                    if (node.getChildren().size() != 1) {
+                        throw new SemanticException(fnName + " should have 1 input, but really have "
+                                + node.getChildren().size() + " inputs. 1 input is ARRAY<STRUCT>", node.getPos());
+                    }
+                    if (!node.getChild(0).getType().isArrayType()) {
+                        throw new SemanticException(fnName + "'s input " + node.getChild(0).toSql() +
+                                " should be an array, but real type is " +
+                                node.getChild(0).getType().toSql(), node.getPos());
+                    }
+                    ArrayType arrayType = (ArrayType) node.getChild(0).getType();
+                    if (!arrayType.getItemType().isStructType()) {
+                        throw new SemanticException(fnName + "'s input " + node.getChild(0).toSql() +
+                                " should be an array of struct, but real type is array of " +
+                                arrayType.getItemType().toSql(), node.getPos());
+                    }
+                    break;
                 case FunctionSet.CELONIS_ENUMERATE_TRANSITIVE_EDGES:
                     if (node.getChildren().size() != 3) {
                         throw new SemanticException(fnName + " should have 3 inputs, but really have "
