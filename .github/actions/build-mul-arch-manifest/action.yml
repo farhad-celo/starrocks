@@ -1,0 +1,20 @@
+name: Build multiple architecture docker manifest
+
+inputs:
+  arm_image_tag:
+    required: true
+  x86_image_tag:
+    required: true
+  mul_arch_image_tag:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: build and push manifest
+      shell: bash
+      run: |
+        export DOCKER_CLI_EXPERIMENTAL=enabled
+
+        docker manifest create ${{ inputs.mul_arch_image_tag }} ${{ inputs.x86_image_tag }} ${{ inputs.arm_image_tag }} 
+        docker manifest push ${{ inputs.mul_arch_image_tag }}

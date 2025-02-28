@@ -7,10 +7,25 @@ inputs:
     required: true
   branch:
     required: false
+  to_push:
+    required: false
+    default: 'false'
+    description: "whether to push the images to remote"
+  aws_access_key_id:
+    required: false
+    description: "aws access key id"
+  aws_secret_access_key:
+    required: false
+    description: "aws access key"
 
 runs:
   using: composite
   steps:
+    - name: Docker login
+      shell: bash
+      run: |
+        echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+
     - name: Build FE image
       shell: bash
       run: |
@@ -33,3 +48,48 @@ runs:
         DOCKER_BUILDKIT=1 docker build -q --force-rm=true --build-arg RUN_AS_USER=starrocks \
           --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
           -f docker/dockerfiles/be/be-ubuntu.Dockerfile -t starrocks-be:${{inputs.image_tag}} .
+
+    - name: Push FE to GHCR
+      if: ${{ inputs.to_push == 'true' }}
+      uses: ./.github/actions/push-to-registry
+      with:
+        local_image: "starrocks-fe:${{ inputs.image_tag }}"
+        remote_image: "ghcr.io/celonis/celostar/starrocks-fe:${{ inputs.image_tag }}"
+
+    - name: Push BE image to GHCR
+      if: ${{ inputs.to_push == 'true' }}
+      uses: ./.github/actions/push-to-registry
+      with:
+        local_image: "starrocks-be:${{ inputs.image_tag }}"
+        remote_image: "ghcr.io/celonis/celostar/starrocks-be:${{ inputs.image_tag }}"
+        
+    - name: Configure prod AWS credentials
+      if: ${{ inputs.to_push == 'true' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: eu-central-1
+        
+    - name: prod Amazon ECR login
+      if: ${{ inputs.to_push == 'true' }}
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Push FE image to ECR
+      if: ${{ inputs.to_push == 'true' }}
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      uses: ./.github/actions/push-to-registry
+      with:
+        local_image: "starrocks-fe:${{ inputs.image_tag }}"
+        remote_image: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.image_tag }}"
+
+    - name: Push BE image to ECR
+      if: ${{ inputs.to_push == 'true' }}
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      uses: ./.github/actions/push-to-registry
+      with:
+        local_image: "starrocks-be:${{ inputs.image_tag }}"
+        remote_image: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.image_tag }}"

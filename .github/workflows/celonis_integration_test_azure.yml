@@ -15,7 +15,7 @@ on:
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.3
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:cpml-new-source
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:hu-mul-ar-multi-arch
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
@@ -25,10 +25,10 @@ permissions:
 
 jobs:
   sync-and-rebase-upstream:
-    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     outputs:
       test_branch: ${{steps.rebase.outputs.test_branch || inputs.branch_to_test}}
-      test_image_tag: ${{steps.rebase.outputs.test_branch || steps.image_tag_output.outputs.test_image_tag}}
+      test_image_tag: ${{ steps.rebase.outputs.test_branch || steps.image_tag_output.outputs.test_image_tag }}
     steps:
       - name: Output image tag
         if: ${{inputs.branch_to_test != ''}}
@@ -144,7 +144,7 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
 
   presubmit-test:
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64, image=ubuntu22-full-x64, disk=large, "run-id=${{ github.run_id }}"]
     # No need to run presubmit test on existing branch as the pull request of the branch will trigger it.
     if: inputs.branch_to_test == ''
     needs: sync-and-rebase-upstream
@@ -160,75 +160,181 @@ jobs:
       - name: Pull dev env image
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
-          docker pull ${BUILDER}
+          docker pull ${{ env.BUILDER }}
 
       - name: Test
         uses: ./.github/actions/presubmit-test
         with:
-          builder: ${BUILDER}
+          builder: ${{ env.BUILDER }}
 
-  build-artifact:
-    #    runs-on: [self-hosted, celostar, ec2-sr]
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
+  build-arm:
+    runs-on: [ runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}" ]
     needs: sync-and-rebase-upstream
     env:
-      test_image_tag: ${{needs.sync-and-rebase-upstream.outputs.test_image_tag}}
-      test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
+      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-arm
+      test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
     outputs:
-      test_branch: ${{env.test_branch}}
-      artifact_image_tag: ${{env.test_image_tag}}
+      test_branch: ${{ env.test_branch }}
+      artifact_image_tag: ${{ env.image_tag }}
+      test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
+      allin1_image: ${{ env.image_tag }}
     steps:
-      - name: update docker data root
-        run: |
-          echo '{"data-root": "/home/runner/_work/docker"}' | sudo tee /etc/docker/daemon.json > /dev/null
-          sudo systemctl restart docker
-          sudo cat /etc/docker/daemon.json
-      - name: df -Th
-        run: |
-          df -Th
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{env.test_branch}}
 
-      - name: Build and push artifact image
+      - name: Build artifact image
         id: build-artifact
         uses: ./.github/actions/build-artifact
         with:
-          dev_env_image: ${BUILDER}
-          image_tag: ${test_image_tag}
-      - name: df -Th
-        run: |
-          df -Th
-  
-
-  build-allin1:
-    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,disk=default,"run-id=${{ github.run_id }}"]
-    needs: build-artifact
-    env:
-      test_branch: ${{needs.build-artifact.outputs.test_branch}}
-      artifact_image_tag: ${{needs.build-artifact.outputs.artifact_image_tag}}
-    outputs:
-      allin1_image_tag: ${{env.artifact_image_tag}}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{env.test_branch}}
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'false'
 
       - name: Build and push allin1 image
         uses: ./.github/actions/build-allin1
         with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${artifact_image_tag}
-          image_tag: ${artifact_image_tag}
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${image_tag}
+          pull_artifact: 'false'
+
+      - name: Build and push fe-be
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  build-x86:
+    runs-on: [ runs-on, runner=64cpu-linux-x64, image=ubuntu24-full-x64, disk=large, "run-id=${{ github.run_id }}" ]
+    needs: sync-and-rebase-upstream
+    env:
+      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-x86
+      test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
+    outputs:
+      test_branch: ${{ env.test_branch }}
+      artifact_image_tag: ${{ env.image_tag }}
+      test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
+      allin1_image: ${{ env.image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{env.test_branch}}
+
+      - name: Build artifact image
+        id: build-artifact
+        uses: ./.github/actions/build-artifact
+        with:
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'false'
+
+      - name: Build and push allin1 image
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          pull_artifact: 'false'
+
+      - name: Build and push fe-be
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  build-manifest:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: [build-arm, build-x86]
+    env:
+      arm_image_tag: ${{ needs.build-arm.outputs.allin1_image }}
+      x86_image_tag: ${{ needs.build-x86.outputs.allin1_image }}
+      allin1_image_tag: ${{ needs.build-x86.outputs.test_image_tag }}
+      fe_be_image_tag: ${{ needs.build-x86.outputs.test_image_tag }}
+    outputs:
+      test_branch: ${{ needs.build-allin1-x86.outputs.test_branch }}
+      allin1_image_tag: ${{ env.allin1_image_tag }}
+      fe_be_image_tag: ${{ env.fe_be_image_tag }}
+    steps:
+      - name: GHCR login
+        shell: bash
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{env.test_branch}}
+      - name: Build and push allin1 manifest
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${arm_image_tag}"
+          x86_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${x86_image_tag}"
+          mul_arch_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${allin1_image_tag}"
+      - name: Build and push fe-be manifest
+        shell: bash
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+          export DOCKER_CLI_EXPERIMENTAL=enabled
+
+          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-be:${fe_be_image_tag}"
+          arm_tag="ghcr.io/celonis/celostar/starrocks-be:${arm_image_tag}"
+          x86_tag="ghcr.io/celonis/celostar/starrocks-be:${x86_image_tag}"
+
+          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
+
+          docker manifest push "$mul_arch_tag"
+          
+          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-fe:${fe_be_image_tag}"
+          arm_tag="ghcr.io/celonis/celostar/starrocks-be:${arm_image_tag}"
+          x86_tag="ghcr.io/celonis/celostar/starrocks-be:${x86_image_tag}"
+
+          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
+
+          docker manifest push "$mul_arch_tag"
+
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push fe-be manifest to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${arm_image_tag}"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${x86_image_tag}"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${fe_be_image_tag}"
+
+      - name: Build and push fe manifest to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${arm_image_tag}"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${x86_image_tag}"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${fe_be_image_tag}"
 
   celostar-presubmit-test:
-    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
-    needs: build-allin1
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: build-manifest
     env:
-      test_image_tag: ${{needs.build-allin1.outputs.allin1_image_tag}}
+      test_image_tag: ${{needs.build-manifest.outputs.allin1_image_tag}}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -250,88 +356,11 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
 
-  build-fe-be:
-    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,disk=default,"run-id=${{ github.run_id }}"]
-    needs: build-artifact
-    env:
-      test_branch: ${{needs.build-artifact.outputs.test_branch}}
-      test_image_tag: ${{needs.build-artifact.outputs.artifact_image_tag}}
-    outputs:
-      test_image_tag: ${{env.test_image_tag}}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{env.test_branch}}
-
-      - name: Pull artifact image
-        run: |
-          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
-          docker pull ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
-
-      - name: Build FE & BE
-        uses: ./.github/actions/build-fe-be
-        with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
-          image_tag: ${test_image_tag}
-
-      - name: Push FE image to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-fe:${test_image_tag}
-          remote_image: ghcr.io/celonis/celostar/starrocks-fe:${test_image_tag}
-
-      - name: Push BE image to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-be:${test_image_tag}
-          remote_image: ghcr.io/celonis/celostar/starrocks-be:${test_image_tag}
-
-      - name: Configure prod AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
-
-      - name: prod Amazon ECR login
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Push FE image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-fe:${test_image_tag}
-          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${test_image_tag}
-
-      - name: Push BE image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-be:${test_image_tag}
-          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${test_image_tag}
-
-  # Skip this step as the current runs-on runners are ephemeral.
-  #      - name: clean up
-  #        if: ${{ always() }}
-  #        run: |
-  #          docker rmi -f $(docker images -q starrocks-fe:${test_image_tag}) || true
-  #          docker rmi -f $(docker images -q starrocks-be:${test_image_tag}) || true
-  #          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}) || true
-  #          docker system prune -f
-  #          docker volume prune -f
-  #          docker logout ghcr.io
-  #        continue-on-error: true
-
   e2e-tests:
-    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
-    needs: build-fe-be
+    runs-on: [runs-on,runner=1cpu-linux-x64, image=ubuntu22-full-x64, "run-id=${{ github.run_id }}"]
+    needs: build-manifest
     env:
-      test_image_tag: ${{needs.build-fe-be.outputs.test_image_tag}}
+      test_image_tag: ${{ needs.build-manifest.outputs.fe_be_image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -360,17 +389,17 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
 
-
-
-  build-asan-artifact:
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
+  build-asan-arm:
+    runs-on: [ runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}" ]
     needs: sync-and-rebase-upstream
     env:
-      test_branch: ${{needs.sync-and-rebase-upstream.outputs.test_branch}}
-      test_image_tag: "${{needs.sync-and-rebase-upstream.outputs.test_image_tag}}-asan"
+      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-asan-arm
+      test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
     outputs:
-      test_branch: ${{env.test_branch}}
-      test_image_tag: ${{env.test_image_tag}}
+      test_branch: ${{ env.test_branch }}
+      artifact_image_tag: ${{ env.image_tag }}
+      test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
+      allin1_image: ${{ env.image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -378,21 +407,33 @@ jobs:
           fetch-depth: 0
           ref: ${{env.test_branch}}
 
-      - name: Build and push artifact image
+      - name: Build artifact image
+        id: build-artifact
         uses: ./.github/actions/build-artifact
         with:
-          dev_env_image: ${BUILDER}
-          image_tag: ${test_image_tag}
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'false'
           is_asan_mode: 'yes'
 
-  build-asan-allin1:
-    runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,disk=default,"run-id=${{ github.run_id }}"]
-    needs: build-asan-artifact
+      - name: Build and push allin1 image
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          pull_artifact: 'false'
+
+  build-asan-x86:
+    runs-on: [ runs-on, runner=64cpu-linux-x64, image=ubuntu24-full-x64, disk=large, "run-id=${{ github.run_id }}" ]
+    needs: sync-and-rebase-upstream
     env:
-      test_branch: ${{needs.build-asan-artifact.outputs.test_branch}}
-      test_image_tag: ${{needs.build-asan-artifact.outputs.test_image_tag}}
+      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-asan-x86
+      test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
     outputs:
-      allin1_image_tag: ${{env.test_image_tag}}
+      test_branch: ${{ env.test_branch }}
+      artifact_image_tag: ${{ env.image_tag }}
+      test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
+      allin1_image: ${{ env.image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -400,17 +441,54 @@ jobs:
           fetch-depth: 0
           ref: ${{env.test_branch}}
 
-      - name: Build and push asan allin1 image
+      - name: Build artifact image
+        id: build-artifact
+        uses: ./.github/actions/build-artifact
+        with:
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'false'
+
+      - name: Build and push allin1 image
         uses: ./.github/actions/build-allin1
         with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
-          image_tag: ${test_image_tag}
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          pull_artifact: 'false'
+
+  build-asan-manifest:
+    runs-on: [ runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}" ]
+    needs: [ build-asan-arm, build-asan-x86 ]
+    env:
+      arm_image_tag: ${{ needs.build-asan-arm.outputs.allin1_image }}
+      x86_image_tag: ${{ needs.build-asan-x86.outputs.allin1_image }}
+      allin1_image_tag: ${{ needs.build-asan-x86.outputs.test_image_tag }}-asan
+    outputs:
+      test_branch: ${{ needs.build-asan-x86.outputs.test_branch }}
+      allin1_image_tag: ${{ env.allin1_image_tag }}
+    steps:
+      - name: GHCR login
+        shell: bash
+        run: |
+            echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{env.test_branch}}
+      - name: Build and push allin1 manifest
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${{ env.arm_image_tag }}"
+          x86_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${{ env.x86_image_tag }}"
+          mul_arch_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${{ env.allin1_image_tag }}"
+
 
   celostar-compliance-test:
-    runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
-    needs: build-asan-allin1
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: build-asan-manifest
     env:
-      test_image_tag: ${{needs.build-asan-allin1.outputs.allin1_image_tag}}
+      test_image_tag: ${{ needs.build-asan-manifest.outputs.allin1_image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

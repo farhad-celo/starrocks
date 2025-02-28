@@ -26,7 +26,7 @@ runs:
     - name: GHCR login
       shell: bash
       run: |
-        echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+        echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
 
     - name: Pull artifact image
       if: ${{inputs.pull_artifact == 'true'}}
@@ -42,7 +42,7 @@ runs:
         # Need to set the flag to make Celostar compliance test pass.
         echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf
 
-        if [[ "${{inputs.for_dic}}" == "true" ]]; then
+        if [[ "${{ inputs.for_dic }}" == "true" ]]; then
           echo "Adding more configs for DIC"
           {
             echo 'JAVA_OPTS="-Xms8g -Xmx64g"'
@@ -57,15 +57,10 @@ runs:
         # Build image and always remove intermediate containers.
         DOCKER_BUILDKIT=1 docker buildx build -q --force-rm=true \
           --build-arg WITH_DEBUG_INFO=true \
-          --build-arg ARTIFACTIMAGE=${{inputs.artifact_image}} \
+          --build-arg ARTIFACTIMAGE=${{ inputs.artifact_image }} \
           -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile \
-          -t starrocks-allin1:${{inputs.image_tag}} .
-
-    - name: Push to GHCR
-      uses: ./.github/actions/push-to-registry
-      with:
-        local_image: starrocks-allin1:${{inputs.image_tag}}
-        remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${{inputs.image_tag}}
+          -t ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.image_tag }} \
+          --push .
 
 # Skip this step as we are using runs-on runner which is ephemeral.
 #    - name: Clean up artifact image
