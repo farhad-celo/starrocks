@@ -32,9 +32,9 @@ NFAEvaluator::NFAEvaluator(const NFA* nfa): nfa_(nfa) {
     initial_dfa_state_ = to_dfa_state(state);
 }
 
-bool NFAEvaluator::matches(const std::vector<std::string>& activities) {
+bool NFAEvaluator::matches(const std::vector<Slice>& activities) {
     int current_state = initial_dfa_state_;
-    for (const std::string& activity : activities) {
+    for (const Slice& activity : activities) {
         current_state = get_or_compute_updated_state(activity, current_state);
     }
     return final_dfa_states_[current_state];
@@ -59,7 +59,7 @@ int NFAEvaluator::to_dfa_state(const std::vector<bool>& nfa_state_set) {
     return rv;
 }
 
-int NFAEvaluator::get_or_compute_updated_state(const std::string& activity, int current_dfa_state) {
+int NFAEvaluator::get_or_compute_updated_state(const Slice& activity, int current_dfa_state) {
     auto rv_iter = dfa_transitions_.find({current_dfa_state, activity});
     if (rv_iter != dfa_transitions_.end()) {
         return rv_iter->second;
@@ -72,7 +72,7 @@ int NFAEvaluator::get_or_compute_updated_state(const std::string& activity, int 
 }
 
 std::vector<bool>
-NFAEvaluator::compute_updated_state(const std::string& activity, const std::vector<bool>& current_state) {
+NFAEvaluator::compute_updated_state(const Slice& activity, const std::vector<bool>& current_state) {
     std::vector<bool> new_state(current_state.size());
     for (int i = 0; i < nfa_->states.size(); ++i) {
         if (!current_state[i]) {
@@ -123,16 +123,15 @@ void NFAEvaluator::add_state_and_transitions(int new_state, std::vector<bool>* c
     }
 }
 
-StatusOr<std::string> convert_like_pattern(const std::string& pattern) {
+StatusOr<std::string> convert_like_pattern(const Slice& pattern) {
     std::string re_pattern;
     re_pattern.clear();
 
     bool is_escaped = false;
-
     re_pattern.append("^");
     bool has_unescaped_wildcards = false;
 
-    for (int i = 0; i < pattern.size(); ++i) {
+    for (int i = 0; i < pattern.size; ++i) {
         if (!is_escaped && pattern[i] == '%') {
             re_pattern.append(".*");
             has_unescaped_wildcards = true;
@@ -156,18 +155,15 @@ StatusOr<std::string> convert_like_pattern(const std::string& pattern) {
             is_escaped = false;
         }
     }
-
     if (!has_unescaped_wildcards) {
         return Status::RuntimeError(fmt::format("Regex {} should have wildcards", pattern));
     }
 
     re_pattern.append("$");
-
     return re_pattern;
 }
 
-
-bool NFAEvaluator::transition_matches_activity(const std::string& activity, const NFA::Transition& transition) {
+bool NFAEvaluator::transition_matches_activity(const Slice& activity, const NFA::Transition& transition) {
     switch (transition.type) {
         case NFA::E_TRANSITION:
             return false;
@@ -178,25 +174,28 @@ bool NFAEvaluator::transition_matches_activity(const std::string& activity, cons
         case NFA::INVERSE_MATCH:
             return !transition.activity_names.count(activity);
         case NFA::LIKE:
-            if (transition.activity_names.count("%")) {
+            if (transition.activity_names.count(Slice("%"))) {
                 return true;
             }
-            return transition.regex_patterns->Match(re2::StringPiece(activity.c_str(), activity.size()), nullptr);
+            return transition.regex_patterns->Match(re2::StringPiece(activity.data, activity.size), nullptr);
     }
     std::stringstream error;
     error << "Unhandled case: " << transition.type << std::endl;
     throw std::runtime_error(error.str());
 }
 
-
-static StatusOr<std::unique_ptr<NFA>> from_json(const std::string& input) {
+// Keeps the NFA that defines matching. Initialized once per thread.
+struct MatchProcessState {
+    std::unique_ptr<NFA> nfa;
     rapidjson::Document document;
-    document.Parse(input.c_str());
+};
+
+static StatusOr<std::unique_ptr<NFA>> from_json(MatchProcessState* func_state, const std::string& input) {
+    func_state->document.Parse(input.c_str());
     std::unique_ptr<NFA> result = std::make_unique<NFA>();
+    result->initial_state = func_state->document["initialState"].GetInt();
 
-    result->initial_state = document["initialState"].GetInt();
-
-    const rapidjson::Value& states = document["states"];
+    const rapidjson::Value& states = func_state->document["states"];
     for (rapidjson::SizeType i = 0; i < states.Size(); ++i) {
         std::unique_ptr<NFA::State> state = std::make_unique<NFA::State>();
         const rapidjson::Value& transitions = states[i]["transitions"];
@@ -210,7 +209,7 @@ static StatusOr<std::unique_ptr<NFA>> from_json(const std::string& input) {
             }
             const rapidjson::Value& activity_names = transitions[j]["activityNames"];
             for (rapidjson::SizeType k = 0; k < activity_names.Size(); ++k) {
-                transition->activity_names.insert(activity_names[k].GetString());
+                transition->activity_names.insert(Slice(activity_names[k].GetString()));
             }
             if (transition->type == NFA::LIKE) {
                 RE2::Options opts;
@@ -218,7 +217,7 @@ static StatusOr<std::unique_ptr<NFA>> from_json(const std::string& input) {
                 opts.set_dot_nl(true);
                 opts.set_log_errors(false);
                 std::unique_ptr<re2::RE2::Set> regex_set = std::make_unique<re2::RE2::Set>(opts, RE2::UNANCHORED);
-                for (const std::string& activity : transition->activity_names) {
+                for (const Slice& activity : transition->activity_names) {
                     ASSIGN_OR_RETURN(const std::string regex, convert_like_pattern(activity));
                     std::string err;
                     if (regex_set->Add(regex, &err) < 0) {
@@ -248,25 +247,21 @@ ColumnPtr celonis_match_process_internal(const NFA* nfa, const Column& elements,
     result.reserve(num_array);
     using ValueType = RunTimeCppType<TYPE_VARCHAR>;
     auto elements_ptr = (const ValueType *) (elements.raw_data());
-    std::vector<std::string> current_array;
-
+    std::vector<Slice> current_array;
     NFAEvaluator nfa_eval(nfa);
-
     for (size_t i = 0; i < num_array; i++) {
         if (null_array_offsets != nullptr && (*null_array_offsets)[i]) {
             result.append_null();
             continue;
         }
-        size_t offset = offsets_ptr[i];
-        size_t array_size = offsets_ptr[i + 1] - offsets_ptr[i];
+        size_t start = offsets_ptr[i];
+        size_t end = offsets_ptr[i + 1];
         current_array.clear();
-        for (size_t index = 0; index < array_size; ++index) {
-            if (null_element_offsets != nullptr && (*null_element_offsets)[offset + index] != 0) {
+        for (size_t index = start; index < end; ++index) {
+            if (null_element_offsets != nullptr && (*null_element_offsets)[index] != 0) {
                 continue;
             }
-
-            const auto &value = elements_ptr[offset + index];
-            current_array.push_back(value.to_string());
+            current_array.push_back(elements_ptr[index]);
         }
         if (nfa_eval.matches(current_array)) {
             result.append(1L);
@@ -276,11 +271,6 @@ ColumnPtr celonis_match_process_internal(const NFA* nfa, const Column& elements,
     }
     return result.build(/*is_const=*/false);
 }
-
-// Keeps the NFA that defines matching. Initialized once per thread.
-struct MatchProcessState {
-    std::unique_ptr<NFA> nfa;
-};
 
 Status CelonisMatchProcess::match_process_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
@@ -294,21 +284,22 @@ Status CelonisMatchProcess::match_process_prepare(FunctionContext* context, Func
         return Status::OK();
     }
     const auto json_input = context->get_constant_column(1);
+    auto *state = new MatchProcessState();
     std::string json = ColumnHelper::get_const_value<TYPE_VARCHAR>(json_input).to_string();
-    StatusOr<std::unique_ptr<NFA>> nfa_status = from_json(json);
+    StatusOr<std::unique_ptr<NFA>> nfa_status = from_json(state, json);
     if (!nfa_status.ok()) {
         std::stringstream error;
         error << "can't parse JSON specification in celonis_match_process" << std::endl;
         throw std::runtime_error(error.str());
     }
-    auto *state = new MatchProcessState();
     state->nfa = std::move(nfa_status.value());
     context->set_function_state(scope, state);
 
     return Status::OK();
 }
 
-Status CelonisMatchProcess::match_process_prepare_benchmark_only(FunctionContext* context, std::unique_ptr<NFA> nfa, FunctionContext::FunctionStateScope scope) {
+Status CelonisMatchProcess::match_process_prepare_benchmark_only(FunctionContext* context, std::unique_ptr<NFA> nfa,
+                                                                 FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
     }
@@ -316,11 +307,9 @@ Status CelonisMatchProcess::match_process_prepare_benchmark_only(FunctionContext
         return Status::InvalidArgument(
                 "celonis_match_process needs 1 parameter: column");
     }
-
-    auto *state = new MatchProcessState();
+    auto* state = new MatchProcessState();
     state->nfa = std::move(nfa);
     context->set_function_state(scope, state);
-
     return Status::OK();
 }
 
@@ -329,7 +318,6 @@ Status CelonisMatchProcess::match_process_close(FunctionContext* context, Functi
         auto* state = reinterpret_cast<MatchProcessState*>(context->get_function_state(scope));
         delete state;
     }
-
     return Status::OK();
 }
 

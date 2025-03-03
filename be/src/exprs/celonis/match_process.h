@@ -39,11 +39,11 @@ public:
     DEFINE_VECTORIZED_FN(celonis_match_process);
 
     static Status match_process_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
-
     static Status match_process_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
-    /// Instead of preparing the NFA from context's json column, prepare it from @param nfa. Only used in the benchmarks.
-    static Status match_process_prepare_benchmark_only(FunctionContext* context, std::unique_ptr<NFA> nfa, FunctionContext::FunctionStateScope scope);
+    // Instead of preparing the NFA from context's json column, prepare it from @param nfa. Only used in the benchmarks.
+    static Status match_process_prepare_benchmark_only(FunctionContext* context, std::unique_ptr<NFA> nfa,
+                                                       FunctionContext::FunctionStateScope scope);
 };
 
 // Describes the NFA structure.
@@ -53,7 +53,7 @@ struct NFA {
     struct Transition {
         TransitionType type;
         std::vector<int> to_states;
-        HashSet<std::string> activity_names;
+        SliceHashSet activity_names;
         // for transition of type LIKE, keep the precompiled regular expressions for matching.
         std::unique_ptr<RE2::Set> regex_patterns;
     };
@@ -72,7 +72,7 @@ class NFAEvaluator {
 public:
     NFAEvaluator(const NFA* nfa);
 
-    bool matches(const std::vector<std::string>& activities);
+    bool matches(const std::vector<Slice>& activities);
 
 private:
     const NFA* nfa_;
@@ -80,9 +80,9 @@ private:
 
     struct TransitionKey {
         int current_dfa_state;
-        std::string input_symbol;
+        SliceWithHash input_symbol;
 
-        TransitionKey(int current_state, const std::string& input_symbol)
+        TransitionKey(int current_state, const Slice& input_symbol)
                 : current_dfa_state(current_state), input_symbol(input_symbol){};
 
         bool operator==(const TransitionKey& other) const {
@@ -92,7 +92,7 @@ private:
 
     struct TransitionKeyHasher {
         std::size_t operator()(const TransitionKey& k) const {
-            return ((std::hash<int>()(k.current_dfa_state) ^ (std::hash<std::string>()(k.input_symbol) << 1)) >> 1);
+            return ((std::hash<int>()(k.current_dfa_state) ^ (k.input_symbol.hash << 1)) >> 1);
         }
     };
 
@@ -104,17 +104,18 @@ private:
 
     phmap::flat_hash_map<int, std::vector<bool>, StdHash<int>> dfa_state_to_nfa_states_;
 
+    // Based on the benchmark, using BitVector gives similar performance.
     std::vector<bool> final_dfa_states_;
 
     int to_dfa_state(const std::vector<bool>& nfa_state_set);
 
     void add_state_and_transitions(int new_state, std::vector<bool>* state);
 
-    std::vector<bool> compute_updated_state(const std::string& activity, const std::vector<bool>& current_state);
+    std::vector<bool> compute_updated_state(const Slice& activity, const std::vector<bool>& current_state);
 
-    bool transition_matches_activity(const std::string& activity, const NFA::Transition& transition);
+    bool transition_matches_activity(const Slice& activity, const NFA::Transition& transition);
 
-    int get_or_compute_updated_state(const std::string& activity, int current_dfa_state);
+    int get_or_compute_updated_state(const Slice& activity, int current_dfa_state);
 };
 
 } // namespace starrocks
