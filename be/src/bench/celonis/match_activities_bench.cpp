@@ -12,132 +12,132 @@
 
 namespace starrocks {
 
+// Args: Number of rows/ Length of each variant / Number of possible values / Starting nodes length / Nodes length / Ending nodes length / Excluding nodes length / Excluding all nodes length / Any nodes length
 /*
-2024-09-25T15:16:40+00:00
+2025-03-03T02:55:41+00:00
 Running ./be/build_Release/src/bench/celonis/output/match_activities_bench
-Run on (32 X 2650 MHz CPU s)
+Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 0.37, 1.84, 1.67
-// Args: Number of rows/ Length of each variant / Number of possible values / Starting nodes length / Nodes length / Ending nodes length / Excluding nodes length / Excluding all nodes length / Any nodes length
+Load Average: 3.35, 2.35, 1.95
 --------------------------------------------------------------------------------------------------------------------------------------
 Benchmark                                                                            Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------------------------------------------------------------------
-BM_MatchActivitiesNonConstantConfig/1000/20/20/5/0/0/0/0/0                      779899 ns       779796 ns          901 RowInvRate=779.796ns
-BM_MatchActivitiesNonConstantConfig/10000/20/20/5/0/0/0/0/0                    7725200 ns      7724517 ns           88 RowInvRate=772.452ns
-BM_MatchActivitiesNonConstantConfig/100000/20/20/5/0/0/0/0/0                  93531618 ns     93525635 ns            7 RowInvRate=935.256ns
-BM_MatchActivitiesNonConstantConfig/1000/20/40/5/0/0/0/0/0                      736121 ns       735967 ns          959 RowInvRate=735.967ns
-BM_MatchActivitiesNonConstantConfig/10000/20/40/5/0/0/0/0/0                    7275547 ns      7274303 ns           97 RowInvRate=727.43ns
-BM_MatchActivitiesNonConstantConfig/100000/20/40/5/0/0/0/0/0                  89196993 ns     89187518 ns            8 RowInvRate=891.875ns
-BM_MatchActivitiesNonConstantConfig/1000/20/60/5/0/0/0/0/0                      719353 ns       719276 ns          968 RowInvRate=719.276ns
-BM_MatchActivitiesNonConstantConfig/10000/20/60/5/0/0/0/0/0                    7073946 ns      7073401 ns           99 RowInvRate=707.34ns
-BM_MatchActivitiesNonConstantConfig/100000/20/60/5/0/0/0/0/0                  87785826 ns     87774573 ns            8 RowInvRate=877.746ns
-BM_MatchActivitiesNonConstantConfig/1000/20/20/10/0/0/0/0/0                    1143196 ns      1142795 ns          614 RowInvRate=1.14279us
-BM_MatchActivitiesNonConstantConfig/10000/20/20/10/0/0/0/0/0                  11289640 ns     11288630 ns           61 RowInvRate=1.12886us
-BM_MatchActivitiesNonConstantConfig/100000/20/20/10/0/0/0/0/0                129979836 ns    129966386 ns            5 RowInvRate=1.29966us
-BM_MatchActivitiesNonConstantConfig/1000/20/40/10/0/0/0/0/0                    1085521 ns      1085370 ns          647 RowInvRate=1085.37ns
-BM_MatchActivitiesNonConstantConfig/10000/20/40/10/0/0/0/0/0                  10688673 ns     10683080 ns           65 RowInvRate=1068.31ns
-BM_MatchActivitiesNonConstantConfig/100000/20/40/10/0/0/0/0/0                125165578 ns    125153076 ns            6 RowInvRate=1.25153us
-BM_MatchActivitiesNonConstantConfig/1000/20/60/10/0/0/0/0/0                    1052962 ns      1052823 ns          666 RowInvRate=1052.82ns
-BM_MatchActivitiesNonConstantConfig/10000/20/60/10/0/0/0/0/0                  10424342 ns     10422389 ns           67 RowInvRate=1042.24ns
-BM_MatchActivitiesNonConstantConfig/100000/20/60/10/0/0/0/0/0                121374428 ns    121355621 ns            6 RowInvRate=1.21356us
-BM_MatchActivitiesConstantConfig/1000/20/20/5/0/0/0/0/0                         139979 ns       139924 ns         5041 RowInvRate=139.924ns
-BM_MatchActivitiesConstantConfig/10000/20/20/5/0/0/0/0/0                       1390967 ns      1390853 ns          492 RowInvRate=139.085ns
-BM_MatchActivitiesConstantConfig/100000/20/20/5/0/0/0/0/0                     30063486 ns     30061092 ns           23 RowInvRate=300.611ns
-BM_MatchActivitiesConstantConfig/1000/20/40/5/0/0/0/0/0                          94614 ns        94539 ns         7468 RowInvRate=94.5388ns
-BM_MatchActivitiesConstantConfig/10000/20/40/5/0/0/0/0/0                        919118 ns       918969 ns          771 RowInvRate=91.8969ns
-BM_MatchActivitiesConstantConfig/100000/20/40/5/0/0/0/0/0                     25811880 ns     25810231 ns           27 RowInvRate=258.102ns
-BM_MatchActivitiesConstantConfig/1000/20/60/5/0/0/0/0/0                          79013 ns        78911 ns         9024 RowInvRate=78.9114ns
-BM_MatchActivitiesConstantConfig/10000/20/60/5/0/0/0/0/0                        771378 ns       771339 ns          904 RowInvRate=77.1339ns
-BM_MatchActivitiesConstantConfig/100000/20/60/5/0/0/0/0/0                     24409457 ns     24406678 ns           29 RowInvRate=244.067ns
-BM_MatchActivitiesConstantConfig/1000/20/20/10/0/0/0/0/0                        209525 ns       209492 ns         3345 RowInvRate=209.492ns
-BM_MatchActivitiesConstantConfig/10000/20/20/10/0/0/0/0/0                      2096009 ns      2095587 ns          330 RowInvRate=209.559ns
-BM_MatchActivitiesConstantConfig/100000/20/20/10/0/0/0/0/0                    36389744 ns     36386704 ns           19 RowInvRate=363.867ns
-BM_MatchActivitiesConstantConfig/1000/20/40/10/0/0/0/0/0                        132439 ns       132394 ns         5318 RowInvRate=132.394ns
-BM_MatchActivitiesConstantConfig/10000/20/40/10/0/0/0/0/0                      1318955 ns      1318696 ns          529 RowInvRate=131.87ns
-BM_MatchActivitiesConstantConfig/100000/20/40/10/0/0/0/0/0                    29428042 ns     29422349 ns           23 RowInvRate=294.223ns
-BM_MatchActivitiesConstantConfig/1000/20/60/10/0/0/0/0/0                        105222 ns       105132 ns         6733 RowInvRate=105.132ns
-BM_MatchActivitiesConstantConfig/10000/20/60/10/0/0/0/0/0                      1043248 ns      1043150 ns          670 RowInvRate=104.315ns
-BM_MatchActivitiesConstantConfig/100000/20/60/10/0/0/0/0/0                    26923740 ns     26920310 ns           26 RowInvRate=269.203ns
-BM_MatchActivitiesConstantLargeMatchesConfig/1000/20/5000/3000/0/0/0/0/0        319774 ns       319693 ns         2192 RowInvRate=319.693ns
-BM_MatchActivitiesConstantLargeMatchesConfig/10000/20/5000/3000/0/0/0/0/0      1696693 ns      1696524 ns          419 RowInvRate=169.652ns
-BM_MatchActivitiesConstantLargeMatchesConfig/100000/20/5000/3000/0/0/0/0/0    32188890 ns     32180257 ns           22 RowInvRate=321.803ns
-BM_MatchActivitiesConstantLargeMatchesConfig/1000000/20/5000/3000/0/0/0/0/0  346122178 ns    346090617 ns            2 RowInvRate=346.091ns
-BM_MatchActivitiesConstantConfig/1000/20/20/0/5/0/0/0/0                         542612 ns       542352 ns         1293 RowInvRate=542.352ns
-BM_MatchActivitiesConstantConfig/10000/20/20/0/5/0/0/0/0                       5414021 ns      5411907 ns          130 RowInvRate=541.191ns
-BM_MatchActivitiesConstantConfig/100000/20/20/0/5/0/0/0/0                     70916506 ns     70904595 ns           10 RowInvRate=709.046ns
-BM_MatchActivitiesConstantConfig/1000/20/40/0/5/0/0/0/0                         441253 ns       441022 ns         1585 RowInvRate=441.022ns
-BM_MatchActivitiesConstantConfig/10000/20/40/0/5/0/0/0/0                       4434024 ns      4433542 ns          159 RowInvRate=443.354ns
-BM_MatchActivitiesConstantConfig/100000/20/40/0/5/0/0/0/0                     60681131 ns     60674294 ns           11 RowInvRate=606.743ns
-BM_MatchActivitiesConstantConfig/1000/20/60/0/5/0/0/0/0                         399011 ns       398961 ns         1747 RowInvRate=398.961ns
-BM_MatchActivitiesConstantConfig/10000/20/60/0/5/0/0/0/0                       3992816 ns      3991028 ns          176 RowInvRate=399.103ns
-BM_MatchActivitiesConstantConfig/100000/20/60/0/5/0/0/0/0                     56896572 ns     56890837 ns           12 RowInvRate=568.908ns
-BM_MatchActivitiesConstantConfig/1000/20/20/0/10/0/0/0/0                        575555 ns       575377 ns         1213 RowInvRate=575.377ns
-BM_MatchActivitiesConstantConfig/10000/20/20/0/10/0/0/0/0                      5759909 ns      5759439 ns          123 RowInvRate=575.944ns
-BM_MatchActivitiesConstantConfig/100000/20/20/0/10/0/0/0/0                    74119342 ns     74112895 ns            9 RowInvRate=741.129ns
-BM_MatchActivitiesConstantConfig/1000/20/40/0/10/0/0/0/0                        416667 ns       416576 ns         1678 RowInvRate=416.576ns
-BM_MatchActivitiesConstantConfig/10000/20/40/0/10/0/0/0/0                      4156516 ns      4155425 ns          168 RowInvRate=415.543ns
-BM_MatchActivitiesConstantConfig/100000/20/40/0/10/0/0/0/0                    58071551 ns     58066059 ns           12 RowInvRate=580.661ns
-BM_MatchActivitiesConstantConfig/1000/20/60/0/10/0/0/0/0                        347768 ns       347674 ns         2017 RowInvRate=347.674ns
-BM_MatchActivitiesConstantConfig/10000/20/60/0/10/0/0/0/0                      3463815 ns      3463302 ns          200 RowInvRate=346.33ns
-BM_MatchActivitiesConstantConfig/100000/20/60/0/10/0/0/0/0                    50722045 ns     50717529 ns           13 RowInvRate=507.175ns
-BM_MatchActivitiesConstantConfig/1000/20/20/0/0/5/0/0/0                         139604 ns       139569 ns         5006 RowInvRate=139.569ns
-BM_MatchActivitiesConstantConfig/10000/20/20/0/0/5/0/0/0                       1423719 ns      1423589 ns          516 RowInvRate=142.359ns
-BM_MatchActivitiesConstantConfig/100000/20/20/0/0/5/0/0/0                     31076639 ns     31069928 ns           22 RowInvRate=310.699ns
-BM_MatchActivitiesConstantConfig/1000/20/40/0/0/5/0/0/0                          92551 ns        92469 ns         7539 RowInvRate=92.4687ns
-BM_MatchActivitiesConstantConfig/10000/20/40/0/0/5/0/0/0                        912222 ns       912172 ns          760 RowInvRate=91.2172ns
-BM_MatchActivitiesConstantConfig/100000/20/40/0/0/5/0/0/0                     26341644 ns     26338200 ns           27 RowInvRate=263.382ns
-BM_MatchActivitiesConstantConfig/1000/20/60/0/0/5/0/0/0                          75749 ns        75708 ns         9180 RowInvRate=75.7075ns
-BM_MatchActivitiesConstantConfig/10000/20/60/0/0/5/0/0/0                        759983 ns       759916 ns          880 RowInvRate=75.9916ns
-BM_MatchActivitiesConstantConfig/100000/20/60/0/0/5/0/0/0                     24646039 ns     24643354 ns           28 RowInvRate=246.434ns
-BM_MatchActivitiesConstantConfig/1000/20/20/0/0/10/0/0/0                        209329 ns       209283 ns         3347 RowInvRate=209.283ns
-BM_MatchActivitiesConstantConfig/10000/20/20/0/0/10/0/0/0                      2122473 ns      2122115 ns          338 RowInvRate=212.212ns
-BM_MatchActivitiesConstantConfig/100000/20/20/0/0/10/0/0/0                    37501802 ns     37495670 ns           19 RowInvRate=374.957ns
-BM_MatchActivitiesConstantConfig/1000/20/40/0/0/10/0/0/0                        131766 ns       131694 ns         5303 RowInvRate=131.694ns
-BM_MatchActivitiesConstantConfig/10000/20/40/0/0/10/0/0/0                      1318801 ns      1318483 ns          544 RowInvRate=131.848ns
-BM_MatchActivitiesConstantConfig/100000/20/40/0/0/10/0/0/0                    30683233 ns     30679782 ns           23 RowInvRate=306.798ns
-BM_MatchActivitiesConstantConfig/1000/20/60/0/0/10/0/0/0                        103021 ns       102963 ns         6800 RowInvRate=102.963ns
-BM_MatchActivitiesConstantConfig/10000/20/60/0/0/10/0/0/0                      1041839 ns      1041673 ns          660 RowInvRate=104.167ns
-BM_MatchActivitiesConstantConfig/100000/20/60/0/0/10/0/0/0                    27456874 ns     27454335 ns           25 RowInvRate=274.543ns
-BM_MatchActivitiesConstantConfig/1000/20/20/0/0/0/0/5/0                         587957 ns       587770 ns         1186 RowInvRate=587.77ns
-BM_MatchActivitiesConstantConfig/10000/20/20/0/0/0/0/5/0                       5888051 ns      5884842 ns          116 RowInvRate=588.484ns
-BM_MatchActivitiesConstantConfig/100000/20/20/0/0/0/0/5/0                     75290808 ns     75281089 ns           10 RowInvRate=752.811ns
-BM_MatchActivitiesConstantConfig/1000/20/40/0/0/0/0/5/0                         502011 ns       501945 ns         1390 RowInvRate=501.945ns
-BM_MatchActivitiesConstantConfig/10000/20/40/0/0/0/0/5/0                       5038486 ns      5037099 ns          136 RowInvRate=503.71ns
-BM_MatchActivitiesConstantConfig/100000/20/40/0/0/0/0/5/0                     66607724 ns     66599221 ns           11 RowInvRate=665.992ns
-BM_MatchActivitiesConstantConfig/1000/20/60/0/0/0/0/5/0                         463637 ns       463540 ns         1513 RowInvRate=463.54ns
-BM_MatchActivitiesConstantConfig/10000/20/60/0/0/0/0/5/0                       4666344 ns      4665670 ns          150 RowInvRate=466.567ns
-BM_MatchActivitiesConstantConfig/100000/20/60/0/0/0/0/5/0                     62685865 ns     62671736 ns           11 RowInvRate=626.717ns
-BM_MatchActivitiesConstantConfig/1000/20/20/0/0/0/0/10/0                        686998 ns       686904 ns         1020 RowInvRate=686.904ns
-BM_MatchActivitiesConstantConfig/10000/20/20/0/0/0/0/10/0                      6886576 ns      6885590 ns          100 RowInvRate=688.559ns
-BM_MatchActivitiesConstantConfig/100000/20/20/0/0/0/0/10/0                    84202608 ns     84195100 ns            8 RowInvRate=841.951ns
-BM_MatchActivitiesConstantConfig/1000/20/40/0/0/0/0/10/0                        571992 ns       571860 ns         1224 RowInvRate=571.86ns
-BM_MatchActivitiesConstantConfig/10000/20/40/0/0/0/0/10/0                      5709405 ns      5708763 ns          115 RowInvRate=570.876ns
-BM_MatchActivitiesConstantConfig/100000/20/40/0/0/0/0/10/0                    73658839 ns     73651174 ns           10 RowInvRate=736.512ns
-BM_MatchActivitiesConstantConfig/1000/20/60/0/0/0/0/10/0                        513595 ns       513469 ns         1364 RowInvRate=513.469ns
-BM_MatchActivitiesConstantConfig/10000/20/60/0/0/0/0/10/0                      5114550 ns      5111761 ns          134 RowInvRate=511.176ns
-BM_MatchActivitiesConstantConfig/100000/20/60/0/0/0/0/10/0                    68255961 ns     68242553 ns           10 RowInvRate=682.426ns
-BM_MatchActivitiesConstantConfig/1000/20/20/0/0/0/0/0/5                         396283 ns       396125 ns         1767 RowInvRate=396.125ns
-BM_MatchActivitiesConstantConfig/10000/20/20/0/0/0/0/0/5                       3996631 ns      3996068 ns          175 RowInvRate=399.607ns
-BM_MatchActivitiesConstantConfig/100000/20/20/0/0/0/0/0/5                     56233958 ns     56224696 ns           12 RowInvRate=562.247ns
-BM_MatchActivitiesConstantConfig/1000/20/40/0/0/0/0/0/5                         378431 ns       378177 ns         1850 RowInvRate=378.177ns
-BM_MatchActivitiesConstantConfig/10000/20/40/0/0/0/0/0/5                       3768244 ns      3767501 ns          184 RowInvRate=376.75ns
-BM_MatchActivitiesConstantConfig/100000/20/40/0/0/0/0/0/5                     54146889 ns     54137381 ns           13 RowInvRate=541.374ns
-BM_MatchActivitiesConstantConfig/1000/20/60/0/0/0/0/0/5                         370465 ns       370396 ns         1893 RowInvRate=370.396ns
-BM_MatchActivitiesConstantConfig/10000/20/60/0/0/0/0/0/5                       3705675 ns      3705169 ns          189 RowInvRate=370.517ns
-BM_MatchActivitiesConstantConfig/100000/20/60/0/0/0/0/0/5                     53498910 ns     53490225 ns           13 RowInvRate=534.902ns
-BM_MatchActivitiesConstantConfig/1000/20/20/0/0/0/0/0/10                        391922 ns       391703 ns         1789 RowInvRate=391.703ns
-BM_MatchActivitiesConstantConfig/10000/20/20/0/0/0/0/0/10                      3931520 ns      3930921 ns          176 RowInvRate=393.092ns
-BM_MatchActivitiesConstantConfig/100000/20/20/0/0/0/0/0/10                    55034577 ns     55026208 ns           12 RowInvRate=550.262ns
-BM_MatchActivitiesConstantConfig/1000/20/40/0/0/0/0/0/10                        369493 ns       369329 ns         1897 RowInvRate=369.329ns
-BM_MatchActivitiesConstantConfig/10000/20/40/0/0/0/0/0/10                      3704901 ns      3704515 ns          189 RowInvRate=370.451ns
-BM_MatchActivitiesConstantConfig/100000/20/40/0/0/0/0/0/10                    53097826 ns     53089971 ns           13 RowInvRate=530.9ns
-BM_MatchActivitiesConstantConfig/1000/20/60/0/0/0/0/0/10                        361691 ns       361601 ns         1938 RowInvRate=361.601ns
-BM_MatchActivitiesConstantConfig/10000/20/60/0/0/0/0/0/10                      3622940 ns      3622447 ns          193 RowInvRate=362.245ns
-BM_MatchActivitiesConstantConfig/100000/20/60/0/0/0/0/0/10                    52430170 ns     52420777 ns           13 RowInvRate=524.208ns
+BM_MatchActivitiesNonConstantConfig/1000/20/20/5/0/0/0/0/0                      812108 ns       812087 ns          859 RowInvRate=812.087ns
+BM_MatchActivitiesNonConstantConfig/10000/20/20/5/0/0/0/0/0                    7877648 ns      7877310 ns           89 RowInvRate=787.731ns
+BM_MatchActivitiesNonConstantConfig/100000/20/20/5/0/0/0/0/0                  82621069 ns     82615761 ns            9 RowInvRate=826.158ns
+BM_MatchActivitiesNonConstantConfig/1000/20/40/5/0/0/0/0/0                      780335 ns       780298 ns          903 RowInvRate=780.298ns
+BM_MatchActivitiesNonConstantConfig/10000/20/40/5/0/0/0/0/0                    7616298 ns      7615654 ns           95 RowInvRate=761.565ns
+BM_MatchActivitiesNonConstantConfig/100000/20/40/5/0/0/0/0/0                  80933549 ns     80932366 ns            9 RowInvRate=809.324ns
+BM_MatchActivitiesNonConstantConfig/1000/20/60/5/0/0/0/0/0                      758898 ns       758886 ns          915 RowInvRate=758.886ns
+BM_MatchActivitiesNonConstantConfig/10000/20/60/5/0/0/0/0/0                    7204707 ns      7203850 ns           97 RowInvRate=720.385ns
+BM_MatchActivitiesNonConstantConfig/100000/20/60/5/0/0/0/0/0                  74206771 ns     74204758 ns            9 RowInvRate=742.048ns
+BM_MatchActivitiesNonConstantConfig/1000/20/20/10/0/0/0/0/0                    1218360 ns      1218335 ns          575 RowInvRate=1.21834us
+BM_MatchActivitiesNonConstantConfig/10000/20/20/10/0/0/0/0/0                  12010434 ns     12010072 ns           58 RowInvRate=1.20101us
+BM_MatchActivitiesNonConstantConfig/100000/20/20/10/0/0/0/0/0                122617042 ns    122615240 ns            6 RowInvRate=1.22615us
+BM_MatchActivitiesNonConstantConfig/1000/20/40/10/0/0/0/0/0                    1141488 ns      1141452 ns          612 RowInvRate=1.14145us
+BM_MatchActivitiesNonConstantConfig/10000/20/40/10/0/0/0/0/0                  11264808 ns     11264562 ns           62 RowInvRate=1.12646us
+BM_MatchActivitiesNonConstantConfig/100000/20/40/10/0/0/0/0/0                115307273 ns    115303999 ns            6 RowInvRate=1.15304us
+BM_MatchActivitiesNonConstantConfig/1000/20/60/10/0/0/0/0/0                    1103348 ns      1103302 ns          634 RowInvRate=1.1033us
+BM_MatchActivitiesNonConstantConfig/10000/20/60/10/0/0/0/0/0                  10904687 ns     10904508 ns           64 RowInvRate=1090.45ns
+BM_MatchActivitiesNonConstantConfig/100000/20/60/10/0/0/0/0/0                111656642 ns    111651287 ns            6 RowInvRate=1.11651us
+BM_MatchActivitiesConstantConfig/1000/20/20/5/0/0/0/0/0                         153376 ns       153372 ns         4571 RowInvRate=153.372ns
+BM_MatchActivitiesConstantConfig/10000/20/20/5/0/0/0/0/0                       1520745 ns      1520711 ns          465 RowInvRate=152.071ns
+BM_MatchActivitiesConstantConfig/100000/20/20/5/0/0/0/0/0                     17510050 ns     17494003 ns           41 RowInvRate=174.94ns
+BM_MatchActivitiesConstantConfig/1000/20/40/5/0/0/0/0/0                         103135 ns       103143 ns         6850 RowInvRate=103.143ns
+BM_MatchActivitiesConstantConfig/10000/20/40/5/0/0/0/0/0                        999802 ns       999745 ns          703 RowInvRate=99.9745ns
+BM_MatchActivitiesConstantConfig/100000/20/40/5/0/0/0/0/0                     12600634 ns     12599920 ns           55 RowInvRate=125.999ns
+BM_MatchActivitiesConstantConfig/1000/20/60/5/0/0/0/0/0                          85949 ns        85954 ns         8224 RowInvRate=85.9543ns
+BM_MatchActivitiesConstantConfig/10000/20/60/5/0/0/0/0/0                        820277 ns       820255 ns          855 RowInvRate=82.0255ns
+BM_MatchActivitiesConstantConfig/100000/20/60/5/0/0/0/0/0                     10984479 ns     10984371 ns           65 RowInvRate=109.844ns
+BM_MatchActivitiesConstantConfig/1000/20/20/10/0/0/0/0/0                        229988 ns       229871 ns         3026 RowInvRate=229.871ns
+BM_MatchActivitiesConstantConfig/10000/20/20/10/0/0/0/0/0                      2279751 ns      2279645 ns          308 RowInvRate=227.965ns
+BM_MatchActivitiesConstantConfig/100000/20/20/10/0/0/0/0/0                    25457147 ns     25453060 ns           29 RowInvRate=254.531ns
+BM_MatchActivitiesConstantConfig/1000/20/40/10/0/0/0/0/0                        145612 ns       145620 ns         4793 RowInvRate=145.62ns
+BM_MatchActivitiesConstantConfig/10000/20/40/10/0/0/0/0/0                      1419737 ns      1419707 ns          496 RowInvRate=141.971ns
+BM_MatchActivitiesConstantConfig/100000/20/40/10/0/0/0/0/0                    16514793 ns     16512690 ns           42 RowInvRate=165.127ns
+BM_MatchActivitiesConstantConfig/1000/20/60/10/0/0/0/0/0                        115008 ns       114998 ns         6110 RowInvRate=114.998ns
+BM_MatchActivitiesConstantConfig/10000/20/60/10/0/0/0/0/0                      1115102 ns      1115145 ns          633 RowInvRate=111.514ns
+BM_MatchActivitiesConstantConfig/100000/20/60/10/0/0/0/0/0                    13853375 ns     13852149 ns           51 RowInvRate=138.521ns
+BM_MatchActivitiesConstantLargeMatchesConfig/1000/20/5000/3000/0/0/0/0/0        354185 ns       354163 ns         1974 RowInvRate=354.163ns
+BM_MatchActivitiesConstantLargeMatchesConfig/10000/20/5000/3000/0/0/0/0/0      1826259 ns      1825907 ns          379 RowInvRate=182.591ns
+BM_MatchActivitiesConstantLargeMatchesConfig/100000/20/5000/3000/0/0/0/0/0    19399450 ns     19397997 ns           36 RowInvRate=193.98ns
+BM_MatchActivitiesConstantLargeMatchesConfig/1000000/20/5000/3000/0/0/0/0/0  191925565 ns    191913903 ns            4 RowInvRate=191.914ns
+BM_MatchActivitiesConstantConfig/1000/20/20/0/5/0/0/0/0                         582840 ns       582599 ns         1206 RowInvRate=582.599ns
+BM_MatchActivitiesConstantConfig/10000/20/20/0/5/0/0/0/0                       5806099 ns      5806065 ns          121 RowInvRate=580.606ns
+BM_MatchActivitiesConstantConfig/100000/20/20/0/5/0/0/0/0                     60819383 ns     60814277 ns           12 RowInvRate=608.143ns
+BM_MatchActivitiesConstantConfig/1000/20/40/0/5/0/0/0/0                         470496 ns       470464 ns         1488 RowInvRate=470.464ns
+BM_MatchActivitiesConstantConfig/10000/20/40/0/5/0/0/0/0                       4641212 ns      4640896 ns          149 RowInvRate=464.09ns
+BM_MatchActivitiesConstantConfig/100000/20/40/0/5/0/0/0/0                     49324825 ns     49323340 ns           14 RowInvRate=493.233ns
+BM_MatchActivitiesConstantConfig/1000/20/60/0/5/0/0/0/0                         422867 ns       422807 ns         1657 RowInvRate=422.807ns
+BM_MatchActivitiesConstantConfig/10000/20/60/0/5/0/0/0/0                       4201854 ns      4201698 ns          167 RowInvRate=420.17ns
+BM_MatchActivitiesConstantConfig/100000/20/60/0/5/0/0/0/0                     45501569 ns     45501314 ns           15 RowInvRate=455.013ns
+BM_MatchActivitiesConstantConfig/1000/20/20/0/10/0/0/0/0                        629789 ns       629759 ns         1103 RowInvRate=629.759ns
+BM_MatchActivitiesConstantConfig/10000/20/20/0/10/0/0/0/0                      6288005 ns      6287788 ns          111 RowInvRate=628.779ns
+BM_MatchActivitiesConstantConfig/100000/20/20/0/10/0/0/0/0                    65453210 ns     65452320 ns           11 RowInvRate=654.523ns
+BM_MatchActivitiesConstantConfig/1000/20/40/0/10/0/0/0/0                        453264 ns       453243 ns         1542 RowInvRate=453.243ns
+BM_MatchActivitiesConstantConfig/10000/20/40/0/10/0/0/0/0                      4503923 ns      4503804 ns          156 RowInvRate=450.38ns
+BM_MatchActivitiesConstantConfig/100000/20/40/0/10/0/0/0/0                    48022645 ns     48001791 ns           15 RowInvRate=480.018ns
+BM_MatchActivitiesConstantConfig/1000/20/60/0/10/0/0/0/0                        383368 ns       383349 ns         1828 RowInvRate=383.349ns
+BM_MatchActivitiesConstantConfig/10000/20/60/0/10/0/0/0/0                      3820472 ns      3820385 ns          184 RowInvRate=382.038ns
+BM_MatchActivitiesConstantConfig/100000/20/60/0/10/0/0/0/0                    40845001 ns     40841249 ns           17 RowInvRate=408.412ns
+BM_MatchActivitiesConstantConfig/1000/20/20/0/0/5/0/0/0                         155051 ns       155031 ns         4520 RowInvRate=155.031ns
+BM_MatchActivitiesConstantConfig/10000/20/20/0/0/5/0/0/0                       1541624 ns      1541525 ns          457 RowInvRate=154.153ns
+BM_MatchActivitiesConstantConfig/100000/20/20/0/0/5/0/0/0                     19212767 ns     19211943 ns           37 RowInvRate=192.119ns
+BM_MatchActivitiesConstantConfig/1000/20/40/0/0/5/0/0/0                         103280 ns       103274 ns         6839 RowInvRate=103.274ns
+BM_MatchActivitiesConstantConfig/10000/20/40/0/0/5/0/0/0                       1009776 ns      1009809 ns          701 RowInvRate=100.981ns
+BM_MatchActivitiesConstantConfig/100000/20/40/0/0/5/0/0/0                     13628228 ns     13627748 ns           52 RowInvRate=136.277ns
+BM_MatchActivitiesConstantConfig/1000/20/60/0/0/5/0/0/0                          85496 ns        85486 ns         8261 RowInvRate=85.4858ns
+BM_MatchActivitiesConstantConfig/10000/20/60/0/0/5/0/0/0                        827813 ns       827848 ns          859 RowInvRate=82.7848ns
+BM_MatchActivitiesConstantConfig/100000/20/60/0/0/5/0/0/0                     11848013 ns     11847388 ns           60 RowInvRate=118.474ns
+BM_MatchActivitiesConstantConfig/1000/20/20/0/0/10/0/0/0                        230962 ns       230952 ns         3024 RowInvRate=230.952ns
+BM_MatchActivitiesConstantConfig/10000/20/20/0/0/10/0/0/0                      2286862 ns      2286763 ns          305 RowInvRate=228.676ns
+BM_MatchActivitiesConstantConfig/100000/20/20/0/0/10/0/0/0                    25801002 ns     25798951 ns           27 RowInvRate=257.99ns
+BM_MatchActivitiesConstantConfig/1000/20/40/0/0/10/0/0/0                        147146 ns       147142 ns         4795 RowInvRate=147.142ns
+BM_MatchActivitiesConstantConfig/10000/20/40/0/0/10/0/0/0                      1456624 ns      1456603 ns          489 RowInvRate=145.66ns
+BM_MatchActivitiesConstantConfig/100000/20/40/0/0/10/0/0/0                    17824022 ns     17823773 ns           38 RowInvRate=178.238ns
+BM_MatchActivitiesConstantConfig/1000/20/60/0/0/10/0/0/0                        115247 ns       115246 ns         6083 RowInvRate=115.246ns
+BM_MatchActivitiesConstantConfig/10000/20/60/0/0/10/0/0/0                      1127138 ns      1127245 ns          627 RowInvRate=112.724ns
+BM_MatchActivitiesConstantConfig/100000/20/60/0/0/10/0/0/0                    15179285 ns     15179036 ns           47 RowInvRate=151.79ns
+BM_MatchActivitiesConstantConfig/1000/20/20/0/0/0/0/5/0                         634625 ns       634596 ns         1098 RowInvRate=634.596ns
+BM_MatchActivitiesConstantConfig/10000/20/20/0/0/0/0/5/0                       6338221 ns      6337654 ns          111 RowInvRate=633.765ns
+BM_MatchActivitiesConstantConfig/100000/20/20/0/0/0/0/5/0                     66625332 ns     66624459 ns           11 RowInvRate=666.245ns
+BM_MatchActivitiesConstantConfig/1000/20/40/0/0/0/0/5/0                         537561 ns       537517 ns         1296 RowInvRate=537.517ns
+BM_MatchActivitiesConstantConfig/10000/20/40/0/0/0/0/5/0                       5321654 ns      5320977 ns          133 RowInvRate=532.098ns
+BM_MatchActivitiesConstantConfig/100000/20/40/0/0/0/0/5/0                     56553203 ns     56552554 ns           12 RowInvRate=565.526ns
+BM_MatchActivitiesConstantConfig/1000/20/60/0/0/0/0/5/0                         495880 ns       495875 ns         1414 RowInvRate=495.875ns
+BM_MatchActivitiesConstantConfig/10000/20/60/0/0/0/0/5/0                       4942054 ns      4942032 ns          139 RowInvRate=494.203ns
+BM_MatchActivitiesConstantConfig/100000/20/60/0/0/0/0/5/0                     52673870 ns     52668580 ns           14 RowInvRate=526.686ns
+BM_MatchActivitiesConstantConfig/1000/20/20/0/0/0/0/10/0                        744937 ns       744823 ns          940 RowInvRate=744.823ns
+BM_MatchActivitiesConstantConfig/10000/20/20/0/0/0/0/10/0                      7402279 ns      7401490 ns           93 RowInvRate=740.149ns
+BM_MatchActivitiesConstantConfig/100000/20/20/0/0/0/0/10/0                    77793491 ns     77777171 ns            9 RowInvRate=777.772ns
+BM_MatchActivitiesConstantConfig/1000/20/40/0/0/0/0/10/0                        617186 ns       617146 ns         1127 RowInvRate=617.146ns
+BM_MatchActivitiesConstantConfig/10000/20/40/0/0/0/0/10/0                      6116267 ns      6116119 ns          114 RowInvRate=611.612ns
+BM_MatchActivitiesConstantConfig/100000/20/40/0/0/0/0/10/0                    64587273 ns     64579044 ns           11 RowInvRate=645.79ns
+BM_MatchActivitiesConstantConfig/1000/20/60/0/0/0/0/10/0                        554918 ns       554867 ns         1260 RowInvRate=554.867ns
+BM_MatchActivitiesConstantConfig/10000/20/60/0/0/0/0/10/0                      5491017 ns      5490685 ns          127 RowInvRate=549.068ns
+BM_MatchActivitiesConstantConfig/100000/20/60/0/0/0/0/10/0                    57592613 ns     57587515 ns           12 RowInvRate=575.875ns
+BM_MatchActivitiesConstantConfig/1000/20/20/0/0/0/0/0/5                         153066 ns       153057 ns         4580 RowInvRate=153.057ns
+BM_MatchActivitiesConstantConfig/10000/20/20/0/0/0/0/0/5                       1505822 ns      1505712 ns          458 RowInvRate=150.571ns
+BM_MatchActivitiesConstantConfig/100000/20/20/0/0/0/0/0/5                     18054526 ns     18053810 ns           39 RowInvRate=180.538ns
+BM_MatchActivitiesConstantConfig/1000/20/40/0/0/0/0/0/5                         209975 ns       209966 ns         3351 RowInvRate=209.966ns
+BM_MatchActivitiesConstantConfig/10000/20/40/0/0/0/0/0/5                       2051314 ns      2051287 ns          341 RowInvRate=205.129ns
+BM_MatchActivitiesConstantConfig/100000/20/40/0/0/0/0/0/5                     23601526 ns     23600875 ns           29 RowInvRate=236.009ns
+BM_MatchActivitiesConstantConfig/1000/20/60/0/0/0/0/0/5                         243410 ns       243401 ns         2867 RowInvRate=243.401ns
+BM_MatchActivitiesConstantConfig/10000/20/60/0/0/0/0/0/5                       2406211 ns      2406045 ns          292 RowInvRate=240.604ns
+BM_MatchActivitiesConstantConfig/100000/20/60/0/0/0/0/0/5                     26768800 ns     26767813 ns           25 RowInvRate=267.678ns
+BM_MatchActivitiesConstantConfig/1000/20/20/0/0/0/0/0/10                        115714 ns       115734 ns         6061 RowInvRate=115.734ns
+BM_MatchActivitiesConstantConfig/10000/20/20/0/0/0/0/0/10                      1137076 ns      1137053 ns          623 RowInvRate=113.705ns
+BM_MatchActivitiesConstantConfig/100000/20/20/0/0/0/0/0/10                    14239062 ns     14237023 ns           49 RowInvRate=142.37ns
+BM_MatchActivitiesConstantConfig/1000/20/40/0/0/0/0/0/10                        152251 ns       152232 ns         4663 RowInvRate=152.232ns
+BM_MatchActivitiesConstantConfig/10000/20/40/0/0/0/0/0/10                      1468099 ns      1468092 ns          475 RowInvRate=146.809ns
+BM_MatchActivitiesConstantConfig/100000/20/40/0/0/0/0/0/10                    17565717 ns     17564523 ns           40 RowInvRate=175.645ns
+BM_MatchActivitiesConstantConfig/1000/20/60/0/0/0/0/0/10                        179807 ns       179823 ns         3919 RowInvRate=179.823ns
+BM_MatchActivitiesConstantConfig/10000/20/60/0/0/0/0/0/10                      1799003 ns      1798905 ns          386 RowInvRate=179.89ns
+BM_MatchActivitiesConstantConfig/100000/20/60/0/0/0/0/0/10                    20992537 ns     20989855 ns           34 RowInvRate=209.899ns
 */
 
 enum MatchType {

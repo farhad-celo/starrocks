@@ -22,6 +22,13 @@ struct MatchConfig {
     SliceHashSet excluding_nodes;
     SliceHashSet excluding_all_nodes;
     SliceHashSet any_nodes;
+    // any_nodes_mode is set to true when only any_nodes is non-empty.
+    bool any_nodes_mode = false;
+
+    void set_any_nodes_mode() {
+        any_nodes_mode = ((!any_nodes.empty()) && start_nodes.empty() && nodes.empty() && end_nodes.empty() &&
+                          excluding_nodes.empty() && excluding_all_nodes.empty());
+    }
 };
 
 struct MatchActivitiesStateFragmentLocal {
@@ -38,7 +45,8 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
                   const SliceHashSet& end_nodes,
                   const SliceHashSet& excluding_nodes,
                   const SliceHashSet& excluding_all_nodes,
-                  const SliceHashSet& any_nodes) {
+                  const SliceHashSet& any_nodes,
+                  bool any_nodes_mode) {
     const auto& null_elements = activity_array_data.null_elements;
     SliceHashSet nodes_seen;
     nodes_seen.reserve(nodes.size());
@@ -95,6 +103,9 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         }
         if (!has_any_node && any_nodes.find(value) != any_nodes.end()) {
             has_any_node = true;
+            if (any_nodes_mode) {
+                return 1L;
+            }
         }
         if (excluding_nodes.find(value) != excluding_nodes.end()) {
             return 0L;
@@ -170,6 +181,7 @@ Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* cont
     _populate_filter(excluding_nodes_column, 0, state->match_config.excluding_nodes);
     _populate_filter(excluding_all_nodes_column, 0, state->match_config.excluding_all_nodes);
     _populate_filter(any_nodes_column, 0, state->match_config.any_nodes);
+    state->match_config.set_any_nodes_mode();
     return Status::OK();
 }
 
@@ -213,9 +225,11 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(st
         _populate_filter(columns[5], row, excluding_all_nodes);
         SliceHashSet any_nodes;
         _populate_filter(columns[6], row, any_nodes);
+        bool any_nodes_mode = ((!any_nodes.empty()) && start_nodes.empty() && nodes.empty() && end_nodes.empty() &&
+                               excluding_nodes.empty() && excluding_all_nodes.empty());
         result.append(
                 _match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes, end_nodes,
-                                  excluding_nodes, excluding_all_nodes, any_nodes));
+                                  excluding_nodes, excluding_all_nodes, any_nodes, any_nodes_mode));
     }
 
     return result.build(ColumnHelper::is_all_const(columns));
@@ -245,7 +259,7 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starro
                                   state->match_config.start_nodes, state->match_config.nodes,
                                   state->match_config.end_nodes,
                                   state->match_config.excluding_nodes, state->match_config.excluding_all_nodes,
-                                  state->match_config.any_nodes));
+                                  state->match_config.any_nodes, state->match_config.any_nodes_mode));
     }
 
     return result.build(ColumnHelper::is_all_const(columns));
