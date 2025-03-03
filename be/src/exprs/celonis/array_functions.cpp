@@ -570,6 +570,16 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
     ColumnViewer end_activity_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
     ColumnViewer end_mode_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
 
+    DCHECK(result->is_nullable());
+    auto* res_nullable_column = down_cast<NullableColumn*>(result.get());
+    auto* res_null_column = res_nullable_column->mutable_null_column();
+    auto* res_data_column = res_nullable_column->mutable_data_column();
+    auto* res_elements_column = down_cast<ArrayColumn*>(res_data_column)->elements_column().get();
+    auto* res_offsets_column = down_cast<ArrayColumn*>(res_data_column)->offsets_column().get();
+    size_t new_offset = 0;
+    res_elements_column->reserve(activity_offsets[n_rows]);
+
+    // TODO(y.zhang): Add prepare method to handle constant parameters; handle AllAll specially.
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || begin_mode_viewer.is_null(row) ||
             (begin_mode_viewer.value(row).to_string() != "ALL" && begin_activity_viewer.is_null(row)) ||
@@ -578,6 +588,7 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
             result->append_nulls(1);
             continue;
         }
+        res_null_column->get_data().push_back(0);
         const std::string begin_mode = begin_mode_viewer.value(row).to_string();
         const std::string end_mode = end_mode_viewer.value(row).to_string();
         if (begin_mode != "FIRST" && begin_mode != "LAST" && begin_mode != "ALL") {
@@ -633,32 +644,31 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
             DCHECK(end_mode == "ALL");
             end_index = end - 1;
         }
-        DatumArray array;
-        array.reserve(size);
         if (!begin_index.has_value() || !end_index.has_value() || begin_index.value() > end_index.value()) {
             for (int64_t j = 0; j < size; ++j) {
-                array.push_back(kNullDatum);
+                res_elements_column->append_datum(kNullDatum);
             }
         } else {
             for (int64_t j = start; j < begin_index.value(); ++j) {
-                array.push_back(kNullDatum);
+                res_elements_column->append_datum(kNullDatum);
             }
             for (int64_t j = begin_index.value(); j <= end_index.value(); ++j) {
                 if (fill_one) {
-                    array.emplace_back(1L);
+                    res_elements_column->append_datum(Datum(1L));
                 } else {
                     if (activity_array_data.null_elements != nullptr && (*activity_array_data.null_elements)[j] != 0) {
-                        array.push_back(kNullDatum);
+                        res_elements_column->append_datum(kNullDatum);
                     } else {
-                        array.emplace_back(activities[j]);
+                        res_elements_column->append_datum(activities[j]);
                     }
                 }
             }
             for (int64_t j = end_index.value() + 1; j < end; ++j) {
-                array.push_back(kNullDatum);
+                res_elements_column->append_datum(kNullDatum);
             }
         }
-        result->append_datum(array);
+        new_offset += size;
+        res_offsets_column->get_data().push_back(new_offset);
     }
     return Status::OK();
 }
