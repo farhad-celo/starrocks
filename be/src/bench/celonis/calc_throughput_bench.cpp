@@ -51,7 +51,9 @@ TypeDescriptor array_type(const LogicalType& element_type) {
     return t;
 }
 
-static void do_bench(benchmark::State& state, LogicalType activity_type) {
+
+template <LogicalType ActivityLT>
+static void do_bench(benchmark::State& state) {
     int num_rows = state.range(0);
     int event_array_size = state.range(1);
     using UniformInt = std::uniform_int_distribution<std::mt19937::result_type>;
@@ -74,8 +76,8 @@ static void do_bench(benchmark::State& state, LogicalType activity_type) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(activity_type)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(activity_type)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(ActivityLT)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(ActivityLT)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
     auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT));
@@ -86,10 +88,10 @@ static void do_bench(benchmark::State& state, LogicalType activity_type) {
         state.PauseTiming();
         total_rows += num_rows;
 
-        auto activity_array_col = ColumnHelper::create_column(array_type(activity_type), false);
+        auto activity_array_col = ColumnHelper::create_column(array_type(ActivityLT), false);
         auto timestamp_array_col = ColumnHelper::create_column(array_type(TYPE_BIGINT), false);
-        auto start_activity_col = ColumnHelper::create_column(TypeDescriptor(activity_type), false);
-        auto end_activity_col = ColumnHelper::create_column(TypeDescriptor(activity_type), false);
+        auto start_activity_col = ColumnHelper::create_column(TypeDescriptor(ActivityLT), false);
+        auto end_activity_col = ColumnHelper::create_column(TypeDescriptor(ActivityLT), false);
         auto start_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto end_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
 
@@ -104,11 +106,11 @@ static void do_bench(benchmark::State& state, LogicalType activity_type) {
         DatumArray activities;
         activities.resize(event_array_size);
 
-        if (activity_type == TYPE_VARCHAR) {
+        if (ActivityLT == TYPE_VARCHAR) {
             int max_str_length = state.range(2);
             assert(max_str_length < alphanum.size());
             std::generate(activities.begin(), activities.end(), [&]() { return gen_rand_str(max_str_length); });
-        } else if (activity_type == TYPE_BIGINT) {
+        } else if (ActivityLT == TYPE_BIGINT) {
             std::generate(activities.begin(), activities.end(), [&]() { return uniform_int(rng); });
         } else {
             std::cerr << "activity type not supported" << std::endl;
@@ -122,21 +124,22 @@ static void do_bench(benchmark::State& state, LogicalType activity_type) {
             end_label_col->append_datum(Slice("first"));
         }
         state.ResumeTiming();
-        EXPECT_TRUE(CelonisCalcThroughputFunctions::celonis_calc_throughput(ctx.get(), {activity_array_col, timestamp_array_col,
-                                                                                        start_activity_col,
-                                                                                        end_activity_col,
-                                                                                        start_label_col,
-                                                                                        end_label_col}).ok());
+        EXPECT_TRUE(CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_throughput(ctx.get(), {activity_array_col,
+                                                                                                    timestamp_array_col,
+                                                                                                    start_activity_col,
+                                                                                                    end_activity_col,
+                                                                                                    start_label_col,
+                                                                                                    end_label_col}).ok());
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
 static void BM_CalcThroughputInt(benchmark::State& state) {
-    do_bench(state, TYPE_BIGINT);
+    do_bench<TYPE_BIGINT>(state);
 }
 
 static void BM_CalcThroughputStr(benchmark::State& state) {
-    do_bench(state, TYPE_VARCHAR);
+    do_bench<TYPE_VARCHAR>(state);
 }
 
 // Args: Number of rows / Event array size
