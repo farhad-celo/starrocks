@@ -117,7 +117,7 @@ public:
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
                 size_t row_num) const override {
         if (UNLIKELY(this->data(state).size_limit_reached())) {
-            ctx->set_error(("size limit (" + std::to_string(config::array_agg_size_limit) +
+            ctx->set_error(("size limit (" + std::to_string(this->data(state).size_limit) +
                             ") of multi_array_agg is reached").c_str());
             return;
         }
@@ -205,11 +205,17 @@ public:
             return;
         }
         auto& state_impl = this->data(const_cast<AggDataPtr>(state));
+        if (UNLIKELY(state_impl.size_limit_reached())) {
+            ctx->set_error(("size limit (" + std::to_string(state_impl.size_limit) +
+                            ") of multi_array_agg is reached").c_str());
+            return;
+        }
         // should check overflow before append, otherwise will generate invalid result.
         if (UNLIKELY(state_impl.check_overflow(ctx))) {
             return;
         }
         const auto num_agg_columns = get_num_agg_columns(ctx);
+        auto sort_start_time = std::chrono::high_resolution_clock::now();
         Permutation perm;
         if (!ctx->get_is_asc_order().empty()) {
             Columns order_by_columns;
@@ -243,6 +249,14 @@ public:
             index.resize(res_num);
             elem_size = res_num;
         }
+        auto sort_end_time = std::chrono::high_resolution_clock::now();
+        auto sort_duration = std::chrono::duration_cast<std::chrono::microseconds>(sort_end_time - sort_start_time);
+        if (elem_size > 1000000) {
+            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) num of rows = << " << elem_size << std::endl;
+            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) sorting time = << " << sort_duration.count() << " ms\n";
+        }
+
+        auto output_start_time = std::chrono::high_resolution_clock::now();
         for (auto i = 0; i < num_agg_columns; ++i) {
             DCHECK_EQ(state_impl.data_columns[i]->size(), elem_size);
             auto& to_column = columns[i];
@@ -261,6 +275,12 @@ public:
             auto& offsets = array_col->offsets_column()->get_data();
             offsets.push_back(offsets.back() + elem_size);
             state_impl.release_data_column(i);
+        }
+        auto output_end_time = std::chrono::high_resolution_clock::now();
+        auto output_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                output_end_time - output_start_time);
+        if (elem_size > 1000000) {
+            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) output time = << " << output_duration.count() << " ms\n";
         }
         state_impl.data_columns.clear(); // early release memory
         // should check overflow after append, otherwise the result column with multi row will be overflow.

@@ -351,7 +351,7 @@ public:
                 size_t row_num) const override {
         // celonis start
         if (UNLIKELY(this->data(state).size_limit_reached())) {
-            ctx->set_error(("size limit (" + std::to_string(config::array_agg_size_limit) +
+            ctx->set_error(("size limit (" + std::to_string(this->data(state).size_limit) +
                             ") of array_agg is reached").c_str());
             return;
         }
@@ -446,6 +446,13 @@ public:
             return;
         }
         auto& state_impl = this->data(const_cast<AggDataPtr>(state));
+        // celonis start
+        if (UNLIKELY(state_impl.size_limit_reached())) {
+            ctx->set_error(("size limit (" + std::to_string(state_impl.size_limit) +
+                            ") of array_agg is reached").c_str());
+            return;
+        }
+        // celonis end
         // should check overflow before append, otherwise will generate invalid result.
         if (UNLIKELY(state_impl.check_overflow(ctx))) {
             return;
