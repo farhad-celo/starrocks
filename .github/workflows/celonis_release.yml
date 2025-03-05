@@ -24,64 +24,129 @@ env:
   ASAN_BUILD_TYPE: ASAN
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
   GITHUB_USERNAME: ${{ github.repository }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:cpml-new-source
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:mul-arch-dev-env
 
 jobs:
-  build-image:
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
-
+  build-arm:
+    runs-on: [ runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}" ]
+    env:
+      image_tag: ${{ github.ref_name }}-arm
+    outputs:
+      artifact_image_tag: ${{ env.image_tag }}
+      allin1_image: ${{ env.image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: update docker data root
-        run: |
-          echo '{"data-root": "/home/runner/_work/docker"}' | sudo tee /etc/docker/daemon.json > /dev/null
-          sudo systemctl restart docker
-          sudo cat /etc/docker/daemon.json
 
       - name: Pull dev env image
         run: |
-          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
-          docker pull ${BUILDER}
-
+          echo ${{ env.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+          docker pull ${{ env.BUILDER }}
       - name: Build artifact image
+        id: build-artifact
         uses: ./.github/actions/build-artifact
         with:
-          dev_env_image: ${BUILDER}
-          image_tag: ${IMAGE_TAG}
-          to_push: false
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'false'
 
       - name: Build and push allin1 image
         uses: ./.github/actions/build-allin1
         with:
-          artifact_image: starrocks-artifacts:${IMAGE_TAG}
-          image_tag: ${IMAGE_TAG}
-          pull_artifact: false
-          clean_up_artifact_image: false
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${image_tag}
+          pull_artifact: 'false'
 
-      - name: Build FE & BE
+      - name: Build and push fe-be
         uses: ./.github/actions/build-fe-be
         with:
-          artifact_image: starrocks-artifacts:${IMAGE_TAG}
-          image_tag: ${IMAGE_TAG}
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+  build-x86:
+    runs-on: [ runs-on, runner=64cpu-linux-x64, image=ubuntu24-full-x64, disk=large, "run-id=${{ github.run_id }}" ]
+    env:
+      image_tag: ${{ github.ref_name }}-x86
+    outputs:
+      artifact_image_tag: ${{ env.image_tag }}
+      allin1_image: ${{ env.image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build artifact image
+        id: build-artifact
+        uses: ./.github/actions/build-artifact
+        with:
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'false'
+
+      - name: Build and push allin1 image
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          pull_artifact: 'false'
+
+      - name: Build and push fe-be
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  build-and-push-manifest:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: [build-arm, build-x86]
+    env:
+      arm_image_tag: ${{ needs.build-arm.outputs.allin1_image }}
+      x86_image_tag: ${{ needs.build-x86.outputs.allin1_image }}
+      allin1_image_tag: ${{ github.ref_name }}
+      fe_be_image_tag: ${{ github.ref_name }}
+    outputs:
+      allin1_image_tag: ${{ env.allin1_image_tag }}
+      fe_be_image_tag: ${{ env.fe_be_image_tag }}
+    steps:
       - name: GHCR login
+        shell: bash
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
-      - name: Push FE image to GHCR
-        uses: ./.github/actions/push-to-registry
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and push allin1 manifest
+        uses: ./.github/actions/build-mul-arch-manifest
         with:
-          local_image: starrocks-fe:${IMAGE_TAG}
-          remote_image: ghcr.io/celonis/celostar/starrocks-fe:${IMAGE_TAG}
-      - name: Push BE docker image to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-be:${IMAGE_TAG}
-          remote_image: ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}
-      - name: GitHub Docker logout
-        if: ${{ always() }}
+          arm_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${arm_image_tag}"
+          x86_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${x86_image_tag}"
+          mul_arch_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${allin1_image_tag}"
+      - name: Build and push fe-be manifest
+        shell: bash
         run: |
-          docker logout ghcr.io
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+          export DOCKER_CLI_EXPERIMENTAL=enabled
+
+          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-be:${fe_be_image_tag}"
+          arm_tag="ghcr.io/celonis/celostar/starrocks-be:${arm_image_tag}"
+          x86_tag="ghcr.io/celonis/celostar/starrocks-be:${x86_image_tag}"
+
+          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
+
+          docker manifest push "$mul_arch_tag"
+          
+          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-fe:${fe_be_image_tag}"
+          arm_tag="ghcr.io/celonis/celostar/starrocks-be:${arm_image_tag}"
+          x86_tag="ghcr.io/celonis/celostar/starrocks-be:${x86_image_tag}"
+
+          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
+
+          docker manifest push "$mul_arch_tag"
 
       - name: Configure prod AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -94,45 +159,26 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Push FE image to ECR
+      - name: Build and push fe-be manifest to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        uses: ./.github/actions/push-to-registry
+        uses: ./.github/actions/build-mul-arch-manifest
         with:
-          local_image: starrocks-fe:${IMAGE_TAG}
-          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${IMAGE_TAG}
-      - name: Push BE image to ECR
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${arm_image_tag}"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${x86_image_tag}"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${fe_be_image_tag}"
+
+      - name: Build and push fe manifest to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        uses: ./.github/actions/push-to-registry
+        uses: ./.github/actions/build-mul-arch-manifest
         with:
-          local_image: starrocks-be:${IMAGE_TAG}
-          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${IMAGE_TAG}
-
-
-# Skip this as the runs-on runner is ephemeral.
-#      - name: Clean up
-#        if: ${{ always() }}
-#        run: |
-#          # Delete the built docker image from the runner.
-#          docker rmi -f $(docker images -q starrocks-fe:${IMAGE_TAG})
-#          docker rmi -f $(docker images -q starrocks-be:${IMAGE_TAG})
-#          docker rmi -f $(docker images -q starrocks-artifacts:${IMAGE_TAG})
-#
-#          # Delete stopped containers, dangling images, dangling build cache, etc.
-#          docker system prune -f
-#
-#          # We could not simply delete the repo as it will fail the "Post checkout repository" step from the checkout action
-#          # after this step.
-#          rm -rf /runner/_work/celostar-starrocks/celostar-starrocks/*
-#
-#          # Remove temporary files.
-#          rm -rf /tmp/*
-#        continue-on-error: true
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${arm_image_tag}"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${x86_image_tag}"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${fe_be_image_tag}"
 
   build-asan-allin1-image:
-    runs-on: [runs-on,runner=32cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
-
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -140,20 +186,19 @@ jobs:
       - name: Pull dev env image
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
-          docker pull ${BUILDER}
+          docker pull ${{ env.BUILDER }}
 
       - name: Build ASAN artifact image
         uses: ./.github/actions/build-artifact
         with:
-          dev_env_image: ${BUILDER}
-          image_tag: ${ASAN_IMAGE_TAG}
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.ASAN_IMAGE_TAG }}
           is_asan_mode: 'yes'
-          to_push: false
+          to_push: true
 
       - name: Build and push ASAN allin1 image
         uses: ./.github/actions/build-allin1
         with:
-          artifact_image: starrocks-artifacts:${ASAN_IMAGE_TAG}
-          image_tag: ${ASAN_IMAGE_TAG}
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${ASAN_IMAGE_TAG}
+          image_tag: ${{ env.ASAN_IMAGE_TAG }}
           pull_artifact: false
-          clean_up_artifact_image: true

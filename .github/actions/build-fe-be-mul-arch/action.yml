@@ -1,0 +1,89 @@
+name: Build and push FE & BE images mul-march
+
+inputs:
+  artifact_image:
+    required: true
+  image_tag:
+    required: true
+  branch:
+    required: false
+  to_push:
+    required: false
+    default: 'false'
+    description: "whether to push the images to remote"
+  aws_access_key_id:
+    required: false
+    description: "aws access key id"
+  aws_secret_access_key:
+    required: false
+    description: "aws access key"
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure prod AWS credentials
+      if: ${{ inputs.to_push == 'true' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: eu-central-1
+
+    - name: prod Amazon ECR login
+      if: ${{ inputs.to_push == 'true' }}
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        platforms: linux/amd64,linux/arm64
+
+    - name: Docker login
+      shell: bash
+      run: |
+        echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+
+    - name: Install QEMU
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qemu qemu-user-static
+
+    - name: Build and push Docker FE image
+      uses: docker/build-push-action@v4
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: ${{ inputs.to_push }}
+        file: docker/dockerfiles/fe/fe-ubuntu.Dockerfile
+        provenance: false
+        build-args: |
+          RUN_AS_USER=starrocks
+          ARTIFACTIMAGE=${{ inputs.artifact_image }}
+        tags: |
+          starrocks-fe:${{ inputs.image_tag }}
+          ghcr.io/celonis/celostar/starrocks-fe:${{ inputs.image_tag }}
+          ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.image_tag }}
+
+    - name: Build and push Docker BE image
+      uses: docker/build-push-action@v4
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: ${{ inputs.to_push }}
+        file: docker/dockerfiles/be/be-ubuntu.Dockerfile
+        build-args: |
+          RUN_AS_USER=starrocks
+          ARTIFACTIMAGE=${{ inputs.artifact_image }}
+        tags: |
+          starrocks-be:${{ inputs.image_tag }}
+          ghcr.io/celonis/celostar/starrocks-be:${{ inputs.image_tag }}
+          ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.image_tag }}     
