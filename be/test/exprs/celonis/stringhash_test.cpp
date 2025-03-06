@@ -30,6 +30,8 @@ TEST_F(CelonisStringhashTest, normal_cases) {
     strings->append_datum(" ");
     strings->append_datum("");
     strings->append_datum(kNullDatum);
+    strings->append_datum("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-=_+[]\\{}|;");
+    strings->append_datum("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345");
     const auto result = CelonisStringhash::stringhash(nullptr, {strings}).value();
     ASSERT_EQ(strings->size(), result->size());
     EXPECT_EQ("cScbqCayViK/QywnqgPUP9MiW6rjPelytv7oRtJ", result->get(0).get_slice());
@@ -39,6 +41,8 @@ TEST_F(CelonisStringhashTest, normal_cases) {
     EXPECT_EQ("6CRFGgx7qL8rK9qOomRISAfWysVHcpaC/k1WC1C", result->get(4).get_slice());
     EXPECT_EQ("aSF6MHmQgJThESHQQjVKfB9VtkgsoaUeGyUN/R7", result->get(5).get_slice());
     EXPECT_TRUE(result->get(6).is_null());
+    EXPECT_EQ("yJ0l74olqCL02HTbzkPUucdFmtD9Amf0Uw0zNXn", result->get(7).get_slice());
+    EXPECT_EQ("SBYuE+grqRe7Th5KibfLEPYoC3rBOt9gjFUPH8A", result->get(8).get_slice());
 }
 
 } // namespace starrocks

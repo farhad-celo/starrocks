@@ -85,11 +85,11 @@ using base64_hash_t = static_string<(TRUNCATED_DIGEST_SIZE / 3) * 4 - 1>;
 /**
  * Computes a truncated hash (30 bytes) of the input string and returns the binary digest array.
  */
-[[nodiscard]] hash_t hash(std::string_view str) {
+[[nodiscard]] hash_t hash(Slice slice) {
     auto full_hash = std::array<uint8_t, BLAKE2S_OUTBYTES>{};
     // invariant full_hash.size() = BLAKE2S_OUTBYTES;
     // hashing never fails since bounds are derived from containers and output container size is BLAKE2S_OUTBYTES
-    blake2s(full_hash.data(), full_hash.size(), str.data(), str.length(), nullptr, 0);
+    blake2s(full_hash.data(), full_hash.size(), slice.data, slice.size, nullptr, 0);
 
     auto truncated_hash = std::array<uint8_t, TRUNCATED_DIGEST_SIZE>{};
 
@@ -103,11 +103,11 @@ using base64_hash_t = static_string<(TRUNCATED_DIGEST_SIZE / 3) * 4 - 1>;
  * Computes the truncated hash (30 bytes) of the input string, encodes the result with base64 (resulting in
  * 40 bytes of base64), which is then NULL-terminated, returning a string of length 39 bytes and a NULL-terminator.
  */
-[[nodiscard]] base64_hash_t hash_base64(std::string_view str) {
+[[nodiscard]] base64_hash_t hash_base64(Slice slice) {
     static_assert(TRUNCATED_DIGEST_SIZE % 3 == 0, "Digest must be divisible by 3 to avoid base64 padding.");
     static constexpr size_t BASE64_SIZE{(TRUNCATED_DIGEST_SIZE / 3) * 4};
 
-    const auto digest{hash(str)};
+    const auto digest{hash(slice)};
     std::array<char, BASE64_SIZE> readable_digest{};
     base64_encode(digest.data(), digest.size(), readable_digest.data());
     readable_digest.back() = '\0';
@@ -127,9 +127,8 @@ StatusOr<ColumnPtr> CelonisStringhash::stringhash([[maybe_unused]] FunctionConte
             result.append_null();
             continue;
         }
-        const auto input_string = input_string_viewer.value(row).to_string();
-        const auto hash_str = hash_base64(input_string).to_string();
-        result.append(hash_str);
+        const auto hash_str = hash_base64(input_string_viewer.value(row));
+        result.append(Slice(hash_str.data(), hash_str.size()));
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
