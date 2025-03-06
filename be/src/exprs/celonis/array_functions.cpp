@@ -396,10 +396,12 @@ private:
 
         auto* output_elements_column = down_cast<ArrayColumn*>(output_array_column)->elements_column().get();
         auto* output_offsets_column = down_cast<ArrayColumn*>(output_array_column)->offsets_column().get();
+        output_elements_column->reserve(input_offsets[input_array_column.size()]);
 
         for (size_t i = 0; i < input_array_column.size(); i++) {
             size_t start = input_offsets[i];
             size_t end = input_offsets[i + 1];
+            DCHECK(end >= start);
             int64_t lag_offset = offset_viewer.value(i);
             std::deque<size_t> window;
             for (size_t j = start; j < end; ++j) {
@@ -478,13 +480,16 @@ private:
 
         auto* output_elements_column = down_cast<ArrayColumn*>(output_array_column)->elements_column().get();
         auto* output_offsets_column = down_cast<ArrayColumn*>(output_array_column)->offsets_column().get();
+        output_elements_column->reserve(input_offsets[input_array_column.size()]);
 
         for (size_t i = 0; i < input_array_column.size(); i++) {
             size_t start = input_offsets[i];
             size_t end = input_offsets[i + 1];
+            DCHECK(end >= start);
             int64_t lead_offset = offset_viewer.value(i);
             std::deque<size_t> window;
             std::vector<std::optional<size_t>> idxes;
+            idxes.reserve(end - start);
             // traverse the elements reversely.
             for (size_t j = end; j-- > start;) {
                 if (window.size() == lead_offset) {
