@@ -21,16 +21,16 @@ struct TrimStateFragmentLocal {
 };
 
 template <TrimDirection TRIM_DIRECTION>
-void trim_if(std::string& value, const phmap::flat_hash_set<char, StdHash<char>> characters) {
+void trim_if(std::string& value, const phmap::flat_hash_set<char, StdHash<char>>& characters) {
     if constexpr (TRIM_DIRECTION == TrimDirection::LEFT) {
         boost::trim_left_if(value, [&characters](char value_char) {
             return std::ranges::any_of(characters,
-                                       [&value_char](const char trim_char) { return value_char == trim_char; });
+                                       [value_char](const char trim_char) { return value_char == trim_char; });
         });
     } else {
         boost::trim_right_if(value, [&characters](char value_char) {
             return std::ranges::any_of(characters,
-                                       [&value_char](const char trim_char) { return value_char == trim_char; });
+                                       [value_char](const char trim_char) { return value_char == trim_char; });
         });
     }
 }
@@ -60,13 +60,17 @@ template <TrimDirection TRIM_DIRECTION>
 [[nodiscard]] StatusOr<ColumnPtr> trim_non_constant(FunctionContext* /* context */, const Columns& columns) {
     const auto input_column_viewer{ColumnViewer<TYPE_VARCHAR>(columns[0])};
     const auto characters_column_viewer{ColumnViewer<TYPE_VARCHAR>(columns[1])};
+    phmap::flat_hash_set<char, StdHash<char>> unique_characters{};
+
+    DCHECK_EQ(input_column_viewer.size(), characters_column_viewer.size());
 
     return trim_for_each(
             input_column_viewer,
-            [&characters_column_viewer](std::string& value, const auto row) {
-                auto characters{characters_column_viewer.value(row).to_string()};
-                trim_if<TRIM_DIRECTION>(
-                        value, phmap::flat_hash_set<char, StdHash<char>>(characters.begin(), characters.end()));
+            [&unique_characters, &characters_column_viewer](std::string& value, const auto row) {
+                const auto characters{characters_column_viewer.value(row).to_string()};
+                unique_characters.insert(characters.begin(), characters.end());
+                trim_if<TRIM_DIRECTION>(value, unique_characters);
+                unique_characters.clear();
             },
             characters_column_viewer);
 }

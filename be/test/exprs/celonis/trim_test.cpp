@@ -22,6 +22,25 @@ protected:
 
     void TearDown() override {}
 
+    StatusOr<ColumnPtr> RunLtrimConstantCase(ColumnPtr input_column, ColumnPtr characters) const {
+        context_->set_constant_columns({nullptr, characters});
+        return RunLtrim(input_column, characters);
+    }
+
+    StatusOr<ColumnPtr> RunLtrimNonConstantCase(ColumnPtr input_column, ColumnPtr characters) const {
+        return RunLtrim(input_column, characters);
+    }
+
+    StatusOr<ColumnPtr> RunRtrimConstantCase(ColumnPtr input_column, ColumnPtr characters) const {
+        context_->set_constant_columns({nullptr, characters});
+        return RunRtrim(input_column, characters);
+    }
+
+    StatusOr<ColumnPtr> RunRtrimNonConstantCase(ColumnPtr input_column, ColumnPtr characters) const {
+        return RunRtrim(input_column, characters);
+    }
+
+private:
     StatusOr<ColumnPtr> RunLtrim(ColumnPtr input_column, ColumnPtr characters) const {
         DeferOp close_fragment_local(
                 [this] { CelonisTrim::trim_close(context_.get(), FunctionContext::FRAGMENT_LOCAL); });
@@ -42,7 +61,6 @@ protected:
         return std::move(result);
     }
 
-private:
     std::unique_ptr<FunctionContext> context_;
 };
 
@@ -59,7 +77,7 @@ TEST_F(CelonisTrimTest, ltrim_whitespace_trim_arg) {
 
     const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", 1)};
 
-    const auto result{RunLtrim(input_column, whitespace).value()};
+    const auto result{RunLtrimConstantCase(input_column, whitespace).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 8);
@@ -86,7 +104,7 @@ TEST_F(CelonisTrimTest, ltrim_empty_trim_arg) {
 
     const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>("", 1)};
 
-    const auto result{RunLtrim(input_column, whitespace).value()};
+    const auto result{RunLtrimConstantCase(input_column, whitespace).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 8);
@@ -110,7 +128,7 @@ TEST_F(CelonisTrimTest, ltrim_with_trim_arg) {
 
     const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>("x", 1)};
 
-    const auto result{RunLtrim(input_column, characters).value()};
+    const auto result{RunLtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 5);
@@ -129,7 +147,7 @@ TEST_F(CelonisTrimTest, ltrim_with_null_trim_arg) {
 
     const auto characters{ColumnHelper::create_const_null_column(1)};
 
-    const auto result{RunLtrim(input_column, characters).value()};
+    const auto result{RunLtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 3);
@@ -151,7 +169,7 @@ TEST_F(CelonisTrimTest, ltrim_with_trim_args) {
 
     const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", 1)};
 
-    const auto result{RunLtrim(input_column, characters).value()};
+    const auto result{RunLtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 8);
@@ -182,7 +200,7 @@ TEST_F(CelonisTrimTest, ltrim_with_string_column) {
     characters->append_datum("?");
     characters->append_nulls(1);
 
-    const auto result{RunLtrim(input_column, characters).value()};
+    const auto result{RunLtrimNonConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 6);
@@ -198,7 +216,7 @@ TEST_F(CelonisTrimTest, ltrim_all_null_constants) {
     const auto input_column{ColumnHelper::create_const_null_column(TYPE_VARCHAR)};
     const auto characters{ColumnHelper::create_const_null_column(TYPE_VARCHAR)};
 
-    const auto result{RunLtrim(input_column, characters).value()};
+    const auto result{RunLtrimConstantCase(input_column, characters).value()};
 
     ASSERT_EQ(result->size(), 1);
     ASSERT_TRUE(result->get(0).is_null());
@@ -217,7 +235,7 @@ TEST_F(CelonisTrimTest, rtrim_whitespace_trim_arg) {
 
     const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", 1)};
 
-    const auto result{RunRtrim(input_column, whitespace).value()};
+    const auto result{RunRtrimConstantCase(input_column, whitespace).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 8);
@@ -244,7 +262,7 @@ TEST_F(CelonisTrimTest, rtrim_empty_trim_arg) {
 
     const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>("", 1)};
 
-    const auto result{RunRtrim(input_column, whitespace).value()};
+    const auto result{RunRtrimConstantCase(input_column, whitespace).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 8);
@@ -268,7 +286,7 @@ TEST_F(CelonisTrimTest, rtrim_with_trim_arg) {
 
     const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>("x", 1)};
 
-    const auto result{RunRtrim(input_column, characters).value()};
+    const auto result{RunRtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 5);
@@ -292,7 +310,7 @@ TEST_F(CelonisTrimTest, rtrim_with_trim_args) {
 
     const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", 1)};
 
-    const auto result{RunRtrim(input_column, characters).value()};
+    const auto result{RunRtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 8);
@@ -314,7 +332,7 @@ TEST_F(CelonisTrimTest, rtrim_with_null_trim_arg) {
 
     const auto characters{ColumnHelper::create_const_null_column(1)};
 
-    const auto result{RunRtrim(input_column, characters).value()};
+    const auto result{RunRtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 3);
@@ -340,7 +358,7 @@ TEST_F(CelonisTrimTest, rtrim_with_string_column) {
     characters->append_datum("?");
     characters->append_nulls(1);
 
-    const auto result{RunRtrim(input_column, characters).value()};
+    const auto result{RunRtrimNonConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
 
     ASSERT_EQ(result->size(), 6);
@@ -356,7 +374,7 @@ TEST_F(CelonisTrimTest, rtrim_all_null_constants) {
     const auto input_column{ColumnHelper::create_const_null_column(TYPE_VARCHAR)};
     const auto characters{ColumnHelper::create_const_null_column(TYPE_VARCHAR)};
 
-    const auto result{RunRtrim(input_column, characters).value()};
+    const auto result{RunRtrimConstantCase(input_column, characters).value()};
 
     ASSERT_EQ(result->size(), 1);
     ASSERT_TRUE(result->get(0).is_null());
