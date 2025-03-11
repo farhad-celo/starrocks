@@ -13,22 +13,22 @@
 namespace starrocks {
 
 /*
-2025-03-09T16:39:41+00:00
+2025-03-10T20:38:12+00:00
 Running ./be/build_Release/src/bench/celonis/output/timestamp_millis_bench
-Run on (32 X 2445.43 MHz CPU s)
+Run on (32 X 3244.02 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 6.99, 9.11, 4.52
+Load Average: 10.90, 7.22, 4.75
 // Number of rows
 ------------------------------------------------------------------------------------
 Benchmark                          Time             CPU   Iterations UserCounters...
 ------------------------------------------------------------------------------------
-BM_TimestampMillis/1000     40051130 ns     40050686 ns           17 RowInvRate=40.0507us
-BM_TimestampMillis/10000   400856047 ns    400838758 ns            2 RowInvRate=40.0839us
-BM_TimestampMillis/100000 4006747543 ns   4006618309 ns            1 RowInvRate=40.0662us
+BM_TimestampMillis/1000         7846 ns         7768 ns        92080 RowInvRate=7.76807ns
+BM_TimestampMillis/10000       63643 ns        63601 ns        10912 RowInvRate=6.36012ns
+BM_TimestampMillis/100000     784427 ns       777798 ns         1132 RowInvRate=7.77798ns
 */
 
 int64_t generate_random_unix_milliseconds() {

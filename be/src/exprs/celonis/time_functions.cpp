@@ -1390,7 +1390,11 @@ CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context
             continue;
         }
         auto unix_millis = data_column.value(row);
-        result.append(add_timeunits_helper(EPOCH, "MILLISECONDS", unix_millis));
+        int64_t seconds = unix_millis / 1000;
+        int64_t microseconds = (unix_millis % 1000) * 1000;
+        TimestampValue timestamp;
+        timestamp.from_unix_second(seconds, microseconds);
+        result.append(timestamp);
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }
