@@ -53,6 +53,14 @@ static int64_t MAX_MS = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_
 
 static int64_t MIN_MS = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
 
+TimestampValue timestamp_from_unix_millis(int64_t unix_millis) {
+    int64_t seconds = unix_millis / 1000;
+    int64_t microseconds = (unix_millis % 1000) * 1000;
+    TimestampValue timestamp;
+    timestamp.from_unix_second(seconds, microseconds);
+    return timestamp;
+}
+
 static TimestampValue
 add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
     std::vector<int> adds;
@@ -93,7 +101,7 @@ static int get_year(const TimestampValue& value) {
 }
 
 static int get_year(int64_t millis) {
-    TimestampValue t = add_timeunits_helper(EPOCH, "MILLISECONDS", millis);
+    TimestampValue t = timestamp_from_unix_millis(millis);
     return get_year(t);
 }
 
@@ -400,7 +408,7 @@ public:
             }
         }
         if (rv.has_value()) {
-            auto res_timestamp = add_timeunits_helper(EPOCH, "MILLISECONDS", rv.value());
+            auto res_timestamp = timestamp_from_unix_millis(rv.value());
             if (is_out_scope(res_timestamp, calendar_id)) {
                 return std::nullopt;
             }
@@ -977,7 +985,7 @@ private:
         if (target_ms < MIN_MS || target_ms >= MAX_MS) {
             return std::nullopt;
         }
-        auto res_timestamp = add_timeunits_helper(EPOCH, "MILLISECONDS", target_ms);
+        auto res_timestamp = timestamp_from_unix_millis(target_ms);
         if (is_out_scope(res_timestamp, calendar_id)) {
             return std::nullopt;
         }
@@ -1390,10 +1398,7 @@ CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context
             continue;
         }
         auto unix_millis = data_column.value(row);
-        int64_t seconds = unix_millis / 1000;
-        int64_t microseconds = (unix_millis % 1000) * 1000;
-        TimestampValue timestamp;
-        timestamp.from_unix_second(seconds, microseconds);
+        TimestampValue timestamp = timestamp_from_unix_millis(unix_millis);
         result.append(timestamp);
     }
     return result.build(ColumnHelper::is_all_const(columns));
