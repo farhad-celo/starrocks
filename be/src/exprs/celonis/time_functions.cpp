@@ -61,37 +61,25 @@ TimestampValue timestamp_from_unix_millis(int64_t unix_millis) {
     return timestamp;
 }
 
+static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
+    return timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+}
+
 static TimestampValue
 add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
-    std::vector<int> adds;
-    const int64_t max_int = std::numeric_limits<int>::max();
-    const int64_t min_int = std::numeric_limits<int>::min();
-    while (add_value > max_int) {
-        adds.push_back(max_int);
-        add_value -= max_int;
+    auto start_millis = remap_timestamp_ms(timestamp);
+    int64_t factor = 1;
+    if (time_unit == "DAYS" || time_unit == "WORKDAYS") {
+        factor = 86400000L;
+    } else if (time_unit == "HOURS") {
+        factor = 3600000L;
+    } else if (time_unit == "MINUTES") {
+        factor = 60000L;
+    } else if (time_unit == "SECONDS") {
+        factor = 1000L;
     }
-    while (add_value < min_int) {
-        adds.push_back(min_int);
-        add_value -= min_int;
-    }
-    if (add_value != 0) {
-        adds.push_back(add_value);
-    }
-    TimestampValue rv = timestamp;
-    for (auto add: adds) {
-        if (time_unit == "DAYS" || time_unit == "WORKDAYS") {
-            rv = rv.add<TimeUnit::DAY>(add);
-        } else if (time_unit == "HOURS") {
-            rv = rv.add<TimeUnit::HOUR>(add);
-        } else if (time_unit == "MINUTES") {
-            rv = rv.add<TimeUnit::MINUTE>(add);
-        } else if (time_unit == "SECONDS") {
-            rv = rv.add<TimeUnit::SECOND>(add);
-        } else {
-            rv = rv.add<TimeUnit::MILLISECOND>(add);
-        }
-    }
-    return rv;
+    auto end_millis = start_millis + add_value * factor;
+    return timestamp_from_unix_millis(end_millis);
 }
 
 static int get_year(const TimestampValue& value) {
@@ -125,10 +113,6 @@ static int64_t ceil_to_nearest_multiple(int64_t num, int64_t multiple) {
         ceiled_num += multiple;
     }
     return ceiled_num;
-}
-
-static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
-    return timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
 }
 
 static int64_t millis_between(const TimestampValue& from_timestamp, const TimestampValue& to_timestamp) {
