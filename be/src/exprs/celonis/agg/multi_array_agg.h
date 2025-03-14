@@ -266,7 +266,6 @@ public:
             auto& res = state_impl.data_columns[i];
             auto array_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(to_column.get()));
             DCHECK(!res->is_constant());
-            array_col->elements_column()->reserve(array_col->elements_column()->size() + elem_size);
             if (index.empty()) {
                 array_col->elements_column()->append(*res, 0, elem_size);
             } else {
