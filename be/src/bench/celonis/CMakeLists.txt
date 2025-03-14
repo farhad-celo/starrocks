@@ -1,3 +1,4 @@
+ADD_BE_BENCH(${SRC_DIR}/bench/celonis/array_trimmed_mean_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/string_to_int_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/string_to_double_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/stringhash_bench)
