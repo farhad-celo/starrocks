@@ -1,6 +1,5 @@
 #include "exprs/celonis/array_count_distinct.h"
 
-#include "column/array_column.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
 #include "column/hash_set.h"
@@ -34,30 +33,32 @@ CelonisArrayCountDistinct<LT>::array_count_distinct([[maybe_unused]] starrocks::
                                                     const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    const size_t n_rows = columns[0]->size();
+    const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
     const auto& elements = down_cast<const RunTimeColumnType<LT>&>(*array_data.elements).get_data().data();
     const auto& offsets = array_data.offsets->get_data().data();
+    const auto* null_elements = array_data.null_elements;
 
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    LHashSetType<LT> elements_seen;
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
         }
-        LHashSetType<LT> elements_seen;
+        elements_seen.clear();
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
         for (auto i = start; i < end; ++i) {
-            if (array_data.null_elements != nullptr && (*array_data.null_elements)[i] != 0) {
+            if (null_elements != nullptr && (*null_elements)[i] != 0) {
                 continue;
             }
             elements_seen.insert(elements[i]);
         }
         result.append(elements_seen.size());
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 template

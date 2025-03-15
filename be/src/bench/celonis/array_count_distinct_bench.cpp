@@ -13,7 +13,7 @@
 namespace starrocks {
 
 /*
-2025-03-14T15:13:18+00:00
+2025-03-14T18:44:27+00:00
 Running ./be/build_Release/src/bench/celonis/output/array_count_distinct_bench
 Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
@@ -21,29 +21,29 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 1.81, 2.50, 2.92
+Load Average: 2.04, 4.21, 3.17
 // Args: Number of rows / Null percentage / Array length
 ---------------------------------------------------------------------------------------------------
 Benchmark                                         Time             CPU   Iterations UserCounters...
 ---------------------------------------------------------------------------------------------------
-BM_ArrayCountDistinctVarchar/1000/0/20       796273 ns       796209 ns          886 RowInvRate=796.209ns
-BM_ArrayCountDistinctVarchar/10000/0/20     7924203 ns      7923993 ns           88 RowInvRate=792.399ns
-BM_ArrayCountDistinctVarchar/1000/10/20      775188 ns       775125 ns          909 RowInvRate=775.125ns
-BM_ArrayCountDistinctVarchar/10000/10/20    7623748 ns      7623137 ns           92 RowInvRate=762.314ns
-BM_ArrayCountDistinctVarchar/1000/50/20      496496 ns       496454 ns         1418 RowInvRate=496.454ns
-BM_ArrayCountDistinctVarchar/10000/50/20    4913594 ns      4913431 ns          142 RowInvRate=491.343ns
-BM_ArrayCountDistinctVarchar/1000/0/40      1399362 ns      1399257 ns          501 RowInvRate=1.39926us
-BM_ArrayCountDistinctVarchar/10000/0/40    13946382 ns     13945720 ns           50 RowInvRate=1.39457us
-BM_ArrayCountDistinctVarchar/1000/10/40     1417999 ns      1417935 ns          494 RowInvRate=1.41793us
-BM_ArrayCountDistinctVarchar/10000/10/40   14167084 ns     14165885 ns           49 RowInvRate=1.41659us
-BM_ArrayCountDistinctVarchar/1000/50/40      954943 ns       954887 ns          730 RowInvRate=954.887ns
-BM_ArrayCountDistinctVarchar/10000/50/40    9514308 ns      9513680 ns           74 RowInvRate=951.368ns
-BM_ArrayCountDistinctVarchar/1000/0/80      2558225 ns      2558090 ns          274 RowInvRate=2.55809us
-BM_ArrayCountDistinctVarchar/10000/0/80    26488270 ns     26487371 ns           26 RowInvRate=2.64874us
-BM_ArrayCountDistinctVarchar/1000/10/80     2595638 ns      2595522 ns          270 RowInvRate=2.59552us
-BM_ArrayCountDistinctVarchar/10000/10/80   26926499 ns     26925436 ns           26 RowInvRate=2.69254us
-BM_ArrayCountDistinctVarchar/1000/50/80     1783618 ns      1783545 ns          392 RowInvRate=1.78354us
-BM_ArrayCountDistinctVarchar/10000/50/80   18726776 ns     18726294 ns           37 RowInvRate=1.87263us
+BM_ArrayCountDistinctVarchar/1000/0/20       306468 ns       306484 ns         2285 RowInvRate=306.484ns
+BM_ArrayCountDistinctVarchar/10000/0/20     3029414 ns      3029271 ns          234 RowInvRate=302.927ns
+BM_ArrayCountDistinctVarchar/1000/10/20      304771 ns       304761 ns         2295 RowInvRate=304.761ns
+BM_ArrayCountDistinctVarchar/10000/10/20    3022134 ns      3022003 ns          232 RowInvRate=302.2ns
+BM_ArrayCountDistinctVarchar/1000/50/20      275750 ns       275698 ns         2297 RowInvRate=275.698ns
+BM_ArrayCountDistinctVarchar/10000/50/20    2606932 ns      2606719 ns          267 RowInvRate=260.672ns
+BM_ArrayCountDistinctVarchar/1000/0/40       577666 ns       577644 ns         1216 RowInvRate=577.644ns
+BM_ArrayCountDistinctVarchar/10000/0/40     5670657 ns      5670353 ns          123 RowInvRate=567.035ns
+BM_ArrayCountDistinctVarchar/1000/10/40      572252 ns       572159 ns         1233 RowInvRate=572.159ns
+BM_ArrayCountDistinctVarchar/10000/10/40    5651476 ns      5651027 ns          124 RowInvRate=565.103ns
+BM_ArrayCountDistinctVarchar/1000/50/40      500755 ns       500755 ns         1000 RowInvRate=500.755ns
+BM_ArrayCountDistinctVarchar/10000/50/40    4890991 ns      4890760 ns          135 RowInvRate=489.076ns
+BM_ArrayCountDistinctVarchar/1000/0/80      1145877 ns      1145818 ns          607 RowInvRate=1.14582us
+BM_ArrayCountDistinctVarchar/10000/0/80    12945317 ns     12944693 ns           56 RowInvRate=1.29447us
+BM_ArrayCountDistinctVarchar/1000/10/80     1284064 ns      1283786 ns          567 RowInvRate=1.28379us
+BM_ArrayCountDistinctVarchar/10000/10/80   13459372 ns     13452945 ns           56 RowInvRate=1.34529us
+BM_ArrayCountDistinctVarchar/1000/50/80     1138478 ns      1138114 ns          535 RowInvRate=1.13811us
+BM_ArrayCountDistinctVarchar/10000/50/80   10783511 ns     10782942 ns           64 RowInvRate=1078.29ns
 */
 
 static void BM_ArrayCountDistinctVarchar(benchmark::State& state) {
