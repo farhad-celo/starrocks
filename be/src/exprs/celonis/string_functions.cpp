@@ -35,8 +35,37 @@ Status xxh3_128bits_update(XXH3_state_t* state, const void* input, size_t len, c
 // xxh3_128bits_update_new also hashes the length of the input
 Status xxh3_128bits_update_new(XXH3_state_t* state, const void* input, size_t len, const std::string& function_name) {
     RETURN_IF_ERROR(xxh3_128bits_update(state, input, len, function_name));
-    const std::string len_str = "_" + std::to_string(len) + "_";
-    RETURN_IF_ERROR(xxh3_128bits_update(state, len_str.data(), len_str.size(), function_name));
+    // Also hash the value "_" + std::string(len) + "_"
+    char len_buffer[32];  // enough for any size_t value
+    len_buffer[0] = '_';
+
+    // Convert size_t to string manually
+    size_t temp_len = len;
+    size_t pos = 1;
+
+    // Handle zero case
+    if (temp_len == 0) {
+        len_buffer[pos++] = '0';
+    } else {
+        // Find end position by counting digits
+        size_t end_pos = 1;
+        size_t temp = temp_len;
+        while (temp > 0) {
+            end_pos++;
+            temp /= 10;
+        }
+
+        // Fill digits from right to left
+        pos = end_pos - 1;
+        while (temp_len > 0) {
+            len_buffer[pos--] = '0' + (temp_len % 10);
+            temp_len /= 10;
+        }
+        pos = end_pos;
+    }
+    // Add suffix
+    len_buffer[pos++] = '_';
+    RETURN_IF_ERROR(xxh3_128bits_update(state, len_buffer, pos, function_name));
     return Status::OK();
 }
 
@@ -56,14 +85,12 @@ StatusOr<ColumnPtr> xx_hash3_128_v2_helper(starrocks::FunctionContext* context, 
     DCHECK(columns.size() >= 1);
     const size_t row_size = columns[0]->size();
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
-    std::vector<XXH3_state_t> states(row_size);
-
-    for (size_t i = 0; i < row_size; i++) {
-        XXH_errorcode code = XXH3_128bits_reset_withSeed(&(states[i]), default_xxhash_seed);
-        if (UNLIKELY(code != XXH_OK)) {
-            return Status::InternalError(function_name + ": init xxh3 state failed");
-        }
+    XXH3_state_t init_state;
+    XXH_errorcode code = XXH3_128bits_reset_withSeed(&init_state, default_xxhash_seed);
+    if (UNLIKELY(code != XXH_OK)) {
+        return Status::InternalError(function_name + ": init xxh3 state failed");
     }
+    std::vector<XXH3_state_t> states(row_size, init_state);
 
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
         DCHECK_EQ(1, columns.size());
@@ -131,11 +158,10 @@ StatusOr<ColumnPtr> xx_hash3_128_v2_helper(starrocks::FunctionContext* context, 
         }
     }
     ColumnBuilder<TYPE_LARGEINT> builder(row_size);
-    std::vector<bool> is_null_vec(row_size, false);
     for (int row = 0; row < row_size; ++row) {
         XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
         int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
-        builder.append(res, is_null_vec[row]);
+        builder.append(res, false);
     }
     return builder.build(ColumnHelper::is_all_const(columns));
 }

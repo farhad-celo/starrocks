@@ -13,28 +13,28 @@
 namespace starrocks {
 
 /*
-2025-03-10T18:52:15+00:00
+2025-03-10T19:13:00+00:00
 Running ./be/build_Release/src/bench/celonis/output/xx_hash3_128_v3_bench
-Run on (32 X 3059.04 MHz CPU s)
+Run on (32 X 3105.45 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 2.39, 35.04, 32.38
+Load Average: 0.28, 1.76, 9.44
 // Args: Number of rows // Number of input columns / Average length of string
 -----------------------------------------------------------------------------------
 Benchmark                         Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------
-BM_Hash128V3/100000/1/10   14458689 ns     14456892 ns           49 RowInvRate=144.569ns
-BM_Hash128V3/100000/2/10   21501422 ns     21500585 ns           33 RowInvRate=215.006ns
-BM_Hash128V3/100000/3/10   27512206 ns     27512185 ns           26 RowInvRate=275.122ns
-BM_Hash128V3/100000/1/20   14442961 ns     14442109 ns           49 RowInvRate=144.421ns
-BM_Hash128V3/100000/2/20   22295366 ns     22295343 ns           32 RowInvRate=222.953ns
-BM_Hash128V3/100000/3/20   37381941 ns     37379237 ns           18 RowInvRate=373.792ns
-BM_Hash128V3/100000/1/40   14471988 ns     14471737 ns           48 RowInvRate=144.717ns
-BM_Hash128V3/100000/2/40   32621872 ns     32618017 ns           21 RowInvRate=326.18ns
-BM_Hash128V3/100000/3/40   47778992 ns     47778370 ns           15 RowInvRate=477.784ns
+BM_Hash128V3/100000/1/10   11906416 ns     11906654 ns           60 RowInvRate=119.067ns
+BM_Hash128V3/100000/2/10   16754586 ns     16751585 ns           42 RowInvRate=167.516ns
+BM_Hash128V3/100000/3/10   20996633 ns     20992097 ns           33 RowInvRate=209.921ns
+BM_Hash128V3/100000/1/20   11399903 ns     11399384 ns           61 RowInvRate=113.994ns
+BM_Hash128V3/100000/2/20   17770555 ns     17770182 ns           39 RowInvRate=177.702ns
+BM_Hash128V3/100000/3/20   28975125 ns     28973272 ns           24 RowInvRate=289.733ns
+BM_Hash128V3/100000/1/40   11527241 ns     11527025 ns           61 RowInvRate=115.27ns
+BM_Hash128V3/100000/2/40   25774769 ns     25774113 ns           27 RowInvRate=257.741ns
+BM_Hash128V3/100000/3/40   36962701 ns     36962418 ns           19 RowInvRate=369.624ns
 */
 
 std::string generate_random_string(int min_len, int max_len) {
