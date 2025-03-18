@@ -215,6 +215,7 @@ TEST_F(CelonisArrayEndFinderTest, celonis_array_last_double) {
 
 TEST_F(CelonisArrayEndFinderTest, celonis_array_last_varchar) {
     auto arrays = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    arrays->append_datum(DatumArray{kNullDatum});
     arrays->append_datum(DatumArray{});
     arrays->append_datum(kNullDatum);
     arrays->append_datum(DatumArray{kNullDatum, "a", kNullDatum, "B"});
@@ -222,15 +223,18 @@ TEST_F(CelonisArrayEndFinderTest, celonis_array_last_varchar) {
     arrays->append_datum(DatumArray{kNullDatum});
     arrays->append_datum(DatumArray{"apple", "APPLE"});
     arrays->append_datum(DatumArray{kNullDatum, kNullDatum, "Google"});
+    arrays->append_datum(DatumArray{"apple"});
     const auto result = CelonisArrayEndFinder<TYPE_VARCHAR>::array_last(nullptr, {arrays}).value();
-    ASSERT_EQ(7, result->size());
+    ASSERT_EQ(arrays->size(), result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_TRUE(result->get(1).is_null());
-    EXPECT_EQ("B", result->get(2).get_slice());
-    EXPECT_EQ("", result->get(3).get_slice());
-    EXPECT_TRUE(result->get(4).is_null());
-    EXPECT_EQ("APPLE", result->get(5).get_slice());
-    EXPECT_EQ("Google", result->get(6).get_slice());
+    EXPECT_TRUE(result->get(2).is_null());
+    EXPECT_EQ("B", result->get(3).get_slice());
+    EXPECT_EQ("", result->get(4).get_slice());
+    EXPECT_TRUE(result->get(5).is_null());
+    EXPECT_EQ("APPLE", result->get(6).get_slice());
+    EXPECT_EQ("Google", result->get(7).get_slice());
+    EXPECT_EQ("apple", result->get(8).get_slice());
 }
 
 TEST_F(CelonisArrayEndFinderTest, celonis_array_last_datetime) {

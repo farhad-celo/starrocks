@@ -13,32 +13,32 @@
 namespace starrocks {
 
 /*
-2025-03-15T02:29:40+00:00
+2025-03-15T12:21:30+00:00
 Running ./be/build_Release/src/bench/celonis/output/array_first_last_bench
-Run on (32 X 2762.96 MHz CPU s)
+Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 0.46, 0.85, 1.86
+Load Average: 9.08, 6.76, 4.41
 // Args: Number of rows / Null percentage / Array Length
 --------------------------------------------------------------------------------------------
 Benchmark                                  Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------------------------
-BM_ArrayFirstVarchar/10000/0/20       363080 ns       363072 ns         1936 RowInvRate=36.3072ns
-BM_ArrayFirstVarchar/10000/50/20      486326 ns       486339 ns         1453 RowInvRate=48.6339ns
-BM_ArrayFirstVarchar/10000/100/20     432774 ns       432771 ns         1634 RowInvRate=43.2771ns
-BM_ArrayFirstVarchar/10000/0/40       566988 ns       566941 ns         1241 RowInvRate=56.6941ns
-BM_ArrayFirstVarchar/10000/50/40      683115 ns       682992 ns         1028 RowInvRate=68.2992ns
-BM_ArrayFirstVarchar/10000/100/40     730424 ns       730343 ns          984 RowInvRate=73.0343ns
+BM_ArrayFirstVarchar/10000/0/20       358305 ns       358321 ns         1957 RowInvRate=35.8321ns
+BM_ArrayFirstVarchar/10000/50/20      475582 ns       475546 ns         1487 RowInvRate=47.5546ns
+BM_ArrayFirstVarchar/10000/100/20     358763 ns       358749 ns         1956 RowInvRate=35.8749ns
+BM_ArrayFirstVarchar/10000/0/40       569122 ns       569077 ns         1262 RowInvRate=56.9077ns
+BM_ArrayFirstVarchar/10000/50/40      679079 ns       678988 ns         1043 RowInvRate=67.8988ns
+BM_ArrayFirstVarchar/10000/100/40     652185 ns       652133 ns         1174 RowInvRate=65.2133ns
 
-BM_ArrayLastVarchar/10000/0/20        383381 ns       383449 ns         1821 RowInvRate=38.3449ns
-BM_ArrayLastVarchar/10000/50/20       484168 ns       484175 ns         1451 RowInvRate=48.4175ns
-BM_ArrayLastVarchar/10000/100/20      428046 ns       428049 ns         1589 RowInvRate=42.8049ns
-BM_ArrayLastVarchar/10000/0/40        576658 ns       576638 ns         1180 RowInvRate=57.6638ns
-BM_ArrayLastVarchar/10000/50/40       698600 ns       698496 ns         1039 RowInvRate=69.8496ns
-BM_ArrayLastVarchar/10000/100/40      732284 ns       732183 ns          981 RowInvRate=73.2183ns
+BM_ArrayLastVarchar/10000/0/20        360974 ns       361073 ns         1944 RowInvRate=36.1073ns
+BM_ArrayLastVarchar/10000/50/20       474242 ns       474275 ns         1500 RowInvRate=47.4275ns
+BM_ArrayLastVarchar/10000/100/20      355977 ns       355999 ns         1980 RowInvRate=35.5999ns
+BM_ArrayLastVarchar/10000/0/40        609343 ns       609398 ns         1268 RowInvRate=60.9398ns
+BM_ArrayLastVarchar/10000/50/40       678415 ns       678334 ns          952 RowInvRate=67.8334ns
+BM_ArrayLastVarchar/10000/100/40      663562 ns       663527 ns         1164 RowInvRate=66.3527ns
 */
 
 using ScalarFunction = StatusOr<ColumnPtr> (*)(FunctionContext* context, const Columns& columns);
