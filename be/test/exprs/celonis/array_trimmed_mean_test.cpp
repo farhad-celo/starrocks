@@ -78,19 +78,58 @@ TEST_F(CelonisArrayTrimmedMeanTest, null_upper_cutoff) {
 
 TEST_F(CelonisArrayTrimmedMeanTest, cut_all) {
     auto local_ctx{create_context(TYPE_INT)};
-    auto const_column_lower = ColumnHelper::create_const_column<TYPE_BIGINT>(60, 2);
-    auto const_column_upper = ColumnHelper::create_const_column<TYPE_BIGINT>(60, 2);
+    auto const_column_lower = ColumnHelper::create_const_column<TYPE_BIGINT>(70, 2);
+    auto const_column_upper = ColumnHelper::create_const_column<TYPE_BIGINT>(70, 2);
     local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
     auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
     input_array->append_datum(DatumArray{2});
     input_array->append_datum(DatumArray{1, 2, 3, 1, 2, 3, 4});
+    input_array->append_datum(DatumArray{1, 2, 3, 1, 2, 3, 4, kNullDatum});
 
     const auto result = CelonisArrayTrimmedMean<TYPE_INT>::celonis_array_trimmed_mean(local_ctx.get(),
                                                                                       {input_array, const_column_lower,
                                                                                        const_column_upper}).value();
-    ASSERT_EQ(2, result->size());
+    ASSERT_EQ(3, result->size());
     ASSERT_EQ(2, result->get(0).get_double());
     ASSERT_EQ(0, result->get(1).get_double());
+    ASSERT_TRUE(result->get(2).is_null());
+}
+
+TEST_F(CelonisArrayTrimmedMeanTest, invalid_cutoff) {
+    {
+        auto local_ctx{create_context(TYPE_INT)};
+        auto const_column_lower = ColumnHelper::create_const_column<TYPE_BIGINT>(120, 2);
+        auto const_column_upper = ColumnHelper::create_const_column<TYPE_BIGINT>(5, 2);
+        local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        input_array->append_datum(DatumArray{2});
+        input_array->append_datum(DatumArray{1, 2, 3, 1, 2, 3, 4});
+
+        const auto result = CelonisArrayTrimmedMean<TYPE_INT>::celonis_array_trimmed_mean(local_ctx.get(),
+                                                                                          {input_array,
+                                                                                           const_column_lower,
+                                                                                           const_column_upper}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_EQ(0, result->get(0).get_double());
+        ASSERT_EQ(0, result->get(1).get_double());
+    }
+    {
+        auto local_ctx{create_context(TYPE_INT)};
+        auto const_column_lower = ColumnHelper::create_const_column<TYPE_BIGINT>(5, 2);
+        auto const_column_upper = ColumnHelper::create_const_column<TYPE_BIGINT>(120, 2);
+        local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        input_array->append_datum(DatumArray{2});
+        input_array->append_datum(DatumArray{1, 2, 3, 1, 2, 3, 4});
+
+        const auto result = CelonisArrayTrimmedMean<TYPE_INT>::celonis_array_trimmed_mean(local_ctx.get(),
+                                                                                          {input_array,
+                                                                                           const_column_lower,
+                                                                                           const_column_upper}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_EQ(0, result->get(0).get_double());
+        ASSERT_EQ(0, result->get(1).get_double());
+    }
 }
 
 TEST_F(CelonisArrayTrimmedMeanTest, simple_example) {
