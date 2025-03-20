@@ -101,6 +101,14 @@ jobs:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+      - name: Publish fe artifacts to GitHub Packages
+        if: ${{ !github.event.release.draft && !github.event.release.prerelease }}
+        continue-on-error: true
+        uses: ./.github/actions/publish-fe-artifacts
+        with:
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+
   build-and-push-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     needs: [build-arm, build-x86]

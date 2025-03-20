@@ -3,9 +3,7 @@ name: "Publish FE artifacts to GitHub packages"
 inputs:
   artifact_image:
     required: true
-  token_for_artifact_publishing:
-    required: true
-  token_for_artifact_deletion:
+  token:
     required: true
 
 runs:
@@ -15,20 +13,21 @@ runs:
       with:
         java-version: '11'
         distribution: 'temurin'
-        server-password: ${{ inputs.token_for_artifact_publishing }}
+        server-password: 'MAVEN_INTERNAL_TOKEN'
         server-id: 'github'
 
     - name: Extract and Publish FE artifacts
       shell: bash
       working-directory: fe
       env:
-          TOKEN_FOR_ARTIFACT_DELETION: ${{ inputs.token_for_artifact_deletion }}
+          TOKEN_FOR_ARTIFACT_DELETION: ${{ inputs.token }}
+          MAVEN_INTERNAL_TOKEN: ${{ inputs.token }}
       run: |
         function delete_artifact() {
           MODULE_DIRECTORY=$1
 
-          PACKAGE_NAME=$(cd "$MODULE_DIRECTORY" && mvn --quiet -Dexec.executable="echo" -Dexec.args='${project.groupId}.${project.artifactId}' --non-recursive exec:exec)
-          PACKAGE_VERSION=$(cd "$MODULE_DIRECTORY" && mvn --quiet -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+          PACKAGE_NAME=$(cd "$MODULE_DIRECTORY" && mvn --quiet help:evaluate -Dexpression=project.groupId -DforceStdout).$(cd "$MODULE_DIRECTORY" && mvn --quiet help:evaluate -Dexpression=project.artifactId -DforceStdout)
+          PACKAGE_VERSION=$(cd "$MODULE_DIRECTORY" && mvn --quiet help:evaluate -Dexpression=project.version -DforceStdout)
 
           ID=$(curl -s -X POST \
               -H "Accept: json" \
@@ -59,7 +58,7 @@ runs:
           CONTAINER_ID=$1
           MODULE_DIRECTORY=$2
 
-          FINAL_NAME=$(cd "$MODULE_DIRECTORY" && mvn --quiet -Dexec.executable="echo" -Dexec.args='${project.build.finalName}' --non-recursive exec:exec)
+          FINAL_NAME=$(cd "$MODULE_DIRECTORY" && mvn --quiet help:evaluate -Dexpression=project.build.finalName -DforceStdout)
 
           mkdir --parents "$MODULE_DIRECTORY/target"
           docker cp "$CONTAINER_ID:/release/fe_artifacts/fe/lib/$FINAL_NAME.jar" "$MODULE_DIRECTORY/target/$FINAL_NAME.jar"
