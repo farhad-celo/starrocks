@@ -32,6 +32,9 @@ public:
         UnnestedArrayData timestamp_array_data = prepare_array_input(timestamp_column.get());
         DCHECK(timestamp_array_data.elements->is_timestamp());
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
+        const auto& timestamp_elements = down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(
+                *timestamp_array_data.elements).get_data().data();
+        const auto& timestamp_null_elements = timestamp_array_data.null_elements;
 
         const bool has_secondary_order = (columns.size() >= 5) && (!columns[4]->has_null());
         ColumnPtr secondary_order_column = has_secondary_order ? ColumnHelper::unpack_and_duplicate_const_column(
@@ -152,12 +155,11 @@ public:
             // based on benchmark, using unix_seconds is faster than using TimestampValue.
             std::vector<int64_t> unix_seconds;
             unix_seconds.reserve(total_size);
-            auto timestamp_array = timestamp_column->get(row).get_array();
-            for (const auto& item: timestamp_array) {
-                if (item.is_null()) {
+            for (auto time_idx = src_timestamp_start; time_idx < src_timestamp_end; ++time_idx) {
+                if (timestamp_null_elements != nullptr && (*timestamp_null_elements)[time_idx] != 0) {
                     unix_seconds.push_back(std::numeric_limits<int64_t>::min());
                 } else {
-                    auto x = item.get_timestamp().to_unix_second();
+                    auto x = timestamp_elements[time_idx].to_unix_second();
                     unix_seconds.push_back(x);
                 }
             }
