@@ -102,4 +102,24 @@ TEST_F(CelonisArrayAvgTest, array_double) {
     EXPECT_EQ(3.14, result->get(6).get_double());
 }
 
+TEST_F(CelonisArrayAvgTest, array_double_non_null) {
+    auto arrays = ColumnHelper::create_column(TYPE_ARRAY_DOUBLE, true);
+    arrays->append_datum(DatumArray{});
+    arrays->append_datum(kNullDatum);
+    arrays->append_datum(DatumArray{1.2, 2.5, 2.3});
+    arrays->append_datum(DatumArray{-2.3, 2.3, 3.0});
+    arrays->append_datum(DatumArray{});
+    arrays->append_datum(DatumArray{-120.3, -120.3});
+    arrays->append_datum(DatumArray{3.14, 3.14, 3.14});
+    const auto result = CelonisArrayAvg<TYPE_DOUBLE>::array_avg(nullptr, {arrays}).value();
+    EXPECT_EQ(7, result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
+    EXPECT_EQ(2.0, result->get(2).get_double());
+    EXPECT_EQ(1.0, result->get(3).get_double());
+    EXPECT_TRUE(result->get(4).is_null());
+    EXPECT_EQ(-120.3, result->get(5).get_double());
+    EXPECT_EQ(3.14, result->get(6).get_double());
+}
+
 } // namespace starrocks

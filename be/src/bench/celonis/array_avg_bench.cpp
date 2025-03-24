@@ -12,24 +12,25 @@
 namespace starrocks {
 
 /*
-2025-03-15T15:44:12+00:00
+2025-03-15T15:59:37+00:00
 Running ./be/build_Release/src/bench/celonis/output/array_avg_bench
-Run on (32 X 2878.52 MHz CPU s)
+Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 3.89, 3.11, 2.76
+Load Average: 7.08, 6.12, 4.58
+// Args: Number of rows / Array length
 -------------------------------------------------------------------------------
 Benchmark                     Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------
-BM_ArrayAvg/1000/20       18949 ns        18863 ns        36933 RowInvRate=18.8626ns
-BM_ArrayAvg/10000/20     174655 ns       174666 ns         4003 RowInvRate=17.4666ns
-BM_ArrayAvg/1000/40       33150 ns        33061 ns        20861 RowInvRate=33.0611ns
-BM_ArrayAvg/10000/40     304176 ns       304052 ns         2324 RowInvRate=30.4052ns
-BM_ArrayAvg/1000/80       60535 ns        60486 ns        11711 RowInvRate=60.4859ns
-BM_ArrayAvg/10000/80     607857 ns       607498 ns         1167 RowInvRate=60.7498ns
+BM_ArrayAvg/1000/20       18774 ns        18686 ns        35533 RowInvRate=18.6856ns
+BM_ArrayAvg/10000/20     173873 ns       173790 ns         4094 RowInvRate=17.379ns
+BM_ArrayAvg/1000/40       31383 ns        31270 ns        22281 RowInvRate=31.2696ns
+BM_ArrayAvg/10000/40     295767 ns       295707 ns         2399 RowInvRate=29.5707ns
+BM_ArrayAvg/1000/80       58315 ns        58293 ns        12078 RowInvRate=58.2932ns
+BM_ArrayAvg/10000/80     585060 ns       584841 ns         1205 RowInvRate=58.4841ns
 */
 
 static void BM_ArrayAvg(benchmark::State& state) {
