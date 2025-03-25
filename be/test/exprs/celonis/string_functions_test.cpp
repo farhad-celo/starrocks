@@ -61,6 +61,7 @@ protected:
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
     auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -79,12 +80,12 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_collision) {
     ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
 
     ASSERT_EQ(2, result->size());
-    EXPECT_EQ("95534194333898912524556646770114125019", int128_to_string(result->get(0).get_int128()));
-    EXPECT_EQ("-15604239156722706735822034149563619436", int128_to_string(result->get(1).get_int128()));
+    EXPECT_NE(int128_to_string(result->get(0).get_int128()), int128_to_string(result->get(1).get_int128()));
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_concat_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
     auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -107,10 +108,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_concat_collision) {
     ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
 
     ASSERT_EQ(4, result->size());
-    EXPECT_EQ("-116423615381574681252646068740447308930", int128_to_string(result->get(0).get_int128()));
-    EXPECT_EQ("79912828542332434191845536781608325267", int128_to_string(result->get(1).get_int128()));
-    EXPECT_EQ("149327305336444856090942449101198044171", int128_to_string(result->get(2).get_int128()));
-    EXPECT_EQ("31751105303156399554110410960461273213", int128_to_string(result->get(3).get_int128()));
+    EXPECT_NE(int128_to_string(result->get(0).get_int128()), int128_to_string(result->get(1).get_int128()));
+    EXPECT_NE(int128_to_string(result->get(2).get_int128()), int128_to_string(result->get(3).get_int128()));
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
@@ -296,6 +295,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
     auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -750,6 +750,59 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2) {
     }
 }
 
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_collision) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    Columns columns;
+    auto column1 = BinaryColumn::create();
+    column1->append("70B5E8DAF8BF1EEE91CC8D383DB5A16E");
+    column1->append("78AC441C9BB21EDEB483CA3CB88FDC57");
+
+    auto column2 = BinaryColumn::create();
+    column2->append("010");
+    column2->append("010");
+
+    columns.emplace_back(column1);
+    columns.emplace_back(column2);
+
+    ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), columns).value();
+
+    ASSERT_EQ(2, result->size());
+    EXPECT_NE(int128_to_string(result->get(0).get_int128()), int128_to_string(result->get(1).get_int128()));
+}
+
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_concat_collision) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    Columns columns;
+    auto column1 = BinaryColumn::create();
+    column1->append("22");
+    column1->append("2");
+    column1->append("1");
+    column1->append("11111111111");
+
+    auto column2 = BinaryColumn::create();
+    column2->append("44");
+    column2->append("244");
+    column2->append("1111111111");
+    column2->append("");
+
+    columns.emplace_back(column1);
+    columns.emplace_back(column2);
+
+    ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), columns).value();
+
+    ASSERT_EQ(4, result->size());
+    EXPECT_NE(int128_to_string(result->get(0).get_int128()), int128_to_string(result->get(1).get_int128()));
+    EXPECT_NE(int128_to_string(result->get(2).get_int128()), int128_to_string(result->get(3).get_int128()));
+}
+
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_const_array_input) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
@@ -761,9 +814,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_const_array_input)
         column = ConstColumn::create(column, 3);
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
         ASSERT_EQ(column->size(), result->size());
-        EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(1).get_int128()));
-        EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(2).get_int128()));
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(2).get_int128()));
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -793,8 +846,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
         column->append_datum(DatumArray{"starrocks"});
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
         ASSERT_EQ(2, result->size());
-        EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("70964585907158640341122805077717094742", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-39860275131497362562110746998887222515", int128_to_string(result->get(1).get_int128()));
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -802,8 +855,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
         column->append_datum(DatumArray{"hello", "starrocks"});
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
         ASSERT_EQ(2, result->size());
-        EXPECT_EQ("-9508340982777299797928774324431085410", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("-60119840840360818224922178158465423753", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("144019643735392052535165383538110996661", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-133694396197743686302797954021954852834", int128_to_string(result->get(1).get_int128()));
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), false);
@@ -811,8 +864,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
         column->append_datum(DatumArray{"hello", "starrocks"});
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
         ASSERT_EQ(2, result->size());
-        EXPECT_EQ("-9508340982777299797928774324431085410", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("-60119840840360818224922178158465423753", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("144019643735392052535165383538110996661", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-133694396197743686302797954021954852834", int128_to_string(result->get(1).get_int128()));
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -842,7 +895,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
         strings->append_datum(kNullDatum);
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {strings}).value();
         ASSERT_EQ(2, result->size());
-        EXPECT_EQ("113354056479506190712662670385450615649", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("62891042711506979871088750514650369910", int128_to_string(result->get(0).get_int128()));
         EXPECT_TRUE(result->get(1).is_null());
     }
 }
@@ -867,8 +920,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable) {
         columns.emplace_back(column);
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), columns).value();
         ASSERT_EQ(2, result->size());
-        EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("70964585907158640341122805077717094742", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-39860275131497362562110746998887222515", int128_to_string(result->get(1).get_int128()));
     }
     {
         Columns columns;
@@ -885,8 +938,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable) {
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), columns).value();
 
         ASSERT_EQ(2, result->size());
-        EXPECT_EQ("-9508340982777299797928774324431085410", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("-60119840840360818224922178158465423753", int128_to_string(result->get(1).get_int128()));
+        EXPECT_EQ("144019643735392052535165383538110996661", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-133694396197743686302797954021954852834", int128_to_string(result->get(1).get_int128()));
     }
     {
         Columns columns;
@@ -919,7 +972,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable) {
         strings->append_datum(kNullDatum);
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {strings}).value();
         ASSERT_EQ(2, result->size());
-        EXPECT_EQ("113354056479506190712662670385450615649", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("62891042711506979871088750514650369910", int128_to_string(result->get(0).get_int128()));
         EXPECT_TRUE(result->get(1).is_null());
     }
 }

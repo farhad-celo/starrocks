@@ -271,10 +271,21 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     size_t row_size = columns[0]->size();
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
-    std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
+    XXH3_state_t init_state;
+    XXH_errorcode code = XXH3_128bits_reset_withSeed(&init_state, default_xxhash_seed);
+    if (UNLIKELY(code != XXH_OK)) {
+        return Status::InternalError("CELONIS_XX_HASH3_128_NULLABLE: init xxh3 state failed");
+    }
+    std::vector<XXH3_state_t> states(row_size, init_state);
     std::vector<bool> is_null_vec(row_size, false);
 
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
+        DCHECK_EQ(1, columns.size());
+        if (columns[0]->only_null()) {
+            auto result_column = context->create_column(context->get_return_type(), true);
+            result_column->append_nulls(row_size);
+            return result_column;
+        }
         ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
         UnnestedArrayData string_data = prepare_array_input(array_column.get());
         const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
@@ -293,8 +304,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                     break;
                 }
                 Slice slice = strings[i];
-                uint128_t seed = seeds_vec[row];
-                seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+                RETURN_IF_ERROR(
+                        xxh3_128bits_update_new(&states[row], slice.data, slice.size, "CELONIS_XX_HASH3_128_NULLABLE"));
             }
         }
     } else {
@@ -313,16 +324,17 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                     continue;
                 }
                 auto slice = viewer.value(row);
-                uint128_t seed = seeds_vec[row];
-                seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
+                RETURN_IF_ERROR(
+                        xxh3_128bits_update_new(&states[row], slice.data, slice.size, "CELONIS_XX_HASH3_128_NULLABLE"));
             }
         }
     }
     ColumnBuilder<TYPE_LARGEINT> builder(row_size);
     for (int row = 0; row < row_size; ++row) {
-        builder.append(seeds_vec[row], is_null_vec[row]);
+        XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
+        int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
+        builder.append(res, is_null_vec[row]);
     }
-
     return builder.build(ColumnHelper::is_all_const(columns));
 }
 
