@@ -608,6 +608,25 @@ TEST_F(CelonisTransitsMatchTest, normal_cases_const_manual) {
     }
     {
         Prepare<TYPE_VARCHAR>({TYPE_VARCHAR}, {TYPE_VARCHAR});
+        std::optional<std::vector<DatumArray>> left_keys_arrays1 = std::vector<DatumArray>{
+                DatumArray{"L1", "L2", "L3"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays1 = std::vector<DatumArray>{
+                DatumArray{"R1", "R2", "R3"}};
+        AddRow(left_keys_arrays1, DatumArray{"foo", "bar", "foo"}, right_keys_arrays1,
+               DatumArray{"foo", "baz", "foo"});
+        std::optional<std::vector<DatumArray>> left_keys_arrays2 = std::vector<DatumArray>{
+                DatumArray{"LL1", "LL2", "LL3"}};
+        std::optional<std::vector<DatumArray>> right_keys_arrays2 = std::vector<DatumArray>{
+                DatumArray{"RR1", "RR2", "RR3"}};
+        AddRow(left_keys_arrays2, DatumArray{"foo", "bar", "foo"}, right_keys_arrays2,
+               DatumArray{"foo", "baz", "foo"});
+        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        ASSERT_EQ(2, result->size());
+        Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{"R1", "R3", "R1", "R3"}});
+        Validate(result, 1, {DatumArray{"LL1", "LL1", "LL3", "LL3"}}, {DatumArray{"RR1", "RR3", "RR1", "RR3"}});
+    }
+    {
+        Prepare<TYPE_VARCHAR>({TYPE_VARCHAR}, {TYPE_VARCHAR});
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{
                 DatumArray{"L1", "L2", "L3"}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{

@@ -14,35 +14,35 @@
 namespace starrocks {
 
 /*
-2025-03-16T20:57:13+00:00
+2025-03-27T16:46:19+00:00
 Running ./be/build_Release/src/bench/celonis/output/transits_match_bench
-Run on (32 X 2445.43 MHz CPU s)
+Run on (32 X 3207.41 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 5.66, 4.19, 3.15
+Load Average: 11.99, 10.98, 7.89
 // Args: Number of rows / Number of primary key fields / Length of match/manual array
 -------------------------------------------------------------------------------------------------
 Benchmark                                       Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------------
-BM_ConstantTransitsMatch/1000/2/10       24051426 ns     24049864 ns           30 RowInvRate=24.0499us
-BM_ConstantTransitsMatch/10000/2/10     238770354 ns    238758593 ns            3 RowInvRate=23.8759us
-BM_ConstantTransitsMatch/1000/4/10       43624338 ns     43619729 ns           16 RowInvRate=43.6197us
-BM_ConstantTransitsMatch/10000/4/10     433229649 ns    433199868 ns            2 RowInvRate=43.32us
-BM_ConstantTransitsMatch/1000/2/20       67575659 ns     67573433 ns           10 RowInvRate=67.5734us
-BM_ConstantTransitsMatch/10000/2/20     675038481 ns    674978389 ns            1 RowInvRate=67.4978us
-BM_ConstantTransitsMatch/1000/4/20      129604019 ns    129594915 ns            6 RowInvRate=129.595us
-BM_ConstantTransitsMatch/10000/4/20    1306545370 ns   1306478190 ns            1 RowInvRate=130.648us
-BM_NonConstantTransitsMatch/1000/2/10    26007512 ns     26005721 ns           27 RowInvRate=26.0057us
-BM_NonConstantTransitsMatch/10000/2/10  262219601 ns    262208067 ns            3 RowInvRate=26.2208us
-BM_NonConstantTransitsMatch/1000/4/10    45775699 ns     45773613 ns           15 RowInvRate=45.7736us
-BM_NonConstantTransitsMatch/10000/4/10  460681674 ns    460659071 ns            2 RowInvRate=46.0659us
-BM_NonConstantTransitsMatch/1000/2/20    72926937 ns     72925243 ns           10 RowInvRate=72.9252us
-BM_NonConstantTransitsMatch/10000/2/20  724848604 ns    724780485 ns            1 RowInvRate=72.478us
-BM_NonConstantTransitsMatch/1000/4/20   133766453 ns    133730193 ns            5 RowInvRate=133.73us
-BM_NonConstantTransitsMatch/10000/4/20 1359135022 ns   1359015301 ns            1 RowInvRate=135.902us
+BM_ConstantTransitsMatch/1000/2/10        3580343 ns      3580351 ns          196 RowInvRate=3.58035us
+BM_ConstantTransitsMatch/10000/2/10      35569860 ns     35569411 ns           20 RowInvRate=3.55694us
+BM_ConstantTransitsMatch/1000/4/10        3739630 ns      3739541 ns          187 RowInvRate=3.73954us
+BM_ConstantTransitsMatch/10000/4/10      37678075 ns     37676249 ns           19 RowInvRate=3.76762us
+BM_ConstantTransitsMatch/1000/2/20        7231388 ns      7231398 ns           96 RowInvRate=7.2314us
+BM_ConstantTransitsMatch/10000/2/20      72035417 ns     72034451 ns           10 RowInvRate=7.20345us
+BM_ConstantTransitsMatch/1000/4/20        7617699 ns      7617745 ns           93 RowInvRate=7.61775us
+BM_ConstantTransitsMatch/10000/4/20      76593813 ns     76592698 ns            9 RowInvRate=7.65927us
+BM_NonConstantTransitsMatch/1000/2/10    25843644 ns     25843248 ns           27 RowInvRate=25.8432us
+BM_NonConstantTransitsMatch/10000/2/10  257733049 ns    257694509 ns            3 RowInvRate=25.7695us
+BM_NonConstantTransitsMatch/1000/4/10    44268532 ns     44266154 ns           16 RowInvRate=44.2662us
+BM_NonConstantTransitsMatch/10000/4/10  440484696 ns    440466052 ns            2 RowInvRate=44.0466us
+BM_NonConstantTransitsMatch/1000/2/20    72455052 ns     72435845 ns           10 RowInvRate=72.4358us
+BM_NonConstantTransitsMatch/10000/2/20  692335557 ns    692328488 ns            1 RowInvRate=69.2328us
+BM_NonConstantTransitsMatch/1000/4/20   127116678 ns    127116953 ns            6 RowInvRate=127.117us
+BM_NonConstantTransitsMatch/10000/4/20 1286897681 ns   1286886804 ns            1 RowInvRate=128.689us
 */
 
 enum MatchType {
@@ -231,7 +231,6 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
     auto array_type_desc = logical_type_to_array_type_desc(TYPE_VARCHAR);
 
     int total_rows = 0;
-    TimestampValue timestamp;
     for (auto _: state) {
         state.PauseTiming();
         left_primary_keys_column = ColumnHelper::create_column(left_key_struct_type, true);

@@ -296,16 +296,56 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
     ColumnPtr res = context->create_column(context->get_return_type(), true);
     auto null_column = down_cast<NullableColumn*>(res.get());
     StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
-    auto fields = st->fields_column();
+    auto& fields = st->fields_column();
     DCHECK_EQ(2, fields.size());
     StructColumn* res_left_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[0].get()));
     StructColumn* res_right_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[1].get()));
-    auto res_left_fields = res_left_column->fields_column();
-    auto res_right_fields = res_right_column->fields_column();
-
+    auto& res_left_fields = res_left_column->fields_column();
+    auto& res_right_fields = res_right_column->fields_column();
+    DCHECK(fields[0]->is_nullable());
+    DCHECK(fields[1]->is_nullable());
+    auto null_column_1 = down_cast<NullableColumn*>(fields[0].get());
+    auto null_column_2 = down_cast<NullableColumn*>(fields[1].get());
     const auto* state = reinterpret_cast<const TransitsMatchStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
+    std::vector<ColumnPtr> res_left_elements;
+    std::vector<ColumnPtr> res_right_elements;
+    std::vector<NullableColumn*> res_left_nulls;
+    std::vector<NullableColumn*> res_right_nulls;
+    std::vector<UInt32Column::Ptr> res_left_offsets;
+    std::vector<UInt32Column::Ptr> res_right_offsets;
+    for (auto i = 0; i < res_left_fields.size(); ++i) {
+        res_left_nulls.push_back(down_cast<NullableColumn*>(res_left_fields[i].get()));
+        auto array_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(res_left_fields[i].get()));
+        res_left_elements.push_back(array_col->elements_column());
+        res_left_offsets.push_back(array_col->offsets_column());
+    }
+    for (auto i = 0; i < res_right_fields.size(); ++i) {
+        res_right_nulls.push_back(down_cast<NullableColumn*>(res_right_fields[i].get()));
+        auto array_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(res_right_fields[i].get()));
+        res_right_elements.push_back(array_col->elements_column());
+        res_right_offsets.push_back(array_col->offsets_column());
+    }
+    std::vector<Column*> left_key_elements;
+    std::vector<Column*> right_key_elements;
+    std::vector<UInt32Column::Ptr> left_key_offsets;
+    std::vector<UInt32Column::Ptr> right_key_offsets;
+    for (auto i = 0; i < left_key_fields.size(); ++i) {
+        left_key_elements.push_back(down_cast<const ArrayColumn*>(
+                ColumnHelper::get_data_column(left_key_fields[i].get()))->elements_column().get());
+        left_key_offsets.push_back(
+                down_cast<ArrayColumn*>(ColumnHelper::get_data_column(left_key_fields[i].get()))->offsets_column());
+    }
+    for (auto i = 0; i < right_key_fields.size(); ++i) {
+        right_key_elements.push_back(down_cast<const ArrayColumn*>(
+                ColumnHelper::get_data_column(right_key_fields[i].get()))->elements_column().get());
+        right_key_offsets.push_back(
+                down_cast<ArrayColumn*>(ColumnHelper::get_data_column(right_key_fields[i].get()))->offsets_column());
+    }
+    std::vector<uint32_t> left_indexes;
+    std::vector<uint32_t> right_indexes;
+    int new_offset = 0;
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
             columns[3]->is_null(row) || left_key_fields.size() == 0 || right_key_fields.size() == 0 ||
@@ -314,10 +354,11 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
             continue;
         }
 
-        const auto left_length = left_key_fields[0]->get(row).get_array().size();
+        const auto left_length = left_key_offsets[0]->get_data()[row + 1] - left_key_offsets[0]->get_data()[row];
+        const auto left_start = left_key_offsets[0]->get_data()[row];
         bool inconsistent_left_length = false;
-        for (auto i = 0; i < left_key_fields.size(); ++i) {
-            if (left_key_fields[i]->get(row).get_array().size() != left_length) {
+        for (auto i = 1; i < left_key_fields.size(); ++i) {
+            if (left_length != left_key_offsets[i]->get_data()[row + 1] - left_key_offsets[i]->get_data()[row]) {
                 inconsistent_left_length = true;
                 break;
             }
@@ -327,10 +368,11 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
             continue;
         }
 
-        const auto right_length = right_key_fields[0]->get(row).get_array().size();
+        const auto right_length = right_key_offsets[0]->get_data()[row + 1] - right_key_offsets[0]->get_data()[row];
+        const auto right_start = right_key_offsets[0]->get_data()[row];
         bool inconsistent_right_length = false;
-        for (auto i = 0; i < right_key_fields.size(); ++i) {
-            if (right_key_fields[i]->get(row).get_array().size() != right_length) {
+        for (auto i = 1; i < right_key_fields.size(); ++i) {
+            if (right_length != right_key_offsets[i]->get_data()[row + 1] - right_key_offsets[i]->get_data()[row]) {
                 inconsistent_right_length = true;
                 break;
             }
@@ -339,7 +381,6 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
             res->append_nulls(1);
             continue;
         }
-
 
         auto left_match_array = columns[1]->get(row).get_array();
         auto right_match_array = columns[3]->get(row).get_array();
@@ -365,16 +406,29 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
             res->append_nulls(1);
             continue;
         }
-        if (fields[0]->is_nullable()) {
-            auto null_column_1 = down_cast<NullableColumn*>(fields[0].get());
-            null_column_1->null_column_data().emplace_back(0);
-        }
-        if (fields[1]->is_nullable()) {
-            auto null_column_2 = down_cast<NullableColumn*>(fields[1].get());
-            null_column_2->null_column_data().emplace_back(0);
-        }
+        null_column_1->null_column_data().emplace_back(0);
+        null_column_2->null_column_data().emplace_back(0);
         std::vector<Edge> edges = compute_edges(left_match_array, right_match_array, state->manual_map);
-        AddEdges(edges, left_key_fields, right_key_fields, res_left_fields, res_right_fields, null_column, row);
+        for (const auto& edge: edges) {
+            left_indexes.push_back(left_start + edge.left_index);
+            right_indexes.push_back(right_start + edge.right_index);
+        }
+        new_offset += edges.size();
+        for (auto i = 0; i < left_key_fields.size(); ++i) {
+            res_left_offsets[i]->get_data().push_back(new_offset);
+            res_left_nulls[i]->null_column_data().emplace_back(0);
+        }
+        for (auto i = 0; i < right_key_fields.size(); ++i) {
+            res_right_offsets[i]->get_data().push_back(new_offset);
+            res_right_nulls[i]->null_column_data().emplace_back(0);
+        }
+        null_column->null_column_data().emplace_back(0);
+    }
+    for (auto i = 0; i < left_key_fields.size(); ++i) {
+        res_left_elements[i].get()->append_selective(*left_key_elements[i], left_indexes);
+    }
+    for (auto i = 0; i < right_key_fields.size(); ++i) {
+        res_right_elements[i].get()->append_selective(*right_key_elements[i], right_indexes);
     }
     return res;
 }
