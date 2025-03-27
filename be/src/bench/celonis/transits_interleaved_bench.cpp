@@ -14,7 +14,7 @@
 namespace starrocks {
 
 /*
-2025-03-16T15:10:54+00:00
+2025-03-23T22:39:05+00:00
 Running ./be/build_Release/src/bench/celonis/output/transits_interleaved_bench
 Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
@@ -22,18 +22,19 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 2.64, 1.43, 0.68
+Load Average: 5.65, 3.33, 2.70
+// Args: Number of rows / Number of primary key fields / Length of timestamp (sorting) array
 --------------------------------------------------------------------------------------------
 Benchmark                                  Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------------------------
-BM_TransitsInterleaved/1000/2/10    28589467 ns     28588587 ns           25 RowInvRate=28.5886us
-BM_TransitsInterleaved/10000/2/10  285495344 ns    285484677 ns            2 RowInvRate=28.5485us
-BM_TransitsInterleaved/1000/4/10    53383700 ns     53381811 ns           13 RowInvRate=53.3818us
-BM_TransitsInterleaved/10000/4/10  532756552 ns    532743409 ns            1 RowInvRate=53.2743us
-BM_TransitsInterleaved/1000/2/20    88563445 ns     88554559 ns            8 RowInvRate=88.5546us
-BM_TransitsInterleaved/10000/2/20  891932434 ns    891890718 ns            1 RowInvRate=89.1891us
-BM_TransitsInterleaved/1000/4/20   171559885 ns    171549020 ns            4 RowInvRate=171.549us
-BM_TransitsInterleaved/10000/4/20 1700078437 ns   1699893928 ns            1 RowInvRate=169.989us
+BM_TransitsInterleaved/1000/2/10      719304 ns       719231 ns          942 RowInvRate=719.231ns
+BM_TransitsInterleaved/10000/2/10    6985941 ns      6985524 ns          100 RowInvRate=698.552ns
+BM_TransitsInterleaved/1000/4/10      962675 ns       962596 ns          728 RowInvRate=962.596ns
+BM_TransitsInterleaved/10000/4/10    9366809 ns      9366368 ns           73 RowInvRate=936.637ns
+BM_TransitsInterleaved/1000/2/20     1292370 ns      1292329 ns          543 RowInvRate=1.29233us
+BM_TransitsInterleaved/10000/2/20   12889734 ns     12889509 ns           55 RowInvRate=1.28895us
+BM_TransitsInterleaved/1000/4/20     1745283 ns      1745185 ns          403 RowInvRate=1.74519us
+BM_TransitsInterleaved/10000/4/20   17774174 ns     17773852 ns           39 RowInvRate=1.77739us
 */
 
 TypeDescriptor TYPE_ARRAY_DATETIME = TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME));
