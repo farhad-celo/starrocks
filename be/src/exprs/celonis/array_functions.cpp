@@ -562,7 +562,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] Functi
     return CelonisNullToEmpty::process(columns);
 }
 
-Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
+Status calc_crop_impl(const Columns& columns, bool fill_one, const ColumnPtr& result) {
     DCHECK_EQ(columns.size(), 5);
     size_t n_rows = columns[0]->size();
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
@@ -586,7 +586,7 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
     size_t new_offset = 0;
     res_elements_column->reserve(activity_offsets[n_rows]);
 
-    // TODO(y.zhang): Add prepare method to handle constant parameters; handle AllAll specially.
+    // TODO(y.zhang): Add prepare method to handle constant parameters.
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || begin_mode_viewer.is_null(row) ||
             (begin_mode_viewer.value(row).to_string() != "ALL" && begin_activity_viewer.is_null(row)) ||
@@ -615,41 +615,44 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, ColumnPtr result) {
         std::optional<int64_t> last_begin_index = std::nullopt;
         std::optional<int64_t> first_end_index = std::nullopt;
         std::optional<int64_t> last_end_index = std::nullopt;
-        for (int64_t i = start; i < end; ++i) {
-            if (activity_array_data.null_elements != nullptr && (*activity_array_data.null_elements)[i] != 0) {
-                continue;
-            }
-            const std::string activity = activities[i].to_string();
-            if (activity == begin_activity) {
-                last_begin_index = i;
-                if (!first_begin_index.has_value()) {
-                    first_begin_index = i;
-                }
-            }
-            if (activity == end_activity) {
-                last_end_index = i;
-                if (!first_end_index.has_value()) {
-                    first_end_index = i;
-                }
-            }
-        }
         std::optional<int64_t> begin_index = std::nullopt;
         std::optional<int64_t> end_index = std::nullopt;
-        if (begin_mode == "FIRST") {
-            begin_index = first_begin_index;
-        } else if (begin_mode == "LAST") {
-            begin_index = last_begin_index;
-        } else {
-            DCHECK(begin_mode == "ALL");
+        if (begin_mode == "ALL" && end_mode == "ALL") {
             begin_index = start;
-        }
-        if (end_mode == "FIRST") {
-            end_index = first_end_index;
-        } else if (end_mode == "LAST") {
-            end_index = last_end_index;
-        } else {
-            DCHECK(end_mode == "ALL");
             end_index = end - 1;
+        } else {
+            for (int64_t i = start; i < end; ++i) {
+                if (activity_array_data.null_elements != nullptr && (*activity_array_data.null_elements)[i] != 0) {
+                    continue;
+                }
+                const std::string activity = activities[i].to_string();
+                if (activity == begin_activity) {
+                    last_begin_index = i;
+                    if (!first_begin_index.has_value()) {
+                        first_begin_index = i;
+                    }
+                }
+                if (activity == end_activity) {
+                    last_end_index = i;
+                    if (!first_end_index.has_value()) {
+                        first_end_index = i;
+                    }
+                }
+            }
+            if (begin_mode == "FIRST") {
+                begin_index = first_begin_index;
+            } else if (begin_mode == "LAST") {
+                begin_index = last_begin_index;
+            } else {
+                begin_index = start;
+            }
+            if (end_mode == "FIRST") {
+                end_index = first_end_index;
+            } else if (end_mode == "LAST") {
+                end_index = last_end_index;
+            } else {
+                end_index = end - 1;
+            }
         }
         if (!begin_index.has_value() || !end_index.has_value() || begin_index.value() > end_index.value()) {
             for (int64_t j = 0; j < size; ++j) {

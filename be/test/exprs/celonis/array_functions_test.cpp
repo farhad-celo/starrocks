@@ -2891,6 +2891,26 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_to_null_normal_cases) {
     }
     {
         auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{});
+        begin_activity->append_datum(kNullDatum);
+        begin_mode->append_datum("ALL");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop_to_null(nullptr,
+                                                                     {activity, begin_activity, begin_mode,
+                                                                      end_activity,
+                                                                      end_mode}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ(0, result->get(0).get_array().size());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
