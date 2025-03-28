@@ -315,7 +315,6 @@ private:
         const auto& key_data = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(key_data_column).get_data();
 
         for (size_t i = 0; i < chunk_size; i++) {
-            Slice prev;
             size_t start = src_offsets[i];
             size_t end = src_offsets[i + 1];
             if (end == start) {
@@ -328,11 +327,13 @@ private:
             if (key_end - key_start != end - start) {
                 return Status::InvalidArgument("The size of input_array and key_array should not be different.");
             }
+            int prev_idx = -1;
+            auto base_diff = start - key_start;
             for (auto id = key_start; id < key_end; ++id) {
-                if (id == key_start || prev != key_data[id]) {
-                    src_index.push_back(id - key_start + start);
+                if (prev_idx == -1 || key_data[prev_idx] != key_data[id]) {
+                    src_index.push_back(id + base_diff);
                     new_offset++;
-                    prev = key_data[id];
+                    prev_idx = id;
                 }
             }
             dest_offsets_column->get_data().push_back(new_offset);
@@ -709,10 +710,11 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_count([[maybe_unused]] Function
                                                        const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    const size_t n_rows = columns[0]->size();
+    const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
     const auto& offsets = array_data.offsets->get_data().data();
+    const auto* null_elements = array_data.null_elements;
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
 
     for (auto row = 0; row < n_rows; ++row) {
@@ -722,32 +724,33 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_count([[maybe_unused]] Function
         }
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
-        if (array_data.null_elements == nullptr) {
+        if (null_elements == nullptr) {
             result.append(end - start);
             continue;
         }
         int64_t cnt = 0;
         for (auto i = start; i < end; ++i) {
-            if ((*array_data.null_elements)[i] != 0) {
+            if ((*null_elements)[i] != 0) {
                 continue;
             }
             ++cnt;
         }
         result.append(cnt);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::array_bool_or([[maybe_unused]] FunctionContext* context,
                                                          const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    const size_t n_rows = columns[0]->size();
+    const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr boolean_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData boolean_array_data = prepare_array_input(boolean_array_column.get());
     const auto& booleans =
             down_cast<const RunTimeColumnType<TYPE_BOOLEAN>&>(*boolean_array_data.elements).get_data().data();
     const auto& offsets = boolean_array_data.offsets->get_data().data();
+    const auto* null_elements = boolean_array_data.null_elements;
     ColumnBuilder<TYPE_BOOLEAN> result(n_rows);
 
     for (auto row = 0; row < n_rows; ++row) {
@@ -759,7 +762,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_bool_or([[maybe_unused]] Functi
         const auto end = offsets[row + 1];
         bool is_true = false;
         for (auto i = start; i < end; ++i) {
-            if (boolean_array_data.null_elements != nullptr && (*boolean_array_data.null_elements)[i] != 0) {
+            if (null_elements != nullptr && (*null_elements)[i] != 0) {
                 continue;
             }
             if (booleans[i]) {
@@ -769,7 +772,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_bool_or([[maybe_unused]] Functi
         }
         result.append(is_true);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 } // namespace starrocks

@@ -13,7 +13,7 @@
 namespace starrocks {
 
 /*
-2025-03-14T15:37:43+00:00
+2025-03-27T11:38:31+00:00
 Running ./be/build_Release/src/bench/celonis/output/array_functions_bench
 Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
@@ -21,41 +21,41 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 2.74, 3.94, 3.23
+Load Average: 5.91, 4.39, 4.18
 ----------------------------------------------------------------------------------------------
 Benchmark                                    Time             CPU   Iterations UserCounters...
 ----------------------------------------------------------------------------------------------
 // Args: Number of rows / Number of unique elements in the array / Max number of duplicates per unique element
-BM_DedupSortedByVARCHAR/10000/10/5     2428011 ns      2427770 ns          291 RowInvRate=242.777ns
-BM_DedupSortedByVARCHAR/10000/20/5     6283689 ns      6282785 ns          111 RowInvRate=628.279ns
-BM_DedupSortedByVARCHAR/10000/10/10    4334589 ns      4334238 ns          161 RowInvRate=433.424ns
-BM_DedupSortedByVARCHAR/10000/20/10    9249412 ns      9247639 ns           76 RowInvRate=924.764ns
+BM_DedupSortedByVARCHAR/10000/10/5     2454653 ns      2454393 ns          290 RowInvRate=245.439ns
+BM_DedupSortedByVARCHAR/10000/20/5     6276774 ns      6276287 ns          111 RowInvRate=627.629ns
+BM_DedupSortedByVARCHAR/10000/10/10    4327619 ns      4327285 ns          162 RowInvRate=432.729ns
+BM_DedupSortedByVARCHAR/10000/20/10    9201218 ns      9199696 ns           76 RowInvRate=919.97ns
 // Args: Number of rows / True percentage / Array length
-BM_ArrayBoolOr/1000/1/10                 14633 ns        14579 ns        47432 RowInvRate=14.5794ns
-BM_ArrayBoolOr/10000/1/10               139060 ns       138951 ns         5257 RowInvRate=13.8951ns
-BM_ArrayBoolOr/1000/10/10                19303 ns        19249 ns        36953 RowInvRate=19.2493ns
-BM_ArrayBoolOr/10000/10/10              190497 ns       187573 ns         3789 RowInvRate=18.7573ns
-BM_ArrayBoolOr/1000/50/10                20257 ns        20180 ns        32987 RowInvRate=20.1795ns
-BM_ArrayBoolOr/10000/50/10              192363 ns       192259 ns         3855 RowInvRate=19.2259ns
-BM_ArrayBoolOr/1000/1/20                 18957 ns        18899 ns        37428 RowInvRate=18.8988ns
-BM_ArrayBoolOr/10000/1/20               184758 ns       184632 ns         3993 RowInvRate=18.4632ns
-BM_ArrayBoolOr/1000/10/20                21940 ns        21881 ns        32065 RowInvRate=21.8807ns
-BM_ArrayBoolOr/10000/10/20              206817 ns       206707 ns         3340 RowInvRate=20.6707ns
-BM_ArrayBoolOr/1000/50/20                20661 ns        20605 ns        35024 RowInvRate=20.6053ns
-BM_ArrayBoolOr/10000/50/20              182548 ns       182440 ns         3713 RowInvRate=18.244ns
+BM_ArrayBoolOr/1000/1/10                 13628 ns        13580 ns        49883 RowInvRate=13.5805ns
+BM_ArrayBoolOr/10000/1/10               124194 ns       124100 ns         5695 RowInvRate=12.41ns
+BM_ArrayBoolOr/1000/10/10                18644 ns        18580 ns        38142 RowInvRate=18.5795ns
+BM_ArrayBoolOr/10000/10/10              173107 ns       173010 ns         4045 RowInvRate=17.301ns
+BM_ArrayBoolOr/1000/50/10                18697 ns        18648 ns        37477 RowInvRate=18.6479ns
+BM_ArrayBoolOr/10000/50/10              176191 ns       176111 ns         3991 RowInvRate=17.6111ns
+BM_ArrayBoolOr/1000/1/20                 17421 ns        17381 ns        39864 RowInvRate=17.3808ns
+BM_ArrayBoolOr/10000/1/20               169161 ns       169065 ns         4163 RowInvRate=16.9065ns
+BM_ArrayBoolOr/1000/10/20                21748 ns        21701 ns        32194 RowInvRate=21.7013ns
+BM_ArrayBoolOr/10000/10/20              204236 ns       204142 ns         3430 RowInvRate=20.4142ns
+BM_ArrayBoolOr/1000/50/20                18872 ns        18824 ns        37167 RowInvRate=18.8237ns
+BM_ArrayBoolOr/10000/50/20              176469 ns       176399 ns         3967 RowInvRate=17.6399ns
 // Args: Number of rows / Null percentage / Array length
-BM_ArrayCountVarchar/1000/0/20           10837 ns        10733 ns        65169 RowInvRate=10.7332ns
-BM_ArrayCountVarchar/10000/0/20          85396 ns        85252 ns        12728 RowInvRate=8.52516ns
-BM_ArrayCountVarchar/1000/10/20          12406 ns        12295 ns        53709 RowInvRate=12.295ns
-BM_ArrayCountVarchar/10000/10/20        106069 ns       105943 ns         6698 RowInvRate=10.5943ns
-BM_ArrayCountVarchar/1000/50/20          13110 ns        13011 ns        56816 RowInvRate=13.0115ns
-BM_ArrayCountVarchar/10000/50/20        106957 ns       106796 ns         7112 RowInvRate=10.6796ns
-BM_ArrayCountVarchar/1000/0/100           8145 ns         8004 ns        63514 RowInvRate=8.00351ns
-BM_ArrayCountVarchar/10000/0/100        126271 ns       125878 ns         5565 RowInvRate=12.5878ns
-BM_ArrayCountVarchar/1000/10/100         30326 ns        30179 ns        21304 RowInvRate=30.1792ns
-BM_ArrayCountVarchar/10000/10/100       335791 ns       335445 ns         2097 RowInvRate=33.5445ns
-BM_ArrayCountVarchar/1000/50/100         30525 ns        30333 ns        21192 RowInvRate=30.3333ns
-BM_ArrayCountVarchar/10000/50/100       306140 ns       305998 ns         2288 RowInvRate=30.5998ns
+BM_ArrayCountVarchar/1000/0/20            7862 ns         7734 ns        90380 RowInvRate=7.73351ns
+BM_ArrayCountVarchar/10000/0/20          54991 ns        54876 ns        12712 RowInvRate=5.48764ns
+BM_ArrayCountVarchar/1000/10/20          11769 ns        11665 ns        59731 RowInvRate=11.6649ns
+BM_ArrayCountVarchar/10000/10/20         93428 ns        93320 ns         7515 RowInvRate=9.33205ns
+BM_ArrayCountVarchar/1000/50/20          11860 ns        11769 ns        59012 RowInvRate=11.7691ns
+BM_ArrayCountVarchar/10000/50/20         93447 ns        93338 ns         7456 RowInvRate=9.33384ns
+BM_ArrayCountVarchar/1000/0/100           7993 ns         7844 ns        89847 RowInvRate=7.84388ns
+BM_ArrayCountVarchar/10000/0/100         93222 ns        92988 ns         7577 RowInvRate=9.29879ns
+BM_ArrayCountVarchar/1000/10/100         29251 ns        29134 ns        23915 RowInvRate=29.1336ns
+BM_ArrayCountVarchar/10000/10/100       298464 ns       298247 ns         2361 RowInvRate=29.8247ns
+BM_ArrayCountVarchar/1000/50/100         29501 ns        29348 ns        23776 RowInvRate=29.3479ns
+BM_ArrayCountVarchar/10000/50/100       271210 ns       271083 ns         2603 RowInvRate=27.1083ns
 */
 
 static void BM_DedupSortedByVARCHAR(benchmark::State& state) {
