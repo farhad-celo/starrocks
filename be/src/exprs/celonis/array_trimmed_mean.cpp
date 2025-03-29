@@ -146,7 +146,12 @@ StatusOr<ColumnPtr> CelonisArrayTrimmedMean<LT>::celonis_array_trimmed_mean(Func
             result_column.append_null();
             continue;
         }
-        std::sort(buffer.begin(), buffer.end());
+        if (first > 0) {
+            std::nth_element(buffer.begin(), buffer.begin() + first, buffer.end());
+        }
+        if (last < buffer.size()) {
+            std::nth_element(buffer.begin() + first, buffer.begin() + last, buffer.end());
+        }
         CppType sum;
         // Use parallel execution only for large arrays (> parallel_threshold)
         if (count > parallel_threshold) {
