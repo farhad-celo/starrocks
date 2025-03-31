@@ -566,6 +566,9 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] Functi
 Status calc_crop_impl(const Columns& columns, bool fill_one, const ColumnPtr& result) {
     DCHECK_EQ(columns.size(), 5);
     size_t n_rows = columns[0]->size();
+    if (n_rows == 0) {
+        return Status::OK();
+    }
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
     DCHECK(activity_array_data.elements->is_binary());
@@ -587,27 +590,31 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, const ColumnPtr& re
     size_t new_offset = 0;
     res_elements_column->reserve(activity_offsets[n_rows]);
 
-    // TODO(y.zhang): Add prepare method to handle constant parameters.
+    if (begin_mode_viewer.is_null(0) || end_mode_viewer.is_null(0)) {
+        result->append_nulls(n_rows);
+        return Status::OK();
+    }
+    const std::string begin_mode = begin_mode_viewer.value(0).to_string();
+    const std::string end_mode = end_mode_viewer.value(0).to_string();
+    if ((begin_mode != "ALL" && begin_activity_viewer.is_null(0)) ||
+        (end_mode != "ALL" && end_activity_viewer.is_null(0))) {
+        result->append_nulls(n_rows);
+        return Status::OK();
+    }
+    const std::string begin_activity = begin_mode == "ALL" ? "" : begin_activity_viewer.value(0).to_string();
+    const std::string end_activity = end_mode == "ALL" ? "" : end_activity_viewer.value(0).to_string();
+    if (begin_mode != "FIRST" && begin_mode != "LAST" && begin_mode != "ALL") {
+        return Status::InvalidArgument("begin range mode must be FIRST/LAST/ALL.");
+    }
+    if (end_mode != "FIRST" && end_mode != "LAST" && end_mode != "ALL") {
+        return Status::InvalidArgument("end range mode must be FIRST/LAST/ALL.");
+    }
     for (size_t row = 0; row < n_rows; ++row) {
-        if (columns[0]->is_null(row) || begin_mode_viewer.is_null(row) ||
-            (begin_mode_viewer.value(row).to_string() != "ALL" && begin_activity_viewer.is_null(row)) ||
-            end_mode_viewer.is_null(row) ||
-            (end_mode_viewer.value(row).to_string() != "ALL" && end_activity_viewer.is_null(row))) {
+        if (columns[0]->is_null(row)) {
             result->append_nulls(1);
             continue;
         }
         res_null_column->get_data().push_back(0);
-        const std::string begin_mode = begin_mode_viewer.value(row).to_string();
-        const std::string end_mode = end_mode_viewer.value(row).to_string();
-        if (begin_mode != "FIRST" && begin_mode != "LAST" && begin_mode != "ALL") {
-            return Status::InvalidArgument("begin range mode must be FIRST/LAST/ALL.");
-        }
-        if (end_mode != "FIRST" && end_mode != "LAST" && end_mode != "ALL") {
-            return Status::InvalidArgument("end range mode must be FIRST/LAST/ALL.");
-        }
-        const std::string begin_activity = begin_mode == "ALL" ? "" : begin_activity_viewer.value(row).to_string();
-        const std::string end_activity = end_mode == "ALL" ? "" : end_activity_viewer.value(row).to_string();
-
         const auto start = static_cast<int64_t>(activity_offsets[row]);
         const auto end = static_cast<int64_t>(activity_offsets[row + 1]);
         DCHECK(end >= start);
