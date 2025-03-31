@@ -97,9 +97,8 @@ ColumnPtr index_activity_loop_impl(Column* array_column) {
     ColumnPtr& result_elements = result_array->elements_column();
     result_elements->reserve(elements.size());
 
-    uint32_t hash[elements.size()];
-    memset(hash, 0, elements.size() * sizeof(uint32_t));
-    elements.fnv_hash(hash, 0, elements.size());
+    std::vector<uint32_t> hash(elements.size(), 0);
+    elements.fnv_hash(hash.data(), 0, elements.size());
 
     std::vector<int64_t> temp_for_reverse;  // -1: NULL, >1 : Max count of a loop starting
 
@@ -189,9 +188,8 @@ ColumnPtr index_activity_type_impl(Column* array_column) {
 
     phmap::flat_hash_map<Element, int64_t, HashOnElement , EqualOnElement> element_counter_map;
 
-    uint32_t hash[elements.size()];
-    memset(hash, 0, elements.size() * sizeof(uint32_t));
-    elements.fnv_hash(hash, 0, elements.size());
+    std::vector<uint32_t> hash(elements.size(), 0);
+    elements.fnv_hash(hash.data(), 0, elements.size());
 
     std::vector<int64_t> temp_for_reverse;  // 0: NULL, >0 : Max count of a loop starting, <0 : -(index of a loop starting + 1)
 
