@@ -1,6 +1,5 @@
 #include "count_edges.h"
 
-#include "column/array_column.h"
 #include "column/column_helper.h"
 #include "column/nullable_column.h"
 #include "exprs/celonis/util.h"
@@ -41,8 +40,7 @@ std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, co
                           const NullColumn::Container* null_offsets,
                           const NullColumn::Container* activity_array_nulls) {
 
-    const size_t num_activities = offsets.size() - 1;
-
+    const size_t num_rows = offsets.size() - 1;
     auto offsets_ptr = offsets.get_data().data();
     // TODO: other types
     using ValueType = RunTimeCppType<TYPE_VARCHAR>;
@@ -60,23 +58,23 @@ std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, co
     result.emplace_back(count_column_ptr);
 
     using SliceCountHashMap = phmap::flat_hash_map<SlicePairWithHash, int64_t, HashOnSlicePairWithHash, EqualOnSlicePairWithHash>;
-
-    for (size_t i = 0; i < num_activities; i++) {
+    SliceCountHashMap edges_count;
+    std::vector<SlicePairWithHash> distinct_edges;
+    for (size_t i = 0; i < num_rows; i++) {
         if (activity_array_nulls != nullptr && (*activity_array_nulls)[i]) {
             // Skip the NULL array.
             offset_column->append(result_offset);
             continue;
         }
-        SliceCountHashMap edges_count;
-        std::vector<SlicePairWithHash> distinct_edges;
-
+        edges_count.clear();
+        distinct_edges.clear();
         size_t offset = offsets_ptr[i];
-        size_t array_size = offsets_ptr[i + 1] - offsets_ptr[i];
+        int64_t array_size = offsets_ptr[i + 1] - offsets_ptr[i];
         if (array_size <= 1) {
             offset_column->append(result_offset);
             continue;
         }
-        for (size_t index = 0; index < array_size - 1; ++index) {
+        for (auto index = 0; index < array_size - 1; ++index) {
             if constexpr (element_has_null) {
                 // Nulls are ignored
                 if ((*null_offsets)[offset + index] != 0) {
@@ -94,9 +92,9 @@ std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, co
             }
             const auto& next_value = elements_ptr[offset + index + 1];
             SlicePairWithHash candidate_edge(value, next_value);
-            size_t old_size = edges_count.size();
-            edges_count[candidate_edge]++;
-            if (old_size != edges_count.size()) {
+            auto [it, inserted] = edges_count.try_emplace(candidate_edge, 0);
+            it->second++;
+            if (inserted) {
                 distinct_edges.push_back(candidate_edge);
                 result_offset++;
             }
