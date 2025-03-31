@@ -13,43 +13,43 @@
 namespace starrocks {
 
 /*
-2024-11-01T15:20:13+00:00
+2025-03-31T01:09:33+00:00
 Running ./be/build_Release/src/bench/celonis/output/remap_values_bench
-Run on (32 X 2879.51 MHz CPU s)
+Run on (32 X 3242.97 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 3.45, 4.90, 3.46
+Load Average: 13.93, 9.66, 6.52
 // Args: Number of rows / Number of possible strings / Size of old (new) maps
 -------------------------------------------------------------------------------------------------
 Benchmark                                       Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------------
-BM_RemapValuesNonConstant/1000/40/20      1326383 ns      1326232 ns          528 RowInvRate=1.32623us
-BM_RemapValuesNonConstant/10000/40/20    13198074 ns     13196138 ns           53 RowInvRate=1.31961us
-BM_RemapValuesNonConstant/100000/40/20  138115776 ns    138102470 ns            5 RowInvRate=1.38102us
-BM_RemapValuesNonConstant/1000/60/20      1329007 ns      1328739 ns          522 RowInvRate=1.32874us
-BM_RemapValuesNonConstant/10000/60/20    13268962 ns     13267697 ns           53 RowInvRate=1.32677us
-BM_RemapValuesNonConstant/100000/60/20  138252171 ns    138232176 ns            5 RowInvRate=1.38232us
-BM_RemapValuesNonConstant/1000/40/40      2403935 ns      2402796 ns          292 RowInvRate=2.4028us
-BM_RemapValuesNonConstant/10000/40/40    24574811 ns     24571330 ns           29 RowInvRate=2.45713us
-BM_RemapValuesNonConstant/100000/40/40  258430563 ns    258385908 ns            3 RowInvRate=2.58386us
-BM_RemapValuesNonConstant/1000/60/40      2424225 ns      2423962 ns          289 RowInvRate=2.42396us
-BM_RemapValuesNonConstant/10000/60/40    24793853 ns     24792131 ns           28 RowInvRate=2.47921us
-BM_RemapValuesNonConstant/100000/60/40  259059275 ns    259037839 ns            3 RowInvRate=2.59038us
-BM_RemapValuesConstant/1000/40/20           64152 ns        64131 ns        11185 RowInvRate=64.1309ns
-BM_RemapValuesConstant/10000/40/20         592989 ns       592792 ns         1233 RowInvRate=59.2792ns
-BM_RemapValuesConstant/100000/40/20       5701246 ns      5698563 ns          122 RowInvRate=56.9856ns
-BM_RemapValuesConstant/1000/60/20           59477 ns        59472 ns        11654 RowInvRate=59.4722ns
-BM_RemapValuesConstant/10000/60/20         535936 ns       535886 ns         1288 RowInvRate=53.5886ns
-BM_RemapValuesConstant/100000/60/20       5184079 ns      5183607 ns          129 RowInvRate=51.8361ns
-BM_RemapValuesConstant/1000/40/40           72608 ns        72605 ns         9757 RowInvRate=72.6048ns
-BM_RemapValuesConstant/10000/40/40         666415 ns       666374 ns         1055 RowInvRate=66.6374ns
-BM_RemapValuesConstant/100000/40/40       6432207 ns      6431332 ns          107 RowInvRate=64.3133ns
-BM_RemapValuesConstant/1000/60/40           68377 ns        68365 ns         9912 RowInvRate=68.3649ns
-BM_RemapValuesConstant/10000/60/40         626212 ns       626190 ns         1126 RowInvRate=62.619ns
-BM_RemapValuesConstant/100000/60/40       6222981 ns      6222508 ns          111 RowInvRate=62.2251ns
+BM_RemapValuesNonConstant/1000/40/20      1427486 ns      1427304 ns          483 RowInvRate=1.4273us
+BM_RemapValuesNonConstant/10000/40/20    14402269 ns     14401721 ns           50 RowInvRate=1.44017us
+BM_RemapValuesNonConstant/100000/40/20  145888841 ns    145887114 ns            5 RowInvRate=1.45887us
+BM_RemapValuesNonConstant/1000/60/20      1397979 ns      1397922 ns          500 RowInvRate=1.39792us
+BM_RemapValuesNonConstant/10000/60/20    13861571 ns     13861377 ns           50 RowInvRate=1.38614us
+BM_RemapValuesNonConstant/100000/60/20  139015420 ns    139009539 ns            5 RowInvRate=1.3901us
+BM_RemapValuesNonConstant/1000/40/40      2575109 ns      2574893 ns          274 RowInvRate=2.57489us
+BM_RemapValuesNonConstant/10000/40/40    25024592 ns     25023331 ns           28 RowInvRate=2.50233us
+BM_RemapValuesNonConstant/100000/40/40  257864507 ns    257855546 ns            3 RowInvRate=2.57856us
+BM_RemapValuesNonConstant/1000/60/40      2624097 ns      2623984 ns          271 RowInvRate=2.62398us
+BM_RemapValuesNonConstant/10000/60/40    25492787 ns     25491253 ns           27 RowInvRate=2.54913us
+BM_RemapValuesNonConstant/100000/60/40  257203854 ns    257200900 ns            3 RowInvRate=2.57201us
+BM_RemapValuesConstant/1000/40/20           49887 ns        49878 ns        13999 RowInvRate=49.8784ns
+BM_RemapValuesConstant/10000/40/20         440697 ns       440681 ns         1559 RowInvRate=44.0681ns
+BM_RemapValuesConstant/100000/40/20       4394037 ns      4393944 ns          156 RowInvRate=43.9394ns
+BM_RemapValuesConstant/1000/60/20           47382 ns        47379 ns        15099 RowInvRate=47.3791ns
+BM_RemapValuesConstant/10000/60/20         426517 ns       426516 ns         1643 RowInvRate=42.6516ns
+BM_RemapValuesConstant/100000/60/20       4193314 ns      4193209 ns          167 RowInvRate=41.9321ns
+BM_RemapValuesConstant/1000/40/40           53990 ns        53991 ns        13023 RowInvRate=53.9913ns
+BM_RemapValuesConstant/10000/40/40         478497 ns       478485 ns         1453 RowInvRate=47.8485ns
+BM_RemapValuesConstant/100000/40/40       4780264 ns      4780136 ns          149 RowInvRate=47.8014ns
+BM_RemapValuesConstant/1000/60/40           53772 ns        53773 ns        12873 RowInvRate=53.7734ns
+BM_RemapValuesConstant/10000/60/40         481072 ns       481075 ns         1491 RowInvRate=48.1075ns
+BM_RemapValuesConstant/100000/60/40       4664196 ns      4664148 ns          150 RowInvRate=46.6415ns
 */
 
 enum MatchType {

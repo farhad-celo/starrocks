@@ -24,14 +24,13 @@ struct ValueMap<LT, FixedLengthLTGuard<LT>> {
 template<LogicalType LT>
 struct ValueMap<LT, StringLTGuard<LT>> {
     using CppType = RunTimeCppValueType<LT>;
-    using KeyType = std::string;
-    using HashMap = phmap::flat_hash_map<KeyType, Datum, SliceHash>;
+    using KeyType = CppType;
+    using HashMap = phmap::flat_hash_map<Slice, Datum, SliceHashWithSeed<PhmapSeed1>, SliceEqual>;
 };
 
 template<LogicalType LT>
 struct ValueHashMap {
     using CppType = RunTimeCppType<LT>;
-    using HashMapKeyType = typename ValueMap<LT>::KeyType;
     using HashMap = typename ValueMap<LT, guard::Guard>::HashMap;
 
     HashMap value_map;
@@ -47,8 +46,7 @@ struct ValueHashMap {
             if (old_datum.is_null()) {
                 null_value = new_datum;
             } else {
-                const auto key = _convert_to_key_type(old_datum.get<CppType>());
-                value_map[key] = new_datum;
+                value_map[old_datum.get<CppType>()] = new_datum;
             }
         }
     }
@@ -60,21 +58,11 @@ struct ValueHashMap {
             }
             return default_value.has_value() ? default_value.value() : key_datum;
         }
-        const auto key = _convert_to_key_type(key_datum.get<CppType>());
-        auto it = value_map.find(key);
+        auto it = value_map.find(key_datum.get<CppType>());
         if (it == value_map.end()) {
             return default_value.has_value() ? default_value.value() : key_datum;
         } else {
             return it->second;
-        }
-    }
-
-private:
-    HashMapKeyType _convert_to_key_type(CppType v) const {
-        if constexpr (lt_is_string<LT>) {
-            return std::string(v.data, v.size);
-        } else {
-            return v;
         }
     }
 };
