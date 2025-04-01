@@ -13,43 +13,43 @@
 namespace starrocks {
 
 /*
-2025-03-29T16:58:10+00:00
+2025-03-31T19:30:27+00:00
 Running ./be/build_Release/src/bench/celonis/output/shortened_variant_bench
-Run on (32 X 2852.16 MHz CPU s)
+Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 5.10, 5.98, 4.66
+Load Average: 8.16, 4.79, 4.25
 // Number of rows / Number of distinct activities / Variant length / Cycle length
 -----------------------------------------------------------------------------------------------
 Benchmark                                     Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------------------
-BM_ShortenedVariant/10000/20/20/1       4933164 ns      4933113 ns          142 RowInvRate=493.311ns
-BM_ShortenedVariant/100000/20/20/1     57106948 ns     57107116 ns           12 RowInvRate=571.071ns
-BM_ShortenedVariant/10000/100/20/1      4436434 ns      4436278 ns          159 RowInvRate=443.628ns
-BM_ShortenedVariant/100000/100/20/1    51855958 ns     51854871 ns           14 RowInvRate=518.549ns
-BM_ShortenedVariant/10000/1000/20/1     4593336 ns      4592626 ns          152 RowInvRate=459.263ns
-BM_ShortenedVariant/100000/1000/20/1   53727911 ns     53726105 ns           13 RowInvRate=537.261ns
-BM_ShortenedVariant/10000/20/40/1       9777662 ns      9777158 ns           69 RowInvRate=977.716ns
-BM_ShortenedVariant/100000/20/40/1    115530968 ns    115531289 ns            6 RowInvRate=1.15531us
-BM_ShortenedVariant/10000/100/40/1      8780967 ns      8780610 ns           80 RowInvRate=878.061ns
-BM_ShortenedVariant/100000/100/40/1   103254938 ns    103252152 ns            7 RowInvRate=1032.52ns
-BM_ShortenedVariant/10000/1000/40/1     9136186 ns      9136343 ns           77 RowInvRate=913.634ns
-BM_ShortenedVariant/100000/1000/40/1  107271361 ns    107267783 ns            7 RowInvRate=1072.68ns
-BM_ShortenedVariant/10000/20/20/2       5130374 ns      5129612 ns          136 RowInvRate=512.961ns
-BM_ShortenedVariant/100000/20/20/2     62703652 ns     62701218 ns           12 RowInvRate=627.012ns
-BM_ShortenedVariant/10000/100/20/2      4444217 ns      4444083 ns          157 RowInvRate=444.408ns
-BM_ShortenedVariant/100000/100/20/2    56831968 ns     56831315 ns           13 RowInvRate=568.313ns
-BM_ShortenedVariant/10000/1000/20/2     4594468 ns      4593923 ns          151 RowInvRate=459.392ns
-BM_ShortenedVariant/100000/1000/20/2   58644641 ns     58643428 ns           13 RowInvRate=586.434ns
-BM_ShortenedVariant/10000/20/40/2      10211956 ns     10211812 ns           69 RowInvRate=1021.18ns
-BM_ShortenedVariant/100000/20/40/2    118964596 ns    118959976 ns            6 RowInvRate=1.1896us
-BM_ShortenedVariant/10000/100/40/2      8859954 ns      8859914 ns           78 RowInvRate=885.991ns
-BM_ShortenedVariant/100000/100/40/2   105675726 ns    105667949 ns            7 RowInvRate=1056.68ns
-BM_ShortenedVariant/10000/1000/40/2     9200948 ns      9200786 ns           75 RowInvRate=920.079ns
-BM_ShortenedVariant/100000/1000/40/2  108152937 ns    108153565 ns            6 RowInvRate=1081.54ns
+BM_ShortenedVariant/10000/20/20/1       2968020 ns      2967929 ns          235 RowInvRate=296.793ns
+BM_ShortenedVariant/100000/20/20/1     36194517 ns     36193444 ns           20 RowInvRate=361.934ns
+BM_ShortenedVariant/10000/100/20/1      2370904 ns      2370765 ns          294 RowInvRate=237.076ns
+BM_ShortenedVariant/100000/100/20/1    30251590 ns     30250961 ns           23 RowInvRate=302.51ns
+BM_ShortenedVariant/10000/1000/20/1     2418646 ns      2418500 ns          291 RowInvRate=241.85ns
+BM_ShortenedVariant/100000/1000/20/1   30482567 ns     30482224 ns           23 RowInvRate=304.822ns
+BM_ShortenedVariant/10000/20/40/1       6117496 ns      6117431 ns          114 RowInvRate=611.743ns
+BM_ShortenedVariant/100000/20/40/1     74542357 ns     74541416 ns           10 RowInvRate=745.414ns
+BM_ShortenedVariant/10000/100/40/1      4780091 ns      4780284 ns          139 RowInvRate=478.028ns
+BM_ShortenedVariant/100000/100/40/1    60483472 ns     60480965 ns           12 RowInvRate=604.81ns
+BM_ShortenedVariant/10000/1000/40/1     4748152 ns      4748155 ns          146 RowInvRate=474.815ns
+BM_ShortenedVariant/100000/1000/40/1   63109639 ns     63107035 ns           11 RowInvRate=631.07ns
+BM_ShortenedVariant/10000/20/20/2       3040914 ns      3040578 ns          228 RowInvRate=304.058ns
+BM_ShortenedVariant/100000/20/20/2     41264541 ns     41263969 ns           17 RowInvRate=412.64ns
+BM_ShortenedVariant/10000/100/20/2      2411073 ns      2411057 ns          287 RowInvRate=241.106ns
+BM_ShortenedVariant/100000/100/20/2    35567971 ns     35566484 ns           20 RowInvRate=355.665ns
+BM_ShortenedVariant/10000/1000/20/2     2396993 ns      2396519 ns          292 RowInvRate=239.652ns
+BM_ShortenedVariant/100000/1000/20/2   33214420 ns     33209464 ns           21 RowInvRate=332.095ns
+BM_ShortenedVariant/10000/20/40/2       6304151 ns      6304137 ns          107 RowInvRate=630.414ns
+BM_ShortenedVariant/100000/20/40/2     76848827 ns     76846727 ns            9 RowInvRate=768.467ns
+BM_ShortenedVariant/10000/100/40/2      4870201 ns      4870294 ns          126 RowInvRate=487.029ns
+BM_ShortenedVariant/100000/100/40/2    63083733 ns     63082253 ns           11 RowInvRate=630.823ns
+BM_ShortenedVariant/10000/1000/40/2     4814588 ns      4814521 ns          145 RowInvRate=481.452ns
+BM_ShortenedVariant/100000/1000/40/2   62827303 ns     62824392 ns           11 RowInvRate=628.244ns
 */
 
 static void do_bench(benchmark::State& state) {

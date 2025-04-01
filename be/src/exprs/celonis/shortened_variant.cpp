@@ -21,7 +21,8 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
     auto elements_ptr = (const ValueType *) (elements.raw_data());
 
     result_offsets.reserve(num_array);
-    result_elements->reserve(elements.size());
+    std::vector<uint32_t> src_index;
+    src_index.reserve(elements.size() / 2);
     size_t new_offset = 0;
     for (size_t i = 0; i < num_array; i++) {
         size_t offset = offsets_ptr[i];
@@ -36,7 +37,7 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
         if (array_size == 1) {
             if (null_element_offsets == nullptr || (*null_element_offsets)[offset] == 0) {
                 // This is a non-NULL element.
-                result_elements->append_datum(elements.get(offset));
+                src_index.push_back(offset);
                 ++new_offset;
             }
             result_offsets.push_back(new_offset);
@@ -48,7 +49,7 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
         auto cur = offset;
         if (null_element_offsets == nullptr || (*null_element_offsets)[offset] == 0) {
             // This is a non-NULL element.
-            result_elements->append_datum(elements_ptr[cur]);
+            src_index.push_back(cur);
             new_offset++;
         }
         while (cur + 1 - offset < array_size) {
@@ -65,12 +66,13 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
                 current_cycle_len = 1;
                 prev = cur;
             }
-            result_elements->append_datum(elements_ptr[cur]);
+            src_index.push_back(cur);
             new_offset++;
         }
         result_offsets.push_back(new_offset);
 
     }
+    result_elements->append_selective(elements, src_index);
     return result_array;
 }
 }  // namespace
