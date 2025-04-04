@@ -75,7 +75,7 @@ TEST_F(CelonisTrimTest, ltrim_whitespace_trim_arg) {
     input_column->append_nulls(1);
     input_column->append_datum(" \n");
 
-    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", 1)};
+    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", input_column->size())};
 
     const auto result{RunLtrimConstantCase(input_column, whitespace).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -102,7 +102,7 @@ TEST_F(CelonisTrimTest, ltrim_empty_trim_arg) {
     input_column->append_nulls(1);
     input_column->append_datum(" \n");
 
-    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>("", 1)};
+    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>("", input_column->size())};
 
     const auto result{RunLtrimConstantCase(input_column, whitespace).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -126,7 +126,7 @@ TEST_F(CelonisTrimTest, ltrim_with_trim_arg) {
     input_column->append_datum(" PQL");
     input_column->append_nulls(1);
 
-    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>("x", 1)};
+    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>("x", input_column->size())};
 
     const auto result{RunLtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -145,7 +145,7 @@ TEST_F(CelonisTrimTest, ltrim_with_null_trim_arg) {
     input_column->append_datum("yPQL");
     input_column->append_datum(" PQL");
 
-    const auto characters{ColumnHelper::create_const_null_column(1)};
+    const auto characters{ColumnHelper::create_const_null_column(input_column->size())};
 
     const auto result{RunLtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -167,7 +167,7 @@ TEST_F(CelonisTrimTest, ltrim_with_trim_args) {
     input_column->append_nulls(1);
     input_column->append_datum(" \n");
 
-    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", 1)};
+    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", input_column->size())};
 
     const auto result{RunLtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -213,13 +213,13 @@ TEST_F(CelonisTrimTest, ltrim_with_string_column) {
 }
 
 TEST_F(CelonisTrimTest, ltrim_all_null_constants) {
-    const auto input_column{ColumnHelper::create_const_null_column(TYPE_VARCHAR)};
-    const auto characters{ColumnHelper::create_const_null_column(TYPE_VARCHAR)};
+    const auto input_column{ColumnHelper::create_const_null_column(10)};
+    const auto characters{ColumnHelper::create_const_null_column(10)};
 
     const auto result{RunLtrimConstantCase(input_column, characters).value()};
 
-    ASSERT_EQ(result->size(), 1);
-    ASSERT_TRUE(result->get(0).is_null());
+    ASSERT_EQ(result->size(), 10);
+    ASSERT_TRUE(result->only_null());
 }
 
 TEST_F(CelonisTrimTest, rtrim_whitespace_trim_arg) {
@@ -233,7 +233,7 @@ TEST_F(CelonisTrimTest, rtrim_whitespace_trim_arg) {
     input_column->append_nulls(1);
     input_column->append_datum("\n ");
 
-    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", 1)};
+    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", input_column->size())};
 
     const auto result{RunRtrimConstantCase(input_column, whitespace).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -260,7 +260,7 @@ TEST_F(CelonisTrimTest, rtrim_empty_trim_arg) {
     input_column->append_nulls(1);
     input_column->append_datum("\n ");
 
-    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>("", 1)};
+    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>("", input_column->size())};
 
     const auto result{RunRtrimConstantCase(input_column, whitespace).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -284,7 +284,7 @@ TEST_F(CelonisTrimTest, rtrim_with_trim_arg) {
     input_column->append_datum("PQL ");
     input_column->append_nulls(1);
 
-    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>("x", 1)};
+    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>("x", input_column->size())};
 
     const auto result{RunRtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -308,7 +308,7 @@ TEST_F(CelonisTrimTest, rtrim_with_trim_args) {
     input_column->append_nulls(1);
     input_column->append_datum("\n ");
 
-    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", 1)};
+    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", input_column->size())};
 
     const auto result{RunRtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -330,7 +330,7 @@ TEST_F(CelonisTrimTest, rtrim_with_null_trim_arg) {
     input_column->append_datum("yPQL");
     input_column->append_datum(" PQL");
 
-    const auto characters{ColumnHelper::create_const_null_column(1)};
+    const auto characters{ColumnHelper::create_const_null_column(input_column->size())};
 
     const auto result{RunRtrimConstantCase(input_column, characters).value()};
     const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
@@ -371,13 +371,13 @@ TEST_F(CelonisTrimTest, rtrim_with_string_column) {
 }
 
 TEST_F(CelonisTrimTest, rtrim_all_null_constants) {
-    const auto input_column{ColumnHelper::create_const_null_column(TYPE_VARCHAR)};
-    const auto characters{ColumnHelper::create_const_null_column(TYPE_VARCHAR)};
+    const auto input_column{ColumnHelper::create_const_null_column(10)};
+    const auto characters{ColumnHelper::create_const_null_column(10)};
 
     const auto result{RunRtrimConstantCase(input_column, characters).value()};
 
-    ASSERT_EQ(result->size(), 1);
-    ASSERT_TRUE(result->get(0).is_null());
+    ASSERT_EQ(result->size(), 10);
+    ASSERT_TRUE(result->only_null());
 }
 
 } // namespace starrocks

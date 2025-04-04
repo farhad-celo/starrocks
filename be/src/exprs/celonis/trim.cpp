@@ -38,34 +38,32 @@ void trim_if(std::string& value, const phmap::flat_hash_set<char, StdHash<char>>
 template <typename TrimFn>
     requires std::invocable<TrimFn, std::string&, int32_t>
 [[nodiscard]] ColumnPtr trim_for_each(
-        const ColumnViewer<TYPE_VARCHAR>& input_column, TrimFn&& trim_fn,
+        const ColumnPtr& input_column, TrimFn&& trim_fn,
         const std::optional<ColumnViewer<TYPE_VARCHAR>>& characters_column = std::nullopt) {
-    const auto num_rows{static_cast<int32_t>(input_column.size())};
-    ColumnBuilder<TYPE_VARCHAR> result_column{num_rows};
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(input_column.get());
+    const auto input_column_viewer{ColumnViewer<TYPE_VARCHAR>(input_column)};
+    ColumnBuilder<TYPE_VARCHAR> result_column(num_rows);
 
     for (auto row{0}; row < num_rows; ++row) {
-        if (input_column.is_null(row) || (characters_column.has_value() && characters_column->is_null(row))) {
+        if (input_column_viewer.is_null(row) || (characters_column.has_value() && characters_column->is_null(row))) {
             result_column.append_null();
             continue;
         }
-        auto value{input_column.value(row).to_string()};
+        auto value{input_column_viewer.value(row).to_string()};
         trim_fn(value, row);
         result_column.append(std::move(value));
     }
 
-    return result_column.build(false);
+    return result_column.build(all_const);
 }
 
 template <TrimDirection TRIM_DIRECTION>
 [[nodiscard]] StatusOr<ColumnPtr> trim_non_constant(FunctionContext* /* context */, const Columns& columns) {
-    const auto input_column_viewer{ColumnViewer<TYPE_VARCHAR>(columns[0])};
     const auto characters_column_viewer{ColumnViewer<TYPE_VARCHAR>(columns[1])};
     phmap::flat_hash_set<char, StdHash<char>> unique_characters{};
 
-    DCHECK_EQ(input_column_viewer.size(), characters_column_viewer.size());
-
     return trim_for_each(
-            input_column_viewer,
+            columns[0],
             [&unique_characters, &characters_column_viewer](std::string& value, const auto row) {
                 const auto characters{characters_column_viewer.value(row).to_string()};
                 unique_characters.insert(characters.begin(), characters.end());
@@ -77,20 +75,20 @@ template <TrimDirection TRIM_DIRECTION>
 
 template <TrimDirection TRIM_DIRECTION>
 [[nodiscard]] StatusOr<ColumnPtr> trim_constant(FunctionContext* context, const Columns& columns) {
-    const auto input_column_viewer{ColumnViewer<TYPE_VARCHAR>(columns[0])};
     const auto* state{reinterpret_cast<const TrimStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL))};
     const auto characters{state->characters_opt};
     if (!characters.has_value()) {
-        return ColumnHelper::create_const_null_column(input_column_viewer.size());
+        return ColumnHelper::create_const_null_column(columns[0]->size());
     }
 
-    return trim_for_each(input_column_viewer, [&characters](std::string& value, auto /* row */) {
+    return trim_for_each(columns[0], [&characters](std::string& value, auto /* row */) {
         trim_if<TRIM_DIRECTION>(value, characters.value());
     });
 }
 
 StatusOr<ColumnPtr> trim(FunctionContext* context, const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto* state{reinterpret_cast<const TrimStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL))};
     return state->function(context, columns);
