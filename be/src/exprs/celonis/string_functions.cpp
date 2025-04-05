@@ -527,10 +527,12 @@ StatusOr<ColumnPtr> CelonisStringFunctions::upper([[maybe_unused]]FunctionContex
 StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::FunctionContext* context,
                                                                   const starrocks::Columns& columns) {
     auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+    const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_VARCHAR> result(n_rows);
 
-    auto size = columns[0]->size();
-    ColumnBuilder<TYPE_VARCHAR> result(size);
-    for (int row = 0; row < size; ++row) {
+    constexpr char REPLACEMENT_CHAR{'?'};
+    std::string sanitized;
+    for (int row = 0; row < n_rows; ++row) {
         if (str_viewer.is_null(row)) {
             result.append_null();
             continue;
@@ -541,11 +543,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::Fun
         auto input = std::string_view(str_viewer.value(row));
         size_t found = input.find('\0');
         input = input.substr(0, found);
-        std::string sanitized;
+        sanitized.clear();
         sanitized.reserve(input.length());
-
-        constexpr char REPLACEMENT_CHAR{'?'};
-
         for (const auto* itr{input.begin()}; itr != input.end();) {
             const auto decoded{boost::locale::utf::utf_traits<char>::decode(itr, input.end())};
             if (decoded == boost::locale::utf::illegal || decoded == boost::locale::utf::incomplete) {
@@ -554,13 +553,11 @@ StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::Fun
                 boost::locale::utf::utf_traits<char>::encode(decoded, std::back_inserter(sanitized));
             }
         }
-
         result.append(Slice(sanitized));
     }
 
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
-
 
 static bool split_index(const Slice& haystack, const Slice& delimiter, int32_t part_number, Slice& res) {
     if (part_number >= 0) {
