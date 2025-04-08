@@ -158,6 +158,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/mode_test.cpp
         ./exprs/celonis/agg/multi_linear_regression_test.cpp
         ./exprs/celonis/agg/product_test.cpp
+        ./exprs/celonis/agg/top_k_utils_test.cpp
         ./exprs/celonis/agg/sorted_first_last_test.cpp
         ./exprs/celonis/agg/trimmed_mean_test.cpp
         ./exprs/celonis/agg/variant_agg_test.cpp
@@ -203,8 +204,10 @@ set(EXEC_FILES
         ./exprs/celonis/remap_values_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/remap_timestamps_calendar_test.cpp
+        ./exprs/celonis/row_buffer_test.cpp
         ./exprs/celonis/serialization_utils_test.cpp
         ./exprs/celonis/shortened_variant_test.cpp
+        ./exprs/celonis/sort_utils_test.cpp
         ./exprs/celonis/source_target_test.cpp
         ./exprs/celonis/stringhash_test.cpp
         ./exprs/celonis/string_functions_test.cpp

@@ -127,6 +127,7 @@ set(CELONIS_FILES
   celonis/agg/linear_regression.cpp
   celonis/agg/mode.cpp
   celonis/agg/product.cpp
+  celonis/agg/top_k_utils.cpp
   celonis/agg/variant_util.cpp
   celonis/agg/util.cpp
   celonis/agg/variant_agg.cpp
@@ -164,6 +165,7 @@ set(CELONIS_FILES
   celonis/qnorm.cpp
   celonis/remap_timestamp_weekday.cpp
   celonis/remap_values.cpp
+  celonis/row_buffer.cpp
   celonis/serialization_utils.cpp
   celonis/shortened_variant.cpp
   celonis/source_target.cpp
