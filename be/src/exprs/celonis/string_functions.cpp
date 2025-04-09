@@ -78,21 +78,23 @@ Status validate_slice(const Slice& slice, const std::string& reserved_str, const
     return Status::OK();
 }
 
-StatusOr<ColumnPtr> xx_hash3_128_v2_helper(starrocks::FunctionContext* context, const starrocks::Columns& columns,
-                                           const std::string& function_name,
-                                           Status (* hash_update_func)(XXH3_state_t*, const void*, size_t,
-                                                                       const std::string&)) {
+StatusOr<ColumnPtr> xx_hash3_128_helper(starrocks::FunctionContext* context, const starrocks::Columns& columns,
+                                        const std::string& function_name,
+                                        Status (* hash_update_func)(XXH3_state_t*, const void*, size_t,
+                                                                    const std::string&)) {
     DCHECK(columns.size() >= 1);
-    const size_t row_size = columns[0]->size();
+    const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
     XXH3_state_t init_state;
     XXH_errorcode code = XXH3_128bits_reset_withSeed(&init_state, default_xxhash_seed);
     if (UNLIKELY(code != XXH_OK)) {
         return Status::InternalError(function_name + ": init xxh3 state failed");
     }
-    std::vector<XXH3_state_t> states(row_size, init_state);
+    std::vector<XXH3_state_t> states;
+    states.reserve(n_rows);
 
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
+        states.assign(n_rows, init_state);
         DCHECK_EQ(1, columns.size());
         // columns[0] is NULL literal
         if (columns[0]->only_null()) {
@@ -107,14 +109,15 @@ StatusOr<ColumnPtr> xx_hash3_128_v2_helper(starrocks::FunctionContext* context, 
             int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
             auto result_column = context->create_column(context->get_return_type(), false);
             result_column->append_datum(res);
-            return ConstColumn::create(std::move(result_column), row_size);
+            // We need to return a const column here, otherwise function_call_expr will not resize it correctly.
+            return ConstColumn::create(std::move(result_column), n_rows);
         }
         ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
         UnnestedArrayData string_data = prepare_array_input(array_column.get());
         const auto& slices = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
                 *string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
-        for (size_t row = 0; row < row_size; ++row) {
+        for (size_t row = 0; row < n_rows; ++row) {
             if (columns[0]->is_null(row)) {
                 RETURN_IF_ERROR(hash_update_func(&states[row], XXHASH3_128_NULL_ARRAY_STRING.data(),
                                                  XXHASH3_128_NULL_ARRAY_STRING.size(), function_name));
@@ -137,15 +140,38 @@ StatusOr<ColumnPtr> xx_hash3_128_v2_helper(starrocks::FunctionContext* context, 
             }
         }
     } else {
-        // The below implementation follows the implementation of SR's xx_hash3_128.
+        size_t num_const_columns = 0;
+        while (num_const_columns < columns.size()) {
+            if (columns[num_const_columns]->is_constant()) {
+                ++num_const_columns;
+            } else {
+                break;
+            }
+        }
         std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
-        Slice null_string_slice = Slice(XXHASH3_128_NULL_STRING);
         column_viewers.reserve(columns.size());
         for (const auto& column: columns) {
             column_viewers.emplace_back(column);
         }
-        for (const auto& viewer: column_viewers) {
-            for (size_t row = 0; row < row_size; ++row) {
+        // Handle the leading constant columns
+        Slice null_string_slice = Slice(XXHASH3_128_NULL_STRING);
+        if (n_rows > 0) {
+            for (auto i = 0; i < num_const_columns; ++i) {
+                const auto& viewer = column_viewers[i];
+                Slice slice;
+                if (!viewer.is_null(0)) {
+                    slice = viewer.value(0);
+                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_STRING, function_name));
+                } else {
+                    slice = null_string_slice;
+                }
+                RETURN_IF_ERROR(hash_update_func(&(init_state), slice.data, slice.size, function_name));
+            }
+        }
+        states.assign(n_rows, init_state);
+        for (auto i = num_const_columns; i < columns.size(); ++i) {
+            const auto& viewer = column_viewers[i];
+            for (size_t row = 0; row < n_rows; ++row) {
                 Slice slice;
                 if (!viewer.is_null(row)) {
                     slice = viewer.value(row);
@@ -157,25 +183,25 @@ StatusOr<ColumnPtr> xx_hash3_128_v2_helper(starrocks::FunctionContext* context, 
             }
         }
     }
-    ColumnBuilder<TYPE_LARGEINT> builder(row_size);
-    for (int row = 0; row < row_size; ++row) {
+    ColumnBuilder<TYPE_LARGEINT> builder(n_rows);
+    for (int row = 0; row < n_rows; ++row) {
         XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
         int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
         builder.append(res, false);
     }
-    return builder.build(ColumnHelper::is_all_const(columns));
+    return builder.build(all_const);
 }
 
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v2(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
-    return xx_hash3_128_v2_helper(context, columns, "CELONIS_XX_HASH3_128_V2", xxh3_128bits_update);
+    return xx_hash3_128_helper(context, columns, "CELONIS_XX_HASH3_128_V2", xxh3_128bits_update);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v3(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
-    return xx_hash3_128_v2_helper(context, columns, "CELONIS_XX_HASH3_128_V3", xxh3_128bits_update_new);
+    return xx_hash3_128_helper(context, columns, "CELONIS_XX_HASH3_128_V3", xxh3_128bits_update_new);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,

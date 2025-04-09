@@ -212,6 +212,52 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
     }
 }
 
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_with_leading_const_columns) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    {
+        Columns columns;
+        auto column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        column->append_datum("hello");
+        column = ConstColumn::create(column, 2);
+        columns.emplace_back(column);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(0).get_int128()));
+    }
+    {
+        Columns columns;
+        auto column1 = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        column1->append_datum("hello");
+        column1 = ConstColumn::create(column1, 2);
+        columns.emplace_back(column1);
+        auto column2 = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        column2->append_datum("world");
+        column2->append_datum("starrocks");
+        columns.emplace_back(column2);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("144019643735392052535165383538110996661", int128_to_string(result->get(0).get_int128()));
+        EXPECT_EQ("-133694396197743686302797954021954852834", int128_to_string(result->get(1).get_int128()));
+    }
+    {
+        Columns columns;
+        auto column1 = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        column1->append_datum("hello");
+        column1 = ConstColumn::create(column1, 2);
+        columns.emplace_back(column1);
+        auto column2 = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        column2->append_datum("world");
+        column2 = ConstColumn::create(column2, 2);
+        columns.emplace_back(column2);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), columns).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("144019643735392052535165383538110996661", int128_to_string(result->get(0).get_int128()));
+    }
+}
+
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
@@ -509,20 +555,16 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_const_array_input) {
         column->append_datum(DatumArray{"hello"});
         column = ConstColumn::create(column, 3);
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v2(ctx.get(), {column}).value();
-        ASSERT_EQ(3, result->size());
+        ASSERT_EQ(1, result->size());
         EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(1).get_int128()));
-        EXPECT_EQ("-98478366302105124680504504609445627880", int128_to_string(result->get(2).get_int128()));
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
         column->append_datum(kNullDatum);
         column = ConstColumn::create(column, 3);
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v2(ctx.get(), {column}).value();
-        ASSERT_EQ(3, result->size());
+        ASSERT_EQ(1, result->size());
         EXPECT_EQ("-55107912451276212254785155889373354613", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("-55107912451276212254785155889373354613", int128_to_string(result->get(1).get_int128()));
-        EXPECT_EQ("-55107912451276212254785155889373354613", int128_to_string(result->get(2).get_int128()));
     }
 }
 
