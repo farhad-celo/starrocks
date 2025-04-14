@@ -401,17 +401,21 @@ private:
         auto* output_offsets_column = down_cast<ArrayColumn*>(output_array_column)->offsets_column().get();
         output_elements_column->reserve(input_offsets[input_array_column.size()]);
 
+        std::vector<uint32_t> src_index;
+        std::deque<size_t> window;
         for (size_t i = 0; i < input_array_column.size(); i++) {
             size_t start = input_offsets[i];
             size_t end = input_offsets[i + 1];
             DCHECK(end >= start);
+            src_index.clear();
+            window.clear();
             int64_t lag_offset = offset_viewer.value(i);
-            std::deque<size_t> window;
+            int num_nulls = 0;
             for (size_t j = start; j < end; ++j) {
                 if (window.size() == lag_offset) {
-                    output_elements_column->append(input_elements_column, window.front(), 1);
+                    src_index.push_back(window.front());
                 } else {
-                    output_elements_column->append_nulls(1);
+                    ++num_nulls;
                 }
                 if (!input_elements_column.get(j).is_null()) {
                     window.push_back(j);
@@ -420,6 +424,8 @@ private:
                     window.pop_front();
                 }
             }
+            output_elements_column->append_nulls(num_nulls);
+            output_elements_column->append_selective(input_elements_column, src_index);
         }
         output_offsets_column->get_data() = down_cast<const ArrayColumn&>(input_array_column).offsets().get_data();
         return Status::OK();
