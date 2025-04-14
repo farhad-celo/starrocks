@@ -657,6 +657,21 @@ TEST_F(CelonisArrayFunctionsTest, array_lead_empty_array) {
     ASSERT_EQ(0, result->get(1).get_array().size());
 }
 
+TEST_F(CelonisArrayFunctionsTest, array_lead_all_empty_arrays) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, false);
+    input_array->append_datum(DatumArray{});
+    input_array->append_datum(DatumArray{});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+    offset_array->append_datum(3L);
+    offset_array->append_datum(3L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(2, result->size());
+    ASSERT_EQ(0, result->get(0).get_array().size());
+    ASSERT_EQ(0, result->get(1).get_array().size());
+}
+
 TEST_F(CelonisArrayFunctionsTest, array_lead_input_array_contains_null) {
     auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     input_array->append_datum(kNullDatum);

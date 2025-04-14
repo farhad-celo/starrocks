@@ -494,6 +494,9 @@ private:
         for (size_t i = 0; i < input_array_column.size(); i++) {
             size_t start = input_offsets[i];
             size_t end = input_offsets[i + 1];
+            if (end == start) {
+                continue;
+            }
             DCHECK(end >= start);
             int64_t lead_offset = offset_viewer.value(i);
             std::deque<size_t> window;
