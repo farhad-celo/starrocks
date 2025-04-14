@@ -11,40 +11,39 @@
 #include "runtime/types.h"
 
 namespace starrocks {
-
 /*
-2025-04-13T19:44:39+00:00
+2025-04-14T16:30:49+00:00
 Running ./be/build_Release/src/bench/celonis/output/array_lead_lag_bench
-Run on (32 X 2445.43 MHz CPU s)
+Run on (32 X 3238.9 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 4.97, 3.46, 2.19
+Load Average: 4.57, 2.23, 3.15
 // Args: Number of rows / Array Length
 ----------------------------------------------------------------------------------------
 Benchmark                              Time             CPU   Iterations UserCounters...
 ----------------------------------------------------------------------------------------
-BM_ArrayLeadVarchar/1000/10       361693 ns       361676 ns         1934 RowInvRate=361.676ns
-BM_ArrayLeadVarchar/10000/10     3533008 ns      3532999 ns          198 RowInvRate=353.3ns
-BM_ArrayLeadVarchar/100000/10   35297861 ns     35296787 ns           20 RowInvRate=352.968ns
-BM_ArrayLeadVarchar/1000/20       631006 ns       630957 ns         1105 RowInvRate=630.957ns
-BM_ArrayLeadVarchar/10000/20     6237935 ns      6237775 ns          113 RowInvRate=623.777ns
-BM_ArrayLeadVarchar/100000/20   64158920 ns     64158333 ns           11 RowInvRate=641.583ns
-BM_ArrayLeadVarchar/1000/40      1181208 ns      1181146 ns          600 RowInvRate=1.18115us
-BM_ArrayLeadVarchar/10000/40    11495336 ns     11495352 ns           61 RowInvRate=1.14954us
-BM_ArrayLeadVarchar/100000/40  118743678 ns    118739433 ns            6 RowInvRate=1.18739us
+BM_ArrayLeadVarchar/1000/10       181304 ns       181311 ns         3877 RowInvRate=181.311ns
+BM_ArrayLeadVarchar/10000/10     1758467 ns      1758427 ns          399 RowInvRate=175.843ns
+BM_ArrayLeadVarchar/100000/10   17503135 ns     17502985 ns           39 RowInvRate=175.03ns
+BM_ArrayLeadVarchar/1000/20       316197 ns       316212 ns         2218 RowInvRate=316.212ns
+BM_ArrayLeadVarchar/10000/20     3101212 ns      3100850 ns          228 RowInvRate=310.085ns
+BM_ArrayLeadVarchar/100000/20   32141030 ns     32139290 ns           21 RowInvRate=321.393ns
+BM_ArrayLeadVarchar/1000/40       564792 ns       564804 ns         1244 RowInvRate=564.804ns
+BM_ArrayLeadVarchar/10000/40     5584970 ns      5584427 ns          125 RowInvRate=558.443ns
+BM_ArrayLeadVarchar/100000/40   59121523 ns     59115908 ns           12 RowInvRate=591.159ns
 
-BM_ArrayLagVarchar/1000/10        179901 ns       179877 ns         3895 RowInvRate=179.877ns
-BM_ArrayLagVarchar/10000/10      1738559 ns      1738529 ns          404 RowInvRate=173.853ns
-BM_ArrayLagVarchar/100000/10    22690605 ns     22296394 ns           41 RowInvRate=222.964ns
-BM_ArrayLagVarchar/1000/20        471238 ns       471173 ns         1201 RowInvRate=471.173ns
-BM_ArrayLagVarchar/10000/20      3289908 ns      3289759 ns          206 RowInvRate=328.976ns
-BM_ArrayLagVarchar/100000/20    33891312 ns     33890780 ns           21 RowInvRate=338.908ns
-BM_ArrayLagVarchar/1000/40        583680 ns       583628 ns         1192 RowInvRate=583.628ns
-BM_ArrayLagVarchar/10000/40      5815463 ns      5815111 ns          124 RowInvRate=581.511ns
-BM_ArrayLagVarchar/100000/40    59481300 ns     59481282 ns           11 RowInvRate=594.813ns
+BM_ArrayLagVarchar/1000/10        183703 ns       183692 ns         3823 RowInvRate=183.692ns
+BM_ArrayLagVarchar/10000/10      1756422 ns      1756254 ns          396 RowInvRate=175.625ns
+BM_ArrayLagVarchar/100000/10    17678469 ns     17677896 ns           39 RowInvRate=176.779ns
+BM_ArrayLagVarchar/1000/20        315279 ns       315270 ns         2216 RowInvRate=315.27ns
+BM_ArrayLagVarchar/10000/20      3080721 ns      3080696 ns          229 RowInvRate=308.07ns
+BM_ArrayLagVarchar/100000/20    33751190 ns     33751140 ns           21 RowInvRate=337.511ns
+BM_ArrayLagVarchar/1000/40        566004 ns       565999 ns         1240 RowInvRate=565.999ns
+BM_ArrayLagVarchar/10000/40      5552678 ns      5552509 ns          126 RowInvRate=555.251ns
+BM_ArrayLagVarchar/100000/40    59884434 ns     59881198 ns           12 RowInvRate=598.812ns
 */
 
 using ScalarFunction = StatusOr<ColumnPtr> (*)(FunctionContext* context, const Columns& columns);

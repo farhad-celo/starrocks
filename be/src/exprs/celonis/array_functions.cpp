@@ -491,6 +491,8 @@ private:
         auto* output_offsets_column = down_cast<ArrayColumn*>(output_array_column)->offsets_column().get();
         output_elements_column->reserve(input_offsets[input_array_column.size()]);
 
+        std::deque<size_t> window;
+        std::vector<uint32_t> src_index;
         for (size_t i = 0; i < input_array_column.size(); i++) {
             size_t start = input_offsets[i];
             size_t end = input_offsets[i + 1];
@@ -498,16 +500,16 @@ private:
                 continue;
             }
             DCHECK(end >= start);
+            window.clear();
+            src_index.clear();
             int64_t lead_offset = offset_viewer.value(i);
-            std::deque<size_t> window;
-            std::vector<std::optional<size_t>> idxes;
-            idxes.reserve(end - start);
+            int num_nulls = 0;
             // traverse the elements reversely.
             for (size_t j = end; j-- > start;) {
                 if (window.size() == lead_offset) {
-                    idxes.emplace_back(window.front());
+                    src_index.push_back(window.front());
                 } else {
-                    idxes.emplace_back(std::nullopt);
+                    ++num_nulls;
                 }
                 if (!input_elements_column.get(j).is_null()) {
                     window.push_back(j);
@@ -516,13 +518,9 @@ private:
                     window.pop_front();
                 }
             }
-            for (auto it = idxes.rbegin(); it != idxes.rend(); ++it) {
-                if (it->has_value()) {
-                    output_elements_column->append(input_elements_column, it->value(), 1);
-                } else {
-                    output_elements_column->append_nulls(1);
-                }
-            }
+            std::reverse(src_index.begin(), src_index.end());
+            output_elements_column->append_selective(input_elements_column, src_index);
+            output_elements_column->append_nulls(num_nulls);
         }
         output_offsets_column->get_data() = down_cast<const ArrayColumn&>(input_array_column).offsets().get_data();
         return Status::OK();
