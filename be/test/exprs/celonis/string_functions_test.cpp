@@ -339,6 +339,140 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3) {
     }
 }
 
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    {
+        Columns columns;
+        auto column = BinaryColumn::create();
+        columns.emplace_back(column);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), columns).value();
+        ASSERT_EQ(0, result->size());
+    }
+    {
+        Columns columns;
+        auto column = BinaryColumn::create();
+        column->append("hello");
+        column->append("starrocks");
+        columns.emplace_back(column);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), columns).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("\xCC\x82\xEC>&T\x2\x1D+L\xDD\xC2", result->get(0).get_slice().to_string());
+        EXPECT_EQ("\xBF\xCB" "Cp\xB4" "0\x3\xE2\r\xF3\x9A\xA6", result->get(1).get_slice().to_string());
+    }
+    {
+        Columns columns;
+        auto column1 = BinaryColumn::create();
+        column1->append("hello");
+        column1->append("hello");
+        auto column2 = BinaryColumn::create();
+        column2->append("world");
+        column2->append("starrocks");
+        columns.emplace_back(column1);
+        columns.emplace_back(column2);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), columns).value();
+
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("\xACifm\xA8,Yl\xB5\xA0I\v", result->get(0).get_slice().to_string());
+        EXPECT_EQ("\x16" "4\xC3zYek\x9B\x1Eh\x91\x9E", result->get(1).get_slice().to_string());
+    }
+    {
+        Columns columns;
+        auto column1 = BinaryColumn::create();
+        column1->append("hello");
+        auto column2 = ColumnHelper::create_const_null_column(1);
+        auto column3 = BinaryColumn::create();
+        column3->append("world");
+        columns.emplace_back(column1);
+        columns.emplace_back(column2);
+        columns.emplace_back(column3);
+
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), columns).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("\xF0l/\xACI\x80\r\xEKu\xCE\x16", result->get(0).get_slice().to_string());
+    }
+    {
+        Columns columns;
+        auto column1 = ColumnHelper::create_const_null_column(1);
+        columns.emplace_back(column1);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), columns).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ("\xBE?\xFEM\x8D\xB2\xFC\xB8\xE1\xFB<\xEA", result->get(0).get_slice().to_string());
+    }
+    {
+        auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        strings->append_datum("Celonis");
+        strings->append_datum(kNullDatum);
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), {strings}).value();
+        ASSERT_EQ(2, result->size());
+        EXPECT_EQ("]\xF8\x9A#\xCE_P/vOzh", result->get(0).get_slice().to_string());
+        EXPECT_EQ("\xBE?\xFEM\x8D\xB2\xFC\xB8\xE1\xFB<\xEA", result->get(1).get_slice().to_string());
+    }
+    {
+        auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        strings->append_datum(XXHASH3_128_NULL_STRING.c_str());
+        strings->append_datum(kNullDatum);
+        const auto result = CelonisStringFunctions::xx_hash3_96(ctx.get(), {strings});
+        EXPECT_EQ(result.status().message(),
+                  "CELONIS_XX_HASH3_96: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+    }
+}
+
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_collision) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    Columns columns;
+    auto column1 = BinaryColumn::create();
+    column1->append("70B5E8DAF8BF1EEE91CC8D383DB5A16E");
+    column1->append("78AC441C9BB21EDEB483CA3CB88FDC57");
+
+    auto column2 = BinaryColumn::create();
+    column2->append("010");
+    column2->append("010");
+
+    columns.emplace_back(column1);
+    columns.emplace_back(column2);
+
+    ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), columns).value();
+
+    ASSERT_EQ(2, result->size());
+    EXPECT_NE(result->get(0).get_slice(), result->get(1).get_slice());
+}
+
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_concat_collision) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    Columns columns;
+    auto column1 = BinaryColumn::create();
+    column1->append("22");
+    column1->append("2");
+    column1->append("1");
+    column1->append("11111111111");
+
+    auto column2 = BinaryColumn::create();
+    column2->append("44");
+    column2->append("244");
+    column2->append("1111111111");
+    column2->append("");
+
+    columns.emplace_back(column1);
+    columns.emplace_back(column2);
+
+    ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), columns).value();
+
+    ASSERT_EQ(4, result->size());
+    EXPECT_NE(result->get(0).get_slice(), result->get(1).get_slice());
+    EXPECT_NE(result->get(2).get_slice(), result->get(3).get_slice());
+}
+
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),

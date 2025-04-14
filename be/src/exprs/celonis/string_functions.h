@@ -48,6 +48,18 @@ public:
     /**
      * @param: [string_value, ...] or [string_array]
      * @paramType: [VARCHAR, ...] or [ARRAY_VARCHAR]
+     * @return TYPE_VARCHAR
+     * celonis_xx_hash3_96(NULL) != NULL
+     * celonis_xx_hash3_96(NULL) == celonis_xx_hash3_96(NULL)
+     * celonis_xx_hash3_96(NULL) != celonis_xx_hash3_96(NULL, NULL)
+     * celonis_xx_hash3_96(NULL array) != celonis_xx_hash3_96([NULL]) (NULL array means the type is array and the array is NULL)
+     * celonis_xx_hash3_96([NULL, NULL]) != celonis_xx_hash3_96([NULL])
+     */
+    DEFINE_VECTORIZED_FN(xx_hash3_96);
+
+    /**
+     * @param: [string_value, ...] or [string_array]
+     * @paramType: [VARCHAR, ...] or [ARRAY_VARCHAR]
      * @return LARGEINT
      * celonis_xx_hash3_128_nullable(NULL, ...) == NULL
      * celonis_xx_hash3_128_nullable([NULL, ...]) == NULL
