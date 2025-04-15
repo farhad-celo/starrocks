@@ -252,8 +252,8 @@ public:
         auto sort_end_time = std::chrono::high_resolution_clock::now();
         auto sort_duration = std::chrono::duration_cast<std::chrono::microseconds>(sort_end_time - sort_start_time);
         if (elem_size > 1000000) {
-            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) num of rows = << " << elem_size << std::endl;
-            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) sorting time = << " << sort_duration.count() << " ms\n";
+            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) num of rows = " << elem_size << std::endl;
+            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) sorting time = " << sort_duration.count() << " us\n";
         }
 
         auto output_start_time = std::chrono::high_resolution_clock::now();
@@ -279,7 +279,7 @@ public:
         auto output_duration = std::chrono::duration_cast<std::chrono::microseconds>(
                 output_end_time - output_start_time);
         if (elem_size > 1000000) {
-            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) output time = << " << output_duration.count() << " ms\n";
+            LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) output time = " << output_duration.count() << " us\n";
         }
         state_impl.data_columns.clear(); // early release memory
         // should check overflow after append, otherwise the result column with multi row will be overflow.
