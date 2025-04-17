@@ -146,7 +146,10 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
     }
     std::vector<uint32_t> left_indexes;
     std::vector<uint32_t> right_indexes;
+    left_indexes.reserve(n_rows);
+    right_indexes.reserve(n_rows);
     int new_offset = 0;
+    std::vector<Edge> edges;
     for (auto row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[3]->is_null(row) ||
             columns[4]->is_null(row) || columns[6]->is_null(row) || left_key_fields.size() == 0 ||
@@ -234,10 +237,10 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
             auto null_column_2 = down_cast<NullableColumn*>(fields[1].get());
             null_column_2->null_column_data().emplace_back(0);
         }
-        std::vector<Edge> edges;
         std::optional<Node> pre_node = std::nullopt;
         size_t left_i = left_start;
         size_t right_i = right_start;
+        edges.clear();
         while (left_i < left_end || right_i < right_end) {
             Node node = {false, 0};
             // Make sure left_primary_keys are ordered based on left_timestamps and left_sortings.
