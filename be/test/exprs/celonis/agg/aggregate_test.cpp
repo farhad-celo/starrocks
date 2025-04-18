@@ -112,6 +112,8 @@ private:
 };
 
 TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
+    const bool enable_workday_mask_in_workday_calendar = config::enable_workday_mask_in_workday_calendar;
+    config::enable_workday_mask_in_workday_calendar = false;
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
@@ -200,7 +202,8 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
         auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
         ASSERT_TRUE(json_string.has_value());
-        EXPECT_EQ(json_string.value(), R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}})");
+        EXPECT_EQ(json_string.value(),
+                  R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}})");
     }
     // mixed NULL and non-NULL year, is_workdays, NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -269,7 +272,8 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
         auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
         ASSERT_TRUE(json_string.has_value());
-        EXPECT_EQ(json_string.value(), R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}})");
+        EXPECT_EQ(json_string.value(),
+                  R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true]},{"year":"1971","isWorkday":[true,false,true,false]}]}})");
     }
     // non-NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -332,7 +336,8 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
         auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
         ASSERT_TRUE(json_string.has_value());
-        EXPECT_EQ(json_string.value(), R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true],"calendarId":"id1"},{"year":"1971","isWorkday":[true,false,true,false],"calendarId":"id2"}]}})");
+        EXPECT_EQ(json_string.value(),
+                  R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true],"calendarId":"id1"},{"year":"1971","isWorkday":[true,false,true,false],"calendarId":"id2"}]}})");
     }
     // empty input
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
@@ -527,7 +532,434 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_LT(res_array_col->get(0).get_array()[0].get_slice().to_string().size(), 1000000);
         EXPECT_LT(res_array_col->get(0).get_array()[1].get_slice().to_string().size(), 1000000);
     }
+    config::enable_workday_mask_in_workday_calendar = enable_workday_mask_in_workday_calendar;
+}
 
+TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mask_enabled) {
+    const bool enable_workday_mask_in_workday_calendar = config::enable_workday_mask_in_workday_calendar;
+    config::enable_workday_mask_in_workday_calendar = true;
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    local_ctx->set_runtime_state(runtime_state.get());
+
+    const AggregateFunction* agg_func = get_aggregate_function("celonis_make_workday_calendar", TYPE_BIGINT, TYPE_ARRAY,
+                                                               false);
+    TypeDescriptor type_struct;
+    type_struct.type = LogicalType::TYPE_STRUCT;
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BIGINT));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BOOLEAN));
+    type_struct.field_names.emplace_back("year");
+    type_struct.field_names.emplace_back("is_workdays");
+    type_struct.field_names.emplace_back("calendar_id");
+    type_struct.field_names.emplace_back("is_calendar_id_null");
+
+    TypeDescriptor type_array_char;
+    type_array_char.type = LogicalType::TYPE_ARRAY;
+    type_array_char.children.emplace_back(LogicalType::TYPE_VARCHAR);
+
+    auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    // NULL calendar_id
+    {
+        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        year_column->append_datum(1970L);
+        year_column->append_datum(1971L);
+
+        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        is_workdays_column->append_datum("0101");
+        is_workdays_column->append_datum("1010");
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        calendar_id_column->append_datum(kNullDatum);
+        calendar_id_column->append_datum(kNullDatum);
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = year_column.get();
+        raw_columns[1] = is_workdays_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(2, agg_state->year->size());
+        EXPECT_EQ(2, agg_state->is_workdays->size());
+        EXPECT_EQ(2, agg_state->calendar_id->size());
+        EXPECT_EQ(2, agg_state->is_calendar_id_null->size());
+        EXPECT_EQ(year_column->debug_string(), agg_state->year->debug_string());
+        EXPECT_EQ(is_workdays_column->debug_string(), agg_state->is_workdays->debug_string());
+        EXPECT_EQ("['', '']", agg_state->calendar_id->debug_string());
+        EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(year_column);
+        columns.push_back(is_workdays_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  "{\"workdayCalendar\":{\"entries\":[{\"year\":\"1970\",\"workdayMask\":\"Cg==\"},{\"year\":\"1971\",\"workdayMask\":\"BQ==\"}]}}");
+    }
+    // mixed NULL and non-NULL year, is_workdays, NULL calendar_id
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        year_column->append_datum(1970L);
+        year_column->append_datum(kNullDatum);
+        year_column->append_datum(1971L);
+        year_column->append_datum(1972L);
+
+        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        is_workdays_column->append_datum("0101");
+        is_workdays_column->append_datum("1100");
+        is_workdays_column->append_datum("1010");
+        is_workdays_column->append_datum(kNullDatum);
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        calendar_id_column->append_datum(kNullDatum);
+        calendar_id_column->append_datum(kNullDatum);
+        calendar_id_column->append_datum(kNullDatum);
+        calendar_id_column->append_datum(kNullDatum);
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = year_column.get();
+        raw_columns[1] = is_workdays_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(2, agg_state->year->size());
+        EXPECT_EQ(2, agg_state->is_workdays->size());
+        EXPECT_EQ(2, agg_state->calendar_id->size());
+        EXPECT_EQ(2, agg_state->is_calendar_id_null->size());
+        EXPECT_EQ("[1970, 1971]", agg_state->year->debug_string());
+        EXPECT_EQ("['0101', '1010']", agg_state->is_workdays->debug_string());
+        EXPECT_EQ("['', '']", agg_state->calendar_id->debug_string());
+        EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(year_column);
+        columns.push_back(is_workdays_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  "{\"workdayCalendar\":{\"entries\":[{\"year\":\"1970\",\"workdayMask\":\"Cg==\"},{\"year\":\"1971\",\"workdayMask\":\"BQ==\"}]}}");
+    }
+    // non-NULL calendar_id
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        year_column->append_datum(1970L);
+        year_column->append_datum(1971L);
+
+        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        is_workdays_column->append_datum("0101");
+        is_workdays_column->append_datum("1010");
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        calendar_id_column->append_datum("id1");
+        calendar_id_column->append_datum("id2");
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = year_column.get();
+        raw_columns[1] = is_workdays_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(2, agg_state->year->size());
+        EXPECT_EQ(2, agg_state->is_workdays->size());
+        EXPECT_EQ(2, agg_state->calendar_id->size());
+        EXPECT_EQ(2, agg_state->is_calendar_id_null->size());
+        EXPECT_EQ(year_column->debug_string(), agg_state->year->debug_string());
+        EXPECT_EQ(is_workdays_column->debug_string(), agg_state->is_workdays->debug_string());
+        EXPECT_EQ("['id1', 'id2']", agg_state->calendar_id->debug_string());
+        EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(year_column);
+        columns.push_back(is_workdays_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  "{\"workdayCalendar\":{\"entries\":[{\"year\":\"1970\",\"calendarId\":\"id1\",\"workdayMask\":\"Cg==\"},{\"year\":\"1971\",\"calendarId\":\"id2\",\"workdayMask\":\"BQ==\"}]}}");
+    }
+    // empty input
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = year_column.get();
+        raw_columns[1] = is_workdays_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(0, agg_state->year->size());
+        EXPECT_EQ(0, agg_state->is_workdays->size());
+        EXPECT_EQ(0, agg_state->calendar_id->size());
+        EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(0, res_struct_col->size());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(year_column);
+        columns.push_back(is_workdays_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(0, res_struct_col->size());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(1, res_array_col->size());
+        // The result factory calendar does not contain any entries.
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
+    }
+    // no valid rows, row one has NULL year, row two has NULL is_workdays
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        year_column->append_datum(kNullDatum);
+        year_column->append_datum(1970L);
+
+        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        is_workdays_column->append_datum("1010");
+        is_workdays_column->append_datum(kNullDatum);
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        calendar_id_column->append_datum(kNullDatum);
+        calendar_id_column->append_datum(kNullDatum);
+
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = year_column.get();
+        raw_columns[1] = is_workdays_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(0, agg_state->year->size());
+        EXPECT_EQ(0, agg_state->is_workdays->size());
+        EXPECT_EQ(0, agg_state->calendar_id->size());
+        EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(0, res_struct_col->size());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(year_column);
+        columns.push_back(is_workdays_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(0, res_struct_col->size());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(1, res_array_col->size());
+        // The result factory calendar does not contain any entries.
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
+    }
+    // no valid rows, both rows contain NULL year
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        year_column->append_datum(kNullDatum);
+        year_column->append_datum(kNullDatum);
+
+        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        is_workdays_column->append_datum("1010");
+        is_workdays_column->append_datum("0101");
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        calendar_id_column->append_datum(kNullDatum);
+        calendar_id_column->append_datum(kNullDatum);
+
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = year_column.get();
+        raw_columns[1] = is_workdays_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(0, agg_state->year->size());
+        EXPECT_EQ(0, agg_state->is_workdays->size());
+        EXPECT_EQ(0, agg_state->calendar_id->size());
+        EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(0, res_struct_col->size());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(year_column);
+        columns.push_back(is_workdays_column);
+        columns.push_back(calendar_id_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(0, res_struct_col->size());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(1, res_array_col->size());
+        // The result factory calendar does not contain any entries.
+        EXPECT_EQ("[[]]", res_array_col->debug_string());
+    }
+    // resultant calendar is longer than 1M.
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        const int64_t n_rows = 15000;
+        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        const std::string workday_str(366, '0');
+        for (auto i = 0; i < n_rows; ++i) {
+            int64_t year = i + 1970L;
+            bool is_leap_year = (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0));
+            year_column->append_datum(i + 1970L);
+            is_workdays_column->append_datum(Slice(workday_str.data(), is_leap_year ? 366 : 365));
+            calendar_id_column->append_datum("id1");
+        }
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = year_column.get();
+        raw_columns[1] = is_workdays_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(n_rows, agg_state->year->size());
+        EXPECT_EQ(n_rows, agg_state->is_workdays->size());
+        EXPECT_EQ(n_rows, agg_state->calendar_id->size());
+        EXPECT_EQ(n_rows, agg_state->is_calendar_id_null->size());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_GT(res_array_col->debug_string().size(), 1000000);
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(2, res_array_col->get(0).get_array().size());
+        EXPECT_LT(res_array_col->get(0).get_array()[0].get_slice().to_string().size(), 1000000);
+        EXPECT_LT(res_array_col->get(0).get_array()[1].get_slice().to_string().size(), 1000000);
+    }
+    config::enable_workday_mask_in_workday_calendar = enable_workday_mask_in_workday_calendar;
 }
 
 TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {

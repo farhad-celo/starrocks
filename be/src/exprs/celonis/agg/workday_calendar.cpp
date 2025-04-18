@@ -158,11 +158,28 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         const std::string calendar_id = state_impl.calendar_id->get(i).get_slice().to_string();
         const bool calendar_id_not_null = !static_cast<bool>(state_impl.is_calendar_id_null->get(i).get_uint8());
         entry.set_year(year);
-        for (char is_workday: is_workdays) {
-            if (is_workday == '0') {
-                entry.add_is_workday(false);
-            } else {
-                entry.add_is_workday(true);
+        if (config::enable_workday_mask_in_workday_calendar) {
+            size_t num_days = is_workdays.size();
+            size_t num_bytes = (num_days + 7) / 8;
+            std::string mask_data(num_bytes, '\0');
+            for (auto j = 0; j < num_days; ++j) {
+                if (is_workdays[j] == '1') {
+                    int byte_index = j / 8;
+                    int bit_index = j % 8;
+                    unsigned char bit_value_to_set = (1 << bit_index);
+                    mask_data[byte_index] = static_cast<char>(
+                            static_cast<unsigned char>(mask_data[byte_index]) | bit_value_to_set
+                    );
+                }
+            }
+            entry.set_workday_mask(mask_data);
+        } else {
+            for (char is_workday: is_workdays) {
+                if (is_workday == '0') {
+                    entry.add_is_workday(false);
+                } else {
+                    entry.add_is_workday(true);
+                }
             }
         }
         if (calendar_id_not_null) {
