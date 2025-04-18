@@ -40,6 +40,7 @@ message WorkdayCalendarEntry {
   optional int64 year = 1;
   repeated bool is_workday = 2;
   optional string calendar_id = 3;
+  optional bytes workday_mask = 4;
 }
 
 message WorkdayCalendar {

@@ -735,13 +735,13 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_with_id) {
         calendar_id_column_->append_datum("id1");
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 364}).c_str(),
                                                  R"(, calendar_id: "id2"},)",
                                                  R"("entries": { "year": 1971, )",
-                                                 celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {5, 7}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
                                                  R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());

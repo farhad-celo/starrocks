@@ -804,9 +804,25 @@ private:
 
     std::bitset<366> to_bitset(const celonis::accelerator::WorkdayCalendarEntry& entry) {
         std::bitset<366> bit_set;
-        for (int i = 0; i < entry.is_workday_size(); ++i) {
-            if (entry.is_workday(i)) {
-                bit_set.set(i, true);
+        if (entry.has_workday_mask()) {
+            const std::string& mask = entry.workday_mask();
+            size_t mask_len_bytes = mask.length();
+            for (int i = 0; i < 366; ++i) {
+                int byte_index = i / 8;
+                int bit_index = i % 8;
+                if (static_cast<size_t>(byte_index) < mask_len_bytes) {
+                    const unsigned char byte_value = static_cast<unsigned char>(mask[byte_index]);
+                    const unsigned char bit_mask_value = (1 << bit_index);
+                    if ((byte_value & bit_mask_value) != 0) {
+                        bit_set.set(i, true);
+                    }
+                }
+            }
+        } else {
+            for (int i = 0; i < entry.is_workday_size() && i < 366; ++i) {
+                if (entry.is_workday(i)) {
+                    bit_set.set(i, true);
+                }
             }
         }
         return bit_set;
@@ -1102,10 +1118,15 @@ validate_workday_calendar(const celonis::accelerator::WorkdayCalendar& workday_c
             return Status::InvalidArgument("year is not set in a workday calendar entry.");
         }
         auto required_n_days = get_days_in_year(entry.year());
-        if (required_n_days != entry.is_workday_size()) {
+        if (!entry.has_workday_mask() && required_n_days != entry.is_workday_size()) {
             return Status::InvalidArgument(
                     fmt::format("{} should have {} days, however the workday calendar contains {} is_workday.",
                                 entry.year(), required_n_days, entry.is_workday_size()));
+        }
+        if (entry.has_workday_mask() && entry.workday_mask().length() != 46) {
+            return Status::InvalidArgument(
+                    fmt::format("The length of workday_mask of workday calendar should be 46 however it is {}",
+                                entry.workday_mask().length()));
         }
         if (has_calendar_id == -1) {
             has_calendar_id = entry.has_calendar_id();

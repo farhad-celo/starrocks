@@ -1,5 +1,6 @@
 #include "util.h"
 #include "google/protobuf/util/json_util.h"
+#include "google/protobuf/stubs/strutil.h"
 
 namespace starrocks::celonis {
 
@@ -22,6 +23,25 @@ std::string get_is_workdays_str(int n_days, const std::unordered_set<int>& one_i
         sep = ", ";
         rv += item;
     }
+    return rv;
+}
+
+std::string get_workday_mask_str(int n_days, const std::unordered_set<int>& one_indexes) {
+    size_t num_bytes = (n_days + 7) / 8;
+    std::string mask_data(num_bytes, '\0');
+    for (auto i = 0; i < n_days; ++i) {
+        if (one_indexes.count(i)) {
+            int byte_index = i / 8;
+            int bit_index = i % 8;
+            unsigned char bit_value_to_set = (1 << bit_index);
+            mask_data[byte_index] = static_cast<char>(
+                    static_cast<unsigned char>(mask_data[byte_index]) | bit_value_to_set
+            );
+        }
+    }
+    std::string base64_mask;
+    google::protobuf::Base64Escape(mask_data, &base64_mask);
+    std::string rv = "\"workday_mask\": \"" + base64_mask + "\"";
     return rv;
 }
 

@@ -248,10 +248,10 @@ TEST_F(CelonisInCalendarTest, const_workday_calendar_with_id) {
     const auto result = RunConstantCalendar({
                                                     R"({"workday_calendar": {)",
                                                     R"("entries": { "year": 1970, )",
-                                                    celonis::get_is_workdays_str(365, {0, 10, 15}),
+                                                    celonis::get_workday_mask_str(365, {0, 10, 15}),
                                                     R"(, calendar_id: "id1"},)",
                                                     R"("entries": { "year": 1970, )",
-                                                    celonis::get_is_workdays_str(365, {11}),
+                                                    celonis::get_workday_mask_str(365, {11}),
                                                     R"(, calendar_id: "id2"},)",
                                                     R"( }})"}).value();
     ASSERT_EQ(3, result->size());
