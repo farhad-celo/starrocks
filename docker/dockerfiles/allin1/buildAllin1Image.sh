@@ -4,7 +4,7 @@ set -e
 
 RELEASE_VERSION=${RELEASE_VERSION:-"latest"}
 BUILD_TYPE=${BUILD_TYPE:-"Release"}
-BUILDER=${BUILDER:-"ghcr.io/celonis/celostar/starrocks-dev-env:3.1-cs-ca2bfcd3-cpml"}
+BUILDER=${BUILDER:-"ghcr.io/celonis/celostar/starrocks-dev-env:rebase-3.3-6e712479"}
 
 docker pull $BUILDER
 docker buildx build --force-rm=true --build-arg RELEASE_VERSION=${RELEASE_VERSION} --build-arg BUILD_TYPE=${BUILD_TYPE} --build-arg builder=${BUILDER} -f ../artifacts/artifact.Dockerfile -t starrocks-artifacts:${RELEASE_VERSION} ../../..
