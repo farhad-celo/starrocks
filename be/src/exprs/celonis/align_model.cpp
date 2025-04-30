@@ -136,6 +136,11 @@ StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, con
         row_to_variant_index.push_back(variant_index++);
     }
     DCHECK_EQ(row_to_variant_index.size(), chunk_size);
+    if (src_array_data.null_elements != nullptr) {
+        // TODO: Handle NULL activities.
+        // To see if it happens.
+        LOG_EVERY_T(INFO, 60) << "align_model() ignored NULL activities.";
+    }
 
     AlignModelHelper helper;
     RETURN_IF_ERROR(helper.execute(variants, json_bpmn_model_description));
