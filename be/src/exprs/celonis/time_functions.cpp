@@ -1310,7 +1310,7 @@ remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::strin
         milliseconds = remap_timestamp_ms(timestamp);
     } else {
         if (calendar_state.calendar.requires_calendar_id() && !calendar_id.has_value()) {
-            return Status::InvalidArgument("Calendar ID column not provided.");
+            return std::nullopt;
         }
         if (!calendar_state.calendar.requires_calendar_id()) {
             calendar_id = std::nullopt;
@@ -1440,7 +1440,8 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionCon
             milliseconds = remap_timestamp_ms(timestamp);
         } else {
             if (calendar.requires_calendar_id() && !calendar_id.has_value()) {
-                return Status::InvalidArgument("Calendar ID column not provided.");
+                result.append_null();
+                continue;
             }
             if (!calendar.requires_calendar_id()) {
                 calendar_id = std::nullopt;

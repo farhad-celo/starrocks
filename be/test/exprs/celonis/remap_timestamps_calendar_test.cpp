@@ -1169,27 +1169,30 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_not_provided_when_needed)
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"}, "MILLISECONDS");
-        ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().message(), "Calendar ID column not provided.");
+                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "id"} }})"},
+                "MILLISECONDS").value();
+        ASSERT_EQ(timestamp_column_->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
     }
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
-                                                 R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
-                                                 R"(, calendar_id: "id1"},)",
-                                                 R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
-                                                 R"(, calendar_id: "id2"},)",
-                                                 R"("entries": { "year": 1971, )",
-                                                 celonis::get_is_workdays_str(365, {5, 7}).c_str(),
-                                                 R"(, calendar_id: "id1"},)",
-                                                 R"( }})"}, "MILLISECONDS");
-        ASSERT_TRUE(result.status().is_invalid_argument());
-        EXPECT_EQ(result.status().message(), "Calendar ID column not provided.");
+                                                            R"("entries": { "year": 1970, )",
+                                                            celonis::get_is_workdays_str(365,
+                                                                                         {0, 4, 10, 100, 150}).c_str(),
+                                                            R"(, calendar_id: "id1"},)",
+                                                            R"("entries": { "year": 1970, )",
+                                                            celonis::get_is_workdays_str(365,
+                                                                                         {0, 4, 10, 100, 364}).c_str(),
+                                                            R"(, calendar_id: "id2"},)",
+                                                            R"("entries": { "year": 1971, )",
+                                                            celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                                                            R"(, calendar_id: "id1"},)",
+                                                            R"( }})"}, "MILLISECONDS").value();
+        ASSERT_EQ(timestamp_column_->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
     }
 }
 
