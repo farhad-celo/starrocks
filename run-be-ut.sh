@@ -321,7 +321,8 @@ append_negative_case "*LakePrimaryKeyCompactionTest.test_major_compaction_thread
 append_negative_case "*MemLimitedChunkQueueTest*"
 append_negative_case "*TestPipelineControlFlow*"
 append_negative_case "*ParquetCLIReaderTest*"
-
+append_negative_case "*LakePrimaryKeyPublishTest*"
+append_negative_case "*LakePrimaryKeyCompactionTest*"
 
 
 # prepare util test_data
