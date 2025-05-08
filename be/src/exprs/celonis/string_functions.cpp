@@ -835,20 +835,55 @@ static std::optional<double> to_double(std::stringstream& ss, const std::string_
 }
 
 std::optional<int64_t> to_int64(const std::string_view& str) {
-    if (str.empty() || std::isspace(str.front()) || std::isspace(str.back())) {
+    if (str.empty()) {
         return std::nullopt;
     }
-
-    int64_t result;
-    auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result, 10);
-
-    if (ec == std::errc::invalid_argument || ptr == str.data()) {
-        return std::nullopt;
-    } else if (ec == std::errc::result_out_of_range) {
-        return std::nullopt;
-    } else {
-        return result;
+    size_t index = 0;
+    bool negative = false;
+    // Handle sign
+    if (str[index] == '-') {
+        negative = true;
+        index++;
+    } else if (str[index] == '+') {
+        index++;
     }
+    // Must have at least one digit
+    if (index >= str.size() || !std::isdigit(str[index])) {
+        return std::nullopt;
+    }
+    int64_t result = 0;
+    const int64_t pos_limit = std::numeric_limits<int64_t>::max();
+    const int64_t neg_limit = std::numeric_limits<int64_t>::min();
+    const int64_t limit = negative ? neg_limit : -pos_limit;
+    const int64_t limit_before = limit / 10;
+
+    // Parse digits
+    while (index < str.size() && std::isdigit(str[index])) {
+        if (result < limit_before) {
+            return std::nullopt;  // Overflow check
+        }
+        result *= 10;
+        int digit = str[index] - '0';
+        if (result < limit + digit) {
+            return std::nullopt;  // Overflow check
+        }
+        result -= digit;
+        index++;
+    }
+
+    // Handle decimal part if present
+    if (index < str.size() && str[index] == '.') {
+        index++;
+        // Skip decimal digits
+        while (index < str.size() && std::isdigit(str[index])) {
+            index++;
+        }
+    }
+    // Check if we've consumed the entire string
+    if (index != str.size()) {
+        return std::nullopt;
+    }
+    return negative ? result : -result;
 }
 
 StatusOr<ColumnPtr>
@@ -864,10 +899,6 @@ CelonisStringFunctions::string_to_int([[maybe_unused]] FunctionContext* context,
             continue;
         }
         std::string_view input_string = std::string_view(input_string_viewer.value(i));
-        if (input_string.find_first_of("eE") != std::string::npos) {
-            res.append_null();
-            continue;
-        }
         std::optional<int64_t> result = to_int64(input_string);
         if (result.has_value()) {
             res.append(result.value());
