@@ -112,8 +112,11 @@ StatusOr<ColumnPtr> CelonisArrayTrimmedMean<LT>::celonis_array_trimmed_mean(Func
         const int64_t lower_cutoff = lower_cutoff_viewer.value(i);
         const int64_t upper_cutoff = upper_cutoff_viewer.value(i);
         if (lower_cutoff < 0 || lower_cutoff > 100 || upper_cutoff < 0 || upper_cutoff > 100) {
-            result_column.append(0.0);
-            continue;
+            return Status::InvalidArgument("CELONIS_ARRAY_TRIMMED_MEAN: Cutoff value must be in interval [0, 100].");
+        }
+        if (lower_cutoff + upper_cutoff > 100) {
+            return Status::InvalidArgument(
+                    "CELONIS_ARRAY_TRIMMED_MEAN: Sum of lower cutoff and upper cutoff must be in interval [0, 100].");
         }
 
         const auto start = offsets[i];

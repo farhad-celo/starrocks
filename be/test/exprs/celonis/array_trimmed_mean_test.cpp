@@ -88,11 +88,10 @@ TEST_F(CelonisArrayTrimmedMeanTest, cut_all) {
 
     const auto result = CelonisArrayTrimmedMean<TYPE_INT>::celonis_array_trimmed_mean(local_ctx.get(),
                                                                                       {input_array, const_column_lower,
-                                                                                       const_column_upper}).value();
-    ASSERT_EQ(3, result->size());
-    ASSERT_EQ(2, result->get(0).get_double());
-    ASSERT_EQ(0, result->get(1).get_double());
-    ASSERT_TRUE(result->get(2).is_null());
+                                                                                       const_column_upper});
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().message(),
+              "CELONIS_ARRAY_TRIMMED_MEAN: Sum of lower cutoff and upper cutoff must be in interval [0, 100].");
 }
 
 TEST_F(CelonisArrayTrimmedMeanTest, invalid_cutoff) {
@@ -108,10 +107,9 @@ TEST_F(CelonisArrayTrimmedMeanTest, invalid_cutoff) {
         const auto result = CelonisArrayTrimmedMean<TYPE_INT>::celonis_array_trimmed_mean(local_ctx.get(),
                                                                                           {input_array,
                                                                                            const_column_lower,
-                                                                                           const_column_upper}).value();
-        ASSERT_EQ(2, result->size());
-        ASSERT_EQ(0, result->get(0).get_double());
-        ASSERT_EQ(0, result->get(1).get_double());
+                                                                                           const_column_upper});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().message(), "CELONIS_ARRAY_TRIMMED_MEAN: Cutoff value must be in interval [0, 100].");
     }
     {
         auto local_ctx{create_context(TYPE_INT)};
@@ -125,10 +123,26 @@ TEST_F(CelonisArrayTrimmedMeanTest, invalid_cutoff) {
         const auto result = CelonisArrayTrimmedMean<TYPE_INT>::celonis_array_trimmed_mean(local_ctx.get(),
                                                                                           {input_array,
                                                                                            const_column_lower,
-                                                                                           const_column_upper}).value();
-        ASSERT_EQ(2, result->size());
-        ASSERT_EQ(0, result->get(0).get_double());
-        ASSERT_EQ(0, result->get(1).get_double());
+                                                                                           const_column_upper});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().message(), "CELONIS_ARRAY_TRIMMED_MEAN: Cutoff value must be in interval [0, 100].");
+    }
+    {
+        auto local_ctx{create_context(TYPE_INT)};
+        auto const_column_lower = ColumnHelper::create_const_column<TYPE_BIGINT>(49, 2);
+        auto const_column_upper = ColumnHelper::create_const_column<TYPE_BIGINT>(52, 2);
+        local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        input_array->append_datum(DatumArray{2});
+        input_array->append_datum(DatumArray{1, 2, 3, 1, 2, 3, 4});
+
+        const auto result = CelonisArrayTrimmedMean<TYPE_INT>::celonis_array_trimmed_mean(local_ctx.get(),
+                                                                                          {input_array,
+                                                                                           const_column_lower,
+                                                                                           const_column_upper});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().message(),
+                  "CELONIS_ARRAY_TRIMMED_MEAN: Sum of lower cutoff and upper cutoff must be in interval [0, 100].");
     }
 }
 
