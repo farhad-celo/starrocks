@@ -219,13 +219,11 @@ TEST_F(CelonisBuildKMeansModelTest, one_feature_large_k) {
     // Get the result
     auto result = ColumnHelper::create_column(get_return_type(), true);
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
-
-    std::vector<std::vector<double>> expected_centroids = {{0},
-                                                           {0.333333},
-                                                           {0.666667},
-                                                           {1}};
-    std::vector<std::pair<double, double>> expected_limits = {{1, 4}};
-    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
+    ASSERT_TRUE(local_ctx1->has_error());
+    const char* error = local_ctx1->error_msg();
+    ASSERT_NE(error, nullptr);
+    EXPECT_EQ(std::string_view(error),
+              "CELONIS_BUILD_KMEANS_MODEL: not enough rows 4 provided for training of size k 5");
 }
 
 TEST_F(CelonisBuildKMeansModelTest, cancellation_work) {
@@ -296,14 +294,11 @@ TEST_F(CelonisBuildKMeansModelTest, two_features_large_k) {
     // Get the result
     auto result = ColumnHelper::create_column(get_return_type(), true);
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
-
-    std::vector<std::vector<double>> expected_centroids = {{0.0, 0.0},
-                                                           {0.0, 1.0},
-                                                           {1.0, 0.0},
-                                                           {1.0, 1.0}};
-    std::vector<std::pair<double, double>> expected_limits = {{0.0, 1.0},
-                                                              {0.0, 1.0}};
-    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
+    ASSERT_TRUE(local_ctx1->has_error());
+    const char* error = local_ctx1->error_msg();
+    ASSERT_NE(error, nullptr);
+    EXPECT_EQ(std::string_view(error),
+              "CELONIS_BUILD_KMEANS_MODEL: not enough rows 4 provided for training of size k 5");
 }
 
 TEST_F(CelonisBuildKMeansModelTest, two_features_small_k) {

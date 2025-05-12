@@ -319,14 +319,20 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
         return;
     }
     if (UNLIKELY(ctx->state()->cancelled_ref())) {
-        ctx->set_error("celonis_build_kmeans_model detects cancelled.", false);
+        ctx->set_error("CELONIS_BUILD_KMEANS_MODEL detects cancelled.", false);
+        to->append_default();
+        return;
+    }
+    if (num_clusters > points.size()) {
+        ctx->set_error(fmt::format("CELONIS_BUILD_KMEANS_MODEL: not enough rows {} provided for training of size k {}",
+                                   points.size(), num_clusters).c_str(), false);
         to->append_default();
         return;
     }
     DCHECK_GT(num_clusters, 0);
     std::vector<std::vector<double>> centroids;
     const auto& [limits, normalized_points] = normalize_points(points);
-    if (num_clusters >= normalized_points.size()) {
+    if (num_clusters == normalized_points.size()) {
         centroids = normalized_points;
         std::sort(centroids.begin(), centroids.end());
     } else {
