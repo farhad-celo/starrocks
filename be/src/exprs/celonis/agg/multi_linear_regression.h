@@ -273,6 +273,8 @@ public:
             const std::string model = to_model_str(beta);
             to->append_datum(model.c_str());
         } else {
+            ctx->set_error(
+                    "CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL: Unable to fit regression model. The system is singular or ill-conditioned.");
             to->append_datum(kNullDatum);
         }
     }

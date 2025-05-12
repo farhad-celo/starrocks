@@ -197,6 +197,11 @@ protected:
         func->finalize_to_column(local_ctx.get(), state->state(), result.get());
         ASSERT_EQ(1, result->size());
         if (is_null) {
+            ASSERT_TRUE(local_ctx->has_error());
+            const char* error = local_ctx->error_msg();
+            ASSERT_NE(error, nullptr);
+            EXPECT_EQ(std::string_view(error),
+                      "CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL: Unable to fit regression model. The system is singular or ill-conditioned.");
             EXPECT_TRUE(result->get(0).is_null());
         } else {
             const std::string model = result->get(0).get_slice().to_string();
