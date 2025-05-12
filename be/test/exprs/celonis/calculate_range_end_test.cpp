@@ -101,9 +101,9 @@ TEST_F(CelonisCalculateRangeEndTest, unsupported_time_unit) {
     start_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
     step_size_column_->append_datum("1s");
     step_count_column_->append_datum(10L);
-    const auto result = Run().value();
-    ASSERT_EQ(1, result->size());
-    EXPECT_TRUE(result->get(0).is_null());
+    const auto result = Run();
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().message(), "CELONIS_CALCULATE_RANGE_END: Invalid step size 1s.");
 }
 
 TEST_F(CelonisCalculateRangeEndTest, malformed_time_unit) {
@@ -112,18 +112,18 @@ TEST_F(CelonisCalculateRangeEndTest, malformed_time_unit) {
         start_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
         step_size_column_->append_datum("1ah");
         step_count_column_->append_datum(10L);
-        const auto result = Run().value();
-        ASSERT_EQ(1, result->size());
-        EXPECT_TRUE(result->get(0).is_null());
+        const auto result = Run();
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().message(), "CELONIS_CALCULATE_RANGE_END: Invalid step size 1ah.");
     }
     {
         Prepare();
         start_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
         step_size_column_->append_datum("xxx");
         step_count_column_->append_datum(10L);
-        const auto result = Run().value();
-        ASSERT_EQ(1, result->size());
-        EXPECT_TRUE(result->get(0).is_null());
+        const auto result = Run();
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().message(), "CELONIS_CALCULATE_RANGE_END: Invalid step size xxx.");
     }
 }
 

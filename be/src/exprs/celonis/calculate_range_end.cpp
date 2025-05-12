@@ -82,8 +82,8 @@ CelonisCalculateRangeEnd::calculate_range_end([[maybe_unused]] starrocks::Functi
         std::string step_size = step_size_viewer.value(row).to_string();
         auto number_unit = parse_step_size(step_size);
         if (!number_unit.has_value()) {
-            result.append_null();
-            continue;
+            return Status::InvalidArgument(
+                    fmt::format("CELONIS_CALCULATE_RANGE_END: Invalid step size {}.", step_size));
         }
         const auto number = number_unit->first;
         const auto time_unit = number_unit->second;
