@@ -82,11 +82,9 @@ TEST_F(CelonisMultiInTest, non_const_match_lists) {
 
     int_arrays_1->append_datum(DatumArray{1});
     int_arrays_2->append_datum(DatumArray{2});
-    auto result = Run({ints_1, ints_2}, {int_arrays_1, int_arrays_2}).value();
-    EXPECT_EQ(3, result->size());
-    EXPECT_EQ(true, result->get(0).get_uint8());
-    EXPECT_EQ(false, result->get(1).get_uint8());
-    EXPECT_EQ(false, result->get(2).get_uint8());
+    auto result = Run({ints_1, ints_2}, {int_arrays_1, int_arrays_2});
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().message(), "CELONIS_MULTI_IN: the second argument (struct_of_arrays) must be constant.");
 }
 
 TEST_F(CelonisMultiInTest, match_fields_mismatch) {

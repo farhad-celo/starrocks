@@ -134,8 +134,7 @@ Status CelonisMultiIn::prepare(starrocks::FunctionContext* context, FunctionCont
     context->set_function_state(scope, state);
     auto match_column = context->get_constant_column(1);
     if (match_column == nullptr) {
-        state->function = multi_in_non_constant_config;
-        return Status::OK();
+        return Status::InvalidArgument("CELONIS_MULTI_IN: the second argument (struct_of_arrays) must be constant.");
     }
     state->function = multi_in_constant_config;
     if (match_column->empty()) {
