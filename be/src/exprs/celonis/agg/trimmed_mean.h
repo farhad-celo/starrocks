@@ -32,6 +32,12 @@ class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggre
         this->data(state).update(column.get_data()[row_num]);
     }
 
+    void update_batch_single_state(FunctionContext* ctx, size_t chunk_size, const Column** columns,
+                                   AggDataPtr __restrict state) const override {
+        const auto& column = down_cast<const InputColumnType&>(*columns[0]);
+        this->data(state).update_batch(column.get_data());
+    }
+
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         ResultColumnType* column = down_cast<ResultColumnType*>(to);
 

@@ -103,6 +103,7 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_1_bigint) {
     func->serialize_to_column(local_ctx.get(), state1->state(), serde_column.get());
     func->merge(local_ctx.get(), serde_column.get(), state2->state(), 0);
     func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
+    ASSERT_FALSE(local_ctx->has_error());
 
     ASSERT_EQ(2.5, result_column->get_data()[0]);  // (-102, -101, -100), 1, 2, 3, 4, (100, 101, 102)
 }
@@ -162,6 +163,7 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_2_bigint) {
     func->serialize_to_column(local_ctx.get(), state1->state(), serde_column.get());
     func->merge(local_ctx.get(), serde_column.get(), state2->state(), 0);
     func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
+    ASSERT_FALSE(local_ctx->has_error());
 
     ASSERT_EQ(5.0, result_column->get_data()[0]);  // (3, 4), 5, (10, 22)
 }
@@ -227,6 +229,7 @@ TEST_F(CelonisTrimmedMeanTest, type_double) {
     func->serialize_to_column(local_ctx.get(), state1->state(), serde_column.get());
     func->merge(local_ctx.get(), serde_column.get(), state2->state(), 0);
     func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
+    ASSERT_FALSE(local_ctx->has_error());
 
     ASSERT_EQ(5.5, result_column->get_data()[0]);  // (1, 2), 3, 4, 5, 6, 7, 8, (9, 10, 11)
 }
