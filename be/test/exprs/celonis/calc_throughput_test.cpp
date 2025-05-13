@@ -220,9 +220,13 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstNullableArray) {
             "a2", "first", "first", true, 9L);
 }
 
-TEST_F(CelonisCalcThroughputTest, FirstToLast) {
+TEST_F(CelonisCalcThroughputTest, FirstToLast1) {
     testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "a1",
             "a2", "first", "last", false, 19L);
+}
+
+TEST_F(CelonisCalcThroughputTest, FirstToLast2) {
+    testOne(DatumArray{"A", "B", "C"}, DatumArray{0L, 1L, 3L}, "A", "A", "first", "last", false, Datum());
 }
 
 TEST_F(CelonisCalcThroughputTest, LastToFirst) {
@@ -240,9 +244,15 @@ TEST_F(CelonisCalcThroughputTest, CaseEnd) {
             "", "last", "case_end", false, 197L);
 }
 
-TEST_F(CelonisCalcThroughputTest, LastToLast) {
+TEST_F(CelonisCalcThroughputTest, LastToLast1) {
     testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "a1",
             "a2", "last", "last", false, 17L);
+}
+
+TEST_F(CelonisCalcThroughputTest, LastToLast2) {
+    // Since the starting activity (last B) comes after the ending activity (last A), there is a conflict and NULL is
+    // returned.
+    testOne(DatumArray{"A", "B", "A", "B"}, DatumArray{0L, 1L, 3L, 7L}, "B", "A", "last", "last", false, Datum());
 }
 
 TEST_F(CelonisCalcThroughputTest, MissingStart) {
