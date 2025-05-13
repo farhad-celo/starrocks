@@ -1,6 +1,7 @@
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/index_activity_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/array_trimmed_mean_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/string_to_int_bench)
+ADD_BE_BENCH(${SRC_DIR}/bench/celonis/qnorm_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/string_to_double_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/stringhash_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/patindex_bench)
