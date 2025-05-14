@@ -21,18 +21,20 @@ enum Label {
 template<typename ActivityCppType>
 int findActivity(const ActivityCppType* activity_elements, const NullColumn::Container* activity_nulls, uint32_t begin_offset,
                  uint32_t end_offset, const ActivityCppType& name, Label label) {
-    if (label == CASE_START) return begin_offset;
-    if (label == CASE_END) return end_offset - 1;
-
     int found_idx = -1;
     for (size_t i = begin_offset; i < end_offset; ++i) {
         if (activity_nulls != nullptr && (*activity_nulls)[i]) {
             continue;
         }
+        if (label == CASE_START) {
+            return i;
+        }
+        if (label == CASE_END) {
+            found_idx = i;
+        }
         if (activity_elements[i] == name) {
             if (label == FIRST) {
-                found_idx = i;
-                return found_idx;
+                return i;
             }
             found_idx = i;
         }

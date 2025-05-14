@@ -234,14 +234,37 @@ TEST_F(CelonisCalcThroughputTest, LastToFirst) {
             "a2", "last", "first", false, 7L);
 }
 
-TEST_F(CelonisCalcThroughputTest, CaseStart) {
+TEST_F(CelonisCalcThroughputTest, CaseStartAndEnd1) {
+    testOne(DatumArray{kNullDatum, "a1", "a1", "a2", "a2", "a3", kNullDatum},
+            DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "",
+            "", "case_start", "case_end", true, 98L);
+}
+
+TEST_F(CelonisCalcThroughputTest, CaseStartAndEnd2) {
+    testOne(DatumArray{kNullDatum, kNullDatum, kNullDatum}, DatumArray{1L, 2L, 3L}, "", "", "case_start", "case_end",
+            true, Datum());
+}
+
+TEST_F(CelonisCalcThroughputTest, CaseStart1) {
     testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "",
             "a2", "case_start", "first", false, 9L);
 }
 
-TEST_F(CelonisCalcThroughputTest, CaseEnd) {
+TEST_F(CelonisCalcThroughputTest, CaseStart2) {
+    testOne(DatumArray{kNullDatum, "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L},
+            "",
+            "a2", "case_start", "first", false, 8L);
+}
+
+TEST_F(CelonisCalcThroughputTest, CaseEnd1) {
     testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "a1",
             "", "last", "case_end", false, 197L);
+}
+
+TEST_F(CelonisCalcThroughputTest, CaseEnd2) {
+    testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", kNullDatum}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L},
+            "a1",
+            "", "last", "case_end", false, 97L);
 }
 
 TEST_F(CelonisCalcThroughputTest, LastToLast1) {
