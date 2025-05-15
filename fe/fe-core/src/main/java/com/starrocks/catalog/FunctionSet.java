@@ -1195,11 +1195,19 @@ public class FunctionSet {
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR,
                     Lists.newArrayList(Type.DATETIME, Type.DATETIME, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
                     true, false, true));
-        // celonis_make_weekday_calendar (bigint shifts)
+        // celonis_make_weekday_calendar (BIGINT begin_shift and end_shift)
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_WEEKDAY_CALENDAR,
-                    Lists.newArrayList(Type.VARCHAR, Type.BIGINT, Type.BIGINT, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
-                    true, false, true));
-        // celonis_make_weekday_calendar (string shifts)
+                Lists.newArrayList(Type.VARCHAR, Type.BIGINT, Type.BIGINT, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
+                true, false, true));
+        // celonis_make_weekday_calendar (BIGINT begin_shift and VARCHAR end_shift)
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_WEEKDAY_CALENDAR,
+                Lists.newArrayList(Type.VARCHAR, Type.BIGINT, Type.VARCHAR, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
+                true, false, true));
+        // celonis_make_weekday_calendar (VARCHAR begin_shift and BIGINT end_shift)
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_WEEKDAY_CALENDAR,
+                Lists.newArrayList(Type.VARCHAR, Type.VARCHAR, Type.BIGINT, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
+                true, false, true));
+        // celonis_make_weekday_calendar (VARCHAR begin_shift and end_shift)
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_WEEKDAY_CALENDAR,
                     Lists.newArrayList(Type.VARCHAR, Type.VARCHAR, Type.VARCHAR, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
                     true, false, true));
