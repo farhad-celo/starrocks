@@ -15,41 +15,41 @@
 namespace starrocks {
 
 /*
-2025-05-14T21:10:46+00:00
+2025-05-15T16:38:45+00:00
 Running ./be/build_Release/src/bench/celonis/output/calc_throughput_bench
-Run on (32 X 3086.16 MHz CPU s)
+Run on (32 X 3275.23 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 14.83, 6.99, 4.24
+Load Average: 9.43, 4.48, 1.91
 // Args: Number of rows / Event array size / Max string length (for string type)
 -------------------------------------------------------------------------------------------------------
 Benchmark                                             Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------------------
-BM_CalcThroughputIntFirstLast/1000/10             19301 ns        19208 ns        36267 RowInvRate=19.208ns
-BM_CalcThroughputIntFirstLast/10000/10           159241 ns       159241 ns         4358 RowInvRate=15.9241ns
-BM_CalcThroughputIntFirstLast/1000/20             26365 ns        26285 ns        26918 RowInvRate=26.2852ns
-BM_CalcThroughputIntFirstLast/10000/20           229296 ns       229260 ns         3041 RowInvRate=22.926ns
+BM_CalcThroughputIntFirstLast/1000/10             21236 ns        21148 ns        33165 RowInvRate=21.1483ns
+BM_CalcThroughputIntFirstLast/10000/10           177411 ns       177402 ns         3937 RowInvRate=17.7402ns
+BM_CalcThroughputIntFirstLast/1000/20             27185 ns        27094 ns        25869 RowInvRate=27.0942ns
+BM_CalcThroughputIntFirstLast/10000/20           235215 ns       235217 ns         2977 RowInvRate=23.5217ns
 
-BM_CalcThroughputStrFirstLast/1000/10/8           55200 ns        55181 ns        12693 RowInvRate=55.1805ns
-BM_CalcThroughputStrFirstLast/10000/10/8         515450 ns       515478 ns         1372 RowInvRate=51.5478ns
-BM_CalcThroughputStrFirstLast/1000/20/8           90077 ns        90076 ns         7792 RowInvRate=90.0764ns
-BM_CalcThroughputStrFirstLast/10000/20/8         859092 ns       859041 ns          833 RowInvRate=85.9041ns
-BM_CalcThroughputStrFirstLast/1000/10/16          55180 ns        55159 ns        12681 RowInvRate=55.1588ns
-BM_CalcThroughputStrFirstLast/10000/10/16        501412 ns       501463 ns         1000 RowInvRate=50.1463ns
-BM_CalcThroughputStrFirstLast/1000/20/16         168656 ns       115241 ns         7963 RowInvRate=115.241ns
-BM_CalcThroughputStrFirstLast/10000/20/16       2137988 ns      1408076 ns          644 RowInvRate=140.808ns
+BM_CalcThroughputStrFirstLast/1000/10/8           47057 ns        47041 ns        14881 RowInvRate=47.0409ns
+BM_CalcThroughputStrFirstLast/10000/10/8         438360 ns       438366 ns         1588 RowInvRate=43.8366ns
+BM_CalcThroughputStrFirstLast/1000/20/8           70981 ns        70970 ns         9925 RowInvRate=70.9696ns
+BM_CalcThroughputStrFirstLast/10000/20/8         689114 ns       689130 ns         1028 RowInvRate=68.913ns
+BM_CalcThroughputStrFirstLast/1000/10/16          46682 ns        46658 ns        14982 RowInvRate=46.658ns
+BM_CalcThroughputStrFirstLast/10000/10/16        425522 ns       425556 ns         1628 RowInvRate=42.5556ns
+BM_CalcThroughputStrFirstLast/1000/20/16          70247 ns        70241 ns        10011 RowInvRate=70.2408ns
+BM_CalcThroughputStrFirstLast/10000/20/16        643841 ns       643870 ns         1092 RowInvRate=64.387ns
 
-BM_CalcThroughputStrCaseStartEnd/1000/10/8        60853 ns        58032 ns        11107 RowInvRate=58.0322ns
-BM_CalcThroughputStrCaseStartEnd/10000/10/8      469142 ns       469032 ns         1418 RowInvRate=46.9032ns
-BM_CalcThroughputStrCaseStartEnd/1000/20/8        76874 ns        76836 ns         9206 RowInvRate=76.8359ns
-BM_CalcThroughputStrCaseStartEnd/10000/20/8      807143 ns       806980 ns          983 RowInvRate=80.698ns
-BM_CalcThroughputStrCaseStartEnd/1000/10/16       63755 ns        52966 ns        14635 RowInvRate=52.9659ns
-BM_CalcThroughputStrCaseStartEnd/10000/10/16     660623 ns       530047 ns         1527 RowInvRate=53.0047ns
-BM_CalcThroughputStrCaseStartEnd/1000/20/16       73858 ns        73824 ns         7355 RowInvRate=73.8243ns
-BM_CalcThroughputStrCaseStartEnd/10000/20/16     716145 ns       715865 ns         1026 RowInvRate=71.5865ns
+BM_CalcThroughputStrCaseStartEnd/1000/10/8        30874 ns        30835 ns        22616 RowInvRate=30.8349ns
+BM_CalcThroughputStrCaseStartEnd/10000/10/8      282310 ns       282329 ns         2513 RowInvRate=28.2329ns
+BM_CalcThroughputStrCaseStartEnd/1000/20/8        40867 ns        40855 ns        17108 RowInvRate=40.8547ns
+BM_CalcThroughputStrCaseStartEnd/10000/20/8      440882 ns       440909 ns         1731 RowInvRate=44.0909ns
+BM_CalcThroughputStrCaseStartEnd/1000/10/16       30986 ns        30950 ns        22557 RowInvRate=30.9499ns
+BM_CalcThroughputStrCaseStartEnd/10000/10/16     277894 ns       277936 ns         2561 RowInvRate=27.7936ns
+BM_CalcThroughputStrCaseStartEnd/1000/20/16       40824 ns        40806 ns        17065 RowInvRate=40.8061ns
+BM_CalcThroughputStrCaseStartEnd/10000/20/16     382351 ns       382428 ns         1803 RowInvRate=38.2428ns
 */
 
 TypeDescriptor array_type(const LogicalType& element_type) {

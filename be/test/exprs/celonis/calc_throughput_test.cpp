@@ -184,10 +184,10 @@ TEST_F(CelonisCalcThroughputTest, InputArrayIsSometimesNull) {
     // row 1: [NULL, "a"]
     // row 2: ["a", "a", "a", "b", "b", "c"]
     // row 3: ["a", "b", NULL]
-    activity_array->append_datum(Datum());
-    activity_array->append_datum(DatumArray{Datum(), "a"});
+    activity_array->append_datum(kNullDatum);
+    activity_array->append_datum(DatumArray{kNullDatum, "a"});
     activity_array->append_datum(DatumArray{"a", "a", "a", "b", "b", "c"});
-    activity_array->append_datum(DatumArray{"a", "b", Datum()});
+    activity_array->append_datum(DatumArray{"a", "b", kNullDatum});
 
     ColumnPtr start_activity_col, end_activity_col, start_label_col, end_label_col;
     create_const_params(&start_activity_col, &end_activity_col, &start_label_col, &end_label_col);
@@ -199,9 +199,9 @@ TEST_F(CelonisCalcThroughputTest, InputArrayIsSometimesNull) {
     // row 2: [1, 2, 3, 10, 20, 100]
     // row 3: NULL
     timestamp_array->append_datum(DatumArray{1L});
-    timestamp_array->append_datum(Datum());
+    timestamp_array->append_datum(kNullDatum);
     timestamp_array->append_datum(DatumArray{1L, 2L, 3L, 10L, 20L, 100L});
-    timestamp_array->append_datum(Datum());
+    timestamp_array->append_datum(kNullDatum);
 
     // Only row 2 has non-NULL data in both activity and timestamp columns.
     const auto result = CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
@@ -226,12 +226,20 @@ TEST_F(CelonisCalcThroughputTest, FirstToLast1) {
 }
 
 TEST_F(CelonisCalcThroughputTest, FirstToLast2) {
-    testOne(DatumArray{"A", "B", "C"}, DatumArray{0L, 1L, 3L}, "A", "A", "first", "last", false, Datum());
+    testOne(DatumArray{"A", "B", "C"}, DatumArray{0L, 1L, 3L}, "A", "A", "first", "last", false, kNullDatum);
 }
 
-TEST_F(CelonisCalcThroughputTest, LastToFirst) {
+TEST_F(CelonisCalcThroughputTest, FirstToLast3) {
+    testOne(DatumArray{}, DatumArray{}, "A", "B", "first", "last", false, kNullDatum);
+}
+
+TEST_F(CelonisCalcThroughputTest, LastToFirst1) {
     testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "a1",
             "a2", "last", "first", false, 7L);
+}
+
+TEST_F(CelonisCalcThroughputTest, LaseToFirst2) {
+    testOne(DatumArray{}, DatumArray{}, "A", "B", "last", "first", false, kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, CaseStartAndEnd1) {
@@ -242,7 +250,11 @@ TEST_F(CelonisCalcThroughputTest, CaseStartAndEnd1) {
 
 TEST_F(CelonisCalcThroughputTest, CaseStartAndEnd2) {
     testOne(DatumArray{kNullDatum, kNullDatum, kNullDatum}, DatumArray{1L, 2L, 3L}, "", "", "case_start", "case_end",
-            true, Datum());
+            true, kNullDatum);
+}
+
+TEST_F(CelonisCalcThroughputTest, CaseStartAndEnd3) {
+    testOne(DatumArray{}, DatumArray{}, "", "", "case_start", "case_end", true, kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, CaseStart1) {
@@ -275,29 +287,29 @@ TEST_F(CelonisCalcThroughputTest, LastToLast1) {
 TEST_F(CelonisCalcThroughputTest, LastToLast2) {
     // Since the starting activity (last B) comes after the ending activity (last A), there is a conflict and NULL is
     // returned.
-    testOne(DatumArray{"A", "B", "A", "B"}, DatumArray{0L, 1L, 3L, 7L}, "B", "A", "last", "last", false, Datum());
+    testOne(DatumArray{"A", "B", "A", "B"}, DatumArray{0L, 1L, 3L, 7L}, "B", "A", "last", "last", false, kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, MissingStart) {
     testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "a0",
-            "a2", "first", "first", false, Datum());
+            "a2", "first", "first", false, kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, MissingEnd) {
     testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "a0",
-            "a9", "first", "first", false, Datum());
+            "a9", "first", "first", false, kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, StartTimestampIsNull) {
-    testOne(DatumArray{"a1", "a2", "a3"}, DatumArray{Datum(), 10L, 100L}, "a1", "a3", "first", "first", false, Datum());
+    testOne(DatumArray{"a1", "a2", "a3"}, DatumArray{kNullDatum, 10L, 100L}, "a1", "a3", "first", "first", false, kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, EndTimestampIsNull) {
-    testOne(DatumArray{"a1", "a2", "a3"}, DatumArray{1L, 10L, Datum()}, "a1", "a3", "first", "first", false, Datum());
+    testOne(DatumArray{"a1", "a2", "a3"}, DatumArray{1L, 10L, kNullDatum}, "a1", "a3", "first", "first", false, kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, ActivityContainsNull) {
-    testOne(DatumArray{"a1", Datum(), "a3"}, DatumArray{1L, 10L, 100L}, "a1", "a3", "first", "first", false, 99L);
+    testOne(DatumArray{"a1", kNullDatum, "a3"}, DatumArray{1L, 10L, 100L}, "a1", "a3", "first", "first", false, 99L);
 }
 
 TEST_F(CelonisCalcThroughputTest, MultipleRows) {
@@ -305,12 +317,12 @@ TEST_F(CelonisCalcThroughputTest, MultipleRows) {
     activity_array->append_datum(DatumArray{"a1"});
     activity_array->append_datum(DatumArray{"a1", "a2"});
     activity_array->append_datum(DatumArray{"a1", "a2", "a3"});
-    activity_array->append_datum(DatumArray{"a1", Datum(), "a2", "a3"});
+    activity_array->append_datum(DatumArray{"a1", kNullDatum, "a2", "a3"});
     auto timestamp_array = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
     timestamp_array->append_datum(DatumArray{1L});
     timestamp_array->append_datum(DatumArray{1L, 10L});
-    timestamp_array->append_datum(DatumArray{1L, Datum(), 100L});
-    timestamp_array->append_datum(DatumArray{Datum(),  10L, 20L, 100L});
+    timestamp_array->append_datum(DatumArray{1L, kNullDatum, 100L});
+    timestamp_array->append_datum(DatumArray{kNullDatum,  10L, 20L, 100L});
 
     auto start_activity_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     start_activity_col->append_datum(Slice("a1"));

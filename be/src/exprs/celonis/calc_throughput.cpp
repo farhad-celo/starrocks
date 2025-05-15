@@ -21,25 +21,35 @@ enum Label {
 template<typename ActivityCppType>
 int findActivity(const ActivityCppType* activity_elements, const NullColumn::Container* activity_nulls, uint32_t begin_offset,
                  uint32_t end_offset, const ActivityCppType& name, Label label) {
-    int found_idx = -1;
-    for (size_t i = begin_offset; i < end_offset; ++i) {
+    int64_t begin = static_cast<int64_t>(begin_offset);
+    int64_t end = static_cast<int64_t>(end_offset);
+    if (label == CASE_START || label == FIRST) {
+        for(auto i = begin; i < end; ++i) {
+            if (activity_nulls != nullptr && (*activity_nulls)[i]) {
+                continue;
+            }
+            if (label == CASE_START) {
+                return i;
+            }
+            if (activity_elements[i] == name) {
+                return i;
+            }
+        }
+        return -1;
+    }
+    // CASE_END and LAST
+    for (auto i = end - 1; i >= begin; --i) {
         if (activity_nulls != nullptr && (*activity_nulls)[i]) {
             continue;
         }
-        if (label == CASE_START) {
+        if (label == CASE_END) {
             return i;
         }
-        if (label == CASE_END) {
-            found_idx = i;
-        }
         if (activity_elements[i] == name) {
-            if (label == FIRST) {
-                return i;
-            }
-            found_idx = i;
+            return i;
         }
     }
-    return found_idx;
+    return -1;
 }
 
 Label parseLabel(const std::string& format) {
