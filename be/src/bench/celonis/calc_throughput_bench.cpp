@@ -15,31 +15,41 @@
 namespace starrocks {
 
 /*
-2024-12-30T02:04:06+00:00
+2025-05-14T21:10:46+00:00
 Running ./be/build_Release/src/bench/celonis/output/calc_throughput_bench
-Run on (32 X 3242.42 MHz CPU s)
+Run on (32 X 3086.16 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 5.52, 2.19, 1.13
+Load Average: 14.83, 6.99, 4.24
 // Args: Number of rows / Event array size / Max string length (for string type)
--------------------------------------------------------------------------------------------
-Benchmark                                 Time             CPU   Iterations UserCounters...
--------------------------------------------------------------------------------------------
-BM_CalcThroughputInt/1000/10          20049 ns        19940 ns        35507 RowInvRate=19.9404ns
-BM_CalcThroughputInt/10000/10        167702 ns       167659 ns         4143 RowInvRate=16.7659ns
-BM_CalcThroughputInt/1000/20          23754 ns        23658 ns        29655 RowInvRate=23.6576ns
-BM_CalcThroughputInt/10000/20        210758 ns       210707 ns         3292 RowInvRate=21.0707ns
-BM_CalcThroughputStr/1000/10/8        34998 ns        34897 ns        20206 RowInvRate=34.8971ns
-BM_CalcThroughputStr/10000/10/8      305132 ns       305078 ns         2295 RowInvRate=30.5078ns
-BM_CalcThroughputStr/1000/20/8        46804 ns        46706 ns        14997 RowInvRate=46.706ns
-BM_CalcThroughputStr/10000/20/8      429541 ns       429520 ns         1647 RowInvRate=42.952ns
-BM_CalcThroughputStr/1000/10/16       34823 ns        34730 ns        19896 RowInvRate=34.7298ns
-BM_CalcThroughputStr/10000/10/16     301108 ns       301085 ns         2346 RowInvRate=30.1085ns
-BM_CalcThroughputStr/1000/20/16       46126 ns        46030 ns        15321 RowInvRate=46.03ns
-BM_CalcThroughputStr/10000/20/16     410406 ns       410354 ns         1692 RowInvRate=41.0354ns
+-------------------------------------------------------------------------------------------------------
+Benchmark                                             Time             CPU   Iterations UserCounters...
+-------------------------------------------------------------------------------------------------------
+BM_CalcThroughputIntFirstLast/1000/10             19301 ns        19208 ns        36267 RowInvRate=19.208ns
+BM_CalcThroughputIntFirstLast/10000/10           159241 ns       159241 ns         4358 RowInvRate=15.9241ns
+BM_CalcThroughputIntFirstLast/1000/20             26365 ns        26285 ns        26918 RowInvRate=26.2852ns
+BM_CalcThroughputIntFirstLast/10000/20           229296 ns       229260 ns         3041 RowInvRate=22.926ns
+
+BM_CalcThroughputStrFirstLast/1000/10/8           55200 ns        55181 ns        12693 RowInvRate=55.1805ns
+BM_CalcThroughputStrFirstLast/10000/10/8         515450 ns       515478 ns         1372 RowInvRate=51.5478ns
+BM_CalcThroughputStrFirstLast/1000/20/8           90077 ns        90076 ns         7792 RowInvRate=90.0764ns
+BM_CalcThroughputStrFirstLast/10000/20/8         859092 ns       859041 ns          833 RowInvRate=85.9041ns
+BM_CalcThroughputStrFirstLast/1000/10/16          55180 ns        55159 ns        12681 RowInvRate=55.1588ns
+BM_CalcThroughputStrFirstLast/10000/10/16        501412 ns       501463 ns         1000 RowInvRate=50.1463ns
+BM_CalcThroughputStrFirstLast/1000/20/16         168656 ns       115241 ns         7963 RowInvRate=115.241ns
+BM_CalcThroughputStrFirstLast/10000/20/16       2137988 ns      1408076 ns          644 RowInvRate=140.808ns
+
+BM_CalcThroughputStrCaseStartEnd/1000/10/8        60853 ns        58032 ns        11107 RowInvRate=58.0322ns
+BM_CalcThroughputStrCaseStartEnd/10000/10/8      469142 ns       469032 ns         1418 RowInvRate=46.9032ns
+BM_CalcThroughputStrCaseStartEnd/1000/20/8        76874 ns        76836 ns         9206 RowInvRate=76.8359ns
+BM_CalcThroughputStrCaseStartEnd/10000/20/8      807143 ns       806980 ns          983 RowInvRate=80.698ns
+BM_CalcThroughputStrCaseStartEnd/1000/10/16       63755 ns        52966 ns        14635 RowInvRate=52.9659ns
+BM_CalcThroughputStrCaseStartEnd/10000/10/16     660623 ns       530047 ns         1527 RowInvRate=53.0047ns
+BM_CalcThroughputStrCaseStartEnd/1000/20/16       73858 ns        73824 ns         7355 RowInvRate=73.8243ns
+BM_CalcThroughputStrCaseStartEnd/10000/20/16     716145 ns       715865 ns         1026 RowInvRate=71.5865ns
 */
 
 TypeDescriptor array_type(const LogicalType& element_type) {
@@ -53,7 +63,7 @@ TypeDescriptor array_type(const LogicalType& element_type) {
 
 
 template <LogicalType ActivityLT>
-static void do_bench(benchmark::State& state) {
+static void do_bench(benchmark::State& state, const std::string& start_label, const std::string& end_label) {
     int num_rows = state.range(0);
     int event_array_size = state.range(1);
     using UniformInt = std::uniform_int_distribution<std::mt19937::result_type>;
@@ -120,8 +130,8 @@ static void do_bench(benchmark::State& state) {
             timestamp_array_col->append_datum(timestamps);
             start_activity_col->append_datum(activities[uniform_int(rng) % activities.size()]);
             end_activity_col->append_datum(activities[uniform_int(rng) % activities.size()]);
-            start_label_col->append_datum(Slice("first"));
-            end_label_col->append_datum(Slice("first"));
+            start_label_col->append_datum(Slice(start_label));
+            end_label_col->append_datum(Slice(end_label));
         }
         state.ResumeTiming();
         EXPECT_TRUE(CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_throughput(ctx.get(), {activity_array_col,
@@ -134,19 +144,26 @@ static void do_bench(benchmark::State& state) {
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
-static void BM_CalcThroughputInt(benchmark::State& state) {
-    do_bench<TYPE_BIGINT>(state);
+static void BM_CalcThroughputIntFirstLast(benchmark::State& state) {
+    do_bench<TYPE_BIGINT>(state, "first", "last");
 }
 
-static void BM_CalcThroughputStr(benchmark::State& state) {
-    do_bench<TYPE_VARCHAR>(state);
+static void BM_CalcThroughputStrFirstLast(benchmark::State& state) {
+    do_bench<TYPE_VARCHAR>(state, "first", "last");
+}
+
+static void BM_CalcThroughputStrCaseStartEnd(benchmark::State& state) {
+    do_bench<TYPE_VARCHAR>(state, "case_start", "case_end");
 }
 
 // Args: Number of rows / Event array size
-BENCHMARK(BM_CalcThroughputInt)->ArgsProduct({{1000, 10000}, {10, 20}});
+BENCHMARK(BM_CalcThroughputIntFirstLast)->ArgsProduct({{1000, 10000}, {10, 20}});
 
 // Args: Number of rows / Event array size / Max string length (for string type)
-BENCHMARK(BM_CalcThroughputStr)->ArgsProduct({{1000, 10000}, {10, 20}, {8, 16}});
+BENCHMARK(BM_CalcThroughputStrFirstLast)->ArgsProduct({{1000, 10000}, {10, 20}, {8, 16}});
+
+// Args: Number of rows / Event array size / Max string length (for string type)
+BENCHMARK(BM_CalcThroughputStrCaseStartEnd)->ArgsProduct({{1000, 10000}, {10, 20}, {8, 16}});
 
 }  // namespace starrocks
 
