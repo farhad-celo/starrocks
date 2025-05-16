@@ -1,7 +1,6 @@
 #include "exprs/celonis/match_process.h"
 
 #include "util.h"
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include "column/column_helper.h"
 #include "column/vectorized_fwd.h"
@@ -141,7 +140,9 @@ TEST_F(CelonisMatchProcessTest, celonis_match_b_a_old_unmatched) {
     auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
 
     array->append_datum(DatumArray{"A", "B"});
+    array->append_datum(DatumArray{kNullDatum, "A", kNullDatum, kNullDatum, "B", kNullDatum});
     array->append_datum(DatumArray{"D"});
+    array->append_datum(DatumArray{"D", kNullDatum});
 
     auto json_spec = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     json_spec->append_datum(Datum{jsonInput});
@@ -150,7 +151,7 @@ TEST_F(CelonisMatchProcessTest, celonis_match_b_a_old_unmatched) {
     input.push_back(array);
     input.push_back(json_spec);
 
-    match_process(input, {1, 0});
+    match_process(input, {1, 1, 0, 0});
 }
 
 TEST_F(CelonisMatchProcessTest, celonis_match_a_b_eventually) {
