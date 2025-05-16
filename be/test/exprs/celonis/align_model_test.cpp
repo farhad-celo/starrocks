@@ -434,14 +434,20 @@ TEST_F(CelonisAlignModelTest, Parallel_NULL) {
                             {"null", "null"},
                             {"C", "null", "B", "B"},
                             {"C", "B", "B"},
+                            {"A", "null", "null", "C"},
+                            {"null", "A", "null", "C", "null"},
+                            {"A", "null", "null", "C"},
                             {}};
     std::vector<Result> expected = {
             PARALLEL_MODEL_RESULTS.at({"A", "C"}),
             PARALLEL_MODEL_RESULTS.at({"A", "B", "C"}),
             {},
             {},
-            {},
             PARALLEL_MODEL_RESULTS.at({"C", "B", "B"}),
+            PARALLEL_MODEL_RESULTS.at({"C", "B", "B"}),
+            PARALLEL_MODEL_RESULTS.at({"A", "C"}),
+            PARALLEL_MODEL_RESULTS.at({"A", "C"}),
+            PARALLEL_MODEL_RESULTS.at({"A", "C"}),
             {}
     };
     Run(variants, PARALLEL_MODEL, expected);

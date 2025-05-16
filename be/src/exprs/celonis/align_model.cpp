@@ -121,10 +121,8 @@ StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, con
         variant.reserve(end - start);
         for (size_t i = start; i < end; ++i) {
             if (src_array_data.null_elements != nullptr && (*src_array_data.null_elements)[i]) {
-                // Ignores a row when if it has NULL activities. An alternative is to proceed with non-NULL activities
-                // but it would complicate later stages due to element index mismatches, etc.
-                variant.clear();
-                break;
+                // Ignores null activities. Variants are not supposed to have NULL activities.
+                continue;
             }
             variant.push_back(src_elements[i].to_string());
         }
@@ -136,11 +134,6 @@ StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, con
         row_to_variant_index.push_back(variant_index++);
     }
     DCHECK_EQ(row_to_variant_index.size(), chunk_size);
-    if (src_array_data.null_elements != nullptr) {
-        // TODO: Handle NULL activities.
-        // To see if it happens.
-        LOG_EVERY_T(INFO, 60) << "align_model() ignored NULL activities.";
-    }
 
     AlignModelHelper helper;
     RETURN_IF_ERROR(helper.execute(variants, json_bpmn_model_description));
