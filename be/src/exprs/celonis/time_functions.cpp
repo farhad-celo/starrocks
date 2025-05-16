@@ -119,113 +119,6 @@ static int64_t millis_between(const TimestampValue& from_timestamp, const Timest
     return remap_timestamp_ms(to_timestamp) - remap_timestamp_ms(from_timestamp);
 }
 
-struct TimeRange {
-    int64_t begin_ms;
-    int64_t end_ms;
-    bool is_weekly;
-
-    TimeRange(int64_t begin_ms, int64_t end_ms) : begin_ms(begin_ms), end_ms(end_ms), is_weekly(false) {}
-
-    TimeRange(int64_t begin_ms, int64_t end_ms, bool is_weekly) : begin_ms(begin_ms), end_ms(end_ms),
-                                                                  is_weekly(is_weekly) {}
-
-    TimeRange(const TimeRange& other) : begin_ms(other.begin_ms), end_ms(other.end_ms), is_weekly(other.is_weekly) {}
-
-    TimeRange& operator=(const TimeRange& other) {
-        if (this != &other) {
-            begin_ms = other.begin_ms;
-            end_ms = other.end_ms;
-            is_weekly = other.is_weekly;
-        }
-        return *this;
-    }
-
-    virtual ~TimeRange() = default;
-
-    // Computes the intersection with [left_ms, right_ms)
-    std::vector<TimeRange> intersect(int64_t left_ms, int64_t right_ms) const {
-        std::vector<TimeRange> rv;
-        if (!is_weekly) {
-            int64_t start = std::max(begin_ms, left_ms);
-            int64_t end = std::min(end_ms, right_ms);
-            if (end > start) {
-                rv.emplace_back(start, end);
-            }
-            return rv;
-        }
-        const int64_t begin = left_ms;
-        const int64_t end = right_ms;
-        int64_t cur_begin = begin_ms;
-        int64_t cur_end = end_ms;
-        int64_t period = NUM_MILLISECONDS_PER_WEEK;
-        // move [cur_begin, cur_end) to the left of [begin, end)
-        if (cur_end > begin) {
-            int64_t n_periods = (cur_end - begin + period - 1) / period;
-            cur_begin -= n_periods * period;
-            cur_end -= n_periods * period;
-        }
-        // move [cur_begin, cur_end) to right to pass [begin, end)
-        while (true) {
-            if (cur_begin >= end) {
-                break;
-            }
-            int64_t left = std::max(cur_begin, begin);
-            int64_t right = std::min(cur_end, end);
-            if (right > left) {
-                rv.emplace_back(left, right);
-            }
-            cur_begin += period;
-            cur_end += period;
-        }
-        return rv;
-    }
-
-    // Computes the overlap in milliseconds with [left_ms, right_ms)
-    int64_t compute_overlap(int64_t left_ms, int64_t right_ms) const {
-        if (!is_weekly) {
-            int64_t start = std::max(begin_ms, left_ms);
-            int64_t end = std::min(end_ms, right_ms);
-            return (end > start) ? end - start : 0;
-        }
-        const int64_t begin = left_ms;
-        const int64_t end = right_ms;
-        int64_t cur_begin = begin_ms;
-        int64_t cur_end = end_ms;
-        int64_t period = NUM_MILLISECONDS_PER_WEEK;
-        // move [cur_begin, cur_end) to the left of [begin, end)
-        if (cur_end > begin) {
-            int64_t n_periods = (cur_end - begin + period - 1) / period;
-            cur_begin -= n_periods * period;
-            cur_end -= n_periods * period;
-        }
-        int64_t rv = 0L;
-        // move [cur_begin, cur_end) to right to pass [begin, end)
-        while (true) {
-            if (cur_begin >= end) {
-                break;
-            }
-            int64_t left = std::max(cur_begin, begin);
-            int64_t right = std::min(cur_end, end);
-            rv += (right > left) ? (right - left) : 0L;
-            cur_begin += period;
-            cur_end += period;
-        }
-        return rv;
-    }
-
-    bool is_ms_in(int64_t ms) const {
-        if (!is_weekly) {
-            return ms >= begin_ms && ms < end_ms;
-        }
-        int64_t diff_mod = (ms - begin_ms) % NUM_MILLISECONDS_PER_WEEK;
-        if (diff_mod < 0) {
-            diff_mod += NUM_MILLISECONDS_PER_WEEK;
-        }
-        int64_t adjusted_ms = begin_ms + diff_mod;
-        return begin_ms <= adjusted_ms && adjusted_ms < end_ms;
-    }
-};
-
 static void sort_time_ranges(std::vector<TimeRange>& time_ranges) {
     std::sort(time_ranges.begin(), time_ranges.end(),
               [](const TimeRange& a, const TimeRange& b) { return a.begin_ms < b.begin_ms; });
@@ -1373,6 +1266,102 @@ StatusOr<ColumnPtr> func(FunctionContext* context, const starrocks::Columns& col
 }
 
 } // namespace
+
+std::vector<TimeRange> TimeRange::intersect(int64_t left_ms, int64_t right_ms) const {
+    std::vector<TimeRange> rv;
+    if (!is_weekly) {
+        int64_t start = std::max(begin_ms, left_ms);
+        int64_t end = std::min(end_ms, right_ms);
+        if (end > start) {
+            rv.emplace_back(start, end);
+        }
+        return rv;
+    }
+    const int64_t begin = left_ms;
+    const int64_t end = right_ms;
+    int64_t cur_begin = begin_ms;
+    int64_t cur_end = end_ms;
+    int64_t period = NUM_MILLISECONDS_PER_WEEK;
+    // move [cur_begin, cur_end) to the left of [begin, end)
+    if (cur_end > begin) {
+        int64_t n_periods = (cur_end - begin + period - 1) / period;
+        cur_begin -= n_periods * period;
+        cur_end -= n_periods * period;
+    }
+    // move [cur_begin, cur_end) to right to pass [begin, end)
+    while (true) {
+        if (cur_begin >= end) {
+            break;
+        }
+        int64_t left = std::max(cur_begin, begin);
+        int64_t right = std::min(cur_end, end);
+        if (right > left) {
+            rv.emplace_back(left, right);
+        }
+        cur_begin += period;
+        cur_end += period;
+    }
+    return rv;
+}
+
+int64_t TimeRange::compute_overlap(int64_t left_ms, int64_t right_ms) const {
+    if (left_ms > right_ms) {
+        return 0;
+    }
+
+    constexpr auto do_compute_overlap = [](int64_t begin_ms, int64_t end_ms, int64_t left_ms, int64_t right_ms) {
+        int64_t start = std::max(begin_ms, left_ms);
+        int64_t end = std::min(end_ms, right_ms);
+        return (end > start) ? end - start : 0;
+    };
+
+    if (!is_weekly) {
+        return do_compute_overlap(this->begin_ms, this->end_ms, left_ms, right_ms);
+    }
+    const int64_t period = NUM_MILLISECONDS_PER_WEEK;
+
+    const int64_t begin_normalized = this->begin_ms % period;
+    const int64_t end_normalized = this->end_ms % period;
+
+    int64_t left_normalized = left_ms % period;
+    int64_t left_week = left_ms / period;
+    if (left_normalized < 0) {
+        left_normalized += period;
+        left_week -= 1;
+    }
+    int64_t right_normalized = right_ms % period;
+    int64_t right_week = right_ms / period;
+    if (right_normalized < 0) {
+        right_normalized += period;
+        right_week -= 1;
+    }
+
+    DCHECK_LE(left_week, right_week);
+
+    if (left_week == right_week) {
+        // If [left_ms, right_ms) is within the same week, just compute the overlap once
+        return do_compute_overlap(begin_normalized, end_normalized, left_normalized, right_normalized);
+    }
+
+    const int64_t n_weeks_between = right_week - left_week - 1;
+    DCHECK_GE(n_weeks_between, 0);
+    const int64_t weeks_between_overlap = n_weeks_between * (this->end_ms - this->begin_ms);
+    const int64_t first_week_overlap = do_compute_overlap(begin_normalized, end_normalized, left_normalized, period);
+    const int64_t last_week_overlap = do_compute_overlap(begin_normalized, end_normalized, 0, right_normalized);
+    return weeks_between_overlap + first_week_overlap + last_week_overlap;
+}
+
+bool TimeRange::is_ms_in(int64_t ms) const {
+    if (!is_weekly) {
+        return ms >= begin_ms && ms < end_ms;
+    }
+    int64_t diff_mod = (ms - begin_ms) % NUM_MILLISECONDS_PER_WEEK;
+    if (diff_mod < 0) {
+        diff_mod += NUM_MILLISECONDS_PER_WEEK;
+    }
+    int64_t adjusted_ms = begin_ms + diff_mod;
+    return begin_ms <= adjusted_ms && adjusted_ms < end_ms;
+}
 
 StatusOr<ColumnPtr>
 CelonisTimeFunctions::millis_timestamp([[maybe_unused]] FunctionContext* context, const Columns& columns) {

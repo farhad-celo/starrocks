@@ -11,6 +11,83 @@
 
 namespace starrocks {
 
+TEST(TimeRangeTest, weekly_compute_overlap) {
+    constexpr int64_t NUM_DAYS_PER_WEEK = 7L;
+    constexpr int64_t DAY_MS = 86400000L;
+    constexpr int64_t WEEK_MS = DAY_MS * NUM_DAYS_PER_WEEK;
+
+    {
+        // Empty range
+        constexpr std::array EMPTY_RANGES{
+                TimeRange{0, 0, true},
+                TimeRange{10, 10, true},
+                TimeRange{-10, -10, true},
+        };
+        for (const auto& range : EMPTY_RANGES) {
+            EXPECT_EQ(range.compute_overlap(0, 0), 0);
+            EXPECT_EQ(range.compute_overlap(0, 10), 0);
+            EXPECT_EQ(range.compute_overlap(-10, 0), 0);
+            EXPECT_EQ(range.compute_overlap(-10, 10), 0);
+            EXPECT_EQ(range.compute_overlap(1, 0), 0);
+            EXPECT_EQ(range.compute_overlap(0, 10 * WEEK_MS), 0);
+        }
+    }
+    {
+        // Simple range
+        const TimeRange range{0, 10, true};
+
+        // No overlap
+        EXPECT_EQ(range.compute_overlap(0, 0), 0);
+        EXPECT_EQ(range.compute_overlap(10, 20), 0);
+        EXPECT_EQ(range.compute_overlap(-10, 0), 0);
+        EXPECT_EQ(range.compute_overlap(-10, -5), 0);
+        EXPECT_EQ(range.compute_overlap(1, 0), 0);
+
+        // Full overlap
+        EXPECT_EQ(range.compute_overlap(0, 10), 10);
+        EXPECT_EQ(range.compute_overlap(0, 20), 10);
+        EXPECT_EQ(range.compute_overlap(-10, 10), 10);
+        EXPECT_EQ(range.compute_overlap(-10, 20), 10);
+
+        // Partial overlap
+        EXPECT_EQ(range.compute_overlap(0, 8), 8);
+        EXPECT_EQ(range.compute_overlap(2, 10), 8);
+        EXPECT_EQ(range.compute_overlap(2, 8), 6);
+
+        // Full overlap in other week
+        EXPECT_EQ(range.compute_overlap(WEEK_MS, WEEK_MS + 10), 10);
+        EXPECT_EQ(range.compute_overlap(WEEK_MS, WEEK_MS + 20), 10);
+        EXPECT_EQ(range.compute_overlap(17 * WEEK_MS, 17 * WEEK_MS + 10), 10);
+        EXPECT_EQ(range.compute_overlap(-WEEK_MS, -WEEK_MS + 10), 10);
+        EXPECT_EQ(range.compute_overlap(-WEEK_MS, -WEEK_MS + 20), 10);
+        EXPECT_EQ(range.compute_overlap(-WEEK_MS, 0), 10);
+
+        // Partial overlap in other week
+        EXPECT_EQ(range.compute_overlap(WEEK_MS, WEEK_MS + 8), 8);
+        EXPECT_EQ(range.compute_overlap(WEEK_MS + 2, WEEK_MS + 10), 8);
+        EXPECT_EQ(range.compute_overlap(WEEK_MS + 2, WEEK_MS + 8), 6);
+        EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS, -17 * WEEK_MS + 8), 8);
+        EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS + 2, -17 * WEEK_MS + 10), 8);
+        EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS + 2, -17 * WEEK_MS + 8), 6);
+
+        // Repeated overlap
+        EXPECT_EQ(range.compute_overlap(0, WEEK_MS + 10), 20);
+        EXPECT_EQ(range.compute_overlap(0, 17 * WEEK_MS + 10), 180);
+        EXPECT_EQ(range.compute_overlap(3 * WEEK_MS, 17 * WEEK_MS + 10), 150);
+        EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS, 17 * WEEK_MS + 10), 350);
+        EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS, -3 * WEEK_MS), 140);
+
+        // Repeated & partial overlap
+        EXPECT_EQ(range.compute_overlap(0, WEEK_MS + 8), 18);
+        EXPECT_EQ(range.compute_overlap(2, WEEK_MS + 10), 18);
+        EXPECT_EQ(range.compute_overlap(2, WEEK_MS + 8), 16);
+        EXPECT_EQ(range.compute_overlap(3, 17 * WEEK_MS + 5), 7+160+5);
+        EXPECT_EQ(range.compute_overlap(2 * WEEK_MS + 3, 17 * WEEK_MS + 5), 7+140+5);
+        EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS + 3, 17 * WEEK_MS + 5), 7 + 160 + 170 + 5);
+        EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS + 3, -3 * WEEK_MS + 5), 7 + 130 + 5);
+    }
+}
+
 class CelonisTimeFunctionsTest : public ::testing::Test {
 protected:
     void SetUp() override {}
