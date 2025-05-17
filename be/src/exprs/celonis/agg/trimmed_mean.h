@@ -50,7 +50,15 @@ class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggre
             }
         }
         if (lower_cutoff < 0 || lower_cutoff > 100 || upper_cutoff < 0 || upper_cutoff > 100) {
-            column->append(0.0);
+            ctx->set_error("CELONIS_TRIMMED_MEAN: Cutoff value must be in interval [0, 100].", false);
+            column->append_default();
+            return;
+        }
+        if (lower_cutoff + upper_cutoff > 100) {
+            ctx->set_error(
+                    "CELONIS_TRIMMED_MEAN: Sum of lower cutoff and upper cutoff must be in interval [0, 100].",
+                    false);
+            column->append_default();
             return;
         }
 

@@ -349,7 +349,9 @@ TEST_F(CelonisTrimmedMeanTest, invalid_lower_and_upper) {
     func->serialize_to_column(local_ctx.get(), state1->state(), serde_column.get());
     func->merge(local_ctx.get(), serde_column.get(), state2->state(), 0);
     func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
-
+    ASSERT_TRUE(local_ctx->has_error());
+    EXPECT_EQ(std::string_view(local_ctx->error_msg()),
+              "CELONIS_TRIMMED_MEAN: Sum of lower cutoff and upper cutoff must be in interval [0, 100].");
     ASSERT_EQ(0.0, result_column->get_data()[0]);
 }
 
