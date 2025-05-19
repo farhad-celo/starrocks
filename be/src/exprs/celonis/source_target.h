@@ -7,8 +7,14 @@ namespace starrocks {
 
 enum class SourceTargetType { SOURCE, TARGET };
 
-// TODO (mkennecke): Support other edge configurations
-enum class SourceTargetEdgeConfig { DEFAULT, ANY_TO_ANY };
+enum class SourceTargetEdgeConfig {
+    DEFAULT,
+    ANY_TO_ANY,
+    FIRST_TO_ANY,
+    FIRST_TO_ANY_WITH_SELF,
+    ANY_TO_LAST,
+    FIRST_TO_LAST
+};
 
 template <SourceTargetType SOURCE_TARGET_TYPE>
 class CelonisSourceTarget {

@@ -17,7 +17,107 @@ struct SourceTargetStateFragmentLocal {
     ScalarFunction function;
 };
 
-template <bool is_source, SourceTargetEdgeConfig /* edge_config */, bool has_group, bool has_null_element,
+template <bool has_null_element, bool is_first_or_last>
+void handle_null_elements(ColumnPtr& result_elements, const size_t new_offset, const size_t offset,
+                          const UnnestedArrayData& array_data, const size_t array_size) {
+    if constexpr (has_null_element) {
+        if constexpr (is_first_or_last) {
+            if ((*array_data.null_elements)[offset] != 0) {
+                for (int j = 0; j < array_size; ++j) {
+                    const auto res{(result_elements->set_null(new_offset + j))};
+                    DCHECK(res);
+                }
+            }
+        } else {
+            for (int j = 0; j < array_size; ++j) {
+                if ((*array_data.null_elements)[offset + j] != 0) {
+                    const auto res{(result_elements->set_null(new_offset + j))};
+                    DCHECK(res);
+                }
+            }
+        }
+    }
+}
+
+template <bool is_source, bool has_null_element>
+void execute_any_to_any(ColumnPtr& result_elements, size_t& new_offset, size_t offset,
+                        const UnnestedArrayData& array_data, const size_t array_size) {
+    if constexpr (!is_source) {
+        offset++;
+    }
+    result_elements->append(*array_data.elements, offset, array_size - 1);
+    handle_null_elements<has_null_element, /* is_first_or_last */ false>(result_elements, new_offset, offset,
+                                                                         array_data, array_size - 1);
+    new_offset += array_size - 1;
+}
+
+template <bool is_source, bool has_null_element>
+void execute_first_to_any(ColumnPtr& result_elements, size_t& new_offset, size_t offset,
+                          const UnnestedArrayData& array_data, const size_t array_size) {
+    if constexpr (!is_source) {
+        offset++;
+        result_elements->append(*array_data.elements, offset, array_size - 1);
+        handle_null_elements<has_null_element, /* is_first_or_last */ false>(result_elements, new_offset, offset,
+                                                                             array_data, array_size - 1);
+    } else {
+        result_elements->append_value_multiple_times(*array_data.elements, offset, array_size - 1);
+        handle_null_elements<has_null_element, /* is_first_or_last */ true>(result_elements, new_offset, offset,
+                                                                            array_data, array_size - 1);
+    }
+    new_offset += array_size - 1;
+}
+
+template <bool is_source, bool has_null_element>
+void execute_first_to_any_with_self(ColumnPtr& result_elements, size_t& new_offset, const size_t offset,
+                                    const UnnestedArrayData& array_data, const size_t array_size) {
+    if constexpr (!is_source) {
+        result_elements->append(*array_data.elements, offset, array_size);
+        handle_null_elements<has_null_element, /* is_first_or_last */ false>(result_elements, new_offset, offset,
+                                                                             array_data, array_size);
+    } else {
+        result_elements->append_value_multiple_times(*array_data.elements, offset, array_size);
+        handle_null_elements<has_null_element, /* is_first_or_last */ true>(result_elements, new_offset, offset,
+                                                                            array_data, array_size);
+    }
+    new_offset += array_size;
+}
+
+template <bool is_source, bool has_null_element>
+void execute_any_to_last(ColumnPtr& result_elements, size_t& new_offset, size_t offset,
+                         const UnnestedArrayData& array_data, const size_t array_size) {
+    if constexpr (!is_source) {
+        offset = offset + array_size - 1;
+        result_elements->append_value_multiple_times(*array_data.elements, offset, array_size - 1);
+        handle_null_elements<has_null_element, /* is_first_or_last */ true>(result_elements, new_offset, offset,
+                                                                            array_data, array_size - 1);
+    } else {
+        result_elements->append(*array_data.elements, offset, array_size - 1);
+        handle_null_elements<has_null_element, /* is_first_or_last */ false>(result_elements, new_offset, offset,
+                                                                             array_data, array_size - 1);
+    }
+    new_offset += array_size - 1;
+}
+
+template <bool is_source, bool has_null_element>
+void execute_first_to_last(ColumnPtr& result_elements, size_t& new_offset, size_t offset,
+                           const UnnestedArrayData& array_data, const size_t array_size) {
+    if (array_size < 2) {
+        return;
+    }
+    if constexpr (!is_source) {
+        offset = offset + array_size - 1;
+    }
+    result_elements->append(*array_data.elements, offset, 1);
+    if constexpr (has_null_element) {
+        if ((*array_data.null_elements)[offset] != 0) {
+            const auto res{(result_elements->set_null(new_offset))};
+            DCHECK(res);
+        }
+    }
+    new_offset += 1;
+}
+
+template <bool is_source, SourceTargetEdgeConfig edge_config, bool has_group, bool has_null_element,
           bool has_null_group_element>
 ColumnPtr array_sources_targets_impl(const UnnestedArrayData& array_data, const UnnestedArrayData& group_array_data) {
     const size_t num_array = array_data.offsets->size() - 1;
@@ -88,20 +188,26 @@ ColumnPtr array_sources_targets_impl(const UnnestedArrayData& array_data, const 
                 new_offset += index.size();
             }
         } else {
-            if constexpr (!is_source) {
-                offset++;
+            if constexpr (edge_config == SourceTargetEdgeConfig::ANY_TO_ANY) {
+                execute_any_to_any<is_source, has_null_element>(result_elements, new_offset, offset, array_data,
+                                                                array_size);
             }
-            result_elements->append(*array_data.elements, offset, array_size - 1);
-            if constexpr (has_null_element) {
-                // Input has nulls, propagate them to output.
-                for (int j = 0; j < array_size - 1; ++j) {
-                    if ((*array_data.null_elements)[offset + j] != 0) {
-                        auto res = (result_elements->set_null(new_offset + j));
-                        DCHECK(res);
-                    }
-                }
+            if constexpr (edge_config == SourceTargetEdgeConfig::FIRST_TO_ANY) {
+                execute_first_to_any<is_source, has_null_element>(result_elements, new_offset, offset, array_data,
+                                                                  array_size);
             }
-            new_offset += array_size - 1;
+            if constexpr (edge_config == SourceTargetEdgeConfig::FIRST_TO_ANY_WITH_SELF) {
+                execute_first_to_any_with_self<is_source, has_null_element>(result_elements, new_offset, offset,
+                                                                            array_data, array_size);
+            }
+            if constexpr (edge_config == SourceTargetEdgeConfig::ANY_TO_LAST) {
+                execute_any_to_last<is_source, has_null_element>(result_elements, new_offset, offset, array_data,
+                                                                 array_size);
+            }
+            if constexpr (edge_config == SourceTargetEdgeConfig::FIRST_TO_LAST) {
+                execute_first_to_last<is_source, has_null_element>(result_elements, new_offset, offset, array_data,
+                                                                   array_size);
+            }
         }
         result_offsets.push_back(new_offset);
     }
@@ -187,6 +293,18 @@ SourceTargetEdgeConfig getEdgeConfig(const std::string& format) {
     if (format == "any->any") {
         return SourceTargetEdgeConfig::ANY_TO_ANY;
     }
+    if (format == "first->any") {
+        return SourceTargetEdgeConfig::FIRST_TO_ANY;
+    }
+    if (format == "first->any_with_self") {
+        return SourceTargetEdgeConfig::FIRST_TO_ANY_WITH_SELF;
+    }
+    if (format == "any->last") {
+        return SourceTargetEdgeConfig::ANY_TO_LAST;
+    }
+    if (format == "first->last") {
+        return SourceTargetEdgeConfig::FIRST_TO_LAST;
+    }
     return SourceTargetEdgeConfig::DEFAULT;
 }
 
@@ -222,10 +340,22 @@ Status CelonisSourceTarget<SOURCE_TARGET_TYPE>::array_sources_targets_prepare(
         const auto state{new SourceTargetStateFragmentLocal{}};
         context->set_function_state(scope, state);
 
-        // TODO (mkennecke): Support other edge configurations
         switch (edge_config) {
         case SourceTargetEdgeConfig::ANY_TO_ANY:
             state->function = array_sources_targets_impl<SOURCE_TARGET_TYPE, SourceTargetEdgeConfig::ANY_TO_ANY>;
+            break;
+        case SourceTargetEdgeConfig::FIRST_TO_ANY:
+            state->function = array_sources_targets_impl<SOURCE_TARGET_TYPE, SourceTargetEdgeConfig::FIRST_TO_ANY>;
+            break;
+        case SourceTargetEdgeConfig::FIRST_TO_ANY_WITH_SELF:
+            state->function =
+                    array_sources_targets_impl<SOURCE_TARGET_TYPE, SourceTargetEdgeConfig::FIRST_TO_ANY_WITH_SELF>;
+            break;
+        case SourceTargetEdgeConfig::ANY_TO_LAST:
+            state->function = array_sources_targets_impl<SOURCE_TARGET_TYPE, SourceTargetEdgeConfig::ANY_TO_LAST>;
+            break;
+        case SourceTargetEdgeConfig::FIRST_TO_LAST:
+            state->function = array_sources_targets_impl<SOURCE_TARGET_TYPE, SourceTargetEdgeConfig::FIRST_TO_LAST>;
             break;
         default:
             constexpr auto function_name{SOURCE_TARGET_TYPE == SourceTargetType::SOURCE ? "celonis_array_sources()"

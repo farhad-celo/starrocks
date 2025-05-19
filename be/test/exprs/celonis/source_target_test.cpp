@@ -15,8 +15,11 @@ namespace starrocks {
 
 namespace {
 
-// TODO (mkennecke): Support other edge configurations
 const std::string ANY_TO_ANY{"any->any"};
+const std::string FIRST_TO_ANY{"first->any"};
+const std::string FIRST_TO_ANY_WITH_SELF{"first->any_with_self"};
+const std::string ANY_TO_LAST{"any->last"};
+const std::string FIRST_TO_LAST{"first->last"};
 
 } // namespace
 
@@ -471,6 +474,294 @@ TEST_F(CelonisSourceTargetTest, array_celonis_sources_targets_with_group_string_
     evaluator_sources.evaluate(result_sources);
 
     auto result_targets = run_celonis_array_targets(TYPE_ARRAY_VARCHAR, array, group).value();
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any) {
+    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, false)};
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    array->append_datum(DatumArray{});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{2});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{3, 4});
+    evaluator_sources.add_expected(DatumArray{3});
+    evaluator_targets.add_expected(DatumArray{4});
+
+    array->append_datum(DatumArray{6, 7, 8});
+    evaluator_sources.add_expected(DatumArray{6, 6});
+    evaluator_targets.add_expected(DatumArray{7, 8});
+
+    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY).value()};
+    evaluator_sources.evaluate(result_sources);
+
+    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY).value()};
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_null) {
+    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, true)};
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    array->append_datum(DatumArray{});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{kNullDatum});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{kNullDatum, kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum});
+    evaluator_targets.add_expected(DatumArray{kNullDatum});
+
+    array->append_datum(DatumArray{2});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{3, 4, 5});
+    evaluator_sources.add_expected(DatumArray{3, 3});
+    evaluator_targets.add_expected(DatumArray{4, 5});
+
+    array->append_datum(DatumArray{7, kNullDatum, 9});
+    evaluator_sources.add_expected(DatumArray{7, 7});
+    evaluator_targets.add_expected(DatumArray{kNullDatum, 9});
+
+    array->append_datum(DatumArray{11, 12});
+    evaluator_sources.add_expected(DatumArray{11});
+    evaluator_targets.add_expected(DatumArray{12});
+
+    array->append_datum(DatumArray{kNullDatum, 14, kNullDatum, kNullDatum, 15, kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum});
+    evaluator_targets.add_expected(DatumArray{14, kNullDatum, kNullDatum, 15, kNullDatum});
+
+    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY).value()};
+    evaluator_sources.evaluate(result_sources);
+
+    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY).value()};
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_with_self) {
+    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, false)};
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    array->append_datum(DatumArray{});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{2});
+    evaluator_sources.add_expected(DatumArray{2});
+    evaluator_targets.add_expected(DatumArray{2});
+
+    array->append_datum(DatumArray{3, 4});
+    evaluator_sources.add_expected(DatumArray{3, 3});
+    evaluator_targets.add_expected(DatumArray{3, 4});
+
+    array->append_datum(DatumArray{6, 7, 8});
+    evaluator_sources.add_expected(DatumArray{6, 6, 6});
+    evaluator_targets.add_expected(DatumArray{6, 7, 8});
+
+    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF).value()};
+    evaluator_sources.evaluate(result_sources);
+
+    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF).value()};
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_with_self_null) {
+    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, true)};
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    array->append_datum(DatumArray{});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum});
+    evaluator_targets.add_expected(DatumArray{kNullDatum});
+
+    array->append_datum(DatumArray{kNullDatum, kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum, kNullDatum});
+    evaluator_targets.add_expected(DatumArray{kNullDatum, kNullDatum});
+
+    array->append_datum(DatumArray{2});
+    evaluator_sources.add_expected(DatumArray{2});
+    evaluator_targets.add_expected(DatumArray{2});
+
+    array->append_datum(DatumArray{3, 4, 5});
+    evaluator_sources.add_expected(DatumArray{3, 3, 3});
+    evaluator_targets.add_expected(DatumArray{3, 4, 5});
+
+    array->append_datum(DatumArray{7, kNullDatum, 9});
+    evaluator_sources.add_expected(DatumArray{7, 7, 7});
+    evaluator_targets.add_expected(DatumArray{7, kNullDatum, 9});
+
+    array->append_datum(DatumArray{11, 12});
+    evaluator_sources.add_expected(DatumArray{11, 11});
+    evaluator_targets.add_expected(DatumArray{11, 12});
+
+    array->append_datum(DatumArray{kNullDatum, 14, kNullDatum, kNullDatum, 15, kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum});
+    evaluator_targets.add_expected(DatumArray{kNullDatum, 14, kNullDatum, kNullDatum, 15, kNullDatum});
+
+    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF).value()};
+    evaluator_sources.evaluate(result_sources);
+
+    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF).value()};
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_any_last) {
+    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, false)};
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    array->append_datum(DatumArray{});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{2});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{3, 4});
+    evaluator_sources.add_expected(DatumArray{3});
+    evaluator_targets.add_expected(DatumArray{4});
+
+    array->append_datum(DatumArray{6, 7, 8});
+    evaluator_sources.add_expected(DatumArray{6, 7});
+    evaluator_targets.add_expected(DatumArray{8, 8});
+
+    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, ANY_TO_LAST).value()};
+    evaluator_sources.evaluate(result_sources);
+
+    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, ANY_TO_LAST).value()};
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_any_last_null) {
+    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, true)};
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    array->append_datum(DatumArray{});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{kNullDatum});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{kNullDatum, kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum});
+    evaluator_targets.add_expected(DatumArray{kNullDatum});
+
+    array->append_datum(DatumArray{2});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{3, 4, 5});
+    evaluator_sources.add_expected(DatumArray{3, 4});
+    evaluator_targets.add_expected(DatumArray{5, 5});
+
+    array->append_datum(DatumArray{7, kNullDatum, 9});
+    evaluator_sources.add_expected(DatumArray{7, kNullDatum});
+    evaluator_targets.add_expected(DatumArray{9, 9});
+
+    array->append_datum(DatumArray{11, 12});
+    evaluator_sources.add_expected(DatumArray{11});
+    evaluator_targets.add_expected(DatumArray{12});
+
+    array->append_datum(DatumArray{kNullDatum, 14, kNullDatum, kNullDatum, 15, kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum, 14, kNullDatum, kNullDatum, 15});
+    evaluator_targets.add_expected(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum});
+
+    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, ANY_TO_LAST).value()};
+    evaluator_sources.evaluate(result_sources);
+
+    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, ANY_TO_LAST).value()};
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_last) {
+    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, false)};
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    array->append_datum(DatumArray{});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{2});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{3, 4});
+    evaluator_sources.add_expected(DatumArray{3});
+    evaluator_targets.add_expected(DatumArray{4});
+
+    array->append_datum(DatumArray{6, 7, 8});
+    evaluator_sources.add_expected(DatumArray{6});
+    evaluator_targets.add_expected(DatumArray{8});
+
+    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_LAST).value()};
+    evaluator_sources.evaluate(result_sources);
+
+    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_LAST).value()};
+    evaluator_targets.evaluate(result_targets);
+}
+
+TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_last_null) {
+    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, true)};
+    celonis::TestEvaluator<TYPE_INT> evaluator_sources;
+    celonis::TestEvaluator<TYPE_INT> evaluator_targets;
+
+    array->append_datum(DatumArray{});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{kNullDatum});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{kNullDatum, kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum});
+    evaluator_targets.add_expected(DatumArray{kNullDatum});
+
+    array->append_datum(DatumArray{2});
+    evaluator_sources.add_expected(DatumArray{});
+    evaluator_targets.add_expected(DatumArray{});
+
+    array->append_datum(DatumArray{3, 4, 5});
+    evaluator_sources.add_expected(DatumArray{3});
+    evaluator_targets.add_expected(DatumArray{5});
+
+    array->append_datum(DatumArray{7, kNullDatum, 9});
+    evaluator_sources.add_expected(DatumArray{7});
+    evaluator_targets.add_expected(DatumArray{9});
+
+    array->append_datum(DatumArray{11, 12});
+    evaluator_sources.add_expected(DatumArray{11});
+    evaluator_targets.add_expected(DatumArray{12});
+
+    array->append_datum(DatumArray{kNullDatum, 14, kNullDatum, kNullDatum, 15, kNullDatum});
+    evaluator_sources.add_expected(DatumArray{kNullDatum});
+    evaluator_targets.add_expected(DatumArray{kNullDatum});
+
+    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_LAST).value()};
+    evaluator_sources.evaluate(result_sources);
+
+    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_LAST).value()};
     evaluator_targets.evaluate(result_targets);
 }
 
