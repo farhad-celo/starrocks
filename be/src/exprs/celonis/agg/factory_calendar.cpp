@@ -83,7 +83,10 @@ void FactoryCalendarAggregateFunction::update(FunctionContext* ctx, const Column
             return;
         }
     }
-
+    // ignore the interval if its start_timestamp is larger than its end_timestamp.
+    if (columns[0]->get(row_num).get_timestamp() > columns[1]->get(row_num).get_timestamp()) {
+        return;
+    }
     auto& state_impl = this->data(state);
     state_impl.start_timestamp->append_datum(columns[0]->get(row_num));
     state_impl.end_timestamp->append_datum(columns[1]->get(row_num));
@@ -195,6 +198,9 @@ void FactoryCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
             continue;
         }
         if ((src[1]->is_nullable() && src[1]->is_null(row)) || src[1]->only_null()) {
+            continue;
+        }
+        if (src[0]->get(row).get_timestamp() > src[1]->get(row).get_timestamp()) {
             continue;
         }
         valid_indexes.push_back(row);

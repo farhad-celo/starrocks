@@ -1235,22 +1235,25 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         // The result factory calendar does not contain any entries.
         EXPECT_EQ("[[]]", res_array_col->debug_string());
     }
-    // no valid rows, row one has NULL start timestamp, row two has NULL end timestamp.
+    // no valid rows, row one has NULL start timestamp, row two has NULL end timestamp, row 3 has start > end.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
         auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
         start_timestamp_column->append_datum(kNullDatum);
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        start_timestamp_column->append_datum(TimestampValue::create(1972, 1, 1, 0, 0, 0));
 
         auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
         end_timestamp_column->append_datum(kNullDatum);
+        end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
 
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
         auto calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id1");
         calendar_id_column->append_datum("id2");
+        calendar_id_column->append_datum("id3");
 
         std::vector<const Column*> raw_columns;
         raw_columns.resize(3);
