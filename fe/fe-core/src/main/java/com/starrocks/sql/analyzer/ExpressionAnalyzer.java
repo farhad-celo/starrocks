@@ -1077,6 +1077,17 @@ public class ExpressionAnalyzer {
 
         private void checkFunction(String fnName, FunctionCallExpr node, Type[] argumentTypes) {
             switch (fnName) {
+                case FunctionSet.CELONIS_STRING_TO_DOUBLE: {
+                    if (node.getChildren().size() != 1) {
+                        throw new SemanticException(fnName + " should have one input", node.getPos());
+                    }
+                    if (!node.getChild(0).getType().isStringType()) {
+                        throw new SemanticException(fnName + "'s input " + node.getChild(0).toSql() +
+                                " should be string, but real type is " +
+                                node.getChild(0).getType().toSql(), node.getPos());
+                    }
+                    break;
+                }
                 case FunctionSet.MULTI_ARRAY_AGG: {
                     if (node.getChildren().isEmpty()) {
                         throw new SemanticException(fnName + " should have at least one input", node.getPos());
