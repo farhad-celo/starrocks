@@ -175,13 +175,16 @@ public:
         return id_to_time_ranges_.size() > 1;
     }
 
-    int64_t
+    std::optional<int64_t>
     remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id) const {
         int64 ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64_t left_ms = ms < 0 ? ms : 0L;
         int64_t right_ms = ms < 0 ? 0L : ms;
-        int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id);
-        return ms < 0 ? -overlap : overlap;
+        std::optional<int64_t> overlap = compute_overlap(left_ms, right_ms, calendar_id);
+        if (!overlap.has_value()) {
+            return std::nullopt;
+        }
+        return ms < 0 ? -overlap.value() : overlap.value();
     }
 
     std::optional<int64_t>
@@ -194,8 +197,11 @@ public:
         int64 to_ms = to_timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
         int64_t left_ms = to_ms >= from_ms ? from_ms : to_ms;
         int64_t right_ms = to_ms >= from_ms ? to_ms : from_ms;
-        int64_t overlap = compute_overlap(left_ms, right_ms, calendar_id, round_to_day);
-        return (to_ms >= from_ms) ? overlap : -overlap;
+        std::optional<int64_t> overlap = compute_overlap(left_ms, right_ms, calendar_id, round_to_day);
+        if (!overlap.has_value()) {
+            return 0;
+        }
+        return (to_ms >= from_ms) ? overlap.value() : -overlap.value();
     }
 
     struct CompareTimeRange {
@@ -815,9 +821,9 @@ private:
         return compute_duration(right_ms, time_ranges, cum_sum) - compute_duration(left_ms, time_ranges, cum_sum);
     }
 
-    int64_t compute_overlap(int64_t left_ms, int64_t right_ms, const std::optional<std::string>& calendar_id,
-                            bool round_to_day = false) const {
-        int64_t rv = 0L;
+    std::optional<int64_t>
+    compute_overlap(int64_t left_ms, int64_t right_ms, const std::optional<std::string>& calendar_id,
+                    bool round_to_day = false) const {
         auto time_ranges_it = id_to_time_ranges_.find(calendar_id);
         if (time_ranges_it != id_to_time_ranges_.end()) {
             const auto& time_ranges = round_to_day ? id_to_round_time_ranges_.find(calendar_id)->second
@@ -831,12 +837,18 @@ private:
                        (!round_to_day && cum_sum_it != id_to_cum_sum_.end()));
                 return quick_compute_overlap(left_ms, right_ms, time_ranges, cum_sum_it->second);
             } else {
+                int64_t rv = 0L;
                 for (const auto& cur_time_range: time_ranges) {
                     rv += cur_time_range.compute_overlap(left_ms, right_ms);
                 }
+                return rv;
             }
         }
-        return rv;
+        if (calendar_id.has_value()) {
+            // The requested calendar_id does not exist.
+            return std::nullopt;
+        }
+        return 0L;
     }
 
     bool quick_is_timestamp_in(int64_t ms, const std::vector<TimeRange>& time_ranges) const {
@@ -1212,7 +1224,11 @@ remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::strin
         if (!calendar_state.calendar.requires_calendar_id()) {
             calendar_id = std::nullopt;
         }
-        milliseconds = calendar_state.calendar.remap_timestamp_ms(timestamp, calendar_id);
+        std::optional<int64_t> rv = calendar_state.calendar.remap_timestamp_ms(timestamp, calendar_id);
+        if (!rv.has_value()) {
+            return std::nullopt;
+        }
+        milliseconds = rv.value();
     }
     return convert_time_unit(time_unit, milliseconds);
 }
@@ -1439,7 +1455,12 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionCon
             if (!calendar.requires_calendar_id()) {
                 calendar_id = std::nullopt;
             }
-            milliseconds = calendar.remap_timestamp_ms(timestamp, calendar_id);
+            std::optional<int64_t> rv = calendar.remap_timestamp_ms(timestamp, calendar_id);
+            if (!rv.has_value()) {
+                result.append_null();
+                continue;
+            }
+            milliseconds = rv.value();
         }
         result.append(milliseconds / time_unit_to_ms);
     }
