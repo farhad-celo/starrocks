@@ -177,13 +177,19 @@ TEST_F(CelonisInCalendarTest, const_weekday_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
+        timestamp_column_->append_datum(TimestampValue::create(1399, 12, 30, 1, 0, 0));
+        timestamp_column_->append_datum(TimestampValue::create(10000, 1, 1, 1, 1, 0));
+        calendar_id_column_->append_datum(kNullDatum);
+        calendar_id_column_->append_datum(kNullDatum);
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar(
                 {R"({"weekday_calendar": {)",
                  R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200001} }, )",
                  R"(} })"}).value();
-        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(3, result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
+        EXPECT_TRUE(result->get(1).is_null());
+        EXPECT_TRUE(result->get(2).is_null());
     }
 }
 
@@ -326,6 +332,14 @@ TEST_F(CelonisInCalendarTest, non_const_calendar) {
     Prepare();
     timestamp_column_->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
     timestamp_column_->append_datum(TimestampValue::create(1969, 12, 25, 17, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(1399, 12, 30, 1, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(10000, 1, 1, 1, 1, 0));
+    calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
+                                              R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                                              R"(} })"});
+    calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
+                                              R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200001} }, )",
+                                              R"(} })"});
     calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
                                               R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
                                               R"(} })"});
@@ -334,10 +348,14 @@ TEST_F(CelonisInCalendarTest, non_const_calendar) {
                                               R"(} })"});
     calendar_id_column_->append_datum(kNullDatum);
     calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
     const auto result = Run().value();
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
+    EXPECT_TRUE(result->get(2).is_null());
+    EXPECT_TRUE(result->get(3).is_null());
     config::treat_calendar_column_as_constant_in_calendar_functions = treat_calendar_column_as_constant_in_calendar_functions;
 }
 

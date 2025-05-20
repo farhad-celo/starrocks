@@ -49,6 +49,7 @@ static const TimestampValue MAX_YEAR = TimestampValue::create(10000, 1, 1, 0, 0,
 
 static const TimestampValue MIN_YEAR = TimestampValue::create(1400, 1, 1, 0, 0, 0);
 
+// Valid datetime is in [MIN_MS, MAX_MS).
 static int64_t MAX_MS = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
 
 static int64_t MIN_MS = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
@@ -305,6 +306,9 @@ public:
             return std::nullopt;
         }
         const int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        if (ms < MIN_MS || ms >= MAX_MS) {
+            return std::nullopt;
+        }
         auto time_ranges_it = id_to_time_ranges_.find(calendar_id);
         if (time_ranges_it != id_to_time_ranges_.end()) {
             auto no_weekly_it = id_to_no_weekly_.find(calendar_id);
