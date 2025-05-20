@@ -23,33 +23,35 @@ int findActivity(const ActivityCppType* activity_elements, const NullColumn::Con
                  uint32_t end_offset, const ActivityCppType& name, Label label) {
     int64_t begin = static_cast<int64_t>(begin_offset);
     int64_t end = static_cast<int64_t>(end_offset);
-    if (label == CASE_START || label == FIRST) {
-        for(auto i = begin; i < end; ++i) {
-            if (activity_nulls != nullptr && (*activity_nulls)[i]) {
-                continue;
+    // Saola does not ignore NULLs for CASE_START and CASE_END
+    switch (label) {
+        case CASE_START:
+            return begin;
+        case CASE_END:
+            return end - 1;
+        case FIRST:
+            for (auto i = begin; i < end; ++i) {
+                if (activity_nulls != nullptr && (*activity_nulls)[i]) {
+                    continue;
+                }
+                if (activity_elements[i] == name) {
+                    return i;
+                }
             }
-            if (label == CASE_START) {
-                return i;
+            return -1;
+        case LAST:
+            for (auto i = end - 1; i >= begin; --i) {
+                if (activity_nulls != nullptr && (*activity_nulls)[i]) {
+                    continue;
+                }
+                if (activity_elements[i] == name) {
+                    return i;
+                }
             }
-            if (activity_elements[i] == name) {
-                return i;
-            }
-        }
-        return -1;
+            return -1;
+        default:
+            return -1;
     }
-    // CASE_END and LAST
-    for (auto i = end - 1; i >= begin; --i) {
-        if (activity_nulls != nullptr && (*activity_nulls)[i]) {
-            continue;
-        }
-        if (label == CASE_END) {
-            return i;
-        }
-        if (activity_elements[i] == name) {
-            return i;
-        }
-    }
-    return -1;
 }
 
 Label parseLabel(const std::string& format) {
