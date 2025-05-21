@@ -11,12 +11,20 @@
 
 namespace starrocks {
 
+// Saola sets the limit to 10000, because for the main application, populating dropdown menus, doesn't require more
+// items. Here we use the same limit. we can increase it when necessary.
+const size_t MAX_GENERATED_ROWS_LIMIT = 10000;
+
 template <LogicalType LT, LogicalType StepLT>
 class CelonisGenerateRange final : public TableFunction {
     struct MyState final : public TableFunctionState {
+        size_t total_rows_generated_count = 0;
         ~MyState() override = default;
 
-        void on_new_params() override { set_offset(0); }
+        void on_new_params() override {
+            set_offset(0);
+            total_rows_generated_count = 0;
+        }
     };
 
 public:
@@ -43,6 +51,11 @@ public:
         auto state = down_cast<MyState*>(base_state);
         auto res = RunTimeColumnType<LT>::create();
         auto offsets = UInt32Column::create();
+        // If an error status is already set (e.g., from a previous call exceeding row limit), return early.
+        if (!state->status().ok()) {
+            // Return empty columns and offsets, the error is already in state.
+            return std::make_pair(Columns{res}, offsets);
+        }
         auto arg_step = ColumnViewer<StepLT>(state->get_columns()[0]);
         auto arg_range_start = ColumnViewer<LT>(state->get_columns()[1]);
         auto arg_range_end = ColumnViewer<LT>(state->get_columns()[2]);
@@ -97,7 +110,14 @@ public:
                     auto& data = res->get_data();
                     auto count = max_chunk_size - res->size();
                     for (decltype(count) i = 0; i < count; i++) {
+                        if (state->total_rows_generated_count >= MAX_GENERATED_ROWS_LIMIT) {
+                            state->set_status(Status::InvalidArgument(
+                                    "CELONIS_GENERATE_RANGE: Number of generated rows exceeds the limit of " +
+                                    std::to_string(MAX_GENERATED_ROWS_LIMIT) + "."));
+                            break;
+                        }
                         data.push_back(current);
+                        state->total_rows_generated_count++;
                         current = increase_timestamp_func(current);
                         overflow = !current.is_valid();
                         if (current > range_end || overflow) {
@@ -114,12 +134,23 @@ public:
                     resize_column_uninitialized(res.get(), old_size + count);
                     auto *data = res->get_data().data();
                     for (decltype(count) i = 0; i < count; i++) {
+                        if (state->total_rows_generated_count >= MAX_GENERATED_ROWS_LIMIT) {
+                            state->set_status(Status::InvalidArgument(
+                                    "CELONIS_GENERATE_RANGE: Number of generated rows exceeds the limit of " +
+                                    std::to_string(MAX_GENERATED_ROWS_LIMIT) + "."));
+                            break;
+                        }
                         data[old_size + i] = current;
+                        state->total_rows_generated_count++;
                         overflow = add_overflow(current, step, &current);
                         if (overflow) {
                             break;
                         }
                     }
+                }
+                // Max generated rows limit reached
+                if (!state->status().ok()){
+                    break;
                 }
 
                 if (current > range_end || overflow) {
