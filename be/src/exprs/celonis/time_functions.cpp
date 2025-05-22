@@ -178,6 +178,9 @@ public:
     std::optional<int64_t>
     remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id) const {
         int64 ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+        if (ms < MIN_MS || ms >= MAX_MS) {
+            return std::nullopt;
+        }
         int64_t left_ms = ms < 0 ? ms : 0L;
         int64_t right_ms = ms < 0 ? 0L : ms;
         std::optional<int64_t> overlap = compute_overlap(left_ms, right_ms, calendar_id);
