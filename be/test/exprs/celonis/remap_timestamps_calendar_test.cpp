@@ -303,6 +303,41 @@ TEST_F(CelonisRemapTimestampsCalendarTest, intersect_calendar) {
     }
 }
 
+TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar_full_day) {
+    {
+        Prepare();
+        timestamp_column_->append_datum(TimestampValue::create(2022, 10, 28, 11, 30, 0));
+        timestamp_column_->append_datum(TimestampValue::create(2022, 10, 24, 11, 30, 0));
+        timestamp_column_->append_datum(TimestampValue::create(2022, 10, 29, 11, 30, 0));
+        timestamp_column_->append_datum(TimestampValue::create(2022, 10, 23, 11, 30, 0));
+        timestamp_column_->append_datum(TimestampValue::create(1950, 1, 1, 0, 0, 0));
+        timestamp_column_->append_datum(TimestampValue::create(2022, 10, 27, 11, 30, 0));
+        timestamp_column_->append_datum(TimestampValue::create(2022, 10, 25, 11, 30, 0));
+        timestamp_column_->append_datum(TimestampValue::create(2022, 10, 26, 11, 30, 0));
+        timestamp_column_->append_datum(TimestampValue::create(1969, 10, 29, 0, 0, 0));
+        for (auto i = 0; i < timestamp_column_->size(); ++i) {
+            calendar_id_column_->append_datum(kNullDatum);
+        }
+        const auto result = RunConstantCalendarAndTimeUnit({
+                                                           R"({"weekday_calendar": {)",
+                                                           R"("monday": {"use_day": true, "shift": {"begin": 0, "end": 86400000} },)",
+                                                           R"("tuesday": {"use_day": true, "shift": {"begin": 0, "end": 86400000} },)",
+                                                           R"("wednesday": {"use_day": true, "shift": {"begin": 0, "end": 86400000} },)",
+                                                           R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 86400000} })",
+                                                           R"(} })"}, "DAYS").value();
+        ASSERT_EQ(timestamp_column_->size(), result->size());
+        EXPECT_EQ(11025L, result->get(0).get_int64());
+        EXPECT_EQ(11021L, result->get(1).get_int64());
+        EXPECT_EQ(11025L, result->get(2).get_int64());
+        EXPECT_EQ(11021L, result->get(3).get_int64());
+        EXPECT_EQ(-4175L, result->get(4).get_int64());
+        EXPECT_EQ(11024L, result->get(5).get_int64());
+        EXPECT_EQ(11022L, result->get(6).get_int64());
+        EXPECT_EQ(11023L, result->get(7).get_int64());
+        EXPECT_EQ(-37L, result->get(8).get_int64());
+    }
+}
+
 TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
     {
         Prepare();

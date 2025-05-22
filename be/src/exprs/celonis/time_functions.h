@@ -11,8 +11,10 @@ struct TimeRange {
 
     /** Computes the intersection with [left_ms, right_ms) */
     [[nodiscard]] std::vector<TimeRange> intersect(int64_t left_ms, int64_t right_ms) const;
+
     /** Computes the overlap in milliseconds with [left_ms, right_ms) */
     [[nodiscard]] int64_t compute_overlap(int64_t left_ms, int64_t right_ms) const;
+
     [[nodiscard]] bool is_ms_in(int64_t ms) const;
 };
 

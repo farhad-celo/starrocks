@@ -487,9 +487,9 @@ private:
                 continue;
             }
             if (entry.has_calendar_id()) {
-                id_to_time_ranges[entry.calendar_id()].emplace_back(entry.start_date(), entry.end_date());
+                id_to_time_ranges[entry.calendar_id()].emplace_back(entry.start_date(), entry.end_date(), false);
             } else {
-                id_to_time_ranges[std::nullopt].emplace_back(entry.start_date(), entry.end_date());
+                id_to_time_ranges[std::nullopt].emplace_back(entry.start_date(), entry.end_date(), false);
             }
         }
         for (auto& kv: id_to_time_ranges) {
@@ -738,7 +738,7 @@ private:
         for (int i = 0; i < bit_set.size(); ++i) {
             if (bit_set.test(i)) {
                 int64_t begin = year_begin_ms + NUM_MILLISECONDS_PER_DAY * i;
-                time_ranges.emplace_back(begin, begin + NUM_MILLISECONDS_PER_DAY);
+                time_ranges.emplace_back(begin, begin + NUM_MILLISECONDS_PER_DAY, false);
             }
         }
         return time_ranges;
@@ -1293,7 +1293,7 @@ std::vector<TimeRange> TimeRange::intersect(int64_t left_ms, int64_t right_ms) c
         int64_t start = std::max(begin_ms, left_ms);
         int64_t end = std::min(end_ms, right_ms);
         if (end > start) {
-            rv.emplace_back(start, end);
+            rv.emplace_back(start, end, false);
         }
         return rv;
     }
@@ -1316,7 +1316,7 @@ std::vector<TimeRange> TimeRange::intersect(int64_t left_ms, int64_t right_ms) c
         int64_t left = std::max(cur_begin, begin);
         int64_t right = std::min(cur_end, end);
         if (right > left) {
-            rv.emplace_back(left, right);
+            rv.emplace_back(left, right, false);
         }
         cur_begin += period;
         cur_end += period;
@@ -1325,7 +1325,7 @@ std::vector<TimeRange> TimeRange::intersect(int64_t left_ms, int64_t right_ms) c
 }
 
 int64_t TimeRange::compute_overlap(int64_t left_ms, int64_t right_ms) const {
-    if (left_ms > right_ms) {
+    if (left_ms >= right_ms || this->begin_ms >= this->end_ms) {
         return 0;
     }
 
@@ -1339,10 +1339,12 @@ int64_t TimeRange::compute_overlap(int64_t left_ms, int64_t right_ms) const {
         return do_compute_overlap(this->begin_ms, this->end_ms, left_ms, right_ms);
     }
     const int64_t period = NUM_MILLISECONDS_PER_WEEK;
-
     const int64_t begin_normalized = this->begin_ms % period;
-    const int64_t end_normalized = this->end_ms % period;
-
+    int64_t end_normalized = this->end_ms % period;
+    // note that it is impossible that begin_ms < period < end_ms.
+    if (end_normalized == 0) {
+        end_normalized = period;
+    }
     int64_t left_normalized = left_ms % period;
     int64_t left_week = left_ms / period;
     if (left_normalized < 0) {
