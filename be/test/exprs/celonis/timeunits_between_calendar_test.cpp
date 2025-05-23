@@ -187,10 +187,18 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_weekday_calendar) {
         Prepare();
         from_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 1, 0, 0));
         from_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 8, 2, 0, 0));
+        from_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 8, 2, 0, 0));
+        from_timestamp_column_->append_datum(TimestampValue::create(10000, 1, 1, 1, 1, 0)); // invalid
         to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 6, 1, 0, 0));
         to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 1, 2, 0, 0));
+        to_timestamp_column_->append_datum(TimestampValue::create(1399, 12, 31, 1, 0, 0)); // invalid
+        to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 8, 2, 0, 0));
         time_unit_column_->append_datum("WORKDAYS");
         time_unit_column_->append_datum("WORKDAYS");
+        time_unit_column_->append_datum("WORKDAYS");
+        time_unit_column_->append_datum("WORKDAYS");
+        calendar_id_column_->append_datum(kNullDatum);
+        calendar_id_column_->append_datum(kNullDatum);
         calendar_id_column_->append_datum(kNullDatum);
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendar({
@@ -205,6 +213,8 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_weekday_calendar) {
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
         EXPECT_EQ(3.0, result->get(0).get_double());
         EXPECT_EQ(-5.0, result->get(1).get_double());
+        EXPECT_TRUE(result->get(2).is_null());
+        EXPECT_TRUE(result->get(3).is_null());
     }
     {
         Prepare();

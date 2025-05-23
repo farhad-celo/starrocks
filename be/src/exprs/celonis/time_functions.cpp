@@ -45,14 +45,22 @@ static const int MONTH_TO_QUARTER[13] = {0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4};
 
 static const TimestampValue EPOCH = TimestampValue::create(1970, 1, 1, 0, 0, 0);
 
-static const TimestampValue MAX_YEAR = TimestampValue::create(10000, 1, 1, 0, 0, 0);
+static const TimestampValue MAX_VALID_TIMESTAMP = TimestampValue::create(10000, 1, 1, 0, 0, 0);
 
-static const TimestampValue MIN_YEAR = TimestampValue::create(1400, 1, 1, 0, 0, 0);
+static const TimestampValue MIN_VALID_TIMESTAMP = TimestampValue::create(1400, 1, 1, 0, 0, 0);
 
-// Valid datetime is in [MIN_MS, MAX_MS).
-static int64_t MAX_MS = MAX_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+// Valid datetime is in [MIN_VALID_MILLIS, MAX_VALID_MILLIS).
+static int64_t MAX_VALID_MILLIS = MAX_VALID_TIMESTAMP.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
 
-static int64_t MIN_MS = MIN_YEAR.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+static int64_t MIN_VALID_MILLIS = MIN_VALID_TIMESTAMP.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
+
+bool is_timestamp_in_valid_range(const TimestampValue& timestamp) {
+    return MIN_VALID_TIMESTAMP <= timestamp && timestamp < MAX_VALID_TIMESTAMP;
+}
+
+bool is_timestamp_in_valid_range(int64_t unix_millis) {
+    return MIN_VALID_MILLIS <= unix_millis && unix_millis < MAX_VALID_MILLIS;
+}
 
 TimestampValue timestamp_from_unix_millis(int64_t unix_millis) {
     int64_t seconds = unix_millis / 1000;
@@ -178,7 +186,7 @@ public:
     std::optional<int64_t>
     remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id) const {
         int64 ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
-        if (ms < MIN_MS || ms >= MAX_MS) {
+        if (!is_timestamp_in_valid_range(ms)) {
             return std::nullopt;
         }
         int64_t left_ms = ms < 0 ? ms : 0L;
@@ -264,8 +272,8 @@ public:
         }
         int64_t ms_left = std::abs(add_ms);
         // [begin_ms, end_ms)
-        int64_t begin_ms = left_to_right ? ms : MIN_MS;
-        int64_t end_ms = left_to_right ? MAX_MS : ms;
+        int64_t begin_ms = left_to_right ? ms : MIN_VALID_MILLIS;
+        int64_t end_ms = left_to_right ? MAX_VALID_MILLIS : ms;
         std::optional<int64_t> rv = std::nullopt;
         int64_t period = left_to_right ? NUM_MILLISECONDS_PER_WEEK : -NUM_MILLISECONDS_PER_WEEK;
         while (!pq.empty()) {
@@ -290,7 +298,8 @@ public:
             }
             int64_t new_begin_ms = top.begin_ms + period;
             int64_t new_end_ms = top.end_ms + period;
-            if (!((left_to_right && new_begin_ms >= MAX_MS) || (!left_to_right && new_end_ms < MIN_MS))) {
+            if (!((left_to_right && new_begin_ms >= MAX_VALID_MILLIS) ||
+                  (!left_to_right && new_end_ms < MIN_VALID_MILLIS))) {
                 pq.emplace(new_begin_ms, new_end_ms, true);
             }
         }
@@ -315,7 +324,7 @@ public:
             return std::nullopt;
         }
         const int64_t ms = timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
-        if (ms < MIN_MS || ms >= MAX_MS) {
+        if (!is_timestamp_in_valid_range(ms)) {
             return std::nullopt;
         }
         auto time_ranges_it = id_to_time_ranges_.find(calendar_id);
@@ -894,7 +903,7 @@ private:
         DCHECK(index >= 0 && index < time_ranges.size());
         const auto begin_ms = time_ranges.at(index).begin_ms;
         const auto target_ms = begin_ms + target - cum_sum.at(index);
-        if (target_ms < MIN_MS || target_ms >= MAX_MS) {
+        if (!is_timestamp_in_valid_range(target_ms)) {
             return std::nullopt;
         }
         auto res_timestamp = timestamp_from_unix_millis(target_ms);
@@ -1176,9 +1185,12 @@ timeunits_between(const TimestampValue& from_timestamp_raw, const TimestampValue
                   const std::string& time_unit,
                   const CalendarState& calendar_state,
                   std::optional<std::string>& calendar_id) {
-    const bool round_to_day = time_unit == "WORKDAYS";
+    if (!is_timestamp_in_valid_range(from_timestamp_raw) || !is_timestamp_in_valid_range(to_timestamp_raw)) {
+        return std::nullopt;
+    }
     TimestampValue from_timestamp = from_timestamp_raw;
     TimestampValue to_timestamp = to_timestamp_raw;
+    const bool round_to_day = time_unit == "WORKDAYS";
     if (round_to_day) {
         from_timestamp.trunc_to_day();
         to_timestamp.trunc_to_day();
