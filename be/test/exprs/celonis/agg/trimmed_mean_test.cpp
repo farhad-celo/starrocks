@@ -234,6 +234,69 @@ TEST_F(CelonisTrimmedMeanTest, type_double) {
     ASSERT_EQ(5.5, result_column->get_data()[0]);  // (1, 2), 3, 4, 5, 6, 7, 8, (9, 10, 11)
 }
 
+TEST_F(CelonisTrimmedMeanTest, type_double_large_input) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+
+    auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(5, 1);
+    auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(5, 1);
+    local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+
+    const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_DOUBLE, TYPE_DOUBLE, false);
+
+    const int n = 200'000; // n > parallel_threshold for double which is 100'000
+    // update even_data_column
+    auto state1 = ManagedAggrState::create(ctx, func);
+
+    auto even_data_column = RunTimeColumnType<TYPE_DOUBLE>::create();
+    auto const_column_lower1 = const_column_lower->clone();
+    auto const_column_upper1 = const_column_upper->clone();
+    for (int i = 0; i <= n; i += 2) {
+        even_data_column->append(static_cast<double>(i));
+    }
+
+    std::vector<const Column*> raw_columns1;
+    raw_columns1.resize(3);
+    raw_columns1[0] = even_data_column.get();
+    raw_columns1[1] = const_column_lower1.get();
+    raw_columns1[2] = const_column_upper1.get();
+
+    func->update_batch_single_state(local_ctx.get(), even_data_column->size(), raw_columns1.data(), state1->state());
+
+    // update odd_data_column
+    auto state2 = ManagedAggrState::create(ctx, func);
+
+    auto odd_data_column = RunTimeColumnType<TYPE_DOUBLE>::create();
+    auto const_column_lower2 = const_column_lower->clone();
+    auto const_column_upper2 = const_column_upper->clone();
+    for (int i = 1; i <= n; i += 2) {
+        odd_data_column->append(static_cast<double>(i));
+    }
+
+
+    std::vector<const Column*> raw_columns2;
+    raw_columns2.resize(3);
+    raw_columns2[0] = odd_data_column.get();
+    raw_columns2[1] = const_column_lower2.get();
+    raw_columns2[2] = const_column_upper2.get();
+
+    func->update_batch_single_state(local_ctx.get(), odd_data_column->size(), raw_columns2.data(), state2->state());
+
+    // merge column 1 and column 2
+    ColumnPtr serde_column = BinaryColumn::create();
+    auto result_column = RunTimeColumnType<TYPE_DOUBLE>::create();
+    func->serialize_to_column(local_ctx.get(), state1->state(), serde_column.get());
+    func->merge(local_ctx.get(), serde_column.get(), state2->state(), 0);
+    func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
+    ASSERT_FALSE(local_ctx->has_error());
+
+    ASSERT_EQ(100000.0, result_column->get_data()[0]);
+}
+
 TEST_F(CelonisTrimmedMeanTest, null_handling) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
