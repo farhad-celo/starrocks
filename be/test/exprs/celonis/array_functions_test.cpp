@@ -263,6 +263,48 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_only_null) {
     }
 }
 
+TEST_F(CelonisArrayFunctionsTest, activities_to_variant_only_null) {
+    auto activities_array = ColumnHelper::create_const_null_column(2);
+    const auto result = CelonisArrayFunctions::activities_to_variant(nullptr, {activities_array}).value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_TRUE(result->is_null(0));
+    EXPECT_TRUE(result->is_null(1));
+}
+
+TEST_F(CelonisArrayFunctionsTest, activities_to_variant_normal_cases) {
+    auto activities_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    activities_array->append_datum(DatumArray{"a1", "a2", kNullDatum});
+    activities_array->append_datum(kNullDatum);
+    activities_array->append_datum(DatumArray{"a1", kNullDatum, "abc", kNullDatum, kNullDatum, "a3", ""});
+    activities_array->append_datum(DatumArray{});
+    activities_array->append_datum(DatumArray{""});
+    activities_array->append_datum(DatumArray{kNullDatum});
+    activities_array->append_datum(DatumArray{kNullDatum, kNullDatum});
+    activities_array->append_datum(DatumArray{kNullDatum, "", "abc", kNullDatum, "", "abc", ""});
+    activities_array->append_datum(DatumArray{"activity"});
+    const auto result = CelonisArrayFunctions::activities_to_variant(nullptr, {activities_array}).value();
+    ASSERT_EQ(activities_array->size(), result->size());
+    EXPECT_EQ("a1, a2", result->get(0).get_slice());
+    EXPECT_TRUE(result->is_null(1));
+    EXPECT_EQ("a1, abc, a3, ", result->get(2).get_slice());
+    EXPECT_EQ("", result->get(3).get_slice());
+    EXPECT_EQ("", result->get(4).get_slice());
+    EXPECT_TRUE(result->is_null(5));
+    EXPECT_TRUE(result->is_null(6));
+    EXPECT_EQ(", abc, , abc, ", result->get(7).get_slice());
+    EXPECT_EQ("activity", result->get(8).get_slice());
+}
+
+TEST_F(CelonisArrayFunctionsTest, activities_to_variant_empty_array) {
+    auto activities_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    activities_array->append_datum(DatumArray{});
+    activities_array->append_datum(DatumArray{});
+    const auto result = CelonisArrayFunctions::activities_to_variant(nullptr, {activities_array}).value();
+    ASSERT_EQ(activities_array->size(), result->size());
+    EXPECT_EQ("", result->get(0).get_slice());
+    EXPECT_EQ("", result->get(1).get_slice());
+}
+
 TEST_F(CelonisArrayFunctionsTest, array_lag_datetime) {
     auto input_array = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, false);
     input_array->append_datum(DatumArray{TimestampValue::create(2020, 8, 10, 1, 32, 32),

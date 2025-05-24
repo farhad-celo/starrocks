@@ -1538,6 +1538,7 @@ celostar_functions = [
     [2000291, 'celonis_array_trimmed_mean',        True, False, 'DOUBLE', ['ARRAY_BIGINT', 'BIGINT', 'BIGINT'], 'CelonisArrayTrimmedMean<TYPE_BIGINT>::celonis_array_trimmed_mean'],
     [2000292, 'celonis_array_trimmed_mean',        True, False, 'DOUBLE', ['ARRAY_DOUBLE', 'BIGINT', 'BIGINT'], 'CelonisArrayTrimmedMean<TYPE_DOUBLE>::celonis_array_trimmed_mean'],
     [2000300, 'celonis_transpose_array_of_struct', True, False, 'ANY_STRUCT', ['ANY_ARRAY'], 'CelonisTransposeArrayOfStruct::transpose_array_of_struct'],
+    [2000310, 'celonis_activities_to_variant',     True, False, 'VARCHAR', ['ARRAY_VARCHAR'], 'CelonisArrayFunctions::activities_to_variant'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis',            True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],

@@ -348,6 +348,63 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::dedup_sorted_by([[maybe_unused]] Func
     return CelonisDedupSortedBy::process(columns);
 }
 
+StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]] FunctionContext* context,
+                                                                 const Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnPtr activities_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
+    UnnestedArrayData activities_data = prepare_array_input(activities_column.get());
+    const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *activities_data.elements).get_data().data();
+    const auto& offsets = activities_data.offsets->get_data().data();
+
+    ColumnBuilder<TYPE_VARCHAR> result(num_rows);
+    const std::string separator = ", ";
+    std::string variant;
+    for (auto row = 0; row < num_rows; ++row) {
+        if (activities_data.null_arrays != nullptr && (*activities_data.null_arrays)[row] != 0) {
+            result.append_nulls(1);
+            continue;
+        }
+        const auto start = offsets[row];
+        const auto end = offsets[row + 1];
+        if (start == end) {
+            result.append("");
+            continue;
+        }
+        size_t count = 0;
+        size_t total_length = 0;
+        for (auto i = start; i < end; ++i) {
+            if (activities_data.null_elements != nullptr && (*activities_data.null_elements)[i] != 0) {
+                continue;
+            }
+            ++count;
+            total_length += activities[i].size;
+        }
+        if (count == 0) {
+            result.append_nulls(1);
+            continue;
+        }
+        variant.clear();
+        variant.reserve(total_length + (count - 1) * separator.length());
+        bool first = true;
+        for (auto i = start; i < end; ++i) {
+            if (activities_data.null_elements != nullptr && (*activities_data.null_elements)[i] != 0) {
+                continue;
+            }
+            if (!first) {
+                variant += separator;
+            }
+            variant += activities[i].to_string();
+            first = false;
+        }
+        result.append(Slice(variant));
+
+    }
+    return result.build(all_const);
+}
+
 class CelonisArrayLag {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {

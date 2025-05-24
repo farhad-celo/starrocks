@@ -32,6 +32,18 @@ public:
     DEFINE_VECTORIZED_FN(dedup_sorted_by);
 
     /**
+     * @param: [activity_array]
+     * @paramType: [ARRAY_VARCHAR]
+     * @return: VARCHAR
+     * Aggregates activities in an array into a string (separated by ", "), which represents a variant.
+     * NULL activities are ignored.
+     * If the activity_array is NULL, its variant is NULL.
+     * If the activity_array is empty, its variant is "".
+     * If the activity_array is not empty and all activities are NULL, its variant is NULL.
+     */
+    DEFINE_VECTORIZED_FN(activities_to_variant);
+
+    /**
      * @param: [input_array, offset]
      * @paramType: [ANY_ARRAY, BIGINT]
      * @return: input_array type
