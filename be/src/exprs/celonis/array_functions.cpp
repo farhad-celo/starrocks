@@ -369,10 +369,6 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
         }
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
-        if (start == end) {
-            result.append("");
-            continue;
-        }
         size_t count = 0;
         size_t total_length = 0;
         for (auto i = start; i < end; ++i) {

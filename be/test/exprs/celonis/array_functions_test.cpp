@@ -287,7 +287,7 @@ TEST_F(CelonisArrayFunctionsTest, activities_to_variant_normal_cases) {
     EXPECT_EQ("a1, a2", result->get(0).get_slice());
     EXPECT_TRUE(result->is_null(1));
     EXPECT_EQ("a1, abc, a3, ", result->get(2).get_slice());
-    EXPECT_EQ("", result->get(3).get_slice());
+    EXPECT_TRUE(result->get(3).is_null());
     EXPECT_EQ("", result->get(4).get_slice());
     EXPECT_TRUE(result->is_null(5));
     EXPECT_TRUE(result->is_null(6));
@@ -301,8 +301,8 @@ TEST_F(CelonisArrayFunctionsTest, activities_to_variant_empty_array) {
     activities_array->append_datum(DatumArray{});
     const auto result = CelonisArrayFunctions::activities_to_variant(nullptr, {activities_array}).value();
     ASSERT_EQ(activities_array->size(), result->size());
-    EXPECT_EQ("", result->get(0).get_slice());
-    EXPECT_EQ("", result->get(1).get_slice());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
 }
 
 TEST_F(CelonisArrayFunctionsTest, array_lag_datetime) {
