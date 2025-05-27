@@ -2,6 +2,7 @@
 
 #include <queue>
 #include <chrono>
+#include <tbb/parallel_for.h>
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
@@ -105,18 +106,32 @@ struct Clusterer {
         std::vector<int64_t> labels(n_points, -1);
         std::vector<bool> is_cores(n_points, false);
         std::vector<bool> is_isolated(n_points, false);
-        for (int i = 0; i < n_points; ++i) {
-            if (points[i].is_empty_variant) {
-                labels[i] = NULL_VARIANT_LABEL;
-            }
-        }
+        std::vector<std::vector<size_t>> precomputed_neighbors(n_points);
+
+        // TODO(y.zhang): Parallelizing neighbors computation using TBB is a short term fix for performance issue.
+        // This may increase the total CPU time when the number of clusters is small.
+        tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, n_points),
+                [&](const tbb::blocked_range<size_t>& range) {
+                    for (size_t i = range.begin(); i != range.end(); ++i) {
+                        if (points[i].is_empty_variant) {
+                            labels[i] = NULL_VARIANT_LABEL;
+                        } else {
+                            precomputed_neighbors[i] = get_neighbors(points, i, is_cores, is_isolated);
+                        }
+                    }
+                },
+                tbb::auto_partitioner()  // Let TBB decide the best partitioning
+        );
+
+
         int64_t cluster_id = 0;
         // Traverse the points
         for (auto index = 0; index < points.size(); ++index) {
             if (labels[index] != -1) {
                 continue;
             }
-            auto neighbors = get_neighbors(points, index, is_cores, is_isolated);
+            const auto& neighbors = precomputed_neighbors[index];
             if (neighbors.size() == 1) {
                 is_isolated[index] = true;
             }
