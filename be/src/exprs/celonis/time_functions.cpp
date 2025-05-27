@@ -2071,6 +2071,10 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
         }
         const std::string time_unit = time_unit_viewer.value(row).to_string();
         const auto timestamp = timestamp_viewer.value(row);
+        if (!is_timestamp_in_valid_range(timestamp)) {
+            result.append_null();
+            continue;
+        }
         auto add_value = add_value_viewer.value(row);
         std::optional<std::string> calendar_id = std::nullopt;
         if (!calendar_id_viewer.is_null(row)) {
@@ -2109,9 +2113,13 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_const([[maybe_unused]] Functio
             result.append_null();
             continue;
         }
+        const auto timestamp = timestamp_viewer.value(row);
+        if (!is_timestamp_in_valid_range(timestamp)) {
+            result.append_null();
+            continue;
+        }
         std::string time_unit = time_unit_viewer.value(row).to_string();
         RETURN_IF_ERROR(validate_time_unit(time_unit));
-        const auto timestamp = timestamp_viewer.value(row);
         auto add_value = add_value_viewer.value(row);
         std::optional<std::string> calendar_id = std::nullopt;
         if (!calendar_id_viewer.is_null(row)) {
