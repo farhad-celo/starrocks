@@ -9,8 +9,7 @@ namespace {
 ColumnPtr celonis_shortened_variant_impl(const Column& elements,
                                          const UInt32Column& offsets,
                                          const NullColumn::Container* null_element_offsets,
-                                         const NullColumn::Container* null_array_offsets, int64_t length_size) {
-
+                                         const NullColumn::Container* null_array_offsets, int64_t max_cycle_length) {
     const size_t num_array = offsets.size() - 1;
     auto offsets_ptr = offsets.get_data().data();
     auto result_array = ArrayColumn::create(NullableColumn::create(elements.clone_empty(), NullColumn::create()),
@@ -59,7 +58,7 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
             }
             if (elements_ptr[cur] == elements_ptr[prev]) {
                 current_cycle_len++;
-                if (current_cycle_len > length_size) {
+                if (current_cycle_len > max_cycle_length) {
                     continue;
                 }
             } else {
@@ -78,15 +77,17 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
 }  // namespace
 
 StatusOr<ColumnPtr> CelonisShortenedVariant::celonis_shortened_variant(FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(columns.size(), 2);
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     const Column* array = columns[0].get();
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
-
-    ColumnViewer<TYPE_BIGINT> cycle_length(columns[1]);
+    DCHECK_GT(columns[1]->size(), 0);
+    ColumnViewer<TYPE_BIGINT> max_cycle_len_col(columns[1]);
+    int64_t max_cycle_length = max_cycle_len_col.value(0);
     ColumnPtr result = celonis_shortened_variant_impl(*array_data.elements, *array_data.offsets,
                                                       array_data.null_elements, array_data.null_arrays,
-                                                      cycle_length.value(0));
+                                                      max_cycle_length);
     if (array_data.null_arrays != nullptr) {
         return NullableColumn::create(std::move(result), down_cast<const NullableColumn*>(array)->null_column());
    }

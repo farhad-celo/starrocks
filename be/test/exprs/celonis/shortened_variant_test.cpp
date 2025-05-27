@@ -1,7 +1,6 @@
 #include "exprs/celonis/shortened_variant.h"
 
 #include "column/column_helper.h"
-#include "exprs/function_context.h"
 #include "util.h"
 
 #include <glog/logging.h>
@@ -21,18 +20,19 @@ protected:
 };
 
 TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_has_cycle) {
-    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    auto array_column = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     // Input data:
-    array->append_datum(DatumArray{"a", "b", "b", "b", "c"});
-    array->append_datum(DatumArray{"a", "b"});
-    array->append_datum(DatumArray{"b", "b"});
-    array->append_datum(DatumArray{"b"});
-    array->append_datum(DatumArray{"b", "b", "b", "a", "d", "d"});
+    array_column->append_datum(DatumArray{"a", "b", "b", "b", "c"});
+    array_column->append_datum(DatumArray{"a", "b"});
+    array_column->append_datum(DatumArray{"b", "b"});
+    array_column->append_datum(DatumArray{"b"});
+    array_column->append_datum(DatumArray{"b", "b", "b", "a", "d", "d"});
 
-    auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
-    modifier->append_datum(2L);
+    auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
+    max_cycle_length_column->append_datum(2L);
 
-    const auto result_sources = CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array, modifier}).value();
+    const auto result_sources = CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array_column,
+                                                                                             max_cycle_length_column}).value();
     ASSERT_EQ(5, result_sources->size());
     auto first_row = result_sources->get(0).get_array();
     EXPECT_EQ(4, first_row.size());
@@ -65,14 +65,15 @@ TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_has_cycle) {
 }
 
 TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_null_arrays) {
-    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
-    array->append_datum(DatumArray{Datum()});
-    array->append_datum(Datum());
-    array->append_datum(DatumArray{Datum(), "b", Datum(), "b", "b"});
-    array->append_datum(DatumArray{"b", Datum(), "b", Datum(), "b"});
-    auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
-    modifier->append_datum(2L);
-    const auto result_sources = CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array, modifier}).value();
+    auto array_column = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    array_column->append_datum(DatumArray{Datum()});
+    array_column->append_datum(Datum());
+    array_column->append_datum(DatumArray{Datum(), "b", Datum(), "b", "b"});
+    array_column->append_datum(DatumArray{"b", Datum(), "b", Datum(), "b"});
+    auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
+    max_cycle_length_column->append_datum(2L);
+    const auto result_sources = CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array_column,
+                                                                                             max_cycle_length_column}).value();
     ASSERT_EQ(4, result_sources->size());
     auto first_row = result_sources->get(0).get_array();
     EXPECT_EQ(0, first_row.size());
@@ -91,13 +92,14 @@ TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_null_arrays) {
 }
 
 TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_longer_cycle) {
-    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    auto array_column = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     // Input data:
-    array->append_datum(DatumArray{"b", "b", "b", "b", "c", "c", "c"});
-    auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
-    modifier->append_datum(3L);
+    array_column->append_datum(DatumArray{"b", "b", "b", "b", "c", "c", "c"});
+    auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
+    max_cycle_length_column->append_datum(3L);
 
-    const auto result_sources = CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array, modifier}).value();
+    const auto result_sources = CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array_column,
+                                                                                             max_cycle_length_column}).value();
     ASSERT_EQ(1, result_sources->size());
     auto first_row = result_sources->get(0).get_array();
     EXPECT_EQ(6, first_row.size());

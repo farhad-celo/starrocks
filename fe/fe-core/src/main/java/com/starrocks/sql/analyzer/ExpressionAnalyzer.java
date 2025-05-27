@@ -1077,6 +1077,17 @@ public class ExpressionAnalyzer {
 
         private void checkFunction(String fnName, FunctionCallExpr node, Type[] argumentTypes) {
             switch (fnName) {
+                case FunctionSet.CELONIS_SHORTENED_VARIANT: {
+                    if (!(node.getChild(1) instanceof IntLiteral)) {
+                        throw new SemanticException(
+                                fnName + " requires second parameter must be a constant interval", node.getPos());
+                    }
+                    if (((IntLiteral) node.getChild(1)).getValue() <= 0) {
+                        throw new SemanticException(
+                                fnName + " requires second parameter must be positive", node.getPos());
+                    }
+                    break;
+                }
                 case FunctionSet.CELONIS_STRING_TO_DOUBLE: {
                     if (node.getChildren().size() != 1) {
                         throw new SemanticException(fnName + " should have one input", node.getPos());
