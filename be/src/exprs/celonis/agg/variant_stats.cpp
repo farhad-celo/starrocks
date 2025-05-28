@@ -70,10 +70,10 @@ void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_to
     for (auto it = variant_map_.cbegin(); it != variant_map_.cend(); it++) {
         v_count[index++] = it;
     }
-    LOG(INFO) << log_prefix(query_id) << ": started variants sorting\n";
+    LOG(INFO) << get_log_prefix(query_id) << ": started variants sorting\n";
     std::sort(v_count.begin(), v_count.end(),
               [](const VRef& lhs, const VRef& rhs) { return lhs->second > rhs->second; });
-    LOG(INFO) << log_prefix(query_id) << ": done variants sorting (variant_map_ size = " << variant_map_.size()
+    LOG(INFO) << get_log_prefix(query_id) << ": done variants sorting (variant_map_ size = " << variant_map_.size()
               << ")\n";
 
     // 2. find a happy variant
@@ -317,7 +317,7 @@ VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_
             }
             *statistics_proto.add_top() = entry;
         }
-        LOG(INFO) << log_prefix(query_id) << ": total number of top variants = " << total_variants << "\n";
+        LOG(INFO) << get_log_prefix(query_id) << ": total number of top variants = " << total_variants << "\n";
     }
     // Happy path
     celonis::accelerator::VariantCountPair count_pair;
@@ -347,16 +347,16 @@ VariantStatsFinalizer::to_string(const std::vector<VList>& activity_top_variants
     }
 }
 
-std::string VariantStatsFinalizer::log_prefix(const std::string& query_id) const {
+std::string VariantStatsFinalizer::get_log_prefix(const std::string& query_id) const {
     return "CELONIS_VARIANT_STATS (" + query_id + ")";
 }
 
 std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx) {
     const std::string query_id = print_id(ctx->state()->query_id());
-    LOG(INFO) << log_prefix(query_id) << ": merging_seconds = " << merging_microseconds_ / 1000000.0 << " seconds."
-              << std::endl;
-    LOG(INFO) << log_prefix(query_id) << ": merging_bytes = " << merging_bytes_ << " bytes." << std::endl;
-    LOG(INFO) << log_prefix(query_id) << ": number of states merged = " << merging_states_ << std::endl;
+    const std::string log_prefix = get_log_prefix(query_id);
+    LOG(INFO) << log_prefix << ": merging_seconds = " << merging_microseconds_ / 1000000.0 << " seconds." << std::endl;
+    LOG(INFO) << log_prefix << ": merging_bytes = " << merging_bytes_ << " bytes." << std::endl;
+    LOG(INFO) << log_prefix << ": number of states merged = " << merging_states_ << std::endl;
     if (activity_map_.size() > std::numeric_limits<int16_t>::max()) {
         ctx->set_error(std::string(
                                "CELONIS_VARIANT_STATS: the size of activity_map is " + std::to_string(activity_map_.size()) +
@@ -371,8 +371,7 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     }
 
     std::vector<size_t> a_lastseen(activity_map_.size());
-    std::map<std::pair<int32_t, int32_t>, std::pair<int32_t, int32_t>> edge_stats;
-    LOG(INFO) << log_prefix(query_id) << ": started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
+    LOG(INFO) << log_prefix << ": started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
     for (const auto& [variant, count]: variant_map_) {
         for (int i = 0; i < variant.data.size(); i++) {
             auto activity_id = variant.data[i];
@@ -403,22 +402,20 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
         ctx->set_error("variant_stats detects cancelled.", false);
         return std::nullopt;
     }
-    LOG(INFO) << log_prefix(query_id) << ": done traversing variant_map_\n";
-    LOG(INFO) << log_prefix(query_id) << ": (done traversing variant_map) size of activity_stats_ = "
-              << activity_stats_.size() << "\n";
-    LOG(INFO) << log_prefix(query_id) << ": (done traversing variant_map) size of edge_map_ = " << edge_map_.size()
-              << "\n";
-    LOG(INFO) << log_prefix(query_id) << ": started finding top\n";
+    LOG(INFO) << log_prefix << ": done traversing variant_map\n";
+    LOG(INFO) << log_prefix << ": size of activity_stats_ = " << activity_stats_.size() << "\n";
+    LOG(INFO) << log_prefix << ": size of edge_map_ = " << edge_map_.size() << "\n";
+    LOG(INFO) << log_prefix << ": started finding top\n";
     std::vector<VList> activity_top_variants;
     VRef happy;
     compute_top_variants(activity_top_variants, happy, query_id);
-    LOG(INFO) << log_prefix(query_id) << ": done finding top (activity_top_variants size = "
+    LOG(INFO) << log_prefix << ": done finding top (activity_top_variants size = "
               << activity_top_variants.size()
               << ")\n";
-    LOG(INFO) << log_prefix(query_id) << ": started to_string\n";
+    LOG(INFO) << log_prefix << ": started to_string\n";
     auto rv = to_string(activity_top_variants, happy, query_id);
     if (rv.has_value()) {
-        LOG(INFO) << log_prefix(query_id) << ": done to_string (length = " << rv->size() << ")\n";
+        LOG(INFO) << log_prefix << ": done to_string (length = " << rv->size() << ")\n";
     } else {
         ctx->set_error(std::string("CELONIS_VARIANT_STATS: output string size exceeds the limit (100M)").c_str(),
                        false);

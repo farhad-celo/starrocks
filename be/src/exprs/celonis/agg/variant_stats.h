@@ -128,7 +128,7 @@ private:
     to_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
               const std::string& query_id) const;
 
-    std::string log_prefix(const std::string& query_id) const;
+    std::string get_log_prefix(const std::string& query_id) const;
 
     // Computes the variant that starts and ends with the most common start/end activities,
     // otherwise returns the top most frequent activity.

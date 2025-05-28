@@ -528,7 +528,7 @@ public:
 
 private:
 
-    std::string log_prefix(const std::string& query_id) const;
+    std::string get_log_prefix(const std::string& query_id) const;
 
 };
 

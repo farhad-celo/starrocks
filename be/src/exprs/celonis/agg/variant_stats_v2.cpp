@@ -362,7 +362,7 @@ CelonisVariantStatsAggregateV2State::to_string(const std::vector<std::vector<siz
     }
 }
 
-std::string CelonisVariantStateV2AggregationFunction::log_prefix(const std::string& query_id) const {
+std::string CelonisVariantStateV2AggregationFunction::get_log_prefix(const std::string& query_id) const {
     return "CELONIS_VARIANT_STATS_V2 (" + query_id + ")";
 }
 
@@ -416,10 +416,11 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
     });
     auto& state_impl = this->data(state);
     const std::string query_id = print_id(ctx->state()->query_id());
-    LOG(INFO) << log_prefix(query_id) << ": merging_seconds = " << state_impl.merging_microseconds() / 1000000.0
+    const std::string log_prefix = get_log_prefix(query_id);
+    LOG(INFO) << log_prefix << ": merging_seconds = " << state_impl.merging_microseconds() / 1000000.0
               << " seconds." << std::endl;
-    LOG(INFO) << log_prefix(query_id) << ": merging_bytes = " << state_impl.merging_bytes() << " bytes." << std::endl;
-    LOG(INFO) << log_prefix(query_id) << ": number of states merged = " << state_impl.merging_states() << std::endl;
+    LOG(INFO) << log_prefix << ": merging_bytes = " << state_impl.merging_bytes() << " bytes." << std::endl;
+    LOG(INFO) << log_prefix << ": number of states merged = " << state_impl.merging_states() << std::endl;
 
     if (state_impl.activity_array().size() > static_cast<size_t>(std::numeric_limits<int16_t>::max())) {
         ctx->set_error(std::string(
@@ -441,17 +442,16 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
         ctx->set_error("variant_stats_v2 detects cancelled.", false);
         return;
     }
-    LOG(INFO) << log_prefix(query_id) << ": started finding top\n";
+    LOG(INFO) << log_prefix << ": started finding top\n";
     std::vector<std::vector<size_t>> activity_top_variants;
     size_t happy;
     state_impl.compute_top_variants(activity_top_variants, happy);
-    LOG(INFO) << log_prefix(query_id) << ": done finding top (activity_top_variants size = "
-              << activity_top_variants.size()
+    LOG(INFO) << log_prefix << ": done finding top (activity_top_variants size = " << activity_top_variants.size()
               << ")\n";
-    LOG(INFO) << log_prefix(query_id) << ": started to_string\n";
+    LOG(INFO) << log_prefix << ": started to_string\n";
     auto rv = state_impl.to_string(activity_top_variants, happy);
     if (rv.has_value()) {
-        LOG(INFO) << log_prefix(query_id) << ": done to_string (length = " << rv->size() << ")\n";
+        LOG(INFO) << log_prefix << ": done to_string (length = " << rv->size() << ")\n";
         output = rv.value();
     } else {
         ctx->set_error(std::string("CELONIS_VARIANT_STATS_V2: output string size exceeds the limit (100M)").c_str(),
