@@ -13,37 +13,37 @@
 namespace starrocks {
 
 /*
-2025-01-06T21:46:21+00:00
+2025-05-28T01:38:40+00:00
 Running ./be/build_Release/src/bench/celonis/output/null_to_empty_bench
-Run on (32 X 2445.43 MHz CPU s)
+Run on (32 X 3018.74 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 8.47, 8.21, 5.03
-// Args: Number of rows / Array length / Null percentage
+Load Average: 4.79, 3.89, 2.41
+// Args: Number of rows / Array length / Null elements percentage
 -------------------------------------------------------------------------------------------------------
 Benchmark                                             Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------------------
-BM_NullToEmpty/1000/10/0/iterations:2000           1905 ns         1808 ns         2000 RowInvRate=1.80776ns
-BM_NullToEmpty/10000/10/0/iterations:2000          2985 ns         2787 ns         2000 RowInvRate=278.706ps
-BM_NullToEmpty/100000/10/0/iterations:2000         6093 ns         5636 ns         2000 RowInvRate=56.3634ps
-BM_NullToEmpty/1000/100/0/iterations:2000          2785 ns         2609 ns         2000 RowInvRate=2.60858ns
-BM_NullToEmpty/10000/100/0/iterations:2000        43420 ns        42894 ns         2000 RowInvRate=4.28937ns
-BM_NullToEmpty/100000/100/0/iterations:2000      491110 ns       489838 ns         2000 RowInvRate=4.89838ns
-BM_NullToEmpty/1000/10/10/iterations:2000          6122 ns         6045 ns         2000 RowInvRate=6.04522ns
-BM_NullToEmpty/10000/10/10/iterations:2000        46332 ns        46340 ns         2000 RowInvRate=4.634ns
-BM_NullToEmpty/100000/10/10/iterations:2000      432625 ns       432665 ns         2000 RowInvRate=4.32665ns
-BM_NullToEmpty/1000/100/10/iterations:2000         5856 ns         5858 ns         2000 RowInvRate=5.85778ns
-BM_NullToEmpty/10000/100/10/iterations:2000       45701 ns        45702 ns         2000 RowInvRate=4.57015ns
-BM_NullToEmpty/100000/100/10/iterations:2000     433832 ns       433863 ns         2000 RowInvRate=4.33863ns
+BM_NullToEmpty/1000/10/0/iterations:2000           1869 ns         1751 ns         2000 RowInvRate=1.7508ns
+BM_NullToEmpty/10000/10/0/iterations:2000          2921 ns         2731 ns         2000 RowInvRate=273.124ps
+BM_NullToEmpty/100000/10/0/iterations:2000         5422 ns         5010 ns         2000 RowInvRate=50.1029ps
+BM_NullToEmpty/1000/100/0/iterations:2000          2443 ns         2286 ns         2000 RowInvRate=2.28569ns
+BM_NullToEmpty/10000/100/0/iterations:2000        40424 ns        40300 ns         2000 RowInvRate=4.03001ns
+BM_NullToEmpty/100000/100/0/iterations:2000      485913 ns       484465 ns         2000 RowInvRate=4.84465ns
+BM_NullToEmpty/1000/10/10/iterations:2000         49248 ns        49252 ns         2000 RowInvRate=49.2518ns
+BM_NullToEmpty/10000/10/10/iterations:2000       456958 ns       456969 ns         2000 RowInvRate=45.6969ns
+BM_NullToEmpty/100000/10/10/iterations:2000     5014906 ns      5014640 ns         2000 RowInvRate=50.1464ns
+BM_NullToEmpty/1000/100/10/iterations:2000       179715 ns       179734 ns         2000 RowInvRate=179.734ns
+BM_NullToEmpty/10000/100/10/iterations:2000     2579224 ns      2579152 ns         2000 RowInvRate=257.915ns
+BM_NullToEmpty/100000/100/10/iterations:2000   49168663 ns     49164198 ns         2000 RowInvRate=491.642ns
 */
 
 static void BM_NullToEmpty(benchmark::State& state) {
     int num_rows = state.range(0);
     int array_length = state.range(1);
-    bool null_probability = state.range(2) / 100.0;
+    double null_probability = state.range(2) / 100.0;
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)))};
@@ -88,7 +88,7 @@ static void BM_NullToEmpty(benchmark::State& state) {
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
 
-// Args: Number of rows / Array length / Null percentage
+// Args: Number of rows / Array length / Null elements percentage
 BENCHMARK(BM_NullToEmpty)->ArgsProduct({{1000, 10000, 100000}, {10, 100}, {0, 10}})->Iterations(2000);
 
 } // namespace starrocks
