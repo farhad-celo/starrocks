@@ -408,10 +408,16 @@ public:
             return;
         }
         auto row_accessor = celonis::SerializedRowAccessor{ctx, state_impl.buffer.data(), state_impl.buffer.size()};
-        if (row_accessor.seek_and_is_null()) {
-            to->append_default();
-            return;
+        // If the value is NULL or an order by column is NULL, we return NULL.
+        for (int i = 0; i < ctx->get_num_args(); ++i) {
+            if (row_accessor.seek_and_is_null()) {
+                to->append_default();
+                return;
+            }
+            row_accessor.get();  // This must be called once if not null to move the pointer.
         }
+        row_accessor.rewind();
+        row_accessor.seek_and_is_null();
         to->append_datum(row_accessor.get());
     }
 
