@@ -1077,6 +1077,15 @@ public class ExpressionAnalyzer {
 
         private void checkFunction(String fnName, FunctionCallExpr node, Type[] argumentTypes) {
             switch (fnName) {
+                case FunctionSet.CELONIS_BUILD_ABC_MODEL: {
+                    var inputColumnType = node.getChild(0).getType();
+                    if (!inputColumnType.isIntegerType() && !inputColumnType.isFloatingPointType()) {
+                        throw new SemanticException(
+                                fnName + ": Input column must be of type INT or FLOAT, but got [" + inputColumnType + "]",
+                                node.getPos());
+                    }
+                    break;
+                }
                 case FunctionSet.CELONIS_SHORTENED_VARIANT: {
                     if (!(node.getChild(1) instanceof IntLiteral)) {
                         throw new SemanticException(
