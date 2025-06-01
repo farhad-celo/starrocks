@@ -54,6 +54,10 @@ CONF_mBool(enable_workday_mask_in_workday_calendar, "true");
 // When the number of elements of (multi_)array_agg exceeds this limit, fail the query.
 CONF_mInt64(array_agg_size_limit, "4294967296"); // 2^32
 
+// If number of rows (in a group) <= multi_array_agg_serialization_threshold, use `serialized_data` to manage the data
+// in MultiArrayAggAggregateState.
+CONF_mInt32(multi_array_agg_serialization_threshold, "2");
+
 // End of Celonis configures
 
 

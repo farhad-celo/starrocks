@@ -2529,6 +2529,8 @@ TypeDescriptor logical_types_to_struct_type(const std::vector<LogicalType>& logi
 }
 
 TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
+    const int32_t multi_array_agg_serialization_threshold = config::multi_array_agg_serialization_threshold;
+    config::multi_array_agg_serialization_threshold = 10;
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
@@ -2536,8 +2538,8 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
     auto return_type = AnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR}));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
-    std::vector<bool> is_asc_order{0};
-    std::vector<bool> nulls_first{1};
+    std::vector<bool> is_asc_order{false};
+    std::vector<bool> nulls_first{true};
     local_ctx->set_is_asc_order(is_asc_order);
     local_ctx->set_nulls_first(nulls_first);
     local_ctx->set_runtime_state(runtime_state.get());
@@ -2576,10 +2578,15 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         array_agg_func->update_batch_single_state(local_ctx.get(), int_column->size(), raw_columns.data(),
                                                   state->state());
         auto agg_state = (MultiArrayAggAggregateState*) (state->state());
-        ASSERT_EQ(agg_state->data_columns.size(), 2);
-        // data_columns in state are nullable
-        ASSERT_EQ((agg_state->data_columns)[0]->debug_string(), char_column->debug_string());
-        ASSERT_EQ((agg_state->data_columns)[1]->debug_string(), int_column->debug_string());
+        ASSERT_EQ(agg_state->data_columns.size(), 0);
+        Columns data_columns;
+        data_columns.reserve(2);
+        for(auto i = 0; i < 2; ++i) {
+            data_columns.emplace_back(local_ctx->create_column(*local_ctx->get_arg_type(i), true));
+        }
+        agg_state->deserialize_data(data_columns);
+        EXPECT_EQ(data_columns[0]->debug_string(), char_column->debug_string());
+        EXPECT_EQ(data_columns[1]->debug_string(), int_column->debug_string());
 
         TypeDescriptor type_array_char;
         type_array_char.type = LogicalType::TYPE_ARRAY;
@@ -2597,7 +2604,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         type_struct_char_int.field_names.emplace_back("int");
         auto serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
         array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
-        ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+        EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                          "[{vchar:[NULL,'bcd','cdrdfe',NULL,'esfg'],int:[NULL,9,NULL,7,6]}]"), 0);
 
         state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
@@ -2606,14 +2613,14 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
 
         serialized_col->resize(0);
         array_agg_func->convert_to_serialize_format(local_ctx.get(), columns, int_column->size(), &serialized_col);
-        ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+        EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                          "[{vchar:[NULL],int:[NULL]}, {vchar:['bcd'],int:[9]}, {vchar:['cdrdfe'],int:[NULL]}, "
                          "{vchar:[NULL],int:[7]}, {vchar:['esfg'],int:[6]}]"),
                   0);
 
         auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR}), true);
         array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
-        ASSERT_EQ(strcmp(res_col->debug_string().c_str(), "[{col0:[NULL,'cdrdfe','bcd',NULL,'esfg']}]"), 0);
+        EXPECT_EQ(strcmp(res_col->debug_string().c_str(), "[{col0:[NULL,'cdrdfe','bcd',NULL,'esfg']}]"), 0);
     }
     // nullable columns input with cancelled
     {
@@ -2646,10 +2653,15 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         array_agg_func->update_batch_single_state(local_ctx.get(), int_column->size(), raw_columns.data(),
                                                   state->state());
         auto agg_state = (MultiArrayAggAggregateState*) (state->state());
-        ASSERT_EQ(agg_state->data_columns.size(), 2);
-        // data_columns in state are nullable
-        ASSERT_EQ((agg_state->data_columns)[0]->debug_string(), char_column->debug_string());
-        ASSERT_EQ((agg_state->data_columns)[1]->debug_string(), int_column->debug_string());
+        ASSERT_EQ(agg_state->data_columns.size(), 0);
+        Columns data_columns;
+        data_columns.reserve(2);
+        for(auto i = 0; i < 2; ++i) {
+            data_columns.emplace_back(local_ctx->create_column(*local_ctx->get_arg_type(i), true));
+        }
+        agg_state->deserialize_data(data_columns);
+        EXPECT_EQ(data_columns[0]->debug_string(), char_column->debug_string());
+        EXPECT_EQ(data_columns[1]->debug_string(), int_column->debug_string());
 
         TypeDescriptor type_array_char;
         type_array_char.type = LogicalType::TYPE_ARRAY;
@@ -2667,7 +2679,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         type_struct_char_int.field_names.emplace_back("int");
         auto serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
         array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
-        ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+        EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                          "[{vchar:[NULL,'bcd','cdrdfe',NULL,'esfg'],int:[NULL,9,NULL,7,6]}]"), 0);
 
         state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
@@ -2675,7 +2687,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
                                                  serialized_col->size());
         serialized_col->resize(0);
         array_agg_func->convert_to_serialize_format(local_ctx.get(), columns, int_column->size(), &serialized_col);
-        ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+        EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                          "[{vchar:[NULL],int:[NULL]}, {vchar:['bcd'],int:[9]}, {vchar:['cdrdfe'],int:[NULL]}, "
                          "{vchar:[NULL],int:[7]}, {vchar:['esfg'],int:[6]}]"), 0);
 
@@ -2684,9 +2696,12 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
         ASSERT_TRUE(local_ctx->has_error());
     }
+    config::multi_array_agg_serialization_threshold = multi_array_agg_serialization_threshold;
 }
 
 TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
+    const int32_t multi_array_agg_serialization_threshold = config::multi_array_agg_serialization_threshold;
+    config::multi_array_agg_serialization_threshold = 10;
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
@@ -2695,8 +2710,8 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
     auto return_type = AnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
-    std::vector<bool> is_asc_order{0};
-    std::vector<bool> nulls_first{1};
+    std::vector<bool> is_asc_order{false};
+    std::vector<bool> nulls_first{true};
     local_ctx->set_is_asc_order(is_asc_order);
     local_ctx->set_nulls_first(nulls_first);
     local_ctx->set_runtime_state(runtime_state.get());
@@ -2742,11 +2757,16 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
     array_agg_func->update_batch_single_state(local_ctx.get(), int_column->size(), raw_columns.data(),
                                               state->state());
     auto agg_state = (MultiArrayAggAggregateState*) (state->state());
-    ASSERT_EQ(agg_state->data_columns.size(), 3);
-    // data_columns in state are nullable
-    ASSERT_EQ((agg_state->data_columns)[0]->debug_string(), char_column_1->debug_string());
-    ASSERT_EQ((agg_state->data_columns)[1]->debug_string(), char_column_2->debug_string());
-    ASSERT_EQ((agg_state->data_columns)[2]->debug_string(), int_column->debug_string());
+    ASSERT_EQ(agg_state->data_columns.size(), 0);
+    Columns data_columns;
+    data_columns.reserve(3);
+    for(auto i = 0; i < 3; ++i) {
+        data_columns.emplace_back(local_ctx->create_column(*local_ctx->get_arg_type(i), true));
+    }
+    agg_state->deserialize_data(data_columns);
+    EXPECT_EQ(data_columns[0]->debug_string(), char_column_1->debug_string());
+    EXPECT_EQ(data_columns[1]->debug_string(), char_column_2->debug_string());
+    EXPECT_EQ(data_columns[2]->debug_string(), int_column->debug_string());
 
     TypeDescriptor type_array_char;
     type_array_char.type = LogicalType::TYPE_ARRAY;
@@ -2766,7 +2786,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
     type_struct_char_char_int.field_names.emplace_back("int");
     auto serialized_col = ColumnHelper::create_column(type_struct_char_char_int, true);
     array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
-    ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+    EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                      "[{vchar1:[NULL,'bcd','cdrdfe',NULL,'esfg'],"
                      "vchar2:[NULL,'bcd2','cdrdfe2',NULL,'esfg2'],int:[NULL,9,NULL,7,6]}]"), 0);
 
@@ -2776,15 +2796,136 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
 
     serialized_col->resize(0);
     array_agg_func->convert_to_serialize_format(local_ctx.get(), columns, int_column->size(), &serialized_col);
-    ASSERT_EQ(strcmp(serialized_col->debug_string().c_str(),
+    EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                      "[{vchar1:[NULL],vchar2:[NULL],int:[NULL]}, {vchar1:['bcd'],vchar2:['bcd2'],int:[9]}, "
                      "{vchar1:['cdrdfe'],vchar2:['cdrdfe2'],int:[NULL]}, {vchar1:[NULL],vchar2:[NULL],int:[7]}, "
                      "{vchar1:['esfg'],vchar2:['esfg2'],int:[6]}]"), 0);
 
     auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}), true);
     array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
-    ASSERT_EQ(strcmp(res_col->debug_string().c_str(),
+    EXPECT_EQ(strcmp(res_col->debug_string().c_str(),
                      "[{col0:[NULL,'cdrdfe','bcd',NULL,'esfg'],col1:[NULL,'cdrdfe2','bcd2',NULL,'esfg2']}]"), 0);
+    config::multi_array_agg_serialization_threshold = multi_array_agg_serialization_threshold;
+}
+
+TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
+    const int32_t multi_array_agg_serialization_threshold = config::multi_array_agg_serialization_threshold;
+    config::multi_array_agg_serialization_threshold = 10;
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+
+    auto return_type = AnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    std::vector<bool> is_asc_order{false};
+    std::vector<bool> nulls_first{true};
+    local_ctx->set_is_asc_order(is_asc_order);
+    local_ctx->set_nulls_first(nulls_first);
+    local_ctx->set_runtime_state(runtime_state.get());
+
+    const AggregateFunction* array_agg_func = get_aggregate_function("multi_array_agg", TYPE_VARCHAR, TYPE_STRUCT,
+                                                                     false);
+    auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+
+    auto char_type = TypeDescriptor::create_varchar_type(30);
+    auto char_column_1 = ColumnHelper::create_column(char_type, true);
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("A");
+    char_column_1->append_datum("B");
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("C");
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("D");
+    char_column_1->append_datum("E");
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("F");
+    char_column_1->append_datum("G");
+
+    auto char_column_2 = ColumnHelper::create_column(char_type, true);
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("a");
+    char_column_2->append_datum("b");
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("c");
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("d");
+    char_column_2->append_datum("e");
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("f");
+    char_column_2->append_datum("g");
+
+    auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
+    auto int_column = ColumnHelper::create_column(int_type, true);
+    int_column->append_datum(Datum());
+    int_column->append_datum(1);
+    int_column->append_datum(Datum());
+    int_column->append_datum(2);
+    int_column->append_datum(3);
+    int_column->append_datum(Datum());
+    int_column->append_datum(4);
+    int_column->append_datum(Datum());
+    int_column->append_datum(5);
+    int_column->append_datum(6);
+    int_column->append_datum(7);
+
+    std::vector<const Column*> raw_columns;
+    std::vector<ColumnPtr> columns;
+    columns.push_back(char_column_1);
+    columns.push_back(char_column_2);
+    columns.push_back(int_column);
+    raw_columns.resize(3);
+    raw_columns[0] = char_column_1.get();
+    raw_columns[1] = char_column_2.get();
+    raw_columns[2] = int_column.get();
+
+    // test update
+    array_agg_func->update_batch_single_state(local_ctx.get(), int_column->size(), raw_columns.data(),
+                                              state->state());
+    auto agg_state = (MultiArrayAggAggregateState*) (state->state());
+    ASSERT_EQ(agg_state->data_columns.size(), 3);
+    // data_columns in state are nullable
+    EXPECT_EQ((agg_state->data_columns)[0]->debug_string(), char_column_1->debug_string());
+    EXPECT_EQ((agg_state->data_columns)[1]->debug_string(), char_column_2->debug_string());
+    EXPECT_EQ((agg_state->data_columns)[2]->debug_string(), int_column->debug_string());
+
+    TypeDescriptor type_array_char;
+    type_array_char.type = LogicalType::TYPE_ARRAY;
+    type_array_char.children.emplace_back(TypeDescriptor(LogicalType::TYPE_VARCHAR));
+
+    TypeDescriptor type_array_int;
+    type_array_int.type = LogicalType::TYPE_ARRAY;
+    type_array_int.children.emplace_back(TypeDescriptor(LogicalType::TYPE_INT));
+
+    TypeDescriptor type_struct_char_char_int;
+    type_struct_char_char_int.type = LogicalType::TYPE_STRUCT;
+    type_struct_char_char_int.children.emplace_back(type_array_char);
+    type_struct_char_char_int.children.emplace_back(type_array_char);
+    type_struct_char_char_int.children.emplace_back(type_array_int);
+    type_struct_char_char_int.field_names.emplace_back("vchar1");
+    type_struct_char_char_int.field_names.emplace_back("vchar2");
+    type_struct_char_char_int.field_names.emplace_back("int");
+    auto serialized_col = ColumnHelper::create_column(type_struct_char_char_int, true);
+    array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
+    EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
+                     "[{vchar1:[NULL,'A','B',NULL,'C',NULL,'D','E',NULL,'F','G'],"
+                     "vchar2:[NULL,'a','b',NULL,'c',NULL,'d','e',NULL,'f','g'],int:[NULL,1,NULL,2,3,NULL,4,NULL,5,6,7]}]"), 0);
+
+    state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+    array_agg_func->merge_batch_single_state(local_ctx.get(), state->state(), serialized_col.get(), 0,
+                                             serialized_col->size());
+
+    serialized_col->resize(0);
+    array_agg_func->convert_to_serialize_format(local_ctx.get(), columns, int_column->size(), &serialized_col);
+    EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
+                     "[{vchar1:[NULL],vchar2:[NULL],int:[NULL]}, {vchar1:['A'],vchar2:['a'],int:[1]}, {vchar1:['B'],vchar2:['b'],int:[NULL]}, {vchar1:[NULL],vchar2:[NULL],int:[2]}, {vchar1:['C'],vchar2:['c'],int:[3]}, {vchar1:[NULL],vchar2:[NULL],int:[NULL]}, {vchar1:['D'],vchar2:['d'],int:[4]}, {vchar1:['E'],vchar2:['e'],int:[NULL]}, {vchar1:[NULL],vchar2:[NULL],int:[5]}, {vchar1:['F'],vchar2:['f'],int:[6]}, {vchar1:['G'],vchar2:['g'],int:[7]}]"), 0);
+
+    auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}), true);
+    array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
+    EXPECT_EQ(strcmp(res_col->debug_string().c_str(),
+                     "[{col0:[NULL,'E','B',NULL,'G','F',NULL,'D','C',NULL,'A'],col1:[NULL,'e','b',NULL,'g','f',NULL,'d','c',NULL,'a']}]"), 0);
+    config::multi_array_agg_serialization_threshold = multi_array_agg_serialization_threshold;
 }
 
 } // namespace starrocks

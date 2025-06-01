@@ -32,17 +32,78 @@ namespace starrocks {
 // input columns result in intermediate result: struct{array[col0], array[col1], array[col2]... array[coln]}
 struct MultiArrayAggAggregateState {
 
-    MultiArrayAggAggregateState(): size_limit(config::array_agg_size_limit) {}
+    MultiArrayAggAggregateState() : size_limit(config::array_agg_size_limit),
+                                    serialization_threshold(config::multi_array_agg_serialization_threshold) {}
+
+    void create_columns(FunctionContext* ctx) {
+        auto num = ctx->get_num_args();
+        data_columns.reserve(num);
+        for (auto i = 0; i < num; ++i) {
+            data_columns.emplace_back(ctx->create_column(*ctx->get_arg_type(i), true));
+        }
+    };
+
+    void clear_serialized_data() {
+        serialized_data.clear();
+        num_serialized_rows = 0;
+    }
 
     bool size_limit_reached() const {
-        return !data_columns.empty() && data_columns[0]->size() > size_limit;
+        return (!data_columns.empty() && data_columns[0]->size() > size_limit) || num_serialized_rows > size_limit;
     }
 
-    void update(const Column& column, size_t index, size_t offset, size_t count) {
-        data_columns[index]->append(column, offset, count);
+    void deserialize_data(const Columns& columns) {
+        const uint8_t* pos = serialized_data.data();
+        auto end = pos + serialized_data.size();
+        while (pos < end) {
+            size_t index;
+            memcpy(&index, pos, sizeof(size_t));
+            pos += sizeof(size_t);
+            size_t count;
+            memcpy(&count, pos, sizeof(size_t));
+            pos += sizeof(size_t);
+            for (auto i = 0; i < count; ++i) {
+                pos = columns[index]->deserialize_and_append(pos);
+            }
+        }
+        DCHECK_EQ(pos, end);
     }
 
-    void update_nulls(size_t index, size_t count) { data_columns[index]->append_nulls(count); }
+    void init_columns(FunctionContext* ctx) {
+        create_columns(ctx);
+        deserialize_data(data_columns);
+        clear_serialized_data();
+    }
+
+    void update(FunctionContext* ctx, const Column& column, size_t index, size_t offset, size_t count) {
+        // switch to use data_columns
+        if (data_columns.empty() && num_serialized_rows + count > serialization_threshold) {
+            init_columns(ctx);
+        }
+        if (data_columns.empty()) {
+            // TODO(y.zhang): Get rid of the overhead.
+            // We can not use column->serialize(...) to serialize the data directly. serialize() is not a const method.
+            auto temp_column = ctx->create_column(*ctx->get_arg_type(index), true);
+            temp_column->append(column, offset, count);
+            serialize_data(temp_column, index, 0, count);
+        } else {
+            data_columns[index]->append(column, offset, count);
+        }
+    }
+
+    void update_nulls(FunctionContext* ctx, size_t index, size_t count) {
+        // switch to use data_columns
+        if (data_columns.empty() && num_serialized_rows + count > serialization_threshold) {
+            init_columns(ctx);
+        }
+        if (data_columns.empty()) {
+            auto temp_column = ctx->create_column(*ctx->get_arg_type(index), true);
+            temp_column->append_nulls(count);
+            serialize_data(temp_column, index, 0, count);
+        } else {
+            data_columns[index]->append_nulls(count);
+        }
+    }
 
     bool check_overflow(FunctionContext* ctx) const {
         std::string err_msg;
@@ -84,8 +145,41 @@ struct MultiArrayAggAggregateState {
 
     // using pointer rather than vector to avoid variadic size
     // multi_array_agg(a, b order by c, d), the a,b,c,d are put into data_columns in order.
+    // When the number of rows is small, it is not memory efficient to use data_columns.
+    // If number of rows <= serialization_threshold, serialized_data is used to manage the data.
     Columns data_columns;
     int64_t size_limit;
+    int32_t serialization_threshold;
+    std::vector<uint8> serialized_data;
+    int32_t num_serialized_rows = 0;
+
+private:
+
+    void serialize_data(const ColumnPtr& column, size_t index, size_t offset, size_t count) {
+        // size_t index,
+        // size_t count,
+        // serialize elements in [offset, offset + count)
+        if (index == 0) {
+            num_serialized_rows += count;
+        }
+        size_t req_size = sizeof(size_t) * 2;
+        for (auto i = offset; i < offset + count; ++i) {
+            req_size += column->serialize_size(i);
+        }
+        auto old_size = serialized_data.size();
+        serialized_data.resize(old_size + req_size);
+        auto pos = serialized_data.data() + old_size;
+        memcpy(pos, &index, sizeof(size_t));
+        pos += sizeof(index);
+        memcpy(pos, &count, sizeof(size_t));
+        pos += sizeof(count);
+        for (auto i = offset; i < offset + count; ++i) {
+            auto size_written = column->serialize(i, pos);
+            pos += size_written;
+        }
+        DCHECK_EQ(pos, serialized_data.data() + serialized_data.size());
+    }
+
 };
 
 class MultiArrayAggAggregateFunction
@@ -97,12 +191,8 @@ private:
 
 public:
     void create(FunctionContext* ctx, AggDataPtr __restrict ptr) const override {
-        auto num = ctx->get_num_args();
-        auto* state = new (ptr) MultiArrayAggAggregateState;
-        for (auto i = 0; i < num; ++i) {
-            state->data_columns.emplace_back(ctx->create_column(*ctx->get_arg_type(i), true));
-        }
-        DCHECK(state->data_columns.size() >= ctx->get_is_asc_order().size() + 1);
+        auto* state = new(ptr) MultiArrayAggAggregateState;
+        DCHECK(state->data_columns.empty());
     }
 
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const override {
@@ -112,6 +202,7 @@ public:
                 col->resize(0);
             }
         }
+        state_impl.clear_serialized_data();
     }
 
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
@@ -128,7 +219,7 @@ public:
             }
             // TODO: update is random access, so we could not pre-reserve memory for State, which is the bottleneck
             if ((columns[i]->is_nullable() && columns[i]->is_null(row_num)) || columns[i]->only_null()) {
-                this->data(state).update_nulls(i, 1);
+                this->data(state).update_nulls(ctx, i, 1);
                 continue;
             }
             auto* data_col = columns[i];
@@ -138,7 +229,7 @@ public:
                 data_col = down_cast<const ConstColumn*>(columns[i])->data_column().get();
                 tmp_row_num = 0;
             }
-            this->data(state).update(*data_col, i, tmp_row_num, 1);
+            this->data(state).update(ctx, *data_col, i, tmp_row_num, 1);
         }
     }
 
@@ -148,7 +239,7 @@ public:
         for (auto i = 0; i < input_columns.size(); ++i) {
             auto array_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns[i].get()));
             auto& offsets = array_column->offsets().get_data();
-            this->data(state).update(array_column->elements(), i, offsets[row_num],
+            this->data(state).update(ctx, array_column->elements(), i, offsets[row_num],
                                      offsets[row_num + 1] - offsets[row_num]);
         }
     }
@@ -160,22 +251,24 @@ public:
         if (UNLIKELY(state_impl.check_overflow(ctx))) {
             return;
         }
-
+        if (state_impl.data_columns.empty()) {
+            state_impl.init_columns(ctx);
+        }
         auto& columns = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
         if (to->is_nullable()) {
             down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
         }
         for (auto i = 0; i < columns.size(); ++i) {
-            auto elem_size = state_impl.data_columns[i]->size();
+            auto elem_size = state_impl.data_columns.at(i)->size();
             auto array_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(columns[i].get()));
             if (columns[i]->is_nullable()) {
                 down_cast<NullableColumn*>(columns[i].get())->null_column_data().emplace_back(0);
             }
-            if (state_impl.data_columns[i]->only_null()) {
+            if (state_impl.data_columns.at(i)->only_null()) {
                 array_col->elements_column()->append_nulls(elem_size);
             } else {
                 array_col->elements_column()->append(
-                        *ColumnHelper::unpack_and_duplicate_const_column(elem_size, state_impl.data_columns[i]), 0,
+                        *ColumnHelper::unpack_and_duplicate_const_column(elem_size, state_impl.data_columns.at(i)), 0,
                         elem_size);
             }
             auto& offsets = array_col->offsets_column()->get_data();
@@ -205,6 +298,9 @@ public:
             return;
         }
         auto& state_impl = this->data(const_cast<AggDataPtr>(state));
+        if (state_impl.data_columns.empty()) {
+            state_impl.init_columns(ctx);
+        }
         if (UNLIKELY(state_impl.size_limit_reached())) {
             ctx->set_error(("size limit (" + std::to_string(state_impl.size_limit) +
                             ") of multi_array_agg is reached").c_str());
