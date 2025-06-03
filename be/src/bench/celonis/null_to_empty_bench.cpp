@@ -13,31 +13,31 @@
 namespace starrocks {
 
 /*
-2025-05-28T01:38:40+00:00
+2025-06-01T16:46:02+00:00
 Running ./be/build_Release/src/bench/celonis/output/null_to_empty_bench
-Run on (32 X 3018.74 MHz CPU s)
+Run on (32 X 3236.83 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 4.79, 3.89, 2.41
+Load Average: 12.76, 7.19, 5.41
 // Args: Number of rows / Array length / Null elements percentage
 -------------------------------------------------------------------------------------------------------
 Benchmark                                             Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------------------
-BM_NullToEmpty/1000/10/0/iterations:2000           1869 ns         1751 ns         2000 RowInvRate=1.7508ns
-BM_NullToEmpty/10000/10/0/iterations:2000          2921 ns         2731 ns         2000 RowInvRate=273.124ps
-BM_NullToEmpty/100000/10/0/iterations:2000         5422 ns         5010 ns         2000 RowInvRate=50.1029ps
-BM_NullToEmpty/1000/100/0/iterations:2000          2443 ns         2286 ns         2000 RowInvRate=2.28569ns
-BM_NullToEmpty/10000/100/0/iterations:2000        40424 ns        40300 ns         2000 RowInvRate=4.03001ns
-BM_NullToEmpty/100000/100/0/iterations:2000      485913 ns       484465 ns         2000 RowInvRate=4.84465ns
-BM_NullToEmpty/1000/10/10/iterations:2000         49248 ns        49252 ns         2000 RowInvRate=49.2518ns
-BM_NullToEmpty/10000/10/10/iterations:2000       456958 ns       456969 ns         2000 RowInvRate=45.6969ns
-BM_NullToEmpty/100000/10/10/iterations:2000     5014906 ns      5014640 ns         2000 RowInvRate=50.1464ns
-BM_NullToEmpty/1000/100/10/iterations:2000       179715 ns       179734 ns         2000 RowInvRate=179.734ns
-BM_NullToEmpty/10000/100/10/iterations:2000     2579224 ns      2579152 ns         2000 RowInvRate=257.915ns
-BM_NullToEmpty/100000/100/10/iterations:2000   49168663 ns     49164198 ns         2000 RowInvRate=491.642ns
+BM_NullToEmpty/1000/10/0/iterations:2000           1807 ns         1716 ns         2000 RowInvRate=1.71637ns
+BM_NullToEmpty/10000/10/0/iterations:2000          3048 ns         2853 ns         2000 RowInvRate=285.291ps
+BM_NullToEmpty/100000/10/0/iterations:2000         6499 ns         6061 ns         2000 RowInvRate=60.6101ps
+BM_NullToEmpty/1000/100/0/iterations:2000          2952 ns         2759 ns         2000 RowInvRate=2.75928ns
+BM_NullToEmpty/10000/100/0/iterations:2000        44319 ns        43902 ns         2000 RowInvRate=4.39021ns
+BM_NullToEmpty/100000/100/0/iterations:2000      510906 ns       509300 ns         2000 RowInvRate=5.093ns
+BM_NullToEmpty/1000/10/10/iterations:2000          6678 ns         6639 ns         2000 RowInvRate=6.63852ns
+BM_NullToEmpty/10000/10/10/iterations:2000        50277 ns        50283 ns         2000 RowInvRate=5.02827ns
+BM_NullToEmpty/100000/10/10/iterations:2000      755666 ns       755605 ns         2000 RowInvRate=7.55605ns
+BM_NullToEmpty/1000/100/10/iterations:2000        48432 ns        48446 ns         2000 RowInvRate=48.4463ns
+BM_NullToEmpty/10000/100/10/iterations:2000      727975 ns       727758 ns         2000 RowInvRate=72.7758ns
+BM_NullToEmpty/100000/100/10/iterations:2000   17861678 ns     17838895 ns         2000 RowInvRate=178.389ns
 */
 
 static void BM_NullToEmpty(benchmark::State& state) {

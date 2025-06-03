@@ -599,16 +599,7 @@ public:
         const auto& input_data_column = input_nullable_column->data_column_ref();
 
         // It should return a non-nullable column because it is registered in celonisAlwaysReturnNonNullableFunctions.
-        ColumnPtr output_column = input_data_column.clone_empty();
-
-        for (size_t i = 0; i < n_rows; ++i) {
-            if (input_column->is_null(i)) {
-                output_column->append_default();
-            } else {
-                output_column->append(input_data_column, i, 1);
-            }
-        }
-        return output_column;
+        return input_data_column.clone();
     }
 };
 
