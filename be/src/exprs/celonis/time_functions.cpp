@@ -2041,7 +2041,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::timeunits_between_calendar(FunctionCon
 
 Status CelonisTimeFunctions::add_timeunits_calendar_prepare(FunctionContext* context,
                                                             FunctionContext::FunctionStateScope scope) {
-    RETURN_IF_ERROR(prepare(context, scope, 5, 3, std::nullopt));
+    RETURN_IF_ERROR(prepare(context, scope, 5, 3, 2));
     return Status::OK();
 }
 
@@ -2107,6 +2107,8 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_const([[maybe_unused]] Functio
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
     ColumnBuilder<TYPE_DATETIME> result(n_rows);
     const Calendar& calendar = calendar_state->calendar;
+    const std::string& time_unit = calendar_state->time_unit.value();
+    const bool is_calendar_empty = calendar_state->is_empty;
     for (size_t row = 0; row < n_rows; ++row) {
         if (timestamp_viewer.is_null(row) || add_value_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
             calendar_state->is_null) {
@@ -2118,14 +2120,12 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_const([[maybe_unused]] Functio
             result.append_null();
             continue;
         }
-        std::string time_unit = time_unit_viewer.value(row).to_string();
-        RETURN_IF_ERROR(validate_time_unit(time_unit));
         auto add_value = add_value_viewer.value(row);
         std::optional<std::string> calendar_id = std::nullopt;
         if (!calendar_id_viewer.is_null(row)) {
             calendar_id = calendar_id_viewer.value(row).to_string();
         }
-        if (calendar_state->is_empty) {
+        if (is_calendar_empty) {
             if (calendar_id.has_value()) {
                 return Status::InvalidArgument(
                         "Calendar ID column should not be set when calendar specification is not set.");

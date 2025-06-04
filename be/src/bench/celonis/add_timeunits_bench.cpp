@@ -14,31 +14,31 @@
 namespace starrocks {
 
 /*
-2025-03-12T21:15:12+00:00
+2025-06-01T22:32:43+00:00
 Running ./be/build_Release/src/bench/celonis/output/add_timeunits_bench
-Run on (32 X 2850.13 MHz CPU s)
+Run on (32 X 3244.17 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 7.38, 8.04, 9.69
+Load Average: 11.60, 7.17, 6.05
 // Args: Number of rows
 ------------------------------------------------------------------------------------
 Benchmark                          Time             CPU   Iterations UserCounters...
 ------------------------------------------------------------------------------------
-BM_AddMilliseconds/10000      710183 ns       710104 ns          972 RowInvRate=71.0104ns
-BM_AddMilliseconds/100000    7077739 ns      7077515 ns           99 RowInvRate=70.7752ns
-BM_AddSeconds/10000           741138 ns       741073 ns          944 RowInvRate=74.1073ns
-BM_AddSeconds/100000         7347378 ns      7346905 ns           95 RowInvRate=73.469ns
-BM_AddMinutes/10000           654764 ns       654645 ns         1069 RowInvRate=65.4645ns
-BM_AddMinutes/100000         6482653 ns      6482513 ns          108 RowInvRate=64.8251ns
-BM_AddHours/10000             560767 ns       560700 ns         1249 RowInvRate=56.07ns
-BM_AddHours/100000           5573275 ns      5572842 ns          124 RowInvRate=55.7284ns
-BM_AddDays/10000              440013 ns       439932 ns         1586 RowInvRate=43.9932ns
-BM_AddDays/100000            4370581 ns      4370406 ns          160 RowInvRate=43.7041ns
-BM_AddWorkdays/10000          452608 ns       452533 ns         1545 RowInvRate=45.2533ns
-BM_AddWorkdays/100000        4505190 ns      4504993 ns          155 RowInvRate=45.0499ns
+BM_AddMilliseconds/10000      476175 ns       476106 ns         1462 RowInvRate=47.6106ns
+BM_AddMilliseconds/100000    4724512 ns      4724544 ns          148 RowInvRate=47.2454ns
+BM_AddSeconds/10000           467941 ns       467878 ns         1468 RowInvRate=46.7878ns
+BM_AddSeconds/100000         4669530 ns      4669553 ns          150 RowInvRate=46.6955ns
+BM_AddMinutes/10000           380447 ns       380395 ns         1846 RowInvRate=38.0395ns
+BM_AddMinutes/100000         3795923 ns      3795625 ns          185 RowInvRate=37.9563ns
+BM_AddHours/10000             295259 ns       295216 ns         2366 RowInvRate=29.5216ns
+BM_AddHours/100000           2926618 ns      2926594 ns          238 RowInvRate=29.2659ns
+BM_AddDays/10000              165950 ns       165907 ns         4220 RowInvRate=16.5907ns
+BM_AddDays/100000            1647100 ns      1647126 ns          419 RowInvRate=16.4713ns
+BM_AddWorkdays/10000          200671 ns       200620 ns         3488 RowInvRate=20.062ns
+BM_AddWorkdays/100000        1987970 ns      1987992 ns          352 RowInvRate=19.8799ns
 */
 
 static const phmap::flat_hash_map<std::string, int64_t> TIME_UNIT_TO_MS = {

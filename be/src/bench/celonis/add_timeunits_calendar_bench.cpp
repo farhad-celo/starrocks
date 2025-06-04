@@ -17,55 +17,55 @@
 namespace starrocks {
 
 /*
-2025-05-16T11:10:56+02:00                                                                                                                                                                                                                                                                 
-Running ./be/build_Release/src/bench/celonis/output/add_timeunits_calendar_bench                                                                                                                                                                                                          
-Run on (12 X 4700.7 MHz CPU s)                                                                                                                                                                                                                                                            
-CPU Caches:                                                                                                                                                                                                                                                                               
-  L1 Data 32 KiB (x6)                                                                                                                                                                                                                                                                     
-  L1 Instruction 32 KiB (x6)                                                                                                                                                                                                                                                              
-  L2 Unified 256 KiB (x6)                                                                                                                                                                                                                                                                 
-  L3 Unified 12288 KiB (x1)                                                                                                                                                                                                                                                               
-Load Average: 1.23, 0.77, 1.19                                                                                                                                                                                                                                                            
+2025-06-01T22:00:31+00:00
+Running ./be/build_Release/src/bench/celonis/output/add_timeunits_calendar_bench
+Run on (32 X 3232.2 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x16)
+  L1 Instruction 32 KiB (x16)
+  L2 Unified 512 KiB (x16)
+  L3 Unified 32768 KiB (x2)
+Load Average: 12.30, 6.89, 4.19
 // Args: Number of rows / Number of calendar ids / Number of calendar entries per id
----------------------------------------------------------------------------------------------------------------                                                                                                                                                                           
-Benchmark                                                     Time             CPU   Iterations UserCounters...                                                                                                                                                                           
----------------------------------------------------------------------------------------------------------------                                                                                                                                                                           
-BM_AddTimeunitsCalendarFactoryCalendar/1000/2/10         113886 ns       113942 ns         6335 RowInvRate=113.942ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/10000/2/10       1032588 ns      1032645 ns          678 RowInvRate=103.264ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/100000/2/10     10156322 ns     10155913 ns           69 RowInvRate=101.559ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/1000/4/10         122963 ns       123017 ns         5682 RowInvRate=123.017ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/10000/4/10       1039898 ns      1039933 ns          673 RowInvRate=103.993ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/100000/4/10     10149681 ns     10148926 ns           68 RowInvRate=101.489ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/1000/8/10         142249 ns       142341 ns         4904 RowInvRate=142.341ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/10000/8/10       1063176 ns      1063223 ns          658 RowInvRate=106.322ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/100000/8/10     10196136 ns     10196156 ns           68 RowInvRate=101.962ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/1000/2/100        174423 ns       174529 ns         4038 RowInvRate=174.529ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/10000/2/100      1099226 ns      1099236 ns          639 RowInvRate=109.924ns                                                                                                                                                                      
-BM_AddTimeunitsCalendarFactoryCalendar/100000/2/100    10344215 ns     10343913 ns           67 RowInvRate=103.439ns
-BM_AddTimeunitsCalendarFactoryCalendar/1000/4/100        251671 ns       251760 ns         2844 RowInvRate=251.76ns
-BM_AddTimeunitsCalendarFactoryCalendar/10000/4/100      1195625 ns      1195675 ns          557 RowInvRate=119.567ns
-BM_AddTimeunitsCalendarFactoryCalendar/100000/4/100    10414709 ns     10414188 ns           67 RowInvRate=104.142ns
-BM_AddTimeunitsCalendarFactoryCalendar/1000/8/100        403627 ns       403754 ns         1770 RowInvRate=403.754ns
-BM_AddTimeunitsCalendarFactoryCalendar/10000/8/100      1345838 ns      1345880 ns          513 RowInvRate=134.588ns
-BM_AddTimeunitsCalendarFactoryCalendar/100000/8/100    10578753 ns     10578577 ns           66 RowInvRate=105.786ns
-BM_AddTimeunitsCalendarFactoryCalendar/1000/2/1000       796926 ns       797044 ns          875 RowInvRate=797.044ns
-BM_AddTimeunitsCalendarFactoryCalendar/10000/2/1000     1732585 ns      1732696 ns          404 RowInvRate=173.27ns
-BM_AddTimeunitsCalendarFactoryCalendar/100000/2/1000   10960622 ns     10960277 ns           63 RowInvRate=109.603ns
-BM_AddTimeunitsCalendarFactoryCalendar/1000/4/1000      1497528 ns      1497547 ns          469 RowInvRate=1.49755us
-BM_AddTimeunitsCalendarFactoryCalendar/10000/4/1000     2435017 ns      2434945 ns          288 RowInvRate=243.495ns
-BM_AddTimeunitsCalendarFactoryCalendar/100000/4/1000   11739086 ns     11738514 ns           59 RowInvRate=117.385ns
-BM_AddTimeunitsCalendarFactoryCalendar/1000/8/1000      2848345 ns      2848369 ns          246 RowInvRate=2.84837us
-BM_AddTimeunitsCalendarFactoryCalendar/10000/8/1000     3828168 ns      3828264 ns          183 RowInvRate=382.826ns
-BM_AddTimeunitsCalendarFactoryCalendar/100000/8/1000   13440837 ns     13440501 ns           52 RowInvRate=134.405ns
-BM_AddTimeunitsCalendarWeekdayCalendar/1000/2          43431229 ns     43430059 ns           16 RowInvRate=43.4301us
-BM_AddTimeunitsCalendarWeekdayCalendar/10000/2        436462360 ns    436449986 ns            2 RowInvRate=43.645us
-BM_AddTimeunitsCalendarWeekdayCalendar/100000/2      4351231653 ns   4351085865 ns            1 RowInvRate=43.5109us
-BM_AddTimeunitsCalendarWeekdayCalendar/1000/4          43701228 ns     43700120 ns           16 RowInvRate=43.7001us
-BM_AddTimeunitsCalendarWeekdayCalendar/10000/4        436352147 ns    436341835 ns            2 RowInvRate=43.6342us
-BM_AddTimeunitsCalendarWeekdayCalendar/100000/4      4393160402 ns   4392990169 ns            1 RowInvRate=43.9299us
-BM_AddTimeunitsCalendarWeekdayCalendar/1000/8          44141921 ns     44140979 ns           16 RowInvRate=44.141us
-BM_AddTimeunitsCalendarWeekdayCalendar/10000/8        436895257 ns    436884023 ns            2 RowInvRate=43.6884us
-BM_AddTimeunitsCalendarWeekdayCalendar/100000/8      4405708032 ns   4405569630 ns            1 RowInvRate=44.0557us
+---------------------------------------------------------------------------------------------------------------
+Benchmark                                                     Time             CPU   Iterations UserCounters...
+---------------------------------------------------------------------------------------------------------------
+BM_AddTimeunitsCalendarFactoryCalendar/1000/2/10         107784 ns       107801 ns         6683 RowInvRate=107.801ns
+BM_AddTimeunitsCalendarFactoryCalendar/10000/2/10        947640 ns       947611 ns          739 RowInvRate=94.7611ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/2/10      9465985 ns      9466126 ns           75 RowInvRate=94.6613ns
+BM_AddTimeunitsCalendarFactoryCalendar/1000/4/10         108367 ns       108399 ns         6497 RowInvRate=108.399ns
+BM_AddTimeunitsCalendarFactoryCalendar/10000/4/10        913491 ns       913500 ns          769 RowInvRate=91.35ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/4/10      8988262 ns      8988194 ns           78 RowInvRate=89.8819ns
+BM_AddTimeunitsCalendarFactoryCalendar/1000/8/10         127043 ns       127086 ns         5498 RowInvRate=127.086ns
+BM_AddTimeunitsCalendarFactoryCalendar/10000/8/10        937149 ns       937140 ns          749 RowInvRate=93.714ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/8/10      9080439 ns      9080604 ns           76 RowInvRate=90.806ns
+BM_AddTimeunitsCalendarFactoryCalendar/1000/2/100        154607 ns       154654 ns         4457 RowInvRate=154.654ns
+BM_AddTimeunitsCalendarFactoryCalendar/10000/2/100       991118 ns       991140 ns          702 RowInvRate=99.114ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/2/100     9172688 ns      9172529 ns           76 RowInvRate=91.7253ns
+BM_AddTimeunitsCalendarFactoryCalendar/1000/4/100        209417 ns       209478 ns         3331 RowInvRate=209.478ns
+BM_AddTimeunitsCalendarFactoryCalendar/10000/4/100      1011119 ns      1011150 ns          687 RowInvRate=101.115ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/4/100     8928828 ns      8928597 ns           78 RowInvRate=89.286ns
+BM_AddTimeunitsCalendarFactoryCalendar/1000/8/100        331414 ns       331497 ns         2075 RowInvRate=331.497ns
+BM_AddTimeunitsCalendarFactoryCalendar/10000/8/100      1141040 ns      1141064 ns          615 RowInvRate=114.106ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/8/100     9129465 ns      9129589 ns           77 RowInvRate=91.2959ns
+BM_AddTimeunitsCalendarFactoryCalendar/1000/2/1000       679416 ns       679544 ns         1043 RowInvRate=679.544ns
+BM_AddTimeunitsCalendarFactoryCalendar/10000/2/1000     1563229 ns      1563224 ns          462 RowInvRate=156.322ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/2/1000    9975643 ns      9975561 ns           72 RowInvRate=99.7556ns
+BM_AddTimeunitsCalendarFactoryCalendar/1000/4/1000      1328035 ns      1327916 ns          531 RowInvRate=1.32792us
+BM_AddTimeunitsCalendarFactoryCalendar/10000/4/1000     2190593 ns      2190662 ns          331 RowInvRate=219.066ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/4/1000   10526922 ns     10526334 ns           66 RowInvRate=105.263ns
+BM_AddTimeunitsCalendarFactoryCalendar/1000/8/1000      2744866 ns      2744891 ns          257 RowInvRate=2.74489us
+BM_AddTimeunitsCalendarFactoryCalendar/10000/8/1000     3362007 ns      3361913 ns          203 RowInvRate=336.191ns
+BM_AddTimeunitsCalendarFactoryCalendar/100000/8/1000   11784465 ns     11784381 ns           61 RowInvRate=117.844ns
+BM_AddTimeunitsCalendarWeekdayCalendar/1000/2          29951565 ns     29949630 ns           23 RowInvRate=29.9496us
+BM_AddTimeunitsCalendarWeekdayCalendar/10000/2        312696607 ns    312666988 ns            2 RowInvRate=31.2667us
+BM_AddTimeunitsCalendarWeekdayCalendar/100000/2      3059288097 ns   3058669850 ns            1 RowInvRate=30.5867us
+BM_AddTimeunitsCalendarWeekdayCalendar/1000/4          29256814 ns     29256570 ns           24 RowInvRate=29.2566us
+BM_AddTimeunitsCalendarWeekdayCalendar/10000/4        303877153 ns    303874208 ns            2 RowInvRate=30.3874us
+BM_AddTimeunitsCalendarWeekdayCalendar/100000/4      2976006763 ns   2975967762 ns            1 RowInvRate=29.7597us
+BM_AddTimeunitsCalendarWeekdayCalendar/1000/8          30141795 ns     30142030 ns           23 RowInvRate=30.142us
+BM_AddTimeunitsCalendarWeekdayCalendar/10000/8        295971590 ns    295960726 ns            2 RowInvRate=29.5961us
+BM_AddTimeunitsCalendarWeekdayCalendar/100000/8      2971714130 ns   2971670839 ns            1 RowInvRate=29.7167us
 */
 
 static void run_benchmark(benchmark::State& state, const CreateCalendar& create_calendar) {
