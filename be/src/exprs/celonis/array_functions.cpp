@@ -360,7 +360,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
     const auto& offsets = activities_data.offsets->get_data().data();
 
     ColumnBuilder<TYPE_VARCHAR> result(num_rows);
-    const std::string separator = ", ";
+    constexpr std::string_view separator = ", ";
     std::string variant;
     for (auto row = 0; row < num_rows; ++row) {
         if (activities_data.null_arrays != nullptr && (*activities_data.null_arrays)[row] != 0) {
@@ -390,12 +390,12 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
                 continue;
             }
             if (!first) {
-                variant += separator;
+                variant.append(separator);
             }
-            variant += activities[i].to_string();
+            variant.append(activities[i].data, activities[i].size);
             first = false;
         }
-        result.append(Slice(variant));
+        result.append(Slice(variant.data(), variant.size()));
 
     }
     return result.build(all_const);
