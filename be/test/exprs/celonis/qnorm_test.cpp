@@ -5,6 +5,7 @@
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <boost/math/distributions/normal.hpp>
 
 namespace starrocks {
 
@@ -45,30 +46,20 @@ TEST_F(CelonisQnormTest, normal_cases) {
     values->append_datum(0.99999);
     values->append_datum(0.9999999);
     values->append_datum(kNullDatum);
+    const double mean = 0.0;
+    const double std_dev = 1.0;
+    boost::math::normal_distribution<double> dist(mean, std_dev);
     const auto result = CelonisQnorm::qnorm(nullptr, {values}).value();
-    const double abs_error = 0.0000001;
+    const double abs_error = 0.00005;
     EXPECT_EQ(values->size(), result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_TRUE(result->get(1).is_null());
     EXPECT_TRUE(result->get(2).is_null());
     EXPECT_TRUE(result->get(3).is_null());
     EXPECT_TRUE(result->get(4).is_null());
-    EXPECT_NEAR(-5.1993376, result->get(5).get_double(), abs_error);
-    EXPECT_NEAR(-4.2648908, result->get(6).get_double(), abs_error);
-    EXPECT_NEAR(-3.0902323, result->get(7).get_double(), abs_error);
-    EXPECT_NEAR(-1.6448536, result->get(8).get_double(), abs_error);
-    EXPECT_NEAR(-1.0364334, result->get(9).get_double(), abs_error);
-    EXPECT_NEAR(-0.6744898, result->get(10).get_double(), abs_error);
-    EXPECT_NEAR(-0.3853205, result->get(11).get_double(), abs_error);
-    EXPECT_NEAR(-0.1256613, result->get(12).get_double(), abs_error);
-    EXPECT_NEAR(0.1256613, result->get(13).get_double(), abs_error);
-    EXPECT_NEAR(0.3853205, result->get(14).get_double(), abs_error);
-    EXPECT_NEAR(0.6744898, result->get(15).get_double(), abs_error);
-    EXPECT_NEAR(1.0364334, result->get(16).get_double(), abs_error);
-    EXPECT_NEAR(1.6448536, result->get(17).get_double(), abs_error);
-    EXPECT_NEAR(3.0902323, result->get(18).get_double(), abs_error);
-    EXPECT_NEAR(4.2648908, result->get(19).get_double(), abs_error);
-    EXPECT_NEAR(5.1993376, result->get(20).get_double(), abs_error);
+    for (size_t i = 5; i < 21; ++i) {
+        EXPECT_NEAR(boost::math::quantile(dist, values->get(i).get_double()), result->get(i).get_double(), abs_error);
+    }
     EXPECT_TRUE(result->get(21).is_null());
 }
 

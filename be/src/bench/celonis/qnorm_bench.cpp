@@ -13,22 +13,22 @@
 namespace starrocks {
 
 /*
-2025-05-11T11:33:11+00:00
+2025-06-05T00:57:15+00:00
 Running ./be/build_Release/src/bench/celonis/output/qnorm_bench
-Run on (32 X 2445.43 MHz CPU s)
+Run on (32 X 3292.8 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 8.52, 9.12, 8.94
+Load Average: 15.70, 8.67, 10.30
 // Number of rows
 --------------------------------------------------------------------------
 Benchmark                Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------
-BM_Qnorm/1000        94719 ns        94722 ns         7411 RowInvRate=94.7217ns
-BM_Qnorm/10000      946970 ns       947004 ns          746 RowInvRate=94.7004ns
-BM_Qnorm/100000    9440371 ns      9439726 ns           73 RowInvRate=94.3973ns
+BM_Qnorm/1000        17407 ns        17389 ns        40261 RowInvRate=17.3885ns
+BM_Qnorm/10000      176022 ns       176014 ns         3974 RowInvRate=17.6014ns
+BM_Qnorm/100000    1825655 ns      1825667 ns          385 RowInvRate=18.2567ns
 */
 
 static void BM_Qnorm(benchmark::State& state) {
