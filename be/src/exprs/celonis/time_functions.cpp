@@ -1947,7 +1947,7 @@ Status CelonisTimeFunctions::date_match_close(FunctionContext* context, Function
 
 Status CelonisTimeFunctions::timeunits_between_calendar_prepare(FunctionContext* context,
                                                                 FunctionContext::FunctionStateScope scope) {
-    RETURN_IF_ERROR(prepare(context, scope, 5, 3, std::nullopt));
+    RETURN_IF_ERROR(prepare(context, scope, 5, 3, 2));
     return Status::OK();
 }
 
@@ -2008,6 +2008,7 @@ StatusOr<ColumnPtr> timeunits_between_calendar_const([[maybe_unused]] FunctionCo
     ColumnViewer to_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
+    const std::string& time_unit = calendar_state->time_unit.value();
     ColumnBuilder<TYPE_DOUBLE> result(n_rows);
     for (size_t row = 0; row < n_rows; ++row) {
         if (from_timestamp_viewer.is_null(row) || to_timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
@@ -2015,8 +2016,6 @@ StatusOr<ColumnPtr> timeunits_between_calendar_const([[maybe_unused]] FunctionCo
             result.append_null();
             continue;
         }
-        const std::string time_unit = time_unit_viewer.value(row).to_string();
-        RETURN_IF_ERROR(validate_time_unit(time_unit));
         const auto from_timestamp = from_timestamp_viewer.value(row);
         const auto to_timestamp = to_timestamp_viewer.value(row);
         std::optional<std::string> calendar_id = std::nullopt;
