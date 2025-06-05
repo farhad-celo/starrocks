@@ -2,6 +2,9 @@
 
 #include <stack>
 #include <chrono>
+#include <tbb/parallel_for.h>
+#include <tbb/concurrent_vector.h>
+#include <tbb/spin_mutex.h>
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
@@ -313,40 +316,70 @@ struct StringClusterer {
     build_graph(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
         auto start_time = std::chrono::high_resolution_clock::now();
         const auto n = tuples.size();
-        std::vector<std::vector<size_t>> graph(n, std::vector<size_t>(0));
         std::vector<std::vector<int>> char_sets = compute_char_sets(tuples);
         phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>> char_to_indexes = build_prefix_index(char_sets);
-        for (auto i = 1; i < n; ++i) {
-            const auto length_i = std::get<1>(tuples[i]).real_length();
-            const auto total_weight_i = std::get<1>(tuples[i]).total_weight;
-            auto neighbors = get_neighbors(char_sets, char_to_indexes, i);
-            std::sort(neighbors.rbegin(), neighbors.rend());
-            for (auto j: neighbors) {
-                // edit_distance(s_i, s_j) >= abs(length_i - length_j), length_i >= length_j
-                if (length_i - std::get<1>(tuples[j]).real_length() > edit_threshold) {
-                    break;
-                }
-                // If two strings do not have any common chars, their edit distance is infinite (Same as what
-                // Saola does).
-                if (!have_common_chars(std::get<1>(tuples[i]), std::get<1>(tuples[j]))) {
-                    continue;
-                }
-                // edit_distance(s_i, s_j) <= total_weight(s_i) + total_weight(s_j)
-                if (edit_threshold >= total_weight_i + std::get<1>(tuples[j]).total_weight ||
-                    weighted_edit_distance_within_threshold(std::get<1>(tuples[i]), std::get<1>(tuples[j]),
-                                                            edit_threshold)) {
-                    graph[i].push_back(j);
-                    graph[j].push_back(i);
-                }
-            }
-            if (i % 100 == 0) {
-                auto cur_time = std::chrono::high_resolution_clock::now();
-                std::chrono::duration<double> elapsed_time = cur_time - start_time;
-                if (elapsed_time.count() > MAX_CLUSTERING_SECONDS) {
-                    return std::nullopt;
-                }
-            }
+
+        std::atomic<bool> timeout_flag{false};
+        std::vector<tbb::concurrent_vector<size_t>> concurrent_graph(n);
+
+        // Parallel loop for graph construction
+        tbb::parallel_for(tbb::blocked_range<size_t>(1, n),
+                          [&](const tbb::blocked_range<size_t>& range) {
+                              for (auto i = range.begin(); i != range.end(); ++i) {
+                                  if (timeout_flag.load()) return;
+
+                                  const auto length_i = std::get<1>(tuples[i]).real_length();
+                                  const auto total_weight_i = std::get<1>(tuples[i]).total_weight;
+                                  auto neighbors = get_neighbors(char_sets, char_to_indexes, i);
+                                  std::sort(neighbors.rbegin(), neighbors.rend());
+
+                                  for (auto j: neighbors) {
+                                      // edit_distance(s_i, s_j) >= abs(length_i - length_j), length_i >= length_j
+                                      if (length_i - std::get<1>(tuples[j]).real_length() > edit_threshold) {
+                                          break;
+                                      }
+                                      // If two strings do not have any common chars, their edit distance is infinite
+                                      // (Same as what Saola does).
+                                      if (!have_common_chars(std::get<1>(tuples[i]), std::get<1>(tuples[j]))) {
+                                          continue;
+                                      }
+                                      // edit_distance(s_i, s_j) <= total_weight(s_i) + total_weight(s_j)
+                                      if (edit_threshold >= total_weight_i + std::get<1>(tuples[j]).total_weight ||
+                                          weighted_edit_distance_within_threshold(std::get<1>(tuples[i]),
+                                                                                  std::get<1>(tuples[j]),
+                                                                                  edit_threshold)) {
+                                          concurrent_graph[i].push_back(j);
+                                          concurrent_graph[j].push_back(i);
+                                      }
+                                  }
+
+                                  // Check timeout periodically
+                                  if (i % 100 == 0) {
+                                      auto cur_time = std::chrono::high_resolution_clock::now();
+                                      std::chrono::duration<double> elapsed_time = cur_time - start_time;
+                                      if (elapsed_time.count() > MAX_CLUSTERING_SECONDS) {
+                                          timeout_flag.store(true);
+                                      }
+                                  }
+                              }
+                          }
+        );
+
+        if (timeout_flag.load()) {
+            return std::nullopt;
         }
+        // Convert concurrent vectors to regular vectors
+        std::vector<std::vector<size_t>> graph(n);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
+                          [&](const tbb::blocked_range<size_t>& range) {
+                              for (auto i = range.begin(); i != range.end(); ++i) {
+                                  graph[i].assign(concurrent_graph[i].begin(), concurrent_graph[i].end());
+                                  // Remove duplicates if any
+                                  std::sort(graph[i].begin(), graph[i].end());
+                                  graph[i].erase(std::unique(graph[i].begin(), graph[i].end()), graph[i].end());
+                              }
+                          }
+        );
         return graph;
     }
 
