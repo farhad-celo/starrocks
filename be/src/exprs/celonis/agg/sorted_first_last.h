@@ -228,7 +228,6 @@ struct CelonisSortedFirstLastAggregateState {
         new_row_accessor.seek();
 
         const auto& is_asc_order = ctx->get_is_asc_order();
-        const auto& null_firsts = ctx->get_nulls_first();
         int num_args = ctx->get_num_args();
         for (int i = 1; i < num_args; ++i) {
             auto order_index = i - 1;
@@ -236,28 +235,10 @@ struct CelonisSortedFirstLastAggregateState {
                 if (new_row_accessor.seek_and_is_null()) {
                     continue;
                 }
-                if (null_firsts[order_index]) {
-                    if constexpr (!is_first) {
-                        set_new_row(new_row_accessor);
-                    }
-                } else {
-                    if constexpr (is_first) {
-                        set_new_row(new_row_accessor);
-                    }
-                }
                 return;
             }
             Datum datum = row_accessor.get(); // This must be called once if not null.
             if (new_row_accessor.seek_and_is_null()) {
-                if (null_firsts[order_index]) {
-                    if constexpr (is_first) {
-                        set_new_row(new_row_accessor);
-                    }
-                } else {
-                    if constexpr (!is_first) {
-                        set_new_row(new_row_accessor);
-                    }
-                }
                 return;
             }
             Datum new_datum = new_row_accessor.get(); // This must be called once if not null.
@@ -316,8 +297,9 @@ struct CelonisSortedFirstLastAggregateState {
         If all the values are NULL, the result is NULL.
  * col0: the column which decides the order of col. There may be more than one ORDER BY column.
          [DESC | ASC]: specifies whether to sort the elements in ascending order (default) or descending order of col0.
-         [NULLS FIRST | NULLS LAST]: specifies whether NULL values are placed at the first or last place.
-                                     If not specified, NULL is considered less than everything other.
+         [NULLS FIRST | NULLS LAST]: this option is currently ignored; see also the Jira ticket CPL-14271. Thus,
+                                     for CELONIS_SORTED_FIRST (CELONIS_SORTED_LAST), NULL values are
+                                     considered to be greater than (less than) any other value.
  */
 template <bool is_first>
 class CelonisSortedFirstLastAggregateFunction

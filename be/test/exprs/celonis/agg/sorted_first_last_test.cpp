@@ -200,19 +200,7 @@ TEST_F(CelonisSortedFirstLastTest, nulls_first) {
     input.emplace_back(DatumStruct{3, 20.0});
     input.emplace_back(DatumStruct{4, 30.0});
 
-    Run<TYPE_INT>(sort_column_types, input, kNullDatum, 4);
-}
-
-TEST_F(CelonisSortedFirstLastTest, nulls_last) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, false}};
-
-    std::vector<DatumStruct> input;
-    input.emplace_back(DatumStruct{1, 10});
-    input.emplace_back(DatumStruct{2, kNullDatum});
-    input.emplace_back(DatumStruct{3, 20});
-    input.emplace_back(DatumStruct{4, 30});
-
-    Run<TYPE_INT>(sort_column_types, input, 1, kNullDatum);
+    Run<TYPE_INT>(sort_column_types, input, 1, 4);
 }
 
 TEST_F(CelonisSortedFirstLastTest, null_order_only) {
@@ -237,7 +225,7 @@ TEST_F(CelonisSortedFirstLastTest, desc_nulls_last) {
     input.emplace_back(DatumStruct{3, 20});
     input.emplace_back(DatumStruct{4, 30});
 
-    Run<TYPE_INT>(sort_column_types, input, 4, kNullDatum);
+    Run<TYPE_INT>(sort_column_types, input, 4, 1);
 }
 
 TEST_F(CelonisSortedFirstLastTest, int128_t) {
