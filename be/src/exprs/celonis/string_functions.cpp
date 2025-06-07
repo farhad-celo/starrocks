@@ -1,7 +1,6 @@
 #include "exprs/celonis/string_functions.h"
 
 #include <boost/locale/utf.hpp>
-#include <charconv>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -23,73 +22,74 @@ namespace starrocks {
 
 namespace {
 
-Status xxh3_128bits_update(XXH3_state_t* state, const void* input, size_t len, const std::string& function_name) {
+constexpr std::string_view CELONIS_XX_HASH3_128_V2 = "CELONIS_XX_HASH3_128_V2";
+constexpr std::string_view CELONIS_XX_HASH3_128_V3 = "CELONIS_XX_HASH3_128_V3";
+constexpr std::string_view CELONIS_XX_HASH3_96 = "CELONIS_XX_HASH3_96";
+
+Status xxh3_128bits_update(XXH3_state_t* state, const void* input, size_t len) {
     XXH_errorcode code = XXH3_128bits_update(state, input, len);
     // code != XXH_OK (e.g., state is not initialized correctly, state == NULL) should be very rare in practice.
     if (UNLIKELY(code != XXH_OK)) {
-        return Status::InternalError(function_name + ": update xxh3 state failed");
+        return Status::InternalError("Update xxh3 state failed");
     }
     return Status::OK();
 }
 
-// xxh3_128bits_update_new also hashes the length of the input
-Status xxh3_128bits_update_new(XXH3_state_t* state, const void* input, size_t len, const std::string& function_name) {
-    RETURN_IF_ERROR(xxh3_128bits_update(state, input, len, function_name));
+// TODO(y.zhang): We can optimize this further, for single column, we do not need to hash "_len_"; also "len_" is
+// enough; and "reversed(len)_" is enough.
+// xxh3_128bits_update_v2 also hashes the length of the input
+Status xxh3_128bits_update_v2(XXH3_state_t* state, const void* input, size_t len) {
+    RETURN_IF_ERROR(xxh3_128bits_update(state, input, len));
     // Also hash the value "_" + std::string(len) + "_"
     char len_buffer[32];  // enough for any size_t value
     len_buffer[0] = '_';
-
-    // Convert size_t to string manually
+    char* p = len_buffer + 1;
     size_t temp_len = len;
-    size_t pos = 1;
 
-    // Handle zero case
-    if (temp_len == 0) {
-        len_buffer[pos++] = '0';
-    } else {
-        // Find end position by counting digits
-        size_t end_pos = 1;
-        size_t temp = temp_len;
-        while (temp > 0) {
-            end_pos++;
-            temp /= 10;
-        }
+    // Extract digits in reverse order
+    char* digit_start = p;
+    do {
+        *p++ = '0' + (temp_len % 10);
+        temp_len /= 10;
+    } while (temp_len > 0);
 
-        // Fill digits from right to left
-        pos = end_pos - 1;
-        while (temp_len > 0) {
-            len_buffer[pos--] = '0' + (temp_len % 10);
-            temp_len /= 10;
-        }
-        pos = end_pos;
+    // Reverse the digits in place
+    char* digit_end = p - 1;
+    while (digit_start < digit_end) {
+        char temp = *digit_start;
+        *digit_start++ = *digit_end;
+        *digit_end-- = temp;
     }
-    // Add suffix
-    len_buffer[pos++] = '_';
-    RETURN_IF_ERROR(xxh3_128bits_update(state, len_buffer, pos, function_name));
+    *p++ = '_';
+    RETURN_IF_ERROR(xxh3_128bits_update(state, len_buffer, p - len_buffer));
     return Status::OK();
 }
 
-Status validate_slice(const Slice& slice, const std::string& reserved_str, const std::string& function_name) {
+template<std::string_view const& reserved_str, std::string_view const& function_name>
+inline Status validate_slice_template(const Slice& slice) {
     if (reserved_str.size() == slice.size &&
-        reserved_str.compare(0, reserved_str.size(), slice.data, slice.size) == 0) {
+        std::memcmp(reserved_str.data(), slice.data, slice.size) == 0) {
         return Status::InvalidArgument(
-                (function_name + ": string value conflicts with the reserved string '" + reserved_str + "'.").c_str());
+                std::string(function_name)
+                        .append(": string value conflicts with the reserved string '")
+                        .append(reserved_str)
+                        .append("'.")
+                        .c_str());
     }
     return Status::OK();
 }
 
-template<bool hash96>
+
+template<bool hash96, std::string_view const& function_name>
 StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const starrocks::Columns& columns,
-                                    const std::string& function_name,
-                                    Status (* hash_update_func)(XXH3_state_t*, const void*, size_t,
-                                                                const std::string&)) {
+                                    Status (* hash_update_func)(XXH3_state_t*, const void*, size_t)) {
     DCHECK(columns.size() >= 1);
     const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
     XXH3_state_t init_state;
     XXH_errorcode code = XXH3_128bits_reset_withSeed(&init_state, default_xxhash_seed);
     if (UNLIKELY(code != XXH_OK)) {
-        return Status::InternalError(function_name + ": init xxh3 state failed");
+        return Status::InternalError(std::string(function_name).append(": init xxh3 state failed"));
     }
     std::vector<XXH3_state_t> states;
     states.reserve(n_rows);
@@ -102,10 +102,10 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
             XXH3_state_t null_array_hash;
             XXH_errorcode reset_code = XXH3_128bits_reset_withSeed(&null_array_hash, default_xxhash_seed);
             if (reset_code != XXH_OK) {
-                return Status::InternalError(function_name + ": init xxh3 state failed");
+                return Status::InternalError(std::string(function_name).append(": init xxh3 state failed"));
             }
             RETURN_IF_ERROR(hash_update_func(&null_array_hash, XXHASH3_128_NULL_ARRAY_STRING.data(),
-                                             XXHASH3_128_NULL_ARRAY_STRING.size(), function_name));
+                                             XXHASH3_128_NULL_ARRAY_STRING.size()));
             XXH128_hash_t value = XXH3_128bits_digest(&null_array_hash);
             int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
             auto result_column = context->create_column(context->get_return_type(), false);
@@ -121,23 +121,22 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
         for (size_t row = 0; row < n_rows; ++row) {
             if (columns[0]->is_null(row)) {
                 RETURN_IF_ERROR(hash_update_func(&states[row], XXHASH3_128_NULL_ARRAY_STRING.data(),
-                                                 XXHASH3_128_NULL_ARRAY_STRING.size(), function_name));
+                                                 XXHASH3_128_NULL_ARRAY_STRING.size()));
                 continue;
             }
             const auto start = offsets[row];
             const auto end = offsets[row + 1];
             for (auto i = start; i < end; ++i) {
                 const bool is_null = string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0;
-                Slice slice;
                 if (!is_null) {
-                    slice = slices[i];
                     // validate that the input string does not conflict with the reserved null string.
-                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_STRING, function_name));
-                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_ARRAY_STRING, function_name));
+                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(slices[i])));
+                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_ARRAY_STRING, function_name>(slices[i])));
+                    RETURN_IF_ERROR(hash_update_func(&states[row], slices[i].data, slices[i].size));
                 } else {
-                    slice = Slice(XXHASH3_128_NULL_STRING);
+                    RETURN_IF_ERROR(hash_update_func(&states[row], XXHASH3_128_NULL_STRING.data(),
+                                                     XXHASH3_128_NULL_STRING.size()));
                 }
-                RETURN_IF_ERROR(hash_update_func(&states[row], slice.data, slice.size, function_name));
             }
         }
     } else {
@@ -155,32 +154,29 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
             column_viewers.emplace_back(column);
         }
         // Handle the leading constant columns
-        Slice null_string_slice = Slice(XXHASH3_128_NULL_STRING);
         if (n_rows > 0) {
             for (auto i = 0; i < num_const_columns; ++i) {
                 const auto& viewer = column_viewers[i];
-                Slice slice;
                 if (!viewer.is_null(0)) {
-                    slice = viewer.value(0);
-                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_STRING, function_name));
+                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(0))));
+                    RETURN_IF_ERROR(hash_update_func(&(init_state), viewer.value(0).data, viewer.value(0).size));
                 } else {
-                    slice = null_string_slice;
+                    RETURN_IF_ERROR(hash_update_func(&(init_state), XXHASH3_128_NULL_STRING.data(),
+                                                     XXHASH3_128_NULL_STRING.size()));
                 }
-                RETURN_IF_ERROR(hash_update_func(&(init_state), slice.data, slice.size, function_name));
             }
         }
         states.assign(n_rows, init_state);
         for (auto i = num_const_columns; i < columns.size(); ++i) {
             const auto& viewer = column_viewers[i];
             for (size_t row = 0; row < n_rows; ++row) {
-                Slice slice;
                 if (!viewer.is_null(row)) {
-                    slice = viewer.value(row);
-                    RETURN_IF_ERROR(validate_slice(slice, XXHASH3_128_NULL_STRING, function_name));
+                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(row))));
+                    RETURN_IF_ERROR(hash_update_func(&(states[row]), viewer.value(row).data, viewer.value(row).size));
                 } else {
-                    slice = null_string_slice;
+                    RETURN_IF_ERROR(hash_update_func(&(states[row]), XXHASH3_128_NULL_STRING.data(),
+                                                     XXHASH3_128_NULL_STRING.size()));
                 }
-                RETURN_IF_ERROR(hash_update_func(&(states[row]), slice.data, slice.size, function_name));
             }
         }
     }
@@ -211,17 +207,17 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v2(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
-    return xx_hash3_helper<false>(context, columns, "CELONIS_XX_HASH3_128_V2", xxh3_128bits_update);
+    return xx_hash3_helper<false, CELONIS_XX_HASH3_128_V2>(context, columns, xxh3_128bits_update);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v3(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
-    return xx_hash3_helper<false>(context, columns, "CELONIS_XX_HASH3_128_V3", xxh3_128bits_update_new);
+    return xx_hash3_helper<false, CELONIS_XX_HASH3_128_V3>(context, columns, xxh3_128bits_update_v2);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_96(starrocks::FunctionContext* context,
                                                         const starrocks::Columns& columns) {
-    return xx_hash3_helper<true>(context, columns, "CELONIS_XX_HASH3_96", xxh3_128bits_update_new);
+    return xx_hash3_helper<true, CELONIS_XX_HASH3_96>(context, columns, xxh3_128bits_update_v2);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,
@@ -265,14 +261,14 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                         0) {
                         return Status::InvalidArgument(
                                 ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
-                                 XXHASH3_128_NULL_STRING + "'.").c_str());
+                                 std::string(XXHASH3_128_NULL_STRING) + "'.").c_str());
                     }
                     if (XXHASH3_128_NULL_ARRAY_STRING.size() == slice.size &&
                         XXHASH3_128_NULL_ARRAY_STRING.compare(0, XXHASH3_128_NULL_ARRAY_STRING.size(), slice.data,
                                                               slice.size) == 0) {
                         return Status::InvalidArgument(
                                 ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL array string '" +
-                                 XXHASH3_128_NULL_ARRAY_STRING + "'.").c_str());
+                                 std::string(XXHASH3_128_NULL_ARRAY_STRING) + "'.").c_str());
                     }
                     seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
                 }
@@ -297,7 +293,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                         0) {
                         return Status::InvalidArgument(
                                 ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
-                                 XXHASH3_128_NULL_STRING + "'.").c_str());
+                                 std::string(XXHASH3_128_NULL_STRING) + "'.").c_str());
                     }
                     seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
                 }
@@ -351,7 +347,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                 }
                 Slice slice = strings[i];
                 RETURN_IF_ERROR(
-                        xxh3_128bits_update_new(&states[row], slice.data, slice.size, "CELONIS_XX_HASH3_128_NULLABLE"));
+                        xxh3_128bits_update_v2(&states[row], slice.data, slice.size));
             }
         }
     } else {
@@ -371,7 +367,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                 }
                 auto slice = viewer.value(row);
                 RETURN_IF_ERROR(
-                        xxh3_128bits_update_new(&states[row], slice.data, slice.size, "CELONIS_XX_HASH3_128_NULLABLE"));
+                        xxh3_128bits_update_v2(&states[row], slice.data, slice.size));
             }
         }
     }

@@ -13,37 +13,37 @@
 namespace starrocks {
 
 /*
-2025-05-03T12:02:55+00:00
+2025-06-01T18:07:04+00:00
 Running ./be/build_Release/src/bench/celonis/output/xx_hash3_128_nullable_bench
-Run on (32 X 3089.61 MHz CPU s)
+Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 4.08, 2.41, 1.52
+Load Average: 1.00, 1.45, 2.08
 // Args: Number of rows / Number of input columns / Number of leading constant columns / Average length of string
 -------------------------------------------------------------------------------------------
 Benchmark                                 Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------
-BM_Hash128Nullable/100000/1/0/10   14006027 ns     14004361 ns           50 RowInvRate=140.044ns
-BM_Hash128Nullable/100000/2/0/10   20927605 ns     20927619 ns           32 RowInvRate=209.276ns
-BM_Hash128Nullable/100000/3/0/10   27494495 ns     27493880 ns           26 RowInvRate=274.939ns
-BM_Hash128Nullable/100000/1/1/10   12912301 ns     12913102 ns           54 RowInvRate=129.131ns
-BM_Hash128Nullable/100000/2/1/10   18950599 ns     18949808 ns           37 RowInvRate=189.498ns
-BM_Hash128Nullable/100000/3/1/10   25430379 ns     25426446 ns           28 RowInvRate=254.264ns
-BM_Hash128Nullable/100000/1/0/20   18863497 ns     18863915 ns           37 RowInvRate=188.639ns
-BM_Hash128Nullable/100000/2/0/20   28218059 ns     28218173 ns           25 RowInvRate=282.182ns
-BM_Hash128Nullable/100000/3/0/20   50481833 ns     50482011 ns           10 RowInvRate=504.82ns
-BM_Hash128Nullable/100000/1/1/20   14875658 ns     14876538 ns           45 RowInvRate=148.765ns
-BM_Hash128Nullable/100000/2/1/20   25454197 ns     25445450 ns           29 RowInvRate=254.455ns
-BM_Hash128Nullable/100000/3/1/20   41138167 ns     41138084 ns           16 RowInvRate=411.381ns
-BM_Hash128Nullable/100000/1/0/40   13590605 ns     13590734 ns           52 RowInvRate=135.907ns
-BM_Hash128Nullable/100000/2/0/40   29809673 ns     29808597 ns           24 RowInvRate=298.086ns
-BM_Hash128Nullable/100000/3/0/40   43068848 ns     43066476 ns           16 RowInvRate=430.665ns
-BM_Hash128Nullable/100000/1/1/40   13149782 ns     13150533 ns           53 RowInvRate=131.505ns
-BM_Hash128Nullable/100000/2/1/40   29913494 ns     29912380 ns           25 RowInvRate=299.124ns
-BM_Hash128Nullable/100000/3/1/40   43908909 ns     43908376 ns           17 RowInvRate=439.084ns
+BM_Hash128Nullable/100000/1/0/10   10580006 ns     10579602 ns           65 RowInvRate=105.796ns
+BM_Hash128Nullable/100000/2/0/10   14642489 ns     14642351 ns           48 RowInvRate=146.424ns
+BM_Hash128Nullable/100000/3/0/10   17398824 ns     17398578 ns           39 RowInvRate=173.986ns
+BM_Hash128Nullable/100000/1/1/10   10131985 ns     10131711 ns           69 RowInvRate=101.317ns
+BM_Hash128Nullable/100000/2/1/10   13215027 ns     13215497 ns           53 RowInvRate=132.155ns
+BM_Hash128Nullable/100000/3/1/10   16764108 ns     16762572 ns           43 RowInvRate=167.626ns
+BM_Hash128Nullable/100000/1/0/20   10374001 ns     10374369 ns           66 RowInvRate=103.744ns
+BM_Hash128Nullable/100000/2/0/20   15079872 ns     15080289 ns           46 RowInvRate=150.803ns
+BM_Hash128Nullable/100000/3/0/20   23283782 ns     23282896 ns           30 RowInvRate=232.829ns
+BM_Hash128Nullable/100000/1/1/20    9998220 ns      9997966 ns           70 RowInvRate=99.9797ns
+BM_Hash128Nullable/100000/2/1/20   12967104 ns     12966076 ns           54 RowInvRate=129.661ns
+BM_Hash128Nullable/100000/3/1/20   21495782 ns     21495546 ns           33 RowInvRate=214.955ns
+BM_Hash128Nullable/100000/1/0/40   10656655 ns     10656830 ns           66 RowInvRate=106.568ns
+BM_Hash128Nullable/100000/2/0/40   19496906 ns     19496716 ns           35 RowInvRate=194.967ns
+BM_Hash128Nullable/100000/3/0/40   27711832 ns     27710083 ns           25 RowInvRate=277.101ns
+BM_Hash128Nullable/100000/1/1/40   10173536 ns     10173491 ns           69 RowInvRate=101.735ns
+BM_Hash128Nullable/100000/2/1/40   18318052 ns     18315075 ns           38 RowInvRate=183.151ns
+BM_Hash128Nullable/100000/3/1/40   25055003 ns     25055371 ns           28 RowInvRate=250.554ns
 */
 
 std::string generate_random_string(int min_len, int max_len) {
