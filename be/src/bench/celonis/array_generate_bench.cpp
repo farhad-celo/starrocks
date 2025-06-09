@@ -14,25 +14,25 @@
 namespace starrocks {
 
 /*
-2025-03-19T22:48:12+00:00
+2025-06-07T16:34:25+00:00
 Running ./be/build_Release/src/bench/celonis/output/array_generate_bench
-Run on (32 X 2445.43 MHz CPU s)
+Run on (32 X 3174.92 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 11.59, 12.27, 10.16
+Load Average: 3.94, 1.70, 1.32
 // Number of rows / Output row length
 ---------------------------------------------------------------------------------------
 Benchmark                             Time             CPU   Iterations UserCounters...
 ---------------------------------------------------------------------------------------
-BM_ArrayGenerate/1000/100       2175607 ns      2175738 ns          324 RowInvRate=2.17574us
-BM_ArrayGenerate/10000/100     21767753 ns     21767199 ns           32 RowInvRate=2.17672us
-BM_ArrayGenerate/100000/100   231008231 ns    231003656 ns            3 RowInvRate=2.31004us
-BM_ArrayGenerate/1000/1000     21236103 ns     21235991 ns           33 RowInvRate=21.236us
-BM_ArrayGenerate/10000/1000   229587532 ns    229575371 ns            3 RowInvRate=22.9575us
-BM_ArrayGenerate/100000/1000 2245083260 ns   2245005027 ns            1 RowInvRate=22.4501us
+BM_ArrayGenerate/1000/100        387599 ns       387724 ns         1834 RowInvRate=387.724ns
+BM_ArrayGenerate/10000/100      8179409 ns      8179348 ns          120 RowInvRate=817.935ns
+BM_ArrayGenerate/100000/100    46429038 ns     46429188 ns           11 RowInvRate=464.292ns
+BM_ArrayGenerate/1000/1000      6188408 ns      6188456 ns          131 RowInvRate=6.18846us
+BM_ArrayGenerate/10000/1000    46403722 ns     46401774 ns           15 RowInvRate=4.64018us
+BM_ArrayGenerate/100000/1000  458729257 ns    458727012 ns            2 RowInvRate=4.58727us
 */
 
 static void BM_ArrayGenerate(benchmark::State& state) {
