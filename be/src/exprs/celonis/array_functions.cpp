@@ -8,6 +8,7 @@
 #include "column/column_builder.h"
 #include "column/column_viewer.h"
 #include "gutil/strings/strcat.h"
+#include "util/faststring.h"
 
 namespace starrocks {
 
@@ -361,7 +362,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
 
     ColumnBuilder<TYPE_VARCHAR> result(num_rows);
     constexpr std::string_view separator = ", ";
-    std::string variant;
+    faststring variant;
     for (auto row = 0; row < num_rows; ++row) {
         if (activities_data.null_arrays != nullptr && (*activities_data.null_arrays)[row] != 0) {
             result.append_nulls(1);
@@ -390,7 +391,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
                 continue;
             }
             if (!first) {
-                variant.append(separator);
+                variant.append(separator.data(), separator.length());
             }
             variant.append(activities[i].data, activities[i].size);
             first = false;
