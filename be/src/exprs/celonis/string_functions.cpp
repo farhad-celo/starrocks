@@ -17,6 +17,7 @@
 #include "exprs/celonis/util.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/unary_function.h"
+#include "util/faststring.h"
 
 namespace starrocks {
 
@@ -468,6 +469,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
 
     auto size = columns[0]->size();
     ColumnBuilder<TYPE_VARCHAR> result(size);
+    faststring result_str;
     for (int row = 0; row < size; ++row) {
         if (str_viewer.is_null(row)) {
             result.append_null();
@@ -475,7 +477,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
         }
 
         const auto str_value = str_viewer.value(row);
-        std::string result_str;
+        result_str.clear();
         result_str.reserve(str_value.get_size());
 
         int char_size = 0;
@@ -487,7 +489,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
             if (cit == translate_mapping.end()) {
                 result_str.append(str_p, char_size);
             } else {
-                result_str.append(cit->second);
+                result_str.append(cit->second.data, cit->second.size);
             }
         }
         result.append(Slice(result_str.data(), result_str.size()));
