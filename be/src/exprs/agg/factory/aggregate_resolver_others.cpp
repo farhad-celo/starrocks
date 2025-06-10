@@ -23,6 +23,17 @@
 
 namespace starrocks {
 
+struct CelonisPercentileDiscDispatcher {
+    template <LogicalType pt>
+    void operator()(AggregateFuncResolver* resolver) {
+        if constexpr (lt_is_datetime<pt> || lt_is_date<pt> || lt_is_arithmetic<pt> || lt_is_string<pt> ||
+                      lt_is_decimal_of_any_version<pt>) {
+            resolver->add_aggregate_mapping_variadic<pt, pt, PercentileState<pt>>(
+                    "celonis_percentile_disc", false, AggregateFactory::MakeCelonisPercentileDiscAggregateFunction<pt>());
+        }
+    }
+};
+
 void AggregateFuncResolver::register_celonis() {
     add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_ARRAY>(
             "celonis_calc_bucket_width_boundaries", false,
@@ -112,6 +123,10 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_DATETIME>());
     add_aggregate_mapping_variadic<TYPE_VARCHAR, TYPE_VARCHAR, CelonisModeState<TYPE_VARCHAR>>(
             "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_VARCHAR>());
+
+    for (auto type : sortable_types()) {
+        type_dispatch_all(type, CelonisPercentileDiscDispatcher(), this);
+    }
 
     add_general_mapping_notnull("celonis_sorted_first", false,
                                 AggregateFactory::MakeCelonisSortedFirstAggregateFunction());

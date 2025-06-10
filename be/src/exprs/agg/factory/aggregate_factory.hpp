@@ -73,6 +73,7 @@
 #include "exprs/celonis/agg/moving_trimmed_mean.h"
 #include "exprs/celonis/agg/multi_array_agg.h"
 #include "exprs/celonis/agg/multi_linear_regression.h"
+#include "exprs/celonis/agg/percentile_disc.h"
 #include "exprs/celonis/agg/product.h"
 #include "exprs/celonis/agg/sorted_first_last.h"
 #include "exprs/celonis/agg/trimmed_mean.h"
@@ -292,6 +293,9 @@ public:
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisTrimmedMeanAggregateFunction();
+
+    template <LogicalType PT>
+    static AggregateFunctionPtr MakeCelonisPercentileDiscAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisVariantStatsAggregateFunction();
 
@@ -567,6 +571,11 @@ AggregateFunctionPtr AggregateFactory::MakeProductAggregateFunction() {
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction() {
     return std::make_shared<CelonisTrimmedMeanAggregateFunction<LT>>();
+}
+
+template <LogicalType PT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisPercentileDiscAggregateFunction() {
+    return std::make_shared<CelonisPercentileDiscAggregateFunction<PT>>();
 }
 
 template <LogicalType LT>

@@ -329,6 +329,7 @@ public class FunctionSet {
     public static final String CELONIS_BUILD_KMEANS_MODEL = "celonis_build_kmeans_model";
     public static final String CELONIS_BUILD_LINEAR_REGRESSION_MODEL = "celonis_build_linear_regression_model";
     public static final String CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL = "celonis_build_multi_linear_regression_model";
+    public static final String CELONIS_PERCENTILE_DISC = "celonis_percentile_disc";
 
     // Bitmap functions:
     public static final String BITMAP_AND = "bitmap_and";
@@ -1146,6 +1147,12 @@ public class FunctionSet {
     }
 
     private void initCelonisAggregateBuiltins() {
+        // celonis_percentile_disc
+        for (Type type : SORTABLE_TYPES) {
+            addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_PERCENTILE_DISC,
+                    Lists.newArrayList(type, Type.DOUBLE), type, Type.VARBINARY,
+                    false, false, false));
+        }
         // celonis_build_multi_linear_regression_model
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL,
                     Lists.newArrayList(Type.ARRAY_DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.VARBINARY,

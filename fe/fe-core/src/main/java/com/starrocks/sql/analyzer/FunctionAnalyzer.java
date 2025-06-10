@@ -570,7 +570,7 @@ public class FunctionAnalyzer {
 
         if (fnName.getFunction().equals(FunctionSet.PERCENTILE_DISC) ||
                 fnName.getFunction().equals(FunctionSet.PERCENTILE_CONT) ||
-                fnName.getFunction().equals(FunctionSet.LC_PERCENTILE_DISC)) {
+                fnName.getFunction().equals(FunctionSet.CELONIS_PERCENTILE_DISC)) {
             if (functionCallExpr.getChildren().size() != 2) {
                 throw new SemanticException(fnName + " requires two parameters");
             }
@@ -910,6 +910,26 @@ public class FunctionAnalyzer {
             sf.add(new StructField("edge_class_id", Type.ARRAY_BIGINT));
             sf.add(new StructField("edge_class_type", Type.ARRAY_VARCHAR));
             fn.setRetType(new StructType(sf));
+        } else if (FunctionSet.CELONIS_PERCENTILE_DISC.equals(fnName)) {
+            argumentTypes[1] = Type.DOUBLE;
+            fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_IDENTICAL);
+            // correct decimal's precision and scale
+            if (fn.getArgs()[0].isDecimalV3()) {
+                List<Type> argTypes = Arrays.asList(argumentTypes[0], fn.getArgs()[1]);
+
+                AggregateFunction newFn = new AggregateFunction(fn.getFunctionName(), argTypes, argumentTypes[0],
+                        ((AggregateFunction) fn).getIntermediateType(), fn.hasVarArgs());
+
+                newFn.setFunctionId(fn.getFunctionId());
+                newFn.setChecksum(fn.getChecksum());
+                newFn.setBinaryType(fn.getBinaryType());
+                newFn.setHasVarArgs(fn.hasVarArgs());
+                newFn.setId(fn.getId());
+                newFn.setUserVisible(fn.isUserVisible());
+                newFn.setisAnalyticFn(((AggregateFunction) fn).isAnalyticFn());
+
+                fn = newFn;
+            }
         } else if (fnName.equals(FunctionSet.CELONIS_BUILD_LINEAR_REGRESSION_MODEL)) {
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_BUILD_LINEAR_REGRESSION_MODEL, argumentTypes,
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
