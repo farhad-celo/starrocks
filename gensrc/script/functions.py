@@ -1416,8 +1416,6 @@ celostar_functions = [
 
     [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities', 'CelonisMatchActivitiesFunctions::prepare', 'CelonisMatchActivitiesFunctions::close'],
     [1000302, 'celonis_remap_timestamp_weekday', True, False, 'BIGINT', ['DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday'],
-    # TODO(j.kim): Remove celonis_index_activity_order() after pql2sql is migrated to celonis_index_activity().
-    [1000304, 'celonis_index_activity_order', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivity::celonis_index_activity', 'CelonisIndexActivity::celonis_index_activity_prepare', 'CelonisIndexActivity::celonis_index_activity_close'],
     [1000305, 'celonis_match_process', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisMatchProcess::celonis_match_process', 'CelonisMatchProcess::match_process_prepare', 'CelonisMatchProcess::match_process_close'],
     [1000306, 'celonis_shortened_variant', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'BIGINT'], 'CelonisShortenedVariant::celonis_shortened_variant'],
     [1000307, 'celonis_conformance', True, False, 'ARRAY_BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisConformance::conformance', 'CelonisConformance::conformance_prepare', 'CelonisConformance::conformance_close'],
