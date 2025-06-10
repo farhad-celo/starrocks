@@ -15,7 +15,7 @@ namespace starrocks {
 
 namespace {
 
-static const double MAX_CLUSTERING_SECONDS = 10 * 60.0;
+static const int MAX_CLUSTERING_SECONDS = 10 * 60;
 
 static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
         // start byte of 1-byte utf8 char: 0b0000'0000 ~ 0b0111'1111
@@ -314,7 +314,7 @@ struct StringClusterer {
     // 4. Remove zero cost chars from chars in String in the beginning.
     std::optional<std::vector<std::vector<size_t>>>
     build_graph(const std::vector<std::tuple<int128_t, String, std::string, int64_t>>& tuples) const {
-        auto start_time = std::chrono::high_resolution_clock::now();
+        auto timeout_time = std::chrono::steady_clock::now() + std::chrono::seconds(MAX_CLUSTERING_SECONDS);
         const auto n = tuples.size();
         std::vector<std::vector<int>> char_sets = compute_char_sets(tuples);
         phmap::flat_hash_map<int, std::vector<size_t>, StdHash<int>> char_to_indexes = build_prefix_index(char_sets);
@@ -355,9 +355,7 @@ struct StringClusterer {
 
                                   // Check timeout periodically
                                   if (i % 100 == 0) {
-                                      auto cur_time = std::chrono::high_resolution_clock::now();
-                                      std::chrono::duration<double> elapsed_time = cur_time - start_time;
-                                      if (elapsed_time.count() > MAX_CLUSTERING_SECONDS) {
+                                      if (std::chrono::steady_clock::now() > timeout_time) {
                                           timeout_flag.store(true);
                                       }
                                   }

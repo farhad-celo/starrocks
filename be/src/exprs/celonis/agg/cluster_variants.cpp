@@ -15,7 +15,7 @@ namespace {
 
 static const int64_t NULL_VARIANT_LABEL = -2;
 static const size_t MAX_DISTINCT_VARIANTS = 10000000;
-static const double MAX_DBSCAN_SECONDS = 10 * 60.0;
+static const int MAX_DBSCAN_SECONDS = 10 * 60;
 
 struct VariantHashesWithCount {
     std::vector<int128_t> hashes;
@@ -94,7 +94,7 @@ struct Clusterer {
     // Each point (i.e., edge_set) is sorted based on edge frequency (from low frequency to high frequency).
     std::optional<std::vector<int64_t>> dbscan(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
                                                const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
-        auto start_time = std::chrono::high_resolution_clock::now();
+        auto timeout_time = std::chrono::steady_clock::now() + std::chrono::seconds(MAX_DBSCAN_SECONDS);
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique edges is " << edge_counter.size() << std::endl;
         DCHECK_EQ(points.size(), counts.size());
         n_is_neighbor_checks = 0;
@@ -144,9 +144,7 @@ struct Clusterer {
             expand_cluster(points, counts, index, neighbors, cluster_id, labels, is_cores, is_isolated);
             ++cluster_id;
             if (index % 100 == 0) {
-                auto cur_time = std::chrono::high_resolution_clock::now();
-                std::chrono::duration<double> elapsed_time = cur_time - start_time;
-                if (elapsed_time.count() > MAX_DBSCAN_SECONDS) {
+                if (std::chrono::steady_clock::now() > timeout_time) {
                     return std::nullopt;
                 }
             }
