@@ -575,7 +575,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::Fun
     ColumnBuilder<TYPE_VARCHAR> result(n_rows);
 
     constexpr char REPLACEMENT_CHAR{'?'};
-    std::string sanitized;
+    faststring sanitized;
+    char buffer[4];
     for (int row = 0; row < n_rows; ++row) {
         if (str_viewer.is_null(row)) {
             result.append_null();
@@ -594,10 +595,11 @@ StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::Fun
             if (decoded == boost::locale::utf::illegal || decoded == boost::locale::utf::incomplete) {
                 sanitized.push_back(REPLACEMENT_CHAR);
             } else {
-                boost::locale::utf::utf_traits<char>::encode(decoded, std::back_inserter(sanitized));
+                char* end = boost::locale::utf::utf_traits<char>::encode(decoded, buffer);
+                sanitized.append(buffer, end - buffer);
             }
         }
-        result.append(Slice(sanitized));
+        result.append(Slice(sanitized.data(), sanitized.size()));
     }
 
     return result.build(all_const);
