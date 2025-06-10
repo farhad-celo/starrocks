@@ -5,9 +5,6 @@ set(CMAKE_CXX_STANDARD 20)
 # Set the root path to the CPML directory
 set(CPML_DIR_PATH "${THIRDPARTY_DIR}CPML") # Must match with the naming used in 'dev-env.Dockerfile'
 # Set paths for each library's include and build directories
-set(CPML_CONCURRENCY_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-concurrency-library/include")
-set(CPML_CONCURRENCY_PATH "${CPML_DIR_PATH}/celonis-concurrency-library/build/libconcurrency.a")
-
 set(CPML_FORMATTING_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-formatting-library/include")
 set(CPML_FORMATTING_PATH "${CPML_DIR_PATH}/celonis-formatting-library/build/libformat.a")
 
@@ -18,13 +15,6 @@ set(CPML_TEMPLATE_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-template-library/includ
 set(CPML_TEMPLATE_PATH "${CPML_DIR_PATH}/celonis-template-library/build/libctl.a")
 
 # For additional libraries, add them here:
-
-# Celonis Concurrency Library
-add_library(cpml_concurrency STATIC IMPORTED)
-set_target_properties(cpml_concurrency PROPERTIES
-    IMPORTED_LOCATION "${CPML_CONCURRENCY_PATH}"
-    INTERFACE_INCLUDE_DIRECTORIES "${CPML_CONCURRENCY_INCLUDE_PATH}"
-)
 
 # Celonis Formatting Library
 add_library(cpml_formatting STATIC IMPORTED)
@@ -70,7 +60,6 @@ target_include_directories(${PROJECT_NAME}
 
 # Link all the libraries to the proxy library
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    cpml_concurrency
     cpml_formatting
     cpml_process_mining
     cpml_template

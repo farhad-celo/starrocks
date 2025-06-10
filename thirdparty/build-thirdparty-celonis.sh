@@ -105,9 +105,9 @@ EOF
   mkdir -p /build/CPML
   CPML_BUILD_ROOT=/build/CPML
   cd ${CPML_BUILD_ROOT}
-  CPML_RELEASE="release-2.204.1"
-  CPML_RESOURCE="CPML-2.204.1.tar.gz"
-  CPML_MD5SUM="ed0a545cdca0a63ddde83f324f2efbe9"
+  CPML_RELEASE="release-2.223.0"
+  CPML_RESOURCE="CPML-2.223.0.tar.gz"
+  CPML_MD5SUM="469a02c2ad651e374e0ead5b5f373895"
 
   echo "Start to download CPML"
 
@@ -131,14 +131,6 @@ EOF
   echo "build template library"
   mkdir -p $CPML_BUILD_ROOT/celonis-template-library/build && \
   cd $CPML_BUILD_ROOT/celonis-template-library/build && \
-  echo "build start..." > format_output.log
-  (cmake -DCMAKE_VERBOSE_MAKEFILE=OFF .. && cmake --build . && cmake --install .) 2>&1 | tee -a format_output.log
-  (cmake --build . && cmake --build . && cmake --install .) 2>&1 | tee -a format_output.log
-  (cmake --install . && cmake --build . && cmake --install .) 2>&1 | tee -a format_output.log
-
-  echo "build concurrency"
-  mkdir -p $CPML_BUILD_ROOT/celonis-concurrency-library/build && \
-  cd $CPML_BUILD_ROOT/celonis-concurrency-library/build && \
   echo "build start..." > format_output.log
   (cmake -DCMAKE_VERBOSE_MAKEFILE=OFF .. && cmake --build . && cmake --install .) 2>&1 | tee -a format_output.log
   (cmake --build . && cmake --build . && cmake --install .) 2>&1 | tee -a format_output.log
