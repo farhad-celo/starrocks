@@ -13,55 +13,55 @@
 namespace starrocks {
 
 /*
-2024-12-20T03:53:38+00:00
+2025-06-09T09:59:53+00:00
 Running ./be/build_Release/src/bench/celonis/output/match_strings_bench
-Run on (32 X 2445.43 MHz CPU s)                                                                                                                                      [0/1883]
+Run on (32 X 3218.15 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 3.60, 3.47, 3.78
+Load Average: 9.29, 5.01, 3.44
 // Args: Number of rows / Number of possible strings / Size of match string / Value of top_k
 -----------------------------------------------------------------------------------------------------
 Benchmark                                           Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------------------------
-BM_MatchStringsNonConstant/1000/20/20/3       4143906 ns      4143790 ns          176 RowInvRate=4.14379us
-BM_MatchStringsNonConstant/10000/20/20/3     43346160 ns     43344528 ns           18 RowInvRate=4.33445us
-BM_MatchStringsNonConstant/100000/20/20/3   383505569 ns    383491326 ns            2 RowInvRate=3.83491us
-BM_MatchStringsNonConstant/1000/40/20/3       4758092 ns      4757890 ns          144 RowInvRate=4.75789us
-BM_MatchStringsNonConstant/10000/40/20/3     48510030 ns     48508821 ns           15 RowInvRate=4.85088us
-BM_MatchStringsNonConstant/100000/40/20/3   483826495 ns    483816465 ns            2 RowInvRate=4.83816us
-BM_MatchStringsNonConstant/1000/60/20/3       5006836 ns      5006823 ns          135 RowInvRate=5.00682us
-BM_MatchStringsNonConstant/10000/60/20/3     50774151 ns     50774262 ns           10 RowInvRate=5.07743us
-BM_MatchStringsNonConstant/100000/60/20/3   507166767 ns    507152446 ns            2 RowInvRate=5.07152us
-BM_MatchStringsNonConstant/1000/20/100/3      8821687 ns      8821559 ns           90 RowInvRate=8.82156us
-BM_MatchStringsNonConstant/10000/20/100/3    77710276 ns     77709586 ns            9 RowInvRate=7.77096us
-BM_MatchStringsNonConstant/100000/20/100/3  802545857 ns    802512004 ns            1 RowInvRate=8.02512us
-BM_MatchStringsNonConstant/1000/40/100/3     11396580 ns     11395945 ns           61 RowInvRate=11.3959us
-BM_MatchStringsNonConstant/10000/40/100/3   110271380 ns    110270647 ns            6 RowInvRate=11.0271us
-BM_MatchStringsNonConstant/100000/40/100/3 1172333502 ns   1172318888 ns            1 RowInvRate=11.7232us
-BM_MatchStringsNonConstant/1000/60/100/3     13890633 ns     13889238 ns           51 RowInvRate=13.8892us
-BM_MatchStringsNonConstant/10000/60/100/3   146786265 ns    146775928 ns            5 RowInvRate=14.6776us
-BM_MatchStringsNonConstant/100000/60/100/3 1463973006 ns   1463896432 ns            1 RowInvRate=14.639us
-BM_MatchStringsConstant/1000/20/20/3           100017 ns       100039 ns         6487 RowInvRate=100.039ns
-BM_MatchStringsConstant/10000/20/20/3          413616 ns       413618 ns         1676 RowInvRate=41.3618ns
-BM_MatchStringsConstant/100000/20/20/3        3420512 ns      3420440 ns          203 RowInvRate=34.2044ns
-BM_MatchStringsConstant/1000/40/20/3           200342 ns       200368 ns         3667 RowInvRate=200.368ns
-BM_MatchStringsConstant/10000/40/20/3          504439 ns       504419 ns         1382 RowInvRate=50.4419ns
-BM_MatchStringsConstant/100000/40/20/3        3526475 ns      3526484 ns          201 RowInvRate=35.2648ns
-BM_MatchStringsConstant/1000/60/20/3           299573 ns       299609 ns         2455 RowInvRate=299.609ns
-BM_MatchStringsConstant/10000/60/20/3          595700 ns       595708 ns         1178 RowInvRate=59.5708ns
-BM_MatchStringsConstant/100000/60/20/3        3746117 ns      3746105 ns          191 RowInvRate=37.461ns
-BM_MatchStringsConstant/1000/20/100/3          139044 ns       139066 ns         5063 RowInvRate=139.066ns
-BM_MatchStringsConstant/10000/20/100/3         434958 ns       434953 ns         1632 RowInvRate=43.4953ns
-BM_MatchStringsConstant/100000/20/100/3       3400974 ns      3401027 ns          200 RowInvRate=34.0103ns
-BM_MatchStringsConstant/1000/40/100/3          345134 ns       345167 ns         1947 RowInvRate=345.167ns
-BM_MatchStringsConstant/10000/40/100/3         680577 ns       680555 ns         1055 RowInvRate=68.0555ns
-BM_MatchStringsConstant/100000/40/100/3       3744114 ns      3744050 ns          181 RowInvRate=37.4405ns
-BM_MatchStringsConstant/1000/60/100/3          625749 ns       625776 ns         1067 RowInvRate=625.776ns
-BM_MatchStringsConstant/10000/60/100/3         964268 ns       964239 ns          725 RowInvRate=96.4239ns
-BM_MatchStringsConstant/100000/60/100/3       4073624 ns      4073420 ns          174 RowInvRate=40.7342ns
+BM_MatchStringsNonConstant/1000/20/20/3       4157064 ns      4156986 ns          166 RowInvRate=4.15699us
+BM_MatchStringsNonConstant/10000/20/20/3     36683555 ns     36681166 ns           16 RowInvRate=3.66812us
+BM_MatchStringsNonConstant/100000/20/20/3   380061892 ns    380052925 ns            2 RowInvRate=3.80053us
+BM_MatchStringsNonConstant/1000/40/20/3       4805964 ns      4805793 ns          148 RowInvRate=4.80579us
+BM_MatchStringsNonConstant/10000/40/20/3     47128090 ns     47127025 ns           15 RowInvRate=4.7127us
+BM_MatchStringsNonConstant/100000/40/20/3   459665372 ns    459654309 ns            2 RowInvRate=4.59654us
+BM_MatchStringsNonConstant/1000/60/20/3       5055963 ns      5055863 ns          100 RowInvRate=5.05586us
+BM_MatchStringsNonConstant/10000/60/20/3     55117629 ns     55114890 ns           10 RowInvRate=5.51149us
+BM_MatchStringsNonConstant/100000/60/20/3   521967685 ns    521963887 ns            2 RowInvRate=5.21964us
+BM_MatchStringsNonConstant/1000/20/100/3      7996683 ns      7996730 ns           81 RowInvRate=7.99673us
+BM_MatchStringsNonConstant/10000/20/100/3    82563426 ns     82563472 ns            8 RowInvRate=8.25635us
+BM_MatchStringsNonConstant/100000/20/100/3  893985091 ns    893954705 ns            1 RowInvRate=8.93955us
+BM_MatchStringsNonConstant/1000/40/100/3     11636225 ns     11636239 ns           59 RowInvRate=11.6362us
+BM_MatchStringsNonConstant/10000/40/100/3   122248967 ns    122245112 ns            6 RowInvRate=12.2245us
+BM_MatchStringsNonConstant/100000/40/100/3 1223174543 ns   1223106995 ns            1 RowInvRate=12.2311us
+BM_MatchStringsNonConstant/1000/60/100/3     14836044 ns     14835339 ns           49 RowInvRate=14.8353us
+BM_MatchStringsNonConstant/10000/60/100/3   140715911 ns    140708535 ns            5 RowInvRate=14.0709us
+BM_MatchStringsNonConstant/100000/60/100/3 1484577582 ns   1484557852 ns            1 RowInvRate=14.8456us
+BM_MatchStringsConstant/1000/20/20/3           104263 ns       104288 ns         6952 RowInvRate=104.288ns
+BM_MatchStringsConstant/10000/20/20/3          405525 ns       405543 ns         1718 RowInvRate=40.5543ns
+BM_MatchStringsConstant/100000/20/20/3        3415871 ns      3415863 ns          205 RowInvRate=34.1586ns
+BM_MatchStringsConstant/1000/40/20/3           193350 ns       193380 ns         3482 RowInvRate=193.38ns
+BM_MatchStringsConstant/10000/40/20/3          501348 ns       501314 ns         1370 RowInvRate=50.1314ns
+BM_MatchStringsConstant/100000/40/20/3        3516970 ns      3516928 ns          202 RowInvRate=35.1693ns
+BM_MatchStringsConstant/1000/60/20/3           295264 ns       295281 ns         2408 RowInvRate=295.281ns
+BM_MatchStringsConstant/10000/60/20/3          592425 ns       592435 ns         1201 RowInvRate=59.2435ns
+BM_MatchStringsConstant/100000/60/20/3        3604400 ns      3604375 ns          194 RowInvRate=36.0438ns
+BM_MatchStringsConstant/1000/20/100/3          124248 ns       124272 ns         4823 RowInvRate=124.272ns
+BM_MatchStringsConstant/10000/20/100/3         448232 ns       448238 ns         1557 RowInvRate=44.8238ns
+BM_MatchStringsConstant/100000/20/100/3       3467389 ns      3467347 ns          202 RowInvRate=34.6735ns
+BM_MatchStringsConstant/1000/40/100/3          348479 ns       348505 ns         1878 RowInvRate=348.505ns
+BM_MatchStringsConstant/10000/40/100/3         651551 ns       651547 ns         1018 RowInvRate=65.1547ns
+BM_MatchStringsConstant/100000/40/100/3       3679085 ns      3679044 ns          193 RowInvRate=36.7904ns
+BM_MatchStringsConstant/1000/60/100/3          626326 ns       626373 ns         1139 RowInvRate=626.373ns
+BM_MatchStringsConstant/10000/60/100/3         989287 ns       989280 ns          712 RowInvRate=98.928ns
+BM_MatchStringsConstant/100000/60/100/3       4191137 ns      4191152 ns          175 RowInvRate=41.9115ns
 */
 
 enum MatchType {
@@ -95,7 +95,7 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
     int num_rows = state.range(0);
     int num_strings = state.range(1);
     int match_size = state.range(2);
-    int top_k = state.range(3);
+    int64_t top_k = static_cast<int64_t>(state.range(3));
 
     using UniformInt = std::uniform_int_distribution<std::mt19937::result_type>;
     std::random_device dev;
@@ -121,7 +121,7 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
     auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -131,7 +131,7 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
         state.PauseTiming();
         total_rows += num_rows;
         auto input_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-        auto top_k_column = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto top_k_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         auto separator_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         for (int i = 0; i < num_rows; i++) {
             input_column->append_datum(gen_rand_element());
