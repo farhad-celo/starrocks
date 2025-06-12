@@ -5,6 +5,9 @@
 #include <random>
 #include <algorithm>
 #include <limits>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
+#include <tbb/concurrent_vector.h>
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
@@ -138,56 +141,76 @@ private:
     }
 
     void initialize_centroids() {
-        // Cap k at the number of points
-        k = std::min(k, static_cast<int64_t>(points.size()));
         // Sort points to get deterministic result
         std::sort(points.begin(), points.end());
 
-        // If k equals the number of points, use all points as centroids
-        if (k == static_cast<int>(points.size())) {
+        // If k is greater than or equal to the number of points, use all points as centroids
+        if (k >= points.size()) {
             centroids = points;
             return;
         }
-
-        // Choose the first centroid randomly
         DCHECK(!points.empty());
-        std::uniform_int_distribution<> distrib(0, points.size() - 1); // Define the range [0, size-1]
+        // Choose first centroid randomly
+        std::uniform_int_distribution<> distrib(0, points.size() - 1);
         auto first_centroid = distrib(gen);
         centroids.push_back(points[first_centroid]);
-        std::set<size_t> available_indexes;
-        for (size_t i = 0; i < points.size(); ++i) {
-            if (i != first_centroid) {
-                available_indexes.insert(i);
-            }
-        }
 
-        // Choose the remaining k - 1 centroids
-        for (int i = 1; i < k; ++i) {
-            double total_distance_squared = 0.0;
+        // Track available points
+        std::vector<bool> is_available(points.size(), true);
+        is_available[first_centroid] = false;
 
-            // Compute distances to the nearest centroid for each non-centroid point
-            std::vector<double> distances_squared;
-            distances_squared.reserve(available_indexes.size());
-            for (size_t j: available_indexes) {
-                auto min_distance_squared = std::numeric_limits<double>::max();
-                for (const auto& centroid: centroids) {
-                    double dist_squared = euclidean_distance_squared(points[j], centroid);
-                    min_distance_squared = std::min(min_distance_squared, dist_squared);
-                }
-                total_distance_squared += min_distance_squared;
-                distances_squared.push_back(min_distance_squared);
-            }
+        // For remaining k-1 centroids
+        for (int iter = 1; iter < k; ++iter) {
+            // Parallel computation of distances to nearest centroid
+            std::vector<double> min_distances(points.size(),
+                                              std::numeric_limits<double>::max());
 
-            // Choose the next centroid with probability proportional to distance squared
+            // Use TBB parallel_for to compute distances
+            tbb::parallel_for(
+                    tbb::blocked_range<size_t>(0, points.size()),
+                    [&](const tbb::blocked_range<size_t>& range) {
+                        for (size_t i = range.begin(); i != range.end(); ++i) {
+                            if (!is_available[i]) {
+                                min_distances[i] = 0.0;
+                                continue;
+                            }
+
+                            double min_dist_sq = std::numeric_limits<double>::max();
+                            for (const auto& centroid: centroids) {
+                                double dist_sq = euclidean_distance_squared(
+                                        points[i], centroid);
+                                min_dist_sq = std::min(min_dist_sq, dist_sq);
+                            }
+                            min_distances[i] = min_dist_sq;
+                        }
+                    }
+            );
+
+            // Parallel reduction to compute total distance
+            double total_distance_squared = tbb::parallel_reduce(
+                    tbb::blocked_range<size_t>(0, points.size()),
+                    0.0,
+                    [&](const tbb::blocked_range<size_t>& range, double init) {
+                        double sum = init;
+                        for (size_t i = range.begin(); i != range.end(); ++i) {
+                            sum += min_distances[i];
+                        }
+                        return sum;
+                    },
+                    std::plus<double>()
+            );
+
+            // Sequential selection (cannot be parallelized due to dependencies)
             std::uniform_real_distribution<> dis_real(0.0, total_distance_squared);
             double r = dis_real(gen);
-            double sum = 0.0;
-            size_t idx = 0;
-            for (size_t j: available_indexes) {
-                sum += distances_squared[idx++];
-                if (sum >= r) {
-                    centroids.push_back(points[j]);
-                    available_indexes.erase(j);
+            double cumsum = 0.0;
+
+            for (size_t i = 0; i < points.size(); ++i) {
+                if (!is_available[i]) continue;
+                cumsum += min_distances[i];
+                if (cumsum >= r) {
+                    centroids.push_back(points[i]);
+                    is_available[i] = false;
                     break;
                 }
             }
@@ -196,18 +219,26 @@ private:
 
     void assign_points_to_clusters() {
         assignments.resize(points.size());
-        for (size_t i = 0; i < points.size(); ++i) {
-            double min_dist_squared = std::numeric_limits<double>::max();
-            int closest_centroid = 0;
-            for (int j = 0; j < k; ++j) {
-                double dist_squared = euclidean_distance_squared(points[i], centroids[j]);
-                if (dist_squared < min_dist_squared) {
-                    min_dist_squared = dist_squared;
-                    closest_centroid = j;
+        // Parallel assignment using TBB
+        tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, points.size()),
+                [&](const tbb::blocked_range<size_t>& range) {
+                    for (size_t i = range.begin(); i != range.end(); ++i) {
+                        double min_dist_squared = std::numeric_limits<double>::max();
+                        int closest_centroid = 0;
+
+                        for (int j = 0; j < k; ++j) {
+                            double dist_squared = euclidean_distance_squared(
+                                    points[i], centroids[j]);
+                            if (dist_squared < min_dist_squared) {
+                                min_dist_squared = dist_squared;
+                                closest_centroid = j;
+                            }
+                        }
+                        assignments[i] = closest_centroid;
+                    }
                 }
-            }
-            assignments[i] = closest_centroid;
-        }
+        );
     }
 
     void update_centroids() {
