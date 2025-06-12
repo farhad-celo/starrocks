@@ -18,7 +18,7 @@ namespace starrocks {
 
 namespace {
 
-static const double MAX_KMEANS_SECONDS = 3.5 * 60.0; // 3.5 mins
+static const int MAX_KMEANS_SECONDS = 3.5 * 60; // 3.5 mins
 static const int MAX_KMEANS_ITERATIONS = 100;
 static const uint64_t MAX_KMEANS_MODEL_SIZE = (100LL << 20); // 100M
 
@@ -204,6 +204,7 @@ private:
             std::uniform_real_distribution<> dis_real(0.0, total_distance_squared);
             double r = dis_real(gen);
             double cumsum = 0.0;
+            bool centroid_added = false;
 
             for (size_t i = 0; i < points.size(); ++i) {
                 if (!is_available[i]) continue;
@@ -211,7 +212,18 @@ private:
                 if (cumsum >= r) {
                     centroids.push_back(points[i]);
                     is_available[i] = false;
+                    centroid_added = true;
                     break;
+                }
+            }
+
+            if (!centroid_added) {
+                for (ssize_t i = points.size() - 1; i >= 0; --i) {
+                    if (is_available[i]) {
+                        centroids.push_back(points[i]);
+                        is_available[i] = false;
+                        break;
+                    }
                 }
             }
         }
@@ -272,15 +284,13 @@ public:
             : points(input_points), k(num_clusters), gen(seed) {}
 
     void run() {
-        auto start_time = std::chrono::high_resolution_clock::now();
+        auto timeout_time = std::chrono::steady_clock::now() + std::chrono::seconds(MAX_KMEANS_SECONDS);
         initialize_centroids();
 
         for (int iter = 0; iter < MAX_KMEANS_ITERATIONS; ++iter) {
             assign_points_to_clusters();
             update_centroids();
-            auto cur_time = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed_time = cur_time - start_time;
-            if (elapsed_time.count() > MAX_KMEANS_SECONDS) {
+            if (std::chrono::steady_clock::now() > timeout_time) {
                 break;
             }
         }
