@@ -25,6 +25,7 @@ namespace {
 
 constexpr std::string_view CELONIS_XX_HASH3_128_V2 = "CELONIS_XX_HASH3_128_V2";
 constexpr std::string_view CELONIS_XX_HASH3_128_V3 = "CELONIS_XX_HASH3_128_V3";
+constexpr std::string_view CELONIS_XX_HASH3_128_V4 = "CELONIS_XX_HASH3_128_V4";
 constexpr std::string_view CELONIS_XX_HASH3_96 = "CELONIS_XX_HASH3_96";
 
 Status xxh3_128bits_update(XXH3_state_t* state, const void* input, size_t len) {
@@ -36,10 +37,7 @@ Status xxh3_128bits_update(XXH3_state_t* state, const void* input, size_t len) {
     return Status::OK();
 }
 
-// TODO(y.zhang): We can optimize this further, for single column, we do not need to hash "_len_"; also "len_" is
-// enough; and "reversed(len)_" is enough.
-// xxh3_128bits_update_v2 also hashes the length of the input
-Status xxh3_128bits_update_v2(XXH3_state_t* state, const void* input, size_t len) {
+Status xxh3_128bits_update_v3(XXH3_state_t* state, const void* input, size_t len) {
     RETURN_IF_ERROR(xxh3_128bits_update(state, input, len));
     // Also hash the value "_" + std::string(len) + "_"
     char len_buffer[32];  // enough for any size_t value
@@ -66,6 +64,12 @@ Status xxh3_128bits_update_v2(XXH3_state_t* state, const void* input, size_t len
     return Status::OK();
 }
 
+Status xxh3_128bits_update_v4(XXH3_state_t* state, const void* input, size_t len) {
+    uint32_t new_len = static_cast<uint32_t>(len);
+    RETURN_IF_ERROR(xxh3_128bits_update(state, &new_len, sizeof(uint32_t)));
+    return xxh3_128bits_update(state, input, len);
+}
+
 template<std::string_view const& reserved_str, std::string_view const& function_name>
 inline Status validate_slice_template(const Slice& slice) {
     if (reserved_str.size() == slice.size &&
@@ -81,7 +85,7 @@ inline Status validate_slice_template(const Slice& slice) {
 }
 
 
-template<bool hash96, std::string_view const& function_name>
+template<bool hash96, bool enable_validation, std::string_view const& function_name>
 StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const starrocks::Columns& columns,
                                     Status (* hash_update_func)(XXH3_state_t*, const void*, size_t)) {
     DCHECK(columns.size() >= 1);
@@ -130,9 +134,12 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
             for (auto i = start; i < end; ++i) {
                 const bool is_null = string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0;
                 if (!is_null) {
-                    // validate that the input string does not conflict with the reserved null string.
-                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(slices[i])));
-                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_ARRAY_STRING, function_name>(slices[i])));
+                    if constexpr (enable_validation) {
+                        // validate that the input string does not conflict with the reserved null string.
+                        RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(slices[i])));
+                        RETURN_IF_ERROR(
+                                (validate_slice_template<XXHASH3_128_NULL_ARRAY_STRING, function_name>(slices[i])));
+                    }
                     RETURN_IF_ERROR(hash_update_func(&states[row], slices[i].data, slices[i].size));
                 } else {
                     RETURN_IF_ERROR(hash_update_func(&states[row], XXHASH3_128_NULL_STRING.data(),
@@ -159,7 +166,10 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
             for (auto i = 0; i < num_const_columns; ++i) {
                 const auto& viewer = column_viewers[i];
                 if (!viewer.is_null(0)) {
-                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(0))));
+                    if constexpr (enable_validation) {
+                        RETURN_IF_ERROR(
+                                (validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(0))));
+                    }
                     RETURN_IF_ERROR(hash_update_func(&(init_state), viewer.value(0).data, viewer.value(0).size));
                 } else {
                     RETURN_IF_ERROR(hash_update_func(&(init_state), XXHASH3_128_NULL_STRING.data(),
@@ -172,7 +182,10 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
             const auto& viewer = column_viewers[i];
             for (size_t row = 0; row < n_rows; ++row) {
                 if (!viewer.is_null(row)) {
-                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(row))));
+                    if constexpr (enable_validation) {
+                        RETURN_IF_ERROR(
+                                (validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(row))));
+                    }
                     RETURN_IF_ERROR(hash_update_func(&(states[row]), viewer.value(row).data, viewer.value(row).size));
                 } else {
                     RETURN_IF_ERROR(hash_update_func(&(states[row]), XXHASH3_128_NULL_STRING.data(),
@@ -208,17 +221,25 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v2(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
-    return xx_hash3_helper<false, CELONIS_XX_HASH3_128_V2>(context, columns, xxh3_128bits_update);
+    return xx_hash3_helper<false, true, CELONIS_XX_HASH3_128_V2>(context, columns, xxh3_128bits_update);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v3(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
-    return xx_hash3_helper<false, CELONIS_XX_HASH3_128_V3>(context, columns, xxh3_128bits_update_v2);
+    return xx_hash3_helper<false, true, CELONIS_XX_HASH3_128_V3>(context, columns, xxh3_128bits_update_v3);
+}
+
+StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v4(starrocks::FunctionContext* context,
+                                                            const starrocks::Columns& columns) {
+    if (context->get_arg_type(0)->type != TYPE_ARRAY && columns.size() == 1) {
+        return xx_hash3_helper<false, false, CELONIS_XX_HASH3_128_V4>(context, columns, xxh3_128bits_update);
+    }
+    return xx_hash3_helper<false, false, CELONIS_XX_HASH3_128_V4>(context, columns, xxh3_128bits_update_v4);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_96(starrocks::FunctionContext* context,
                                                         const starrocks::Columns& columns) {
-    return xx_hash3_helper<true, CELONIS_XX_HASH3_96>(context, columns, xxh3_128bits_update_v2);
+    return xx_hash3_helper<true, true, CELONIS_XX_HASH3_96>(context, columns, xxh3_128bits_update_v3);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,
@@ -348,7 +369,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                 }
                 Slice slice = strings[i];
                 RETURN_IF_ERROR(
-                        xxh3_128bits_update_v2(&states[row], slice.data, slice.size));
+                        xxh3_128bits_update_v3(&states[row], slice.data, slice.size));
             }
         }
     } else {
@@ -368,7 +389,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                 }
                 auto slice = viewer.value(row);
                 RETURN_IF_ERROR(
-                        xxh3_128bits_update_v2(&states[row], slice.data, slice.size));
+                        xxh3_128bits_update_v3(&states[row], slice.data, slice.size));
             }
         }
     }

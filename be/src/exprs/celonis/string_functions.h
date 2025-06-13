@@ -48,6 +48,14 @@ public:
     /**
      * @param: [string_value, ...] or [string_array]
      * @paramType: [VARCHAR, ...] or [ARRAY_VARCHAR]
+     * @return LARGEINT
+     * v4 preserves the same functional properties as v3 but produces different hash values.
+     */
+    DEFINE_VECTORIZED_FN(xx_hash3_128_v4);
+
+    /**
+     * @param: [string_value, ...] or [string_array]
+     * @paramType: [VARCHAR, ...] or [ARRAY_VARCHAR]
      * @return TYPE_VARCHAR
      * celonis_xx_hash3_96(NULL) != NULL
      * celonis_xx_hash3_96(NULL) == celonis_xx_hash3_96(NULL)
