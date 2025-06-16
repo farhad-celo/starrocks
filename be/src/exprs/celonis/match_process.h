@@ -92,11 +92,12 @@ private:
 
     struct TransitionKeyHasher {
         std::size_t operator()(const TransitionKey& k) const {
-            return ((std::hash<int>()(k.current_dfa_state) ^ (k.input_symbol.hash << 1)) >> 1);
+            const std::size_t combined_hash = std::hash<int>()(k.current_dfa_state) ^ k.input_symbol.hash;
+            return phmap::phmap_mix<sizeof(std::size_t)>()(combined_hash);
         }
     };
 
-    // Based on the benchmark, phmap::flat_hash_map has better performance (up to 36% latency reduction)
+    // Based on the benchmark, phmap::flat_hash_map has better performance
     // than std::unordered_map when the number nfa states is small.
     phmap::flat_hash_map<TransitionKey, int, TransitionKeyHasher> dfa_transitions_;
 
