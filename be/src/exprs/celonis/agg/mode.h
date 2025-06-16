@@ -45,7 +45,7 @@ private:
     using MapType = std::conditional_t<
             HAS_SLICE_VALUE_TYPE,
             phmap::flat_hash_map<ValueType, OccurrenceCountType, SliceHash, SliceEqual>, // for type VARCHAR
-            phmap::flat_hash_map<ValueType, OccurrenceCountType>>;                       // for other supported types
+            phmap::flat_hash_map<ValueType, OccurrenceCountType, StdHash<ValueType>>>;   // for other supported types
     /* Stores the number of occurrences for each value */
     MapType aggregate_{};
 };
