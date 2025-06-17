@@ -236,20 +236,23 @@ static StatusOr<std::unique_ptr<NFA>> from_json(MatchProcessState* func_state, c
     return result;
 }
 
-ColumnPtr celonis_match_process_internal(const NFA* nfa, const Column& elements,
-                                         const UInt32Column& offsets,
-                                         const NullColumn::Container* null_element_offsets,
-                                         const NullColumn::Container* null_array_offsets) {
-    const size_t num_array = offsets.size() - 1;
+ColumnPtr celonis_match_process_internal(const NFA* nfa, const Columns& columns) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
+    const Column& elements = *array_data.elements;
+    const UInt32Column& offsets = *array_data.offsets;
+    const NullColumn::Container* null_element_offsets = array_data.null_elements;
+    const NullColumn::Container* null_array_offsets = array_data.null_arrays;
     auto offsets_ptr = offsets.get_data().data();
 
-    ColumnBuilder<TYPE_BIGINT> result(num_array);
-    result.reserve(num_array);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    result.reserve(num_rows);
     using ValueType = RunTimeCppType<TYPE_VARCHAR>;
     auto elements_ptr = (const ValueType *) (elements.raw_data());
     std::vector<Slice> current_array;
     NFAEvaluator nfa_eval(nfa);
-    for (size_t i = 0; i < num_array; i++) {
+    for (size_t i = 0; i < num_rows; i++) {
         if (null_array_offsets != nullptr && (*null_array_offsets)[i]) {
             result.append_null();
             continue;
@@ -263,13 +266,9 @@ ColumnPtr celonis_match_process_internal(const NFA* nfa, const Column& elements,
             }
             current_array.push_back(elements_ptr[index]);
         }
-        if (nfa_eval.matches(current_array)) {
-            result.append(1L);
-        } else {
-            result.append(0L);
-        }
+        result.append(nfa_eval.matches(current_array) ? 1L : 0L);
     }
-    return result.build(/*is_const=*/false);
+    return result.build(all_const);
 }
 
 Status CelonisMatchProcess::match_process_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
@@ -322,12 +321,11 @@ Status CelonisMatchProcess::match_process_close(FunctionContext* context, Functi
 }
 
 StatusOr<ColumnPtr> CelonisMatchProcess::celonis_match_process(FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto* state = reinterpret_cast<const MatchProcessState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     DCHECK(state != nullptr);
     const auto& nfa = state->nfa;
-    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
-    UnnestedArrayData array_data = prepare_array_input(array_column.get());
-    return celonis_match_process_internal(nfa.get(), *array_data.elements, *array_data.offsets, array_data.null_elements, array_data.null_arrays);
+    return celonis_match_process_internal(nfa.get(), columns);
 }
 } // namespace starrocks

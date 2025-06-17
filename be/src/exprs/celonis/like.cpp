@@ -117,7 +117,7 @@ std::pair<std::string, bool> CelonisLike::convert_like_pattern(const Slice& patt
 StatusOr<ColumnPtr> CelonisLike::like_non_constant(FunctionContext* context, const Columns& columns) {
     const auto& value_column = VECTORIZED_FN_ARGS(0);
     const auto& pattern_column = VECTORIZED_FN_ARGS(1);
-    int num_rows = value_column->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
 
     ColumnViewer<TYPE_VARCHAR> value_viewer(value_column);
     ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
@@ -157,7 +157,7 @@ StatusOr<ColumnPtr> CelonisLike::like_non_constant(FunctionContext* context, con
         }
     }
 
-    return result.build(/*is_const=*/false);
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisLike::like_constant_no_wildcard(FunctionContext* context, const Columns& columns) {

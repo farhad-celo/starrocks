@@ -86,14 +86,12 @@ Status CelonisIn<LT>::close(FunctionContext* context, FunctionContext::FunctionS
 template<LogicalType LT>
 StatusOr<ColumnPtr> CelonisIn<LT>::in_non_constant_match([[maybe_unused]]FunctionContext* context,
                                                          const Columns& columns) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const auto& value_column = columns[0];
     const auto& match_column = columns[1];
-    auto num_rows = value_column->size();
-    DCHECK_EQ(match_column->size(), num_rows);
 
     ColumnViewer<LT> value_viewer(value_column);
     ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
-
     for (auto row = 0; row < num_rows; ++row) {
         auto match_datum = match_column->get(row);
         if (match_datum.is_null()) {
@@ -120,20 +118,16 @@ StatusOr<ColumnPtr> CelonisIn<LT>::in_non_constant_match([[maybe_unused]]Functio
         }
         result.append(match);
     }
-    return result.build(/*is_const=*/false);
+    return result.build(all_const);
 }
 
 template<LogicalType LT>
 StatusOr<ColumnPtr> CelonisIn<LT>::in_constant_match([[maybe_unused]]FunctionContext* context, const Columns& columns) {
-    const auto& value_column = columns[0];
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
-
-    ColumnViewer<LT> value_viewer(value_column);
+    ColumnViewer<LT> value_viewer(columns[0]);
     ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
-
     const auto* state = reinterpret_cast<const InStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-
     for (auto row = 0; row < num_rows; ++row) {
         if (value_viewer.is_null(row)) {
             result.append(state->match_has_null);
