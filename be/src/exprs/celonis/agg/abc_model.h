@@ -9,14 +9,14 @@
 #include "gutil/casts.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
-#include <set>
 #include <boost/algorithm/string/join.hpp>
+#include <execution>
 
 namespace starrocks {
 
 template<LogicalType LT, typename T = RunTimeCppType<LT>>
 std::string to_model(const std::vector<std::pair<std::optional<T>, std::optional<T>>>& ranges,
-                     const std::map<T, std::vector<int64_t>>& num_to_counter) {
+                     const std::map<T, std::vector<size_t>>& num_to_counter) {
     // create the model
     std::string model;
     // Use [-1, 0] to represent empty range.
@@ -39,7 +39,7 @@ std::string to_model(const std::vector<std::pair<std::optional<T>, std::optional
     for (const auto& [num, counter]: num_to_counter) {
         std::vector<std::string> items;
         items.push_back(std::to_string(num));
-        int64_t total = std::accumulate(counter.begin(), counter.end(), 0);
+        size_t total = std::accumulate(counter.begin(), counter.end(), static_cast<size_t>(0));
         items.push_back(std::to_string(static_cast<double>(counter[1]) / total));
         items.push_back(std::to_string(static_cast<double>(counter[2]) / total));
         items.push_back(std::to_string(static_cast<double>(counter[3]) / total));
@@ -56,14 +56,14 @@ struct CelonisAbcModelAggregateState {
     void update(const Column* value_column, const Column* pk_hash_column, size_t row_num) {
         auto num = value_column->get(row_num).get<RunTimeCppType<LT>>();
         if (sample_ratio == 1.0) {
-            nums.insert(num);
+            nums[num]++;
         } else {
             int64_t pk_hash = pk_hash_column->get(row_num).get<int64_t>();
             double prob =
                     static_cast<double>(safe_abs(pk_hash)) /
                     static_cast<double>(std::numeric_limits<int64_t>::max());
             if (prob < sample_ratio) {
-                nums.insert(num);
+                nums[num]++;
             }
         }
     }
@@ -71,9 +71,9 @@ struct CelonisAbcModelAggregateState {
     // Returns the total size in bytes required to encode this object.
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(uint32_t);                   // size of nums
-        result += sizeof(CppType) * nums.size();      // items in nums
-        result += sizeof(double) * 3;                 // sample_ratio, ratio_a, ratio_b
+        result += sizeof(uint32_t);                                  // size of nums
+        result += (sizeof(CppType) + sizeof(size_t)) * nums.size();  // key-value pairs in nums
+        result += sizeof(double) * 3;                                // sample_ratio, ratio_a, ratio_b
         return result;
     }
 
@@ -85,11 +85,11 @@ struct CelonisAbcModelAggregateState {
         uint32_t nums_size = nums.size();
         memcpy(dst, &nums_size, sizeof(uint32_t));
         dst += sizeof(uint32_t);
-        // asc order
-        for (auto it = nums.begin(); it != nums.end(); ++it) {
-            auto num = *it;
+        for (const auto& [num, count]: nums) {
             memcpy(dst, &num, sizeof(CppType));
             dst += sizeof(CppType);
+            memcpy(dst, &count, sizeof(size_t));
+            dst += sizeof(size_t);
         }
         memcpy(dst, &sample_ratio, sizeof(double));
         dst += sizeof(double);
@@ -105,13 +105,15 @@ struct CelonisAbcModelAggregateState {
         uint32_t num_size;
         memcpy(&num_size, src, sizeof(uint32_t));
         src += sizeof(uint32_t);
-        auto hint = nums.begin();
+
         for (auto i = 0; i < num_size; ++i) {
             CppType num;
+            size_t count;
             memcpy(&num, src, sizeof(CppType));
             src += sizeof(CppType);
-            hint = nums.insert(hint, num);
-            ++hint;
+            memcpy(&count, src, sizeof(size_t));
+            src += sizeof(size_t);
+            nums[num] += count;
         }
         double sample_r;
         memcpy(&sample_r, src, sizeof(double));
@@ -132,7 +134,7 @@ struct CelonisAbcModelAggregateState {
     double ratio_a = 0.8;
     double ratio_b = 0.15;
     double sample_ratio = 1.0;
-    std::multiset<CppType> nums;
+    phmap::flat_hash_map<CppType, size_t, StdHash<CppType>> nums;
 };
 
 /**
@@ -218,40 +220,55 @@ public:
             to->append_nulls(1);
             return;
         }
-        const T total_sum = std::accumulate(state_impl.nums.begin(), state_impl.nums.end(), T{});
+
+        // Calculate total sum considering counts
+        double total_sum = 0.0;
+        for (const auto& [num, count]: state_impl.nums) {
+            total_sum += static_cast<double>(num) * static_cast<double>(count);
+        }
+
         const double a_breakpoint = static_cast<double>(total_sum) * state_impl.ratio_a;
         const double b_breakpoint = static_cast<double>(total_sum) * (state_impl.ratio_a + state_impl.ratio_b);
         std::vector<std::pair<std::optional<T>, std::optional<T>>> ranges;
         ranges.resize(4);
-        T cur_sum = T{};
-        std::map<T, std::vector<int64_t>> num_to_counter;
+        double cur_sum = 0.0;
+        std::map<T, std::vector<size_t>> num_to_counter;
+
+        // Need to sort keys to traverse from high to low
+        std::vector<std::pair<T, size_t>> sorted_nums(state_impl.nums.begin(), state_impl.nums.end());
+        std::sort(std::execution::par_unseq, sorted_nums.begin(), sorted_nums.end(),
+                  [](const auto& a, const auto& b) { return a.first > b.first; });
+
         std::optional<T> pre_num;
-        std::vector<int64_t> counter(4, 0);
+        std::vector<size_t> counter(4, 0);
+
         // traverse number from high to low
-        for (auto it = state_impl.nums.rbegin(); it != state_impl.nums.rend(); ++it) {
-            T num = *it;
-            cur_sum += num;
-            int category = 3;
-            if (cur_sum <= a_breakpoint) {
-                category = 1;
-            } else if (cur_sum <= b_breakpoint) {
-                category = 2;
-            }
-            // set high
-            if (!ranges[category].second.has_value()) {
-                ranges[category].second = num;
-            }
-            // set low
-            ranges[category].first = num;
-            if (pre_num.has_value() && num != pre_num.value()) {
-                // pre_num appears in multiple groups
-                if (std::count_if(counter.begin(), counter.end(), [](int x) { return x > 0; }) > 1) {
-                    num_to_counter.insert({pre_num.value(), counter});
+        for (const auto& [num, count]: sorted_nums) {
+            for (auto i = 0; i < count; ++i) {
+                cur_sum += static_cast<double>(num);
+                int category = 3;
+                if (cur_sum <= a_breakpoint) {
+                    category = 1;
+                } else if (cur_sum <= b_breakpoint) {
+                    category = 2;
                 }
-                counter = std::vector<int64_t>(4, 0);
+                // set high
+                if (!ranges[category].second.has_value()) {
+                    ranges[category].second = num;
+                }
+                // set low
+                ranges[category].first = num;
+
+                if (pre_num.has_value() && num != pre_num.value()) {
+                    // pre_num appears in multiple groups
+                    if (std::count_if(counter.begin(), counter.end(), [](int x) { return x > 0; }) > 1) {
+                        num_to_counter.insert({pre_num.value(), counter});
+                    }
+                    counter = std::vector<size_t>(4, 0);
+                }
+                counter[category] += 1;
+                pre_num = num;
             }
-            counter[category] += 1;
-            pre_num = num;
         }
         if (pre_num.has_value() && std::count_if(counter.begin(), counter.end(), [](int x) { return x > 0; }) > 1) {
             num_to_counter.insert({pre_num.value(), counter});
