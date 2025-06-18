@@ -5,7 +5,7 @@
 #include "column/column_viewer.h"
 #include "column/array_column.h"
 #include "column/hash_set.h"
-#include "exprs/base64.h"
+#include "exprs/celonis/base64.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
 #include "exprs/celonis/agg/util.h"
@@ -375,9 +375,11 @@ private:
     }
 
     void set_cum_sum() {
+        id_to_cum_sum_.reserve(id_to_time_ranges_.size());
         for (const auto& kv: id_to_time_ranges_) {
             const auto& time_ranges = kv.second;
             std::vector<int64_t> cum_sum = {0};
+            cum_sum.reserve(time_ranges.size() + 1);
             for (const auto& time_range: time_ranges) {
                 cum_sum.push_back(cum_sum.back() + time_range.end_ms - time_range.begin_ms);
             }
@@ -386,8 +388,10 @@ private:
     }
 
     void set_round_time_ranges() {
+        id_to_round_time_ranges_.reserve(id_to_time_ranges_.size());
         for (const auto& kv: id_to_time_ranges_) {
             std::vector<TimeRange> round_time_ranges;
+            round_time_ranges.reserve(kv.second.size());
             for (const auto& time_range: kv.second) {
                 auto round_time_range = time_range;
                 round_time_range.begin_ms = floor_to_nearest_multiple(round_time_range.begin_ms,
@@ -400,9 +404,11 @@ private:
     }
 
     void set_round_cum_sum() {
+        id_to_round_cum_sum_.reserve(id_to_round_time_ranges_.size());
         for (const auto& kv: id_to_round_time_ranges_) {
             const auto& round_time_ranges = kv.second;
             std::vector<int64_t> round_cum_sum = {0};
+            round_cum_sum.reserve(round_time_ranges.size() + 1);
             for (const auto& round_time_range: round_time_ranges) {
                 round_cum_sum.push_back(round_cum_sum.back() + round_time_range.end_ms - round_time_range.begin_ms);
             }
@@ -411,6 +417,7 @@ private:
     }
 
     void set_no_weekly() {
+        id_to_no_weekly_.reserve(id_to_time_ranges_.size());
         for (const auto& kv: id_to_time_ranges_) {
             id_to_no_weekly_.insert({kv.first, std::all_of(kv.second.begin(), kv.second.end(),
                                                            [](const TimeRange& time_range) { return !time_range.is_weekly; })});
@@ -493,30 +500,42 @@ private:
     }
 
     IdToTimeRangesMap to_time_ranges(const celonis::accelerator::FactoryCalendar& factory_calendar) {
+        // Group entry indices by calendar_id
+        phmap::flat_hash_map<std::optional<std::string>, std::vector<size_t>> calendar_to_indexes;
+        for (size_t i = 0; i < factory_calendar.entries_size(); ++i) {
+            const auto& entry = factory_calendar.entries(i);
+            if (entry.has_start_date() && entry.has_end_date() && entry.start_date() <= entry.end_date()) {
+                const auto key = entry.has_calendar_id() ?
+                                 std::make_optional(entry.calendar_id()) : std::nullopt;
+                calendar_to_indexes[key].push_back(i);
+            }
+        }
+
+        // Build result by processing grouped entries
         IdToTimeRangesMap id_to_time_ranges;
-        for (const auto& entry: factory_calendar.entries()) {
-            if (!entry.has_start_date() || !entry.has_end_date() || entry.start_date() > entry.end_date()) {
-                continue;
+        id_to_time_ranges.reserve(calendar_to_indexes.size());
+
+        for (auto& [calendar_id, indexes] : calendar_to_indexes) {
+            auto& time_ranges = id_to_time_ranges[calendar_id];
+            time_ranges.reserve(indexes.size());
+
+            // Process all entries for this calendar_id together
+            for (size_t idx : indexes) {
+                const auto& entry = factory_calendar.entries(idx);
+                time_ranges.emplace_back(entry.start_date(), entry.end_date(), false);
             }
-            if (entry.has_calendar_id()) {
-                id_to_time_ranges[entry.calendar_id()].emplace_back(entry.start_date(), entry.end_date(), false);
-            } else {
-                id_to_time_ranges[std::nullopt].emplace_back(entry.start_date(), entry.end_date(), false);
+
+            // Merge time ranges if needed
+            if (time_ranges.size() > 1) {
+                merge_non_weekly_time_ranges(time_ranges);
             }
         }
-        for (auto& kv: id_to_time_ranges) {
-            merge_non_weekly_time_ranges(kv.second);
-        }
+
         return id_to_time_ranges;
     }
 
     void populate_id_to_time_ranges(const IdToTimeRangesMap& id_to_time_ranges) {
-        for (const auto& kv: id_to_time_ranges) {
-            auto& cur_time_ranges = id_to_time_ranges_[kv.first];
-            for (const auto& time_range: kv.second) {
-                cur_time_ranges.push_back(time_range);
-            }
-        }
+        id_to_time_ranges_ = id_to_time_ranges;
     }
 
     void handle_factory_calendar(const celonis::accelerator::FactoryCalendar& factory_calendar) {
@@ -845,8 +864,6 @@ private:
             if (no_weekly_it->second) {
                 auto cum_sum_it = round_to_day ? id_to_round_cum_sum_.find(calendar_id) : id_to_cum_sum_.find(
                         calendar_id);
-                DCHECK((round_to_day && cum_sum_it != id_to_round_cum_sum_.end()) ||
-                       (!round_to_day && cum_sum_it != id_to_cum_sum_.end()));
                 return quick_compute_overlap(left_ms, right_ms, time_ranges, cum_sum_it->second);
             } else {
                 int64_t rv = 0L;
@@ -934,25 +951,31 @@ private:
 StatusOr<std::string> get_calendar_string(const ColumnPtr& calendar_column, int row) {
     std::string calendar_str;
     auto array = calendar_column->get(row).get_array();
+    size_t size = 0;
     for (const auto& element: array) {
         if (element.is_null()) {
             return Status::InvalidArgument("Calendar array can not contain null values.");
         } else {
-            calendar_str += element.get_slice().to_string();
+            size += element.get_slice().size;
         }
+    }
+    calendar_str.reserve(size);
+    for (const auto& element: array) {
+        calendar_str.append(element.get_slice().data, element.get_slice().size);
     }
     return calendar_str;
 }
 
 static bool
 base64_encoded_string_to_calendar(const std::string& calendar_string, celonis::accelerator::Calendar& calendar) {
-    int cipher_len = calendar_string.length();
-    std::unique_ptr<char[]> p;
-    p.reset(new char[cipher_len + 3]);
+    std::unique_ptr<char[]> decoded_buffer(new char[calendar_string.length()]);
 
-    int len = base64_decode2(calendar_string.data(), calendar_string.length(), p.get());
-    std::string decoded_string(p.get(), len);
-    bool success = calendar.ParseFromString(decoded_string);
+    int decoded_len = base64_decode3(calendar_string.data(), calendar_string.length(), decoded_buffer.get());
+    // Check if the decoding was successful before attempting to parse.
+    if (decoded_len < 0) {
+        return false;
+    }
+    bool success = calendar.ParseFromArray(decoded_buffer.get(), decoded_len);
     return success;
 }
 

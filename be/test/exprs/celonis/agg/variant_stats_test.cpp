@@ -11,7 +11,7 @@
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
 #include "exprs/arithmetic_operation.h"
-#include "exprs/base64.h"
+#include "exprs/celonis/base64.h"
 #include "exprs/celonis/agg/variant_stats.h"
 #include "exprs/function_context.h"
 #include "runtime/runtime_state.h"
@@ -33,7 +33,7 @@ std::optional<std::string> to_statistics_json_string(const std::string& encoded_
     std::unique_ptr<char[]> p;
     p.reset(new char[cipher_len + 3]);
 
-    int len = base64_decode2(encoded_string.data(), encoded_string.length(), p.get());
+    int len = base64_decode3(encoded_string.data(), encoded_string.length(), p.get());
     std::string decoded_string(p.get(), len);
     ::celonis::accelerator::Statistics statistics_proto;
     bool success = statistics_proto.ParseFromString(decoded_string);

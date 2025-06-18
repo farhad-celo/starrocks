@@ -52,7 +52,7 @@ std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& cal
     int cipher_len = (size_t)(4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
     char p[cipher_len];
 
-    int len = base64_encode2((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*)p);
+    int len = base64_encode3((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*)p);
     std::string encoded_string(p, len);
     return encoded_string;
 }
@@ -62,7 +62,7 @@ std::optional<std::string> to_calendar_json_string(const std::string& encoded_st
     std::unique_ptr<char[]> p;
     p.reset(new char[cipher_len + 3]);
 
-    int len = base64_decode2(encoded_string.data(), encoded_string.length(), p.get());
+    int len = base64_decode3(encoded_string.data(), encoded_string.length(), p.get());
     std::string decoded_string(p.get(), len);
     ::celonis::accelerator::Calendar calendar_proto;
     bool success = calendar_proto.ParseFromString(decoded_string);

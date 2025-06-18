@@ -9,7 +9,7 @@
 #include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/base64.h"
+#include "exprs/celonis/base64.h"
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/linear_regression.h"
 #include "exprs/celonis/agg/multi_array_agg.h"
@@ -72,7 +72,7 @@ public:
         std::unique_ptr<char[]> p;
         p.reset(new char[cipher_len + 3]);
 
-        int len = base64_decode2(encoded_string.data(), encoded_string.length(), p.get());
+        int len = base64_decode3(encoded_string.data(), encoded_string.length(), p.get());
         std::string decoded_string(p.get(), len);
         ::celonis::accelerator::Calendar calendar_proto;
         bool success = calendar_proto.ParseFromString(decoded_string);

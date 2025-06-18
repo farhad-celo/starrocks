@@ -21,7 +21,7 @@ std::optional<std::string> to_statistics_json_string(const std::string& encoded_
     std::unique_ptr<char[]> p;
     p.reset(new char[cipher_len + 3]);
 
-    int len = base64_decode2(encoded_string.data(), encoded_string.length(), p.get());
+    int len = base64_decode3(encoded_string.data(), encoded_string.length(), p.get());
     std::string decoded_string(p.get(), len);
     ::celonis::accelerator::Statistics statistics_proto;
     bool success = statistics_proto.ParseFromString(decoded_string);

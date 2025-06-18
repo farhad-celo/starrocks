@@ -6,7 +6,7 @@
 #include "column/datum.h"
 #include "column/type_traits.h"
 #include "column/vectorized_fwd.h"
-#include "exprs/base64.h"
+#include "exprs/celonis/base64.h"
 #include "modules/query/calendars.pb.h"
 #include "runtime/types.h"
 #include "types/logical_type.h"
