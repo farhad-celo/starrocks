@@ -14,35 +14,35 @@
 namespace starrocks {
 
 /*
-2025-03-27T16:46:19+00:00
+2025-06-15T16:41:02+00:00
 Running ./be/build_Release/src/bench/celonis/output/transits_match_bench
-Run on (32 X 3207.41 MHz CPU s)
+Run on (32 X 3369.09 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 11.99, 10.98, 7.89
-// Args: Number of rows / Number of primary key fields / Length of match/manual array
+Load Average: 17.73, 12.87, 13.63
+// Args: Number of rows / Number of primary key fields / Length of match or manual array
 -------------------------------------------------------------------------------------------------
 Benchmark                                       Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------------
-BM_ConstantTransitsMatch/1000/2/10        3580343 ns      3580351 ns          196 RowInvRate=3.58035us
-BM_ConstantTransitsMatch/10000/2/10      35569860 ns     35569411 ns           20 RowInvRate=3.55694us
-BM_ConstantTransitsMatch/1000/4/10        3739630 ns      3739541 ns          187 RowInvRate=3.73954us
-BM_ConstantTransitsMatch/10000/4/10      37678075 ns     37676249 ns           19 RowInvRate=3.76762us
-BM_ConstantTransitsMatch/1000/2/20        7231388 ns      7231398 ns           96 RowInvRate=7.2314us
-BM_ConstantTransitsMatch/10000/2/20      72035417 ns     72034451 ns           10 RowInvRate=7.20345us
-BM_ConstantTransitsMatch/1000/4/20        7617699 ns      7617745 ns           93 RowInvRate=7.61775us
-BM_ConstantTransitsMatch/10000/4/20      76593813 ns     76592698 ns            9 RowInvRate=7.65927us
-BM_NonConstantTransitsMatch/1000/2/10    25843644 ns     25843248 ns           27 RowInvRate=25.8432us
-BM_NonConstantTransitsMatch/10000/2/10  257733049 ns    257694509 ns            3 RowInvRate=25.7695us
-BM_NonConstantTransitsMatch/1000/4/10    44268532 ns     44266154 ns           16 RowInvRate=44.2662us
-BM_NonConstantTransitsMatch/10000/4/10  440484696 ns    440466052 ns            2 RowInvRate=44.0466us
-BM_NonConstantTransitsMatch/1000/2/20    72455052 ns     72435845 ns           10 RowInvRate=72.4358us
-BM_NonConstantTransitsMatch/10000/2/20  692335557 ns    692328488 ns            1 RowInvRate=69.2328us
-BM_NonConstantTransitsMatch/1000/4/20   127116678 ns    127116953 ns            6 RowInvRate=127.117us
-BM_NonConstantTransitsMatch/10000/4/20 1286897681 ns   1286886804 ns            1 RowInvRate=128.689us
+BM_ConstantTransitsMatch/1000/2/10        3185766 ns      3185819 ns          219 RowInvRate=3.18582us
+BM_ConstantTransitsMatch/10000/2/10      31523872 ns     31522468 ns           22 RowInvRate=3.15225us
+BM_ConstantTransitsMatch/1000/4/10        3422112 ns      3422109 ns          205 RowInvRate=3.42211us
+BM_ConstantTransitsMatch/10000/4/10      33791623 ns     33791795 ns           20 RowInvRate=3.37918us
+BM_ConstantTransitsMatch/1000/2/20        6596736 ns      6596575 ns          106 RowInvRate=6.59657us
+BM_ConstantTransitsMatch/10000/2/20      65784546 ns     65761296 ns           10 RowInvRate=6.57613us
+BM_ConstantTransitsMatch/1000/4/20        6980344 ns      6980204 ns          101 RowInvRate=6.9802us
+BM_ConstantTransitsMatch/10000/4/20      69432416 ns     69405657 ns           10 RowInvRate=6.94057us
+BM_NonConstantTransitsMatch/1000/2/10    25150957 ns     25149751 ns           28 RowInvRate=25.1498us
+BM_NonConstantTransitsMatch/10000/2/10  249802242 ns    249787834 ns            3 RowInvRate=24.9788us
+BM_NonConstantTransitsMatch/1000/4/10    43736341 ns     43732486 ns           16 RowInvRate=43.7325us
+BM_NonConstantTransitsMatch/10000/4/10  443435436 ns    443403747 ns            2 RowInvRate=44.3404us
+BM_NonConstantTransitsMatch/1000/2/20    68615490 ns     68615662 ns           10 RowInvRate=68.6157us
+BM_NonConstantTransitsMatch/10000/2/20  689181342 ns    689162284 ns            1 RowInvRate=68.9162us
+BM_NonConstantTransitsMatch/1000/4/20   127797939 ns    127796881 ns            6 RowInvRate=127.797us
+BM_NonConstantTransitsMatch/10000/4/20 1272015929 ns   1271978876 ns            1 RowInvRate=127.198us
 */
 
 enum MatchType {
@@ -285,7 +285,7 @@ static void BM_NonConstantTransitsMatch(benchmark::State& state) {
     do_bench(state, NON_CONSTANT);
 }
 
-// Args: Number of rows / Number of primary key fields / Length of match/manual array
+// Args: Number of rows / Number of primary key fields / Length of match or manual array
 BENCHMARK(BM_ConstantTransitsMatch)->ArgsProduct({{1000, 10000},
                                                   {2,    4},
                                                   {10,   20}});

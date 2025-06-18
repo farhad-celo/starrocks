@@ -1,11 +1,11 @@
 #include "exprs/celonis/transits_match.h"
 
 #include "column/array_column.h"
-#include "column/column_viewer.h"
 #include "column/struct_column.h"
 #include "column/column_helper.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
+#include "util/phmap/btree.h"
 
 namespace starrocks {
 
@@ -13,7 +13,7 @@ namespace {
 
 struct TransitsMatchStateFragmentLocal {
     ScalarFunction function;
-    std::optional<std::map<DatumKey, std::set<DatumKey>>> manual_map = std::nullopt;
+    std::optional<phmap::btree_map<DatumKey, std::set<DatumKey>>> manual_map = std::nullopt;
     // Only one of left_manual and right_manual is NULL; left_manual and right_manual have different length;
     // left_manual or right_manual contains NULL
     bool is_malformed = false;
@@ -61,12 +61,12 @@ AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const C
     }
 }
 
-std::optional<std::map<DatumKey, std::set<DatumKey>>>
+std::optional<phmap::btree_map<DatumKey, std::set<DatumKey>>>
 build_map(const std::optional<DatumArray>& left_manual_array, const std::optional<DatumArray>& right_manual_array) {
     if (!left_manual_array.has_value() || !right_manual_array.has_value()) {
         return std::nullopt;
     }
-    std::map<DatumKey, std::set<DatumKey>> rv;
+    phmap::btree_map<DatumKey, std::set<DatumKey>> rv;
     const auto size = left_manual_array->size();
     DCHECK_EQ(size, right_manual_array->size());
     for (auto i = 0; i < size; ++i) {
@@ -76,11 +76,11 @@ build_map(const std::optional<DatumArray>& left_manual_array, const std::optiona
 }
 
 std::vector<Edge> compute_edges(const DatumArray& left_match_array, const DatumArray& right_match_array,
-                                const std::optional<std::map<DatumKey, std::set<DatumKey>>>& manual_map) {
+                                const std::optional<phmap::btree_map<DatumKey, std::set<DatumKey>>>& manual_map) {
     std::vector<Edge> edges;
     const auto left_size = left_match_array.size();
     const auto right_size = right_match_array.size();
-    std::map<DatumKey, std::vector<size_t>> right_key_to_indexes;
+    phmap::btree_map<DatumKey, std::vector<size_t>> right_key_to_indexes;
     for (size_t i = 0; i < right_size; ++i) {
         right_key_to_indexes[right_match_array[i].convert2DatumKey()].push_back(i);
     }
