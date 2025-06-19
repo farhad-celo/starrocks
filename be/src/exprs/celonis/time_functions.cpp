@@ -19,7 +19,14 @@
 namespace starrocks {
 
 namespace {
-static const int64_t NANOS_PER_MILLIS = 1000000;
+
+enum class CalendarFunction {
+    GET_CALENDAR_ENTRY_START = 0,
+    REMAP_TIMESTAMPS_CALENDAR = 1,
+    TIMEUNITS_BETWEEN_CALENDAR = 2,
+    IN_CALENDAR = 3,
+    ADD_TIMEUNITS_CALENDAR = 4
+};
 
 static const phmap::flat_hash_map<std::string, int64_t, StdHash<std::string>> TIME_UNIT_TO_MS = {
         {"DAYS",         86400000L},
@@ -150,7 +157,7 @@ class Calendar {
 public:
     Calendar() = default;
 
-    Calendar(const celonis::accelerator::Calendar& calendar_proto) {
+    Calendar(const celonis::accelerator::Calendar& calendar_proto, CalendarFunction func) {
         if (calendar_proto.has_multi_weekday_calendar()) {
             handle_multi_weekday_calendar(calendar_proto.multi_weekday_calendar());
         }
@@ -168,11 +175,14 @@ public:
         }
         // sort the time ranges of each calendar_id
         process_time_ranges();
-        set_scope();
         set_cum_sum();
-        set_round_time_ranges();
-        set_round_cum_sum();
         set_no_weekly();
+        // TODO(y.zhang): Add more optimization for other calendar functions.
+        if (func != CalendarFunction::REMAP_TIMESTAMPS_CALENDAR) {
+            set_scope();
+            set_round_time_ranges();
+            set_round_cum_sum();
+        }
     }
 
     bool requires_calendar_id() const {
@@ -1163,7 +1173,8 @@ Status validate_time_unit(const std::string& time_unit) {
 struct CalendarState {
     static StatusOr<CalendarState> create_calendar_state(const ColumnPtr& calendar_column, int row, bool in_prepare,
                                                          bool reject_year_gap_in_workday_calendar,
-                                                         const std::optional<std::string>& time_unit) {
+                                                         const std::optional<std::string>& time_unit,
+                                                         CalendarFunction func) {
         if (time_unit.has_value()) {
             RETURN_IF_ERROR(validate_time_unit(time_unit.value()));
         }
@@ -1176,7 +1187,7 @@ struct CalendarState {
         }
         ASSIGN_OR_RETURN(const celonis::accelerator::Calendar calendar_proto,
                          validate_and_to_proto(calendar_string, in_prepare, reject_year_gap_in_workday_calendar));
-        return CalendarState{Calendar(calendar_proto), false, false, time_unit};
+        return CalendarState{Calendar(calendar_proto, func), false, false, time_unit};
     }
 
     Calendar calendar;
@@ -1272,7 +1283,7 @@ remap_timestamp_calendar(const TimestampValue& input_timestamp, const std::strin
 }
 
 Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope, int num_cols, int calendar_index,
-               std::optional<int> time_unit_index) {
+               std::optional<int> time_unit_index, CalendarFunction func) {
     // context->is_constant_column(index) must not be used to determine if the argument is Array Literal because as of
     // 2024-02-26 it returns false for Array Literal while get_constant_column(index) returns non nullptr.
     if (scope != FunctionContext::FRAGMENT_LOCAL || context->get_num_args() != num_cols ||
@@ -1294,7 +1305,7 @@ Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope sco
         time_unit = time_unit_column->get(0).get_slice().to_string();
     }
     ASSIGN_OR_RETURN(CalendarState calendar_state,
-                     CalendarState::create_calendar_state(calendar_column, 0, true, false, time_unit));
+                     CalendarState::create_calendar_state(calendar_column, 0, true, false, time_unit, func));
     auto* calendar_state_ptr = new CalendarState(std::move(calendar_state));
     context->set_function_state(scope, calendar_state_ptr);
     return Status::OK();
@@ -1533,7 +1544,8 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
         if (!config::treat_calendar_column_as_constant_in_calendar_functions || !calendar_state.has_value()) {
             ASSIGN_OR_RETURN(calendar_state,
                              CalendarState::create_calendar_state(calendar_array_column, row, false, false,
-                                                                  time_unit));
+                                                                  time_unit,
+                                                                  CalendarFunction::REMAP_TIMESTAMPS_CALENDAR));
         }
         ASSIGN_OR_RETURN(const std::optional<int64_t> time,
                          remap_timestamp_calendar(timestamp, time_unit, calendar_state.value(), calendar_id));
@@ -1637,7 +1649,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::get_calendar_entry_start(FunctionConte
 
 Status CelonisTimeFunctions::get_calendar_entry_start_prepare(FunctionContext* context,
                                                               FunctionContext::FunctionStateScope scope) {
-    RETURN_IF_ERROR(prepare(context, scope, 3, 1, std::nullopt));
+    RETURN_IF_ERROR(prepare(context, scope, 3, 1, std::nullopt, CalendarFunction::GET_CALENDAR_ENTRY_START));
     return Status::OK();
 }
 
@@ -1669,7 +1681,7 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
         if (!config::treat_calendar_column_as_constant_in_calendar_functions || !calendar_state.has_value()) {
             ASSIGN_OR_RETURN(calendar_state,
                              CalendarState::create_calendar_state(calendar_array_column, row, false, false,
-                                                                  std::nullopt));
+                                                                  std::nullopt, CalendarFunction::IN_CALENDAR));
         }
         ASSIGN_OR_RETURN(std::optional<bool> is_in,
                          timestamp_in_calendar(timestamp, calendar_state.value(), calendar_id));
@@ -1718,7 +1730,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar(FunctionContext* context,
 }
 
 Status CelonisTimeFunctions::in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-    RETURN_IF_ERROR(prepare(context, scope, 3, 1, std::nullopt));
+    RETURN_IF_ERROR(prepare(context, scope, 3, 1, std::nullopt, CalendarFunction::IN_CALENDAR));
     return Status::OK();
 }
 
@@ -1728,7 +1740,7 @@ Status CelonisTimeFunctions::in_calendar_close(FunctionContext* context, Functio
 
 Status CelonisTimeFunctions::remap_timestamps_calendar_prepare(FunctionContext* context,
                                                                FunctionContext::FunctionStateScope scope) {
-    RETURN_IF_ERROR(prepare(context, scope, 4, 2, 1));
+    RETURN_IF_ERROR(prepare(context, scope, 4, 2, 1, CalendarFunction::REMAP_TIMESTAMPS_CALENDAR));
     return Status::OK();
 }
 
@@ -1970,7 +1982,7 @@ Status CelonisTimeFunctions::date_match_close(FunctionContext* context, Function
 
 Status CelonisTimeFunctions::timeunits_between_calendar_prepare(FunctionContext* context,
                                                                 FunctionContext::FunctionStateScope scope) {
-    RETURN_IF_ERROR(prepare(context, scope, 5, 3, 2));
+    RETURN_IF_ERROR(prepare(context, scope, 5, 3, 2, CalendarFunction::TIMEUNITS_BETWEEN_CALENDAR));
     return Status::OK();
 }
 
@@ -2008,7 +2020,8 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
         if (!config::treat_calendar_column_as_constant_in_calendar_functions || !calendar_state.has_value()) {
             ASSIGN_OR_RETURN(calendar_state,
                              CalendarState::create_calendar_state(calendar_array_column, row, false, true,
-                                                                  time_unit));
+                                                                  time_unit,
+                                                                  CalendarFunction::TIMEUNITS_BETWEEN_CALENDAR));
         }
         ASSIGN_OR_RETURN(const std::optional<double> diff,
                          timeunits_between(from_timestamp, to_timestamp, time_unit, calendar_state.value(),
@@ -2063,7 +2076,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::timeunits_between_calendar(FunctionCon
 
 Status CelonisTimeFunctions::add_timeunits_calendar_prepare(FunctionContext* context,
                                                             FunctionContext::FunctionStateScope scope) {
-    RETURN_IF_ERROR(prepare(context, scope, 5, 3, 2));
+    RETURN_IF_ERROR(prepare(context, scope, 5, 3, 2, CalendarFunction::ADD_TIMEUNITS_CALENDAR));
     return Status::OK();
 }
 
@@ -2105,7 +2118,7 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
         if (!config::treat_calendar_column_as_constant_in_calendar_functions || !calendar_state.has_value()) {
             ASSIGN_OR_RETURN(calendar_state,
                              CalendarState::create_calendar_state(calendar_array_column, row, false, false,
-                                                                  time_unit));
+                                                                  time_unit, CalendarFunction::ADD_TIMEUNITS_CALENDAR));
         }
         ASSIGN_OR_RETURN(const std::optional<TimestampValue> new_timestamp,
                          add_timeunits(timestamp, time_unit, add_value, calendar_state.value(), calendar_id));
