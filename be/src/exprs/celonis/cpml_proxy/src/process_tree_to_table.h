@@ -15,6 +15,6 @@ struct pt_as_tables {
     std::unique_ptr<starrocks::celonis::ResultTable> edge_table;
 };
 
-[[nodiscard]] pt_as_tables convert_pt_to_tables(const cpml::model::pt::tree_and_counts_mapping& pt_and_counts);
+[[nodiscard]] pt_as_tables convert_pt_to_tables(const cpml::model::process_tree& pt);
 
 } // namespace cpml_proxy

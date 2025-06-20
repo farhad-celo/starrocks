@@ -163,12 +163,12 @@ TEST_F(CelonisMoBpmnGraphTest, pql_mo_bpmn_graph_example) {
                 {
                     "process_tree_type": 1,
                     "activity": "A",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "B",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 2,
@@ -177,12 +177,12 @@ TEST_F(CelonisMoBpmnGraphTest, pql_mo_bpmn_graph_example) {
                 {
                     "process_tree_type": 1,
                     "activity": "C",
-                    "object_count": 1
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "D",
-                    "object_count": 1
+                    "object_count": 0
                 }
             ],
             "edge_properties": [
@@ -321,22 +321,22 @@ TEST_F(CelonisMoBpmnGraphTest, pql_mo_bpmn_graph_example) {
                 {
                     "process_tree_type": 1,
                     "activity": "B",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "C",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 0,
                     "activity": null,
-                    "object_count": 1
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "E",
-                    "object_count": 1
+                    "object_count": 0
                 }
             ],
             "edge_properties": [
@@ -469,7 +469,7 @@ TEST_F(CelonisMoBpmnGraphTest, pql_mo_bpmn_graph_example) {
     e.evaluate<int>("bpmn_edges", "SOURCE_ID", {0, 2, 3, 4, 6, 4, 7, 5, 8, 10, 10, 12, 11, 3, 6});
     e.evaluate<int>("bpmn_edges", "TARGET_ID", {2, 3, 4, 6, 5, 7, 5, 1, 10, 11, 12, 11, 3, 6, 9});
     e.evaluate<int>("bpmn_edges", "OBJECT_ID", {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1});
-    e.evaluate<int>("bpmn_edges", "OBJECT_COUNT", {2, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2});
+    e.evaluate<int>("bpmn_edges", "OBJECT_COUNT", {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
 
     e.evaluate<int>("bpmn_nodes", "NODE_ID", {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
     e.evaluate<int>("bpmn_nodes", "NODE_TYPE", {1, 2, 0, 0, 3, 3, 0, 0, 1, 2, 3, 3, 0});
@@ -493,7 +493,7 @@ TEST_F(CelonisMoBpmnGraphTest, pql_mo_bpmn_graph_example_with_inductive_miner_co
         e.evaluate<int>("bpmn_edges", "SOURCE_ID", {0, 2, 3, 4, 6, 4, 7, 5, 8, 10, 10, 12, 11, 3, 6});
         e.evaluate<int>("bpmn_edges", "TARGET_ID", {2, 3, 4, 6, 5, 7, 5, 1, 10, 11, 12, 11, 3, 6, 9});
         e.evaluate<int>("bpmn_edges", "OBJECT_ID", {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1});
-        e.evaluate<int>("bpmn_edges", "OBJECT_COUNT", {2, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2});
+        e.evaluate<int>("bpmn_edges", "OBJECT_COUNT", {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
 
         e.evaluate<int>("bpmn_nodes", "NODE_ID", {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
         e.evaluate<int>("bpmn_nodes", "NODE_TYPE", {1, 2, 0, 0, 3, 3, 0, 0, 1, 2, 3, 3, 0});
@@ -574,7 +574,7 @@ TEST_F(CelonisMoBpmnGraphTest, tiny_mo_scenario_repeated_traces_with_inductive_m
     e.evaluate<int>("bpmn_edges", "SOURCE_ID", {0, 2, 4, 5, 2, 6, 2, 7, 3});
     e.evaluate<int>("bpmn_edges", "TARGET_ID", {2, 4, 5, 3, 6, 3, 7, 3, 1});
     e.evaluate<int>("bpmn_edges", "OBJECT_ID", {0, 0, 0, 0, 0, 0, 0, 0, 0});
-    e.evaluate<int>("bpmn_edges", "OBJECT_COUNT", {5, 1, 1, 1, 2, 2, 2, 2, 5});
+    e.evaluate<int>("bpmn_edges", "OBJECT_COUNT", {0, 0, 0, 0, 0, 0, 0, 0, 0});
 
     e.evaluate<int>("bpmn_nodes", "NODE_ID", {0, 1, 2, 3, 4, 5, 6, 7});
     e.evaluate<int>("bpmn_nodes", "NODE_TYPE", {1, 2, 3, 3, 0, 0, 0, 0});
@@ -593,9 +593,7 @@ TEST_F(CelonisMoBpmnGraphTest, tiny_mo_scenario_with_inductive_miner_high_varian
     e.evaluate<int>("bpmn_edges", "SOURCE_ID", {0, 2, 4, 5, 2, 6, 2, 7, 3});
     e.evaluate<int>("bpmn_edges", "TARGET_ID", {2, 4, 5, 3, 6, 3, 7, 3, 1});
     e.evaluate<int>("bpmn_nodes", "NODE_ID", {0, 1, 2, 3, 4, 5, 6, 7});
-    int64_t oc1 = 10'000'000'000L;
-    int64_t oc3 = 30'000'000'000L;
-    e.evaluate<int64_t>("bpmn_edges", "OBJECT_COUNT", {oc3, oc1, oc1, oc1, oc1, oc1, oc1, oc1, oc3});
+    e.evaluate<int64_t>("bpmn_edges", "OBJECT_COUNT", {0, 0, 0, 0, 0, 0, 0, 0, 0});
     e.evaluate<std::string>("bpmn_activities", "ACTIVITY_NAME", {"A", "B", "C", "D"});
 }
 
@@ -610,12 +608,12 @@ TEST_F(CelonisMoBpmnGraphTest, high_object_count) {
                 {
                     "process_tree_type": 1,
                     "activity": "A",
-                    "object_count": 200000000000
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "B",
-                    "object_count": 200000000000
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 2,
@@ -624,12 +622,12 @@ TEST_F(CelonisMoBpmnGraphTest, high_object_count) {
                 {
                     "process_tree_type": 1,
                     "activity": "C",
-                    "object_count": 100000000000
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "D",
-                    "object_count": 100000000000
+                    "object_count": 0
                 }
             ],
             "edge_properties": [
@@ -768,22 +766,22 @@ TEST_F(CelonisMoBpmnGraphTest, high_object_count) {
                 {
                     "process_tree_type": 1,
                     "activity": "B",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "C",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 0,
                     "activity": null,
-                    "object_count": 1
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "E",
-                    "object_count": 1
+                    "object_count": 0
                 }
             ],
             "edge_properties": [
@@ -916,9 +914,7 @@ TEST_F(CelonisMoBpmnGraphTest, high_object_count) {
     e.evaluate<int>("bpmn_edges", "SOURCE_ID", {0, 2, 3, 4, 6, 4, 7, 5, 8, 10, 10, 12, 11, 3, 6});
     e.evaluate<int>("bpmn_edges", "TARGET_ID", {2, 3, 4, 6, 5, 7, 5, 1, 10, 11, 12, 11, 3, 6, 9});
     e.evaluate<int>("bpmn_edges", "OBJECT_ID", {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1});
-    int64_t oc1 = 100000000000L;
-    int64_t oc2 = 200000000000L;
-    e.evaluate<int64_t>("bpmn_edges", "OBJECT_COUNT", {oc2, oc2, oc2, oc1, oc1, oc1, oc1, oc2, 2, 1, 1, 1, 2, 2, 2});
+    e.evaluate<int64_t>("bpmn_edges", "OBJECT_COUNT", {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
 
     e.evaluate<int>("bpmn_nodes", "NODE_ID", {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
     e.evaluate<int>("bpmn_nodes", "NODE_TYPE", {1, 2, 0, 0, 3, 3, 0, 0, 1, 2, 3, 3, 0});

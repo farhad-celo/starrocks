@@ -34,10 +34,8 @@ inductive_miner_result inductive_miner(const starrocks::Variants& variants, doub
     // Call IM in the CPML
     const auto [process_tree, statistics]{cpml::discovery::inductive_miner(variant_accessor, function_ctx, settings)};
 
-    const auto pt_and_counts{cpml::model::pt::replay_variants(variant_accessor, process_tree, function_ctx)};
-
     // Transform IM results to SR output
-    auto [vertex_table, edge_table]{convert_pt_to_tables(pt_and_counts)};
+    auto [vertex_table, edge_table]{convert_pt_to_tables(process_tree)};
     // N.B: statistics are copied
     return {std::move(vertex_table), std::move(edge_table), statistics.data()};
 }

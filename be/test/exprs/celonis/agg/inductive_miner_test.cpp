@@ -1807,12 +1807,12 @@ TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
                 {
                     "process_tree_type": 1,
                     "activity": "A",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "B",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 2,
@@ -1821,12 +1821,12 @@ TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
                 {
                     "process_tree_type": 1,
                     "activity": "C",
-                    "object_count": 1
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "D",
-                    "object_count": 1
+                    "object_count": 0
                 }
             ],
             "edge_properties": [
@@ -1970,22 +1970,22 @@ TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
                 {
                     "process_tree_type": 1,
                     "activity": "B",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "C",
-                    "object_count": 2
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 0,
                     "activity": null,
-                    "object_count": 1
+                    "object_count": 0
                 },
                 {
                     "process_tree_type": 1,
                     "activity": "E",
-                    "object_count": 1
+                    "object_count": 0
                 }
             ],
             "edge_properties": [
