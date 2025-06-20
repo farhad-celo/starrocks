@@ -1571,9 +1571,14 @@ build_libxml2
 build_azure
 build_libdivide
 
-# Build thirdparties only used by Celonis.
+# Build thirdparty libraries used by the Celonis Saola code integrated to SR
 . ${TP_DIR}/build-thirdparty-celonis.sh
 build_thirdparty_celonis
+
+# Builds the custom Celonis libraries (like the CPML) and their dependencies
+source ${TP_DIR}/build-celonis-libraries.sh
+# Copies the installed library artifacts to the SR dependencies location
+cp -r ${CELONIS_LIBRARIES_INSTALL_DIR} $STARROCKS_THIRDPARTY/installed/
 
 if [[ "${MACHINE_TYPE}" != "aarch64" ]]; then
     build_breakpad
