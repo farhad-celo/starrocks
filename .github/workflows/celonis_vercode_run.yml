@@ -17,7 +17,7 @@ concurrency:
 env:
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:rebase-3.3-6e712479
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:pr1741-3.3-02ee3f6d-celo
 
 jobs:
   # SAST

@@ -2,7 +2,7 @@
 # Please run this command from the git repo root directory to build:
 # DOCKER_BUILDKIT=1 docker build --rm=true -f celonis/docker/StarrocksBuilder/StarrocksBuilder.Dockerfile -t starrocks-artifacts:tag .
 
-ARG builder=ghcr.io/celonis/celostar/starrocks-dev-env:rebase-3.3-6e712479
+ARG builder=ghcr.io/celonis/celostar/starrocks-dev-env:pr1741-3.3-02ee3f6d-celo
 
 FROM ${builder} as fe-builder
 # clean and build Frontend and Spark Dpp application

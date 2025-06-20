@@ -5,14 +5,10 @@ set(CMAKE_CXX_STANDARD 20)
 # Set the root path to the CPML directory
 set(CPML_DIR_PATH "${THIRDPARTY_DIR}CPML") # Must match with the naming used in 'dev-env.Dockerfile'
 # Set paths for each library's include and build directories
-set(CPML_FORMATTING_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-formatting-library/include")
-set(CPML_FORMATTING_PATH "${CPML_DIR_PATH}/celonis-formatting-library/build/libformat.a")
-
-set(CPML_PROCESS_MINNING_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-process-mining-library/include")
-set(CPML_PROCESS_MINNING_PATH "${CPML_DIR_PATH}/celonis-process-mining-library/build/libcpml.a")
-
-set(CPML_TEMPLATE_INCLUDE_PATH "${CPML_DIR_PATH}/celonis-template-library/include")
-set(CPML_TEMPLATE_PATH "${CPML_DIR_PATH}/celonis-template-library/build/libctl.a")
+set(CELONIS_LIBRARIES_INCLUDE_PATH "${CPML_DIR_PATH}/include/")
+set(CPML_FORMATTING_PATH "${CPML_DIR_PATH}/lib/libformat.a")
+set(CPML_PROCESS_MINNING_PATH "${CPML_DIR_PATH}/lib/libcpml.a")
+set(CPML_TEMPLATE_PATH "${CPML_DIR_PATH}/lib/libctl.a")
 
 # For additional libraries, add them here:
 
@@ -20,21 +16,21 @@ set(CPML_TEMPLATE_PATH "${CPML_DIR_PATH}/celonis-template-library/build/libctl.a
 add_library(cpml_formatting STATIC IMPORTED)
 set_target_properties(cpml_formatting PROPERTIES
     IMPORTED_LOCATION "${CPML_FORMATTING_PATH}"
-    INTERFACE_INCLUDE_DIRECTORIES "${CPML_FORMATTING_INCLUDE_PATH}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CELONIS_LIBRARIES_INCLUDE_PATH}"
 )
 
 # Celonis Process Mining Library
 add_library(cpml_process_mining STATIC IMPORTED)
 set_target_properties(cpml_process_mining PROPERTIES
     IMPORTED_LOCATION "${CPML_PROCESS_MINNING_PATH}"
-    INTERFACE_INCLUDE_DIRECTORIES "${CPML_PROCESS_MINNING_INCLUDE_PATH}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CELONIS_LIBRARIES_INCLUDE_PATH}"
 )
 
 # Celonis Template Library
 add_library(cpml_template STATIC IMPORTED)
 set_target_properties(cpml_template PROPERTIES
     IMPORTED_LOCATION "${CPML_TEMPLATE_PATH}"
-    INTERFACE_INCLUDE_DIRECTORIES "${CPML_TEMPLATE_INCLUDE_PATH}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CELONIS_LIBRARIES_INCLUDE_PATH}"
 )
 
 # Define the CPML proxy library
