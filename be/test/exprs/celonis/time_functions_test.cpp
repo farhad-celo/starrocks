@@ -313,6 +313,26 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_const_input) {
         EXPECT_EQ(json_string.value(),
                   R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})");
     }
+	// multi weekday calendar
+	{
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"multiWeekdayCalendar":{"calendars":[{"saturday":{"useDay":true,"shift":{"begin":0,"end":1000}},"calendarId":"US"},{"wednesday":{"useDay":true,"shift":{"begin":1,"end":1000}},"friday":{"useDay":true,"shift":{"begin":0,"end":1000}},"calendarId":"DE"}]}})"
+		});
+        calendars2->append_datum(DatumArray{
+                R"({"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":1000}},"calendarId":"US"},{"tuesday":{"useDay":true,"shift":{"begin":1,"end":1000}},"friday":{"useDay":true,"shift":{"begin":0,"end":1000}},"calendarId":"JPN"}]}})"
+		});
+        calendars1 = ConstColumn::create(calendars1, calendars1->size());
+        calendars2 = ConstColumn::create(calendars2, calendars2->size());
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        auto json_string = celonis::to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"intersectCalendar":{"calendar1":{"multiWeekdayCalendar":{"calendars":[{"saturday":{"useDay":true,"shift":{"begin":0,"end":1000}},"calendarId":"US"},{"wednesday":{"useDay":true,"shift":{"begin":1,"end":1000}},"friday":{"useDay":true,"shift":{"begin":0,"end":1000}},"calendarId":"DE"}]}},"calendar2":{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":1000}},"calendarId":"US"},{"tuesday":{"useDay":true,"shift":{"begin":1,"end":1000}},"friday":{"useDay":true,"shift":{"begin":0,"end":1000}},"calendarId":"JPN"}]}}}})"
+		);
+    }
 }
 
 TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_empty_input) {

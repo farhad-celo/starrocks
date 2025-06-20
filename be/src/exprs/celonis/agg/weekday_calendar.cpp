@@ -205,48 +205,49 @@ void WeekdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
             calendar_id = state_impl.calendar_id->get(i).get_slice().to_string();
         }
         id_to_entries[calendar_id][weekday].emplace_back(shift_begin, shift_end);
-        for (auto& [id, entries]: id_to_entries) {
-            while (true) {
-                celonis::accelerator::WeekdayCalendar weekday_calendar;
-                bool is_empty = true;
-                for (auto& [day, pairs]: entries) {
-                    if (pairs.empty()) {
-                        continue;
-                    }
-                    celonis::accelerator::WeekdayCalendarEntry weekday_calendar_entry;
-                    is_empty = false;
-                    int64_t begin = pairs.back().first;
-                    int64_t end = pairs.back().second;
-                    pairs.pop_back();
-                    weekday_calendar_entry.set_use_day(true);
-                    weekday_calendar_entry.mutable_shift()->set_begin(begin);
-                    weekday_calendar_entry.mutable_shift()->set_end(end);
-                    if (day == "MONDAY") {
-                        *weekday_calendar.mutable_monday() = weekday_calendar_entry;
-                    } else if (day == "TUESDAY") {
-                        *weekday_calendar.mutable_tuesday() = weekday_calendar_entry;
-                    } else if (day == "WEDNESDAY") {
-                        *weekday_calendar.mutable_wednesday() = weekday_calendar_entry;
-                    } else if (day == "THURSDAY") {
-                        *weekday_calendar.mutable_thursday() = weekday_calendar_entry;
-                    } else if (day == "FRIDAY") {
-                        *weekday_calendar.mutable_friday() = weekday_calendar_entry;
-                    } else if (day == "SATURDAY") {
-                        *weekday_calendar.mutable_saturday() = weekday_calendar_entry;
-                    } else {
-                        *weekday_calendar.mutable_sunday() = weekday_calendar_entry;
-                    }
+    }
+
+    for (auto& [id, entries]: id_to_entries) {
+        while (true) {
+            celonis::accelerator::WeekdayCalendar weekday_calendar;
+            bool is_empty = true;
+            for (auto& [day, pairs]: entries) {
+                if (pairs.empty()) {
+                    continue;
                 }
-                // set calendar_id
-                if (id.has_value()) {
-                    weekday_calendar.set_calendar_id(id.value());
+                celonis::accelerator::WeekdayCalendarEntry weekday_calendar_entry;
+                is_empty = false;
+                int64_t begin = pairs.back().first;
+                int64_t end = pairs.back().second;
+                pairs.pop_back();
+                weekday_calendar_entry.set_use_day(true);
+                weekday_calendar_entry.mutable_shift()->set_begin(begin);
+                weekday_calendar_entry.mutable_shift()->set_end(end);
+                if (day == "MONDAY") {
+                    *weekday_calendar.mutable_monday() = weekday_calendar_entry;
+                } else if (day == "TUESDAY") {
+                    *weekday_calendar.mutable_tuesday() = weekday_calendar_entry;
+                } else if (day == "WEDNESDAY") {
+                    *weekday_calendar.mutable_wednesday() = weekday_calendar_entry;
+                } else if (day == "THURSDAY") {
+                    *weekday_calendar.mutable_thursday() = weekday_calendar_entry;
+                } else if (day == "FRIDAY") {
+                    *weekday_calendar.mutable_friday() = weekday_calendar_entry;
+                } else if (day == "SATURDAY") {
+                    *weekday_calendar.mutable_saturday() = weekday_calendar_entry;
+                } else {
+                    *weekday_calendar.mutable_sunday() = weekday_calendar_entry;
                 }
-                if (!is_empty) {
-                    *calendar_proto.mutable_multi_weekday_calendar()->add_calendars() = weekday_calendar;
-                }
-                if (is_empty) {
-                    break;
-                }
+            }
+            // set calendar_id
+            if (id.has_value()) {
+                weekday_calendar.set_calendar_id(id.value());
+            }
+            if (!is_empty) {
+                *calendar_proto.mutable_multi_weekday_calendar()->add_calendars() = weekday_calendar;
+            }
+            if (is_empty) {
+                break;
             }
         }
     }
