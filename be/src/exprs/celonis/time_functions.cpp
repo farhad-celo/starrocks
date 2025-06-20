@@ -1759,16 +1759,16 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
                                                                   const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
 
     int offset = 0;
     UInt32Column::Ptr array_offsets = UInt32Column::create();
-    array_offsets->reserve(n_rows + 1);
+    array_offsets->reserve(num_rows + 1);
 
     BinaryColumn::Ptr array_binary_column = BinaryColumn::create();
     auto null_column = NullColumn::create();
 
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         array_offsets->append(offset);
         if (columns[0]->is_null(row) || columns[1]->is_null(row)) {
             null_column->append(1);
@@ -1800,6 +1800,11 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
         offset += calendar_pieces.size();
     }
     array_offsets->append(offset);
+    if (all_const) {
+        return ConstColumn::create(NullableColumn::create(
+                ArrayColumn::create(NullableColumn::create(array_binary_column, NullColumn::create(offset, 0)),
+                                    array_offsets), null_column), num_rows);
+    }
     return NullableColumn::create(
             ArrayColumn::create(NullableColumn::create(array_binary_column, NullColumn::create(offset, 0)),
                                 array_offsets), null_column);
