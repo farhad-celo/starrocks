@@ -43,6 +43,8 @@ CELONIS_LIBRARIES_BUILD_DIR=${CELONIS_LIBRARIES_BUILD_ROOT}/celonis_library_buil
 # Directory where to install the build artifacts of the Celonis libraries
 CELONIS_LIBRARIES_INSTALL_DIR=${CELONIS_LIBRARIES_BUILD_ROOT}/CPML
 
+CXXFLAGS="-O3 -fno-omit-frame-pointer -fPIC -g"
+CMAKE_BUILD_TYPE=Release
 CMAKE_BUILD_PARALLELISM=8
 
 download_and_build_boost_for_celonis_libraries() {
@@ -56,7 +58,7 @@ download_and_build_boost_for_celonis_libraries() {
   cd ${BOOST_DIR_NAME_FOR_CELONIS_LIBRARIES} && \
   ./bootstrap.sh --prefix=${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR} && \
   ./b2 && \
-  ./b2 install
+  ./b2 link=static runtime-link=static -j $CMAKE_BUILD_PARALLELISM --without-test --without-mpi --without-graph --without-graph_parallel --without-python cxxflags="-std=c++20 -g -fPIC" install
   cd $CELONIS_LIBRARIES_BUILD_ROOT
 }
 
@@ -71,7 +73,7 @@ download_and_build_nlohmann_json_for_celonis_libraries() {
   cd json-3.10.5
   mkdir build
   cd build
-  cmake -DCMAKE_VERBOSE_MAKEFILE=OFF .. -DJSON_BuildTests=False
+  cmake -DCMAKE_VERBOSE_MAKEFILE=OFF -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} .. -DJSON_BuildTests=False
   cmake --build . --parallel ${CMAKE_BUILD_PARALLELISM}
   cmake --install . --prefix ${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}
 #  export NamedType_DIR=${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}/lib/cmake/
@@ -89,7 +91,7 @@ download_and_build_fmt_for_celonis_libraries() {
   cd $FMT_DIR_NAME_FOR_CELONIS_LIBRARIES
   mkdir build
   cd build
-  cmake -DCMAKE_VERBOSE_MAKEFILE=OFF .. -DFMT_TEST=False
+  cmake -DCMAKE_VERBOSE_MAKEFILE=OFF -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} .. -DFMT_TEST=False
   cmake --build . --parallel ${CMAKE_BUILD_PARALLELISM}
   cmake --install . --prefix ${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}
   export fmt_DIR=${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}/lib/cmake/fmt
@@ -141,7 +143,7 @@ download_and_build_named_type_for_celonis_libraries() {
   cd NamedType-${NAMED_TYPE_DIR_NAME_FOR_CELONIS_LIBRARIES} && \
   mkdir build
   cd build
-  cmake -DCMAKE_VERBOSE_MAKEFILE=OFF .. -DENABLE_TEST=false
+  cmake -DCMAKE_VERBOSE_MAKEFILE=OFF -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} .. -DENABLE_TEST=false
   cmake --build . --parallel ${CMAKE_BUILD_PARALLELISM}
   cmake --install . --prefix ${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}
   export NamedType_DIR=${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}/lib/cmake/
@@ -174,6 +176,7 @@ build_celonis_library() (
   cd $CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH
 
   cmake -DCMAKE_VERBOSE_MAKEFILE=OFF \
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
     -DBOOST_ROOT=${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR} \
     -DCMAKE_PREFIX_PATH="${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}/lib/cmake/nlohmann_json" \
     -DCMAKE_INSTALL_PREFIX=${CELONIS_LIBRARIES_INSTALL_DIR} \
@@ -186,6 +189,8 @@ build_celonis_library() (
 download_and_build_celonis_libraries() {
   set -e
   # set -x # Uncomment for debugging the script
+
+  export CXXFLAGS=${CXXFLAGS}
 
   # First we build all the thirdparty dependencies the Celonis libraries depend on
   download_and_build_dependencies_for_celonis_libraries
