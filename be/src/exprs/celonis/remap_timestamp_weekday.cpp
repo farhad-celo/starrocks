@@ -34,17 +34,17 @@ CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday(FunctionContext* c
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer<TYPE_DATETIME> viewer(columns[0]);
-    size_t size = columns[0]->size();
-    ColumnBuilder<TYPE_BIGINT> builder(size);
-    for (int row = 0; row < size; ++row) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    for (int row = 0; row < num_rows; ++row) {
         if (viewer.is_null(row)) {
-            builder.append_null();
+            result.append_null();
         } else {
             const long timestamp_val = viewer.value(row).timestamp();
-            builder.append(convert_timestamp_to_weekday(timestamp_val));
+            result.append(convert_timestamp_to_weekday(timestamp_val));
         }
     }
-    return builder.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 } // namespace starrocks

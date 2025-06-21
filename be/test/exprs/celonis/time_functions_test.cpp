@@ -304,10 +304,10 @@ TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_const_input) {
                 R"({"weekday_calendar": {)",
                 R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
                 R"(} })"});
-        calendars1 = ConstColumn::create(calendars1, calendars1->size());
-        calendars2 = ConstColumn::create(calendars2, calendars2->size());
+        calendars1 = ConstColumn::create(calendars1, 10);
+        calendars2 = ConstColumn::create(calendars2, 10);
         const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
-        ASSERT_EQ(calendars1->size(), result->size());
+        ASSERT_EQ(1, result->size());
         auto json_string = celonis::to_calendar_json_string(result->get(0).get_array()[0].get_slice().to_string());
         ASSERT_TRUE(json_string.has_value());
         EXPECT_EQ(json_string.value(),

@@ -1437,17 +1437,17 @@ bool TimeRange::is_ms_in(int64_t ms) const {
 StatusOr<ColumnPtr>
 CelonisTimeFunctions::millis_timestamp([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
-    const size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    for (auto row = 0; row < n_rows; ++row) {
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
         }
         result.append(remap_timestamp_ms(timestamp_viewer.value(row)));
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>
@@ -1455,9 +1455,9 @@ CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer<TYPE_BIGINT> data_column(columns[0]);
-    auto size = columns[0]->size();
-    ColumnBuilder<TYPE_DATETIME> result(size);
-    for (int row = 0; row < size; ++row) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_DATETIME> result(num_rows);
+    for (int row = 0; row < num_rows; ++row) {
         if (data_column.is_null(row)) {
             result.append_null();
             continue;
@@ -1466,17 +1466,17 @@ CelonisTimeFunctions::timestamp_millis([[maybe_unused]] FunctionContext* context
         TimestampValue timestamp = timestamp_from_unix_millis(unix_millis);
         result.append(timestamp);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionContext* context,
                                                     const starrocks::Columns& columns,
                                                     const CalendarState* calendar_state) {
     DCHECK_EQ(columns.size(), 4);
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     const Calendar& calendar = calendar_state->calendar;
     const std::optional<std::string>& time_unit = calendar_state->time_unit;
     int64_t time_unit_to_ms = 1;
@@ -1485,7 +1485,7 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionCon
         DCHECK(iter != TIME_UNIT_TO_MS.end());
         time_unit_to_ms = iter->second;
     }
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (calendar_state->is_null || timestamp_viewer.is_null(row) || !time_unit.has_value()) {
             result.append_null();
             continue;
@@ -1515,7 +1515,7 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionCon
         }
         result.append(milliseconds / time_unit_to_ms);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionContext* context,
@@ -1523,14 +1523,14 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
     LOG(INFO) << "Non-const version of remap_timestamps_calendar is called.\n";
     DCHECK_EQ(columns.size(), 4);
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[2] });
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
-    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]);
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[2]);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     std::optional<CalendarState> calendar_state = std::nullopt;
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) || columns[2]->is_null(row)) {
             result.append_null();
             continue;
@@ -1555,7 +1555,7 @@ StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionC
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unused]] FunctionContext* context,
@@ -1567,12 +1567,12 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unus
 StatusOr<ColumnPtr> CelonisTimeFunctions::date_between([[maybe_unused]] FunctionContext* context,
                                                        const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 3);
-    const size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer begin_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
     ColumnViewer end_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[2]);
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    for (auto row = 0; row < n_rows; ++row) {
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row)) {
             result.append_null();
             continue;
@@ -1586,7 +1586,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_between([[maybe_unused]] Function
             result.append(0L);
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 static StatusOr<std::optional<bool>>
@@ -1604,10 +1604,10 @@ StatusOr<ColumnPtr>
 get_calendar_entry_start_general([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
     LOG(INFO) << "Non-const version of get_calendar_entry_start is called.\n";
     DCHECK_EQ(columns.size(), 3);
-    size_t n_rows = columns[0]->size();
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    if (n_rows == 0) {
-        return result.build(ColumnHelper::is_all_const(columns));
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    if (num_rows == 0) {
+        return result.build(all_const);
     }
     return Status::NotSupported("Non-const calendar is not supported in get_calendar_entry_start.");
 }
@@ -1616,13 +1616,13 @@ StatusOr<ColumnPtr>
 get_calendar_entry_start_const([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns,
                                const CalendarState* calendar_state) {
     DCHECK_EQ(columns.size(), 3);
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer index_viewer = ColumnViewer<TYPE_INT>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
 
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     const Calendar& calendar = calendar_state->calendar;
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (calendar_state->is_null || calendar_state->is_empty || index_viewer.is_null(row)) {
             result.append_null();
             continue;
@@ -1639,7 +1639,7 @@ get_calendar_entry_start_const([[maybe_unused]] FunctionContext* context, const 
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisTimeFunctions::get_calendar_entry_start(FunctionContext* context,
@@ -1662,13 +1662,13 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
     LOG(INFO) << "Non-const version of in_calendar is called.\n";
     DCHECK_EQ(columns.size(), 3);
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[1]->size(), columns[1]);
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     std::optional<CalendarState> calendar_state = std::nullopt;
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (timestamp_viewer.is_null(row) || columns[1]->is_null(row)) {
             result.append_null();
             continue;
@@ -1692,19 +1692,19 @@ StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* contex
         }
 
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> in_calendar_const([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns,
                                       const CalendarState* calendar_state) {
     DCHECK_EQ(columns.size(), 3);
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
 
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     const Calendar& calendar = calendar_state->calendar;
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (calendar_state->is_null || calendar_state->is_empty || timestamp_viewer.is_null(row)) {
             result.append_null();
             continue;
@@ -1721,7 +1721,7 @@ StatusOr<ColumnPtr> in_calendar_const([[maybe_unused]] FunctionContext* context,
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar(FunctionContext* context,
@@ -1907,10 +1907,10 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match([[maybe_unused]] FunctionCo
 
 StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_non_constant_filters([[maybe_unused]] FunctionContext* context,
                                                                           const starrocks::Columns& columns) {
-    const size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    for (auto row = 0; row < n_rows; ++row) {
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
             columns[3]->is_null(row) || columns[4]->is_null(row) || columns[5]->is_null(row)) {
             result.append_null();
@@ -1920,21 +1920,21 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_non_constant_filters([[mayb
         auto timestamp = timestamp_viewer.value(row);
         result.append(date_filters.matches(timestamp) ? 1L : 0L);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_constant_filters([[maybe_unused]] FunctionContext* context,
                                                                       const starrocks::Columns& columns) {
-    const size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const auto* state = reinterpret_cast<const DateMatchStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     if (state->has_null_filter) {
-        result.append_nulls(n_rows);
+        result.append_nulls(num_rows);
         return result.build(true);
     }
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
-    for (auto row = 0; row < n_rows; ++row) {
+    for (auto row = 0; row < num_rows; ++row) {
         if (timestamp_viewer.is_null(row)) {
             result.append_null();
             continue;
@@ -1942,7 +1942,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_constant_filters([[maybe_un
         auto timestamp = timestamp_viewer.value(row);
         result.append(state->date_filters.matches(timestamp) ? 1L : 0L);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 Status CelonisTimeFunctions::date_match_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
@@ -2001,15 +2001,15 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
     LOG(INFO) << "Non-const version of timeunits_between_calendar is called.\n";
     DCHECK_EQ(columns.size(), 5);
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[3] });
-    const size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer from_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer to_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
-    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[3]->size(), columns[3]);
-    ColumnBuilder<TYPE_DOUBLE> result(n_rows);
+    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[3]);
+    ColumnBuilder<TYPE_DOUBLE> result(num_rows);
     std::optional<CalendarState> calendar_state = std::nullopt;
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (from_timestamp_viewer.is_null(row) || to_timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
             columns[3]->is_null(row)) {
             result.append_null();
@@ -2037,21 +2037,21 @@ StatusOr<ColumnPtr> timeunits_between_calendar_general([[maybe_unused]] Function
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> timeunits_between_calendar_const([[maybe_unused]] FunctionContext* context,
                                                      const starrocks::Columns& columns,
                                                      const CalendarState* calendar_state) {
     DCHECK_EQ(columns.size(), 5);
-    const size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer from_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer to_timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[1]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
     const std::string& time_unit = calendar_state->time_unit.value();
-    ColumnBuilder<TYPE_DOUBLE> result(n_rows);
-    for (size_t row = 0; row < n_rows; ++row) {
+    ColumnBuilder<TYPE_DOUBLE> result(num_rows);
+    for (size_t row = 0; row < num_rows; ++row) {
         if (from_timestamp_viewer.is_null(row) || to_timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
             calendar_state->is_null) {
             result.append_null();
@@ -2071,7 +2071,7 @@ StatusOr<ColumnPtr> timeunits_between_calendar_const([[maybe_unused]] FunctionCo
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisTimeFunctions::timeunits_between_calendar(FunctionContext* context,
@@ -2095,15 +2095,15 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
     LOG(INFO) << "Non-const version of add_timeunits_calendar is called.\n";
     DCHECK_EQ(columns.size(), 5);
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[3] });
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer add_value_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
-    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[3]->size(), columns[3]);
-    ColumnBuilder<TYPE_DATETIME> result(n_rows);
+    ColumnPtr calendar_array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[3]);
+    ColumnBuilder<TYPE_DATETIME> result(num_rows);
     std::optional<CalendarState> calendar_state = std::nullopt;
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (timestamp_viewer.is_null(row) || add_value_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
             columns[3]->is_null(row)) {
             result.append_null();
@@ -2133,23 +2133,23 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_general([[maybe_unused]] Funct
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 static StatusOr<ColumnPtr> add_timeunits_calendar_const([[maybe_unused]] FunctionContext* context,
                                                         const starrocks::Columns& columns,
                                                         const CalendarState* calendar_state) {
     DCHECK_EQ(columns.size(), 5);
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer add_value_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
     ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
-    ColumnBuilder<TYPE_DATETIME> result(n_rows);
+    ColumnBuilder<TYPE_DATETIME> result(num_rows);
     const Calendar& calendar = calendar_state->calendar;
     const std::string& time_unit = calendar_state->time_unit.value();
     const bool is_calendar_empty = calendar_state->is_empty;
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (timestamp_viewer.is_null(row) || add_value_viewer.is_null(row) || time_unit_viewer.is_null(row) ||
             calendar_state->is_null) {
             result.append_null();
@@ -2181,7 +2181,7 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_const([[maybe_unused]] Functio
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisTimeFunctions::add_timeunits_calendar([[maybe_unused]] FunctionContext* context,
