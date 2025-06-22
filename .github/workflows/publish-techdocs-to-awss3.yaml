@@ -1,0 +1,51 @@
+###
+# Learn more about this action: https://github.com/celonis/actions/tree/master/techdocs-publish-to-s3
+# Recommended path in repo: .github/workflows/techdocs-publish.yml
+#
+# backstage.metadata.version: 0.0.1
+# backstage.metadata.workflow: celonis/actions/techdocs-publish-to-s3/job-sample.yml
+#
+# WARNING: Templated variables marked with TODO  must be fixed accordingly.
+###
+name: Publish techdocs
+on:
+  push:
+    # It is recommended to publish docs only for main/master branch.
+    # Select your default Branch
+    branches:
+      - branch-3.3-02ee3f6d-celo # TODO: add your default branch
+    # Update paths to match when you want the workflow to run
+    paths:
+      - '**/catalog-info.yaml'
+      - '**/mkdocs.yaml'
+      - '**/docs/**'
+      - '.github/workflows/*'
+  workflow_dispatch:
+
+jobs:
+  publish-docs:
+    name: Publish Techdocs
+    runs-on: ubuntu-latest
+    container: ghcr.io/celonis/techdocs:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # You can add multiple of these steps to target different mkdocs.yaml files in the same repo
+      # Validate Documentation Before Publishing
+      - name: Validate techdocs
+        uses: celonis/actions/techdocs-validator@master
+        # with:
+        #   # Use this if mkdocs.yaml is in non-default path
+        #   techdocs-path: '.'
+        #   # Add URLs to ignore when searching for orphan links (space separated)
+        #   ignored-urls: 'localhost:8082 example.com'
+
+      # Publish Static files
+      - name: Publish techdocs
+        uses: celonis/actions/techdocs-publish-to-s3@master
+        with:
+          aws-access-key-id: ${{ secrets.BACKSTAGE_AWS_ACCESS_KEY_ID }} # TODO: Change to 
+          aws-secret-access-key: ${{ secrets.BACKSTAGE_AWS_SECRET_ACCESS_KEY }} # TODO: Change to 
+        #   Use this if mkdocs.yaml is in non-default path (root)
+        #   techdocs-path: '/path/to/file'

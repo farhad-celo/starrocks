@@ -1,0 +1,41 @@
+###
+# Learn more about this action: https://github.com/celonis/actions/tree/master/techdocs-validator
+# Recommended path in repo: .github/workflows/techdocs-validate.yml
+#
+# backstage.metadata.version: 0.0.1
+# backstage.metadata.workflow: celonis/actions/techdocs-validator/job-sample.yml
+#
+# WARNING: Templated variables marked with TODO  must be fixed accordingly.
+###
+name: Validate techdocs
+
+on:
+  push:
+    paths:
+      - '**/catalog-info.yaml'
+      - '**/mkdocs.yaml'
+      - '**/celostar-docs/**'
+      - '.github/workflows/*'
+    branches-ignore:
+      - branch-3.3-02ee3f6d-celo # TODO: add your default branch
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate techdocs
+    runs-on: ubuntu-latest
+    container: ghcr.io/celonis/techdocs:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # You can add multiple of these steps to target different mkdocs.yaml files in the same repo
+      - name: Validate techdocs
+        uses: celonis/actions/techdocs-validator@master
+        # with:
+        #   # Use this if mkdocs.yaml is in non-default path
+        #   techdocs-path: '.'
+        #   # Add URLs to ignore when searching for orphan links (space separated)
+        #   ignored-urls: 'localhost:8082 example.com'
+        #   # Set to "true" to enable verbose output
+        #   verbose: 'true'

@@ -1,0 +1,8 @@
+# To enhance the website and see the changes locally, go to the folder where `mkdocs.yaml` is located
+# and use the following command:
+#   docker run -it --rm -v ${PWD}:/app -p 3000:3000 ghcr.io/celonis/techdocs:latest
+# and open http://localhost:3000
+site_name: Documentation
+docs_dir: ./celostar-docs
+plugins:
+  - techdocs-core
