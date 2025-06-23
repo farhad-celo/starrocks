@@ -121,10 +121,15 @@ public:
 
     static Status date_match_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
+    static Status make_intersect_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status make_intersect_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
 private:
     DEFINE_VECTORIZED_FN(date_match_constant_filters);
-
     DEFINE_VECTORIZED_FN(date_match_non_constant_filters);
+    DEFINE_VECTORIZED_FN(make_intersect_calendar_const);
+    DEFINE_VECTORIZED_FN(make_intersect_calendar_general);
 };
 
 } // namespace starrocks

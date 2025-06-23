@@ -191,6 +191,7 @@ set(EXEC_FILES
         ./exprs/celonis/kmeans_test.cpp
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/linear_regression_test.cpp
+        ./exprs/celonis/make_intersect_calendar_test.cpp
         ./exprs/celonis/match_activities_test.cpp
         ./exprs/celonis/match_strings_test.cpp
         ./exprs/celonis/match_process_test.cpp

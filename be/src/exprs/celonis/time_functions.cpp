@@ -1760,9 +1760,110 @@ get_calendar(const ColumnPtr& calendar_column, int row) {
     return validate_and_to_proto(calendar_string, false);
 }
 
-StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::FunctionContext* context,
+struct MakeIntersectCalendarStateFragmentLocal {
+    ScalarFunction function;
+    bool is_null;
+    std::vector<std::string> calendar_pieces;
+};
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar([[maybe_unused]] FunctionContext* context,
                                                                   const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
+    const auto* state = reinterpret_cast<const MakeIntersectCalendarStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return state->function(context, columns);
+}
+
+Status CelonisTimeFunctions::make_intersect_calendar_prepare(FunctionContext* context,
+                                                             FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+    auto state = new MakeIntersectCalendarStateFragmentLocal();
+    context->set_function_state(scope, state);
+
+    auto calendar1_column = context->get_constant_column(0);
+    auto calendar2_column = context->get_constant_column(1);
+    if (calendar1_column == nullptr || calendar2_column == nullptr) {
+        state->function = make_intersect_calendar_general;
+        return Status::OK();
+    }
+    state->function = make_intersect_calendar_const;
+    if (calendar1_column->empty() || calendar2_column->empty()) {
+        return Status::OK();
+    }
+    if (calendar1_column->is_null(0) || calendar2_column->is_null(0)) {
+        state->is_null = true;
+        return Status::OK();
+    }
+    StatusOr<celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(calendar1_column, 0);
+    StatusOr<celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(calendar2_column, 0);
+    if (!status_or_calendar1.ok() || !status_or_calendar2.ok()) {
+        state->is_null = true;
+        return Status::OK();
+    }
+    celonis::accelerator::Calendar calendar_proto;
+    calendar_proto.mutable_intersect_calendar()->mutable_calendar1()->CopyFrom(status_or_calendar1.value());
+    calendar_proto.mutable_intersect_calendar()->mutable_calendar2()->CopyFrom(status_or_calendar2.value());
+    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto);
+    if (!calendar_string.has_value()) {
+        state->is_null = true;
+        return Status::OK();
+    }
+    state->is_null = false;
+    state->calendar_pieces.reserve((calendar_string->size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
+    for (size_t i = 0; i < calendar_string->size(); i += MAX_STRING_SIZE) {
+        state->calendar_pieces.emplace_back(calendar_string->substr(i, MAX_STRING_SIZE));
+    }
+    return Status::OK();
+}
+
+Status CelonisTimeFunctions::make_intersect_calendar_close(FunctionContext* context,
+                                                           FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        const auto* state = reinterpret_cast<const MakeIntersectCalendarStateFragmentLocal*>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+        delete state;
+    }
+    return Status::OK();
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar_const(starrocks::FunctionContext* context,
+                                                                        const starrocks::Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    DCHECK(all_const);
+    DCHECK_EQ(1, num_rows);
+    const auto* state = reinterpret_cast<const MakeIntersectCalendarStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+
+    int offset = 0;
+    UInt32Column::Ptr array_offsets = UInt32Column::create();
+    array_offsets->reserve(num_rows + 1);
+
+    BinaryColumn::Ptr array_binary_column = BinaryColumn::create();
+    auto null_column = NullColumn::create();
+
+    for (size_t row = 0; row < num_rows; ++row) {
+        array_offsets->append(offset);
+        if (state->is_null) {
+            null_column->append(1);
+            continue;
+        }
+        null_column->append(0);
+        for (const auto& calendar_piece: state->calendar_pieces) {
+            array_binary_column->append(Slice(calendar_piece));
+        }
+        offset += state->calendar_pieces.size();
+    }
+    array_offsets->append(offset);
+    return ConstColumn::create(NullableColumn::create(
+            ArrayColumn::create(NullableColumn::create(array_binary_column, NullColumn::create(offset, 0)),
+                                array_offsets), null_column), num_rows);
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar_general(starrocks::FunctionContext* context,
+                                                                          const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
 
@@ -1800,7 +1901,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::Fun
             calendar_pieces.emplace_back(calendar_string->substr(i, MAX_STRING_SIZE));
         }
         for (const auto& calendar_piece: calendar_pieces) {
-            array_binary_column->append(Slice(calendar_piece.c_str()));
+            array_binary_column->append(Slice(calendar_piece));
         }
         offset += calendar_pieces.size();
     }
