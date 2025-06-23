@@ -78,7 +78,8 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
         throw std::runtime_error(error.str());
     }
 
-    ColumnPtr activity_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnPtr activity_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_column.get());
     const auto* activity_elements = down_cast<const ActivityColumn*>(activity_array_data.elements)->get_data().data();
 
@@ -96,13 +97,12 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
         throw std::runtime_error(error.str());
     }
 
-    const size_t num_cases = columns[0]->size();
-    ColumnBuilder<TYPE_BIGINT> result(num_cases);
-    result.reserve(num_cases);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    result.reserve(num_rows);
 
     auto activity_offsets_ptr = activity_array_data.offsets->get_data().data();
     auto timestamp_offsets_ptr = timestamp_array_data.offsets->get_data().data();
-    for (size_t i = 0; i < num_cases; i++) {
+    for (size_t i = 0; i < num_rows; i++) {
         if (activity_array_data.null_arrays != nullptr && (*activity_array_data.null_arrays)[i]) {
             result.append_null();
             continue;
@@ -154,7 +154,7 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
         result.append(throughput);
     }
 
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 template

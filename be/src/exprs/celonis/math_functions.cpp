@@ -34,9 +34,9 @@ CelonisMathFunctions<LT>::square([[maybe_unused]] starrocks::FunctionContext* co
     DCHECK_EQ(columns.size(), 1);
     ColumnViewer value_viewer = ColumnViewer<LT>(columns[0]);
 
-    const size_t n_rows = columns[0]->size();
-    ColumnBuilder<LT> result(n_rows);
-    for (auto row = 0; row < n_rows; ++row) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<LT> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
@@ -48,7 +48,7 @@ CelonisMathFunctions<LT>::square([[maybe_unused]] starrocks::FunctionContext* co
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 template

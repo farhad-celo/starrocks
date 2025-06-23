@@ -22,8 +22,8 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
         return Status::InvalidArgument("size_array column should not be NULL literal.");
     }
     DCHECK(columns.size() == 4 || columns.size() == 5);
-    size_t chunk_size = columns[0]->size();
-    ColumnPtr timestamp_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[1]);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnPtr timestamp_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[1]);
     if (timestamp_column->has_null()) {
         return Status::InvalidArgument("timestamp_array should not be NULL.");
     }
@@ -33,11 +33,11 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
     std::vector<DatumKey> secondary_orders;
     const bool has_secondary_order = (columns.size() == 5) && (!columns[4]->has_null());
     if (has_secondary_order) {
-        secondary_orders.reserve(timestamp_offsets[chunk_size]);
-        ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[4]);
+        secondary_orders.reserve(timestamp_offsets[num_rows]);
+        ColumnPtr secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[4]);
         UnnestedArrayData secondary_order_array_data = prepare_array_input(secondary_order_column.get());
         const auto& secondary_order_offsets = secondary_order_array_data.offsets->get_data().data();
-        for (auto row = 0; row < chunk_size; ++row) {
+        for (auto row = 0; row < num_rows; ++row) {
             const auto start = timestamp_offsets[row];
             const auto end = timestamp_offsets[row + 1];
             if (secondary_order_offsets[row] != start || secondary_order_offsets[row + 1] != end) {
@@ -45,7 +45,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
                         "If provided, the size of secondary_order_array and timestamp_array should not be different.");
             }
         }
-        for (auto row = 0; row < chunk_size; ++row) {
+        for (auto row = 0; row < num_rows; ++row) {
             auto array = secondary_order_column->get(row).get_array();
             for (const auto& item: array) {
                 secondary_orders.push_back(item.convert2DatumKey());
@@ -53,7 +53,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
         }
     }
 
-    ColumnPtr size_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[2]);
+    ColumnPtr size_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[2]);
     if (size_column->has_null()) {
         return Status::InvalidArgument("size_array should not be NULL.");
     }
@@ -65,7 +65,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
     const auto& size_offsets = size_array_data.offsets->get_data().data();
 
     // TODO(y.zhang): Support NULL priority column.
-    ColumnPtr priority_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[3]);
+    ColumnPtr priority_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[3]);
     if (priority_column->has_null()) {
         return Status::InvalidArgument("priority_array should not be NULL.");
     }
@@ -82,13 +82,13 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
             return Status::InvalidArgument("input_array should not be null.");
         }
     }
-    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[0]);
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
     const auto& src_elements = down_cast<const RunTimeColumnType<LT>&>(*array_data.elements).get_data().data();
     const auto& src_offsets = array_data.offsets->get_data().data();
-    ColumnBuilder<LT> result(chunk_size);
+    ColumnBuilder<LT> result(num_rows);
 
-    for (size_t row = 0; row < chunk_size; row++) {
+    for (size_t row = 0; row < num_rows; row++) {
         size_t src_timestamp_start = src_offsets[row];
         size_t src_timestamp_end = src_offsets[row + 1];
         if (timestamp_offsets[row + 1] != src_timestamp_end) {
@@ -163,7 +163,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 template

@@ -115,7 +115,7 @@ CelonisLinearRegression::predict_linear_regression_non_constant_model([[maybe_un
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto& model_column = columns[1];
-    const auto num_rows = model_column->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer<TYPE_VARCHAR> model_viewer(model_column);
 
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
@@ -160,7 +160,7 @@ CelonisLinearRegression::predict_linear_regression_non_constant_model([[maybe_un
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>
@@ -169,7 +169,7 @@ CelonisLinearRegression::predict_linear_regression_constant_model([[maybe_unused
 
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    const auto num_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const auto* state = reinterpret_cast<const LinearRegressionStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
@@ -210,7 +210,7 @@ CelonisLinearRegression::predict_linear_regression_constant_model([[maybe_unused
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>

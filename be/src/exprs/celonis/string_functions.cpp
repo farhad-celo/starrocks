@@ -244,9 +244,9 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_96(starrocks::FunctionConte
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,
                                                          const starrocks::Columns& columns) {
-    const size_t row_size = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
-    std::vector<uint128_t> seeds_vec(row_size, default_xxhash_seed);
+    std::vector<uint128_t> seeds_vec(num_rows, default_xxhash_seed);
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
         // columns[0] is NULL literal
         if (columns[0]->only_null()) {
@@ -255,14 +255,14 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                                                                    default_xxhash_seed);
             auto result_column = context->create_column(context->get_return_type(), false);
             result_column->append_datum(null_array_hash);
-            return ConstColumn::create(std::move(result_column), row_size);
+            return ConstColumn::create(std::move(result_column), num_rows);
         }
-        ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+        ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
         UnnestedArrayData string_data = prepare_array_input(array_column.get());
         const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
                 *string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
-        for (size_t row = 0; row < row_size; ++row) {
+        for (size_t row = 0; row < num_rows; ++row) {
             if (columns[0]->is_null(row)) {
                 seeds_vec[row] = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_ARRAY_STRING.data(),
                                                            XXHASH3_128_NULL_ARRAY_STRING.size(), seeds_vec[row]);
@@ -303,7 +303,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
             column_viewers.emplace_back(column);
         }
         for (const auto& viewer: column_viewers) {
-            for (size_t row = 0; row < row_size; ++row) {
+            for (size_t row = 0; row < num_rows; ++row) {
                 uint128_t seed = seeds_vec[row];
                 if (viewer.is_null(row)) {
                     seeds_vec[row] = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_STRING.data(),
@@ -322,40 +322,40 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
             }
         }
     }
-    ColumnBuilder<TYPE_LARGEINT> builder(row_size);
-    std::vector<bool> is_null_vec(row_size, false);
-    for (int row = 0; row < row_size; ++row) {
+    ColumnBuilder<TYPE_LARGEINT> builder(num_rows);
+    std::vector<bool> is_null_vec(num_rows, false);
+    for (int row = 0; row < num_rows; ++row) {
         builder.append(seeds_vec[row], is_null_vec[row]);
     }
-    return builder.build(ColumnHelper::is_all_const(columns));
+    return builder.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::FunctionContext* context,
                                                                   const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    size_t row_size = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
     XXH3_state_t init_state;
     XXH_errorcode code = XXH3_128bits_reset_withSeed(&init_state, default_xxhash_seed);
     if (UNLIKELY(code != XXH_OK)) {
         return Status::InternalError("CELONIS_XX_HASH3_128_NULLABLE: init xxh3 state failed");
     }
-    std::vector<XXH3_state_t> states(row_size, init_state);
-    std::vector<bool> is_null_vec(row_size, false);
+    std::vector<XXH3_state_t> states(num_rows, init_state);
+    std::vector<bool> is_null_vec(num_rows, false);
 
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
         DCHECK_EQ(1, columns.size());
         if (columns[0]->only_null()) {
             auto result_column = context->create_column(context->get_return_type(), true);
-            result_column->append_nulls(row_size);
+            result_column->append_nulls(num_rows);
             return result_column;
         }
-        ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
+        ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
         UnnestedArrayData string_data = prepare_array_input(array_column.get());
         const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
                 *string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
-        for (size_t row = 0; row < row_size; ++row) {
+        for (size_t row = 0; row < num_rows; ++row) {
             if (columns[0]->is_null(row)) {
                 is_null_vec[row] = true;
                 continue;
@@ -379,7 +379,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
             column_viewers.emplace_back(column);
         }
         for (const auto& viewer: column_viewers) {
-            for (size_t row = 0; row < row_size; ++row) {
+            for (size_t row = 0; row < num_rows; ++row) {
                 if (is_null_vec[row]) {
                     continue;
                 }
@@ -393,13 +393,13 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
             }
         }
     }
-    ColumnBuilder<TYPE_LARGEINT> builder(row_size);
-    for (int row = 0; row < row_size; ++row) {
+    ColumnBuilder<TYPE_LARGEINT> builder(num_rows);
+    for (int row = 0; row < num_rows; ++row) {
         XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
         int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
         builder.append(res, is_null_vec[row]);
     }
-    return builder.build(ColumnHelper::is_all_const(columns));
+    return builder.build(all_const);
 }
 
 struct CelonisTranslateState {
@@ -488,10 +488,10 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
 
     auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
 
-    auto size = columns[0]->size();
-    ColumnBuilder<TYPE_VARCHAR> result(size);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_VARCHAR> result(num_rows);
     faststring result_str;
-    for (int row = 0; row < size; ++row) {
+    for (int row = 0; row < num_rows; ++row) {
         if (str_viewer.is_null(row)) {
             result.append_null();
             continue;
@@ -516,7 +516,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
         result.append(Slice(result_str.data(), result_str.size()));
     }
 
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 struct StringCaseLowerFunction {
@@ -731,10 +731,10 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
     ColumnViewer delimiter_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     ColumnViewer part_number_viewer = ColumnViewer<TYPE_INT>(columns[2]);
 
-    size_t size = columns[0]->size();
-    ColumnBuilder<TYPE_VARCHAR> res(size);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_VARCHAR> res(num_rows);
     Slice slice;
-    for (int i = 0; i < size; ++i) {
+    for (int i = 0; i < num_rows; ++i) {
         if (haystack_viewer.is_null(i) || delimiter_viewer.is_null(i) || part_number_viewer.is_null(i)) {
             res.append_null();
             continue;
@@ -793,7 +793,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
             }
         }
     }
-    return res.build(ColumnHelper::is_all_const(columns));
+    return res.build(all_const);
 }
 
 std::string_view trim_spaces(const std::string_view& str) {
@@ -912,9 +912,9 @@ CelonisStringFunctions::string_to_int([[maybe_unused]] FunctionContext* context,
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    size_t size = columns[0]->size();
-    ColumnBuilder<TYPE_BIGINT> res(size);
-    for (int i = 0; i < size; ++i) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_BIGINT> res(num_rows);
+    for (int i = 0; i < num_rows; ++i) {
         if (input_string_viewer.is_null(i)) {
             res.append_null();
             continue;
@@ -927,7 +927,7 @@ CelonisStringFunctions::string_to_int([[maybe_unused]] FunctionContext* context,
             res.append_null();
         }
     }
-    return res.build(ColumnHelper::is_all_const(columns));
+    return res.build(all_const);
 }
 
 StatusOr<ColumnPtr>
@@ -935,15 +935,15 @@ CelonisStringFunctions::string_to_double(FunctionContext* context, const starroc
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    size_t size = columns[0]->size();
-    ColumnBuilder<TYPE_DOUBLE> res(size);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_DOUBLE> res(num_rows);
     // std::stringstream is about 2.5x faster than atof on large inputs
     std::stringstream ss{};
     const std::locale& en_us_utf8_locale = get_locale();
     std::locale loc_with_thousands_sep{en_us_utf8_locale, new comma_separator_facet};
     // Set the numeric locale to "en_US.UTF-8" for proper parsing
     ss.imbue(loc_with_thousands_sep);
-    for (int i = 0; i < size; ++i) {
+    for (int i = 0; i < num_rows; ++i) {
         if (input_string_viewer.is_null(i)) {
             res.append_null();
             continue;
@@ -957,7 +957,7 @@ CelonisStringFunctions::string_to_double(FunctionContext* context, const starroc
         }
 
     }
-    return res.build(ColumnHelper::is_all_const(columns));
+    return res.build(all_const);
 }
 
 std::string to_lower_utf8(const std::string& input) {
@@ -1129,9 +1129,9 @@ CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext
     UnnestedArrayData pattern_data = prepare_array_input(patterns_column.get());
     const auto& patterns = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*pattern_data.elements).get_data().data();
     const auto& offsets = pattern_data.offsets->get_data().data();
-    size_t n_rows = columns[0]->size();
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    for (size_t row = 0; row < n_rows; ++row) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    for (size_t row = 0; row < num_rows; ++row) {
         // patterns is NULL
         if (columns[1]->is_null(row)) {
             result.append_null();
@@ -1169,7 +1169,7 @@ CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext
         }
         result.append(found_match);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>
@@ -1180,9 +1180,9 @@ CelonisStringFunctions::in_like_constant_patterns([[maybe_unused]] FunctionConte
     const auto* state = reinterpret_cast<const CelonisInLikeState*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
-    size_t n_rows = columns[0]->size();
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    for (size_t row = 0; row < n_rows; ++row) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    for (size_t row = 0; row < num_rows; ++row) {
         if (state->is_null) {
             result.append_null();
             continue;
@@ -1211,7 +1211,7 @@ CelonisStringFunctions::in_like_constant_patterns([[maybe_unused]] FunctionConte
         }
         result.append(found_match);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>
@@ -1336,17 +1336,17 @@ CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionCont
                                                    const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
     DCHECK_EQ(columns.size(), 4);
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    ColumnPtr match_string_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[1]);
+    ColumnPtr match_string_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[1]);
     UnnestedArrayData match_string_data = prepare_array_input(match_string_column.get());
     const auto& match_strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *match_string_data.elements).get_data().data();
     const auto& offsets = match_string_data.offsets->get_data().data();
     ColumnViewer top_k_viewer = ColumnViewer<TYPE_BIGINT>(columns[2]);
     ColumnViewer separator_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
-    ColumnBuilder<TYPE_VARCHAR> result(n_rows);
-    for (size_t row = 0; row < n_rows; ++row) {
+    ColumnBuilder<TYPE_VARCHAR> result(num_rows);
+    for (size_t row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row)) {
             result.append_null();
             continue;
@@ -1369,7 +1369,7 @@ CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionCont
         }
         result.append(get_match_strings_result(input_string, match_string_set, top_k, separator));
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>
@@ -1377,15 +1377,15 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
                                                const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
     DCHECK_EQ(columns.size(), 4);
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     const auto* state = reinterpret_cast<const CelonisMatchStringsState*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    ColumnBuilder<TYPE_VARCHAR> result(n_rows);
+    ColumnBuilder<TYPE_VARCHAR> result(num_rows);
     phmap::flat_hash_map<Slice, std::string, SliceHashWithSeed<PhmapSeed1>, SliceEqual> cache;
     const int64_t top_k = state->top_k;
     const std::string& separator = state->separator;
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || state->null_match_array) {
             result.append_null();
             continue;
@@ -1401,7 +1401,7 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
             result.append(it->second);
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>

@@ -120,7 +120,7 @@ using base64_hash_t = static_string<(TRUNCATED_DIGEST_SIZE / 3) * 4 - 1>;
 StatusOr<ColumnPtr> CelonisStringhash::stringhash([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    auto num_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnBuilder<TYPE_VARCHAR> result(num_rows);
     for (size_t row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row)) {
@@ -130,7 +130,7 @@ StatusOr<ColumnPtr> CelonisStringhash::stringhash([[maybe_unused]] FunctionConte
         const auto hash_str = hash_base64(input_string_viewer.value(row));
         result.append(Slice(hash_str.data(), hash_str.size()));
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 } // namespace starrocks

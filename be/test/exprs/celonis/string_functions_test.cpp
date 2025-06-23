@@ -1042,10 +1042,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_const_array_input)
         column->append_datum(DatumArray{"hello"});
         column = ConstColumn::create(column, 3);
         ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
-        ASSERT_EQ(column->size(), result->size());
+        ASSERT_EQ(1, result->size());
         EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(0).get_int128()));
-        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(1).get_int128()));
-        EXPECT_EQ("38559703224030507026617373843003362347", int128_to_string(result->get(2).get_int128()));
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);

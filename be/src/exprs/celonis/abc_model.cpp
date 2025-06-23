@@ -181,7 +181,7 @@ CelonisAbcModel<LT>::apply_abc_model_non_constant_model([[maybe_unused]]Function
     ColumnViewer value_viewer = ColumnViewer<LT>(columns[0]);
     ColumnViewer pk_hash_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
     ColumnViewer model_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
-    const size_t num_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
     for (int row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row)) {
@@ -200,7 +200,7 @@ CelonisAbcModel<LT>::apply_abc_model_non_constant_model([[maybe_unused]]Function
             result.append(label);
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 template<LogicalType LT>
@@ -211,7 +211,7 @@ StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_constant_model([[maybe_
     const auto* state = reinterpret_cast<const AbcModelStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
-    const size_t num_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
     for (int row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || !state->model.has_value()) {
@@ -225,7 +225,7 @@ StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_constant_model([[maybe_
             result.append(label);
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 
 }
 

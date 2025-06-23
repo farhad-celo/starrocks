@@ -47,9 +47,9 @@ template<ComparisonType CMP_TYPE, LogicalType LT>
         return ColumnViewerType{value};
     });
 
-    const std::size_t row_count{columns.front()->size()};
-    ColumnBuilder<LT> result{static_cast<int32_t>(row_count)};
-    for (std::size_t row_idx{0}; row_idx < row_count; ++row_idx) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<LT> result{static_cast<int32_t>(num_rows)};
+    for (std::size_t row_idx{0}; row_idx < num_rows; ++row_idx) {
         auto column_view_it{std::begin(column_views)};
         bool is_all_null{column_view_it->is_null(row_idx)};
         // N.B: If the value is null, value(...) returns a default value.
@@ -81,7 +81,7 @@ template<ComparisonType CMP_TYPE, LogicalType LT>
         result.append(result_column_value, is_all_null);
     }
 
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 template<ComparisonType CMP_TYPE>

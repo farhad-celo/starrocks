@@ -177,7 +177,7 @@ CelonisKmeans::apply_kmeans_non_constant_model([[maybe_unused]]FunctionContext* 
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto& model_column = columns[1];
-    const auto num_rows = model_column->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer<TYPE_VARCHAR> model_viewer(model_column);
 
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
@@ -222,7 +222,7 @@ CelonisKmeans::apply_kmeans_non_constant_model([[maybe_unused]]FunctionContext* 
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>
@@ -231,7 +231,7 @@ CelonisKmeans::apply_kmeans_constant_model([[maybe_unused]]FunctionContext* cont
 
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    const auto num_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const auto* state = reinterpret_cast<const KmeansStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
@@ -272,7 +272,7 @@ CelonisKmeans::apply_kmeans_constant_model([[maybe_unused]]FunctionContext* cont
             result.append_null();
         }
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>

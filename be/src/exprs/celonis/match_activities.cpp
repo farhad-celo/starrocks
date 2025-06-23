@@ -199,15 +199,15 @@ StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(starrocks::FunctionContext* context,
                                                                               const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
-    size_t n_rows = columns[0]->size();
-    ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
-    for (size_t row = 0; row < n_rows; ++row) {
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
+    for (size_t row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
@@ -232,24 +232,24 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(st
                                   excluding_nodes, excluding_all_nodes, any_nodes, any_nodes_mode));
     }
 
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>
 CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starrocks::FunctionContext* context,
                                                                           const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
-    size_t n_rows = columns[0]->size();
-    ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
     DCHECK(activity_array_data.elements->is_binary());
     const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
-    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    ColumnBuilder<TYPE_BIGINT> result(num_rows);
     const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    for (size_t row = 0; row < n_rows; ++row) {
+    for (size_t row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
@@ -262,7 +262,7 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starro
                                   state->match_config.any_nodes, state->match_config.any_nodes_mode));
     }
 
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>

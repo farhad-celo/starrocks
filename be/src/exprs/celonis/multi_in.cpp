@@ -167,18 +167,18 @@ StatusOr<ColumnPtr>
 CelonisMultiIn::multi_in_constant_config([[maybe_unused]] starrocks::FunctionContext* context,
                                          const starrocks::Columns& columns) {
     auto& input_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
-    const size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const auto* state = reinterpret_cast<const MultiInStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    ColumnBuilder<TYPE_BOOLEAN> result(n_rows);
-    for (auto row = 0; row < n_rows; ++row) {
+    ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || state->match_lists.is_null) {
             result.append_null();
             continue;
         }
         result.append(state->match_lists.match(input_fields, row));
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr>
@@ -187,9 +187,9 @@ CelonisMultiIn::multi_in_non_constant_config([[maybe_unused]] starrocks::Functio
     auto& input_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto& match_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[1].get()))->fields();
     const auto n_fields = input_fields.size();
-    const size_t n_rows = columns[0]->size();
-    ColumnBuilder<TYPE_BOOLEAN> result(n_rows);
-    for (auto row = 0; row < n_rows; ++row) {
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row)) {
             result.append_null();
             continue;
@@ -238,7 +238,7 @@ CelonisMultiIn::multi_in_non_constant_config([[maybe_unused]] starrocks::Functio
         }
         result.append(found_match);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 } // namespace starrocks

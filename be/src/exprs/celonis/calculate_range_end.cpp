@@ -69,12 +69,12 @@ CelonisCalculateRangeEnd::calculate_range_end([[maybe_unused]] starrocks::Functi
                                               const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 3);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    size_t n_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer start_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer step_size_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     ColumnViewer step_count_viewer = ColumnViewer<TYPE_BIGINT>(columns[2]);
-    ColumnBuilder<TYPE_DATETIME> result(n_rows);
-    for (auto row = 0; row < n_rows; ++row) {
+    ColumnBuilder<TYPE_DATETIME> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
         if (start_viewer.is_null(row) || step_size_viewer.is_null(row) || step_count_viewer.is_null(row)) {
             result.append_null();
             continue;
@@ -97,7 +97,7 @@ CelonisCalculateRangeEnd::calculate_range_end([[maybe_unused]] starrocks::Functi
         auto end_timestamp = add_timeunits(start_timestamp, time_unit, number * step_count);
         result.append(end_timestamp);
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 } // namespace starrocks

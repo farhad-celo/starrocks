@@ -10,7 +10,7 @@ using celonis::accelerator::operators::mo::MoBpmnGraphHelper;
 namespace starrocks {
 
 StatusOr<ColumnPtr> CelonisMoBpmnGraph::mo_bpmn_graph(FunctionContext* context, const Columns& columns) {
-    auto num_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnBuilder<TYPE_VARCHAR> results(num_rows);
     for (int row = 0; row < num_rows; row++) {
         std::vector<std::string> process_trees;
@@ -31,7 +31,7 @@ StatusOr<ColumnPtr> CelonisMoBpmnGraph::mo_bpmn_graph(FunctionContext* context, 
         results.append(result);
     }
 
-    return results.build(ColumnHelper::is_all_const(columns));
+    return results.build(all_const);
 }
 
 } // namespace starrocks

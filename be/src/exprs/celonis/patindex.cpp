@@ -57,7 +57,7 @@ CelonisPatindex::patindex_non_constant_pattern([[maybe_unused]]FunctionContext* 
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     ColumnViewer pattern_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     const bool has_occurrence = columns.size() == 3;
-    auto num_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
     for (size_t row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || columns[1]->is_null(row) || (has_occurrence && columns[2]->is_null(row))) {
@@ -69,7 +69,7 @@ CelonisPatindex::patindex_non_constant_pattern([[maybe_unused]]FunctionContext* 
         result.append(pattern_index(input_string.data(), pattern.data(),
                                     (has_occurrence ? columns[2]->get(row).get_int64() : 1)));
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisPatindex::patindex_constant_pattern([[maybe_unused]]FunctionContext* context,
@@ -79,7 +79,7 @@ StatusOr<ColumnPtr> CelonisPatindex::patindex_constant_pattern([[maybe_unused]]F
     const auto* state = reinterpret_cast<const PatindexStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     const std::optional<std::string>& pattern = state->pattern;
-    auto num_rows = columns[0]->size();
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
     for (size_t row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row) || !pattern.has_value() || (has_occurrence && columns[2]->is_null(row))) {
@@ -90,7 +90,7 @@ StatusOr<ColumnPtr> CelonisPatindex::patindex_constant_pattern([[maybe_unused]]F
         result.append(pattern_index(input_string.data(), pattern->data(),
                                     (has_occurrence ? columns[2]->get(row).get_int64() : 1)));
     }
-    return result.build(ColumnHelper::is_all_const(columns));
+    return result.build(all_const);
 }
 
 StatusOr<ColumnPtr> CelonisPatindex::patindex(FunctionContext* context, const Columns& columns) {
