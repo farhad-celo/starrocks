@@ -1351,6 +1351,11 @@ std::vector<TimeRange> TimeRange::intersect(int64_t left_ms, int64_t right_ms) c
     int64_t cur_begin = begin_ms;
     int64_t cur_end = end_ms;
     int64_t period = NUM_MILLISECONDS_PER_WEEK;
+    if (cur_end <= begin) {
+        int64_t n_periods = (begin - cur_end + period - 1) / period;
+        cur_begin += n_periods * period;
+        cur_end += n_periods * period;
+    }
     // move [cur_begin, cur_end) to the left of [begin, end)
     if (cur_end > begin) {
         int64_t n_periods = (cur_end - begin + period - 1) / period;
