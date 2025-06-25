@@ -1,4 +1,5 @@
 #include "util.h"
+#include "exprs/celonis/util.h"
 #include "google/protobuf/util/json_util.h"
 #include "google/protobuf/stubs/strutil.h"
 
@@ -45,9 +46,13 @@ std::string get_workday_mask_str(int n_days, const std::unordered_set<int>& one_
     return rv;
 }
 
-std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& calendar_proto) {
+std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& calendar_proto, bool compress) {
     std::string binary_string;
     calendar_proto.SerializeToString(&binary_string);
+
+    if (compress) {
+        binary_string = std::move(compress_string(binary_string, true));
+    }
 
     int cipher_len = (size_t)(4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
     char p[cipher_len];

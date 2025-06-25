@@ -487,7 +487,36 @@ TEST_F(CelonisAddTimeunitsCalendarTest, add_minutes) {
           }
         }
         )", &calendar_proto);
-        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto);
+        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto, true);
+        const auto result = RunConstantCalendar({encoded_string}, "MINUTES").value();
+        ASSERT_EQ(timestamp_column_->size(), result->size());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 9, 1, 0), result->get(0).get_timestamp());
+        EXPECT_EQ(TimestampValue::create(2018, 1, 2, 15, 2, 0), result->get(1).get_timestamp());
+    }
+    {
+        Prepare();
+        timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+        timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
+        add_value_column_->append_datum(61L);
+        add_value_column_->append_datum(62L);
+        calendar_id_column_->append_datum("DE");
+        calendar_id_column_->append_datum("US");
+        ::celonis::accelerator::Calendar calendar_proto;
+        google::protobuf::TextFormat::ParseFromString(R"(
+        factory_calendar {
+          entries {
+            start_date: 1514880000000
+            end_date: 1514912400000
+            calendar_id: "DE"
+          }
+          entries {
+            start_date: 1514901600000
+            end_date: 1514934000000
+            calendar_id: "US"
+          }
+        }
+        )", &calendar_proto);
+        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto, false);
         const auto result = RunConstantCalendar({encoded_string}, "MINUTES").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(TimestampValue::create(2018, 1, 2, 9, 1, 0), result->get(0).get_timestamp());

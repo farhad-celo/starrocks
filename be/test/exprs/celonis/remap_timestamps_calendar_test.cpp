@@ -368,7 +368,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
           }
         }
         )", &calendar_proto);
-        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto);
+        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto, false);
         const auto result = RunConstantCalendarAndTimeUnit({encoded_string.c_str()}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());
@@ -391,7 +391,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, weekday_calendar) {
           }
         }
         )", &calendar_proto);
-        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto);
+        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto, true);
         std::string first_half = encoded_string.substr(0, encoded_string.length() / 2);
         std::string second_half = encoded_string.substr(encoded_string.length() / 2);
         const auto result = RunConstantCalendarAndTimeUnit({first_half.c_str(), second_half.c_str()}, "SECONDS").value();

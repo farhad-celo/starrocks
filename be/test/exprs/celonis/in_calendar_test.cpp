@@ -104,7 +104,30 @@ TEST_F(CelonisInCalendarTest, const_multiple_weekday_calendar) {
           }
         }
         )", &calendar_proto);
-        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto);
+        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto, true);
+        const auto result = RunConstantCalendar({encoded_string}).value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+    }
+    {
+        Prepare();
+        timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 9, 0, 0));
+        calendar_id_column_->append_datum(kNullDatum);
+        ::celonis::accelerator::Calendar calendar_proto;
+        google::protobuf::TextFormat::ParseFromString(R"(
+        multi_weekday_calendar {
+          calendars {
+            thursday {
+              use_day: true
+              shift {
+                begin: 28800000
+                end: 61200000
+              }
+            }
+          }
+        }
+        )", &calendar_proto);
+        std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto, false);
         const auto result = RunConstantCalendar({encoded_string}).value();
         ASSERT_EQ(1, result->size());
         EXPECT_EQ(1L, result->get(0).get_int64());

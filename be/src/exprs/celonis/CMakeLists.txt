@@ -108,7 +108,8 @@ add_library(celonis_protos ${PROTO_GENERATED_SRCS} ${PROTO_GENERATED_HDRS})
 target_include_directories(Celonis PRIVATE "${BUILD_DIR}/generated")
 
 # Boost
-find_package(Boost 1.80.0 COMPONENTS container)
+find_package(Boost 1.80.0 COMPONENTS container iostreams)
+find_package(ZLIB REQUIRED)
 target_include_directories(Celonis PRIVATE ${Boost_INCLUDE_DIR})
 
 # onetbb does not support static build.
@@ -119,6 +120,8 @@ set_target_properties(onetbb PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib/
 target_link_libraries(Celonis
         PRIVATE
         celonis_protos
-        ${Boost_LIBRARIES}
+        Boost::iostreams
+        Boost::container
+        ZLIB::ZLIB
         onetbb
 )

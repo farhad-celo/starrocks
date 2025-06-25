@@ -5,8 +5,11 @@
 
 namespace starrocks {
 
+const char ZLIB_COMPRESSED_FLAG = 'Z';
+const char UNCOMPRESSED_FLAG = 'U';
+
 const uint128_t XXHASH3_128_SEED = 0;
-// TODO: Think of a better way to handle this.
+// TODO(y.zhang): Think of a better way to handle this.
 // used to represent NULL scalar value when computing hash value.
 constexpr std::string_view XXHASH3_128_NULL_STRING = "_$CeL0nIs_ReSeRvEd_NuLl_";
 // used to represent NULL array when computing hash value.
@@ -49,6 +52,10 @@ bool is_ratio_invalid(double ratio);
 int128_t safe_abs(int128_t value);
 
 int64_t safe_abs(int64_t value);
+
+std::string compress_string(const std::string& data, bool add_flag);
+
+bool decompress_string(std::string_view compressed_data, std::string& decompressed_output);
 
 // Casts 'input_column' as an ArrayColumn (removing Nullable wrapper if present).
 const ArrayColumn& extract_array_column(const Column* input_column);

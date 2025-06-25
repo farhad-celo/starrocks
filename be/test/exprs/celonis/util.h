@@ -22,7 +22,7 @@ std::string get_is_workdays_str(int n_days, const std::unordered_set<int>& one_i
 // Gets the str representation of workday_mask part in WorkdayCalendarEntry
 std::string get_workday_mask_str(int n_days, const std::unordered_set<int>& one_indexes);
 
-std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& calendar_proto);
+std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& calendar_proto, bool compress);
 
 std::optional<std::string> to_calendar_json_string(const std::string& encoded_string);
 

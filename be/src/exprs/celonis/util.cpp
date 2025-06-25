@@ -3,6 +3,12 @@
 #include "column/array_column.h"
 #include "column/column_helper.h"
 #include "util/xxh3.h"
+#include <string>
+#include <sstream>
+
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
 
 namespace starrocks {
 
@@ -13,6 +19,47 @@ uint128_t xx_hash3_128(const void* key, int32_t len, uint128_t seed) {
 
 bool is_ratio_invalid(double ratio) {
     return ratio < -EPS || ratio > 1.0 + EPS;
+}
+
+std::string compress_string(const std::string& data, bool add_flag) {
+    namespace io = boost::iostreams;
+
+    std::stringstream original_string_stream(data);
+    std::stringstream compressed_string_stream;
+
+    io::filtering_streambuf<io::input> out;
+    out.push(io::zlib_compressor(io::zlib::best_compression));
+    out.push(original_string_stream);
+
+    io::copy(out, compressed_string_stream);
+    std::string compressed_data = compressed_string_stream.str();
+
+    if (add_flag) {
+        return std::string(1, ZLIB_COMPRESSED_FLAG) + compressed_data;
+    }
+    return compressed_data;
+}
+
+bool decompress_string(std::string_view compressed_data, std::string& decompressed_output) {
+    namespace io = boost::iostreams;
+    if (!compressed_data.empty() && compressed_data[0] == ZLIB_COMPRESSED_FLAG) {
+        compressed_data.remove_prefix(1);
+    }
+    try {
+        std::stringstream compressed_stream;
+        compressed_stream.write(compressed_data.data(), compressed_data.size());
+
+        std::stringstream decompressed_stream;
+        io::filtering_streambuf<io::input> in;
+        in.push(io::zlib_decompressor());
+        in.push(compressed_stream);
+
+        io::copy(in, decompressed_stream);
+        decompressed_output = decompressed_stream.str();
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
 }
 
 int128_t safe_abs(int128_t value) {

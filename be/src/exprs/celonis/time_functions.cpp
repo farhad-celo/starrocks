@@ -985,8 +985,20 @@ base64_encoded_string_to_calendar(const std::string& calendar_string, celonis::a
     if (decoded_len < 0) {
         return false;
     }
-    bool success = calendar.ParseFromArray(decoded_buffer.get(), decoded_len);
-    return success;
+    std::string_view payload(decoded_buffer.get(), decoded_len);
+    const char format_flag = !payload.empty() ? payload[0] : '\0';
+    if (format_flag == ZLIB_COMPRESSED_FLAG) {
+        std::string decompressed_data;
+        if (!decompress_string(payload.substr(1), decompressed_data)) {
+            return false;
+        }
+        return calendar.ParseFromString(decompressed_data);
+    } else if (format_flag == UNCOMPRESSED_FLAG) {
+        auto protobuf_payload = payload.substr(1);
+        return calendar.ParseFromArray(protobuf_payload.data(), protobuf_payload.size());
+    } else {
+        return calendar.ParseFromArray(payload.data(), payload.size());
+    }
 }
 
 static bool json_string_to_calendar(const std::string& calendar_json_string, celonis::accelerator::Calendar& calendar) {
