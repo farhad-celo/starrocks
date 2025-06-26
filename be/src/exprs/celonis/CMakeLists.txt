@@ -109,7 +109,6 @@ target_include_directories(Celonis PRIVATE "${BUILD_DIR}/generated")
 
 # Boost
 find_package(Boost 1.80.0 COMPONENTS container iostreams)
-find_package(ZLIB REQUIRED)
 target_include_directories(Celonis PRIVATE ${Boost_INCLUDE_DIR})
 
 # onetbb does not support static build.
@@ -122,6 +121,5 @@ target_link_libraries(Celonis
         celonis_protos
         Boost::iostreams
         Boost::container
-        ZLIB::ZLIB
         onetbb
 )
