@@ -1,10 +1,10 @@
 #include "exprs/celonis/abc_model.h"
 
-#include "column/array_column.h"
 #include "column/column_viewer.h"
 #include "column/column_builder.h"
 #include "column/column_hash.h"
 #include "exprs/builtin_functions.h"
+#include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
@@ -14,14 +14,6 @@ namespace starrocks {
 namespace {
 
 static const double EPS = 1e-9;
-
-int64_t safe_abs(int64_t value) {
-    if (value == std::numeric_limits<int64_t>::min()) {
-        return std::numeric_limits<int64_t>::max();
-    } else {
-        return value < 0 ? -value : value;
-    }
-}
 
 template<LogicalType LT>
 class AbcModel {
