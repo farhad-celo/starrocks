@@ -354,6 +354,58 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(json_string.value(),
                   R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true],"calendarId":"id1"},{"year":"1971","isWorkday":[true,false,true,false],"calendarId":"id2"}]}})");
     }
+    // result is sorted
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        year_column->append_datum(1971L);
+        year_column->append_datum(1970L);
+
+        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        is_workdays_column->append_datum("1010");
+        is_workdays_column->append_datum("0101");
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        calendar_id_column->append_datum("id2");
+        calendar_id_column->append_datum("id1");
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = year_column.get();
+        raw_columns[1] = is_workdays_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
+        EXPECT_EQ(2, agg_state->year->size());
+        EXPECT_EQ(2, agg_state->is_workdays->size());
+        EXPECT_EQ(2, agg_state->calendar_id->size());
+        EXPECT_EQ(2, agg_state->is_calendar_id_null->size());
+        EXPECT_EQ(year_column->debug_string(), agg_state->year->debug_string());
+        EXPECT_EQ(is_workdays_column->debug_string(), agg_state->is_workdays->debug_string());
+        EXPECT_EQ("['id2', 'id1']", agg_state->calendar_id->debug_string());
+        EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{year:[1971,1970],is_workdays:['1010','0101'],calendar_id:['id2','id1'],is_calendar_id_null:[0,0]}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(),
+                  R"({"workdayCalendar":{"entries":[{"year":"1970","isWorkday":[false,true,false,true],"calendarId":"id1"},{"year":"1971","isWorkday":[true,false,true,false],"calendarId":"id2"}]}})");
+    }
     // empty input
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {

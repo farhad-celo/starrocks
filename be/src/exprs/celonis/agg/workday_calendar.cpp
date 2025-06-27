@@ -150,8 +150,9 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     DCHECK(state_impl.is_workdays->size() == n_rows);
     DCHECK(state_impl.calendar_id->size() == n_rows);
     DCHECK(state_impl.is_calendar_id_null->size() == n_rows);
-    celonis::accelerator::Calendar calendar_proto;
-    for (int i = 0; i < n_rows; ++i) {
+    std::vector<celonis::accelerator::WorkdayCalendarEntry> entries;
+    entries.reserve(n_rows);
+    for (auto i = 0; i < n_rows; ++i) {
         celonis::accelerator::WorkdayCalendarEntry entry;
         const int64_t year = state_impl.year->get(i).get_int64();
         const std::string is_workdays = state_impl.is_workdays->get(i).get_slice().to_string();
@@ -185,8 +186,23 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         if (calendar_id_not_null) {
             entry.set_calendar_id(calendar_id);
         }
-        *calendar_proto.mutable_workday_calendar()->add_entries() = entry;
+        entries.push_back(std::move(entry));
     }
+
+    // Sort entries for deterministic output - first by calendar_id, then by year
+    std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) {
+        // First sort by calendar_id, empty (i.e., NULL) calendar_id come first
+        if (a.calendar_id() != b.calendar_id()) {
+            return a.calendar_id() < b.calendar_id();
+        }
+        // Then by year
+        return a.year() < b.year();
+    });
+    celonis::accelerator::Calendar calendar_proto;
+    for (auto& entry : entries) {
+        *calendar_proto.mutable_workday_calendar()->add_entries() = std::move(entry);
+    }
+
     std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto,
                                                                           DEFAULT_CELONIS_PROTO_SIZE_LIMIT, true);
     if (!calendar_string.has_value()) {
@@ -201,6 +217,7 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         calendar_pieces.emplace_back(calendar_string->substr(i, MAX_STRING_SIZE));
     }
     DatumArray array;
+    array.reserve(calendar_pieces.size());
     for (const auto& calendar_piece: calendar_pieces) {
         array.emplace_back(calendar_piece.c_str());
     }
