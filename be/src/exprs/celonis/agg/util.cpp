@@ -1,5 +1,6 @@
 #include "column/array_column.h"
 #include "column/column_helper.h"
+#include "exprs/celonis/util.h"
 #include "exprs/celonis/agg/util.h"
 #include "exprs/celonis/base64.h"
 #include <cmath>
@@ -7,12 +8,15 @@
 namespace starrocks {
 
 std::optional<std::string>
-to_base64_encoded_string(const google::protobuf::Message& message, size_t size_limit) {
+to_base64_encoded_string(const google::protobuf::Message& message, size_t size_limit, bool compress) {
     if (message.ByteSizeLong() > size_limit) {
         return std::nullopt;
     }
     std::string binary_string;
     message.SerializeToString(&binary_string);
+    if (compress && !binary_string.empty()) {
+        binary_string = std::move(compress_string(binary_string, true));
+    }
     int cipher_len = (size_t) (4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
     std::string p(cipher_len, '\0');
 

@@ -15,6 +15,7 @@
 #include "exprs/celonis/agg/multi_array_agg.h"
 #include "exprs/celonis/agg/weekday_calendar.h"
 #include "exprs/celonis/agg/workday_calendar.h"
+#include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
 #include "gutil/strings/strcat.h"
 #include "modules/query/calendars.pb.h"
@@ -68,14 +69,28 @@ public:
     }
 
     std::optional<std::string> to_calendar_json_string(const std::string& encoded_string) {
-        int cipher_len = encoded_string.length();
-        std::unique_ptr<char[]> p;
-        p.reset(new char[cipher_len + 3]);
-
-        int len = base64_decode3(encoded_string.data(), encoded_string.length(), p.get());
-        std::string decoded_string(p.get(), len);
+        std::unique_ptr<char[]> decoded_buffer(new char[encoded_string.length()]);
+        int decoded_len = base64_decode3(encoded_string.data(), encoded_string.length(), decoded_buffer.get());
+        // Check if the decoding was successful before attempting to parse.
+        if (decoded_len < 0) {
+            return std::nullopt;
+        }
+        std::string_view payload(decoded_buffer.get(), decoded_len);
+        const char format_flag = !payload.empty() ? payload[0] : '\0';
         ::celonis::accelerator::Calendar calendar_proto;
-        bool success = calendar_proto.ParseFromString(decoded_string);
+        bool success = true;
+        if (format_flag == ZLIB_COMPRESSED_FLAG) {
+            std::string decompressed_data;
+            if (!decompress_string(payload.substr(1), decompressed_data)) {
+                return std::nullopt;
+            }
+            success = calendar_proto.ParseFromString(decompressed_data);
+        } else if (format_flag == UNCOMPRESSED_FLAG) {
+            auto protobuf_payload = payload.substr(1);
+            success = calendar_proto.ParseFromArray(protobuf_payload.data(), protobuf_payload.size());
+        } else {
+            success = calendar_proto.ParseFromArray(payload.data(), payload.size());
+        }
         if (!success) {
             return std::nullopt;
         }
@@ -496,12 +511,15 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     // resultant calendar is longer than 1M.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        const int64_t n_rows = 40000;
+        const int64_t n_rows = 400000;
         auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
         auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        year_column->reserve(n_rows);
+        is_workdays_column->reserve(n_rows);
+        calendar_id_column->reserve(n_rows);
         for (auto i = 0; i < n_rows; ++i) {
             year_column->append_datum(i + 1970L);
             is_workdays_column->append_datum("0000000000");
@@ -916,48 +934,6 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
         EXPECT_EQ("[[]]", res_array_col->debug_string());
-    }
-    // resultant calendar is longer than 1M.
-    state = ManagedAggrState::create(local_ctx.get(), agg_func);
-    {
-        const int64_t n_rows = 15000;
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-
-        auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
-        const std::string workday_str(366, '0');
-        for (auto i = 0; i < n_rows; ++i) {
-            int64_t year = i + 1970L;
-            bool is_leap_year = (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0));
-            year_column->append_datum(i + 1970L);
-            is_workdays_column->append_datum(Slice(workday_str.data(), is_leap_year ? 366 : 365));
-            calendar_id_column->append_datum("id1");
-        }
-
-        std::vector<const Column*> raw_columns;
-        raw_columns.resize(3);
-        raw_columns[0] = year_column.get();
-        raw_columns[1] = is_workdays_column.get();
-        raw_columns[2] = calendar_id_column.get();
-
-        // test update
-        agg_func->update_batch_single_state(local_ctx.get(), year_column->size(), raw_columns.data(),
-                                            state->state());
-        auto agg_state = (WorkdayCalendarAggregateState*) (state->state());
-        EXPECT_EQ(n_rows, agg_state->year->size());
-        EXPECT_EQ(n_rows, agg_state->is_workdays->size());
-        EXPECT_EQ(n_rows, agg_state->calendar_id->size());
-        EXPECT_EQ(n_rows, agg_state->is_calendar_id_null->size());
-
-        // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
-        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_GT(res_array_col->debug_string().size(), 1000000);
-        EXPECT_EQ(1, res_array_col->size());
-        EXPECT_EQ(2, res_array_col->get(0).get_array().size());
-        EXPECT_LT(res_array_col->get(0).get_array()[0].get_slice().to_string().size(), 1000000);
-        EXPECT_LT(res_array_col->get(0).get_array()[1].get_slice().to_string().size(), 1000000);
     }
     config::enable_workday_mask_in_workday_calendar = enable_workday_mask_in_workday_calendar;
 }

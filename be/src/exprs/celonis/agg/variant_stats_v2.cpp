@@ -345,7 +345,7 @@ CelonisVariantStatsAggregateV2State::base64_encoded_string(
     *statistics_proto.mutable_happy() = count_pair;
 
     // set size limit to 100M.
-    std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto, (100LL << 20));
+    std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto, (100LL << 20), false);
     if (!encoded_string.has_value()) {
         LOG(ERROR) << "CELONIS_VARIANT_STATS_V2: proto serialized size exceeds maximum supported length (100M).\n";
     }

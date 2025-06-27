@@ -187,7 +187,8 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         }
         *calendar_proto.mutable_workday_calendar()->add_entries() = entry;
     }
-    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto);
+    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto,
+                                                                          DEFAULT_CELONIS_PROTO_SIZE_LIMIT, true);
     if (!calendar_string.has_value()) {
         ctx->set_error(StrCat("Calendar proto serialized size (", calendar_proto.ByteSizeLong(),
                               " bytes) exceeds maximum supported length (1GB)").c_str(), false);

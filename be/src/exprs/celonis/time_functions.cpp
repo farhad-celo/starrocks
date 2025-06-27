@@ -1817,7 +1817,8 @@ Status CelonisTimeFunctions::make_intersect_calendar_prepare(FunctionContext* co
     celonis::accelerator::Calendar calendar_proto;
     calendar_proto.mutable_intersect_calendar()->mutable_calendar1()->CopyFrom(status_or_calendar1.value());
     calendar_proto.mutable_intersect_calendar()->mutable_calendar2()->CopyFrom(status_or_calendar2.value());
-    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto);
+    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto,
+                                                                          DEFAULT_CELONIS_PROTO_SIZE_LIMIT, false);
     if (!calendar_string.has_value()) {
         state->is_null = true;
         return Status::OK();
@@ -1901,7 +1902,8 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar_general(starro
         celonis::accelerator::Calendar calendar_proto;
         calendar_proto.mutable_intersect_calendar()->mutable_calendar1()->CopyFrom(status_or_calendar1.value());
         calendar_proto.mutable_intersect_calendar()->mutable_calendar2()->CopyFrom(status_or_calendar2.value());
-        std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto);
+        std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto,
+                                                                              DEFAULT_CELONIS_PROTO_SIZE_LIMIT, false);
         if (!calendar_string.has_value()) {
             null_column->append(1);
             continue;
