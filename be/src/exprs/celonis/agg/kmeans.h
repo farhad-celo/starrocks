@@ -78,7 +78,7 @@ struct CelonisKMeansModelAggregateState {
         memcpy(dst, &inconsistent_dimension_, sizeof(uint8_t));
         dst += sizeof(uint8_t);
         memcpy(dst, &num_clusters_, sizeof(int64_t));
-        dst += sizeof(double);
+        dst += sizeof(int64_t);
         memcpy(dst, &seed_, sizeof(int));
         dst += sizeof(int);
         memcpy(dst, &num_features_, sizeof(size_t));
