@@ -24,7 +24,7 @@ using floating_point_t = RunTimeTypeTraits<DoubleLTWrapper::GET_LOGICAL_TYPE()>:
 
 template <typename T>
 ProductAggregateState<T> make_initialized_state(T v) {
-    return ProductAggregateState<T>{ProductAggregateState<T>::AggregationStage::INITIALITZED, v};
+    return ProductAggregateState<T>{ProductAggregateState<T>::AggregationStage::INITIALIZED, v};
 }
 
 template <typename T>
@@ -391,11 +391,11 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format) {
 
     ASSERT_EQ(serialization_column->size(), chunk_size);
     ASSERT_EQ(serialized_stage_data[0],
-              static_cast<RawStageFieldType>(ProductAggregateState<T>::AggregationStage::INITIALITZED));
+              static_cast<RawStageFieldType>(ProductAggregateState<T>::AggregationStage::INITIALIZED));
     ASSERT_EQ(serialized_stage_data[1],
               static_cast<RawStageFieldType>(ProductAggregateState<T>::AggregationStage::UNINITIALIZED));
     ASSERT_EQ(serialized_stage_data[2],
-              static_cast<RawStageFieldType>(ProductAggregateState<T>::AggregationStage::INITIALITZED));
+              static_cast<RawStageFieldType>(ProductAggregateState<T>::AggregationStage::INITIALIZED));
     ASSERT_EQ(serialized_stage_data[3],
               static_cast<RawStageFieldType>(ProductAggregateState<T>::AggregationStage::UNINITIALIZED));
     ASSERT_EQ(serialized_product_data[0], 2);

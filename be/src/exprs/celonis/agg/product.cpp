@@ -70,7 +70,7 @@ void write_serialized_chunk(const ColumnPtr& src, ColumnPtr& dst, const size_t c
                 continue;
             }
         }
-        dst_stage_column_data[i] = static_cast<RawStageType>(StateType::AggregationStage::INITIALITZED);
+        dst_stage_column_data[i] = static_cast<RawStageType>(StateType::AggregationStage::INITIALIZED);
         dst_product_column_data[i] = src_data[i];
     }
 }
@@ -93,7 +93,7 @@ typename ProductAggregateState<T>::AggregationStage ProductAggregateState<T>::ge
 
 template <typename T>
 bool ProductAggregateState<T>::is_initialized() const {
-    return get_stage() == AggregationStage::INITIALITZED;
+    return get_stage() == AggregationStage::INITIALIZED;
 }
 
 template <typename T>
@@ -107,7 +107,7 @@ void ProductAggregateState<T>::update(T val) {
         return;
     }
     if (!is_initialized()) {
-        stage_ = AggregationStage::INITIALITZED;
+        stage_ = AggregationStage::INITIALIZED;
         product_ = val;
     } else {
         if constexpr (std::is_floating_point_v<T>) {

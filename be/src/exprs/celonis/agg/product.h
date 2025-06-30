@@ -24,7 +24,7 @@ template <typename T>
 class ProductAggregateState {
 public:
     /* Represents the current stage of the aggregation. */
-    enum class AggregationStage : int8_t { UNINITIALIZED = 0, INITIALITZED = 1, OVERFLOW = 2 };
+    enum class AggregationStage : int8_t { UNINITIALIZED = 0, INITIALIZED = 1, OVERFLOW = 2 };
 
     /* Columns types for fields in struct column that this state can be converted to. */
     using StageFieldcolumnType = FixedLengthColumn<std::underlying_type_t<AggregationStage>>;
