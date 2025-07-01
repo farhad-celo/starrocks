@@ -4,7 +4,7 @@
 
 #include <concepts>
 
-namespace cpml_proxy {
+namespace starrocks::celonis::cpml_utils {
 
 namespace {
 
@@ -20,7 +20,7 @@ template <std::signed_integral SIGNED_T, typename UNSIGNED_T = std::make_unsigne
 
 } // anonymous namespace
 
-sr_variant_accessor::sr_variant_accessor(const starrocks::Variants& sr_variants) : sr_variants_{sr_variants} {}
+sr_variant_accessor::sr_variant_accessor(const Variants& sr_variants) : sr_variants_{sr_variants} {}
 
 sr_variant_accessor::size_type sr_variant_accessor::size() const {
     return sr_variants_.size();
@@ -34,4 +34,4 @@ std::size_t sr_variant_accessor::count(variant_id_t id) const {
     return sr_variants_[as_unsigned(id.get())].count;
 }
 
-} // namespace cpml_proxy
+} // namespace starrocks::celonis::cpml_utils

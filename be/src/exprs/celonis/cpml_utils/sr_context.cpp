@@ -4,7 +4,7 @@
 #include <cpml/context/memory_context.h>
 #include <cpml/context/tracing_context.h>
 
-namespace cpml_proxy {
+namespace starrocks::celonis::cpml_utils {
 
 namespace {
 
@@ -38,4 +38,4 @@ cpml::context::function_context make_sr_function_context() {
     return cpml::context::function_context{sr_logging_ctx, sr_memory_ctx, std::move(sr_tracing_ctx)};
 }
 
-} // namespace cpml_proxy
+} // namespace starrocks::celonis::cpml_utils

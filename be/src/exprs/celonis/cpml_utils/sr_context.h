@@ -2,8 +2,8 @@
 
 #include <cpml/context/function_context.h>
 
-namespace cpml_proxy {
+namespace starrocks::celonis::cpml_utils {
 
 [[nodiscard]] cpml::context::function_context make_sr_function_context();
 
-} // namespace cpml_proxy
+} // namespace starrocks::celonis::cpml_utils

@@ -3,7 +3,13 @@
 #include <algorithm>
 #include <execution>
 
-#include "cpml_proxy/inductive_miner_proxy.h"
+#include <cpml/context/function_context.h>
+#include <cpml/discovery/inductive_miner_settings.h>
+#include <cpml/discovery/inductive_miner.h>
+
+#include "exprs/celonis/cpml_utils/process_tree_to_table.h"
+#include "exprs/celonis/cpml_utils/sr_context.h"
+#include "exprs/celonis/cpml_utils/sr_variant_accessor.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
@@ -13,6 +19,38 @@ using cel_int_t = int64_t;
 
 namespace starrocks {
 namespace {
+
+[[nodiscard]] cpml::discovery::inductive_miner_exec_settings make_im_settings(const double imfd_frequency_threshold) {
+    using im_settings_builder_t = cpml::discovery::inductive_miner_exec_settings::builder;
+    using infrequent_im_settings_builder_t = cpml::discovery::infrequent_im_settings::builder;
+    return im_settings_builder_t{}                     //
+    .im_policy_settings(                       //
+            infrequent_im_settings_builder_t{} //
+                    .edges_filter_frequency_threshold(imfd_frequency_threshold)
+                    .build()) // throws if the threshold was not in the valid range
+    .build();
+}
+
+struct inductive_miner_result {
+    std::unique_ptr<celonis::ResultTable> vertex_table;
+    std::unique_ptr<celonis::ResultTable> edge_table;
+    std::unordered_map<std::string, std::size_t> statistics;
+};
+
+[[nodiscard]] inductive_miner_result inductive_miner(const Variants& variants, const double imfd_frequency_threshold) {
+    // Setup IM input
+    const celonis::cpml_utils::sr_variant_accessor variant_accessor{variants};
+    const auto function_ctx{celonis::cpml_utils::make_sr_function_context()};
+    const auto settings{make_im_settings(imfd_frequency_threshold)};
+
+    // Call IM in the CPML
+    const auto [process_tree, statistics]{cpml::discovery::inductive_miner(variant_accessor, function_ctx, settings)};
+
+    // Transform IM results to SR output
+    auto [vertex_table, edge_table]{celonis::cpml_utils::convert_pt_to_tables(process_tree)};
+    // N.B: statistics are copied
+    return {std::move(vertex_table), std::move(edge_table), statistics.data()};
+}
 
 std::pair<std::vector<Slice>, Variants> sort_activities_and_variants(const SliceHashMap& activity_map,
                                                                      const VariantHashMap& variant_map) {
@@ -112,7 +150,7 @@ std::optional<std::string> InductiveMinerFinalizer::finalize(FunctionContext* ct
     // Matches activity ids and variant order to Saola.
     const auto& [activities, variants] = sort_activities_and_variants(activity_map_, variant_map_);
 
-    const auto [vertex_table, edge_table, statistics]{cpml_proxy::inductive_miner(variants, imfd_frequency_threshold_)};
+    const auto [vertex_table, edge_table, statistics]{inductive_miner(variants, imfd_frequency_threshold_)};
     return json_string(activities, *vertex_table, *edge_table, statistics);
 }
 

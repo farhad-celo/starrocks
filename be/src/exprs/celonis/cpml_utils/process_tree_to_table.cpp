@@ -1,20 +1,16 @@
 #include "process_tree_to_table.h"
 
 #include <cpml/model/process_tree.h>
-#include <cpml/model/pt/node_to_counts_mapping.h>
 
 #include <numeric>
 #include <queue>
 
-namespace cpml_proxy {
+namespace starrocks::celonis::cpml_utils {
 
 /** Implementation copied from process_tree_to_table from Saola/InductiveMinerHelper */
 namespace {
 
 using cpml::model::process_tree;
-using starrocks::celonis::ResultColumn;
-using starrocks::celonis::ResultTable;
-using starrocks::celonis::NullableResultColumn;
 
 [[nodiscard]] constexpr size_t count_edges(const process_tree& tree) {
     return std::visit(ctl::overloaded{[](const process_tree::activity& /*unused*/) { return size_t{}; },
@@ -123,4 +119,4 @@ pt_as_tables convert_pt_to_tables(const cpml::model::process_tree& pt) {
     return {std::move(vertex_table), std::move(edge_table)};
 }
 
-} // namespace cpml_proxy
+} // namespace starrocks::celonis::cpml_utils

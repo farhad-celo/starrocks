@@ -116,7 +116,6 @@ if(STARROCKS_JIT_ENABLE)
 endif()
 
 include(celonis/add_celonis_libraries.cmake) # imports the custom Celonis libraries like the CPML
-add_subdirectory(celonis/cpml_proxy)
 add_subdirectory(celonis)
 
 set(CELONIS_FILES
@@ -137,6 +136,9 @@ set(CELONIS_FILES
   celonis/agg/variant_agg.cpp
   celonis/agg/variant_stats.cpp
   celonis/agg/variant_stats_v2.cpp
+  celonis/cpml_utils/process_tree_to_table.cpp
+  celonis/cpml_utils/sr_context.cpp
+  celonis/cpml_utils/sr_variant_accessor.cpp
   celonis/abc_model.cpp
   celonis/adjust_daily_timestamps.cpp
   celonis/align_model.cpp
@@ -191,7 +193,7 @@ set_target_properties(blake2s PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib
 
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})
 
-target_include_directories(Exprs PRIVATE "${BUILD_DIR}/generated" "celonis/cpml_proxy/include")
+target_include_directories(Exprs PRIVATE "${BUILD_DIR}/generated")
 target_link_libraries(Exprs PRIVATE blake2s)
 # Link the Celonis libraries
 target_link_libraries(Exprs PRIVATE
@@ -200,5 +202,4 @@ target_link_libraries(Exprs PRIVATE
         celonis_formatting_library # Custom to Celonis (CTL dependency)
         celonis_template_library # Custom to Celonis (CPML dependency)
         celonis_process_mining_library # Custom to Celonis (Process Mining algorithms)
-        cpml_proxy # Custom to Celonis / TODO(n.weber): PMT-1694 - Get rid of proxy
 )
