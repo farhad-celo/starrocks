@@ -422,14 +422,14 @@ Status CelonisStringFunctions::translate_prepare(FunctionContext* context, Funct
     }
 
     if (!context->is_constant_column(1)) {
-        return Status::InvalidArgument("The second parameter of trim only accept literal value");
+        return Status::InvalidArgument("The second parameter of translate only accept literal value");
     }
     if (!context->is_notnull_constant_column(1)) {
         return Status::InvalidArgument("The second parameter should not be null");
     }
 
     if (!context->is_constant_column(2)) {
-        return Status::InvalidArgument("The third parameter of trim only accept literal value");
+        return Status::InvalidArgument("The third parameter of translate only accept literal value");
     }
     if (!context->is_notnull_constant_column(2)) {
         return Status::InvalidArgument("The third parameter should not be null");
