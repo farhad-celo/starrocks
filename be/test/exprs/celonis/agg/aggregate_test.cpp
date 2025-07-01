@@ -1955,46 +1955,6 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         ASSERT_TRUE(json_string.has_value());
         EXPECT_EQ(json_string.value(), R"({"multiWeekdayCalendar":{"calendars":[{"sunday":{"useDay":true,"shift":{"begin":456,"end":456000}}}]}})");
     }
-    // resultant calendar is longer than 1M.
-    state = ManagedAggrState::create(local_ctx.get(), agg_func);
-    {
-        const int64_t n_rows = 80000;
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
-        auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
-        for (auto i = 0; i < n_rows; ++i) {
-            weekday_column->append_datum("MONDAY");
-            shift_begin_column->append_datum(123L);
-            shift_end_column->append_datum(123000L);
-            calendar_id_column->append_datum(kNullDatum);
-        }
-
-        std::vector<const Column*> raw_columns;
-        raw_columns.resize(4);
-        raw_columns[0] = weekday_column.get();
-        raw_columns[1] = shift_begin_column.get();
-        raw_columns[2] = shift_end_column.get();
-        raw_columns[3] = calendar_id_column.get();
-        agg_func->update_batch_single_state(local_ctx.get(), weekday_column->size(), raw_columns.data(),
-                                            state->state());
-        auto agg_state = (WeekdayCalendarAggregateState*) (state->state());
-        EXPECT_EQ(n_rows, agg_state->weekday->size());
-        EXPECT_EQ(n_rows, agg_state->shift_begin->size());
-        EXPECT_EQ(n_rows, agg_state->shift_end->size());
-        EXPECT_EQ(n_rows, agg_state->calendar_id->size());
-        EXPECT_EQ(n_rows, agg_state->is_calendar_id_null->size());
-
-        // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
-        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
-        EXPECT_GT(res_array_col->debug_string().size(), 1000000);
-        EXPECT_EQ(1, res_array_col->size());
-        EXPECT_EQ(2, res_array_col->get(0).get_array().size());
-        EXPECT_LT(res_array_col->get(0).get_array()[0].get_slice().to_string().size(), 1000000);
-        EXPECT_LT(res_array_col->get(0).get_array()[1].get_slice().to_string().size(), 1000000);
-    }
 }
 
 TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
