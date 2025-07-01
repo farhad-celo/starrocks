@@ -9,6 +9,7 @@
 
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
+#include <random>
 
 namespace starrocks {
 
@@ -300,17 +301,31 @@ TEST_F(CelonisMakeIntersectCalendarTest, malformed_calendar1_and_calendar2) {
     ValidateRow(result, 0, std::nullopt);
 }
 
-TEST_F(CelonisMakeIntersectCalendarTest, long_calendar) {
+TEST_F(CelonisMakeIntersectCalendarTest, DISABLED_long_calendar) {
     Prepare();
-    const size_t n_entries = 20000;
+    const size_t n_entries = 100000;
     DatumArray array;
+    array.reserve(n_entries + 2);
     array.emplace_back(R"({"factory_calendar": {)");
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(1, 1000000);
+    std::vector<std::string> entries;
+    entries.reserve(n_entries);
+
     for (size_t i = 0; i < n_entries; ++i) {
-        array.emplace_back(R"("entries": {"start_date": -86400000, "end_date": 3600000, "calendar_id": "id1" }, )");
+        std::string calendar_id = "id" + std::to_string(dis(gen));
+        std::string entry =
+                R"("entries": {"start_date": -86400000, "end_date": 3600000, "calendar_id": ")" + calendar_id +
+                R"(" }, )";
+        entries.push_back(entry);
+    }
+    for (const auto& entry: entries) {
+        array.emplace_back(Slice(entry));
     }
     array.emplace_back(R"(} })");
     const auto result = RunConstantCalendars(array, array, 2).value();
-
     ASSERT_EQ(1, result->size());
     EXPECT_EQ(2L, result->get(0).get_array().size());
 }

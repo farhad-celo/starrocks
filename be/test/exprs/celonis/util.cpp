@@ -63,14 +63,28 @@ std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& cal
 }
 
 std::optional<std::string> to_calendar_json_string(const std::string& encoded_string) {
-    int cipher_len = encoded_string.length();
-    std::unique_ptr<char[]> p;
-    p.reset(new char[cipher_len + 3]);
-
-    int len = base64_decode3(encoded_string.data(), encoded_string.length(), p.get());
-    std::string decoded_string(p.get(), len);
+    std::unique_ptr<char[]> decoded_buffer(new char[encoded_string.length()]);
+    int decoded_len = base64_decode3(encoded_string.data(), encoded_string.length(), decoded_buffer.get());
+    // Check if the decoding was successful before attempting to parse.
+    if (decoded_len < 0) {
+        return std::nullopt;
+    }
+    std::string_view payload(decoded_buffer.get(), decoded_len);
+    const char format_flag = !payload.empty() ? payload[0] : '\0';
     ::celonis::accelerator::Calendar calendar_proto;
-    bool success = calendar_proto.ParseFromString(decoded_string);
+    bool success = true;
+    if (format_flag == ZLIB_COMPRESSED_FLAG) {
+        std::string decompressed_data;
+        if (!decompress_string(payload.substr(1), decompressed_data)) {
+            return std::nullopt;
+        }
+        success = calendar_proto.ParseFromString(decompressed_data);
+    } else if (format_flag == UNCOMPRESSED_FLAG) {
+        auto protobuf_payload = payload.substr(1);
+        success = calendar_proto.ParseFromArray(protobuf_payload.data(), protobuf_payload.size());
+    } else {
+        success = calendar_proto.ParseFromArray(payload.data(), payload.size());
+    }
     if (!success) {
         return std::nullopt;
     }
