@@ -1438,6 +1438,51 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         ASSERT_TRUE(json_string.has_value());
         EXPECT_EQ(json_string.value(), R"({"factoryCalendar":{"entries":[{"startDate":"-86400000","endDate":"3600000","calendarId":"id1"},{"startDate":"-172800000","endDate":"7200000","calendarId":"id2"}]}})");
     }
+    // The result is sorted
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    {
+        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        start_timestamp_column->append_datum(TimestampValue::create(1969, 12, 30, 0, 0, 0));
+        start_timestamp_column->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
+
+        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
+        end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
+
+
+        auto char_type = TypeDescriptor::create_varchar_type(30);
+        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        calendar_id_column->append_datum("id2");
+        calendar_id_column->append_datum("id1");
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(3);
+        raw_columns[0] = start_timestamp_column.get();
+        raw_columns[1] = end_timestamp_column.get();
+        raw_columns[2] = calendar_id_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), start_timestamp_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (FactoryCalendarAggregateState*) (state->state());
+        EXPECT_EQ(2, agg_state->start_timestamp->size());
+        EXPECT_EQ(2, agg_state->end_timestamp->size());
+        EXPECT_EQ(2, agg_state->calendar_id->size());
+        EXPECT_EQ(2, agg_state->is_calendar_id_null->size());
+        EXPECT_EQ(start_timestamp_column->debug_string(), agg_state->start_timestamp->debug_string());
+        EXPECT_EQ(end_timestamp_column->debug_string(), agg_state->end_timestamp->debug_string());
+        EXPECT_EQ(calendar_id_column->debug_string(), agg_state->calendar_id->debug_string());
+        EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
+
+        // test finalize_to_column.
+        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
+        EXPECT_EQ(1, res_array_col->size());
+        EXPECT_EQ(1, res_array_col->get(0).get_array().size());
+        auto json_string = to_calendar_json_string(res_array_col->get(0).get_array()[0].get_slice().to_string());
+        ASSERT_TRUE(json_string.has_value());
+        EXPECT_EQ(json_string.value(), R"({"factoryCalendar":{"entries":[{"startDate":"-86400000","endDate":"3600000","calendarId":"id1"},{"startDate":"-172800000","endDate":"7200000","calendarId":"id2"}]}})");
+    }
     // resultant calendar is longer than 1M.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {

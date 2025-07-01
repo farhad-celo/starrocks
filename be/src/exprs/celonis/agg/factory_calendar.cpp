@@ -154,13 +154,62 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     DCHECK(state_impl.end_timestamp->size() == n_rows);
     DCHECK(state_impl.calendar_id->size() == n_rows);
     DCHECK(state_impl.is_calendar_id_null->size() == n_rows);
+    std::vector<int32_t> row_idxes(n_rows);
+    std::iota(row_idxes.begin(), row_idxes.end(), 0);
+
+    auto ts_to_epoch_millis = [&](const Datum& tv) {
+        return tv.get_timestamp().diff_microsecond(epoch) / 1000L;
+    };
+
+    // Sort order:
+    // - All NULL calendar_id entries (sorted by timestamps)
+    // - All non-NULL calendar_id entries (sorted by calendar_id, then timestamps)
+    auto less_rows = [&](int32_t lhs, int32_t rhs) {
+        const bool lhs_null = static_cast<bool>(
+                state_impl.is_calendar_id_null->get(lhs).get_uint8());
+        const bool rhs_null = static_cast<bool>(
+                state_impl.is_calendar_id_null->get(rhs).get_uint8());
+
+        if (lhs_null != rhs_null) {
+            // one NULL, one non-NULL
+            // NULL first
+            return lhs_null;
+        }
+        if (!lhs_null) {
+            const int cmp = state_impl.calendar_id
+                    ->get(lhs)
+                    .get_slice()
+                    .compare(state_impl.calendar_id
+                                     ->get(rhs)
+                                     .get_slice());
+            if (cmp != 0) {
+                return cmp < 0;
+            }
+        }
+        const int64_t start_lhs = ts_to_epoch_millis(
+                state_impl.start_timestamp->get(lhs));
+        const int64_t start_rhs = ts_to_epoch_millis(
+                state_impl.start_timestamp->get(rhs));
+        if (start_lhs != start_rhs) {
+            return start_lhs < start_rhs;
+        }
+
+        const int64_t end_lhs = ts_to_epoch_millis(
+                state_impl.end_timestamp->get(lhs));
+        const int64_t end_rhs = ts_to_epoch_millis(
+                state_impl.end_timestamp->get(rhs));
+        return end_lhs < end_rhs;
+    };
+
+    std::sort(row_idxes.begin(), row_idxes.end(), less_rows);
     celonis::accelerator::Calendar calendar_proto;
-    for (int i = 0; i < n_rows; ++i) {
+    for (auto row_idx: row_idxes) {
         celonis::accelerator::FactoryCalendarEntry entry;
-        const int64_t start_date = state_impl.start_timestamp->get(i).get_timestamp().diff_microsecond(epoch) / 1000L;
-        const int64_t end_date = state_impl.end_timestamp->get(i).get_timestamp().diff_microsecond(epoch) / 1000L;
-        const std::string calendar_id = state_impl.calendar_id->get(i).get_slice().to_string();
-        const bool calendar_id_not_null = !static_cast<bool>(state_impl.is_calendar_id_null->get(i).get_uint8());
+        const int64_t start_date =
+                state_impl.start_timestamp->get(row_idx).get_timestamp().diff_microsecond(epoch) / 1000L;
+        const int64_t end_date = state_impl.end_timestamp->get(row_idx).get_timestamp().diff_microsecond(epoch) / 1000L;
+        const std::string calendar_id = state_impl.calendar_id->get(row_idx).get_slice().to_string();
+        const bool calendar_id_not_null = !static_cast<bool>(state_impl.is_calendar_id_null->get(row_idx).get_uint8());
         entry.set_start_date(start_date);
         entry.set_end_date(end_date);
         if (calendar_id_not_null) {
