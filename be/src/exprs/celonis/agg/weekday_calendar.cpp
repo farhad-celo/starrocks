@@ -186,7 +186,7 @@ void WeekdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     DCHECK(state_impl.shift_end->size() == size);
     DCHECK(state_impl.calendar_id->size() == size);
     DCHECK(state_impl.is_calendar_id_null->size() == size);
-    std::unordered_map<std::optional<std::string>, std::unordered_map<std::string, std::vector<std::pair<int64_t, int64_t>>>> id_to_entries;
+    std::map<std::optional<std::string>, std::map<std::string, std::vector<std::pair<int64_t, int64_t>>>> id_to_entries;
     celonis::accelerator::Calendar calendar_proto;
     for (int i = 0; i < size; ++i) {
         const std::string weekday = state_impl.weekday->get(i).get_slice().to_string();
