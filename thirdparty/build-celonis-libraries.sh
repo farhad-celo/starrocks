@@ -25,8 +25,8 @@ NAMED_TYPE_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES="${NAMED_TYPE_DIR_NAME_FOR_CELONIS
 NAMED_TYPE_DOWNLOAD_FOR_CELONIS_LIBRARIES="https://github.com/joboccara/NamedType/archive/${NAMED_TYPE_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES}"
 
 # Reference to the Saola release of the Celonis libraries (currently all packaged in the CPML)
-CPML_RELEASE="release-2.224.2"
-CPML_RESOURCE="CPML-2.224.2.tar.gz"
+CPML_RELEASE="release-2.225.4"
+CPML_RESOURCE="CPML-2.225.4.tar.gz"
 
 # The temporary build directory where all thirdparty dependencies are placed at and where we build the Celonis libraries
 # before copying them to their final install directory
@@ -200,7 +200,7 @@ download_and_build_celonis_libraries() {
 
   cd ${CELONIS_LIBRARIES_BUILD_DIR}
 
-  echo "Start to download CPML archive into current working directory '$(pwd)'"
+  echo "Start to download CPML archive ${CPML_RESOURCE} into current working directory '$(pwd)'"
 
   gh release download -R celonis/cpm-query-engine $CPML_RELEASE --pattern "${CPML_RESOURCE}"
 
