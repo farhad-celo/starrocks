@@ -27,7 +27,7 @@ template<ComparisonType CMP_TYPE, LogicalType LT>
     if (const bool all_columns_without_null{std::none_of(columns.begin(), columns.end(), [](const ColumnPtr& column_ptr) {
         return column_ptr->has_null();
     })}; all_columns_without_null) {
-        // At the time of this implementation, Starrock's greatest/least implementation never returns a non-OK
+        // At the time of this implementation, Starrocks' greatest/least implementation never returns a non-OK
         // status. Thus, we access the value of the returned StatusOr without further checks.
         if constexpr (CMP_TYPE == ComparisonType::GREATEST) {
             return MathFunctions::greatest<LT>(context, columns).value();

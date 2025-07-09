@@ -11,7 +11,7 @@ public:
      * @param: [variant, activity_array]
      * @paramType columns: [ARRAY_VARCHAR, ARRAY_VARCHAR]
      * @return: ARRAY_INT
-     * This function expects activity_array column is constant (it also handles that case that activity_array column is
+     * This function expects activity_array column is constant (it also handles the case that activity_array column is
      * not constant) and uses it to create an activity to index (int) map which is used to encode the variants.
      * Before computing the map, we first dedup the activity_array and remove the NULLs.
      * For example activity_array = ['A', 'B', NULL, 'D', 'A'], deduped_activity_array = ['A', 'B', 'D']

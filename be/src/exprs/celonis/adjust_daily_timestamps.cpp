@@ -24,7 +24,7 @@ struct DeconstructedInput {
     size_t num_cases;
 };
 
-// Initializes all the output data and returns it a way where the individual data fields can be easily accessed. All
+// Initializes all the output data and returns it in a way where the individual data fields can be easily accessed. All
 // output columns will already have the correct size, so the respective arrays can be directly written.
 DeconstructedOutputColumn create_output_column(const Column& input_timestamp_column) {
     // We use the input timestamp column as a template for the output

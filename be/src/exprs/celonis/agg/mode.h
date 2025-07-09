@@ -30,7 +30,7 @@ public:
     void increment_occurrence(FunctionContext* ctx, ValueType value, OccurrenceCountType count = 1);
     /**
       * @brief Returns the currently most frequently occurring value or std::nullopt if there are no values stored
-      * @note If multiple values have the same number of occurrences, the smaller value is returned as tie breaker
+      * @note If multiple values have the same number of occurrences, the smaller value is returned as a tie breaker
       */
     [[nodiscard]] std::optional<const ValueType> most_frequent_or_null() const;
     /** Returns the total number of required bytes to serialize this state */

@@ -191,7 +191,7 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
 
     // Sort entries for deterministic output - first by calendar_id, then by year
     std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) {
-        // First sort by calendar_id, empty (i.e., NULL) calendar_id come first
+        // First sort by calendar_id, empty (i.e., NULL) calendar_id comes first
         if (a.calendar_id() != b.calendar_id()) {
             return a.calendar_id() < b.calendar_id();
         }

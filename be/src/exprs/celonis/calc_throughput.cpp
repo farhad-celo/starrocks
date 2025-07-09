@@ -150,7 +150,7 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
             result.append_null();
             continue;
         }
-        const int64 throughput = timestamp_elements[end_activity_idx] - timestamp_elements[start_activity_idx];
+        const int64_t throughput = timestamp_elements[end_activity_idx] - timestamp_elements[start_activity_idx];
         result.append(throughput);
     }
 

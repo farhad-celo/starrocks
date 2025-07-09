@@ -11,7 +11,7 @@ public:
      * @paramType columns: [VARCHAR, ARRAY_VARCHAR]
      * @return: INT
      * 
-     * This functions encodes a string into integer space using a dictionary. The dictionary is computed from
+     * This function encodes a string into integer space using a dictionary. The dictionary is computed from
      * the dict_array by removing duplicates and NULLs.
      * For example dict_array = ['A', 'B', NULL, 'D', 'A'] becomes deduped_dict_array = ['A', 'B', 'D']
      * The dictionary ids are computed by:

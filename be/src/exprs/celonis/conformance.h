@@ -42,7 +42,7 @@ private:
                                           const NullColumn::Container* null_arrays);
 };
 
-// The following implementation was copied from Saola implemention in
+// The following implementation was copied from Saola implementation in
 // https://github.com/celonis/cpm-query-engine/blob/main/query-engine/src/main/native/cpm-accelerator/modules/operators/process/conformance_operator.h
 // and https://github.com/celonis/cpm-query-engine/blob/main/query-engine/src/main/native/cpm-accelerator/modules/operators/process/conformance_operator.cpp.
 // The code was refactored as follows.

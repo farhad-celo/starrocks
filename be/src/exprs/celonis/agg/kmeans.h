@@ -180,7 +180,7 @@ private:
  * the clusters). It returns the model encoded in a string in the below format:
  * "min_1,max_1;...;min_m,max_m:x_11,x_12,...,x_1m;x_21,x_22,...,x_2m;...;x_k1,x_k2,...,x_km"
  * If a point is NULL or contains a NULL value, it is ignored in the training.
- * If NUM_CLUSTERS > # of valid points, we set num of clusters to min(NUM_CLUSTERS, # of valid points).
+ * If NUM_CLUSTERS > # of valid points, we set the num of clusters to min(NUM_CLUSTERS, # of valid points).
  */
 class CelonisKMeansAggregationFunction final
         : public AggregateFunctionBatchHelper<CelonisKMeansModelAggregateState,

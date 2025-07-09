@@ -18,7 +18,7 @@ public:
      *      alignment_move_type: ARRAY_VARCHAR
      *      alignment_activity_index: ARRAY_BIGINT
      *      association_edge_class: ARRAY_BIGINT
-     *      assocation_alignment_index: ARRAY_BIGINT
+     *      association_alignment_index: ARRAY_BIGINT
      *      edge_class_id:  ARRAY_BIGINT
      *      edge_class_type: ARRAY_VARCHAR
      *    }

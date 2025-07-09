@@ -51,12 +51,12 @@ void write_serialized_chunk(const ColumnPtr& src, ColumnPtr& dst, const size_t c
     Buffer<RawStageType>& dst_stage_column_data{dst_stage_column.get_data()};
     auto& dst_product_column_data{dst_product_column.get_data()};
 
-    /* If dst ist nullable, we also need to write null flags. */
+    /* If dst is nullable, we also need to write null flags. */
     if (dst.get()->is_nullable()) {
         down_cast<NullableColumn*>(dst.get())->mutable_null_column()->get_data().resize(chunk_size, 0);
     }
 
-    /* Access the casted raw source data. */
+    /* Access the cast raw source data. */
     const auto* src_data{
             down_cast<const InputColumnType*>(ColumnHelper::get_data_column(src_column))->get_data().data()};
 

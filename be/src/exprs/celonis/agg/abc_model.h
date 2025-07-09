@@ -77,7 +77,7 @@ struct CelonisAbcModelAggregateState {
         return result;
     }
 
-    // Writes and binary encoded version of the object to dst.
+    // Writes a binary encoded version of the object to dst.
     // The size written will be serialized_size()
     // As of 2024-03-01, SR drops array literal in merge and _const_columns in merge is not aligned with
     // _arg_types. So we pass all consts from update() through serialization.

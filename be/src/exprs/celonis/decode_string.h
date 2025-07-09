@@ -11,7 +11,7 @@ public:
      * @paramType columns: [INT, ARRAY_VARCHAR]
      * @return: VARCHAR
      * 
-     * This functions decodes a dictionary id back into string space using a dictionary (reverses
+     * This function decodes a dictionary id back into string space using a dictionary (reverses
      * CELONIS_ENCODE_STRING). The dictionary is computed from the dict_array by removing duplicates and NULLs.
      * For example dict_array = ['A', 'B', NULL, 'D', 'A'] becomes deduped_dict_array = ['A', 'B', 'D']
      * string_to_index = {string: idx for idx, string in enumerate(deduped_dict_array)}
