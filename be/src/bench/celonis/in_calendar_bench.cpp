@@ -16,46 +16,46 @@
 namespace starrocks {
 
 /*
-2024-12-28T21:02:16+00:00
+2025-07-09T14:46:39+00:00
 Running ./be/build_Release/src/bench/celonis/output/in_calendar_bench
-Run on (32 X 3071.23 MHz CPU s)
+Run on (32 X 2943.08 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 1.34, 15.45, 22.17
+Load Average: 3.55, 8.08, 5.32
 // Args: Number of rows / Number of calendar entries per id / Number of calendar ids
 --------------------------------------------------------------------------------------
 Benchmark                            Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------------------
-BM_InCalendar/1000/10/2          75018 ns        75030 ns         9263 RowInvRate=75.0302ns
-BM_InCalendar/10000/10/2        625541 ns       625541 ns         1118 RowInvRate=62.5541ns
-BM_InCalendar/100000/10/2      6196828 ns      6196339 ns          115 RowInvRate=61.9634ns
-BM_InCalendar/1000/100/2        133604 ns       133628 ns         5191 RowInvRate=133.628ns
-BM_InCalendar/10000/100/2       694420 ns       694325 ns         1009 RowInvRate=69.4325ns
-BM_InCalendar/100000/100/2     6206157 ns      6205606 ns          113 RowInvRate=62.0561ns
-BM_InCalendar/1000/1000/2       688884 ns       688970 ns         1063 RowInvRate=688.97ns
-BM_InCalendar/10000/1000/2     1291165 ns      1291102 ns          549 RowInvRate=129.11ns
-BM_InCalendar/100000/1000/2    6795625 ns      6795445 ns          104 RowInvRate=67.9544ns
-BM_InCalendar/1000/10/4          84143 ns        84143 ns         8512 RowInvRate=84.1433ns
-BM_InCalendar/10000/10/4        650212 ns       650174 ns         1081 RowInvRate=65.0174ns
-BM_InCalendar/100000/10/4      6258416 ns      6258306 ns          112 RowInvRate=62.5831ns
-BM_InCalendar/1000/100/4        221161 ns       221207 ns         3244 RowInvRate=221.207ns
-BM_InCalendar/10000/100/4       775528 ns       775500 ns          899 RowInvRate=77.55ns
-BM_InCalendar/100000/100/4     6398059 ns      6398116 ns          110 RowInvRate=63.9812ns
-BM_InCalendar/1000/1000/4      1276836 ns      1276921 ns          553 RowInvRate=1.27692us
-BM_InCalendar/10000/1000/4     1851544 ns      1851554 ns          381 RowInvRate=185.155ns
-BM_InCalendar/100000/1000/4    7584404 ns      7584356 ns           91 RowInvRate=75.8436ns
-BM_InCalendar/1000/10/8         103644 ns       103655 ns         6873 RowInvRate=103.655ns
-BM_InCalendar/10000/10/8        670706 ns       670719 ns         1035 RowInvRate=67.0719ns
-BM_InCalendar/100000/10/8      6314319 ns      6314285 ns          110 RowInvRate=63.1428ns
-BM_InCalendar/1000/100/8        389975 ns       390045 ns         1850 RowInvRate=390.045ns
-BM_InCalendar/10000/100/8       923553 ns       923526 ns          774 RowInvRate=92.3526ns
-BM_InCalendar/100000/100/8     6589608 ns      6589193 ns          105 RowInvRate=65.8919ns
-BM_InCalendar/1000/1000/8      2518905 ns      2518845 ns          280 RowInvRate=2.51884us
-BM_InCalendar/10000/1000/8     3095205 ns      3094994 ns          227 RowInvRate=309.499ns
-BM_InCalendar/100000/1000/8    9034993 ns      9035010 ns           79 RowInvRate=90.3501ns
+BM_InCalendar/1000/10/2          81328 ns        81363 ns         8558 RowInvRate=81.3631ns
+BM_InCalendar/10000/10/2        708965 ns       708989 ns          984 RowInvRate=70.8989ns
+BM_InCalendar/100000/10/2      6954011 ns      6954044 ns          100 RowInvRate=69.5404ns
+BM_InCalendar/1000/100/2        133634 ns       133709 ns         5234 RowInvRate=133.709ns
+BM_InCalendar/10000/100/2       766601 ns       766615 ns          915 RowInvRate=76.6615ns
+BM_InCalendar/100000/100/2     7040569 ns      7040395 ns           98 RowInvRate=70.4039ns
+BM_InCalendar/1000/1000/2       697408 ns       697567 ns         1003 RowInvRate=697.567ns
+BM_InCalendar/10000/1000/2     1350845 ns      1350918 ns          521 RowInvRate=135.092ns
+BM_InCalendar/100000/1000/2    7649122 ns      7649045 ns           92 RowInvRate=76.4905ns
+BM_InCalendar/1000/10/4          84597 ns        84641 ns         8258 RowInvRate=84.641ns
+BM_InCalendar/10000/10/4        647185 ns       647207 ns         1078 RowInvRate=64.7207ns
+BM_InCalendar/100000/10/4      6225772 ns      6225678 ns          111 RowInvRate=62.2568ns
+BM_InCalendar/1000/100/4        188173 ns       188285 ns         3665 RowInvRate=188.285ns
+BM_InCalendar/10000/100/4       766713 ns       766693 ns          913 RowInvRate=76.6693ns
+BM_InCalendar/100000/100/4     6426668 ns      6426435 ns          108 RowInvRate=64.2643ns
+BM_InCalendar/1000/1000/4      1379122 ns      1379256 ns          506 RowInvRate=1.37926us
+BM_InCalendar/10000/1000/4     1964955 ns      1964904 ns          355 RowInvRate=196.49ns
+BM_InCalendar/100000/1000/4    7670482 ns      7670523 ns           90 RowInvRate=76.7052ns
+BM_InCalendar/1000/10/8         102316 ns       102365 ns         6769 RowInvRate=102.365ns
+BM_InCalendar/10000/10/8        703565 ns       703588 ns          997 RowInvRate=70.3588ns
+BM_InCalendar/100000/10/8      6656882 ns      6656786 ns          105 RowInvRate=66.5679ns
+BM_InCalendar/1000/100/8        322489 ns       322609 ns         2137 RowInvRate=322.609ns
+BM_InCalendar/10000/100/8       933290 ns       933335 ns          747 RowInvRate=93.3335ns
+BM_InCalendar/100000/100/8     6969412 ns      6969216 ns          101 RowInvRate=69.6922ns
+BM_InCalendar/1000/1000/8      2729408 ns      2729564 ns          257 RowInvRate=2.72956us
+BM_InCalendar/10000/1000/8     3363714 ns      3363812 ns          208 RowInvRate=336.381ns
+BM_InCalendar/100000/1000/8    9583175 ns      9583115 ns           74 RowInvRate=95.8312ns
 */
 
 static void BM_InCalendar(benchmark::State& state) {
@@ -97,7 +97,7 @@ static void BM_InCalendar(benchmark::State& state) {
     }
     celonis::accelerator::Calendar calendar_proto;
     *calendar_proto.mutable_factory_calendar() = factory_calendar;
-    std::optional<std::string> serialized_calendar = to_base64_encoded_string(calendar_proto);
+    std::optional<std::string> serialized_calendar = to_base64_encoded_string(calendar_proto, 1LL << 30, true);
     ASSERT_TRUE(serialized_calendar.has_value());
     DatumArray calendar_array;
     calendar_array.emplace_back(Slice(serialized_calendar.value()));

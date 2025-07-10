@@ -17,28 +17,28 @@
 namespace starrocks {
 
 /*
-2025-06-17T16:42:38+00:00
+2025-07-10T09:30:02+00:00
 Running ./be/build_Release/src/bench/celonis/output/remap_timestamps_calendar_prepare_bench
-Run on (32 X 3241.82 MHz CPU s)
+Run on (32 X 3102.13 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 20.95, 18.72, 13.78
+Load Average: 38.54, 32.75, 14.35
 // Args: Number of rows / Number of calendar ids / Number of calendar entries per id
 ----------------------------------------------------------------------------------------------------------------------------------
 Benchmark                                                                        Time             CPU   Iterations UserCounters...
 ----------------------------------------------------------------------------------------------------------------------------------
-BM_RemapTimestampsFactoryCalendarPrepare/4096/256/8096/iterations:10     530583583 ns    530553619 ns           10 PrepareCyclesPerSecond=1.88482/s
-BM_RemapTimestampsFactoryCalendarPrepare/40960/256/8096/iterations:10    531954002 ns    531945536 ns           10 PrepareCyclesPerSecond=1.87989/s
-BM_RemapTimestampsFactoryCalendarPrepare/409600/256/8096/iterations:10   534161577 ns    534149596 ns           10 PrepareCyclesPerSecond=1.87213/s
-BM_RemapTimestampsFactoryCalendarPrepare/4096/512/8096/iterations:10    1079118186 ns   1079071577 ns           10 PrepareCyclesPerSecond=0.926723/s
-BM_RemapTimestampsFactoryCalendarPrepare/40960/512/8096/iterations:10   1080023606 ns   1079985684 ns           10 PrepareCyclesPerSecond=0.925938/s
-BM_RemapTimestampsFactoryCalendarPrepare/409600/512/8096/iterations:10  1112415738 ns   1112391765 ns           10 PrepareCyclesPerSecond=0.898964/s
-BM_RemapTimestampsFactoryCalendarPrepare/4096/1024/8096/iterations:10   2245967071 ns   2245808198 ns           10 PrepareCyclesPerSecond=0.445274/s
-BM_RemapTimestampsFactoryCalendarPrepare/40960/1024/8096/iterations:10  2333558613 ns   2333444336 ns           10 PrepareCyclesPerSecond=0.428551/s
-BM_RemapTimestampsFactoryCalendarPrepare/409600/1024/8096/iterations:10 2307234906 ns   2307082901 ns           10 PrepareCyclesPerSecond=0.433448/s
+BM_RemapTimestampsFactoryCalendarPrepare/4096/256/8096/iterations:10     812662170 ns    812638875 ns           10 PrepareCyclesPerSecond=1.23056/s
+BM_RemapTimestampsFactoryCalendarPrepare/40960/256/8096/iterations:10    825079035 ns    825066480 ns           10 PrepareCyclesPerSecond=1.21202/s
+BM_RemapTimestampsFactoryCalendarPrepare/409600/256/8096/iterations:10   827323041 ns    827312261 ns           10 PrepareCyclesPerSecond=1.20873/s
+BM_RemapTimestampsFactoryCalendarPrepare/4096/512/8096/iterations:10    1655994064 ns   1655954785 ns           10 PrepareCyclesPerSecond=0.603881/s
+BM_RemapTimestampsFactoryCalendarPrepare/40960/512/8096/iterations:10   1702450509 ns   1702353112 ns           10 PrepareCyclesPerSecond=0.587422/s
+BM_RemapTimestampsFactoryCalendarPrepare/409600/512/8096/iterations:10  1704191911 ns   1704087332 ns           10 PrepareCyclesPerSecond=0.586824/s
+BM_RemapTimestampsFactoryCalendarPrepare/4096/1024/8096/iterations:10   3444403169 ns   3444221390 ns           10 PrepareCyclesPerSecond=0.290341/s
+BM_RemapTimestampsFactoryCalendarPrepare/40960/1024/8096/iterations:10  3572983118 ns   3572609423 ns           10 PrepareCyclesPerSecond=0.279907/s
+BM_RemapTimestampsFactoryCalendarPrepare/409600/1024/8096/iterations:10 3534062098 ns   3533742308 ns           10 PrepareCyclesPerSecond=0.282986/s
 */
 
 namespace {
@@ -69,7 +69,7 @@ static void run_benchmark(benchmark::State& state, const CreateCalendar& create_
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     celonis::accelerator::Calendar calendar_proto = create_calendar(calendar_ids, rng);
-    std::optional<std::string> serialized_calendar = to_base64_encoded_string(calendar_proto);
+    std::optional<std::string> serialized_calendar = to_base64_encoded_string(calendar_proto, 1LL << 30, true);
     ASSERT_TRUE(serialized_calendar.has_value());
     DatumArray calendar_array;
     calendar_array.emplace_back(Slice(serialized_calendar.value()));

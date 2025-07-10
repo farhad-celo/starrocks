@@ -96,7 +96,7 @@ static void run_benchmark(benchmark::State& state, const CreateCalendar& create_
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     celonis::accelerator::Calendar calendar_proto = create_calendar(calendar_ids, rng);
-    std::optional<std::string> serialized_calendar = to_base64_encoded_string(calendar_proto);
+    std::optional<std::string> serialized_calendar = to_base64_encoded_string(calendar_proto, 1LL << 30, true);
     ASSERT_TRUE(serialized_calendar.has_value());
     DatumArray calendar_array;
     calendar_array.emplace_back(Slice(serialized_calendar.value()));
