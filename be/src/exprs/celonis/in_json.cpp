@@ -7,6 +7,8 @@
 #include "column/hash_set.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
+#include "exprs/celonis/base64.h"
+#include "exprs/celonis/util.h"
 #include "nlohmann/json.hpp"
 
 namespace starrocks {
@@ -14,6 +16,28 @@ namespace starrocks {
 namespace {
 
 using json = nlohmann::json;
+
+bool is_likely_base64_compressed(const std::string& str) {
+    // If the string is empty, it's not base64
+    if (str.empty()) {
+        return false;
+    }
+    // Skip leading whitespace to find the first non-whitespace character
+    size_t first_non_space = str.find_first_not_of(" \t\n\r");
+
+    // If all characters are whitespace, it's not base64
+    if (first_non_space == std::string::npos) {
+        return false;
+    }
+    // Check if the first non-whitespace character indicates JSON
+    char first_char = str[first_non_space];
+    if (first_char == '[' || first_char == '{' || first_char == '"') {
+        return false;
+    }
+    // If it's not JSON, assume it's base64 encoded compressed string
+    return true;
+}
+
 
 // To use SliceHashSet for TYPE_VARCHAR. Copied from ../in_const_predicate.hpp.
 template<LogicalType LT, typename Enable = void>
@@ -59,7 +83,26 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
     if (match_column->is_null(0)) {
         return Status::OK();
     }
-    auto json_str = match_column->get(0).get_slice().to_string();
+    auto json_str_raw = match_column->get(0).get_slice().to_string();
+    std::string json_str;
+    // Check if it is compressed (Base64 encoded)
+    if (is_likely_base64_compressed(json_str_raw)) {
+        // Decode Base64
+        std::vector<char> decoded_buffer(json_str_raw.size()); // Base64 decoded is always smaller
+        int64_t decoded_size = base64_decode3(json_str_raw.c_str(), json_str_raw.size(), decoded_buffer.data());
+        if (decoded_size < 0) {
+            return Status::InvalidArgument("[CELONIS_IN_JSON] Failed to decode Base64 data");
+        }
+        // Decompress
+        std::string_view compressed_view(decoded_buffer.data(), decoded_size);
+        if (!decompress_string(compressed_view, json_str)) {
+            return Status::InvalidArgument("[CELONIS_IN_JSON] Failed to decompress JSON data");
+        }
+    } else {
+        // Use raw string as-is
+        json_str = std::move(json_str_raw);
+    }
+
     json json_array;
     try {
         if (!json::accept(json_str)) {
