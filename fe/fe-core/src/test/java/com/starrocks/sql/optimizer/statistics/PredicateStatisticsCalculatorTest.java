@@ -17,6 +17,7 @@ package com.starrocks.sql.optimizer.statistics;
 
 import com.google.common.collect.Lists;
 import com.starrocks.analysis.BinaryType;
+import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.Type;
 import com.starrocks.sql.optimizer.Utils;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
@@ -101,6 +102,31 @@ public class PredicateStatisticsCalculatorTest {
         Assertions.assertEquals(0, estimatedStatistics.getColumnStatistic(c1).getNullsFraction(), 0.001);
         Assertions.assertEquals(10, estimatedStatistics.getColumnStatistic(c2).getDistinctValuesCount(), 0.001);
         Assertions.assertEquals(0, estimatedStatistics.getColumnStatistic(c2).getNullsFraction(), 0.001);
+    }
+
+    @Test
+    public void testCelonisHashEqualitySelectivity() {
+        ColumnRefOperator c1 = new ColumnRefOperator(0, Type.INT, "c1", true);
+        ColumnRefOperator c2 = new ColumnRefOperator(1, Type.INT, "c2", true);
+
+        Statistics statistics = Statistics.builder()
+                .addColumnStatistic(c1,
+                        ColumnStatistic.builder().setNullsFraction(0.2).setDistinctValuesCount(10).build())
+                .addColumnStatistic(c2,
+                        ColumnStatistic.builder().setNullsFraction(0.5).setDistinctValuesCount(80).build())
+                .setOutputRowCount(10000).build();
+
+        CallOperator hashC1 = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3, Type.BIGINT,
+                Lists.newArrayList(c1));
+        CallOperator hashC2 = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3, Type.BIGINT,
+                Lists.newArrayList(c2));
+
+        BinaryPredicateOperator binaryPredicateOperator =
+                new BinaryPredicateOperator(BinaryType.EQ, hashC1, hashC2);
+        Statistics estimatedStatistics =
+                PredicateStatisticsCalculator.statisticsCalculate(binaryPredicateOperator, statistics);
+
+        Assert.assertEquals(125, estimatedStatistics.getOutputRowCount(), 0.1);
     }
 
     @Test
