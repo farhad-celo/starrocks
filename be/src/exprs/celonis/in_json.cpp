@@ -73,17 +73,42 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
     auto state = new InJsonStateFragmentLocal<LT>();
     context->set_function_state(scope, state);
 
+    // Check if match_column is array type
+    bool is_array = context->get_arg_type(1)->type == TYPE_ARRAY;
+    std::string function_name = is_array ? "CELONIS_IN_JSON_ARRAY" : "CELONIS_IN_JSON";
     auto match_column = context->get_constant_column(1);
     if (match_column == nullptr) {
-        state->function = in_json_non_constant_match;
-        return Status::InvalidArgument("The non-const version of CELONIS_IN_JSON should not be called.");
+        state->function = is_array ? in_json_array_non_constant_match : in_json_non_constant_match;
+        return Status::InvalidArgument("The non-const version of [" + function_name + "] should not be called.");
     }
     state->function = in_json_constant_match;
 
     if (match_column->is_null(0)) {
         return Status::OK();
     }
-    auto json_str_raw = match_column->get(0).get_slice().to_string();
+
+    std::string json_str_raw;
+
+    if (is_array) {
+        // Handle ARRAY_VARCHAR case
+        auto array = match_column->get(0).get_array();
+        size_t size = 0;
+        for (const auto& element: array) {
+            if (element.is_null()) {
+                return Status::InvalidArgument("[" + function_name + "] Array can not contain null values.");
+            } else {
+                size += element.get_slice().size;
+            }
+        }
+        json_str_raw.reserve(size);
+        for (const auto& element: array) {
+            json_str_raw.append(element.get_slice().data, element.get_slice().size);
+        }
+    } else {
+        // Handle VARCHAR case
+        json_str_raw = match_column->get(0).get_slice().to_string();
+    }
+
     std::string json_str;
     // Check if it is compressed (Base64 encoded)
     if (is_likely_base64_compressed(json_str_raw)) {
@@ -91,12 +116,12 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
         std::vector<char> decoded_buffer(json_str_raw.size()); // Base64 decoded is always smaller
         int64_t decoded_size = base64_decode3(json_str_raw.c_str(), json_str_raw.size(), decoded_buffer.data());
         if (decoded_size < 0) {
-            return Status::InvalidArgument("[CELONIS_IN_JSON] Failed to decode Base64 data");
+            return Status::InvalidArgument("[" + function_name + "] Failed to decode Base64 data");
         }
         // Decompress
         std::string_view compressed_view(decoded_buffer.data(), decoded_size);
         if (!decompress_string(compressed_view, json_str)) {
-            return Status::InvalidArgument("[CELONIS_IN_JSON] Failed to decompress JSON data");
+            return Status::InvalidArgument("[" + function_name + "] Failed to decompress JSON data");
         }
     } else {
         // Use raw string as-is
@@ -106,15 +131,15 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
     json json_array;
     try {
         if (!json::accept(json_str)) {
-            return Status::InvalidArgument("[CELONIS_IN_JSON] Invalid JSON format: " + json_str);
+            return Status::InvalidArgument("[" + function_name + "] Invalid JSON format: " + json_str);
         }
         json_array = json::parse(json_str);
     } catch (const std::exception& e) {
         return Status::InvalidArgument(
-                "[CELONIS_IN_JSON] Exception (" + std::string(e.what()) + ") during parsing JSON string: " + json_str);
+                "[" + function_name + "] Exception (" + std::string(e.what()) + ") during parsing JSON string: " + json_str);
     }
     if (!json_array.is_array()) {
-        return Status::InvalidArgument("[CELONIS_IN_JSON] The JSON string is not an array.");
+        return Status::InvalidArgument("[" + function_name + "] The JSON string is not an array.");
     }
     if constexpr (lt_is_string<LT>) {
         phmap::flat_hash_set<std::string> seen;
@@ -161,6 +186,12 @@ StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_non_constant_match([[maybe_unused
 }
 
 template<LogicalType LT>
+StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_array_non_constant_match([[maybe_unused]]FunctionContext* context,
+                                                                  const Columns& columns) {
+    return Status::NotSupported("The non-const version of CELONIS_IN_JSON_ARRAY is not supported.");
+}
+
+template<LogicalType LT>
 StatusOr<ColumnPtr>
 CelonisInJson<LT>::in_json_constant_match([[maybe_unused]]FunctionContext* context, const Columns& columns) {
     const auto& value_column = columns[0];
@@ -185,6 +216,13 @@ CelonisInJson<LT>::in_json_constant_match([[maybe_unused]]FunctionContext* conte
 
 template<LogicalType LT>
 StatusOr<ColumnPtr> CelonisInJson<LT>::in_json(FunctionContext* context, const Columns& columns) {
+    const auto* state = reinterpret_cast<const InJsonStateFragmentLocal<LT>*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return state->function(context, columns);
+}
+
+template<LogicalType LT>
+StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_array(FunctionContext* context, const Columns& columns) {
     const auto* state = reinterpret_cast<const InJsonStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);

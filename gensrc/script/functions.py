@@ -1467,7 +1467,10 @@ celostar_functions = [
     [1001402, 'celonis_in_json', False, False, 'BOOLEAN', ['BIGINT', 'VARCHAR'], 'CelonisInJson<TYPE_BIGINT>::in_json', 'CelonisInJson<TYPE_BIGINT>::prepare', 'CelonisInJson<TYPE_BIGINT>::close'],
     [1001403, 'celonis_in_json', False, False, 'BOOLEAN', ['DOUBLE', 'VARCHAR'], 'CelonisInJson<TYPE_DOUBLE>::in_json', 'CelonisInJson<TYPE_DOUBLE>::prepare', 'CelonisInJson<TYPE_DOUBLE>::close'],
     [1001404, 'celonis_in_json', False, False, 'BOOLEAN', ['VARCHAR', 'VARCHAR'], 'CelonisInJson<TYPE_VARCHAR>::in_json', 'CelonisInJson<TYPE_VARCHAR>::prepare', 'CelonisInJson<TYPE_VARCHAR>::close'],
-
+    [1001501, 'celonis_in_json_array', False, False, 'BOOLEAN', ['INT', 'ARRAY_VARCHAR'], 'CelonisInJson<TYPE_INT>::in_json_array', 'CelonisInJson<TYPE_INT>::prepare', 'CelonisInJson<TYPE_INT>::close'],
+    [1001502, 'celonis_in_json_array', False, False, 'BOOLEAN', ['BIGINT', 'ARRAY_VARCHAR'], 'CelonisInJson<TYPE_BIGINT>::in_json_array', 'CelonisInJson<TYPE_BIGINT>::prepare', 'CelonisInJson<TYPE_BIGINT>::close'],
+    [1001503, 'celonis_in_json_array', False, False, 'BOOLEAN', ['DOUBLE', 'ARRAY_VARCHAR'], 'CelonisInJson<TYPE_DOUBLE>::in_json_array', 'CelonisInJson<TYPE_DOUBLE>::prepare', 'CelonisInJson<TYPE_DOUBLE>::close'],
+    [1001504, 'celonis_in_json_array', False, False, 'BOOLEAN', ['VARCHAR', 'ARRAY_VARCHAR'], 'CelonisInJson<TYPE_VARCHAR>::in_json_array', 'CelonisInJson<TYPE_VARCHAR>::prepare', 'CelonisInJson<TYPE_VARCHAR>::close'],
     # Array functions
     #2000100 removed, see https://github.com/celonis/celostar-starrocks/pull/1478
     [2000110, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
