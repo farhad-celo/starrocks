@@ -141,6 +141,8 @@ export CLASSPATH=${STARROCKS_HOME}/lib/jni-packages/starrocks-hadoop-ext.jar:$ST
 
 # ================= native section =====================
 export LD_LIBRARY_PATH=$STARROCKS_HOME/lib/hadoop/native:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$STARROCKS_HOME/lib/onetbb:$LD_LIBRARY_PATH
+
 
 
 # ================= jemalloc section =====================
