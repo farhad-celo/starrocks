@@ -1,3 +1,4 @@
+ADD_BE_BENCH(${SRC_DIR}/bench/celonis/millis_timestamp_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/index_activity_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/array_trimmed_mean_bench)
 ADD_BE_BENCH(${SRC_DIR}/bench/celonis/string_to_int_bench)
