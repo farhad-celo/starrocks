@@ -111,11 +111,12 @@ public class PredicateStatisticsCalculatorTest {
 
         Statistics statistics = Statistics.builder()
                 .addColumnStatistic(c1,
-                        ColumnStatistic.builder().setNullsFraction(0.2).setDistinctValuesCount(10).build())
+                        ColumnStatistic.builder().setNullsFraction(0.5).setDistinctValuesCount(10).build())
                 .addColumnStatistic(c2,
-                        ColumnStatistic.builder().setNullsFraction(0.5).setDistinctValuesCount(80).build())
+                        ColumnStatistic.builder().setNullsFraction(0.8).setDistinctValuesCount(80).build())
                 .setOutputRowCount(10000).build();
 
+        // Non-nullable version
         CallOperator hashC1 = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3, Type.BIGINT,
                 Lists.newArrayList(c1));
         CallOperator hashC2 = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3, Type.BIGINT,
@@ -127,6 +128,18 @@ public class PredicateStatisticsCalculatorTest {
                 PredicateStatisticsCalculator.statisticsCalculate(binaryPredicateOperator, statistics);
 
         Assert.assertEquals(125, estimatedStatistics.getOutputRowCount(), 0.1);
+
+        // Nullable version
+        hashC1 = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.BIGINT,
+                Lists.newArrayList(c1));
+        hashC2 = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.BIGINT,
+                Lists.newArrayList(c2));
+
+        binaryPredicateOperator = new BinaryPredicateOperator(BinaryType.EQ, hashC1, hashC2);
+        estimatedStatistics =
+                PredicateStatisticsCalculator.statisticsCalculate(binaryPredicateOperator, statistics);
+
+        Assert.assertEquals(12.49, estimatedStatistics.getOutputRowCount(), 0.1);
     }
 
     @Test

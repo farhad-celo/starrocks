@@ -639,6 +639,14 @@ public class ExpressionStatisticsCalculatorTest {
         Assert.assertEquals(-1.7014118346046923E38, columnStatistic.getMinValue(), 0.001);
         Assert.assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
         Assert.assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        // test CELONIS_XX_HASH3_128_NULLABLE function
+        callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.INT,
+                Lists.newArrayList(columnRefOperator));
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+        Assert.assertEquals(1.7014118346046923E38, columnStatistic.getMaxValue(), 0.001);
+        Assert.assertEquals(-1.7014118346046923E38, columnStatistic.getMinValue(), 0.001);
+        Assert.assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        Assert.assertEquals(0.2, columnStatistic.getNullsFraction(), 0.001);
     }
 
     @Test

@@ -607,6 +607,10 @@ public class ExpressionStatisticCalculator {
                     maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
                     nullsFraction = 0.0;
                     break;
+                case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
+                    minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
+                    maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
+                    break;
                 // End CELONIS cases
                 case FunctionSet.SIGN:
                     minValue = -1;
