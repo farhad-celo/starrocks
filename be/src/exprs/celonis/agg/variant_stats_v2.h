@@ -409,6 +409,10 @@ struct CelonisVariantStatsAggregateV2State {
 
     const std::vector<size_t>& variant_lengths() const { return lengths_; }
 
+    size_t num_distinct_variants() const { return lengths_.size(); }
+
+    size_t num_distinct_activities() const { return activity_stats_.size(); }
+
     const std::vector<int64_t>& counts() const { return counts_; }
 
     int32_t get_activity(size_t index) const {

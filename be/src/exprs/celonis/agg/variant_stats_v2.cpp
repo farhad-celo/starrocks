@@ -421,6 +421,8 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
               << " seconds." << std::endl;
     LOG(INFO) << log_prefix << ": merging_bytes = " << state_impl.merging_bytes() << " bytes." << std::endl;
     LOG(INFO) << log_prefix << ": number of states merged = " << state_impl.merging_states() << std::endl;
+    LOG(INFO) << log_prefix << ": distinct activity count = " << state_impl.num_distinct_activities() << std::endl;
+    LOG(INFO) << log_prefix << ": distinct variant count = " << state_impl.num_distinct_variants() << std::endl;
 
     if (state_impl.activity_array().size() > static_cast<size_t>(std::numeric_limits<int16_t>::max())) {
         ctx->set_error(std::string(
