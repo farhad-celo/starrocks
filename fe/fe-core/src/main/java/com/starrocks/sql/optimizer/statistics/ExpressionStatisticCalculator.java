@@ -611,6 +611,30 @@ public class ExpressionStatisticCalculator {
                     minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
                     maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
                     break;
+                case FunctionSet.CELONIS_ARRAY_BOOL_OR:
+                    minValue = 0;
+                    maxValue = 1;
+                    distinctValue = 3;
+                    break;
+                case FunctionSet.CELONIS_SQUARE:
+                    double celonisSquareMinValue;
+                    double celonisSquareMaxValue = Math.max(minValue * minValue, maxValue * maxValue);
+                    if (minValue < 0 && maxValue < 0 || minValue >= 0 && maxValue >= 0) {
+                        celonisSquareMinValue = Math.min(minValue * minValue, maxValue * maxValue);
+                    } else {
+                        celonisSquareMinValue = 0;
+                    }
+                    minValue = celonisSquareMinValue;
+                    maxValue = celonisSquareMaxValue;
+                    break;
+                case FunctionSet.CELONIS_GREATEST:
+                case FunctionSet.CELONIS_LEAST:
+                case FunctionSet.CELONIS_UPPER:
+                case FunctionSet.CELONIS_LOWER:
+                case FunctionSet.CELONIS_TO_DOUBLE:
+                case FunctionSet.CELONIS_STRING_TO_DOUBLE:
+                    // Just use the input's statistics as output's statistics
+                    break;
                 // End CELONIS cases
                 case FunctionSet.SIGN:
                     minValue = -1;

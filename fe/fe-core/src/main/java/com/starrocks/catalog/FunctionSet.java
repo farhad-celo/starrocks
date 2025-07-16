@@ -547,6 +547,11 @@ public class FunctionSet {
     public static final String CELONIS_XX_HASH3_128_V4 = "celonis_xx_hash3_128_v4";
     public static final String CELONIS_XX_HASH3_96 = "celonis_xx_hash3_96";
     public static final String CELONIS_IN_JSON = "celonis_in_json";
+    public static final String CELONIS_ARRAY_BOOL_OR = "celonis_array_bool_or";
+    public static final String CELONIS_SQUARE = "celonis_square";
+    public static final String CELONIS_UPPER = "celonis_upper";
+    public static final String CELONIS_LOWER = "celonis_lower";
+    public static final String CELONIS_TO_DOUBLE = "celonis_to_double";
     public static final String CELONIS_STRING_TO_DOUBLE = "celonis_string_to_double";
     public static final String CELONIS_SHORTENED_VARIANT = "celonis_shortened_variant";
 
