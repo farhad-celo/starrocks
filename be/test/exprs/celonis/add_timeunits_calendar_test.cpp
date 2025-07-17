@@ -98,26 +98,27 @@ TEST_F(CelonisAddTimeunitsCalendarTest, const_empty_calendar) {
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 10, 10, 1, 2));
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 10, 10, 1, 2));
     timestamp_column_->append_datum(TimestampValue::create(1970, 1, 10, 10, 1, 2));
+    timestamp_column_->append_datum(TimestampValue::create(9999, 12, 25, 0, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(1400, 1, 2, 0, 0, 0));
 
     add_value_column_->append_datum(26L);
     add_value_column_->append_datum(365L);
     add_value_column_->append_datum(-5L);
     add_value_column_->append_datum(120L);
     add_value_column_->append_datum(-3662L);
+    add_value_column_->append_datum(52L);
+    add_value_column_->append_datum(-52L);
 
     time_unit_column_->append_datum("HOURS");
     time_unit_column_->append_datum("DAYS");
     time_unit_column_->append_datum("HOURS");
     time_unit_column_->append_datum("MINUTES");
     time_unit_column_->append_datum("SECONDS");
-
-    calendar_column_->append_datum(DatumArray{});
-    calendar_column_->append_datum(DatumArray{});
-    calendar_column_->append_datum(DatumArray{});
-    calendar_column_->append_datum(DatumArray{});
-    calendar_column_->append_datum(DatumArray{});
+    time_unit_column_->append_datum("DAYS");
+    time_unit_column_->append_datum("DAYS");
 
     for (auto i = 0; i < timestamp_column_->size(); ++i) {
+        calendar_column_->append_datum(DatumArray{});
         calendar_id_column_->append_datum(kNullDatum);
     }
     const auto result = Run().value();
@@ -127,6 +128,8 @@ TEST_F(CelonisAddTimeunitsCalendarTest, const_empty_calendar) {
     EXPECT_EQ(TimestampValue::create(1970, 1, 10, 5, 1, 2), result->get(2).get_timestamp());
     EXPECT_EQ(TimestampValue::create(1970, 1, 10, 12, 1, 2), result->get(3).get_timestamp());
     EXPECT_EQ(TimestampValue::create(1970, 1, 10, 9, 0, 0), result->get(4).get_timestamp());
+    EXPECT_TRUE(result->get(5).is_null());
+    EXPECT_TRUE(result->get(6).is_null());
 }
 
 TEST_F(CelonisAddTimeunitsCalendarTest, const_calendar) {
@@ -262,6 +265,41 @@ TEST_F(CelonisAddTimeunitsCalendarTest, add_days) {
     const auto result = RunConstantCalendar(
             {R"({"weekday_calendar": {)",
              R"("tuesday": {"use_day": true, "shift": {"begin": 0, "end": 61200000} }, )",
+             R"(} })"}, "DAYS").value();
+    ASSERT_EQ(timestamp_column_->size(), result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
+}
+
+TEST_F(CelonisAddTimeunitsCalendarTest, const_no_calendar_result_out_of_valid_range) {
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(1400, 1, 10, 0, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(9999, 12, 1, 0, 0, 0));
+    add_value_column_->append_datum(-52L);
+    add_value_column_->append_datum(52L);
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+    const auto result = RunConstantCalendar({}, "DAYS").value();
+    ASSERT_EQ(timestamp_column_->size(), result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
+}
+
+TEST_F(CelonisAddTimeunitsCalendarTest, const_calendar_result_out_of_valid_range) {
+    Prepare();
+    timestamp_column_->append_datum(TimestampValue::create(1400, 1, 10, 0, 0, 0));
+    timestamp_column_->append_datum(TimestampValue::create(9999, 12, 1, 0, 0, 0));
+    add_value_column_->append_datum(-52L);
+    add_value_column_->append_datum(52L);
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_id_column_->append_datum(kNullDatum);
+    const auto result = RunConstantCalendar(
+            {R"({"weekday_calendar": {)",
+             R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+             R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+             R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+             R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+             R"("saturday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
              R"(} })"}, "DAYS").value();
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_TRUE(result->get(0).is_null());

@@ -81,7 +81,7 @@ static int64_t remap_timestamp_ms(const TimestampValue& timestamp) {
     return timestamp.diff_microsecond(EPOCH) / NUM_MICROSECONDS_PER_MILLISECONDS;
 }
 
-static TimestampValue
+static std::optional<TimestampValue>
 add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_unit, int64_t add_value) {
     auto start_millis = remap_timestamp_ms(timestamp);
     int64_t factor = 1;
@@ -95,7 +95,10 @@ add_timeunits_helper(const TimestampValue& timestamp, const std::string& time_un
         factor = 1000L;
     }
     auto end_millis = start_millis + add_value * factor;
-    return timestamp_from_unix_millis(end_millis);
+    if (is_timestamp_in_valid_range(end_millis)) {
+        return timestamp_from_unix_millis(end_millis);
+    }
+    return std::nullopt;
 }
 
 static int get_year(const TimestampValue& value) {
@@ -2290,7 +2293,12 @@ static StatusOr<ColumnPtr> add_timeunits_calendar_const([[maybe_unused]] Functio
                 return Status::InvalidArgument(
                         "Calendar ID column should not be set when calendar specification is not set.");
             }
-            result.append(add_timeunits_helper(timestamp, time_unit, add_value));
+            auto rv = add_timeunits_helper(timestamp, time_unit, add_value);
+            if (rv.has_value()) {
+                result.append(rv.value());
+            } else {
+                result.append_null();
+            }
             continue;
         }
         const std::optional<TimestampValue> new_timestamp = calendar.add_timeunits(timestamp, time_unit, add_value,
