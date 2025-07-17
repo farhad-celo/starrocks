@@ -118,6 +118,11 @@ StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, con
         std::vector<std::string> variant;
         auto start = src_offsets[row];
         auto end = src_offsets[row + 1];
+        if (end - start > 40000) {
+            // TODO(j.kim): Remove this after a new CPML with a fix is merged.
+            //   fix - https://github.com/celonis/cpm-query-engine/pull/6907
+            return Status::InternalError("ALIGN_MODEL: Variants longer than 40000 are not supported.");
+        }
         variant.reserve(end - start);
         for (size_t i = start; i < end; ++i) {
             if (src_array_data.null_elements != nullptr && (*src_array_data.null_elements)[i]) {
