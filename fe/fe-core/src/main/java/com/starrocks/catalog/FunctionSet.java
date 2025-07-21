@@ -546,6 +546,7 @@ public class FunctionSet {
     public static final String CELONIS_XX_HASH3_128_V3 = "celonis_xx_hash3_128_v3";
     public static final String CELONIS_XX_HASH3_128_V4 = "celonis_xx_hash3_128_v4";
     public static final String CELONIS_XX_HASH3_96 = "celonis_xx_hash3_96";
+    public static final String CELONIS_IN = "celonis_in";
     public static final String CELONIS_IN_JSON = "celonis_in_json";
     public static final String CELONIS_ARRAY_BOOL_OR = "celonis_array_bool_or";
     public static final String CELONIS_SQUARE = "celonis_square";
@@ -702,6 +703,7 @@ public class FunctionSet {
                     .add(FunctionSet.CELONIS_XX_HASH3_128_V3)
                     .add(FunctionSet.CELONIS_XX_HASH3_128_V4)
                     .add(FunctionSet.CELONIS_XX_HASH3_96)
+                    .add(FunctionSet.CELONIS_IN)
                     .add(FunctionSet.CELONIS_IN_JSON)
                     .build();
 
