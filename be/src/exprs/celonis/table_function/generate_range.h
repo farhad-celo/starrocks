@@ -54,7 +54,7 @@ public:
         // If an error status is already set (e.g., from a previous call exceeding row limit), return early.
         if (!state->status().ok()) {
             // Return empty columns and offsets, the error is already in state.
-            return std::make_pair(Columns{res}, offsets);
+            return std::make_pair(Columns{res}, UInt32Column::Ptr(std::move(offsets)));
         }
         auto arg_step = ColumnViewer<StepLT>(state->get_columns()[0]);
         auto arg_range_start = ColumnViewer<LT>(state->get_columns()[1]);
@@ -165,7 +165,7 @@ public:
             }
         } // while
         offsets->append(res->size());
-        return std::make_pair(Columns{res}, offsets);
+        return std::make_pair(Columns{res}, UInt32Column::Ptr(std::move(offsets)));
     }
 
 private:
