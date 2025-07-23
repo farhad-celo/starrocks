@@ -35,7 +35,7 @@ Direction getDirection(Slice direction) {
 }
 
 template<bool is_reverse>
-ColumnPtr index_activity_order_impl(Column* array_column) {
+ColumnPtr index_activity_order_impl(const Column* array_column) {
     UnnestedArrayData array_data = prepare_array_input(array_column);
     const size_t num_rows = array_data.offsets->size() - 1;
     auto offsets_ptr = array_data.offsets->get_data().data();
@@ -87,7 +87,7 @@ ColumnPtr index_activity_order_impl(Column* array_column) {
 }
 
 template<bool is_reverse>
-ColumnPtr index_activity_loop_impl(Column* array_column) {
+ColumnPtr index_activity_loop_impl(const Column* array_column) {
     UnnestedArrayData array_data = prepare_array_input(array_column);
     const auto& elements = *array_data.elements;
     const size_t num_rows = array_data.offsets->size() - 1;
@@ -160,7 +160,7 @@ ColumnPtr index_activity_loop_impl(Column* array_column) {
 }
 
 template<bool is_reverse>
-ColumnPtr index_activity_type_impl(Column* array_column) {
+ColumnPtr index_activity_type_impl(const Column* array_column) {
     UnnestedArrayData array_data = prepare_array_input(array_column);
     const auto& elements = *array_data.elements;
     const size_t num_rows = array_data.offsets->size() - 1;
@@ -245,7 +245,7 @@ ColumnPtr index_activity_type_impl(Column* array_column) {
 }  // namespace
 
 struct CelonisIndexActivityStateFragmentLocal {
-    ColumnPtr (*function)(Column*);
+    ColumnPtr (*function)(const Column*);
 };
 
 Status CelonisIndexActivity::celonis_index_activity_prepare(starrocks::FunctionContext *context,
@@ -304,7 +304,7 @@ Status CelonisIndexActivity::celonis_index_activity_close(starrocks::FunctionCon
 StatusOr<ColumnPtr> CelonisIndexActivity::celonis_index_activity(FunctionContext* context,
                                                                  const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    Column* array_column = columns[0].get();
+    const Column* array_column = columns[0].get();
     const auto* state = reinterpret_cast<const CelonisIndexActivityStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
