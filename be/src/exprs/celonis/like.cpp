@@ -16,9 +16,16 @@
 
 namespace starrocks {
 
+enum class LikeFunctionType {
+    LIKE_NON_CONSTANT,
+    LIKE_CONSTANT_NO_WILDCARD,
+    LIKE_PREDICATE
+};
+
 struct LikeStateFragmentLocal {
     std::shared_ptr<re2::RE2> pattern_re2;
     ScalarFunction function;
+    LikeFunctionType function_type;
 };
 
 Status CelonisLike::like_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
@@ -28,6 +35,7 @@ Status CelonisLike::like_prepare(FunctionContext* context, FunctionContext::Func
 
         if (!context->is_constant_column(1)) {
             state->function = like_non_constant;
+            state->function_type = LikeFunctionType::LIKE_NON_CONSTANT;
             return Status::OK();
         }
 
@@ -42,6 +50,7 @@ Status CelonisLike::like_prepare(FunctionContext* context, FunctionContext::Func
             // If there are wildcards in the pattern, LIKE will be called.
             // This implementation depends on the implementation detail of LikePredicate::like_prepare() which sets function state in THREAD_LOCAL only.
             state->function = LikePredicate::like;
+            state->function_type = LikeFunctionType::LIKE_PREDICATE;
             return Status::OK();
         }
 
@@ -53,13 +62,14 @@ Status CelonisLike::like_prepare(FunctionContext* context, FunctionContext::Func
 
         state->pattern_re2 = std::make_shared<re2::RE2>(re_pattern_str, opts);
         state->function = like_constant_no_wildcard;
+        state->function_type = LikeFunctionType::LIKE_CONSTANT_NO_WILDCARD;
 
         return Status::OK();
     }
 
     const auto* like_state_fragment_local = reinterpret_cast<const LikeStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    if (like_state_fragment_local->function == LikePredicate::like) {
+    if (like_state_fragment_local->function_type == LikeFunctionType::LIKE_PREDICATE) {
         return LikePredicate::like_prepare(context, scope);
     }
 
@@ -71,7 +81,7 @@ Status CelonisLike::like_close(FunctionContext* context, FunctionContext::Functi
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         delete like_state_fragment_local;
-    } else if (like_state_fragment_local->function == LikePredicate::like) {
+    } else if (like_state_fragment_local->function_type == LikeFunctionType::LIKE_PREDICATE) {
         return LikePredicate::like_close(context, scope);
     }
     return Status::OK();
