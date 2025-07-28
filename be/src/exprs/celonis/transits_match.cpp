@@ -327,21 +327,23 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
         res_right_elements.push_back(array_col->elements_column());
         res_right_offsets.push_back(array_col->offsets_column());
     }
-    std::vector<Column*> left_key_elements;
-    std::vector<Column*> right_key_elements;
+    std::vector<const Column*> left_key_elements;
+    std::vector<const Column*> right_key_elements;
     std::vector<UInt32Column::Ptr> left_key_offsets;
     std::vector<UInt32Column::Ptr> right_key_offsets;
     for (auto i = 0; i < left_key_fields.size(); ++i) {
         left_key_elements.push_back(down_cast<const ArrayColumn*>(
                 ColumnHelper::get_data_column(left_key_fields[i].get()))->elements_column().get());
         left_key_offsets.push_back(
-                down_cast<ArrayColumn*>(ColumnHelper::get_data_column(left_key_fields[i].get()))->offsets_column());
+                down_cast<const ArrayColumn*>(
+                        ColumnHelper::get_data_column(left_key_fields[i].get()))->offsets_column());
     }
     for (auto i = 0; i < right_key_fields.size(); ++i) {
         right_key_elements.push_back(down_cast<const ArrayColumn*>(
                 ColumnHelper::get_data_column(right_key_fields[i].get()))->elements_column().get());
         right_key_offsets.push_back(
-                down_cast<ArrayColumn*>(ColumnHelper::get_data_column(right_key_fields[i].get()))->offsets_column());
+                down_cast<const ArrayColumn*>(
+                        ColumnHelper::get_data_column(right_key_fields[i].get()))->offsets_column());
     }
     std::vector<uint32_t> left_indexes;
     std::vector<uint32_t> right_indexes;
