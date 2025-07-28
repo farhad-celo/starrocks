@@ -265,7 +265,7 @@ ColumnPtr array_sources_targets_impl(const UnnestedArrayData& array_data, const 
 
 template <SourceTargetType SOURCE_TARGET_TYPE, SourceTargetEdgeConfig EDGE_CONFIG>
 StatusOr<ColumnPtr> array_sources_targets_impl(FunctionContext* context, const Columns& columns) {
-    const auto array_column{ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0])};
+    const auto array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
     const auto array_data{prepare_array_input(array_column.get())};
     ColumnPtr group_column;
     UnnestedArrayData group_array_data;
@@ -280,8 +280,8 @@ StatusOr<ColumnPtr> array_sources_targets_impl(FunctionContext* context, const C
         }
     }
 
-    auto result{array_sources_targets_impl < /*is_source=*/SOURCE_TARGET_TYPE == SourceTargetType::SOURCE,
-                EDGE_CONFIG > (array_data, group_array_data)};
+    auto result = array_sources_targets_impl< /*is_source=*/SOURCE_TARGET_TYPE == SourceTargetType::SOURCE,
+            EDGE_CONFIG>(array_data, group_array_data);
     if (array_data.null_arrays != nullptr) {
         return NullableColumn::create(std::move(result),
                                       down_cast<const NullableColumn*>(array_column.get())->null_column());
@@ -333,7 +333,7 @@ Status CelonisSourceTarget<SOURCE_TARGET_TYPE>::array_sources_targets_prepare(
         if (!context->is_notnull_constant_column(1)) {
             return Status::OK();
         }
-        const auto edge_config_column{context->get_constant_column(1)};
+        const auto edge_config_column = context->get_constant_column(1);
         const auto edge_config{
                 getEdgeConfig(ColumnHelper::get_const_value<TYPE_VARCHAR>(edge_config_column).to_string())};
 
