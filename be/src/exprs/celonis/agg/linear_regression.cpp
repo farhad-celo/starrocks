@@ -33,7 +33,8 @@ namespace {
 static const int PRECISION = 17;
 
 // Performs in-place LU factorization and then solve for X in AX=B
-bool lu_solve(const matrix<double>& A, const vector<double>& B, vector<double>& X) {
+bool lu_solve(const matrix<double>& A, const boost::numeric::ublas::vector<double>& B,
+              boost::numeric::ublas::vector<double>& X) {
     matrix<double> A_lu(A);
     permutation_matrix<std::size_t> perm(A.size1());
     int res = lu_factorize(A_lu, perm);
@@ -43,7 +44,7 @@ bool lu_solve(const matrix<double>& A, const vector<double>& B, vector<double>& 
     return true;
 }
 
-std::string to_model_str(const vector<double>& beta) {
+std::string to_model_str(const boost::numeric::ublas::vector<double>& beta) {
     std::string sep = "";
     std::string rv = "";
     for (double v: beta) {
@@ -208,8 +209,8 @@ void LinearRegressionAggregateFunction::finalize_to_column(FunctionContext* ctx,
         return;
     }
     matrix<double> X(size, num_features.value() + 1);
-    vector<double> y(size);
-    vector<double> beta(num_features.value() + 1);
+    boost::numeric::ublas::vector<double> y(size);
+    boost::numeric::ublas::vector<double> beta(num_features.value() + 1);
     for (auto i = 0; i < size; ++i) {
         X(i, 0) = 1.0;
         for (auto j = 0; j < num_features.value(); ++j) {
@@ -221,7 +222,7 @@ void LinearRegressionAggregateFunction::finalize_to_column(FunctionContext* ctx,
     matrix<double> XtX = prod(trans(X), X);
 
     // compute (X^T * y)
-    vector<double> Xty = prod(trans(X), y);
+    boost::numeric::ublas::vector<double> Xty = prod(trans(X), y);
     // solve for beta using LU decomposition
     if (lu_solve(XtX, Xty, beta)) {
         const std::string model = to_model_str(beta);
