@@ -18,7 +18,7 @@ class Enumerator;
 struct ColumnsKey {
     size_t hash{0};
     struct CommonInfo {
-        Column** columns;
+        const Column** columns;
         LogicalType* types;
         int32_t num_columns;
     };
@@ -199,7 +199,7 @@ struct CelonisEnumerateAggregateState {
     void serialize(FunctionContext* ctx, uint8_t* dst) const;
     std::vector<bool> deserialize(FunctionContext* ctx, const uint8_t* src, size_t len);
 
-    Column* get_column(int column_num) const {
+    const Column* get_column(int column_num) const {
         if ((*data_column_index)[column_num] >= 0) {
             return (*data_raw_columns)[(*data_column_index)[column_num]];
         }
@@ -207,7 +207,7 @@ struct CelonisEnumerateAggregateState {
     }
 
     std::unique_ptr<Columns> data_columns = nullptr;
-    std::unique_ptr<std::vector<Column*>> data_raw_columns = nullptr;
+    std::unique_ptr<std::vector<const Column*>> data_raw_columns = nullptr;
     std::unique_ptr<std::vector<LogicalType>> logical_types = nullptr;
     std::unique_ptr<std::vector<int>> data_column_index = nullptr;
     int key_col_num = 0;

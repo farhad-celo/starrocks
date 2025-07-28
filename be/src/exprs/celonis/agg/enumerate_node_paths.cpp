@@ -41,7 +41,7 @@ LengthComparison parseLengthComparison(std::string str) {
 class ColumnsKeyDictionary {
 public:
     enum ColumnsInfoType { OUT, IN, NUMBER_OF_TYPES };
-    ColumnsKeyDictionary(FunctionContext* ctx, Column** columns, LogicalType* logical_types) {
+    ColumnsKeyDictionary(FunctionContext* ctx, const Column** columns, LogicalType* logical_types) {
         int32_t num_columns = ctx->get_arg_type(0)->children.size();
         columns_key_info_[ColumnsInfoType::OUT] =
                 {.columns = columns, .types = logical_types, .num_columns = num_columns};
@@ -135,12 +135,12 @@ NodePathEnumerator<allow_cycles>::NodePathEnumerator(FunctionContext* ctx, const
           length_comparison_(static_cast<LengthComparison>(state.length_comparison)),
           length_(state.length),
           ckd_(ctx, state.data_raw_columns->data(), state.logical_types->data()) {
-    Column* out_start = state.get_column(InputColumnIndex::OUT_START);
-    Column* out_end = state.get_column(InputColumnIndex::OUT_END);
-    Column* in_start = state.get_column(InputColumnIndex::IN_START);
-    Column* in_end = state.get_column(InputColumnIndex::IN_END);
-    Column* out_all = state.get_column(InputColumnIndex::OUT_ALL);
-    Column* in_all = state.get_column(InputColumnIndex::IN_ALL);
+    const Column* out_start = state.get_column(InputColumnIndex::OUT_START);
+    const Column* out_end = state.get_column(InputColumnIndex::OUT_END);
+    const Column* in_start = state.get_column(InputColumnIndex::IN_START);
+    const Column* in_end = state.get_column(InputColumnIndex::IN_END);
+    const Column* out_all = state.get_column(InputColumnIndex::OUT_ALL);
+    const Column* in_all = state.get_column(InputColumnIndex::IN_ALL);
 
     // To find implicit start
     HashSet<int32_t> outs;
@@ -535,7 +535,7 @@ CelonisEnumerateAggregateState::~CelonisEnumerateAggregateState() {
 void CelonisEnumerateAggregateState::update(FunctionContext* ctx, const Column** columns, size_t row_num, size_t size) {
     DCHECK(data_columns != nullptr);
     ColumnsKey::CommonInfo input_columns_key_info{
-            .columns = const_cast<Column**>(columns), .types = logical_types->data(), .num_columns = key_col_num};
+            .columns = columns, .types = logical_types->data(), .num_columns = key_col_num};
     for (int32_t offset = row_num; offset < row_num + size; ++offset) {
         // Deduplicate rows.
         DedupColumnsKey tmp_key{&input_columns_key_info, offset};
@@ -611,7 +611,7 @@ void CelonisEnumerateAggregateFunction::create_impl(FunctionContext* ctx, Celoni
     DCHECK(is_nulls == nullptr || is_nulls->size() == num_of_columns);
 
     state.data_columns = std::make_unique<Columns>();
-    state.data_raw_columns = std::make_unique<std::vector<Column*>>();
+    state.data_raw_columns = std::make_unique<std::vector<const Column*>>();
     state.logical_types = std::make_unique<std::vector<LogicalType>>();
     state.data_column_index = std::make_unique<std::vector<int>>(num_of_columns, -1);
 
