@@ -102,7 +102,7 @@ public:
         }
 
         ColumnPtr src_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[0]);
-        auto* src_data_column = src_column.get();
+        const auto* src_data_column = src_column.get();
 
         ColumnPtr dest_column = src_column->clone_empty();
         auto* dest_data_column = dest_column.get();
@@ -615,7 +615,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] Functi
     return CelonisNullToEmpty::process(columns);
 }
 
-Status calc_crop_impl(const Columns& columns, bool fill_one, const ColumnPtr& result) {
+Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
     DCHECK_EQ(columns.size(), 5);
     size_t n_rows = columns[0]->size();
     if (n_rows == 0) {
@@ -634,7 +634,7 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, const ColumnPtr& re
     ColumnViewer end_mode_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
 
     DCHECK(result->is_nullable());
-    auto* res_nullable_column = down_cast<NullableColumn*>(result.get());
+    auto* res_nullable_column = down_cast<NullableColumn*>(result);
     auto* res_null_column = res_nullable_column->mutable_null_column();
     auto* res_data_column = res_nullable_column->mutable_data_column();
     auto* res_elements_column = down_cast<ArrayColumn*>(res_data_column)->elements_column().get();
@@ -752,7 +752,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionCo
     type_array_bigint.children[0].type = TYPE_BIGINT;
     type_array_bigint.children[0].len = -1;
     auto result = ColumnHelper::create_column(type_array_bigint, true);
-    RETURN_IF_ERROR(calc_crop_impl(columns, true, result));
+    RETURN_IF_ERROR(calc_crop_impl(columns, true, result.get()));
     return result;
 }
 
@@ -761,7 +761,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] Fu
     DCHECK(columns.size() == 5);
     RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
     auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
-    RETURN_IF_ERROR(calc_crop_impl(columns, false, result));
+    RETURN_IF_ERROR(calc_crop_impl(columns, false, result.get()));
     return result;
 }
 
