@@ -108,7 +108,7 @@ Status trim_prepare(FunctionContext* context, FunctionContext::FunctionStateScop
         return Status::OK();
     }
 
-    if (const auto characters_column{context->get_constant_column(1)}; !characters_column->only_null()) {
+    if (const auto characters_column = context->get_constant_column(1); !characters_column->only_null()) {
         auto characters{ColumnHelper::get_const_value<TYPE_VARCHAR>(characters_column).to_string()};
         state->characters_opt = phmap::flat_hash_set<char, StdHash<char>>(characters.begin(), characters.end());
     }
