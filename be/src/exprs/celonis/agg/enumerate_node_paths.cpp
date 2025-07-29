@@ -11,7 +11,6 @@
 #include "exprs/agg/aggregate.h"
 #include "exprs/function_context.h"
 #include "gutil/casts.h"
-#include "runtime/runtime_state.h"
 #include "util/utf8.h"
 
 namespace starrocks {
@@ -43,10 +42,9 @@ public:
     enum ColumnsInfoType { OUT, IN, NUMBER_OF_TYPES };
     ColumnsKeyDictionary(FunctionContext* ctx, const Column** columns, LogicalType* logical_types) {
         int32_t num_columns = ctx->get_arg_type(0)->children.size();
-        columns_key_info_[ColumnsInfoType::OUT] =
-                {.columns = columns, .types = logical_types, .num_columns = num_columns};
-        columns_key_info_[ColumnsInfoType::IN] =
-                {.columns = columns + num_columns, .types = logical_types, .num_columns = num_columns};
+        columns_key_info_[ColumnsInfoType::OUT] = ColumnsKey::CommonInfo{columns, logical_types, num_columns};
+        columns_key_info_[ColumnsInfoType::IN] = ColumnsKey::CommonInfo{columns + num_columns, logical_types,
+                                                                        num_columns};
         // Assign ID 0 to all NULLs.
         may_add_key(ColumnsInfoType::OUT, -1);
     }
