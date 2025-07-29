@@ -108,7 +108,7 @@ std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, co
     }
     state->set_offset(result_offset);
 
-    return std::make_pair(result, offset_column);
+    return std::make_pair(result, UInt32Column::Ptr(std::move(offset_column)));
 }
 }  // namespace
 
@@ -117,7 +117,7 @@ std::pair<Columns, UInt32Column::Ptr> CountEdges::process(RuntimeState* runtime_
     if (state->get_columns().empty()) {
         return {};
     }
-    Column* activity_array = state->get_columns()[0].get();
+    const Column* activity_array = state->get_columns()[0].get();
     state->set_processed_rows(activity_array->size());
 
     const NullableColumn* nullable_activity_array = nullptr;
