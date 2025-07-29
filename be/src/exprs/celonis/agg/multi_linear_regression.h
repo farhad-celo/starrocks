@@ -24,9 +24,10 @@ using namespace boost::numeric::ublas;
 static const int PRECISION = 17;
 
 // Performs in-place LU factorization and then solve for X in AX=B
-bool lu_solve(const matrix<double>& A, const vector<double>& B, vector<double>& X) {
+bool lu_solve(const matrix<double>& A, const boost::numeric::ublas::vector<double>& B,
+              boost::numeric::ublas::vector<double>& X) {
     matrix<double> A_lu(A);
-    permutation_matrix<std::size_t> perm(A.size1());
+    permutation_matrix <std::size_t> perm(A.size1());
     int res = lu_factorize(A_lu, perm);
     if (res != 0) return false;
     X.assign(B);
@@ -34,7 +35,7 @@ bool lu_solve(const matrix<double>& A, const vector<double>& B, vector<double>& 
     return true;
 }
 
-std::string to_model_str(const vector<double>& beta) {
+std::string to_model_str(const boost::numeric::ublas::vector<double>& beta) {
     std::vector<std::string> beta_strs;
     for (double v: beta) {
         beta_strs.push_back(double_to_string(v, PRECISION));
@@ -253,7 +254,7 @@ public:
         int64_t n_samples = state_impl.n_samples;
         int64_t n_features = state_impl.n_features;
         matrix<double> sum_xx_augmented(n_features + 1, n_features + 1);
-        vector<double> sum_xy_augmented(n_features + 1);
+        boost::numeric::ublas::vector<double> sum_xy_augmented(n_features + 1);
         sum_xx_augmented(0, 0) = n_samples;
         for (auto j = 1; j <= n_features; ++j) {
             sum_xx_augmented(0, j) = state_impl.sum_x[j - 1];
@@ -268,7 +269,7 @@ public:
         for (auto i = 1; i <= n_features; ++i) {
             sum_xy_augmented(i) = state_impl.sum_xy[i - 1];
         }
-        vector<double> beta(n_features + 1);
+        boost::numeric::ublas::vector<double> beta(n_features + 1);
         if (lu_solve(sum_xx_augmented, sum_xy_augmented, beta)) {
             const std::string model = to_model_str(beta);
             to->append_datum(model.c_str());
