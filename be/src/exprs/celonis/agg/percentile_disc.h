@@ -20,7 +20,7 @@ class CelonisPercentileDiscAggregateFunction final : public PercentileContDiscAg
     using ResultColumnType = RunTimeColumnType<ResultLT>;
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
-        std::vector<InputCppType> new_vector = std::move(this->data(state).items);
+        auto new_vector = std::move(this->data(state).items);
         for (auto& innerData : this->data(state).grid) {
             std::move(innerData.begin() + 1, innerData.end() - 1, std::back_inserter(new_vector));
         }
