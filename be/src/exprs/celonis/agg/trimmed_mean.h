@@ -138,7 +138,7 @@ class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggre
 
         const int64_t parallel_threshold = TrimmedMeanParallelExecutionThreshold<LT>::value;
 
-        std::vector<CppType> new_vector = std::move(this->data(state).items);
+        auto new_vector = std::move(this->data(state).items);
         for (auto& innerData : this->data(state).grid) {
             std::move(innerData.begin() + 1, innerData.end() - 1, std::back_inserter(new_vector));
         }
