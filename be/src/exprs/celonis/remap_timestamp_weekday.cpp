@@ -3,9 +3,7 @@
 #include "column/array_column.h"
 #include "column/column.h"
 #include "column/column_builder.h"
-#include "column/column_hash.h"
 #include "column/column_viewer.h"
-#include "exprs/celonis/util.h"
 
 namespace starrocks {
 
