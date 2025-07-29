@@ -66,6 +66,7 @@ jobs:
           docker pull ${Builder}
 
       - name: Test
+        timeout-minutes: 60
         uses: ./.github/actions/presubmit-test
         with:
           builder: ${Builder}
