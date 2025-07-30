@@ -31,33 +31,33 @@ DeconstructedOutputColumn create_output_column(const Column& input_timestamp_col
     UnnestedArrayData timestamp_array_data{prepare_array_input(&input_timestamp_column)};
 
     // The output timestamps are an exact copy of the input timestamps. We will only rewrite a small amount of rows.
-    ColumnPtr output_timestamps{input_timestamp_column.clone_shared()};
-    auto* output_timestamp_arrays{down_cast<ArrayColumn*>(ColumnHelper::get_data_column(output_timestamps.get()))};
-    auto* output_timestamp_elements_nullable{
-            down_cast<NullableColumn*>(output_timestamp_arrays->elements_column().get())};
-    NullColumn::Ptr output_timestamp_elements_null_flags{std::move(output_timestamp_elements_nullable->null_column())};
-    TimestampColumn::Ptr output_timestamp_elements{
-            std::static_pointer_cast<TimestampColumn>(output_timestamp_elements_nullable->data_column())};
+    ColumnPtr output_timestamps = input_timestamp_column.clone();
+    auto* output_timestamp_arrays = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(output_timestamps.get()));
+    auto* output_timestamp_elements_nullable =
+            down_cast<NullableColumn*>(output_timestamp_arrays->elements_column().get());
+    NullColumn::Ptr output_timestamp_elements_null_flags = output_timestamp_elements_nullable->mutable_null_column();
+    TimestampColumn::Ptr output_timestamp_elements =
+            down_cast<TimestampColumn*>(output_timestamp_elements_nullable->mutable_data_column());
 
     // For the output reordering we base it on the input timestamps in terms of dimensions, but do not copy any data. All
     // null flags for the output reordering are 0 as there will be no null values. The array offsets are copied from the
     // timestamps, as columns should have same array sizes.
-    Int64Column::Ptr output_reordering_elements_data{Int64Column::create(timestamp_array_data.elements->size())};
-    NullColumn::Ptr output_reordering_elements_null_flags{
-            NullColumn::create(output_reordering_elements_data->size(), 0)};
-    NullableColumn::Ptr output_reordering_elements{
-            NullableColumn::create(output_reordering_elements_data, std::move(output_reordering_elements_null_flags))};
-    UInt32Column::Ptr output_reordering_offsets{
-            std::static_pointer_cast<UInt32Column>(output_timestamp_arrays->offsets().clone_shared())};
-    ColumnPtr output_reordering{ArrayColumn::create(output_reordering_elements, output_reordering_offsets)};
+    Int64Column::Ptr output_reordering_elements_data = Int64Column::create(timestamp_array_data.elements->size());
+    NullColumn::Ptr output_reordering_elements_null_flags =
+            NullColumn::create(output_reordering_elements_data->size(), 0);
+    NullableColumn::Ptr output_reordering_elements =
+            NullableColumn::create(output_reordering_elements_data, std::move(output_reordering_elements_null_flags));
+    UInt32Column::Ptr output_reordering_offsets =
+            down_cast<UInt32Column*>(output_timestamp_arrays->offsets().clone().get());
+    ColumnPtr output_reordering = ArrayColumn::create(output_reordering_elements, output_reordering_offsets);
 
     // If the input timestamps are nullable then we also wrap the output reordering into a nullable column and copy the array
     // null flags from the timestamps.
     if (input_timestamp_column.is_nullable()) {
         auto* nullable_input{down_cast<const NullableColumn*>(&input_timestamp_column)};
-        ColumnPtr array_null_flags{nullable_input->null_column()->clone_shared()};
+        ColumnPtr array_null_flags = nullable_input->null_column()->clone();
         output_reordering = NullableColumn::create(std::move(output_reordering),
-                                                   std::static_pointer_cast<NullColumn>(array_null_flags));
+                                                   down_cast<NullColumn*>(array_null_flags.get()));
     }
 
     // Fill the reordering arrays for each case with iotas.
@@ -70,8 +70,8 @@ DeconstructedOutputColumn create_output_column(const Column& input_timestamp_col
     }
 
     // Create the final output column and return it in a deconstructed way.
-    ColumnPtr output_column{StructColumn::create(Columns{output_timestamps, output_reordering},
-                                                 std::vector<std::string>{"adjusted_timestamps", "reordering"})};
+    ColumnPtr output_column = StructColumn::create(Columns{output_timestamps, output_reordering},
+                                                   std::vector<std::string>{"adjusted_timestamps", "reordering"});
     return DeconstructedOutputColumn{.final_output = std::move(output_column),
                                      .output_reordering_elements = std::move(output_reordering_elements_data),
                                      .output_timestamp_elements = std::move(output_timestamp_elements),
