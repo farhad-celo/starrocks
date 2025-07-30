@@ -523,29 +523,44 @@ struct StringCaseLowerFunction {
 public:
     template<LogicalType Type, LogicalType ResultType>
     static ColumnPtr evaluate(const ColumnPtr& column) {
-        auto result = column->clone_shared();
-        auto dst = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(result.get()));
+        auto* src = down_cast<BinaryColumn*>(column.get());
+        Bytes& src_bytes = src->get_bytes();
+        Offsets& src_offsets = src->get_offset();
+
+        auto dst = RunTimeColumnType<TYPE_VARCHAR>::create();
+        auto& dst_offsets = dst->get_offset();
         auto& dst_bytes = dst->get_bytes();
 
-        const size_t size = dst_bytes.size();
-        char* begin = (char*) (dst_bytes.data());
-        char* end = (char*) (begin + size);
+        dst_offsets.assign(src_offsets.begin(), src_offsets.end());
+        dst_bytes.resize(src_bytes.size());
+
+        const size_t size = src_bytes.size();
+        const char* src_ptr = (const char*)(src_bytes.data());
+        char* dst_ptr = (char*)(dst_bytes.data());
 
         // for UTF-8, the leading bytes and the continuation bytes do not share values.
-        for (char* ptr = begin; ptr < end; ++ptr) {
-            if ('A' <= (*ptr) && (*ptr) <= 'Z') {
-                *ptr = (*ptr) + 32;
-                continue;
-            }
-            // Character: Ä | UTF-8 Bytes: ['0xC3', '0x84']
-            // Character: Ö | UTF-8 Bytes: ['0xC3', '0x96']
-            // Character: Ü | UTF-8 Bytes: ['0xC3', '0x9C']
-            if ((*ptr) == '\xC3' && (ptr + 1) < end &&
-                ((*(ptr + 1) == '\x84') || (*(ptr + 1) == '\x96') || (*(ptr + 1) == '\x9C'))) {
-                *(ptr + 1) = *(ptr + 1) + 32;
+        for (size_t i = 0; i < size; ++i) {
+            char ch = src_ptr[i];
+
+            if ('A' <= ch && ch <= 'Z') {
+                dst_ptr[i] = ch + 32;
+            } else if (ch == '\xC3' && (i + 1) < size) {
+                // Character: Ä | UTF-8 Bytes: ['0xC3', '0x84']
+                // Character: Ö | UTF-8 Bytes: ['0xC3', '0x96']
+                // Character: Ü | UTF-8 Bytes: ['0xC3', '0x9C']
+                char next_ch = src_ptr[i + 1];
+                if (next_ch == '\x84' || next_ch == '\x96' || next_ch == '\x9C') {
+                    dst_ptr[i] = ch;
+                    dst_ptr[++i] = next_ch + 32;
+                } else {
+                    dst_ptr[i] = ch;
+                }
+            } else {
+                dst_ptr[i] = ch;
             }
         }
-        return result;
+
+        return dst;
     }
 };
 
@@ -558,29 +573,44 @@ struct StringCaseUpperFunction {
 public:
     template<LogicalType Type, LogicalType ResultType>
     static ColumnPtr evaluate(const ColumnPtr& column) {
-        auto result = column->clone_shared();
-        auto dst = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(result.get()));
+        auto* src = down_cast<BinaryColumn*>(column.get());
+        Bytes& src_bytes = src->get_bytes();
+        Offsets& src_offsets = src->get_offset();
+
+        auto dst = RunTimeColumnType<TYPE_VARCHAR>::create();
+        auto& dst_offsets = dst->get_offset();
         auto& dst_bytes = dst->get_bytes();
 
-        const size_t size = dst_bytes.size();
-        char* begin = (char*) (dst_bytes.data());
-        char* end = (char*) (begin + size);
+        dst_offsets.assign(src_offsets.begin(), src_offsets.end());
+        dst_bytes.resize(src_bytes.size());
+
+        const size_t size = src_bytes.size();
+        const char* src_ptr = (const char*)(src_bytes.data());
+        char* dst_ptr = (char*)(dst_bytes.data());
 
         // for UTF-8, the leading bytes and the continuation bytes do not share values.
-        for (char* ptr = begin; ptr < end; ++ptr) {
-            if ('a' <= (*ptr) && (*ptr) <= 'z') {
-                *ptr = (*ptr) - 32;
-                continue;
-            }
-            // Character: ä | UTF-8 Bytes: ['0xC3', '0xA4']
-            // Character: ö | UTF-8 Bytes: ['0xC3', '0xB6']
-            // Character: ü | UTF-8 Bytes: ['0xC3', '0xBC']
-            if ((*ptr) == '\xC3' && (ptr + 1) < end &&
-                ((*(ptr + 1) == '\xA4') || (*(ptr + 1) == '\xB6') || (*(ptr + 1) == '\xBC'))) {
-                *(ptr + 1) = *(ptr + 1) - 32;
+        for (size_t i = 0; i < size; ++i) {
+            char ch = src_ptr[i];
+
+            if ('a' <= ch && ch <= 'z') {
+                dst_ptr[i] = ch - 32;
+            } else if (ch == '\xC3' && (i + 1) < size) {
+                // Character: ä | UTF-8 Bytes: ['0xC3', '0xA4']
+                // Character: ö | UTF-8 Bytes: ['0xC3', '0xB6']
+                // Character: ü | UTF-8 Bytes: ['0xC3', '0xBC']
+                char next_ch = src_ptr[i + 1];
+                if (next_ch == '\xA4' || next_ch == '\xB6' || next_ch == '\xBC') {
+                    dst_ptr[i] = ch;
+                    dst_ptr[++i] = next_ch - 32;
+                } else {
+                    dst_ptr[i] = ch;
+                }
+            } else {
+                dst_ptr[i] = ch;
             }
         }
-        return result;
+
+        return dst;
     }
 };
 
