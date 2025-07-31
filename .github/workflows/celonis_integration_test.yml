@@ -2,8 +2,6 @@ name: Integration Test
 run-name: Integration Test - ${{inputs.branch_to_test || 'sync and rebase upstream'}}
 
 on:
-  schedule:
-    - cron:  '0 7 * * 0,2,4' # Around Pacific time of midnight of Sunday, Tuesday and Thursday
   workflow_dispatch:
     inputs:
       branch_to_test:
@@ -183,25 +181,18 @@ jobs:
           echo '{"data-root": "/home/runner/_work/docker"}' | sudo tee /etc/docker/daemon.json > /dev/null
           sudo systemctl restart docker
           sudo cat /etc/docker/daemon.json
-      - name: df -Th
-        run: |
-          df -Th
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{env.test_branch}}
-
       - name: Build and push artifact image
         id: build-artifact
         uses: ./.github/actions/build-artifact
         with:
           dev_env_image: ${BUILDER}
           image_tag: ${test_image_tag}
-      - name: df -Th
-        run: |
-          df -Th
-        
+          to_push: 'true'
 
   build-allin1:
     runs-on: [runs-on,runner=16cpu-linux-x64,image=ubuntu22-full-x64,disk=default,"run-id=${{ github.run_id }}"]
@@ -223,6 +214,8 @@ jobs:
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${artifact_image_tag}
           image_tag: ${artifact_image_tag}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   celostar-presubmit-test:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
@@ -270,62 +263,19 @@ jobs:
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
           docker pull ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
 
+      - name: Build and push fe-be
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.test_image_tag }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       - name: Build FE & BE
         uses: ./.github/actions/build-fe-be
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}
           image_tag: ${test_image_tag}
-
-      - name: Push FE image to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-fe:${test_image_tag}
-          remote_image: ghcr.io/celonis/celostar/starrocks-fe:${test_image_tag}
-
-      - name: Push BE image to GHCR
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-be:${test_image_tag}
-          remote_image: ghcr.io/celonis/celostar/starrocks-be:${test_image_tag}
-
-      - name: Configure prod AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
-
-      - name: prod Amazon ECR login
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Push FE image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-fe:${test_image_tag}
-          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${test_image_tag}
-
-      - name: Push BE image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        uses: ./.github/actions/push-to-registry
-        with:
-          local_image: starrocks-be:${test_image_tag}
-          remote_image: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${test_image_tag}
-
-# Skip this step as the current runs-on runners are ephemeral.
-#      - name: clean up
-#        if: ${{ always() }}
-#        run: |
-#          docker rmi -f $(docker images -q starrocks-fe:${test_image_tag}) || true
-#          docker rmi -f $(docker images -q starrocks-be:${test_image_tag}) || true
-#          docker rmi -f $(docker images -q ghcr.io/celonis/celostar/starrocks-artifacts:${test_image_tag}) || true
-#          docker system prune -f
-#          docker volume prune -f
-#          docker logout ghcr.io
-#        continue-on-error: true
 
   e2e-abb_06b_stable-load-single_query_and_export_csv:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]

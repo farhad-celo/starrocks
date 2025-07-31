@@ -191,19 +191,21 @@ jobs:
         with:
           dev_env_image: ${{ env.BUILDER }}
           image_tag: ${{ env.image_tag }}
-          to_push: 'false'
+          to_push: 'true'
 
       - name: Build and push allin1 image
         uses: ./.github/actions/build-allin1
         with:
-          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${image_tag}
-          pull_artifact: 'false'
+          pull_artifact: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push fe-be
         uses: ./.github/actions/build-fe-be
         with:
-          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           to_push: 'true'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -233,19 +235,21 @@ jobs:
         with:
           dev_env_image: ${{ env.BUILDER }}
           image_tag: ${{ env.image_tag }}
-          to_push: 'false'
+          to_push: 'true'
 
       - name: Build and push allin1 image
         uses: ./.github/actions/build-allin1
         with:
-          artifact_image: starrocks-artifacts:${{ env.image_tag }}
-          image_tag: ${{ env.image_tag }}
-          pull_artifact: 'false'
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${image_tag}
+          pull_artifact: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push fe-be
         uses: ./.github/actions/build-fe-be
         with:
-          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           to_push: 'true'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
