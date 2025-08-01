@@ -523,9 +523,9 @@ struct StringCaseLowerFunction {
 public:
     template<LogicalType Type, LogicalType ResultType>
     static ColumnPtr evaluate(const ColumnPtr& column) {
-        auto* src = down_cast<BinaryColumn*>(column.get());
-        Bytes& src_bytes = src->get_bytes();
-        Offsets& src_offsets = src->get_offset();
+        auto* src = down_cast<const BinaryColumn*>(column.get());
+        const Bytes& src_bytes = src->get_bytes();
+        const Offsets& src_offsets = src->get_offset();
 
         auto dst = RunTimeColumnType<TYPE_VARCHAR>::create();
         auto& dst_offsets = dst->get_offset();
@@ -573,9 +573,9 @@ struct StringCaseUpperFunction {
 public:
     template<LogicalType Type, LogicalType ResultType>
     static ColumnPtr evaluate(const ColumnPtr& column) {
-        auto* src = down_cast<BinaryColumn*>(column.get());
-        Bytes& src_bytes = src->get_bytes();
-        Offsets& src_offsets = src->get_offset();
+        auto* src = down_cast<const BinaryColumn*>(column.get());
+        const Bytes& src_bytes = src->get_bytes();
+        const Offsets& src_offsets = src->get_offset();
 
         auto dst = RunTimeColumnType<TYPE_VARCHAR>::create();
         auto& dst_offsets = dst->get_offset();
