@@ -13,46 +13,46 @@
 namespace starrocks {
 
 /*
-2025-06-08T11:40:05+00:00
+2025-07-26T01:37:51+00:00
 Running ./be/build_Release/src/bench/celonis/output/sanitize_invalid_utf8_bench
-Run on (32 X 3244.19 MHz CPU s)
+Run on (32 X 3007.28 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 7.52, 4.61, 4.79
+Load Average: 5.20, 3.97, 3.41
 // Args: Number of rows / String length
 ----------------------------------------------------------------------------------------------
 Benchmark                                    Time             CPU   Iterations UserCounters...
 ----------------------------------------------------------------------------------------------
-BM_SanitizeInvalidUtf8/1000/20/1         71922 ns        71919 ns         9762 RowInvRate=71.9186ns
-BM_SanitizeInvalidUtf8/10000/20/1       697050 ns       697024 ns         1003 RowInvRate=69.7024ns
-BM_SanitizeInvalidUtf8/100000/20/1     6915695 ns      6915672 ns           99 RowInvRate=69.1567ns
-BM_SanitizeInvalidUtf8/1000/40/1        121150 ns       121151 ns         5786 RowInvRate=121.151ns
-BM_SanitizeInvalidUtf8/10000/40/1      1196731 ns      1196668 ns          583 RowInvRate=119.667ns
-BM_SanitizeInvalidUtf8/100000/40/1    11820732 ns     11820279 ns           59 RowInvRate=118.203ns
-BM_SanitizeInvalidUtf8/1000/80/1        227429 ns       227451 ns         3071 RowInvRate=227.451ns
-BM_SanitizeInvalidUtf8/10000/80/1      2059454 ns      2059367 ns          339 RowInvRate=205.937ns
-BM_SanitizeInvalidUtf8/100000/80/1    21581186 ns     21581305 ns           33 RowInvRate=215.813ns
-BM_SanitizeInvalidUtf8/1000/20/5         80279 ns        80271 ns         8709 RowInvRate=80.271ns
-BM_SanitizeInvalidUtf8/10000/20/5       787381 ns       787394 ns          887 RowInvRate=78.7394ns
-BM_SanitizeInvalidUtf8/100000/20/5     7780602 ns      7780416 ns           89 RowInvRate=77.8042ns
-BM_SanitizeInvalidUtf8/1000/40/5        135014 ns       135022 ns         5156 RowInvRate=135.022ns
-BM_SanitizeInvalidUtf8/10000/40/5      1336579 ns      1336609 ns          525 RowInvRate=133.661ns
-BM_SanitizeInvalidUtf8/100000/40/5    13303045 ns     13302801 ns           52 RowInvRate=133.028ns
-BM_SanitizeInvalidUtf8/1000/80/5        251219 ns       251235 ns         2869 RowInvRate=251.235ns
-BM_SanitizeInvalidUtf8/10000/80/5      2337578 ns      2337552 ns          297 RowInvRate=233.755ns
-BM_SanitizeInvalidUtf8/100000/80/5    24003093 ns     24002767 ns           29 RowInvRate=240.028ns
-BM_SanitizeInvalidUtf8/1000/20/10        89473 ns        89468 ns         7840 RowInvRate=89.4677ns
-BM_SanitizeInvalidUtf8/10000/20/10      876011 ns       876020 ns          801 RowInvRate=87.602ns
-BM_SanitizeInvalidUtf8/100000/20/10    8637638 ns      8637405 ns           81 RowInvRate=86.374ns
-BM_SanitizeInvalidUtf8/1000/40/10       151274 ns       151282 ns         4600 RowInvRate=151.282ns
-BM_SanitizeInvalidUtf8/10000/40/10     1487582 ns      1487604 ns          474 RowInvRate=148.76ns
-BM_SanitizeInvalidUtf8/100000/40/10   14814113 ns     14813894 ns           48 RowInvRate=148.139ns
-BM_SanitizeInvalidUtf8/1000/80/10       281115 ns       281131 ns         2502 RowInvRate=281.131ns
-BM_SanitizeInvalidUtf8/10000/80/10     2688775 ns      2688815 ns          261 RowInvRate=268.881ns
-BM_SanitizeInvalidUtf8/100000/80/10   27128624 ns     27128803 ns           25 RowInvRate=271.288ns
+BM_SanitizeInvalidUtf8/1000/20/1         60076 ns        60067 ns        11671 RowInvRate=60.0666ns
+BM_SanitizeInvalidUtf8/10000/20/1       586147 ns       586086 ns         1206 RowInvRate=58.6086ns
+BM_SanitizeInvalidUtf8/100000/20/1     5728477 ns      5728223 ns          122 RowInvRate=57.2822ns
+BM_SanitizeInvalidUtf8/1000/40/1         99142 ns        99127 ns         7111 RowInvRate=99.1268ns
+BM_SanitizeInvalidUtf8/10000/40/1       959219 ns       959146 ns          732 RowInvRate=95.9146ns
+BM_SanitizeInvalidUtf8/100000/40/1     9579353 ns      9579305 ns           73 RowInvRate=95.793ns
+BM_SanitizeInvalidUtf8/1000/80/1        176975 ns       176939 ns         4212 RowInvRate=176.939ns
+BM_SanitizeInvalidUtf8/10000/80/1      1718491 ns      1718357 ns          400 RowInvRate=171.836ns
+BM_SanitizeInvalidUtf8/100000/80/1    17817344 ns     17800834 ns           40 RowInvRate=178.008ns
+BM_SanitizeInvalidUtf8/1000/20/5         68408 ns        68394 ns        10224 RowInvRate=68.3941ns
+BM_SanitizeInvalidUtf8/10000/20/5       674592 ns       674554 ns         1049 RowInvRate=67.4554ns
+BM_SanitizeInvalidUtf8/100000/20/5     6638220 ns      6638131 ns          103 RowInvRate=66.3813ns
+BM_SanitizeInvalidUtf8/1000/40/5        111938 ns       111929 ns         6234 RowInvRate=111.929ns
+BM_SanitizeInvalidUtf8/10000/40/5      1115152 ns      1115073 ns          637 RowInvRate=111.507ns
+BM_SanitizeInvalidUtf8/100000/40/5    11039723 ns     11039655 ns           62 RowInvRate=110.397ns
+BM_SanitizeInvalidUtf8/1000/80/5        191622 ns       191608 ns         3651 RowInvRate=191.608ns
+BM_SanitizeInvalidUtf8/10000/80/5      1887242 ns      1887188 ns          369 RowInvRate=188.719ns
+BM_SanitizeInvalidUtf8/100000/80/5    20040292 ns     20040359 ns           35 RowInvRate=200.404ns
+BM_SanitizeInvalidUtf8/1000/20/10        78766 ns        78758 ns         8826 RowInvRate=78.7583ns
+BM_SanitizeInvalidUtf8/10000/20/10      768445 ns       768434 ns          909 RowInvRate=76.8434ns
+BM_SanitizeInvalidUtf8/100000/20/10    7599789 ns      7599494 ns           91 RowInvRate=75.9949ns
+BM_SanitizeInvalidUtf8/1000/40/10       130237 ns       130222 ns         5321 RowInvRate=130.222ns
+BM_SanitizeInvalidUtf8/10000/40/10     1286245 ns      1286158 ns          539 RowInvRate=128.616ns
+BM_SanitizeInvalidUtf8/100000/40/10   12756650 ns     12756567 ns           55 RowInvRate=127.566ns
+BM_SanitizeInvalidUtf8/1000/80/10       225041 ns       225019 ns         3104 RowInvRate=225.019ns
+BM_SanitizeInvalidUtf8/10000/80/10     2207885 ns      2207834 ns          315 RowInvRate=220.783ns
+BM_SanitizeInvalidUtf8/100000/80/10   22926173 ns     22924741 ns           30 RowInvRate=229.247ns
 */
 
 std::string gen_random_str(int min_length, int max_length, int invalid_percentage) {

@@ -1387,6 +1387,8 @@ TEST(CelonisStringFunctionsSanitizeStringTest, Simple) {
     input->append_datum("\xFF");
     input->append_datum("\xC1\xBF");  // 11000001 10111111 must be encoded as ASCII
     input->append_datum("This is \xC3\xE4 invalid");
+    input->append_datum("");
+    input->append_datum("\xFFHELLO\xFF");
 
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
     const auto result = CelonisStringFunctions::sanitize_invalid_utf8(ctx.get(), {input}).value();
@@ -1400,6 +1402,8 @@ TEST(CelonisStringFunctionsSanitizeStringTest, Simple) {
     EXPECT_EQ(v->get(2).get_slice(), "?");
     EXPECT_EQ(v->get(3).get_slice(), "??");
     EXPECT_EQ(v->get(4).get_slice(), "This is ? invalid");
+    EXPECT_EQ(v->get(5).get_slice(), "");
+    EXPECT_EQ(v->get(6).get_slice(), "?HELLO?");
 }
 
 TEST(CelonisStringFunctionsSanitizeStringTest, NullTerminated) {
