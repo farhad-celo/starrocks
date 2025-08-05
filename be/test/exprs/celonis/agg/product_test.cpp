@@ -154,13 +154,14 @@ TEST(CelonisProductStateMerge, product_state_merge_overflowed_with_uninitialized
 
 template <typename T>
 NullableColumn::Ptr create_serialization_column() {
-    auto stage_field_data_col{ProductAggregateState<T>::StageFieldcolumnType::create()};
-    auto product_field_data_col{ProductAggregateState<T>::ProductFieldColumnType::create()};
-    NullableColumn::Ptr stage_field_col{NullableColumn::create(std::move(stage_field_data_col), NullColumn::create())};
-    NullableColumn::Ptr product_field_col{
-            NullableColumn::create(std::move(product_field_data_col), NullColumn::create())};
-    StructColumn::Ptr struct_col{StructColumn::create(Columns{std::move(stage_field_col), std::move(product_field_col)},
-                                                      std::vector<std::string>{"Stage", "Product"})};
+    auto stage_field_data_col = ProductAggregateState<T>::StageFieldcolumnType::create();
+    auto product_field_data_col = ProductAggregateState<T>::ProductFieldColumnType::create();
+    auto stage_field_col = NullableColumn::create(std::move(stage_field_data_col), NullColumn::create());
+    auto product_field_col = NullableColumn::create(std::move(product_field_data_col), NullColumn::create());
+    Columns columns;
+    columns.push_back(std::move(stage_field_col));
+    columns.push_back(std::move(product_field_col));
+    auto struct_col = StructColumn::create(std::move(columns), std::vector<std::string>{"Stage", "Product"});
     return NullableColumn::create(std::move(struct_col), NullColumn::create());
 }
 
@@ -372,7 +373,7 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format) {
     using RawStageFieldType = typename ProductAggregateState<T>::StageFieldcolumnType::ValueType;
     auto input_column{create_nullable_column_from_data<T>({2, {}, 4, {}})};
     auto serialization_column{create_serialization_column<T>()};
-    ColumnPtr serialization_column_abstract{serialization_column};
+    ColumnPtr serialization_column_abstract = serialization_column;
 
     size_t chunk_size{4};
 
@@ -386,8 +387,8 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format) {
             ColumnHelper::get_data_column(serialized_struct_column->fields_column()[0].get()))};
     auto* serialized_product_column{down_cast<FixedLengthColumn<T>*>(
             ColumnHelper::get_data_column(serialized_struct_column->fields_column()[1].get()))};
-    std::vector<RawStageFieldType>& serialized_stage_data{serialized_stage_column->get_data()};
-    std::vector<T>& serialized_product_data{serialized_product_column->get_data()};
+    auto& serialized_stage_data = serialized_stage_column->get_data();
+    auto& serialized_product_data = serialized_product_column->get_data();
 
     ASSERT_EQ(serialization_column->size(), chunk_size);
     ASSERT_EQ(serialized_stage_data[0],
@@ -407,7 +408,7 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format_and_merg
     auto input_column{create_nullable_column_from_data<T>({2, {}, 4, {}})};
     auto result_column{NullableColumn::create(FixedLengthColumn<T>::create(), NullColumn::create())};
     auto serialization_column{create_serialization_column<T>()};
-    ColumnPtr serialization_column_abstract{serialization_column};
+    ColumnPtr serialization_column_abstract = serialization_column;
 
     size_t chunk_size{4};
 
@@ -430,3 +431,4 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format_and_merg
 }
 
 } // namespace starrocks
+
