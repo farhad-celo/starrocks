@@ -21,17 +21,22 @@ protected:
     CelonisAlignModelTest() :
             arg_types_{{AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
                         AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))}},
-            return_type_{
-                    .type = TYPE_STRUCT,
-                    .children = {
-                            TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_VARCHAR, TYPEDESC_ARRAY_VARCHAR, TYPEDESC_ARRAY_BIGINT,
-                            TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_VARCHAR
-                    },
-                    .field_names = {
-                            "alignment_model_vertex_id", "alignment_vertex_label", "alignment_move_type",
-                            "alignment_activity_index", "association_edge_class", "association_alignment_index",
-                            "edge_class_id", "edge_class_type"
-                    }} {}
+            return_type_(AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))) {
+        // Initialize the struct type descriptor properly
+        auto struct_desc = TypeDescriptor::from_logical_type(TYPE_STRUCT);
+        struct_desc.children = {
+                celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+                celonis::array_type(TYPE_BIGINT),
+                celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_BIGINT),
+                celonis::array_type(TYPE_VARCHAR)
+        };
+        struct_desc.field_names = {
+                "alignment_model_vertex_id", "alignment_vertex_label", "alignment_move_type",
+                "alignment_activity_index", "association_edge_class", "association_alignment_index",
+                "edge_class_id", "edge_class_type"
+        };
+        return_type_ = AnyValUtil::column_type_to_type_desc(struct_desc);
+    }
 
     void SetUp() override {}
 
@@ -41,7 +46,7 @@ private:
     typedef std::vector<std::string> Variant;
     typedef std::vector<Variant> VariantRows;
     typedef std::tuple<std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
-                       std::vector<int64_t>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>>
+            std::vector<int64_t>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>>
             Result;
     typedef std::map<Variant, Result> ResultMap;
 
@@ -76,7 +81,7 @@ private:
         }
 
     private:
-        template <int field, typename TYPE>
+        template<int field, typename TYPE>
         void compare_array(int row) {
             if (result_.fields()[field]->get(row).is_null()) {
                 EXPECT_TRUE(std::get<field>(expected_[row]).empty());
@@ -88,10 +93,12 @@ private:
             for (int i = 0; i < result_array.size(); i++) {
                 if constexpr (std::is_same_v<TYPE, std::string>) {
                     EXPECT_EQ(result_array[i].get_slice(), expected_array[i])
-                            << "row: " << row << ", field: " << return_type_.field_names[field] << ", element: " << i;
+                                        << "row: " << row << ", field: " << return_type_.field_names[field]
+                                        << ", element: " << i;
                 } else if constexpr (std::is_same_v<TYPE, int64_t>) {
                     EXPECT_EQ(result_array[i].get_int64(), expected_array[i])
-                            << "row: " << row << ", field: " << return_type_.field_names[field] << ", element: " << i;
+                                        << "row: " << row << ", field: " << return_type_.field_names[field]
+                                        << ", element: " << i;
                 } else {
                     static_assert("Invalid type");
                 }
@@ -148,7 +155,7 @@ private:
 
         const auto result = CelonisAlignModel::align_model(ctx.get(), columns).value();
         ASSERT_TRUE(result->is_struct());
-        StructColumn* st = down_cast<StructColumn*>(result.get());
+        const StructColumn* st = down_cast<const StructColumn*>(result.get());
         Evaluator evaluator(*st, expected, return_type_);
         evaluator.evaluate();
     }
@@ -232,15 +239,15 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RES
                         // alignment
                         {0, 1, 2, 4, 3, 5, 6},
                         {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                        {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                         "GATEWAY_MOVE"},
+                        {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
+                                "GATEWAY_MOVE"},
                         {0, 0, 0, 1, 0, 1, 1},
                         // association
                         {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
                         {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
                         // edge_class
                         {0, 1, 2, 3},
-                        {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "L1_MISSING"}
+                        {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"}
                 }
         },
         {
@@ -248,8 +255,8 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RES
                 {
                         {0, 1, 2, 3, 4, 5, 6},
                         {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
-                        {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
-                         "GATEWAY_MOVE"},
+                        {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE",
+                                "GATEWAY_MOVE"},
                         {0, 0, 0, 1, 2, 2, 2},
                         {0, 0, 0, 0, 0, 0, 1, 1, 1},
                         {0, 1, 2, 3, 5, 6, 2, 4, 5},
@@ -261,14 +268,14 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RES
                 {"C", "B", "B"},
                 {
                         {0, 1, 2, 4, 3, 3, 5, 6},
-                        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B", "BPMN_PARALLEL", "BPMN_END"},
-                        {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
-                         "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B",             "BPMN_PARALLEL", "BPMN_END"},
+                        {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE",  "LOG_MOVE",
+                                "GATEWAY_MOVE", "GATEWAY_MOVE"},
                         {0, 0, 0, 0, 1, 2, 1, 2},
                         {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5},
                         {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7, 0, 1, 3},
                         {0, 1, 2, 3, 4, 5},
-                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE", "L1_MISSING"}
+                        {"SYNC_EDGE", "SYNC_EDGE",  "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE", "L1_MISSING"}
                 }
         }
 };
@@ -347,12 +354,12 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::LOOP_MODEL_RESULTS
                 {
                         {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
                         {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
-                         "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                                "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
                         {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
-                         "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                                "GATEWAY_MOVE", "SYNC_MOVE",  "SYNC_MOVE",  "GATEWAY_MOVE", "GATEWAY_MOVE"},
                         {0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 4},
                         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+                        {0, 1, 2, 3, 4, 5, 6, 7, 8,  9,  10},
                         {0},
                         {"SYNC_EDGE"}
                 }
@@ -362,12 +369,12 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::LOOP_MODEL_RESULTS
                 {
                         {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
                         {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
-                         "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                                "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
                         {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
                                 "GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
                         {0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2},
                         {0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4},
-                        {0, 1, 2, 3, 4, 5, 6, 9, 10, 6, 7, 8, 9, 6, 9, 5, 7, 8, 10},
+                        {0, 1, 2, 3, 4, 5, 6, 9, 10, 6,  7, 8, 9, 6, 9, 5, 7, 8, 10},
                         {0, 1, 2, 3, 4},
                         {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "L1_MISSING"}
                 }
@@ -377,12 +384,12 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::LOOP_MODEL_RESULTS
                 {
                         {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
                         {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
-                         "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                                "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
                         {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE",
-                                    "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                                "GATEWAY_MOVE", "SYNC_MOVE",  "SYNC_MOVE",  "GATEWAY_MOVE", "GATEWAY_MOVE"},
                         {0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3},
                         {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
-                        {0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 4, 5, 6, 4, 6, 3, 5, 7},
+                        {0, 1, 2, 3, 4, 6, 7, 8, 9,  10, 4, 5, 6, 4, 6, 3, 5, 7},
                         {0, 1, 2, 3, 4},
                         {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "L1_MISSING"}
                 }
@@ -428,15 +435,15 @@ TEST_F(CelonisAlignModelTest, Parallel_DuplicatedVariants) {
 }
 
 TEST_F(CelonisAlignModelTest, Parallel_NULL) {
-    VariantRows variants = {{"A", "C"},
-                            {"A", "B", "C"},
+    VariantRows variants = {{"A",    "C"},
+                            {"A",    "B",    "C"},
                             {},
                             {"null", "null"},
-                            {"C", "null", "B", "B"},
-                            {"C", "B", "B"},
-                            {"A", "null", "null", "C"},
-                            {"null", "A", "null", "C", "null"},
-                            {"A", "null", "null", "C"},
+                            {"C",    "null", "B",    "B"},
+                            {"C",    "B",    "B"},
+                            {"A",    "null", "null", "C"},
+                            {"null", "A",    "null", "C", "null"},
+                            {"A",    "null", "null", "C"},
                             {}};
     std::vector<Result> expected = {
             PARALLEL_MODEL_RESULTS.at({"A", "C"}),
@@ -481,7 +488,7 @@ TEST_F(CelonisAlignModelTest, InvalidModel) {
     const auto result = CelonisAlignModel::align_model(ctx.get(), columns);
     ASSERT_FALSE(result.ok());
     EXPECT_TRUE(result.status().is_invalid_argument());
-    
+
     ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
     ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
 }
@@ -502,6 +509,7 @@ TEST_F(CelonisAlignModelTest, Concurrency) {
     struct Input {
         Input(const std::string& model, VariantRows variants, std::vector<Result> expected)
                 : model(model), variants(std::move(variants)), expected(std::move(expected)) {}
+
         const std::string& model;
         VariantRows variants;
         std::vector<Result> expected;
@@ -534,7 +542,7 @@ TEST_F(CelonisAlignModelTest, Concurrency) {
         int id = input_d(rd);
         threads.emplace_back([&](const Input& input) { Run(input.variants, input.model, input.expected); }, inputs[id]);
     }
-    for (auto& t : threads) {
+    for (auto& t: threads) {
         t.join();
     }
 }

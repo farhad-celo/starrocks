@@ -10,7 +10,7 @@
 #include "util.h"
 #include "util/defer_op.h"
 
-namespace starrocks::vectorized {
+namespace starrocks {
 
 const int64_t id_A = 958484639;
 const int64_t id_B = 601389851;
@@ -25,7 +25,7 @@ protected:
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
     TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
 
-    void evaluate(Column* result, Column* expected) {
+    void evaluate(const Column* result, const Column* expected) {
         ASSERT_EQ(result->size(), expected->size());
         for (int i = 0; i < result->size(); ++i) {
             if (result->get(i).is_null() || expected->get(i).is_null()) {
@@ -248,7 +248,7 @@ protected:
 
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
 
-    void evaluate(Column* result, Column* expected) {
+    void evaluate(const Column* result, const Column* expected) {
         ASSERT_EQ(result->size(), expected->size());
         for (int i = 0; i < result->size(); ++i) {
             if (result->get(i).is_null() || expected->get(i).is_null()) {
@@ -448,5 +448,4 @@ TEST_F(CelonisReadableConformanceTest, pql_conformance_input_handling) {
         EXPECT_OK(conform(input, expected.get()));
     }
 }
-} // namespace starrocks::vectorized
-
+} // namespace starrocks
