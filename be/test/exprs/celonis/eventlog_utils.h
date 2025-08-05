@@ -96,13 +96,13 @@ TimestampValue create_timestamp(int day, int hour);
  * datum in the datum array is again expected to be a DatumArray. */
 template <typename T>
 ColumnPtr set_up_eventlog_column(DatumArray data) {
-    NullColumn::Ptr inner_null_flags{NullColumn::create()};
-    typename FixedLengthColumn<T>::Ptr elements{FixedLengthColumn<T>::create()};
-    UInt32Column::Ptr offsets{UInt32Column::create()};
-    NullColumn::Ptr outer_null_flags{NullColumn::create()};
-    ColumnPtr nullable_elements{NullableColumn::create(std::move(elements), std::move(inner_null_flags))};
-    ColumnPtr array_column{ArrayColumn::create(std::move(nullable_elements), std::move(offsets))};
-    ColumnPtr nullable_arrays{NullableColumn::create(std::move(array_column), std::move(outer_null_flags))};
+    auto inner_null_flags = NullColumn::create();
+    auto elements = FixedLengthColumn<T>::create();
+    auto offsets = UInt32Column::create();
+    auto outer_null_flags = NullColumn::create();
+    auto nullable_elements = NullableColumn::create(std::move(elements), std::move(inner_null_flags));
+    auto array_column = ArrayColumn::create(std::move(nullable_elements), std::move(offsets));
+    auto nullable_arrays = NullableColumn::create(std::move(array_column), std::move(outer_null_flags));
 
     std::for_each(data.begin(), data.end(),
                   [&nullable_arrays](const Datum& datum) { nullable_arrays->append_datum(datum); });
