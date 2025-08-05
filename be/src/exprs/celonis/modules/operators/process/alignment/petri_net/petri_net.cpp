@@ -5,8 +5,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "ctl/algorithm.h"
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/algorithm.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "log/log.h"
 #include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
 
@@ -216,7 +216,7 @@ void petri_net_accessor::fire_no_alloc(marking_type& marking, petri_net_transiti
   const auto& pn_transition{pn_data_.pn_transitions[transition.id]};
 
   for (const auto& in_place : pn_transition.in_places) {
-    debug_assert(marking.test(in_place.id));
+    legacy_embedded_debug_assert(marking.test(in_place.id));
     marking.reset(in_place.id);
   }
 
@@ -240,12 +240,12 @@ void petri_net_accessor::fire_inverse_no_alloc(marking_type& marking, petri_net_
   const auto& pn_transition{pn_data_.pn_transitions[transition.id]};
 
   for (const auto& out_place : pn_transition.out_places) {
-    debug_assert(marking.test(out_place.id));
+    legacy_embedded_debug_assert(marking.test(out_place.id));
     marking.reset(out_place.id);
   }
 
   for (const auto& in_place : pn_transition.in_places) {
-    debug_assert(!marking.test(in_place.id));
+    legacy_embedded_debug_assert(!marking.test(in_place.id));
     marking.set(in_place.id);
   }
 }
@@ -321,7 +321,7 @@ std::vector<petri_net_transition_id> petri_net_accessor::consecutive_transitions
 const std::vector<marking_type>& petri_net_accessor::get_final_markings() const { return pn_data_.final_markings; }
 
 bool petri_net_accessor::is_final_marking(const marking_type& marking) const {
-  return ctl::contains(pn_data_.final_markings, marking);
+  return legacy_embedded_ctl::contains(pn_data_.final_markings, marking);
 }
 
 petri_net_accessor::transition_list_type petri_net_accessor::get_transitions_for_label(row_id label) const {
@@ -394,14 +394,14 @@ void safe_petri_net_data::add_places(input_output_mapper& io_mapper, const petri
   for (const auto& start_place_str_id : pn_repr.initial_marking) {
     const auto place{io_mapper.add_place_for_str_id(start_place_str_id)};
     // Only false if start_place_str_id not in pn_repr.places, which means the network is ill formed
-    debug_assert(place.id < pn_places.size());
+    legacy_embedded_debug_assert(place.id < pn_places.size());
     initial_marking.set(place.id);
   }
 
   for (const auto& final_place_str_id : pn_repr.final_marking) {
     const auto place{io_mapper.add_place_for_str_id(final_place_str_id)};
     // Only false if final_place_str_id not in pn_repr.places, which means the network is ill formed
-    debug_assert(place.id < pn_places.size());
+    legacy_embedded_debug_assert(place.id < pn_places.size());
     marking_type final_marking{pn_places.size()};
     final_marking.set(place.id);
     final_markings.emplace_back(final_marking);

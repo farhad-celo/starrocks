@@ -1,6 +1,6 @@
 #include "top_constraints.h"
 
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/conversion.h"
 
 namespace celonis::accelerator::operators::process::alignment::rl_align::rl_statistics {
 
@@ -30,7 +30,7 @@ constraints_config_set top_constraints::get_top(size_t n) const {
   if (n >= constraints.size()) {
     return {constraints};
   }
-  const auto sorted_end{std::next(begin(constraints), ctl::cast<decltype(constraints)::difference_type>(n))};
+  const auto sorted_end{std::next(begin(constraints), legacy_embedded_ctl::cast<decltype(constraints)::difference_type>(n))};
   std::partial_sort(begin(constraints), sorted_end, end(constraints),
                     [this](const auto& lhs, const auto& rhs) { return statistics_.at(lhs) > statistics_.at(rhs); });
   constraints.erase(sorted_end, end(constraints));

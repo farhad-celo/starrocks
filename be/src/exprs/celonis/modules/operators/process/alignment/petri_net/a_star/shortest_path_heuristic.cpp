@@ -99,7 +99,7 @@ heuristic_to_markings::cost_type heuristic_to_markings::get_weight(transition_ty
 
 std::optional<heuristic_to_markings::cost_type> heuristic_to_markings::estimate(
     const petri_net::marking_type& marking) const {
-  if (ctl::contains(target_markings_, marking)) {
+  if (legacy_embedded_ctl::contains(target_markings_, marking)) {
     return {0};
   }
   return transitions_estimate(begin(target_transitions_), end(target_transitions_), marking, metric_, petri_net_);

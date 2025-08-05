@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 
 namespace celonis::accelerator {
 class MemoryThreshold;  // forward declare for MemoryThreshold in operators.pb.h
@@ -21,7 +21,7 @@ class memory_threshold final {
     }
   }
   constexpr void set(double lower, double higher) noexcept {
-    debug_assert(is_valid(lower, higher));
+    legacy_embedded_debug_assert(is_valid(lower, higher));
     set_lower(lower);
     set_higher(higher);
   }
@@ -29,11 +29,11 @@ class memory_threshold final {
   void set(const MemoryThreshold& protobuf_memory_threshold);
   #endif
   constexpr void set_lower(double lower) noexcept {
-    debug_assert(is_valid(lower, higher_threshold));
+    legacy_embedded_debug_assert(is_valid(lower, higher_threshold));
     lower_threshold = lower;
   }
   constexpr void set_higher(double higher) noexcept {
-    debug_assert(is_valid(lower_threshold, higher));
+    legacy_embedded_debug_assert(is_valid(lower_threshold, higher));
     higher_threshold = higher;
   }
 

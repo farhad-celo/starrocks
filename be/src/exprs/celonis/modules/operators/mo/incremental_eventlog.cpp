@@ -8,7 +8,7 @@
 
 #include <tbb/enumerable_thread_specific.h>
 
-#include "ctl/bits/half_open_interval.h"
+#include "legacy_embedded_ctl/bits/half_open_interval.h"
 #include "modules/common/for_each_group.h"
 #include "modules/common/iterator/index_input_iterator.h"
 #include "modules/memory/management/memory_checked_containers.h"
@@ -131,12 +131,12 @@ struct distance_sort_key {
                     typename memory::column_ptrs_impl<COLUMN_PTR_TYPE>::const_data_accessor_t activities)
       : filter_{filter},
         activities_{activities},
-        buffer_{ctl::make_static_array_for_overwrite<COLUMN_PTR_TYPE>(
+        buffer_{legacy_embedded_ctl::make_static_array_for_overwrite<COLUMN_PTR_TYPE>(
             std::accumulate(begin(covering), end(covering), size_t{0},
                             [get_size = process::variant_view_size{filter}](auto acc, const auto& view) {
                               return acc + get_size(view);
                             }),
-            ALLOC_MSG(ctl::MEMBER_INIT_MSG))},
+            LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))},
         reference_points_(covering.size()) {
     std::transform(begin(covering), end(covering), begin(reference_points_),
                    [it = begin(buffer_), &filter, &activities](auto view) mutable {
@@ -169,7 +169,7 @@ struct distance_sort_key {
  private:
   const cube::filter_bitset_t& filter_;
   typename memory::column_ptrs_impl<COLUMN_PTR_TYPE>::const_data_accessor_t activities_;
-  ctl::static_array<COLUMN_PTR_TYPE> buffer_;
+  legacy_embedded_ctl::static_array<COLUMN_PTR_TYPE> buffer_;
   std::vector<std::span<COLUMN_PTR_TYPE>> reference_points_{};
 
   [[nodiscard]] auto count_differences(std::span<COLUMN_PTR_TYPE> ref,
@@ -188,7 +188,7 @@ struct event_subset {
   static auto create_factory(const cube::filter_bitset_t& filter,
                              typename memory::column_ptrs_impl<COLUMN_PTR_TYPE>::const_data_accessor_t activities) {
     const auto size{filter.size() - filter.count()};
-    auto buffer{ctl::make_static_array_for_overwrite<COLUMN_PTR_TYPE>(size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+    auto buffer{legacy_embedded_ctl::make_static_array_for_overwrite<COLUMN_PTR_TYPE>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
     auto* it{buffer.begin()};
     return [&filter, activities, buffer = std::move(buffer), it](process::variant_view v) mutable {
       auto* const old_it{it};
@@ -286,8 +286,8 @@ constexpr auto end(const event_subset<P>& e) {
 
 struct exec_compute_counter {
   struct ranking_result {
-    ctl::shared_static_array<row_id> ranking;
-    ctl::shared_static_array<row_id> accumulated_counts;
+    legacy_embedded_ctl::shared_static_array<row_id> ranking;
+    legacy_embedded_ctl::shared_static_array<row_id> accumulated_counts;
     size_t cover_size{};
   };
 
@@ -310,7 +310,7 @@ struct exec_compute_counter {
     // we ignore empty traces (analogously to the inductive miner), so remove the empty trace from the counter
     counter.erase(process::variant_view{});
     if (counter.empty()) {
-      return {ctl::shared_static_array<row_id>{}, ctl::shared_static_array<row_id>()};
+      return {legacy_embedded_ctl::shared_static_array<row_id>{}, legacy_embedded_ctl::shared_static_array<row_id>()};
     }
 
     // now that we have all traces and counts, we compute the weighted set cover
@@ -319,7 +319,7 @@ struct exec_compute_counter {
     using set_cover_data = std::tuple<process::variant_view, row_id, event_subset<column_pointer_type>>;
     memory::management::checked_vector_t<set_cover_data> boas{
         counter.size(),
-        memory::management::checked_allocator<decltype(boas)>(context, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+        memory::management::checked_allocator<decltype(boas)>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
 
     std::vector<column_pointer_type> activity_set(begin(activities), end(activities));
     std::sort(begin(activity_set), end(activity_set));
@@ -358,8 +358,8 @@ struct exec_compute_counter {
     const auto sort_vector{get_sort_vector(activity_accessor, covering, counter)};
 
     ranking_result result{
-        ctl::make_shared_static_array_for_overwrite<row_id>(case_domain_count, ALLOC_MSG(ctl::RETURN_VALUE_MSG)),
-        ctl::make_shared_static_array_for_overwrite<row_id>(counter.size(), ALLOC_MSG(ctl::RETURN_VALUE_MSG)),
+        legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(case_domain_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG)),
+        legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(counter.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG)),
         covering.size()};
     std::transform(begin(sort_vector), end(sort_vector), begin(result.accumulated_counts),
                    [&counter](const auto& p) { return counter[p]; });
@@ -368,7 +368,7 @@ struct exec_compute_counter {
     // we can re-use the counter for the ranking map
     auto ranking_map = std::move(counter);
     ranking_map.insert_or_assign({}, std::numeric_limits<row_id>::max());
-    for (row_id i{0}, num_variants{ctl::cast<row_id>(sort_vector.size())}; i != num_variants; ++i) {
+    for (row_id i{0}, num_variants{legacy_embedded_ctl::cast<row_id>(sort_vector.size())}; i != num_variants; ++i) {
       ranking_map[sort_vector[i]] = i;
     }
     common::for_each_group<size_t>(case_accessor, grain_size, [&ranking_map, &result, &case_accessor](auto group) {
@@ -450,8 +450,8 @@ counter_ranking_of(const COUNTER&, const RANKING&, const CMP&) -> counter_rankin
 
 struct exec_compute_ranking {
   struct ranking_result {
-    ctl::shared_static_array<row_id> ranking;
-    ctl::shared_static_array<row_id> accumulated_counts;
+    legacy_embedded_ctl::shared_static_array<row_id> ranking;
+    legacy_embedded_ctl::shared_static_array<row_id> accumulated_counts;
   };
 
   row_id case_domain_count;
@@ -469,11 +469,11 @@ struct exec_compute_ranking {
     // we ignore empty traces (analogously to the inductive miner), so remove the empty trace from the counter
     counter.erase(process::variant_view{});
     if (counter.empty()) {
-      return {ctl::shared_static_array<row_id>{}, ctl::shared_static_array<row_id>()};
+      return {legacy_embedded_ctl::shared_static_array<row_id>{}, legacy_embedded_ctl::shared_static_array<row_id>()};
     }
     // create ranking of variants
-    auto variant_ranking{ctl::make_static_array_for_overwrite<std::pair<process::variant_view, row_id>>(
-        counter.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+    auto variant_ranking{legacy_embedded_ctl::make_static_array_for_overwrite<std::pair<process::variant_view, row_id>>(
+        counter.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
     std::copy(begin(counter), end(counter), begin(variant_ranking));
     const auto count_greater{[&](const auto& lhs, const auto& rhs) {
       return lhs.second > rhs.second || (lhs.second == rhs.second && less(lhs.first, rhs.first));
@@ -482,12 +482,12 @@ struct exec_compute_ranking {
     const counter_ranking_of ranking_of{counter, variant_ranking, count_greater};
     // create ranking of cases
     auto ranking{
-        ctl::make_shared_static_array_for_overwrite<row_id>(case_domain_count, ALLOC_MSG(ctl::MEMBER_INIT_MSG))};
+        legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(case_domain_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))};
     common::for_each_group<size_t>(case_accessor, grain_size,
                                    [&](auto group) { ranking[case_accessor[group.begin()]] = ranking_of(group); });
     // create the accumulated counts
     auto accumulated_variant_counts{
-        ctl::make_shared_static_array_for_overwrite<row_id>(variant_ranking.size(), ALLOC_MSG(ctl::MEMBER_INIT_MSG))};
+        legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(variant_ranking.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))};
     std::transform(begin(variant_ranking), end(variant_ranking), begin(accumulated_variant_counts),
                    [](const auto& p) { return p.second; });
     std::partial_sum(begin(accumulated_variant_counts), end(accumulated_variant_counts),
@@ -559,19 +559,19 @@ std::pair<incremental_eventlog, size_t> incremental_eventlog::activity_cover(con
 
 row_id incremental_eventlog::retain_percentage_of_objects(double ratio) const {
   if (ratio <= 0) {
-    return ctl::cast<row_id>(1);
+    return legacy_embedded_ctl::cast<row_id>(1);
   }
   if (ratio >= 1) {
-    return ctl::cast<row_id>(variant_count());
+    return legacy_embedded_ctl::cast<row_id>(variant_count());
   }
 
   const auto target_count = static_cast<double>(object_count()) * ratio;
   // lower_bound always returns a value within the range because target count is < 1 because of the initial check
   // This is why the +1 is safe and we do not have to handle lower bound returning the past-the-end iterator
-  const auto num_retained_variants{ctl::cast<row_id>(std::distance(
+  const auto num_retained_variants{legacy_embedded_ctl::cast<row_id>(std::distance(
       begin(accumulated_variant_counts_), std::ranges::lower_bound(accumulated_variant_counts_, target_count) + 1))};
 
-  return std::max(ctl::cast<row_id>(1), num_retained_variants);
+  return std::max(legacy_embedded_ctl::cast<row_id>(1), num_retained_variants);
 }
 
 }  // namespace celonis::accelerator::operators::mo

@@ -4,7 +4,7 @@
 
 namespace celonis::accelerator::common {
 
-output_string_buffer::output_string_buffer(ctl::default_tracking_allocator_t<char> allocator, strategy_t strategy)
+output_string_buffer::output_string_buffer(legacy_embedded_ctl::default_tracking_allocator_t<char> allocator, strategy_t strategy)
     : buffer_{char_buffer{std::move(allocator)}}, strategy_{strategy} {}
 
 std::pair<output_string_buffer::size_type, char*> output_string_buffer::copy_to_buffer(std::string_view str) {
@@ -66,8 +66,8 @@ char* output_string_buffer::store(std::string_view str) {
   throw common::internal_exception{"Unknown output string buffer strategy"};
 }
 
-void output_string_buffer::copy_to_given_continuous_buffer(ctl::array_view<char> target_char_buffer,
-                                                           ctl::array_view<cel_string_t> result_buffer) {
+void output_string_buffer::copy_to_given_continuous_buffer(legacy_embedded_ctl::array_view<char> target_char_buffer,
+                                                           legacy_embedded_ctl::array_view<cel_string_t> result_buffer) {
   common::runtime_assert(strategy_ == strategy_t::BEST_EFFORT_DICTIONARY, "Runtime Assertion failed");
   // reallocate_temporary buffer to correct location in result buffer
   buffer_.copy_to_given_continuous_buffer_and_reset(target_char_buffer);

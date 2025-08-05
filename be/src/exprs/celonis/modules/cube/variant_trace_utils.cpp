@@ -14,11 +14,11 @@ namespace {
 // Since the trace lengths are stored in an extra raw data handler, it's impossible to have a template
 // specialization for pointer_data_handler<trace_type> to sort by itself. Thus, we sort the trace pointer
 // data handlers explicitly here.
-[[nodiscard]] ctl::static_array<trace_buffer_type> sort_trace_buffer(
-    ctl::static_array<trace_type>& traces, const ctl::static_array<trace_length_type>& trace_lengths,
+[[nodiscard]] legacy_embedded_ctl::static_array<trace_buffer_type> sort_trace_buffer(
+    legacy_embedded_ctl::static_array<trace_type>& traces, const legacy_embedded_ctl::static_array<trace_length_type>& trace_lengths,
     const size_t trace_buffer_size) {
-  auto sorted_trace_buffer{ctl::make_static_array_for_overwrite<trace_buffer_type>(
-      trace_buffer_size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+  auto sorted_trace_buffer{legacy_embedded_ctl::make_static_array_for_overwrite<trace_buffer_type>(
+      trace_buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
 
   auto* buffer_ptr{sorted_trace_buffer.data()};
   for (size_t i{0}; i < traces.size(); ++i) {

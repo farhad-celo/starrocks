@@ -3,8 +3,8 @@
 #include <thread>
 #include <type_traits>
 
-#include "ctl/mutex.h"
-#include "ctl/static_array_fwd.h"
+#include "legacy_embedded_ctl/mutex.h"
+#include "legacy_embedded_ctl/static_array_fwd.h"
 #include "modules/common/execution_context_fwd.h"
 #ifndef CELOSTAR
 #include "modules/io/compressed_data.h"
@@ -21,7 +21,7 @@ enum class pointer_data_handler_swap_type { NO_SWAP, SWAPPED_DICTIONARY, SWAPPED
 
 template <typename T>
 struct loaded_data {
-  ctl::shared_static_array<T> data;
+  legacy_embedded_ctl::shared_static_array<T> data;
 };
 
 struct swapped_data {};
@@ -44,19 +44,19 @@ class pointer_data_handler final : public data_handler {
 
  public:
   [[nodiscard]] static std::shared_ptr<pointer_data_handler<T>> create_data_handler(
-      const ctl::shared_static_array<POINTER_T>& ptr, const ctl::shared_static_array<STORAGE_T>& buffer,
+      const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr, const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer,
       const std::string& swap_file, pointer_data_handler_swap_type type, swap_info sinfo,
       const std::string& description);
 
   [[nodiscard]] static std::shared_ptr<pointer_data_handler<T>> create_data_handler(
-      ctl::static_array<POINTER_T>&& ptr, ctl::static_array<STORAGE_T>&& buffer, const std::string& swap_file,
+      legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& buffer, const std::string& swap_file,
       pointer_data_handler_swap_type type, swap_info sinfo, const std::string& description);
 
   [[nodiscard]] static std::shared_ptr<pointer_data_handler> create_temp_data_handler(
-      const ctl::shared_static_array<POINTER_T>& ptr, const ctl::shared_static_array<STORAGE_T>& str_buffer);
+      const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr, const legacy_embedded_ctl::shared_static_array<STORAGE_T>& str_buffer);
 
   [[nodiscard]] static std::shared_ptr<pointer_data_handler> create_temp_data_handler(
-      ctl::static_array<POINTER_T>&& ptr, ctl::static_array<STORAGE_T>&& str_buffer);
+      legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& str_buffer);
 
 #ifndef CELOSTAR
   [[nodiscard]] static std::shared_ptr<pointer_data_handler<T>> init_from_swap(const std::string& swap_file,
@@ -120,8 +120,8 @@ class pointer_data_handler final : public data_handler {
     data_handler_data<STORAGE_T> buffer;
   };
 
-  pointer_data_handler(const ctl::shared_static_array<POINTER_T>& ptr_data,
-                       const ctl::shared_static_array<STORAGE_T>& buffer_data, swap_info sinfo,
+  pointer_data_handler(const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr_data,
+                       const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer_data, swap_info sinfo,
                        const std::string& base_swap_file, pointer_data_handler_swap_type type, std::string description);
 
 #ifndef CELOSTAR
@@ -185,7 +185,7 @@ class pointer_data_handler final : public data_handler {
   std::atomic<size_t> pointer_size_{0};
   std::atomic<size_t> buffer_size_{0};
 
-  ctl::owning_mutex<data_wrapper> data_;
+  legacy_embedded_ctl::owning_mutex<data_wrapper> data_;
 
   std::atomic<size_t> usage_count_{0};
   std::atomic<mem_time_t> last_usage_{};

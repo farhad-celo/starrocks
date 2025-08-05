@@ -6,7 +6,7 @@
 #include <tuple>
 #include <vector>
 
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/conversion.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
@@ -74,7 +74,7 @@ void trace_alignment::prune_simple() {
     ++write_out_it;
     ++curr_move_it;
   }
-  debug_assert(write_out_it <= std::end(data_));
+  legacy_embedded_debug_assert(write_out_it <= std::end(data_));
   data_.erase(write_out_it, std::end(data_));
 }
 
@@ -84,7 +84,7 @@ void trace_alignment::prune_lcs(size_t chunk_size, const common::execution_conte
   }
 
   constexpr auto is_move_on_model{[](const alignment_move& move) { return !(move.is_log() || move.is_unmapped()); }};
-  if (std::ranges::count_if(data_, is_move_on_model) <= ctl::cast<int64_t>(chunk_size)) {
+  if (std::ranges::count_if(data_, is_move_on_model) <= legacy_embedded_ctl::cast<int64_t>(chunk_size)) {
     // If the run on the model is smaller than chunk_size, then we set chunk size to the size of the trace
     // This way we still ensure that the total runtime <= chunk_size * size_of_trace but we get better alignments
     chunk_size = data_.size();
@@ -121,24 +121,24 @@ void trace_alignment::prune_lcs(size_t chunk_size, const common::execution_conte
           [[fallthrough]];
         default:
           // Both should not happen
-          ctl::assert_unreachable();
+          legacy_embedded_ctl::assert_unreachable();
       }
     }
 
-    const int32_t max_iterations{ctl::cast<int32_t>(chunk_size * chunk_size)};
+    const int32_t max_iterations{legacy_embedded_ctl::cast<int32_t>(chunk_size * chunk_size)};
     const auto lcs_alignment{
         sequence_aligner::align_sequence_to_run(trace_chunk, model_run_chunk, max_iterations, context)};
     // If it didn't time out, then it has a smaller or equal cost than the sub-span and we use that,
     //  else we assign the sub-span. Notice that we assign a high-enough MAX_ITERATIONS so that it should always succeed
     const auto span_to_copy{lcs_alignment ? alignment_span_type{lcs_alignment.value().data()} : chunk_subspan};
-    debug_assert(span_to_copy.size() <= chunk_size);
+    legacy_embedded_debug_assert(span_to_copy.size() <= chunk_size);
     if (span_to_copy.data() != std::to_address(output_it)) {
       std::ranges::copy(span_to_copy, output_it);
     }
-    output_it += ctl::cast<int64_t>(span_to_copy.size());
+    output_it += legacy_embedded_ctl::cast<int64_t>(span_to_copy.size());
   }
 
-  debug_assert(output_it <= std::end(data_));
+  legacy_embedded_debug_assert(output_it <= std::end(data_));
   data_.erase(output_it, std::end(data_));
   cost_ = compute_cost(*this);
   visible_model_moves_count_ = count_model_moves(*this);

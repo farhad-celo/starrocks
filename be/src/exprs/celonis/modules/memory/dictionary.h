@@ -5,8 +5,8 @@
 #include <string>
 #include <type_traits>
 
-#include "ctl/assert.h"
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/shared_types.h"
 #include "modules/memory/dictionary_fwd.h"
@@ -132,12 +132,12 @@ class dictionary_map {
 
   // getters
   [[nodiscard]] bool is_mapped(row_id source_idx) const noexcept {
-    debug_assert(source_idx < source_size());
+    legacy_embedded_debug_assert(source_idx < source_size());
     return (lookup_[source_idx] != VALUE_NOT_FOUND);
   }
 
   [[nodiscard]] row_id get_mapping(row_id source_idx) const noexcept {
-    debug_assert(source_idx < source_size());
+    legacy_embedded_debug_assert(source_idx < source_size());
     return lookup_[source_idx];
   }
 
@@ -146,13 +146,13 @@ class dictionary_map {
   [[nodiscard]] row_id target_size() const noexcept { return target_size_; }
 
  private:
-  explicit dictionary_map(ctl::static_array<row_id>&& lookup, row_id target_size)
+  explicit dictionary_map(legacy_embedded_ctl::static_array<row_id>&& lookup, row_id target_size)
       : lookup_{std::move(lookup)}, target_size_{target_size} {
-    debug_assert(!lookup_.empty());
-    debug_assert(lookup_[0] == 0);
+    legacy_embedded_debug_assert(!lookup_.empty());
+    legacy_embedded_debug_assert(lookup_[0] == 0);
   }
 
-  ctl::static_array<row_id> lookup_;
+  legacy_embedded_ctl::static_array<row_id> lookup_;
   row_id target_size_;
 };
 

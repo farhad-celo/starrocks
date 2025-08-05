@@ -4,7 +4,7 @@
 #include <scoped_allocator>
 #include <vector>
 
-#include "ctl/memory/resource_owning_allocator.h"
+#include "legacy_embedded_ctl/memory/resource_owning_allocator.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
 #include "modules/operators/process/alignment/input_output_mapper.h"
@@ -97,14 +97,14 @@ class trace_alignment {
   }
 
  private:
-  std::vector<alignment_move, ctl::resource_owning_allocator<alignment_move>> data_{};
+  std::vector<alignment_move, legacy_embedded_ctl::resource_owning_allocator<alignment_move>> data_{};
   uint64_t cost_{0};
   uint64_t visible_model_moves_count_{0};
 };
 
 using trace_alignment_t = std::optional<trace_alignment>;
 
-using trace_alignment_allocator_type = std::scoped_allocator_adaptor<ctl::resource_owning_allocator<trace_alignment_t>>;
+using trace_alignment_allocator_type = std::scoped_allocator_adaptor<legacy_embedded_ctl::resource_owning_allocator<trace_alignment_t>>;
 using vector_of_alignments = std::vector<trace_alignment_t, trace_alignment_allocator_type>;
 
 }  // namespace celonis::accelerator::operators::process::alignment

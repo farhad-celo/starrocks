@@ -1,6 +1,6 @@
 #include "table_to_user_visible_name_mapping.h"
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/common/exceptions.h"
 #include "modules/memory/table.h"
 

@@ -6,8 +6,8 @@
 #include <variant>
 #include <vector>
 
-#include "ctl/assert.h"
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/conversion.h"
 #include "modules/memory/column.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/operators/process/bpmn/a_star/replay.h"
@@ -45,8 +45,8 @@ using replay_result_conforms = replay_result_source_target;  // Currently confor
                                                                 const bpmn_graph& model) {
   // todo(h.ashraf): what do we do when we have empty input models ( START -> END ) and an empty trace? the transitions
   //  would be empty in this case.
-  debug_assert(!linearized_transitions.empty(), "MO_BPMN_SOURCE/TARGET: Replayer performed no transitions");
-  debug_assert(!input_trace.empty(),
+  legacy_embedded_debug_assert(!linearized_transitions.empty(), "MO_BPMN_SOURCE/TARGET: Replayer performed no transitions");
+  legacy_embedded_debug_assert(!input_trace.empty(),
                "MO_BPMN_SOURCE/TARGET: Encountered empty trace while trying to replay eventlog on BPMN model.");
 
   std::vector<vertex_id_type> source_vertices{};
@@ -68,7 +68,7 @@ using replay_result_conforms = replay_result_source_target;  // Currently confor
   current_source_kpi.emplace(model.single_start_vertex(), *input_trace_iter);
 
   const auto calculate_target_kpi = [&](vertex_id_type source_id, vertex_id_type target_id) -> row_id {
-    return std::visit(ctl::overloaded(
+    return std::visit(legacy_embedded_ctl::overloaded(
                           [&](const bpmn::exclusive_choice& /**/) {
                             current_source_kpi[target_id] = current_source_kpi.at(source_id);
                             return current_source_kpi.at(target_id);
@@ -76,7 +76,7 @@ using replay_result_conforms = replay_result_source_target;  // Currently confor
                           [&](const bpmn::task& /**/) {
                             const auto current_kpi_value{*input_trace_iter};
                             current_source_kpi[target_id] = current_kpi_value;
-                            debug_assert(
+                            legacy_embedded_debug_assert(
                                 input_trace_iter != input_trace.end(),
                                 "Replayer generated more virtual KPI values than available in the input trace");
                             input_trace_iter++;
@@ -93,7 +93,7 @@ using replay_result_conforms = replay_result_source_target;  // Currently confor
                           },
                           [](const vertex_type& /**/) {
                             // There should be no transitions on start / end nodes
-                            ctl::assert_unreachable();
+                            legacy_embedded_ctl::assert_unreachable();
                             return row_id{0};
                           }),
                       model.get_vertex(target_id).get_vertex_type());
@@ -119,7 +119,7 @@ using replay_result_conforms = replay_result_source_target;  // Currently confor
   source_col_ptrs.push_back(target_col_ptrs.back());
   target_col_ptrs.push_back(target_col_ptrs.back());  // end node gets values of last task node
 
-  debug_assert(source_vertices.size() == target_vertices.size() && target_vertices.size() == source_col_ptrs.size() &&
+  legacy_embedded_debug_assert(source_vertices.size() == target_vertices.size() && target_vertices.size() == source_col_ptrs.size() &&
                source_col_ptrs.size() == target_col_ptrs.size());
 
   std::vector<row_id> join_index(source_vertices.size(), case_table_row_index);
@@ -168,7 +168,7 @@ using replay_result_conforms = replay_result_source_target;  // Currently confor
                                                                       const activity_trace_t& trace_activity,
                                                                       const trace_t& trace_input, row_id case_row_index,
                                                                       const common::execution_context& context) {
-  debug_assert(trace_activity.size() == trace_input.size());
+  legacy_embedded_debug_assert(trace_activity.size() == trace_input.size());
 
   const auto& [model, replay_caches]{model_and_caches};
 
@@ -300,7 +300,7 @@ class exec_replay_for_conformance final : public exec_replay {
   exec_replay_for_conformance(const model_and_caches_pair& model_and_caches, const row_id row_count,
                               const row_id case_count, const common::execution_context& context) noexcept
       : exec_replay{model_and_caches, row_count},
-        conforming_rows_{ctl::cast_unsigned(case_count)},
+        conforming_rows_{legacy_embedded_ctl::cast_unsigned(case_count)},
         context_{context} {};
 
   void handle_previous_trace(row_id case_table_row_index) {
@@ -310,7 +310,7 @@ class exec_replay_for_conformance final : public exec_replay {
   }
 
   template <class TUPLE>
-  [[nodiscard]] ctl::dynamic_bitset_t operator()(const TUPLE& t) {
+  [[nodiscard]] legacy_embedded_ctl::dynamic_bitset_t operator()(const TUPLE& t) {
     const auto activity_ptrs_ac{std::get<0>(t).get_const_accessor()};
     const auto case_ptrs_ac{std::get<1>(t).get_const_accessor()};
 
@@ -341,7 +341,7 @@ class exec_replay_for_conformance final : public exec_replay {
   }
 
  private:
-  ctl::dynamic_bitset_t conforming_rows_;
+  legacy_embedded_ctl::dynamic_bitset_t conforming_rows_;
   const common::execution_context& context_;
 };
 
@@ -357,7 +357,7 @@ replay_result_source_target replay_eventlog_for_source_target(
   auto context{parent_context.create_sub_context(
       "replay_eventlog_source_target",
       {{"model", to_string(model)}, {"eventlog_row_count", case_id_column->get_row_count(parent_context)}})};
-  debug_assert(input_column->get_row_count(context) == activity_column->get_row_count(context));
+  legacy_embedded_debug_assert(input_column->get_row_count(context) == activity_column->get_row_count(context));
 
   details::replay_caches replay_caches{context};
   const model_and_caches_pair model_and_caches{model, replay_caches};
@@ -368,7 +368,7 @@ replay_result_source_target replay_eventlog_for_source_target(
       input_column->get_column_pointers(context), activity_case_join_index);
 }
 
-ctl::dynamic_bitset_t replay_eventlog_for_conformance(const bpmn_graph& model, const memory::column_t& activity_column,
+legacy_embedded_ctl::dynamic_bitset_t replay_eventlog_for_conformance(const bpmn_graph& model, const memory::column_t& activity_column,
                                                       const memory::column_t& case_id_column,
                                                       common::execution_context& parent_context) {
   if (!model.is_single_object()) {

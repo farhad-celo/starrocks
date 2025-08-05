@@ -119,7 +119,7 @@ struct alignment_move_type_strings {
     case alignment_move_type::SYNC_MOVE:
       return alignment_move_type_strings::SYNC;
     default:
-      ctl::assert_unreachable();
+      legacy_embedded_ctl::assert_unreachable();
   }
 }
 
@@ -147,7 +147,7 @@ struct edge_type_strings {
     case edge_type::L1_MISSING:
       return edge_type_strings::L1_MISSING;
     default:
-      ctl::assert_unreachable();
+      legacy_embedded_ctl::assert_unreachable();
   }
 }
 
@@ -198,7 +198,7 @@ class parallel_vertex_pairs {
 
  private:
   struct hash {
-    size_t operator()(const std::array<bpmn::vertex_id_type, 2>& v) const { return ctl::hash_range(v); }
+    size_t operator()(const std::array<bpmn::vertex_id_type, 2>& v) const { return legacy_embedded_ctl::hash_range(v); }
   };
   std::unordered_set<std::array<bpmn::vertex_id_type, 2>, hash, std::ranges::equal_to, ALLOCATOR> data_{};
 };

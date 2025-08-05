@@ -5,8 +5,8 @@
 #include <utility>
 #include <vector>
 
-#include "ctl/type_traits.h"
-#include "ctl/utils/allocation_messages.h"
+#include "legacy_embedded_ctl/type_traits.h"
+#include "legacy_embedded_ctl/utils/allocation_messages.h"
 #include "modules/memory/management/memory_checked_containers.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::a_star {
@@ -25,18 +25,18 @@ template <typename MARKING, typename TRANSITION, typename COST, typename MARKING
           typename MARKING_EQUAL_TO = std::equal_to<MARKING>>
 class consistent_path_construction {
  public:
-  using marking_value_type = ctl::remove_all_cvr_t<MARKING>;
+  using marking_value_type = legacy_embedded_ctl::remove_all_cvr_t<MARKING>;
   using marking_const_reference_type = std::add_lvalue_reference_t<std::add_const_t<MARKING>>;
-  using transition_value_type = ctl::remove_all_cvr_t<TRANSITION>;
-  using cost_value_type = ctl::remove_all_cvr_t<COST>;
+  using transition_value_type = legacy_embedded_ctl::remove_all_cvr_t<TRANSITION>;
+  using cost_value_type = legacy_embedded_ctl::remove_all_cvr_t<COST>;
 
   explicit consistent_path_construction(const common::execution_context& context)
       : open_set_{std::greater<>{},
                   memory::management::checked_vector_t<open_node_type>{
                       memory::management::checked_allocator<memory::management::checked_vector_t<open_node_type>>(
-                          context, ALLOC_MSG(ctl::MEMBER_INIT_MSG))}},
+                          context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))}},
         partial_paths_{
-            memory::management::checked_allocator<partial_path_t>(context, ALLOC_MSG(ctl::MEMBER_INIT_MSG))} {}
+            memory::management::checked_allocator<partial_path_t>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))} {}
 
   // NOLINTNEXTLINE(bugprone-exception-escape)
   struct marking_wrapper {

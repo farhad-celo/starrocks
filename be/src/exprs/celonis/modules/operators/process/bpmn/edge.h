@@ -2,7 +2,7 @@
 
 #include <tuple>
 
-#include "ctl/hash.h"
+#include "legacy_embedded_ctl/hash.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/operators/process/bpmn/vertex.h"
 #include "modules/operators/process/bpmn/vertex_types.h"
@@ -48,9 +48,9 @@ class edge {
 struct edge_hash_ignore_count {
   size_t operator()(const edge& e) const {
     std::size_t seed{};
-    ctl::hash_combine(seed, e.get_source_id());
-    ctl::hash_combine(seed, e.get_target_id());
-    ctl::hash_combine(seed, e.get_object_id());
+    legacy_embedded_ctl::hash_combine(seed, e.get_source_id());
+    legacy_embedded_ctl::hash_combine(seed, e.get_target_id());
+    legacy_embedded_ctl::hash_combine(seed, e.get_object_id());
     return seed;
   }
 };

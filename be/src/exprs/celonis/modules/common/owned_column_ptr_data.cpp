@@ -11,9 +11,9 @@ owned_column_ptr_data<COL_PTR_TYPE> make_array(row_id row_count, memory::zero_in
                                                const common::execution_context& context) {
   return zero_initialize.get()
              ? owned_column_ptr_data<COL_PTR_TYPE>{memory::tracking::make_static_array_value_init<COL_PTR_TYPE>(
-                   row_count, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)}
+                   row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)}
              : owned_column_ptr_data<COL_PTR_TYPE>{memory::tracking::make_static_array_for_overwrite<COL_PTR_TYPE>(
-                   row_count, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+                   row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
 }
 
 }  // namespace

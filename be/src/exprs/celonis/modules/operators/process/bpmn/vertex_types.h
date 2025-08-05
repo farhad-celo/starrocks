@@ -4,7 +4,7 @@
 #include <string>
 #include <variant>
 
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
 
@@ -63,7 +63,7 @@ inline bool is_gateway(vertex_type type) {
 
 [[nodiscard]] inline std::string to_string(const vertex_type& type) {
   return std::visit(
-      ctl::overloaded{[](const task& /**/) { return "BPMN_TASK"; },
+      legacy_embedded_ctl::overloaded{[](const task& /**/) { return "BPMN_TASK"; },
                       [](const parallel& /**/) { return "BPMN_PARALLEL"; },
                       [](const exclusive_choice& /**/) { return "BPMN_EXCLUSIVE_CHOICE"; },
                       [](const start& /**/) { return "BPMN_START"; }, [](const end& /**/) { return "BPMN_END"; }},

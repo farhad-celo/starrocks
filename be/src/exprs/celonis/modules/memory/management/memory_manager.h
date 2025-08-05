@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "concurrency/shared_counting_mutex.h"
-#include "ctl/memory/meminfo_fwd.h"
-#include "ctl/source_location.h"
+#include "legacy_embedded_ctl/memory/meminfo_fwd.h"
+#include "legacy_embedded_ctl/source_location.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/cube/execution/tracking/operator_statistics_fwd.h"
 #include "modules/memory/management/data_handler_fwd.h"
@@ -76,7 +76,7 @@ class memory_manager {
    */
   memory_info get_data_status() const;
 
-  ctl::full_meminfo get_memory_status() const;
+  legacy_embedded_ctl::full_meminfo get_memory_status() const;
 
   /**
    * Compresses / swaps out data handlers that have not been used for the time limits specified in the corresponding
@@ -103,7 +103,7 @@ class memory_manager {
    * Used in testing scenarios to override the real memory status with a mocked one to be able to more easily test
    * high memory usage situations
    */
-  void set_meminfo_fetcher(std::function<ctl::full_meminfo()> meminfo_fetcher);
+  void set_meminfo_fetcher(std::function<legacy_embedded_ctl::full_meminfo()> meminfo_fetcher);
 
   memory_threshold& get_cache_eviction_threshold() noexcept { return cache_eviction_threshold_; }
   const memory_threshold& get_cache_eviction_threshold() const noexcept { return cache_eviction_threshold_; }
@@ -119,7 +119,7 @@ class memory_manager {
    * case where the lock could not be acquired in time)
    */
   std::pair<std::vector<volatile_group_t>, std::vector<managed_group_t>> get_groups(
-      std::chrono::seconds wait_time, ctl::source_location source_location = ctl::source_location{}) const;
+      std::chrono::seconds wait_time, legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{}) const;
 
   void add_invocation_to_operator_statistics(const std::string& key, std::chrono::milliseconds runtime) const;
 
@@ -142,7 +142,7 @@ class memory_manager {
   std::unordered_set<volatile_group_t> volatile_groups_{};
   std::unordered_set<managed_group_t> persistent_groups_{};
 
-  std::function<ctl::full_meminfo()> meminfo_fetcher_;
+  std::function<legacy_embedded_ctl::full_meminfo()> meminfo_fetcher_;
   std::atomic<int64_t> cache_retention_time_in_min_{60};
   std::atomic<int64_t> cache_compression_time_in_min_{cache_retention_time_in_min_ / 2};
   memory_threshold cache_eviction_threshold_{0.5, 0.82};

@@ -61,8 +61,8 @@ rl_sparse_solutions_type rl_solutions_sparse(const rl_problem_instance_builder& 
         auto solutions{problem_builder.extract_solutions(rl_problems)};
         for (size_t i{}; i != solutions.size(); ++i) {
           const auto result_it{result.find(rl_problems.get_slot(i))};
-          debug_assert(result_it != end(result));
-          debug_assert(result_it->second.empty());  // check that for all degenerate constraints, we only align once
+          legacy_embedded_debug_assert(result_it != end(result));
+          legacy_embedded_debug_assert(result_it->second.empty());  // check that for all degenerate constraints, we only align once
           result_it->second = std::move(solutions[i]);
         }
       }};
@@ -142,7 +142,7 @@ std::pair<trace_alignment_t, size_t> rl_aligner::operator()(std::span<const row_
     for (size_t i{0}; i != constraints_.data.size(); ++i) {
       const auto& constraint{constraints_.data[i]};
       const auto solution_iterator{sparse_solutions.find(constraint)};
-      debug_assert(solution_iterator != end(sparse_solutions));
+      legacy_embedded_debug_assert(solution_iterator != end(sparse_solutions));
       const auto& solution{solution_iterator->second};
       if (get_cost(solution) >= best_cost_so_far) {
         continue;
@@ -171,7 +171,7 @@ std::pair<trace_alignment_t, size_t> rl_aligner::operator()(std::span<const row_
 }
 
 void rl_aligner::collect_statistics(const std::vector<size_t>& alignment_scores) {
-  debug_assert(constraints_.data.size() == alignment_scores.size());
+  legacy_embedded_debug_assert(constraints_.data.size() == alignment_scores.size());
   auto zip_begin{boost::make_zip_iterator(boost::make_tuple(constraints_.data.begin(), alignment_scores.begin()))};
   const auto zip_end{boost::make_zip_iterator(boost::make_tuple(constraints_.data.end(), alignment_scores.end()))};
 

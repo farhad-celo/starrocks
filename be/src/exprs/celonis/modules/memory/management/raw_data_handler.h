@@ -9,7 +9,7 @@
 #include <thread>
 #include <type_traits>
 
-#include "ctl/static_array_fwd.h"
+#include "legacy_embedded_ctl/static_array_fwd.h"
 #include "modules/common/execution_context.h"
 #ifndef CELOSTAR
 #include "modules/io/compressed_data.h"
@@ -32,17 +32,17 @@ class raw_data_handler final : public data_handler {
   static constexpr const char* RAW_DATA_HANDLER_SWAP_IN_KEY = "RAW_DATA_HANDLER_SWAP_IN";
   static constexpr const char* RAW_DATA_HANDLER_SWAP_OUT_KEY = "RAW_DATA_HANDLER_SWAP_OUT";
 
-  static raw_data_handler_t<T> create_data_handler(ctl::static_array<T> data, const std::string& swap_file,
+  static raw_data_handler_t<T> create_data_handler(legacy_embedded_ctl::static_array<T> data, const std::string& swap_file,
                                                    const swap_info& sinfo, const std::string& description);
 
-  static raw_data_handler_t<T> create_temp_data_handler(ctl::static_array<T> data);
+  static raw_data_handler_t<T> create_temp_data_handler(legacy_embedded_ctl::static_array<T> data);
 
-  static raw_data_handler_t<T> create_data_handler(const ctl::shared_static_array<T>& data,
+  static raw_data_handler_t<T> create_data_handler(const legacy_embedded_ctl::shared_static_array<T>& data,
                                                    const std::string& swap_file, const swap_info& sinfo,
                                                    const std::string& description);
 
   [[nodiscard]] static std::shared_ptr<raw_data_handler<T>> create_temp_data_handler(
-      const ctl::shared_static_array<T>& data);
+      const legacy_embedded_ctl::shared_static_array<T>& data);
 
 #ifndef CELOSTAR
   /**
@@ -97,7 +97,7 @@ class raw_data_handler final : public data_handler {
    * This function returns a pointer to the immutable stored data.
    */
   const_data_accessor_t get_const_data(const common::execution_context& context = {}) requires(
-      requires(ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; });
+      requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; });
 
   std::string description() const override { return desc; }
 
@@ -109,10 +109,10 @@ class raw_data_handler final : public data_handler {
   ~raw_data_handler() override;
 
  private:
-  raw_data_handler(load_status status, ctl::shared_static_array<T> data, size_t size, std::string swap_file,
+  raw_data_handler(load_status status, legacy_embedded_ctl::shared_static_array<T> data, size_t size, std::string swap_file,
                    swap_info swap_information, bool persisted, size_t size_on_disk, std::string description);
 
-  ctl::shared_static_array<T> swap_in_data(const common::execution_context& context);
+  legacy_embedded_ctl::shared_static_array<T> swap_in_data(const common::execution_context& context);
 
 #ifndef CELOSTAR
   void swap_to_disk(common::execution_context& context);
@@ -131,7 +131,7 @@ class raw_data_handler final : public data_handler {
 
   mutable std::shared_mutex data_mutex;
   std::atomic<load_status> status;
-  ctl::shared_static_array<T> data;
+  legacy_embedded_ctl::shared_static_array<T> data;
   std::atomic<size_t> size;
   std::atomic<size_t> size_on_disk;
 #ifndef CELOSTAR

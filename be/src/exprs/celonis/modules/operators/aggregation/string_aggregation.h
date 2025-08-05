@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "ctl/static_array_fwd.h"
+#include "legacy_embedded_ctl/static_array_fwd.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/owned_column_ptr_data.h"
 #include "modules/common/trace_types.h"
@@ -44,7 +44,7 @@ namespace celonis::accelerator::operators::aggregation {
 [[nodiscard]] memory::builders::result_column_builder_t execute_parallel_string_agg_operator(
     const std::string& op_name, common::execution_context& context, const projection_vector_t& projection,
     const std::shared_ptr<cube::filter_bitset_t>& accepted_rows, const memory::column_t& source_column,
-    row_id group_count, const std::string& delimiter, const ctl::static_array<row_id>& group_aligned_permutation,
+    row_id group_count, const std::string& delimiter, const legacy_embedded_ctl::static_array<row_id>& group_aligned_permutation,
     size_t grain_size);
 
 [[nodiscard]] std::pair<cube::execution::columns_and_common_table, std::vector<OrderByDirection>>
@@ -53,7 +53,7 @@ compute_orderby_fetcher_and_order_directions(const OrderByExpressions& order_by_
                                              const common::execution_context& context,
                                              const memory::column_lookup_t& order_by_expression_columns);
 
-[[nodiscard]] ctl::static_array<row_id> compute_group_aligned_permutation_simple(const memory::column_t& source_column,
+[[nodiscard]] legacy_embedded_ctl::static_array<row_id> compute_group_aligned_permutation_simple(const memory::column_t& source_column,
                                                                                  common::execution_context& context,
                                                                                  const projection_vector_t& projection,
                                                                                  row_id target_table_size);
@@ -61,7 +61,7 @@ compute_orderby_fetcher_and_order_directions(const OrderByExpressions& order_by_
 /**
  * The caller is responsible for pulling up the source_column and orderby columns to the common table.
  */
-[[nodiscard]] ctl::static_array<row_id> compute_group_aligned_permutation_order_by_columns(
+[[nodiscard]] legacy_embedded_ctl::static_array<row_id> compute_group_aligned_permutation_order_by_columns(
     const std::string& op_name, const memory::column_t& source_column, common::execution_context& context,
     const cube::query_scope& query_scope, const std::vector<memory::column_t>& orderby_columns,
     const std::vector<OrderByDirection>& orderby_directions, const projection_vector_t& projection,
@@ -123,14 +123,14 @@ using value_idx_to_group_id_mapping_t = memory::join_projection_vector_t;
 [[nodiscard]] memory::cache::variant_trace_cache_t compute_variant_row_ids(
     common::execution_context& context, const std::string& cache_key, const std::string& activity_table_name,
     row_id num_case_rows, const memory::join_projection_vector_t& projection_vector,
-    const ctl::shared_static_array<row_id>& activity_column,
+    const legacy_embedded_ctl::shared_static_array<row_id>& activity_column,
     cube::variant_trace_cache_manager& variant_trace_cache_manager_instance,
     size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);
 
 struct variant_row_id_result {
-  ctl::static_array<trace_type> trace_ptrs;
-  ctl::static_array<trace_buffer_type> trace_buffer_data;
-  ctl::static_array<trace_length_type> trace_lengths;
+  legacy_embedded_ctl::static_array<trace_type> trace_ptrs;
+  legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer_data;
+  legacy_embedded_ctl::static_array<trace_length_type> trace_lengths;
   common::owned_column_ptr_data_t group_id_to_trace_id;
   row_id num_unique_variants;
 };
@@ -138,7 +138,7 @@ struct variant_row_id_result {
 #ifndef CELOSTAR
 [[nodiscard]] variant_row_id_result compute_variant_row_ids(
     common::execution_context& context, row_id num_case_rows, const memory::join_projection_vector_t& projection_vector,
-    const ctl::shared_static_array<row_id>& activity_column,
+    const legacy_embedded_ctl::shared_static_array<row_id>& activity_column,
     size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);
 #endif
 

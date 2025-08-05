@@ -8,8 +8,8 @@
 #include <unordered_set>
 #include <utility>
 
-#include "ctl/mutex.h"
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/mutex.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/common/int_types.h"
 #include "modules/common/owned_column_ptr_data.h"
 #include "modules/common/trace_types.h"
@@ -35,7 +35,7 @@ class variant_trace_cache_manager {
 
   const memory::management::swap_info sinfo;
   std::atomic<uint32_t> curr_cache_id;
-  ctl::owning_mutex<std::unordered_map<std::string, map_value>> locked_variant_trace_caches;
+  legacy_embedded_ctl::owning_mutex<std::unordered_map<std::string, map_value>> locked_variant_trace_caches;
 
 #ifndef CELOSTAR
   std::string get_next_cache_id();
@@ -55,14 +55,14 @@ class variant_trace_cache_manager {
 
 #ifndef CELOSTAR
   void create_and_store_variant_cache(const std::string& cache_key, const std::string& table_name,
-                                      ctl::static_array<trace_type> traces,
-                                      ctl::static_array<trace_buffer_type> trace_buffer,
-                                      ctl::static_array<trace_length_type> trace_lengths);
+                                      legacy_embedded_ctl::static_array<trace_type> traces,
+                                      legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer,
+                                      legacy_embedded_ctl::static_array<trace_length_type> trace_lengths);
 
   void create_and_store_variant_cache_col_ptrs(const std::string& cache_key, const std::string& table_name,
-                                               ctl::static_array<trace_type> traces,
-                                               ctl::static_array<trace_buffer_type> trace_buffer,
-                                               ctl::static_array<trace_length_type> trace_lengths,
+                                               legacy_embedded_ctl::static_array<trace_type> traces,
+                                               legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer,
+                                               legacy_embedded_ctl::static_array<trace_length_type> trace_lengths,
                                                common::owned_column_ptr_data_t group_id_to_trace_id);
 
   memory::cache::variant_trace_cache_t retrieve_variant_cache(const std::string& cache_key);

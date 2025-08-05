@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ctl/checked_ptr_fwd.h"
+#include "legacy_embedded_ctl/checked_ptr_fwd.h"
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table_fwd.h"
@@ -18,7 +18,7 @@ namespace celonis::accelerator::memory {
  */
 struct table_to_column_projection final {
   /** Table on the one-side of the join */
-  const ctl::checked_raw_ptr<const table> table_one_side;
+  const legacy_embedded_ctl::checked_raw_ptr<const table> table_one_side;
   /** Column on the n-side of the join */
   const column_t column_n_side;
   /** Projection from the n-side (column) to the one-side (table) */

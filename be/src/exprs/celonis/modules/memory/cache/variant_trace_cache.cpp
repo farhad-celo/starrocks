@@ -3,7 +3,7 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/common/aligned_blocked_range.h"
 #include "modules/memory/column_pointers.h"
 
@@ -31,12 +31,12 @@ bool variant_trace_cache::has_group_id_to_variant_id_mapping() const {
 }
 
 row_id variant_trace_cache::get_group_id_domain() const {
-  debug_assert(has_group_id_to_variant_id_mapping());
+  legacy_embedded_debug_assert(has_group_id_to_variant_id_mapping());
   return static_cast<row_id>(optional_group_id_to_trace_id_.value()->get_row_count());
 }
 
 const memory::column_ptrs_t& variant_trace_cache::group_id_to_variant_id_mapping_col_ptrs() const {
-  debug_assert(has_group_id_to_variant_id_mapping());
+  legacy_embedded_debug_assert(has_group_id_to_variant_id_mapping());
   return optional_group_id_to_trace_id_.value();
 }
 
@@ -80,7 +80,7 @@ void compute_and_fill_mapping_from_col_ptrs(const variant_trace_cache& variant_e
               const auto variant_id{local_mapping_value.second};
               ++result_mapping.at(variant_id);
             } else {
-              static_assert(ctl::always_false_v<decltype(MAPPING_TO_COMPUTE)>);
+              static_assert(legacy_embedded_ctl::always_false_v<decltype(MAPPING_TO_COMPUTE)>);
             }
           });
         });
@@ -102,7 +102,7 @@ variant_id_to_group_size_mapping_t compute_variant_id_to_group_size_mapping_from
   const auto number_of_variants{variant_entries.get_num_traces()};
   const auto& sub_ctx{ctx.create_sub_context("compute_variant_id_to_group_size_mapping_from_col_ptrs", {})};
   variant_id_to_group_size_mapping_t variant_id_to_group_size_mapping{
-      memory::tracking::make_static_array_value_init<size_t>(number_of_variants, ALLOC_MSG(ctl::RETURN_VALUE_MSG),
+      memory::tracking::make_static_array_value_init<size_t>(number_of_variants, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG),
                                                              sub_ctx)};
   compute_and_fill_mapping_from_col_ptrs<VARIANT_ID_TO_GROUP_SIZE>(variant_entries, variant_id_to_group_size_mapping);
   return variant_id_to_group_size_mapping;

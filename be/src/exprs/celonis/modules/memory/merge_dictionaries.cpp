@@ -2,27 +2,27 @@
 
 #include <numeric>
 
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/memory/merge_dictionaries_internals.h"
 
 namespace celonis::accelerator::memory {
 
-std::pair<dictionary_t, std::vector<ctl::shared_static_array<row_id>>> merge_n_dictionaries(
+std::pair<dictionary_t, std::vector<legacy_embedded_ctl::shared_static_array<row_id>>> merge_n_dictionaries(
     const std::vector<std::pair<dictionary_t, std::string>>& dictionaries, const std::string& swap_file_prefix,
     const management::swap_info& sinfo, const std::string& description, const std::string& op_name,
     common::execution_context& context) {
   auto result = merge_n_dictionaries_raw(dictionaries, op_name, context);
 
   const raw_dictionary_t new_raw_dictionary{
-      std::visit(ctl::overloaded{[&context](const dictionary_t& existing_dictionary) {
+      std::visit(legacy_embedded_ctl::overloaded{[&context](const dictionary_t& existing_dictionary) {
                                    return existing_dictionary->copy_to_raw_dictionary(context);
                                  },
                                  [](raw_dictionary_t&& new_dictionary) { return std::move(new_dictionary); }},
                  std::move(result.dictionary_variant))};
 
-  std::vector<ctl::shared_static_array<row_id>> ptr_mappings;
+  std::vector<legacy_embedded_ctl::shared_static_array<row_id>> ptr_mappings;
   std::transform(result.mappings.begin(), result.mappings.end(), std::back_inserter(ptr_mappings),
-                 [](ctl::static_array<row_id>& mapping) { return std::move(mapping); });
+                 [](legacy_embedded_ctl::static_array<row_id>& mapping) { return std::move(mapping); });
 
   return {new_raw_dictionary->convert_to_dictionary_t_release_data(swap_file_prefix, sinfo, description),
           std::move(ptr_mappings)};
@@ -99,11 +99,11 @@ merge_result merge_n_dictionaries_raw(const std::vector<std::pair<dictionary_t, 
   } else if (non_null_dict.size() == 1) {
     row_id dict_size = non_null_dict[0].dict->get_size();
     auto mapping_d1{memory::tracking::make_static_array_for_overwrite<row_id>(
-        dict_size, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+        dict_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
     std::iota(mapping_d1.begin(), mapping_d1.end(), row_id{0});
 
-    auto mappings{memory::tracking::make_static_array_for_overwrite<ctl::static_array<row_id>>(
-        1, ALLOC_MSG(ctl::RETURN_VALUE_MSG), context)};
+    auto mappings{memory::tracking::make_static_array_for_overwrite<legacy_embedded_ctl::static_array<row_id>>(
+        1, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)};
     mappings[0] = std::move(mapping_d1);
     result = {non_null_dict[0].dict, std::move(mappings), non_null_dict[0].dict->get_size()};
   } else {
@@ -115,14 +115,14 @@ merge_result merge_n_dictionaries_raw(const std::vector<std::pair<dictionary_t, 
   }
 
   auto new_size{result.mappings.size() + null_indexes.size()};
-  auto mappings{memory::tracking::make_static_array_for_overwrite<ctl::static_array<row_id>>(
-      new_size, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+  auto mappings{memory::tracking::make_static_array_for_overwrite<legacy_embedded_ctl::static_array<row_id>>(
+      new_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
   auto null_index_it{null_indexes.begin()};
   auto* mapping_it{result.mappings.begin()};
   for (std::size_t i{0}; i < new_size; ++i) {
     if (null_index_it != null_indexes.end() && i == *null_index_it) {
       auto mapping{
-          memory::tracking::make_static_array_for_overwrite<row_id>(1, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+          memory::tracking::make_static_array_for_overwrite<row_id>(1, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
       mapping[0] = 0;
       mappings[i] = std::move(mapping);
       ++null_index_it;
@@ -133,8 +133,8 @@ merge_result merge_n_dictionaries_raw(const std::vector<std::pair<dictionary_t, 
       throw common::internal_exception("Adding mappings for dictionaries failed at index [{}]", i);
     }
   }
-  debug_assert(null_index_it == null_indexes.end());
-  debug_assert(mapping_it == result.mappings.end());
+  legacy_embedded_debug_assert(null_index_it == null_indexes.end());
+  legacy_embedded_debug_assert(mapping_it == result.mappings.end());
   result.mappings = std::move(mappings);
 
   return result;

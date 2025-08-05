@@ -11,7 +11,7 @@ std::optional<sequence_aligner::sequence_type> get_shortest_pn_trace(const petri
                                                                      int max_num_iterations,
                                                                      std::string_view operator_name,
                                                                      const common::execution_context& context) {
-  debug_assert(!pn_accessor.get_final_markings().empty());
+  legacy_embedded_debug_assert(!pn_accessor.get_final_markings().empty());
 
   const auto baseline{petri_net::a_star::a_star_search(
       pn_accessor,

@@ -11,9 +11,9 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#include "ctl/assert.h"
-#include "ctl/source_location.h"
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/source_location.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "log/log.h"
 #include "modules/common/aligned_blocked_range.h"
 #include "modules/common/date/celonis_date_storage.h"
@@ -217,7 +217,7 @@ void column::load_if_missing(const common::execution_context& context) {
   wait_span.finish_span();
 
 #ifdef CELOSTAR
-  debug_assert(!is_missing());
+  legacy_embedded_debug_assert(!is_missing());
   return;
 #else
   auto load_context{context.create_sub_context("load_if_missing", {})};
@@ -226,13 +226,13 @@ void column::load_if_missing(const common::execution_context& context) {
     if (column_load_ != nullptr) {
       auto data{column_load_->load_missing_column(config_, load_context)};
       std::visit(
-          ctl::overloaded{[this](std::shared_ptr<materialized_data>& mat_data) {
+          legacy_embedded_ctl::overloaded{[this](std::shared_ptr<materialized_data>& mat_data) {
                             if (belongs_to_augmentation_table()) {
-                              debug_assert(config_.row_count == 0);
+                              legacy_embedded_debug_assert(config_.row_count == 0);
                               config_.row_count = mat_data->get_size();
                             }
                             plain_data_ = std::move(mat_data);
-                            debug_assert(plain_data_->get_size() == config_.row_count);
+                            legacy_embedded_debug_assert(plain_data_->get_size() == config_.row_count);
                             status_ = column_loading::column_status::MATERIALIZED;
                             column_pointers_ = nullptr;
                             dict_ = nullptr;
@@ -240,7 +240,7 @@ void column::load_if_missing(const common::execution_context& context) {
                           [this](memory::column_loading::dictified_column_data& dic_data) {
                             column_pointers_ = std::move(dic_data.col_ptrs);
                             dict_ = std::move(dic_data.dict);
-                            debug_assert(column_pointers_->get_row_count() == static_cast<size_t>(config_.row_count));
+                            legacy_embedded_debug_assert(column_pointers_->get_row_count() == static_cast<size_t>(config_.row_count));
                             status_ = column_loading::column_status::DICTIFIED;
                             plain_data_ = nullptr;
                           }},
@@ -356,7 +356,7 @@ bool column::write_out(common::execution_context& context) {
     return success;
   }
 
-  debug_assert(is_materialized());
+  legacy_embedded_debug_assert(is_materialized());
   return plain_data_->write_out(context);
 }
 
@@ -407,7 +407,7 @@ void column::project_null_flags(null_flags_bitset_t& null_flags, const common::e
   std::shared_lock lck(column_mutex_);
 
   if (is_materialized()) {
-    ctl::bitset_mutable_view view{null_flags};
+    legacy_embedded_ctl::bitset_mutable_view view{null_flags};
     view |= plain_data_->get_null_flags()->get_const_data(projection_context).get();
     return;
   }
@@ -459,7 +459,7 @@ row_id column::get_null_value_count(const common::execution_context& context) {
     null_value_count = std::accumulate(local_null_count.begin(), local_null_count.end(), 0);
 
   } else {
-    debug_assert(is_dictified());
+    legacy_embedded_debug_assert(is_dictified());
     null_value_count = cast_execute_column_pointers(exec_count_null_flags{row_count}, *column_pointers_);
   }
 
@@ -488,7 +488,7 @@ std::optional<usage_time_t> column::time_of_last_usage() const {
     case column_loading::DICTIFIED:
       return std::max(dict_->time_of_last_usage(), column_pointers_->time_of_last_usage());
   }
-  ctl::assert_unreachable();
+  legacy_embedded_ctl::assert_unreachable();
 }
 
 column_t column::alias_column(const std::string& alias, const std::string& cache_key, const std::string& format,
@@ -565,7 +565,7 @@ bool column::has_domain_null(const common::execution_context& context) {
   } else if (is_materialized()) {
     has_null_ = plain_data_->get_null_flags()->get_const_data(context).any();
   }
-  debug_assert(has_null_.load().has_value());
+  legacy_embedded_debug_assert(has_null_.load().has_value());
   return has_null_.load().value();
 }
 
@@ -655,7 +655,7 @@ column_info column::dump_header() const {
   return col_dump;
 }
 
-ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column, const common::execution_context& context) {
+legacy_embedded_ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column, const common::execution_context& context) {
   auto null_flags{
       memory::tracking::make_tracked_dynamic_bitset_t(static_cast<size_t>(column->get_row_count(context)), context)};
   column->project_null_flags(null_flags, context);

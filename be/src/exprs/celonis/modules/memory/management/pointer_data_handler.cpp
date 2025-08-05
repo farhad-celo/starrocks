@@ -4,9 +4,9 @@
 #include <string_view>
 #include <type_traits>
 
-#include "ctl/assert.h"
-#include "ctl/static_array.h"
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/static_array.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "log/log.h"
 #ifndef CELOSTAR
 #include "modules/common/call_and_log_unsafe_callable.h"
@@ -56,8 +56,8 @@ std::string_view get_pointer_buffer_file_ending(pointer_data_handler_swap_type t
 // Has to be called before one of the underlying data handlers is triggered to write data to disk.
 template <typename T>
 inline void convert_to_relative_addresses(
-    ctl::shared_static_array<T>& pointers,
-    const ctl::shared_static_array<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) noexcept
+    legacy_embedded_ctl::shared_static_array<T>& pointers,
+    const legacy_embedded_ctl::shared_static_array<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) noexcept
     requires(std::is_pointer_v<T>) {
   const uintptr_t buffer_offset = reinterpret_cast<uintptr_t>(buffer.get());
   for (size_t i = 0; i < pointers.size(); i++) {
@@ -69,8 +69,8 @@ inline void convert_to_relative_addresses(
 // Has to be called before one of the underlying data handlers is accessed.
 template <typename T>
 inline void convert_to_absolute_addresses(
-    ctl::shared_static_array<T>& pointers,
-    const ctl::shared_static_array<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) noexcept
+    legacy_embedded_ctl::shared_static_array<T>& pointers,
+    const legacy_embedded_ctl::shared_static_array<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) noexcept
     requires(std::is_pointer_v<T>) {
   const uintptr_t buffer_offset = reinterpret_cast<uintptr_t>(buffer.get());
   for (size_t i = 0; i < pointers.size(); i++) {
@@ -115,7 +115,7 @@ loaded_data<T> decompress_pointers(
     const io::compressed_data& compressed_pointers, const size_t uncompressed_size,
     const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) requires(std::is_pointer_v<T>) {
   auto pointers{
-      ctl::make_shared_static_array_for_overwrite<T>(uncompressed_size, ALLOC_MSG(ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
+      legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(uncompressed_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
   io::decompress_from_memory_mt(compressed_pointers, io::as_byte_span(std::span{pointers}));
   convert_to_absolute_addresses(pointers, buffer.data);
 
@@ -125,7 +125,7 @@ loaded_data<T> decompress_pointers(
 template <typename T>
 loaded_data<T> decompress_buffer(const io::compressed_data& compressed_buffer, const size_t uncompressed_size) {
   auto buffer{
-      ctl::make_shared_static_array_for_overwrite<T>(uncompressed_size, ALLOC_MSG(ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
+      legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(uncompressed_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
   io::decompress_from_memory_mt(compressed_buffer, io::as_byte_span(std::span{buffer}));
 
   return loaded_data<T>{std::move(buffer)};
@@ -164,9 +164,9 @@ namespace details {
 template <typename T>
 size_t get_size_in_memory(const data_handler_data<T>& data) {
 #ifdef CELOSTAR
-  return std::visit(ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); }),
+  return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); }),
 #else
-  return std::visit(ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); },
+  return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); },
                                     [](const io::compressed_data& compressed) { return compressed.size(); },
                                     [](const swapped_data&) { return size_t{0}; }),
 #endif
@@ -226,7 +226,7 @@ std::optional<size_t> write_out_buffer(const loaded_data<T>& pointers,
 
 template <typename T>
 std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_data_handler(
-    const ctl::shared_static_array<POINTER_T>& ptr, const ctl::shared_static_array<STORAGE_T>& buffer,
+    const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr, const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer,
     const std::string& swap_file, pointer_data_handler_swap_type type, swap_info sinfo,
     const std::string& description) {
   sinfo.memory_manager().reset();
@@ -238,22 +238,22 @@ std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_data_ha
 
 template <typename T>
 std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_data_handler(
-    ctl::static_array<POINTER_T>&& ptr, ctl::static_array<STORAGE_T>&& buffer, const std::string& swap_file,
+    legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& buffer, const std::string& swap_file,
     pointer_data_handler_swap_type type, swap_info sinfo, const std::string& description) {
-  ctl::shared_static_array<POINTER_T> shared_ptr(std::move(ptr));
-  ctl::shared_static_array<STORAGE_T> shared_buffer(std::move(buffer));
+  legacy_embedded_ctl::shared_static_array<POINTER_T> shared_ptr(std::move(ptr));
+  legacy_embedded_ctl::shared_static_array<STORAGE_T> shared_buffer(std::move(buffer));
   return create_data_handler(std::move(shared_ptr), std::move(shared_buffer), swap_file, type, sinfo, description);
 }
 
 template <typename T>
 std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_temp_data_handler(
-    const ctl::shared_static_array<POINTER_T>& ptr, const ctl::shared_static_array<STORAGE_T>& str_buffer) {
+    const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr, const legacy_embedded_ctl::shared_static_array<STORAGE_T>& str_buffer) {
   return create_data_handler(ptr, str_buffer, "", pointer_data_handler_swap_type::NO_SWAP, no_swap(), "");
 }
 
 template <typename T>
 std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_temp_data_handler(
-    ctl::static_array<POINTER_T>&& ptr, ctl::static_array<STORAGE_T>&& str_buffer) {
+    legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& str_buffer) {
   return create_data_handler(std::move(ptr), std::move(str_buffer), "", pointer_data_handler_swap_type::NO_SWAP,
                              no_swap(), "");
 }
@@ -293,9 +293,9 @@ template <typename T>
 load_status pointer_data_handler<T>::get_load_status() const {
   return data_.lock_shared([](const auto& data_wrapper) {
 #ifdef CELOSTAR
-    return std::visit(ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; }),
+    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; }),
 #else
-    return std::visit(ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; },
+    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; },
                                       [](const io::compressed_data&) { return load_status::COMPRESSED; },
                                       [](const swapped_data&) { return load_status::SWAPPED; }),
 #endif
@@ -405,8 +405,8 @@ const_data_accessor<T> pointer_data_handler<T>::get_const_data(const common::exe
     wait_context.get_span().finish_span();
 
 #ifdef CELOSTAR
-    debug_assert(std::holds_alternative<loaded_data<STORAGE_T>>(data_wrapper.buffer));
-    debug_assert(std::holds_alternative<loaded_data<POINTER_T>>(data_wrapper.pointer));
+    legacy_embedded_debug_assert(std::holds_alternative<loaded_data<STORAGE_T>>(data_wrapper.buffer));
+    legacy_embedded_debug_assert(std::holds_alternative<loaded_data<POINTER_T>>(data_wrapper.pointer));
 #else
     if (std::holds_alternative<loaded_data<POINTER_T>>(data_wrapper.pointer)) {
       return const_data_accessor_t{std::get<loaded_data<STORAGE_T>>(data_wrapper.buffer).data,
@@ -529,7 +529,7 @@ void pointer_data_handler<T>::swap_in(const common::execution_context& context) 
   });
 
 #ifdef CELOSTAR
-  debug_assert(already_swapped_in);
+  legacy_embedded_debug_assert(already_swapped_in);
 #else
   if (already_swapped_in) {
     // nothing to do
@@ -569,8 +569,8 @@ void pointer_data_handler<T>::register_files() {
 #endif
 
 template <typename T>
-pointer_data_handler<T>::pointer_data_handler(const ctl::shared_static_array<POINTER_T>& ptr_data,
-                                              const ctl::shared_static_array<STORAGE_T>& buffer_data, swap_info sinfo,
+pointer_data_handler<T>::pointer_data_handler(const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr_data,
+                                              const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer_data, swap_info sinfo,
                                               const std::string& base_swap_file, pointer_data_handler_swap_type type,
                                               std::string description)
     : pointer_swap_file_{base_swap_file + get_dict_file_ending(type).data()},
@@ -611,7 +611,7 @@ pointer_data_handler<T>::pointer_data_handler(size_t pointer_size, size_t buffer
 
 template <typename T>
 bool pointer_data_handler<T>::write_out_if_applicable(const data_wrapper& data, common::execution_context& context) {
-  return std::visit(ctl::overloaded(
+  return std::visit(legacy_embedded_ctl::overloaded(
                         [this, &data, &context](const loaded_data<POINTER_T>& loaded_pointer) {
                           if (loaded_pointer.data.use_count() > 1) {
                             // someone else still uses the pointers
@@ -660,7 +660,7 @@ void pointer_data_handler<T>::write_out_pointers(const io::compressed_data& comp
 
 template <typename T>
 void pointer_data_handler<T>::write_out_buffer(const data_wrapper& data, common::execution_context& context) {
-  std::visit(ctl::overloaded(
+  std::visit(legacy_embedded_ctl::overloaded(
                  [this, &data, &context](const loaded_data<STORAGE_T>& loaded_buffer) {
                    write_out_buffer(loaded_buffer, std::get<loaded_data<POINTER_T>>(data.pointer), context);
                  },
@@ -713,7 +713,7 @@ void pointer_data_handler<T>::swap_in_pointers(data_handler_data<POINTER_T>& poi
                                                const loaded_data<STORAGE_T>& buffer,
                                                const common::execution_context& context) {
 #ifdef CELOSTAR
-  debug_assert(std::holds_alternative<loaded_data<POINTER_T>>(pointer));
+  legacy_embedded_debug_assert(std::holds_alternative<loaded_data<POINTER_T>>(pointer));
   return;
 #else
   if (std::holds_alternative<loaded_data<POINTER_T>>(pointer)) {
@@ -727,9 +727,9 @@ void pointer_data_handler<T>::swap_in_pointers(data_handler_data<POINTER_T>& poi
       status == load_status::COMPRESSED ? std::get<io::compressed_data>(pointer).size() : 0);
 
   loaded_data<POINTER_T> loaded_pointer =
-      std::visit(ctl::overloaded(
+      std::visit(legacy_embedded_ctl::overloaded(
                      [](const loaded_data<POINTER_T>&) {
-                       ctl::assert_unreachable();
+                       legacy_embedded_ctl::assert_unreachable();
                        return loaded_data<POINTER_T>{};
                      },
                      [&buffer, this](const io::compressed_data& compressed_pointer) {
@@ -752,7 +752,7 @@ template <typename T>
 void pointer_data_handler<T>::swap_in_buffer(data_handler_data<STORAGE_T>& buffer,
                                              const common::execution_context& context) {
 #ifdef CELOSTAR
-  debug_assert(std::holds_alternative<loaded_data<STORAGE_T>>(buffer));
+  legacy_embedded_debug_assert(std::holds_alternative<loaded_data<STORAGE_T>>(buffer));
   return;
 #else
   if (std::holds_alternative<loaded_data<STORAGE_T>>(buffer)) {
@@ -766,9 +766,9 @@ void pointer_data_handler<T>::swap_in_buffer(data_handler_data<STORAGE_T>& buffe
       status == load_status::COMPRESSED ? std::get<io::compressed_data>(buffer).size() : 0);
 
   loaded_data<STORAGE_T> loaded_buffer =
-      std::visit(ctl::overloaded(
+      std::visit(legacy_embedded_ctl::overloaded(
                      [](const loaded_data<STORAGE_T>&) {
-                       ctl::assert_unreachable();
+                       legacy_embedded_ctl::assert_unreachable();
                        return loaded_data<STORAGE_T>{};
                      },
                      [this](const io::compressed_data& compressed_buffer) {
@@ -812,9 +812,9 @@ loaded_data<TYPE> pointer_data_handler<T>::swap_in_impl(
     size = read_result.size;
     broken_swap_file = false;
     return loaded_data<TYPE>{std::move(read_result.data)};
-  } catch (ctl::short_of_memory& e) {
+  } catch (legacy_embedded_ctl::short_of_memory& e) {
     throw;
-  } catch (ctl::bad_alloc& e) {
+  } catch (legacy_embedded_ctl::bad_alloc& e) {
     throw;
   } catch (std::exception& e) {
     broken_swap_file = true;
@@ -827,19 +827,19 @@ template <typename T>
 auto pointer_data_handler<T>::get_buffer_start() const -> const STORAGE_T* {
 #ifdef CELOSTAR
   return data_.lock_shared([](const auto& data_wrapper) {
-    return std::visit(ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); }),
+    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); }),
                       data_wrapper.buffer);
   });
 #else
   static const STORAGE_T never_used{};
   return data_.lock_shared([](const auto& data_wrapper) {
-    return std::visit(ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); },
+    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); },
                                       [](const io::compressed_data&) {
-                                        ctl::assert_unreachable();
+                                        legacy_embedded_ctl::assert_unreachable();
                                         return &never_used;
                                       },
                                       [](const swapped_data&) {
-                                        ctl::assert_unreachable();
+                                        legacy_embedded_ctl::assert_unreachable();
                                         return &never_used;
                                       }),
                       data_wrapper.buffer);
@@ -856,19 +856,19 @@ template <typename T>
 auto pointer_data_handler<T>::get_pointer_start() const -> const POINTER_T* {
 #ifdef CELOSTAR
   return data_.lock_shared([](const auto& data_wrapper) {
-    return std::visit(ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); }),
+    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); }),
                       data_wrapper.pointer);
   });
 #else
   static const POINTER_T never_used{};
   return data_.lock_shared([](const auto& data_wrapper) {
-    return std::visit(ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); },
+    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); },
                                       [](const io::compressed_data&) {
-                                        ctl::assert_unreachable();
+                                        legacy_embedded_ctl::assert_unreachable();
                                         return &never_used;
                                       },
                                       [](const swapped_data&) {
-                                        ctl::assert_unreachable();
+                                        legacy_embedded_ctl::assert_unreachable();
                                         return &never_used;
                                       }),
                       data_wrapper.pointer);

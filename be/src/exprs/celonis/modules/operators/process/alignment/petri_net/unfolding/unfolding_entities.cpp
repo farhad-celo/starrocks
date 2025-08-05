@@ -4,7 +4,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::unfolding {
@@ -25,9 +25,9 @@ uint16_t unfolding_event::get_reference_transition_id() const { return reference
 petri_net_transition_id unfolding_event::get_reference_transition() const { return reference_transition_; }
 
 void unfolding_event::add_pre_condition(unfolding_condition* pre_condition) {
-  debug_assert(foata_normal_form_.empty());
-  debug_assert(local_configuration_.empty());
-  debug_assert(marking_.empty());
+  legacy_embedded_debug_assert(foata_normal_form_.empty());
+  legacy_embedded_debug_assert(local_configuration_.empty());
+  legacy_embedded_debug_assert(marking_.empty());
 
   pre_conditions_.push_back(pre_condition);
 }

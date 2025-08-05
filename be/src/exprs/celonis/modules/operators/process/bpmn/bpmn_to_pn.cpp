@@ -81,7 +81,7 @@ void add_edge(const vertex& source, const vertex& target, alignment::petri_net::
     static constexpr auto tau_label{alignment::string_to_int_mapper::get_tau_transition_id()};
     const auto [transition_it, success]{
         petri_net.transitions.try_emplace(fmt::format("t{}_to_{}", source_place_id, target_place_id), tau_label)};
-    debug_assert(success);
+    legacy_embedded_debug_assert(success);
     petri_net.place_transition_arcs.emplace(source_place_id, transition_it->first);
     petri_net.transition_place_arcs.emplace(transition_it->first, target_place_id);
   }
@@ -100,14 +100,14 @@ alignment::petri_net::petri_net_representation get_pn(const bpmn_graph& bpmn_mod
   // handle start/end BPMN vertices
   const auto start_vertex_id{bpmn_model.single_start_vertex()};
   const auto start_place_id{non_parallel_target_place_id_string(start_vertex_id)};
-  debug_assert(!pn.places.contains(start_place_id));
+  legacy_embedded_debug_assert(!pn.places.contains(start_place_id));
   pn.places.emplace(start_place_id);
   pn.place_transition_arcs.emplace(start_place_id, transition_id_string(start_vertex_id));
   pn.initial_marking.emplace(start_place_id);
 
   const auto end_vertex_id{bpmn_model.single_end_vertex()};
   const auto end_place_id{non_parallel_source_place_id_string(end_vertex_id)};
-  debug_assert(!pn.places.contains(end_place_id));
+  legacy_embedded_debug_assert(!pn.places.contains(end_place_id));
   pn.places.emplace(end_place_id);
   pn.transition_place_arcs.emplace(transition_id_string(end_vertex_id), end_place_id);
   pn.final_marking.emplace(end_place_id);

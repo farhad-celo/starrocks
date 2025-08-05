@@ -2,7 +2,7 @@
 
 #include <boost/functional/hash.hpp>
 
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/conversion.h"
 #include "log/log.h"
 #include "modules/operators/process/alignment/petri_net/a_star/consistent_path_construction.h"
 #include "modules/operators/process/alignment/petri_net/a_star/iterative_a_star.h"
@@ -135,11 +135,11 @@ trace_alignment_t sequence_aligner::align_sequence_to_run(std::span<const row_id
   // search for shortest path
   auto path{petri_net::a_star::a_star_search(  // we could use a more specialized implementation of A*
       petri_net, sequence_product_heuristic{petri_net}, sequence_product_path_construction{context},
-      sequence_product::get_initial_marking(), ctl::cast<int>(trace.size() + model_run.size()) + 1, max_iterations)};
+      sequence_product::get_initial_marking(), legacy_embedded_ctl::cast<int>(trace.size() + model_run.size()) + 1, max_iterations)};
 
   if (std::holds_alternative<petri_net::a_star::nothing_found>(path)) {
     // A correctly built a_star search for this type of problem must always return given enough time
-    debug_assert(std::get<petri_net::a_star::nothing_found>(path) == petri_net::a_star::nothing_found::YET);
+    legacy_embedded_debug_assert(std::get<petri_net::a_star::nothing_found>(path) == petri_net::a_star::nothing_found::YET);
     return std::nullopt;
   }
 
@@ -154,7 +154,7 @@ trace_alignment_t sequence_aligner::align_sequence_to_run(std::span<const row_id
   for (const auto& t : std::get<transitions_type>(path)) {
     const auto move_on_log{t.move_first};
     const auto move_on_model{t.move_second};
-    debug_assert(move_on_log || move_on_model);
+    legacy_embedded_debug_assert(move_on_log || move_on_model);
 
     if (move_on_log && move_on_model) {
       result.add(alignment_move::sync(*trace_it, transitions_it->first));
@@ -169,8 +169,8 @@ trace_alignment_t sequence_aligner::align_sequence_to_run(std::span<const row_id
     }
   }
 
-  debug_assert(trace_it == std::cend(trace));
-  debug_assert(transitions_it == std::cend(model_run));
+  legacy_embedded_debug_assert(trace_it == std::cend(trace));
+  legacy_embedded_debug_assert(transitions_it == std::cend(model_run));
   return result;
 }
 

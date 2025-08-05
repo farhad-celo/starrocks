@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/conversion.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
 #include "modules/operators/process/alignment/petri_net/a_star/inconsistent_path_construction.h"
@@ -34,7 +34,7 @@ bool gap_filler::complete_to_sync_moves(const petri_net::rl_problem_solution_t& 
   // Insert missing model moves to enable next synchronous move
   // If there is no way to enable the target synchronous move, make it into a log move and continue
   for (const auto& [variable, transition] : solution) {
-    const auto remaining_cost_budget{max_cost - ctl::cast<int>(alignment.cost_optimistic_lcs_pruning())};
+    const auto remaining_cost_budget{max_cost - legacy_embedded_ctl::cast<int>(alignment.cost_optimistic_lcs_pruning())};
     if (remaining_cost_budget <= 0) {
       return false;
     }
@@ -75,7 +75,7 @@ gap_filler::maybe_transition_span_type gap_filler::get_enabling_transitions_to(
 
   if (inserted) {
     using cost_type = petri_net::a_star::heuristic_to_transition::cost_type;
-    auto max_a_star_cost{std::min(ctl::cast<cost_type>(max_cost), max_insertions_)};
+    auto max_a_star_cost{std::min(legacy_embedded_ctl::cast<cost_type>(max_cost), max_insertions_)};
 
     auto heuristic{petri_net::a_star::heuristic_to_transition{transition, transition_distances_, pn_accessor_}};
     using path_construction_t =
@@ -102,7 +102,7 @@ bool gap_filler::complete_to_final_marking(trace_alignment& alignment, petri_net
   if (pn_accessor_.is_final_marking(current_marking)) {
     return true;
   }
-  const auto remaining_cost_budget{max_cost - ctl::cast<int>(alignment.cost_optimistic_lcs_pruning())};
+  const auto remaining_cost_budget{max_cost - legacy_embedded_ctl::cast<int>(alignment.cost_optimistic_lcs_pruning())};
   if (remaining_cost_budget <= 0) {
     return false;
   }
@@ -120,7 +120,7 @@ bool gap_filler::complete_to_final_marking(trace_alignment& alignment, petri_net
       extended_alignment.add(alignment_move::model(activity_id, enabling_transition));
     }
     extended_alignment.prune_simple();
-    if (max_cost <= ctl::cast<int>(extended_alignment.cost_optimistic_lcs_pruning())) {
+    if (max_cost <= legacy_embedded_ctl::cast<int>(extended_alignment.cost_optimistic_lcs_pruning())) {
       continue;
     }
     // else, we have found an alignment that is better than the fallback

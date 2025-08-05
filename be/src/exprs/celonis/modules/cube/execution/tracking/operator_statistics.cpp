@@ -4,9 +4,9 @@
 
 #include <fmt/format.h>
 
-#include "ctl/assert.h"
-#include "ctl/conversion.h"
-#include "format/json/json.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/conversion.h"
+#include "legacy_embedded_format/json/json.h"
 #include "log/log.h"
 #ifndef CELOSTAR
 #include "modules/query/queries.pb.h"
@@ -14,8 +14,8 @@
 
 namespace celonis::accelerator::cube::execution::tracking {
 
-format::json::json_object_t serialize_data_points(const resource_usage_data_points& data_points) {
-  format::json::json_object_t json{};
+legacy_embedded_format::json::json_object_t serialize_data_points(const resource_usage_data_points& data_points) {
+  legacy_embedded_format::json::json_object_t json{};
   auto& working_memory{json["working_memory"]};
   working_memory["estimated"] = data_points.working_memory.estimated;
   working_memory["actual"] = data_points.working_memory.actual;
@@ -40,7 +40,7 @@ template <typename T>
 
 void log_operator_statistics(const stats_map_t& stats_map) {
   for (const auto& [operator_key, stat] : stats_map) {
-    format::json::json_object_t json;
+    legacy_embedded_format::json::json_object_t json;
     {
       auto& operator_runtime{json["Operator_Runtime"]};
       operator_runtime["operator"] = operator_key;
@@ -67,7 +67,7 @@ void log_operator_statistics(const stats_map_t& stats_map) {
 void log_statistics_drill_down(const stats_map_t& stats_map) {
   for (const auto& [operator_key, stat] : stats_map) {
     for (const auto& [operator_stage, drilled_stats] : stat.drilled_down_statistics) {
-      format::json::json_object_t json;
+      legacy_embedded_format::json::json_object_t json;
       {
         auto& operator_runtime{json["Operator_Runtime_Drilldown"][operator_key]};
         operator_runtime["stage"] = operator_stage;
@@ -81,7 +81,7 @@ void log_statistics_drill_down(const stats_map_t& stats_map) {
 }
 
 void log_operator_telemetry(const stats_map_t& stats_map) {
-  format::json::json_object_t json;
+  legacy_embedded_format::json::json_object_t json;
   auto& telemetry_obj{json["Operator_Telemetry"]};
   bool has_telemetry{false};
 
@@ -107,7 +107,7 @@ void log_operator_telemetry(const stats_map_t& stats_map) {
 
 void log_operator_resource_usage(const stats_map_t& stats_map) {
   for (const auto& [operator_key, stat] : stats_map) {
-    format::json::json_object_t json{};
+    legacy_embedded_format::json::json_object_t json{};
     auto& resource_usage{json["Operator_Resource_Usage"]};
     resource_usage["operator"] = operator_key;
     resource_usage["all_avg"] = serialize_data_points(stat.resource_usage.all_avg.get());
@@ -298,7 +298,7 @@ void operator_statistics_per_query::write_to_query_statistics_response(
     for (const auto& operator_value_pair : sorted_values) {
       auto* operator_statistic{query_statistics->add_operator_memory_statistics()};
       operator_statistic->set_operator_key(operator_value_pair.first);
-      operator_statistic->set_max_allocated(ctl::cast<int64_t>(operator_value_pair.second));
+      operator_statistic->set_max_allocated(legacy_embedded_ctl::cast<int64_t>(operator_value_pair.second));
     }
   }
 }

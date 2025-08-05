@@ -9,7 +9,7 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
-#include "ctl/memory/batched_tracking_memory_resource.h"
+#include "legacy_embedded_ctl/memory/batched_tracking_memory_resource.h"
 #include "modules/common/timer.h"
 #include "modules/operators/process/alignment/fallback/fallback_aligner.h"
 #include "modules/operators/process/alignment/fitting_prefix/fitting_prefix_aligner.h"
@@ -147,7 +147,7 @@ std::pair<vector_of_alignments, log_aligner::agg_alignment_counters> log_aligner
     common::execution_context& context, const memory::cache::variant_trace_cache_t& pruned_variant_trace_cache,
     std::string_view operator_name) {
   vector_of_alignments pruned_alignments(
-      trace_alignment_allocator_type{std::make_shared<ctl::batched_tracking_memory_resource>()});
+      trace_alignment_allocator_type{std::make_shared<legacy_embedded_ctl::batched_tracking_memory_resource>()});
   const row_id number_of_pruned_variants{pruned_variant_trace_cache->get_num_traces()};
   pruned_alignments.resize(number_of_pruned_variants);
   tbb::enumerable_thread_specific<log_aligner::alignment_counters> counters{};
@@ -168,8 +168,8 @@ std::pair<vector_of_alignments, log_aligner::agg_alignment_counters> log_aligner
         return rl_align::rl_aligner{pn_data_tt,
                                     pn_data_tf,
                                     pn_info,
-                                    ctl::cast<row_id>(config.num_analysis_runs),
-                                    ctl::cast<row_id>(config.num_constraints_kept),
+                                    legacy_embedded_ctl::cast<row_id>(config.num_analysis_runs),
+                                    legacy_embedded_ctl::cast<row_id>(config.num_constraints_kept),
                                     config.rl_align_cfg,
                                     execution_ctx};
       }};
@@ -228,7 +228,7 @@ std::pair<trace_alignment_t, log_aligner::alignment_counters> log_aligner::align
   }
 
   // If everything fails, we approximate. The fallback (if it exists) gives an upper bound on the alignment cost
-  const int fallback_cost{fallback_alignment.has_value() ? ctl::cast<int>(fallback_alignment.value().cost())
+  const int fallback_cost{fallback_alignment.has_value() ? legacy_embedded_ctl::cast<int>(fallback_alignment.value().cost())
                                                          : std::numeric_limits<int>::max()};
 
   trace_counters.pruned_variants_computed_relaxation_labeling = 1;
@@ -239,7 +239,7 @@ std::pair<trace_alignment_t, log_aligner::alignment_counters> log_aligner::align
   trace_counters.optimizations_solved = optimizations_solved;
   trace_counters.successful_relaxation_labelings = alignment.has_value() ? 1 : 0;
 
-  if (!alignment.has_value() || ctl::cast<int>(alignment.value().cost()) > fallback_cost) {
+  if (!alignment.has_value() || legacy_embedded_ctl::cast<int>(alignment.value().cost()) > fallback_cost) {
     alignment = fallback_alignment;
   }
 

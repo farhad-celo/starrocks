@@ -22,7 +22,7 @@ multiple_rl_problem_instances::multiple_rl_problem_instances(size_t trace_length
 void multiple_rl_problem_instances::add_assignment(continuous_assignment assignment,
                                                    petri_net::trace_variable target_variable, bool is_null) {
   // Continuous assignments must be added in increasing order
-  debug_assert(assignment.id == assignment_to_variable_.size());
+  legacy_embedded_debug_assert(assignment.id == assignment_to_variable_.size());
   assignment_to_variable_.push_back(target_variable);
   is_null_assignment_.push_back(is_null);
 
@@ -33,7 +33,7 @@ void multiple_rl_problem_instances::add_assignment(continuous_assignment assignm
 }
 
 void multiple_rl_problem_instances::add_compatibilities(const constraints_config& constraints_cfg) {
-  debug_assert(has_free_slot());
+  legacy_embedded_debug_assert(has_free_slot());
 
   slot_constraints_[constraints_config::RIGHT_ORDER_COMPATIBILITY_OFFSET][slot_offset_] =
       constraints_cfg.right_order_compatibility;

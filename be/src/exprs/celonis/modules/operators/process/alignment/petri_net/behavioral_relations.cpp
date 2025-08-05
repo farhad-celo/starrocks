@@ -1,6 +1,6 @@
 #include "behavioral_relations.h"
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/operators/process/alignment/petri_net/petri_net.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
 #include "modules/operators/process/alignment/petri_net/transition_distances.h"
@@ -127,7 +127,7 @@ void set_parallel_sections_to_interleaved(behavioral_relations_matrix& behaviora
               continue;
             }
 
-            debug_assert(
+            legacy_embedded_debug_assert(
                 behavioral_relations.get_relation(transition_i, transition_j) == behavioral_relation::INTERLEAVED ||
                 behavioral_relations.get_relation(transition_i, transition_j) == behavioral_relation::EXCLUSIVE);
             behavioral_relations.set_relation(transition_i, transition_j, behavioral_relation::INTERLEAVED);

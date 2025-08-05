@@ -7,8 +7,8 @@
 
 #include "concurrency/concurrency_utils.h"
 #include "concurrency/shared_counting_mutex.h"
-#include "ctl/memory/meminfo.h"
-#include "ctl/memory/memory_consumption_tracker.h"
+#include "legacy_embedded_ctl/memory/meminfo.h"
+#include "legacy_embedded_ctl/memory/memory_consumption_tracker.h"
 #include "log/log.h"
 #include "modules/common/call_and_log_unsafe_callable.h"
 #include "modules/common/execution_context.h"
@@ -23,9 +23,9 @@ namespace celonis::accelerator::memory::management {
 static constexpr std::chrono::seconds WARNING_UPPER_BOUND{10};
 
 memory_manager::memory_manager(std::shared_ptr<cube::execution::tracking::operator_statistics> op_statistics)
-    : meminfo_fetcher_([]() { return ctl::fetch_current_full_meminfo(); }), op_statistics_(std::move(op_statistics)) {}
+    : meminfo_fetcher_([]() { return legacy_embedded_ctl::fetch_current_full_meminfo(); }), op_statistics_(std::move(op_statistics)) {}
 
-void memory_manager::set_meminfo_fetcher(std::function<ctl::full_meminfo()> meminfo_fetcher) {
+void memory_manager::set_meminfo_fetcher(std::function<legacy_embedded_ctl::full_meminfo()> meminfo_fetcher) {
   meminfo_fetcher_ = std::move(meminfo_fetcher);
 }
 
@@ -57,7 +57,7 @@ std::vector<std::pair<data_handler_t, mem_time_t>> memory_manager::unsafe_get_gr
 }
 
 std::pair<std::vector<volatile_group_t>, std::vector<managed_group_t>> memory_manager::get_groups(
-    std::chrono::seconds wait_time, ctl::source_location source_location) const {
+    std::chrono::seconds wait_time, legacy_embedded_ctl::source_location source_location) const {
   const auto set_lock{concurrency::lock_shared_validated(data_mutex_, wait_time, source_location)};
   common::timer timer;
 
@@ -138,20 +138,20 @@ bool memory_manager::evict_cache_if_needed(const memory_threshold& threshold, co
 
     if (!usage.has_value()) {
       log::jwarn("Failed to retrieve usage",
-                 ctl::meminfo_change_json(old_memory_status, curr_memory_status, std::nullopt, "Eviction"));
+                 legacy_embedded_ctl::meminfo_change_json(old_memory_status, curr_memory_status, std::nullopt, "Eviction"));
       return true;  // leave function as we can not get current memory usage
     }
 
     if (usage.value() <= threshold.lower()) {
       log::jinfo("End memory eviction early",
-                 ctl::meminfo_change_json(old_memory_status, curr_memory_status, std::nullopt, "Eviction"));
+                 legacy_embedded_ctl::meminfo_change_json(old_memory_status, curr_memory_status, std::nullopt, "Eviction"));
       return true;  // leave function as enough data was evicted
     }
   }
 #endif
 
   log::jinfo("High Memory",
-             ctl::meminfo_change_json(old_memory_status, curr_memory_status, not_swapped_bytes, "Eviction"));
+             legacy_embedded_ctl::meminfo_change_json(old_memory_status, curr_memory_status, not_swapped_bytes, "Eviction"));
   return true;
 }
 
@@ -171,7 +171,7 @@ memory_info memory_manager::get_data_status() const {
   return info;
 }
 
-ctl::full_meminfo memory_manager::get_memory_status() const { return meminfo_fetcher_(); }
+legacy_embedded_ctl::full_meminfo memory_manager::get_memory_status() const { return meminfo_fetcher_(); }
 
 void memory_manager::force_swap_in(const common::execution_context& context) const {
   const auto group_vectors{get_groups(std::chrono::seconds{60})};
@@ -205,7 +205,7 @@ void memory_manager::force_swap_out(common::execution_context& context) const {
   }
   const auto new_memory_status = get_memory_status();
   log::jinfo("Forced Swap-Out",
-             ctl::meminfo_change_json(old_memory_status, new_memory_status, std::nullopt, "Forced Swap-Out"));
+             legacy_embedded_ctl::meminfo_change_json(old_memory_status, new_memory_status, std::nullopt, "Forced Swap-Out"));
 
   release_unused_buffers();
 }
@@ -221,7 +221,7 @@ void memory_manager::force_compress() const {
   }
   const auto new_memory_status = get_memory_status();
   log::jinfo("Forced Compression",
-             ctl::meminfo_change_json(old_memory_status, new_memory_status, std::nullopt, "Forced Compression"));
+             legacy_embedded_ctl::meminfo_change_json(old_memory_status, new_memory_status, std::nullopt, "Forced Compression"));
 }
 #endif
 
@@ -370,7 +370,7 @@ void memory_manager::report_non_swapped_dhs(const collect_garbage_mem_groups_res
   if (!stop_collecting && !reported_non_swapped_dhs_ &&
       (!persistent_result.non_swapped_out_mem_handlers.empty() ||
        !volatile_result.non_swapped_out_mem_handlers.empty())) {
-    format::json::json_array_t data_handle_descriptions;
+    legacy_embedded_format::json::json_array_t data_handle_descriptions;
     // Since finding such dhs should be the exception, we are fine with copying the strings here
     for (const auto& description : persistent_result.non_swapped_out_mem_handlers) {
       data_handle_descriptions.emplace_back(description);
@@ -392,7 +392,7 @@ void memory_manager::report_jemalloc_and_tracker_stats(const collect_garbage_mem
     if (!jemalloc_stats.has_value()) {
       return;
     }
-    auto tracker_used{ctl::global_memory_consumption_tracker::get_consumption_tracker().cur_net_allocated()};
+    auto tracker_used{legacy_embedded_ctl::global_memory_consumption_tracker::get_consumption_tracker().cur_net_allocated()};
     log::jinfo("Reporting jemalloc and tracker stats", {{"allocated", jemalloc_stats->allocated},
                                                         {"active", jemalloc_stats->active},
                                                         {"metadata_size", jemalloc_stats->metadata_size},

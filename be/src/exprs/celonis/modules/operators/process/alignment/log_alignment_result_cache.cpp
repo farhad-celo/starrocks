@@ -4,7 +4,7 @@
 #include <mutex>
 
 #include "concurrency/concurrency_utils.h"
-#include "ctl/source_location.h"
+#include "legacy_embedded_ctl/source_location.h"
 #include "modules/operators/process/alignment/log_alignment_result.h"
 
 namespace celonis::accelerator::operators::process::alignment {

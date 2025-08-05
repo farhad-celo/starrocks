@@ -13,12 +13,12 @@
 #include <tbb/parallel_for_each.h>
 #include <tbb/parallel_sort.h>
 
-#include "ctl/assert.h"
-#include "ctl/bitset_view.h"
-#include "ctl/hash.h"
-#include "ctl/static_array.h"
-#include "ctl/utils/allocation_messages.h"
-#include "ctl/utils/allocation_reason.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/bitset_view.h"
+#include "legacy_embedded_ctl/hash.h"
+#include "legacy_embedded_ctl/static_array.h"
+#include "legacy_embedded_ctl/utils/allocation_messages.h"
+#include "legacy_embedded_ctl/utils/allocation_reason.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/int_types.h"
@@ -72,7 +72,7 @@ struct hash_key<cel_string_t> {
 
   struct hash {
     [[nodiscard]] size_t operator()(const cel_string_key& data) const {
-      return ctl::hash_murmur_64a(data.str_without_null_byte());
+      return legacy_embedded_ctl::hash_murmur_64a(data.str_without_null_byte());
     }
   };
 
@@ -111,7 +111,7 @@ class parallel_hash_table {
    public:
     explicit hash_entry_buffer(const common::execution_context& context)
         : entries_buffer_{memory::tracking::make_static_array_value_init<hash_entry>(
-              BUFFER_SIZE, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context)}
+              BUFFER_SIZE, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)}
 
     {}
     // Do not allow copy construction
@@ -122,7 +122,7 @@ class parallel_hash_table {
     hash_entry_buffer& operator=(const hash_entry_buffer&) = delete;
 
     [[nodiscard]] hash_entry* get_unused_entry(const KEY_T key) {
-      debug_assert(!is_full());
+      legacy_embedded_debug_assert(!is_full());
       auto& entry{entries_buffer_.at(next_free_entry_++)};
       entry.init(key);
       return &entry;
@@ -130,8 +130,8 @@ class parallel_hash_table {
 
     // Makes the last entry available in the buffer again
     void reclaim_last_entry(hash_entry* entry) {
-      debug_assert(next_free_entry_ > 0);
-      debug_assert(entry == &entries_buffer_[next_free_entry_ - 1], "only the last entry can be reclaimed");
+      legacy_embedded_debug_assert(next_free_entry_ > 0);
+      legacy_embedded_debug_assert(entry == &entries_buffer_[next_free_entry_ - 1], "only the last entry can be reclaimed");
       next_free_entry_--;
     }
 
@@ -141,7 +141,7 @@ class parallel_hash_table {
     bool is_full() { return size() == BUFFER_SIZE; }
 
    private:
-    ctl::static_array<hash_entry> entries_buffer_;
+    legacy_embedded_ctl::static_array<hash_entry> entries_buffer_;
     size_t next_free_entry_{0};
   };
 
@@ -152,17 +152,17 @@ class parallel_hash_table {
         context_(context),
         hasher_{hasher},
         directory_{memory::tracking::make_static_array<std::atomic<hash_entry*>>(
-            size_, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context)},
+            size_, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)},
         grain_size_{grain_size} {}
 
   /**
    * @brief inserts all input elements and returns an array that maps every element of the input to a unique hash_entry.
    * Elements with the same key point to the same hash_entry.
    */
-  ctl::static_array<hash_entry*> batch_insert_or_get(std::span<const KEY_T> keys, const ctl::bitset_view_t null_flags,
+  legacy_embedded_ctl::static_array<hash_entry*> batch_insert_or_get(std::span<const KEY_T> keys, const legacy_embedded_ctl::bitset_view_t null_flags,
                                                      const uint64_t max_num_hash_collisions_per_bucket = 100) {
     auto associated_entries{memory::tracking::make_static_array_for_overwrite<hash_entry*>(
-        keys.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context_)};
+        keys.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context_)};
 
     tbb::enumerable_thread_specific<std::vector<hash_entry_buffer>> tls_entry_buffers;
     tbb::parallel_for(
@@ -240,9 +240,9 @@ class parallel_hash_table {
     return nullptr;
   }
 
-  ctl::static_array<hash_entry*> get_entries() {
+  legacy_embedded_ctl::static_array<hash_entry*> get_entries() {
     auto entries{memory::tracking::make_static_array_for_overwrite<hash_entry*>(
-        distinct_item_count_, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context_)};
+        distinct_item_count_, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context_)};
 
     std::atomic_size_t index{0};
 
@@ -255,7 +255,7 @@ class parallel_hash_table {
       }
     });
 
-    debug_assert(entries.size() == index);
+    legacy_embedded_debug_assert(entries.size() == index);
     return entries;
   }
 
@@ -270,7 +270,7 @@ class parallel_hash_table {
   const common::execution_context& context_;
   [[no_unique_address]] const HASHER_T hasher_;
 
-  ctl::static_array<std::atomic<hash_entry*>> directory_;
+  legacy_embedded_ctl::static_array<std::atomic<hash_entry*>> directory_;
   std::vector<hash_entry_buffer> entry_buffers_;
   hash_entry null_string_entry;
 
@@ -322,7 +322,7 @@ class parallel_hash_table {
   size_t pick_hash_table_size(size_t num_elements) {
     auto hash_index = hash_policy_.next_size_over(num_elements);
     hash_policy_.commit(hash_index);
-    debug_assert(num_elements > 0, "the hash table must have at least a bucket");
+    legacy_embedded_debug_assert(num_elements > 0, "the hash table must have at least a bucket");
     return num_elements;
   }
 };

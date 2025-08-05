@@ -7,8 +7,8 @@
 
 #include <fmt/format.h>
 
-#include "ctl/assert.h"
-#include "ctl/type_traits.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/type_traits.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/operators/process/bpmn/edge.h"
 #include "modules/operators/process/bpmn/vertex_types.h"
@@ -40,8 +40,8 @@ static constexpr std::array<std::string_view, 6> BPMN_BLOCK_TYPE_STRINGS{"ACTIVI
                                                                          "SEQUENCE", "REDO",      "ROOT"};
 
 [[nodiscard]] inline cel_int_t to_column_value(const bpmn_block_type value) {
-  debug_assert(value != bpmn_block_type::INVALID);
-  return ctl::enum_to_underlying_type(value);
+  legacy_embedded_debug_assert(value != bpmn_block_type::INVALID);
+  return legacy_embedded_ctl::enum_to_underlying_type(value);
 }
 
 [[nodiscard]] inline std::string to_string(const bpmn_block_type value) {

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ctl/bitset_view.h"
-#include "ctl/dynamic_bitset_fwd.h"
+#include "legacy_embedded_ctl/bitset_view.h"
+#include "legacy_embedded_ctl/dynamic_bitset_fwd.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/management/const_bitset_data_accessor_fwd.h"
 #include "modules/memory/management/data_handler.h"

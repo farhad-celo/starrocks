@@ -13,7 +13,7 @@ namespace {
 /** Mapping from old to new vertex IDs */
 using vertex_id_mapping_t = std::unordered_map<vertex_id_type, vertex_id_type>;
 
-vertex_id_mapping_t remap_vertices(const bpmn_graph& graph, const ctl::static_array<row_id>& mapping_vector,
+vertex_id_mapping_t remap_vertices(const bpmn_graph& graph, const legacy_embedded_ctl::static_array<row_id>& mapping_vector,
                                    bpmn_graph_builder& bldr) {
   vertex_id_mapping_t new_vertex_ids{};
   std::ranges::for_each(graph.get_vertices(), [&](const auto& pair) {
@@ -52,7 +52,7 @@ void remap_node_id_to_block_id_mapping(const bpmn_graph_with_block_structure& gr
 
 }  // anonymous namespace
 
-bpmn_graph remap_task_ids(const bpmn_graph& graph, const ctl::static_array<row_id>& mapping_vector) {
+bpmn_graph remap_task_ids(const bpmn_graph& graph, const legacy_embedded_ctl::static_array<row_id>& mapping_vector) {
   bpmn_graph_builder bldr{};
   const auto new_vertex_ids{remap_vertices(graph, mapping_vector, bldr)};
   remap_edges(graph, new_vertex_ids, bldr);
@@ -60,7 +60,7 @@ bpmn_graph remap_task_ids(const bpmn_graph& graph, const ctl::static_array<row_i
 }
 
 bpmn_graph_with_block_structure remap_task_ids(const bpmn_graph_with_block_structure& graph,
-                                               const ctl::static_array<row_id>& mapping_vector) {
+                                               const legacy_embedded_ctl::static_array<row_id>& mapping_vector) {
   bpmn_graph_with_block_structure_builder bldr{};
   const auto new_vertex_ids{remap_vertices(graph, mapping_vector, bldr)};
   remap_edges(graph, new_vertex_ids, bldr);

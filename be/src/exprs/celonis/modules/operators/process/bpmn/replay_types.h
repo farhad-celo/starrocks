@@ -6,8 +6,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "ctl/memory/resource_owning_allocator.h"
-#include "ctl/named_type.h"
+#include "legacy_embedded_ctl/memory/resource_owning_allocator.h"
+#include "legacy_embedded_ctl/named_type.h"
 #include "modules/common/int_types.h"
 #include "modules/operators/process/bpmn/edge.h"
 #include "modules/operators/process/bpmn/vertex_types.h"
@@ -16,19 +16,19 @@
 namespace celonis::accelerator::operators::process::bpmn {
 
 // A strongly typed trace of activity ids, i.e. a variant
-using activity_trace_t = ctl::named_type<std::vector<row_id>, struct strong_variant_type, ctl::strongly_typed_vector>;
+using activity_trace_t = legacy_embedded_ctl::named_type<std::vector<row_id>, struct strong_variant_type, legacy_embedded_ctl::strongly_typed_vector>;
 // A strongly typed trace of arbitrary row_ids, e.g. a sequence of timestamp column row_ids
-using trace_t = ctl::named_type<std::vector<row_id>, struct strong_trace_type, ctl::strongly_typed_vector>;
+using trace_t = legacy_embedded_ctl::named_type<std::vector<row_id>, struct strong_trace_type, legacy_embedded_ctl::strongly_typed_vector>;
 
 /**
  * A token represents an enabled vertex in the marking of a BPMN model. To uniquely identify the source of a token in a
  * marking, it can simply be defined as an edge.
  */
 using token_t = edge;
-using tokens_t = std::vector<token_t, ctl::resource_owning_allocator<token_t>>;
+using tokens_t = std::vector<token_t, legacy_embedded_ctl::resource_owning_allocator<token_t>>;
 
 /** A marking represents one unique state of tokens on the BPMN graph during replay execution. */
-using marking_t = std::multiset<token_t, std::less<>, ctl::resource_owning_allocator<token_t>>;
+using marking_t = std::multiset<token_t, std::less<>, legacy_embedded_ctl::resource_owning_allocator<token_t>>;
 
 class marking_with_num_fired_tasks {
  public:
@@ -52,17 +52,17 @@ struct marking_hash {
 
 /**
  * A collection of markings (found during replaying)
- * A std::scoped_allocator_adaptor is used such that the ctl::resource_owning_allocator gets passed down into
+ * A std::scoped_allocator_adaptor is used such that the legacy_embedded_ctl::resource_owning_allocator gets passed down into
  * marking_t.
  */
-using set_allocator_type = std::scoped_allocator_adaptor<ctl::resource_owning_allocator<marking_t>>;
+using set_allocator_type = std::scoped_allocator_adaptor<legacy_embedded_ctl::resource_owning_allocator<marking_t>>;
 using markings_t = std::unordered_set<marking_t, marking_hash, std::equal_to<>, set_allocator_type>;
 
 /** Represents a token transition which contains the consumed (enabled) tokens and the produced tokens thereof */
 class transition final {
  public:
   // Allocator used for the consumed_ and produced_ tokens.
-  using allocator_type = ctl::resource_owning_allocator<token_t>;
+  using allocator_type = legacy_embedded_ctl::resource_owning_allocator<token_t>;
 
   /** Allows to skip the transition invariant validation when the transition is used for inverse firing */
   [[nodiscard]] static transition swap_transition_direction(transition transition_to_swap);

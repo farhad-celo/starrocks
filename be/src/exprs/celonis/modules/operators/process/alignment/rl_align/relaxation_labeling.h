@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
 #include "modules/operators/process/alignment/petri_net_information.h"
 #include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
@@ -37,7 +37,7 @@ struct continuous_assignment_mapper {
 
   continuous_assignment get_continuous_assignment(petri_net::variable_to_transition_assignment assignment) {
     // If assignment was previously mapped, we get an error
-    debug_assert(std::find(std::cbegin(continuous_to_pair_), std::cend(continuous_to_pair_), assignment) ==
+    legacy_embedded_debug_assert(std::find(std::cbegin(continuous_to_pair_), std::cend(continuous_to_pair_), assignment) ==
                  std::cend(continuous_to_pair_));
 
     const auto cur_size{static_cast<uint32_t>(continuous_to_pair_.size())};
@@ -46,7 +46,7 @@ struct continuous_assignment_mapper {
   }
 
   const petri_net::variable_to_transition_assignment& operator[](continuous_assignment cont_assignment) const {
-    debug_assert(cont_assignment.id < continuous_to_pair_.size());
+    legacy_embedded_debug_assert(cont_assignment.id < continuous_to_pair_.size());
     return continuous_to_pair_[cont_assignment.id];
   }
 

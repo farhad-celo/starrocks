@@ -3,7 +3,7 @@
 #include <initializer_list>
 #include <memory>
 
-#include "ctl/dynamic_bitset.h"
+#include "legacy_embedded_ctl/dynamic_bitset.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/null_flags_fwd.h"

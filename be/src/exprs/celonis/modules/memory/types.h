@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "ctl/named_type.h"
+#include "legacy_embedded_ctl/named_type.h"
 
 namespace celonis::accelerator::memory {
 
@@ -13,11 +13,11 @@ namespace celonis::accelerator::memory {
 using mem_clock_t = std::chrono::steady_clock;
 using mem_time_t = mem_clock_t::time_point;
 
-using usage_time_t = ctl::named_type<mem_time_t, struct usage_time_tag, ctl::comparable,
-                                     ctl::implicitly_convertible_to<mem_time_t>::templ>;
-using load_time_t = ctl::named_type<mem_time_t, struct load_time_tag, ctl::comparable,
-                                    ctl::implicitly_convertible_to<mem_time_t>::templ>;
+using usage_time_t = legacy_embedded_ctl::named_type<mem_time_t, struct usage_time_tag, legacy_embedded_ctl::comparable,
+                                     legacy_embedded_ctl::implicitly_convertible_to<mem_time_t>::templ>;
+using load_time_t = legacy_embedded_ctl::named_type<mem_time_t, struct load_time_tag, legacy_embedded_ctl::comparable,
+                                    legacy_embedded_ctl::implicitly_convertible_to<mem_time_t>::templ>;
 
-using zero_init_t = ctl::named_type<bool, struct zero_init_tag>;
+using zero_init_t = legacy_embedded_ctl::named_type<bool, struct zero_init_tag>;
 
 }  // namespace celonis::accelerator::memory

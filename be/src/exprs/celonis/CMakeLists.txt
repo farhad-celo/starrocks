@@ -76,8 +76,8 @@ add_main_source(operators/process/inductive_miner)
 
 # modularization split
 add_module("concurrency")
-add_module("ctl")
-add_module("format")
+add_module("legacy_embedded_ctl")
+add_module("legacy_embedded_format")
 add_module("logging")
 add_module("types")
 

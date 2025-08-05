@@ -7,7 +7,7 @@
 #include <boost/graph/depth_first_search.hpp>
 
 #include "align_model.h"
-#include "ctl/hash.h"
+#include "legacy_embedded_ctl/hash.h"
 #include "modules/operators/process/bpmn/bpmn_graph_fwd.h"
 #include "partial_order_graph.h"
 
@@ -60,8 +60,8 @@ struct replay_component {
 
 struct replay_component_hasher {
   size_t operator()(const replay_component& component) const {
-    size_t hash{ctl::hash_range(component.edges_as_vertices)};
-    ctl::hash_combine(hash, component.component_type);
+    size_t hash{legacy_embedded_ctl::hash_range(component.edges_as_vertices)};
+    legacy_embedded_ctl::hash_combine(hash, component.component_type);
     return hash;
   }
 };

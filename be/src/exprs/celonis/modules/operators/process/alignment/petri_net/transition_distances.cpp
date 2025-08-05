@@ -1,6 +1,6 @@
 #include "transition_distances.h"
 
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/conversion.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net {
 
@@ -70,7 +70,7 @@ void set_parallel_section_distances(transition_distances_matrix& transition_dist
       return !string_to_int_mapper::is_tau_transition(pn.accessor().get_label(transition));
     }};
     transition_distances_matrix::distance_type current_distance{is_labelled(from) ? 1 : 0};
-    current_distance += ctl::cast<transition_distances_matrix::distance_type>(
+    current_distance += legacy_embedded_ctl::cast<transition_distances_matrix::distance_type>(
         std::count_if(begin(transitions), end(transitions), is_labelled));
 
     transition_distances.update_distance(from, to, current_distance);

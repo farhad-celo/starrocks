@@ -2,7 +2,7 @@
 
 #include <unordered_map>
 
-#include "format/json/json_fwd.h"
+#include "legacy_embedded_format/json/json_fwd.h"
 #include "modules/common/int_types.h"
 #ifndef CELOSTAR
 #include "modules/cube/execution/tracking/operator_tracker_fwd.h"
@@ -171,7 +171,7 @@ class inductive_miner_statistics {
       const cube::execution::tracking::add_telemetry_counter_fn& add_telemetry_counter) const;
 #endif
 
-  format::json::json_object_t to_json() const;
+  legacy_embedded_format::json::json_object_t to_json() const;
 
  private:
   std::unordered_map<std::string, size_t> data_{};

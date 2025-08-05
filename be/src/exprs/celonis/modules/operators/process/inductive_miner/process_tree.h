@@ -6,7 +6,7 @@
 #include <variant>
 #include <vector>
 
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
@@ -181,7 +181,7 @@ struct process_tree {
   template <typename F>
   [[nodiscard]] bool any_child_of(const process_tree::node_type& n, F&& f) const {
     return std::visit(
-        ctl::overloaded{[&f](const exclusive& p) { return std::any_of(begin(p.children), end(p.children), f); },
+        legacy_embedded_ctl::overloaded{[&f](const exclusive& p) { return std::any_of(begin(p.children), end(p.children), f); },
                         [&f](const redo& p) { return std::any_of(begin(p.children), end(p.children), f); },
                         [&f](const parallel& p) { return std::any_of(begin(p.children), end(p.children), f); },
                         [&f](const sequence& p) { return std::any_of(begin(p.children), end(p.children), f); },

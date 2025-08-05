@@ -18,7 +18,7 @@ execution_context::execution_context() noexcept
       extended_tables_{std::make_shared<cube::extended_tables>()} {}
 
 execution_context::execution_context(const std::string& operation_name,
-                                     ctl::abstract_strategy_t memory_tracking_strategy) noexcept
+                                     legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy) noexcept
     : span_{std::make_shared<tracing::span>(operation_name, tracing::tags_t{})},
       memory_tracking_strategy_{std::move(memory_tracking_strategy)},
       table_to_user_visible_name_mapping_{std::make_shared<cube::table_to_user_visible_name_mapping>()},
@@ -27,7 +27,7 @@ execution_context::execution_context(const std::string& operation_name,
 #ifndef CELOSTAR
 execution_context::execution_context(const std::string& operation_name,
                                      const CommunicationRequest_ExecutionContext& remote_context,
-                                     ctl::abstract_strategy_t memory_tracking_strategy) noexcept
+                                     legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy) noexcept
     : span_{remote_context.has_span_context()
                 ? std::make_shared<tracing::span>(operation_name, tracing::tags_t{}, remote_context.span_context())
                 : std::make_shared<tracing::span>(operation_name, tracing::tags_t{})},
@@ -82,11 +82,11 @@ execution_context::execution_context(execution_context&& other_context) noexcept
   }
 }
 
-void execution_context::set_memory_tracking_strategy(ctl::abstract_strategy_t memory_tracking_strategy) {
+void execution_context::set_memory_tracking_strategy(legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy) {
   memory_tracking_strategy_ = std::move(memory_tracking_strategy);
 }
 
-const ctl::abstract_strategy_t& execution_context::get_memory_tracking_strategy() const {
+const legacy_embedded_ctl::abstract_strategy_t& execution_context::get_memory_tracking_strategy() const {
   return memory_tracking_strategy_;
 }
 

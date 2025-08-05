@@ -9,9 +9,9 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
-#include "ctl/assert.h"
-#include "ctl/memory/batched_tracking_memory_resource.h"
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/memory/batched_tracking_memory_resource.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "log/log.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/hash_cache_key.h"
@@ -192,20 +192,20 @@ class exec_fill_variants_to_pruned_variants_map {
       : distinct_variants_{distinct_variants}, context{context} {}
 
   template <class TUPLE>
-  ctl::static_array<row_id> operator()(const TUPLE& t) const {
+  legacy_embedded_ctl::static_array<row_id> operator()(const TUPLE& t) const {
     auto mapping_result{memory::tracking::make_static_array_value_init<row_id>(
-        distinct_variants_, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context)};
+        distinct_variants_, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
 
     const auto variant_column_ptrs_ac{std::get<0>(t).get_const_accessor()};
     const auto pruned_variant_column_ptrs_ac{std::get<1>(t).get_const_accessor()};
 
     const auto variant_column_ptrs_size{variant_column_ptrs_ac.size()};
-    debug_assert(variant_column_ptrs_size == pruned_variant_column_ptrs_ac.size());
+    legacy_embedded_debug_assert(variant_column_ptrs_size == pruned_variant_column_ptrs_ac.size());
 
     for (size_t i{0}; i < variant_column_ptrs_size; ++i) {
       const auto variant_id{static_cast<row_id>(variant_column_ptrs_ac[i])};
       const auto pruned_variant_id{static_cast<row_id>(pruned_variant_column_ptrs_ac[i])};
-      debug_assert(variant_id < distinct_variants_);
+      legacy_embedded_debug_assert(variant_id < distinct_variants_);
       mapping_result[variant_id] = pruned_variant_id;
     }
 
@@ -219,7 +219,7 @@ class exec_fill_variants_to_pruned_variants_map {
 
 class pruned_to_full_variant_mapper {
  public:
-  explicit pruned_to_full_variant_mapper(ctl::static_array<row_id> variant_to_pruned_variant_map)
+  explicit pruned_to_full_variant_mapper(legacy_embedded_ctl::static_array<row_id> variant_to_pruned_variant_map)
       : variant_to_pruned_variant_map_{std::move(variant_to_pruned_variant_map)} {}
 
   vector_of_alignments execute(const vector_of_alignments& pruned_alignments, const common::execution_context& context,
@@ -298,7 +298,7 @@ class pruned_to_full_variant_mapper {
     return result;
   }
 
-  ctl::static_array<row_id> variant_to_pruned_variant_map_;
+  legacy_embedded_ctl::static_array<row_id> variant_to_pruned_variant_map_;
 };
 
 /**
@@ -411,7 +411,7 @@ log_alignment_result_t alignment_operator::calculate_log_alignment(const std::st
     auto merged_dictionaries{
         memory::merge_n_dictionaries_raw(dict_vector, get_user_visible_operator_name(), operator_context)};
     const auto pruned_dict_mapping{std::move(merged_dictionaries.mappings.at(1))};
-    debug_assert(static_cast<row_id>(pruned_dict_mapping.size()) == pruned_dict->get_size());
+    legacy_embedded_debug_assert(static_cast<row_id>(pruned_dict_mapping.size()) == pruned_dict->get_size());
 
     string_to_int_mapper str_mapper{dict};
     const auto pn_repr{petri_net::get_pn_repr_from_operator_input(node_.petri_net_description(), str_mapper)};

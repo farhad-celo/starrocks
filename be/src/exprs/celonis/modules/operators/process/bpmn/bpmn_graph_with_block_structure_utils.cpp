@@ -86,7 +86,7 @@ struct mapping_and_count_of_valid_blocks {
       ++count_of_valid_blocks;
     }
   }
-  debug_assert(count_of_valid_blocks ==
+  legacy_embedded_debug_assert(count_of_valid_blocks ==
                (block_ids_mapping.size() - std::ranges::count(block_ids_mapping, INVALID_BLOCK_ID)));
 
   return {block_ids_mapping, count_of_valid_blocks};
@@ -94,7 +94,7 @@ struct mapping_and_count_of_valid_blocks {
 
 [[nodiscard]] bpmn_block block_with_new_block_and_parent_id(bpmn_block old_block, const bpmn_block_id_t new_block_id,
                                                             const bpmn_block_id_t new_parent_block_id) {
-  debug_assert(is_valid_block(old_block));
+  legacy_embedded_debug_assert(is_valid_block(old_block));
   old_block.block_id = new_block_id;
   old_block.parent_id = new_parent_block_id;
   return old_block;
@@ -142,7 +142,7 @@ blocks_and_mapping_result remove_invalidated_blocks_and_apply_remapping(
       result.mapping.at(new_block_id) = old_mapping.at(old_block_id);
     }
   }
-  debug_assert(std::ranges::all_of(result.blocks, [&blocks = std::as_const(result.blocks)](const bpmn_block& block) {
+  legacy_embedded_debug_assert(std::ranges::all_of(result.blocks, [&blocks = std::as_const(result.blocks)](const bpmn_block& block) {
     const auto block_idx{std::distance(blocks.data(), &block)};  // compute the index of 'block' within 'blocks'
     return block.block_id == block_idx;
   }));

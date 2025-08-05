@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ctl/static_array.h>
+#include <legacy_embedded_ctl/static_array.h>
 
 #include "modules/common/shared_types.h"
 #include "modules/memory/data_array_types.h"
@@ -31,9 +31,9 @@ using raw_dictionary_t = std::unique_ptr<raw_dictionary>;
 template <class T>
 class typed_raw_dictionary : public raw_dictionary {
  public:
-  explicit typed_raw_dictionary(ctl::static_array<T>&& data)
+  explicit typed_raw_dictionary(legacy_embedded_ctl::static_array<T>&& data)
       : raw_dictionary(get_matching_data_type<T>()), data_(std::move(data)) {}
-  ctl::static_array<T>&& release_data() && noexcept { return std::move(data_); }
+  legacy_embedded_ctl::static_array<T>&& release_data() && noexcept { return std::move(data_); }
   dictionary_t convert_to_dictionary_t_release_data(const std::string& swap_file, const management::swap_info& sinfo,
                                                     const std::string& description) final {
     auto handler = management::raw_data_handler<T>::create_data_handler(
@@ -45,17 +45,17 @@ class typed_raw_dictionary : public raw_dictionary {
   [[nodiscard]] size_t get_size() const noexcept final { return data_.size(); }
 
  private:
-  ctl::static_array<T> data_;
+  legacy_embedded_ctl::static_array<T> data_;
 };
 
 template <>
 class typed_raw_dictionary<cel_string_t> : public raw_dictionary {
  public:
-  typed_raw_dictionary(ctl::static_array<cel_string_t>&& data, ctl::static_array<char>&& buffer)
+  typed_raw_dictionary(legacy_embedded_ctl::static_array<cel_string_t>&& data, legacy_embedded_ctl::static_array<char>&& buffer)
       : raw_dictionary{data_type::cel_string}, data_{std::move(data)}, buffer_{std::move(buffer)} {}
 
-  [[nodiscard]] ctl::static_array<cel_string_t>&& release_data() && noexcept { return std::move(data_); }
-  [[nodiscard]] ctl::static_array<char>&& release_buffer() && noexcept { return std::move(buffer_); }
+  [[nodiscard]] legacy_embedded_ctl::static_array<cel_string_t>&& release_data() && noexcept { return std::move(data_); }
+  [[nodiscard]] legacy_embedded_ctl::static_array<char>&& release_buffer() && noexcept { return std::move(buffer_); }
   [[nodiscard]] size_t buffer_size() const noexcept { return buffer_.size(); }
   [[nodiscard]] dictionary_t convert_to_dictionary_t_release_data(const std::string& swap_file,
                                                                   const management::swap_info& sinfo,
@@ -70,7 +70,7 @@ class typed_raw_dictionary<cel_string_t> : public raw_dictionary {
   [[nodiscard]] size_t get_size() const noexcept final { return data_.size(); }
 
  private:
-  ctl::static_array<cel_string_t> data_;
-  ctl::static_array<char> buffer_;
+  legacy_embedded_ctl::static_array<cel_string_t> data_;
+  legacy_embedded_ctl::static_array<char> buffer_;
 };
 }  // namespace celonis::accelerator::memory

@@ -13,7 +13,7 @@ class petri_net_bfs {
  public:
   explicit petri_net_bfs(uint64_t max_depth, const common::execution_context& context)
       : max_depth_{max_depth},
-        paths_{memory::management::checked_allocator<directed_edges_t>(context, ALLOC_MSG(ctl::MEMBER_INIT_MSG))} {}
+        paths_{memory::management::checked_allocator<directed_edges_t>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))} {}
 
   [[nodiscard]] std::vector<petri_net_transition_id> path_to_transition(const petri_net_accessor& pn_accessor,
                                                                         const marking_type& source_marking,

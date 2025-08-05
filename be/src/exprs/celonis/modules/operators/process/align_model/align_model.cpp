@@ -51,8 +51,8 @@ namespace {
 constexpr std::string_view OPERATOR_NAME{"ALIGN_MODEL"};
 
 struct prune_variants_result {
-  ctl::shared_static_array<row_id> pruned_activity_ids;
-  ctl::shared_static_array<row_id> pruned_trace_ids;
+  legacy_embedded_ctl::shared_static_array<row_id> pruned_activity_ids;
+  legacy_embedded_ctl::shared_static_array<row_id> pruned_trace_ids;
 };
 
 prune_variants_result prune_variants(const memory::cache::variant_trace_cache_t& variants,
@@ -77,9 +77,9 @@ prune_variants_result prune_variants(const memory::cache::variant_trace_cache_t&
     }
   }
   prune_variants_result result{memory::tracking::make_shared_static_array_for_overwrite<row_id>(
-                                   buffer.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context),
+                                   buffer.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context),
                                memory::tracking::make_shared_static_array_for_overwrite<row_id>(
-                                   buffer.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context)};
+                                   buffer.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
   std::ranges::copy(buffer, result.pruned_activity_ids.begin());
   std::ranges::copy(projection, result.pruned_trace_ids.begin());
   return result;
@@ -116,7 +116,7 @@ std::optional<alignment_move> remap_move_type(const alignment::alignment_move& m
       return alignment_move{alignment_move_type::UNMAPPED_MOVE, move.label(), std::nullopt};
     }
     default:
-      ctl::assert_unreachable();
+      legacy_embedded_ctl::assert_unreachable();
   }
 }
 
@@ -205,7 +205,7 @@ constexpr bool is_gateway_move(const alignment_move& move) {
   const auto end_gateway_iter{std::find_if(std::rbegin(alignment), std::rend(alignment), is_gateway_move)};
 
   // we cannot have a valid alignment that does not visit the END vertex
-  debug_assert(end_gateway_iter != std::rend(alignment));
+  legacy_embedded_debug_assert(end_gateway_iter != std::rend(alignment));
 
   // .base() for a reverse iterator points to the next element than the reverse-iterator points to
   //  This is undefined behavior if end_gateway_iter == std::rend(alignment)
@@ -218,7 +218,7 @@ alignment_t pruned_to_full_variant(std::span<const alignment_move> pruned_alignm
 
   // The start node should lead the alignment
   const auto pruned_start_gateway_it{std::ranges::find_if(pruned_alignment, is_gateway_move)};
-  debug_assert(pruned_start_gateway_it != std::end(pruned_alignment));
+  legacy_embedded_debug_assert(pruned_start_gateway_it != std::end(pruned_alignment));
   result.emplace_back(*pruned_start_gateway_it);
 
   // for a valid alignment, the end iter always points into the span
@@ -275,14 +275,14 @@ alignment_t pruned_to_full_variant(std::span<const alignment_move> pruned_alignm
   // sort consecutive log and model moves so that log moves come before model moves
   static constexpr auto is_sync_move{[](const auto& m) { return m.move_type == alignment_move_type::SYNC_MOVE; }};
 
-  debug_assert(result.size() >= 2);
+  legacy_embedded_debug_assert(result.size() >= 2);
   for (auto begin_it{std::next(begin(result))}, end_it{std::prev(end(result))},
        sync_it{std::find_if(begin_it, end_it, is_sync_move)};
        begin_it != end_it;
        begin_it = std::ranges::next(sync_it, 1, end_it), sync_it = std::find_if(begin_it, end_it, is_sync_move)) {
     std::stable_sort(begin_it, sync_it, [](const auto& lhs, const auto& rhs) {
-      debug_assert(!is_sync_move(lhs));
-      debug_assert(!is_sync_move(rhs));
+      legacy_embedded_debug_assert(!is_sync_move(lhs));
+      legacy_embedded_debug_assert(!is_sync_move(rhs));
       return is_log_or_unmapped_move(lhs) && !is_log_or_unmapped_move(rhs);
     });
   }
@@ -295,7 +295,7 @@ alignments_t map_pruned_to_full_variants(std::span<const std::optional<alignment
                                          const memory::cache::variant_trace_cache_t& full_variants,
                                          const common::execution_context& context) {
   const auto full_to_pruned_map{pruned_variants->get_case_to_trace_col_ptrs()};
-  debug_assert(full_to_pruned_map.has_value());
+  legacy_embedded_debug_assert(full_to_pruned_map.has_value());
   return memory::cast_execute_column_pointers(
       [&](auto tup) {
         const auto map_accessor{std::get<0>(tup).get_const_accessor()};
@@ -319,7 +319,7 @@ using alignment_to_string_t = std::unordered_map<petri_net_label_t, cel_string_t
 
 using buffer_lookup_t = std::unordered_set<std::string_view>;
 struct buffer_with_lookup {
-  ctl::static_array<char> buffer;
+  legacy_embedded_ctl::static_array<char> buffer;
   buffer_lookup_t buffer_lookup;
 };
 
@@ -355,7 +355,7 @@ struct enum_to_buffer_mapper {
       [](const size_t accumulated, const auto& str_view) { return accumulated + str_view.size() + 1; })};
 
   auto buffer{
-      memory::tracking::make_static_array_for_overwrite<char>(buffer_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      memory::tracking::make_static_array_for_overwrite<char>(buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
   auto* buffer_ptr{buffer.begin()};
 
   std::unordered_set<std::string_view> buffer_lookup;
@@ -370,8 +370,8 @@ struct enum_to_buffer_mapper {
     buffer_lookup.emplace(old_buff_ptr, str_view.size());
   }
 
-  debug_assert(buffer_ptr == buffer.end());
-  debug_assert(!buffer_lookup.empty());
+  legacy_embedded_debug_assert(buffer_ptr == buffer.end());
+  legacy_embedded_debug_assert(!buffer_lookup.empty());
 
   return {std::move(buffer), std::move(buffer_lookup)};
 }
@@ -387,7 +387,7 @@ struct enum_to_buffer_mapper {
       },
       context)};
 
-  debug_assert(!result.buffer_lookup.empty());
+  legacy_embedded_debug_assert(!result.buffer_lookup.empty());
   return {std::move(result.buffer), result.buffer_lookup};
 }
 
@@ -422,7 +422,7 @@ struct petri_net_label_id_to_string_mapper {
       return iter->data();
     }
 
-    debug_assert(move.move_on_model.has_value());
+    legacy_embedded_debug_assert(move.move_on_model.has_value());
     const auto bpmn_vertex_id{*move.move_on_model};
     const auto iter{buffer_lookup.find(bpmn_to_string.at(bpmn_vertex_id))};
     if (iter == buffer_lookup.end()) {
@@ -451,20 +451,20 @@ struct petri_net_label_id_to_string_mapper {
   }
 
   // The NULL string must be part of the string dict
-  debug_assert(buffer_entries.contains(std::string(NULL_STRING.data())));
+  legacy_embedded_debug_assert(buffer_entries.contains(std::string(NULL_STRING.data())));
 
   auto buffer_size{std::accumulate(std::begin(buffer_entries), std::end(buffer_entries), size_t{0},
                                    [](const auto acc, const auto& entry) { return acc + entry.size() + 1; })};
 
   auto buffer{
-      memory::tracking::make_static_array_for_overwrite<char>(buffer_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      memory::tracking::make_static_array_for_overwrite<char>(buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
   std::unordered_set<std::string_view> buffer_lookup;
 
   auto* buffer_ptr{buffer.data()};
   for (const auto& entry : buffer_entries) {
     const auto* old_buffer_ptr{buffer_ptr};
-    buffer_ptr = std::ranges::copy_n(entry.c_str(), ctl::cast<std::iter_difference_t<cel_string_t>>(entry.size() + 1),
+    buffer_ptr = std::ranges::copy_n(entry.c_str(), legacy_embedded_ctl::cast<std::iter_difference_t<cel_string_t>>(entry.size() + 1),
                                      buffer_ptr)
                      .out;
     buffer_lookup.emplace(old_buffer_ptr, entry.size());
@@ -485,20 +485,20 @@ struct table_sizes {
 
 #ifndef CELOSTAR
 struct align_model_table_data {
-  ctl::static_array<cel_int_t> alignment_bpmn_vertex_ids;
+  legacy_embedded_ctl::static_array<cel_int_t> alignment_bpmn_vertex_ids;
   memory::null_flags_t alignment_bpmn_vertex_id_nulls;
-  ctl::static_array<cel_string_t> alignment_activity_labels;
-  ctl::static_array<char> alignment_vertex_type_buffer;
-  ctl::static_array<cel_string_t> alignment_move_types;
-  ctl::static_array<char> alignment_move_buffer;
-  ctl::shared_static_array<row_id> alignment_to_activity_join;
+  legacy_embedded_ctl::static_array<cel_string_t> alignment_activity_labels;
+  legacy_embedded_ctl::static_array<char> alignment_vertex_type_buffer;
+  legacy_embedded_ctl::static_array<cel_string_t> alignment_move_types;
+  legacy_embedded_ctl::static_array<char> alignment_move_buffer;
+  legacy_embedded_ctl::shared_static_array<row_id> alignment_to_activity_join;
 
-  ctl::shared_static_array<row_id> association_to_alignment_join;
-  ctl::shared_static_array<row_id> association_to_edge_class_join;
+  legacy_embedded_ctl::shared_static_array<row_id> association_to_alignment_join;
+  legacy_embedded_ctl::shared_static_array<row_id> association_to_edge_class_join;
 
-  ctl::static_array<row_id> edge_class_ids;
-  ctl::static_array<cel_string_t> edge_class_types;
-  ctl::static_array<char> edge_class_buffer;
+  legacy_embedded_ctl::static_array<row_id> edge_class_ids;
+  legacy_embedded_ctl::static_array<cel_string_t> edge_class_types;
+  legacy_embedded_ctl::static_array<char> edge_class_buffer;
 };
 
 [[nodiscard]] auto create_column_and_join_arrays(const size_t alignment_table_size, const size_t association_table_size,
@@ -507,40 +507,40 @@ struct align_model_table_data {
                                                  const memory::column_t& activity_column,
                                                  common::execution_context& context) {
   auto alignment_bpmn_vertex_ids{memory::tracking::make_static_array_for_overwrite<cel_int_t>(
-      alignment_table_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      alignment_table_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
   memory::null_flags_t alignment_bpmn_vertex_id_nulls{memory::create_null_flags(alignment_table_size, context)};
 
   auto alignment_activity_labels{memory::tracking::make_static_array_for_overwrite<cel_string_t>(
-      alignment_table_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      alignment_table_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
   auto alignment_label_buffer_with_lookup{
       create_merged_buffer_for_alignment_labels(bpmn_to_string, *activity_column->get_string_dict(context), context)};
 
   auto alignment_move_types{memory::tracking::make_static_array_for_overwrite<cel_string_t>(
-      alignment_table_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      alignment_table_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
   auto alignment_move_buffer_with_lookup{create_buffer_for_alignment_move_type(context)};
 
   auto alignment_to_activity_join{memory::tracking::make_shared_static_array_for_overwrite<row_id>(
-      alignment_table_size, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+      alignment_table_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
 
   // the association to alignment join represents the edges - the table itself is empty
   auto association_to_alignment_join{memory::tracking::make_shared_static_array_for_overwrite<row_id>(
-      association_table_size, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+      association_table_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
 
   auto association_to_edge_class_join{memory::tracking::make_shared_static_array_for_overwrite<row_id>(
-      association_table_size, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+      association_table_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
 
   // edge class column
   // NB: we don't need to assign edge classes since if we construct the table with this column,
   //  each row is a separate edge class - so the row-number is implicitly the edge-class-id - however, this is needed
   //  for using SOURCE/TARGET with the associations table so we produce this column
   auto edge_class_ids{memory::tracking::make_static_array_for_overwrite<row_id>(
-      edge_class_table_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      edge_class_table_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
   auto edge_class_types{memory::tracking::make_static_array_for_overwrite<cel_string_t>(
-      edge_class_table_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      edge_class_table_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
   auto edge_class_buffer_with_lookup{create_buffer_for_edge_type(context)};
 
@@ -568,15 +568,15 @@ struct align_model_table_data {
   const auto edge_class_table_name{fmt::format("$${}$${}$$", options.cache_key, INTERNAL_EDGE_CLASS_TABLE_NAME)};
 
   memory::table_t alignment_table{std::make_shared<memory::table>(
-      ctl::cast<row_id>(alignment_vertex_types.size()), alignment_table_name,
+      legacy_embedded_ctl::cast<row_id>(alignment_vertex_types.size()), alignment_table_name,
       common::hash_cache_key(alignment_table_name), options.sinfo, memory::table_meta_data::make_for_operator_table(),
       memory::user_visible_table_name{alignment_table_name}, options.scope.get_table_row_limit())};
   memory::table_t association_table{std::make_shared<memory::table>(
-      ctl::cast<row_id>(association_alignment_join.size()), association_table_name,
+      legacy_embedded_ctl::cast<row_id>(association_alignment_join.size()), association_table_name,
       common::hash_cache_key(association_table_name), options.sinfo, memory::table_meta_data::make_for_operator_table(),
       memory::user_visible_table_name{association_table_name}, options.scope.get_table_row_limit())};
   memory::table_t edge_class_table{std::make_shared<memory::table>(
-      ctl::cast<row_id>(edge_class_id_data.size()), edge_class_table_name,
+      legacy_embedded_ctl::cast<row_id>(edge_class_id_data.size()), edge_class_table_name,
       common::hash_cache_key(edge_class_table_name), options.sinfo, memory::table_meta_data::make_for_operator_table(),
       memory::user_visible_table_name{edge_class_table_name}, options.scope.get_table_row_limit())};
 
@@ -600,16 +600,16 @@ struct align_model_table_data {
   alignment_table->add_string_column(memory::col_name{std::string{ALIGNMENT_MOVE_TYPE}},
                                      memory::col_id{std::string{ALIGNMENT_MOVE_TYPE}}, std::move(alignment_move_types),
                                      std::move(alignment_move_buffer),
-                                     memory::create_null_flags(ctl::cast<row_id>(alignment_move_types_size), context),
+                                     memory::create_null_flags(legacy_embedded_ctl::cast<row_id>(alignment_move_types_size), context),
                                      options.scope.get_table_row_limit());
 
   // 2. Association column
   // CPL-9615 we need to make a copy of the data (instead of using it both here and for the join).
   // Otherwise, the usage count will never be 1, so the data can not be swapped out (also see CPL-9610).
   // Note that this is a _shared_ static array, so copy() will only perform a shallow copy!
-  auto association_edge_class{ctl::make_shared_static_array<cel_int_t>(
-      std::span{association_edge_class_join}, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG),
-      memory::tracking::spawn_allocator<cel_int_t>(context, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG)))};
+  auto association_edge_class{legacy_embedded_ctl::make_shared_static_array<cel_int_t>(
+      std::span{association_edge_class_join}, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG),
+      memory::tracking::spawn_allocator<cel_int_t>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG)))};
   auto association_column{association_table->add_column<cel_int_t>(
       memory::col_name{std::string{ASSOCIATION_COLUMN_NAME}}, memory::col_id{std::string{ASSOCIATION_COLUMN_NAME}},
       association_edge_class, memory::create_null_flags(association_edge_class_join.size(), context),
@@ -716,7 +716,7 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
 
                 const auto& optional_alignment_for_case{alignments.at(variant_trace_id)};
                 const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
-                debug_assert(optional_alignment_for_case.has_value() == optional_replay_result_for_case.has_value());
+                legacy_embedded_debug_assert(optional_alignment_for_case.has_value() == optional_replay_result_for_case.has_value());
                 if (!optional_alignment_for_case) {
                   return;
                 }
@@ -738,7 +738,7 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
           std::ranges::copy(block_vector, std::back_inserter(flattened_blocks));
         }
         std::ranges::sort(flattened_blocks, std::ranges::less{}, &parallel_block_info::first);
-        debug_assert(flattened_blocks.front().first == 0);
+        legacy_embedded_debug_assert(flattened_blocks.front().first == 0);
 
         std::vector<parallel_block> result(flattened_blocks.size());
 
@@ -754,11 +754,11 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
               parallel_block{.offset_in = block_info.first,
                              .size_in = block_info.last - block_info.first,
 #ifdef CELOSTAR
-                             .offset_variant = ctl::cast<row_id>(accumulated_table_sizes.variant_table_size)};
+                             .offset_variant = legacy_embedded_ctl::cast<row_id>(accumulated_table_sizes.variant_table_size)};
 #else
-                             .offset_alignment = ctl::cast<row_id>(accumulated_table_sizes.alignment_table_size),
-                             .offset_association = ctl::cast<row_id>(accumulated_table_sizes.association_table_size),
-                             .offset_edge_class = ctl::cast<row_id>(accumulated_table_sizes.edge_class_table_size)};
+                             .offset_alignment = legacy_embedded_ctl::cast<row_id>(accumulated_table_sizes.alignment_table_size),
+                             .offset_association = legacy_embedded_ctl::cast<row_id>(accumulated_table_sizes.association_table_size),
+                             .offset_edge_class = legacy_embedded_ctl::cast<row_id>(accumulated_table_sizes.edge_class_table_size)};
 #endif
 #ifdef CELOSTAR
           accumulated_table_sizes.variant_table_size += block_info.variant_table_size;
@@ -882,7 +882,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                     const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
                     const auto& optional_alignment_for_case{alignments.at(variant_trace_id)};
                     const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
-                    debug_assert(optional_alignment_for_case.has_value() ==
+                    legacy_embedded_debug_assert(optional_alignment_for_case.has_value() ==
                                  optional_replay_result_for_case.has_value());
                     if (!optional_alignment_for_case) {
                       return;
@@ -927,7 +927,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                                   component.size(), current_edge_class_id);
                       ++current_edge_class_id;
                       // update the output size
-                      current_association_row += ctl::cast<row_id>(component.size());
+                      current_association_row += legacy_embedded_ctl::cast<row_id>(component.size());
                     }
 #endif
 
@@ -949,7 +949,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                               std::next(std::begin(edge_class_id),
                                         current_edge_class_row + replay_result_for_case.num_edge_components()),
                               current_edge_class_row);
-                    current_edge_class_row += ctl::cast<row_id>(replay_result_for_case.num_edge_components());
+                    current_edge_class_row += legacy_embedded_ctl::cast<row_id>(replay_result_for_case.num_edge_components());
 #endif
 
                     // 3. Fill ALIGNMENT table column data and join to Activity table
@@ -995,10 +995,10 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                         replay_result_for_case.alignment_to_timestamp(),
                         std::next(begin(alignment_to_activity_join), current_alignment_row),
                         [&interval](size_t alignment_relative_timestamp_join) {
-                          return ctl::cast<row_id>(interval.begin() + alignment_relative_timestamp_join);
+                          return legacy_embedded_ctl::cast<row_id>(interval.begin() + alignment_relative_timestamp_join);
                         });
 
-                    current_alignment_row += ctl::cast<row_id>(alignment_for_case.size());
+                    current_alignment_row += legacy_embedded_ctl::cast<row_id>(alignment_for_case.size());
 #endif
                   });
             },
@@ -1072,7 +1072,7 @@ bpmn_to_petri_net_result_t bpmn_to_petri_net(const bpmn::bpmn_graph& graph) {
 
     const auto& corresponding_vertex{graph.get_vertex(vertex_ref)};
     const auto label_to_be{std::visit(
-        ctl::overloaded{[](const bpmn::task& t) { return t.activity_id; },
+        legacy_embedded_ctl::overloaded{[](const bpmn::task& t) { return t.activity_id; },
                         [](const auto& /**/) { return alignment::string_to_int_mapper::get_tau_transition_id(); }},
         corresponding_vertex.get_vertex_type())};
     result.pn_str_id_to_bpmn.try_emplace(transition_str_id, vertex_ref);

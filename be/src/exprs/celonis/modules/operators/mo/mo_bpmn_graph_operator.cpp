@@ -3,8 +3,8 @@
 #include <cmath>
 #include <mutex>
 
-#include "ctl/assert.h"
-#include "format/json/json.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_format/json/json.h"
 #include "log/log.h"
 #ifndef CELOSTAR
 #include "modules/common/direct_line_optimization.h"
@@ -82,7 +82,7 @@ process::bpmn::bpmn_graph_with_block_structure filtered_eventlog_to_bpmn(
         is_valid_tree(replayed_result)) {
       tree = replayed_result;
     } else {  // replay failed, so return the original (inconsistent) inductive miner result
-      warning_assert(false, fmt::format("Replay generated an inconsistent process tree {}", pt2dot(tree, nullptr)));
+      legacy_embedded_warning_assert(false, fmt::format("Replay generated an inconsistent process tree {}", pt2dot(tree, nullptr)));
     }
   }
   return process::bpmn::convert_to_bpmn_graph_with_block_structure(tree);
@@ -103,10 +103,10 @@ process::bpmn::bpmn_graph_with_block_structure filtered_eventlog_to_bpmn(
 [[nodiscard]] process::bpmn::bpmn_graph_with_block_structure non_filtered_variants_to_bpmn(
     const mo_bpmn_graph_computation_input& computation_input, process::inductive_miner_statistics& statistics,
     cube::query_scope& scope, const common::execution_context& parent_context) {
-  debug_assert(
+  legacy_embedded_debug_assert(
       details::does_strategy_and_threshold_allow_for_variant_based_approach(computation_input.selection_strategy()),
       "At this moment, the variant path is not supported for [{}]", to_string(computation_input.selection_strategy()));
-  debug_assert(computation_input.has_variants_input());
+  legacy_embedded_debug_assert(computation_input.has_variants_input());
   const auto context{parent_context.create_sub_context("non_filtered_variants_to_bpmn", {})};
 
   const auto& variant_entries{computation_input.get_variants_input().variant_entries};
@@ -149,7 +149,7 @@ double cost_of(const process::bpmn::bpmn_graph& graph) {
   }
   const auto num_gateways{
       std::accumulate(begin(graph.get_vertices()), end(graph.get_vertices()), 0., [](double acc, const auto& pair) {
-        return acc + std::visit(ctl::overloaded{[](const process::bpmn::parallel& /*unused*/) { return 1; },
+        return acc + std::visit(legacy_embedded_ctl::overloaded{[](const process::bpmn::parallel& /*unused*/) { return 1; },
                                                 [](const process::bpmn::exclusive_choice& /*unused*/) { return 1; },
                                                 [](const auto& /*fallback*/) { return 0; }},
                                 pair.second.get_vertex_type());
@@ -215,7 +215,7 @@ std::pair<incremental_eventlog, size_t> get_incremental_eventlog(
       //      std::iota(begin(activities_to_cover), end(activities_to_cover), row_id{0});
       //      return incremental_eventlog::activity_cover(
       //          activities_to_cover, activity_column, case_column,
-      //          cube::filter_bitset_t{ctl::cast<size_t>(activity_column->get_row_count(context)), false}, context);
+      //          cube::filter_bitset_t{legacy_embedded_ctl::cast<size_t>(activity_column->get_row_count(context)), false}, context);
       //    }
     case mo_bpmn_graph_data_selection_strategy::happy_path_strategy::set_cover:
     case mo_bpmn_graph_data_selection_strategy::happy_path_strategy::frequency:
@@ -224,7 +224,7 @@ std::pair<incremental_eventlog, size_t> get_incremental_eventlog(
       return std::pair{
           incremental_eventlog::frequency_decreasing(
               activity_column, case_column,
-              cube::filter_bitset_t{ctl::cast<size_t>(activity_column->get_row_count(context)), false}, context),
+              cube::filter_bitset_t{legacy_embedded_ctl::cast<size_t>(activity_column->get_row_count(context)), false}, context),
           size_t{1}};
   }
 }
@@ -255,7 +255,7 @@ std::pair<incremental_eventlog, size_t> get_incremental_eventlog(
   // we store all intermediately computed BPMN graphs here (also for future slider functionality):
   compute_bpmn_cached compute_bpmn{eventlog_increments, computation_input, grain_size, statistics, context, scope};
   if (eventlog_increments.variant_count() == 0) {
-    return compute_bpmn(ctl::cast<row_id>(min_increments)).extract_graph();
+    return compute_bpmn(legacy_embedded_ctl::cast<row_id>(min_increments)).extract_graph();
   }
 
   const auto complexity_threshold{computation_input.selection_strategy().complexity_threshold()};
@@ -287,7 +287,7 @@ std::pair<incremental_eventlog, size_t> get_incremental_eventlog(
       std::vector<std::pair<row_id, double>> num_variants_utility_values_pairs{};
 
       num_variants = common::extended_line_search(
-                         common::iterator::index_input_iterator{ctl::cast<row_id>(min_increments)},
+                         common::iterator::index_input_iterator{legacy_embedded_ctl::cast<row_id>(min_increments)},
                          common::iterator::index_input_iterator<row_id>{eventlog_increments.variant_count() + 1},
                          [&, max_count = static_cast<double>(eventlog_increments.object_count())](auto num_retained) {
                            const auto result{compute_bpmn(num_retained)};
@@ -340,7 +340,7 @@ std::pair<incremental_eventlog, size_t> get_incremental_eventlog(
     }
   }
 
-  ctl::assert_unreachable();
+  legacy_embedded_ctl::assert_unreachable();
 }
 #endif
 
@@ -412,7 +412,7 @@ mo_bpmn_graph_operator::compute_graph_result mo_bpmn_graph_operator::compute_gra
   // TODO(bluppes): CPL-7544 remove eventually
   const auto dictionary_data{string_dict.get_const_data(operator_context_)};
 #ifndef CELOSTAR
-  format::json::json_object_t log_details{{"Merged graph", process::bpmn2dot(graph, dictionary_data.get())}};
+  legacy_embedded_format::json::json_object_t log_details{{"Merged graph", process::bpmn2dot(graph, dictionary_data.get())}};
   log::jinfo("Merged graph information", log_details);
 #endif
 
@@ -454,8 +454,8 @@ details::bpmn_graph_with_dict merge_bpmn_graphs(
     std::vector<process::bpmn::bpmn_graph_with_block_structure> graphs,
     const std::vector<std::pair<memory::dictionary_t, std::string>>& dictionaries,
     const common::execution_context& parent_context) {
-  debug_assert(graphs.size() == dictionaries.size());
-  debug_assert(!graphs.empty());
+  legacy_embedded_debug_assert(graphs.size() == dictionaries.size());
+  legacy_embedded_debug_assert(!graphs.empty());
 
   const auto context{parent_context.create_sub_context("merge_bpmn_models", {})};
 
@@ -465,7 +465,7 @@ details::bpmn_graph_with_dict merge_bpmn_graphs(
 
   auto merge_result{memory::merge_n_dictionaries_raw(
       dictionaries, mo_bpmn_graph_operator::get_user_visible_operator_name(), context)};
-  auto dict{std::visit(ctl::overloaded{[](memory::raw_dictionary_t&& raw_dict) {
+  auto dict{std::visit(legacy_embedded_ctl::overloaded{[](memory::raw_dictionary_t&& raw_dict) {
                                          return raw_dict->convert_to_dictionary_t_release_data(
                                              "", memory::management::no_swap(), "");
                                        },

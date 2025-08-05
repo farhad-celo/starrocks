@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/cube/filter_bitset.h"
 #include "modules/memory/column.h"
 #include "modules/memory/row_id.h"
@@ -83,16 +83,16 @@ class incremental_eventlog {
 
  private:
   incremental_eventlog(memory::column_t case_column, cube::filter_bitset_t filter,
-                       ctl::shared_static_array<row_id> ranking,
-                       ctl::shared_static_array<row_id> accumulated_variant_counts)
+                       legacy_embedded_ctl::shared_static_array<row_id> ranking,
+                       legacy_embedded_ctl::shared_static_array<row_id> accumulated_variant_counts)
       : case_column_{std::move(case_column)},
         initial_filter_{std::move(filter)},
         ranking_{std::move(ranking)},
         accumulated_variant_counts_{std::move(accumulated_variant_counts)} {}
   memory::column_t case_column_;
   cube::filter_bitset_t initial_filter_;
-  ctl::shared_static_array<row_id> ranking_;
-  ctl::shared_static_array<row_id> accumulated_variant_counts_;
+  legacy_embedded_ctl::shared_static_array<row_id> ranking_;
+  legacy_embedded_ctl::shared_static_array<row_id> accumulated_variant_counts_;
 };
 
 }  // namespace celonis::accelerator::operators::mo

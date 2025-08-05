@@ -4,8 +4,8 @@
 
 #include <boost/date_time/gregorian/gregorian.hpp>
 
-#include "ctl/assert.h"
-#include "ctl/type_traits.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/type_traits.h"
 #include "modules/common/date/celonis_date_storage.h"
 #include "modules/common/do_check.h"
 #include "modules/common/int_types.h"
@@ -106,7 +106,7 @@ inline celonis_date_storage from_julian_day_number_and_millis(int64_t julian_day
       std::is_same_v<DO_CHECK_TAG, common::do_check<true>> || std::is_same_v<DO_CHECK_TAG, common::do_check<false>>,
       "Template parameter 'TAG' must be of type 'do_check<bool>'.");
   static constexpr uint32_t JULIAN_REF_DATE = 2440588;  // boost::gregorian::date(1970, 1, 1).julian_day()
-  debug_assert(JULIAN_REF_DATE == boost::gregorian::date(1970, 1, 1).julian_day());
+  legacy_embedded_debug_assert(JULIAN_REF_DATE == boost::gregorian::date(1970, 1, 1).julian_day());
   const int64_t days = julian_day_number - JULIAN_REF_DATE;
   // If specified by 'DO_CHECK_TAG', assumes the validity check is done in 'from_days_and_millis'
   return from_days_and_millis<DO_CHECK_TAG>(days, millis);

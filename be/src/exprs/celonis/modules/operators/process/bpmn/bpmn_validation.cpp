@@ -13,8 +13,8 @@
 
 #include <fmt/format.h>
 
-#include "ctl/algorithm.h"
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/algorithm.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/common/exceptions.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/edge.h"
@@ -157,7 +157,7 @@ std::unordered_set<vertex_id_type> find_reachable_nodes(
     initial_nodes.pop_back();
     visited.insert(current_node);
     std::ranges::copy_if(edges.at(current_node), std::back_inserter(initial_nodes),
-                         [&visited](const auto& next_node) { return !ctl::contains(visited, next_node); });
+                         [&visited](const auto& next_node) { return !legacy_embedded_ctl::contains(visited, next_node); });
   }
 
   return visited;
@@ -165,7 +165,7 @@ std::unordered_set<vertex_id_type> find_reachable_nodes(
 
 /** Validates that all nodes are on a path from start to end */
 problems_t validate_single_object_nodes_on_path(const bpmn_graph& bpmn_graph, problems_t problems) {
-  debug_assert(bpmn_graph.is_single_object());
+  legacy_embedded_debug_assert(bpmn_graph.is_single_object());
   const auto object{bpmn_graph.get_edges().at(0).get_object_id()};
   const auto reachable_from_start{find_reachable_nodes(bpmn_graph.start_vertex_ids(), bpmn_graph.outgoing_vertices())};
   const auto reachable_from_end{find_reachable_nodes(bpmn_graph.end_vertex_ids(), bpmn_graph.ingoing_vertices())};
@@ -174,11 +174,11 @@ problems_t validate_single_object_nodes_on_path(const bpmn_graph& bpmn_graph, pr
       bpmn_graph.get_vertices().size() != reachable_from_end.size()) {
     for (const auto& [_, v] : bpmn_graph.get_vertices()) {
       const auto node_id{v.get_vertex_id()};
-      if (!ctl::contains(reachable_from_start, node_id)) {
+      if (!legacy_embedded_ctl::contains(reachable_from_start, node_id)) {
         problems.emplace_back(
             fmt::format("Node with ID [{}] is not reachable from the start node of object {}.", node_id, object));
       }
-      if (!ctl::contains(reachable_from_end, node_id)) {
+      if (!legacy_embedded_ctl::contains(reachable_from_end, node_id)) {
         problems.emplace_back(
             fmt::format("Node with ID [{}] is not reachable from the end node of object {}.", node_id, object));
       }

@@ -10,8 +10,8 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/functional/hash.hpp>
 
-#include "ctl/utils/allocation_messages.h"
-#include "ctl/utils/allocation_reason.h"
+#include "legacy_embedded_ctl/utils/allocation_messages.h"
+#include "legacy_embedded_ctl/utils/allocation_reason.h"
 #include "modules/memory/management/memory_checked_containers.h"
 #include "modules/memory/row_id.h"
 #include "modules/operators/process/alignment/input_output_mapper.h"
@@ -116,7 +116,7 @@ class petri_net_accessor {
 
   petri_net_accessor(const safe_petri_net_data& pn_data, const common::execution_context& context)
       : enabled_transitions_cache_{memory::management::checked_allocator<cache_t>(
-            context, ALLOC_MSG(ctl::ENABLED_TRANSITIONS_CACHE))},
+            context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::ENABLED_TRANSITIONS_CACHE))},
         pn_data_{pn_data} {}
 
   // TODO (goulart.e) we wish to make this non-copiable, but right now we can't (see CPL-10395)

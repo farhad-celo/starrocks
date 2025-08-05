@@ -3,9 +3,9 @@
 #include <memory>
 #include <variant>
 
-#include "ctl/static_array_fwd.h"
-#include "ctl/type_traits.h"
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/static_array_fwd.h"
+#include "legacy_embedded_ctl/type_traits.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/memory/management/raw_data_handler.h"
@@ -17,8 +17,8 @@ namespace celonis::accelerator::memory {
 using join_32_t = int32_t;
 using join_64_t = int64_t;
 
-using raw_join32_t = ctl::shared_static_array<join_32_t>;
-using raw_join64_t = ctl::shared_static_array<join_64_t>;
+using raw_join32_t = legacy_embedded_ctl::shared_static_array<join_32_t>;
+using raw_join64_t = legacy_embedded_ctl::shared_static_array<join_64_t>;
 
 using join_raw_t = std::variant<raw_join64_t, raw_join32_t>;
 
@@ -38,9 +38,9 @@ using join_data_handler_t = std::variant<join_data_handler64_t, join_data_handle
 
 template <typename JOIN_TYPE>
 [[nodiscard]] management::raw_data_handler_t<JOIN_TYPE> create_join_from_raw_data(
-    const ctl::shared_static_array<JOIN_TYPE>& raw_join, const std::string& file_name, const std::string& description,
+    const legacy_embedded_ctl::shared_static_array<JOIN_TYPE>& raw_join, const std::string& file_name, const std::string& description,
     const management::swap_info& sinfo) {
-  debug_assert(std::is_same_v<decltype(raw_join), const raw_join64_t&> ||
+  legacy_embedded_debug_assert(std::is_same_v<decltype(raw_join), const raw_join64_t&> ||
                std::is_same_v<decltype(raw_join), const raw_join32_t&>);
   return management::raw_data_handler<JOIN_TYPE>::create_data_handler(raw_join, file_name, sinfo, description);
 }
@@ -55,7 +55,7 @@ concept join_concept =
 
 template <typename FUNCTION, join_concept... JOIN>
 [[nodiscard]] decltype(auto) cast_execute_join(FUNCTION&& f, JOIN&&... joins) {
-  return std::visit(ctl::overloaded{[&f](auto&&... joins) { return std::invoke(std::forward<FUNCTION>(f), joins...); }},
+  return std::visit(legacy_embedded_ctl::overloaded{[&f](auto&&... joins) { return std::invoke(std::forward<FUNCTION>(f), joins...); }},
                     joins...);
 }
 

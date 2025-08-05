@@ -6,7 +6,7 @@
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/functional/hash.hpp>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/common/date/date_time_constants.h"
 #include "modules/common/int_types.h"
 
@@ -222,7 +222,7 @@ inline celonis_date_storage::celonis_date_storage(const tm& time)
     : day_milliseconds{(MILLIS_PER_SECOND *
                         (time.tm_sec + SECONDS_PER_MINUTE * (time.tm_min + MINUTES_PER_HOUR * time.tm_hour)))},
       date{boost::gregorian::date_from_tm(time)} {
-  debug_assert(0 <= day_milliseconds && day_milliseconds < MILLIS_PER_DAY);
+  legacy_embedded_debug_assert(0 <= day_milliseconds && day_milliseconds < MILLIS_PER_DAY);
 }
 
 inline celonis_date_storage::celonis_date_storage(uint16_t year, uint16_t month, uint16_t day, int hour, int minute,
@@ -480,9 +480,9 @@ inline int64_t celonis_date_storage::full_years_between(const celonis_date_stora
 
 inline bool celonis_date_storage::is_invalid_date() const noexcept {
   static constexpr uint32_t MIN_DAY_NUMBER = 2232400;  // boost::gregorian::date{1400, 1, 1}.day_number();
-  debug_assert(MIN_DAY_NUMBER == (boost::gregorian::date{date::MIN_POSSIBLE_YEAR, 1, 1}.day_number()));
+  legacy_embedded_debug_assert(MIN_DAY_NUMBER == (boost::gregorian::date{date::MIN_POSSIBLE_YEAR, 1, 1}.day_number()));
   static constexpr uint32_t MAX_DAY_NUMBER = 5373484;  // boost::gregorian::date{9999, 12, 31}.day_number();
-  debug_assert(MAX_DAY_NUMBER == (boost::gregorian::date{date::MAX_POSSIBLE_YEAR, 12, 31}.day_number()));
+  legacy_embedded_debug_assert(MAX_DAY_NUMBER == (boost::gregorian::date{date::MAX_POSSIBLE_YEAR, 12, 31}.day_number()));
   return date.is_infinity() || date.is_not_a_date() || date.day_number() < MIN_DAY_NUMBER ||
          date.day_number() > MAX_DAY_NUMBER;
 }

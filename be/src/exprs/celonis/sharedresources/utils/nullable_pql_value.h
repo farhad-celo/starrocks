@@ -10,7 +10,7 @@
 #include <variant>
 #include <vector>
 
-#include "ctl/type_traits.h"
+#include "legacy_embedded_ctl/type_traits.h"
 #include "modules/common/date/celonis_date_storage.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/shared_types.h"
@@ -97,7 +97,7 @@ class nullable_pql_value {
     } else if constexpr (std::is_same_v<T, cel_uuid_t>) {
       return nullable_value_.value().to_string();
     } else {
-      static_assert(ctl::always_false_v<T>, "Type not implemented");
+      static_assert(legacy_embedded_ctl::always_false_v<T>, "Type not implemented");
     }
   }
 

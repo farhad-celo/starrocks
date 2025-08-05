@@ -5,7 +5,7 @@
 
 #include <boost/container_hash/hash.hpp>
 
-#include "ctl/cache_fwd.h"
+#include "legacy_embedded_ctl/cache_fwd.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/join_projection_vector.h"
@@ -25,7 +25,7 @@ namespace celonis::accelerator::operators::process::bpmn {
     common::execution_context& context);
 
 using replay_result_source_target_cache_t =
-    ctl::cache<std::pair<std::string, std::string>, replay_result_source_target_t,
+    legacy_embedded_ctl::cache<std::pair<std::string, std::string>, replay_result_source_target_t,
                boost::hash<std::pair<std::string, std::string>>>;
 
 }  // namespace celonis::accelerator::operators::process::bpmn

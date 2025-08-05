@@ -24,7 +24,7 @@ struct path_cache {
       memory::management::checked_ska_hash_map_t<key_t, maybe_tracked_path_t, boost::hash<key_t>, std::equal_to<>>;
 
   path_cache(const common::execution_context& context, std::string_view allocation_message)
-      : entries{memory::management::checked_allocator<cache_t>(context, ALLOC_MSG(allocation_message))} {}
+      : entries{memory::management::checked_allocator<cache_t>(context, LEGACY_EMBEDDED_ALLOC_MSG(allocation_message))} {}
 
   cache_t entries;
 };
@@ -40,8 +40,8 @@ class gap_filler {
   gap_filler(const petri_net::safe_petri_net_data& pn_data, int max_iterations, int max_insertions,
              petri_net::transition_distances_matrix transition_distances, const common::execution_context& context)
       : pn_accessor_{pn_data, context},
-        paths_to_transition{context, ctl::PATHS_TO_TRANSITION_CACHE},
-        paths_to_marking{context, ctl::PATHS_TO_MARKING_CACHE},
+        paths_to_transition{context, legacy_embedded_ctl::PATHS_TO_TRANSITION_CACHE},
+        paths_to_marking{context, legacy_embedded_ctl::PATHS_TO_MARKING_CACHE},
         max_iterations_{max_iterations},
         max_insertions_{max_insertions},
         transition_distances_{std::move(transition_distances)} {}

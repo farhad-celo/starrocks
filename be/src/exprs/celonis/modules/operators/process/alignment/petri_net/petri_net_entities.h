@@ -7,8 +7,8 @@
 #include <boost/container/pmr/polymorphic_allocator.hpp>
 #include <boost/dynamic_bitset.hpp>
 
-#include "ctl/hash.h"
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/hash.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
 
@@ -67,24 +67,24 @@ class static_bitset {
   static_assert(sizeof(bitset_type) + sizeof(size_type) == SIZE_IN_BYTES);
 
   static_bitset() = default;
-  explicit static_bitset(std::size_t s) : bitset_{}, size_{s} { ctl::abort_assert(s <= NUM_BITS * 8); }
+  explicit static_bitset(std::size_t s) : bitset_{}, size_{s} { legacy_embedded_ctl::abort_assert(s <= NUM_BITS * 8); }
   [[nodiscard]] constexpr std::size_t hash_value() const {
     size_t hash_value{0};
-    ctl::hash_combine(hash_value, size_);
-    ctl::hash_combine(hash_value, bitset_);
+    legacy_embedded_ctl::hash_combine(hash_value, size_);
+    legacy_embedded_ctl::hash_combine(hash_value, bitset_);
     return hash_value;
   }
   [[nodiscard]] constexpr std::size_t size() const { return size_; }
   [[nodiscard]] bool test(std::size_t pos) const {
-    ctl::abort_assert(pos < size_);
+    legacy_embedded_ctl::abort_assert(pos < size_);
     return bitset_.test(pos);
   }
   void set(std::size_t pos) {
-    ctl::abort_assert(pos < size_);
+    legacy_embedded_ctl::abort_assert(pos < size_);
     bitset_[pos] = true;
   }
   void reset(std::size_t pos) {
-    ctl::abort_assert(pos < size_);
+    legacy_embedded_ctl::abort_assert(pos < size_);
     bitset_[pos] = false;
   }
   [[nodiscard]] bool operator==(const static_bitset& other) const { return bitset_ == other.bitset_; }
@@ -131,7 +131,7 @@ class marking_type {
   }
 
   [[nodiscard]] constexpr std::size_t hash_value() const {
-    return std::visit(ctl::overloaded{[](const static_bitset_type& arg) { return arg.hash_value(); },
+    return std::visit(legacy_embedded_ctl::overloaded{[](const static_bitset_type& arg) { return arg.hash_value(); },
                                       [](const dynamic_bitset_type& arg) {
                                         std::hash<dynamic_bitset_type> hash;
                                         return hash(arg);
@@ -153,11 +153,11 @@ class marking_type {
   }
 
   [[nodiscard]] bool operator==(const marking_type& other) const {
-    ctl::abort_assert(size() == other.size());
+    legacy_embedded_ctl::abort_assert(size() == other.size());
     return bitset_ == other.bitset_;
   }
   [[nodiscard]] bool operator<(const marking_type& other) const {
-    ctl::abort_assert(size() == other.size());
+    legacy_embedded_ctl::abort_assert(size() == other.size());
     return bitset_ < other.bitset_;
   }
 

@@ -4,7 +4,7 @@
 
 #include <boost/functional/hash.hpp>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/int_types.h"
 
@@ -198,11 +198,11 @@ class constraints_config_grid {
     [[maybe_unused]] const auto is_not_positive_lmb{
         [](const auto& values) { return std::ranges::all_of(values, [](const auto value) { return value <= 0; }); }};
 
-    debug_assert(is_not_negative_lmb(right_order_compatibilities_));
-    debug_assert(is_not_positive_lmb(wrong_order_compatibilities_));
-    debug_assert(is_not_positive_lmb(exclusive_compatibilities_));
-    debug_assert(is_not_negative_lmb(parallel_compatibilities_));
-    debug_assert(is_not_positive_lmb(deletion_compatibilities_));
+    legacy_embedded_debug_assert(is_not_negative_lmb(right_order_compatibilities_));
+    legacy_embedded_debug_assert(is_not_positive_lmb(wrong_order_compatibilities_));
+    legacy_embedded_debug_assert(is_not_positive_lmb(exclusive_compatibilities_));
+    legacy_embedded_debug_assert(is_not_negative_lmb(parallel_compatibilities_));
+    legacy_embedded_debug_assert(is_not_positive_lmb(deletion_compatibilities_));
   }
 
   [[nodiscard]] constraints_config_set make_full_grid() const {

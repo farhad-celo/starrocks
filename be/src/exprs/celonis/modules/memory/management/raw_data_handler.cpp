@@ -18,13 +18,13 @@
 #include <fmt/core.h>
 
 #include "concurrency/concurrency_utils.h"
-#include "ctl/assert.h"
-#include "ctl/exception.h"
-#include "ctl/source_location.h"
-#include "ctl/static_array.h"
-#include "ctl/type_traits.h"
-#include "ctl/utils/allocation_messages.h"
-#include "ctl/utils/allocation_reason.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/exception.h"
+#include "legacy_embedded_ctl/source_location.h"
+#include "legacy_embedded_ctl/static_array.h"
+#include "legacy_embedded_ctl/type_traits.h"
+#include "legacy_embedded_ctl/utils/allocation_messages.h"
+#include "legacy_embedded_ctl/utils/allocation_reason.h"
 #include "log/log.h"
 #ifndef CELOSTAR
 #include "modules/common/call_and_log_unsafe_callable.h"
@@ -60,20 +60,20 @@
 namespace celonis::accelerator::memory::management {
 
 template <typename T>
-raw_data_handler_t<T> raw_data_handler<T>::create_data_handler(ctl::static_array<T> data, const std::string& swap_file,
+raw_data_handler_t<T> raw_data_handler<T>::create_data_handler(legacy_embedded_ctl::static_array<T> data, const std::string& swap_file,
                                                                const swap_info& sinfo, const std::string& description) {
-  return create_data_handler(ctl::shared_static_array<T>{std::move(data)}, swap_file, sinfo, description);
+  return create_data_handler(legacy_embedded_ctl::shared_static_array<T>{std::move(data)}, swap_file, sinfo, description);
 }
 
 template <typename T>
-raw_data_handler_t<T> raw_data_handler<T>::create_temp_data_handler(ctl::static_array<T> data) {
+raw_data_handler_t<T> raw_data_handler<T>::create_temp_data_handler(legacy_embedded_ctl::static_array<T> data) {
   const auto data_size{data.size()};
   return raw_data_handler_t<T>(
       new raw_data_handler(load_status::LOADED, std::move(data), data_size, "", no_swap(), false, 0, ""));
 }
 
 template <typename T>
-raw_data_handler_t<T> raw_data_handler<T>::create_data_handler(const ctl::shared_static_array<T>& data,
+raw_data_handler_t<T> raw_data_handler<T>::create_data_handler(const legacy_embedded_ctl::shared_static_array<T>& data,
                                                                const std::string& swap_file, const swap_info& sinfo,
                                                                const std::string& description) {
   const auto data_size{data.size()};
@@ -83,7 +83,7 @@ raw_data_handler_t<T> raw_data_handler<T>::create_data_handler(const ctl::shared
 }
 
 template <typename T>
-raw_data_handler_t<T> raw_data_handler<T>::create_temp_data_handler(const ctl::shared_static_array<T>& data) {
+raw_data_handler_t<T> raw_data_handler<T>::create_temp_data_handler(const legacy_embedded_ctl::shared_static_array<T>& data) {
   raw_data_handler_t<T> raw_data(
       new raw_data_handler(load_status::LOADED, data, data.size(), "", no_swap(), false, 0, ""));
   return raw_data;
@@ -135,7 +135,7 @@ bool raw_data_handler<T>::compress() {
 template <typename T>
 size_t raw_data_handler<T>::get_size_in_memory() const {
 #ifdef CELOSTAR
-  debug_assert(status == load_status::LOADED);
+  legacy_embedded_debug_assert(status == load_status::LOADED);
   return size * sizeof(T);
 #else
   if (status == load_status::LOADED) {
@@ -151,7 +151,7 @@ size_t raw_data_handler<T>::get_size_in_memory() const {
       return 0;
     default:
       throw common::internal_exception{"Unknown load status [{} ({})].", to_string(status.load()),
-                                       ctl::enum_to_underlying_type(status.load())};
+                                       legacy_embedded_ctl::enum_to_underlying_type(status.load())};
   }
 #endif
 }
@@ -234,7 +234,7 @@ raw_data_handler<T>::~raw_data_handler() {
 }
 
 template <typename T>
-raw_data_handler<T>::raw_data_handler(load_status status, ctl::shared_static_array<T> data, size_t size,
+raw_data_handler<T>::raw_data_handler(load_status status, legacy_embedded_ctl::shared_static_array<T> data, size_t size,
                                       std::string swap_file, swap_info swap_information, bool persisted,
                                       size_t size_on_disk, std::string description)
     : status(status),
@@ -246,7 +246,7 @@ raw_data_handler<T>::raw_data_handler(load_status status, ctl::shared_static_arr
       persisted(persisted),
       desc(std::move(description)) {
 #ifdef CELOSTAR
-  debug_assert(status == load_status::LOADED);
+  legacy_embedded_debug_assert(status == load_status::LOADED);
   loaded_by = std::this_thread::get_id();
   loaded_at = mem_clock_t::now();
 #else
@@ -282,7 +282,7 @@ io::storage_manager::read_return_data<T> read_from_swap(swap_info& swap_info, co
 #endif
 
 template <typename T>
-ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::execution_context& context) {
+legacy_embedded_ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::execution_context& context) {
   auto wait_context = context.create_sub_context("swap_in_wait_for_lock", {});
   common::timer timer_with_lock;
 
@@ -302,7 +302,7 @@ ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::exec
   wait_context.get_span().finish_span();
   // check status after lock is acquired
 #ifdef CELOSTAR
-  debug_assert(status == load_status::LOADED);
+  legacy_embedded_debug_assert(status == load_status::LOADED);
   return data;
 #else
   if (status == load_status::LOADED) {
@@ -316,7 +316,7 @@ ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::exec
   if (status == load_status::COMPRESSED) {
     // allocate memory according to old capacity.
     auto decompressed_data{memory::tracking::make_static_array_for_overwrite<T>(
-        size, ALLOC_MSG(ctl::MEMORY_FOR_DECOMPRESSION_MSG, desc), context)};
+        size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMORY_FOR_DECOMPRESSION_MSG, desc), context)};
     io::decompress_from_memory_mt(compressed_data(), io::as_byte_span(std::span{decompressed_data}));
     data = std::move(decompressed_data);
     compressed_data_.reset();
@@ -341,17 +341,17 @@ ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::exec
       data = std::move(read_result.data);
       size = read_result.size;
       broken_swap_file = false;
-    } catch (ctl::short_of_memory& e) {
+    } catch (legacy_embedded_ctl::short_of_memory& e) {
       throw;
-    } catch (ctl::bad_alloc& e) {
+    } catch (legacy_embedded_ctl::bad_alloc& e) {
       throw;
     } catch (std::exception& e) {
       broken_swap_file = true;
       throw;
     }
   } else {
-    throw common::internal_exception{"Unknown load status: [{}] at {}.", ctl::enum_to_underlying_type(status.load()),
-                                     ctl::source_location{}};
+    throw common::internal_exception{"Unknown load status: [{}] at {}.", legacy_embedded_ctl::enum_to_underlying_type(status.load()),
+                                     legacy_embedded_ctl::source_location{}};
   }
 
   status = load_status::LOADED;
@@ -394,8 +394,8 @@ void raw_data_handler<T>::write_to_disk(const common::execution_context& context
     size_on_disk = sm.encrypt_and_write_mt(swap_file, compressed_data(), sizeof(T) * size, swap_information,
                                            io::get_type_id<T>(), context);
   } else {
-    throw common::internal_exception{"Unknown load status: [{}] at {}.", ctl::enum_to_underlying_type(status.load()),
-                                     ctl::source_location{}};
+    throw common::internal_exception{"Unknown load status: [{}] at {}.", legacy_embedded_ctl::enum_to_underlying_type(status.load()),
+                                     legacy_embedded_ctl::source_location{}};
   }
   persisted = true;
   broken_swap_file = false;
@@ -406,9 +406,9 @@ void raw_data_handler<T>::write_to_disk(const common::execution_context& context
 
 template <typename T>
 [[nodiscard]] const io::compressed_data& raw_data_handler<T>::compressed_data() const {
-  debug_assert(status == load_status::COMPRESSED);
-  debug_assert(compressed_data_.has_value());
-  debug_assert(data.empty());
+  legacy_embedded_debug_assert(status == load_status::COMPRESSED);
+  legacy_embedded_debug_assert(compressed_data_.has_value());
+  legacy_embedded_debug_assert(data.empty());
   return *compressed_data_;
 }
 
@@ -417,14 +417,14 @@ template <typename T>
   if (status == load_status::COMPRESSED) {
     return compressed_data().size();
   }
-  debug_assert(!compressed_data_.has_value());
+  legacy_embedded_debug_assert(!compressed_data_.has_value());
   return 0;
 }
 #endif
 
 template <typename T>
 const_data_accessor<T> raw_data_handler<T>::get_const_data(const common::execution_context& context) requires(
-    requires(ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; }) {
+    requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; }) {
   last_usage = mem_clock_t::now();
   usage_count++;
 
@@ -434,7 +434,7 @@ const_data_accessor<T> raw_data_handler<T>::get_const_data(const common::executi
   if constexpr (supports_const_data_accessor) {
     return const_data_accessor<T>{swap_in_data(context)};
   } else {
-    ctl::assert_unreachable(ctl::source_location());
+    legacy_embedded_ctl::assert_unreachable(legacy_embedded_ctl::source_location());
   }
 }
 

@@ -12,7 +12,7 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
-#include "format/json/json_fwd.h"
+#include "legacy_embedded_format/json/json_fwd.h"
 #include "modules/common/int_types.h"
 
 namespace celonis::accelerator::log {
@@ -75,7 +75,7 @@ void error(fmt::format_string<ARGS...> fmt, ARGS&&... args) {
  * @param message General description of the info
  * @param details Details of the info as a JSON object
  */
-void jinfo(const std::string& message, const format::json::json_object_t& details = {});
+void jinfo(const std::string& message, const legacy_embedded_format::json::json_object_t& details = {});
 
 /**
  * Log to the default logger on log level \a warning structured as JSON
@@ -83,7 +83,7 @@ void jinfo(const std::string& message, const format::json::json_object_t& detail
  * @param message General description of the warning
  * @param details Details of the warning as a JSON object
  */
-void jwarn(const std::string& message, const format::json::json_object_t& details = {});
+void jwarn(const std::string& message, const legacy_embedded_format::json::json_object_t& details = {});
 
 /**
  * Log to the default logger on log level \a debug structured as JSON
@@ -91,7 +91,7 @@ void jwarn(const std::string& message, const format::json::json_object_t& detail
  * @param message General description of the debug
  * @param details Details of the debug as a JSON object
  */
-void jdebug(const std::string& message, const format::json::json_object_t& details = {});
+void jdebug(const std::string& message, const legacy_embedded_format::json::json_object_t& details = {});
 
 /**
  * Log to the default logger on log level \a error structured as JSON
@@ -99,7 +99,7 @@ void jdebug(const std::string& message, const format::json::json_object_t& detai
  * @param message General description of the error
  * @param details Details of the error as a JSON object
  */
-void jerror(const std::string& message, const format::json::json_object_t& details = {});
+void jerror(const std::string& message, const legacy_embedded_format::json::json_object_t& details = {});
 
 /**
  * Force logger to flush.

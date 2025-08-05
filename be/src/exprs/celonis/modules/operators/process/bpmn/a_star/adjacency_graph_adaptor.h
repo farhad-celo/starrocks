@@ -1,6 +1,6 @@
 #pragma once
 
-#include "modules/ctl/include/ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/replay_types.h"
 #include "modules/operators/process/bpmn/replay_utils.h"
@@ -21,7 +21,7 @@ class adjacency_graph_adaptor {
   explicit adjacency_graph_adaptor(const bpmn_graph& model, vertex_id_type target) noexcept
       : model_{model}, target_vertex_{target} {
     const auto target_type{model_.get_vertex(target_vertex_).get_vertex_type()};
-    debug_assert(is_task(target_type) || is_end(target_type));
+    legacy_embedded_debug_assert(is_task(target_type) || is_end(target_type));
   }
 
   [[nodiscard]] transition_list_type get_enabled_transitions(const marking_type& marking_with_num_fired_tasks) const {
@@ -44,7 +44,7 @@ class adjacency_graph_adaptor {
     auto number_of_fired_tasks{marking_with_num_fired_tasks.num_fired_tasks()};
     if (bpmn::is_task(model_.get_vertex(transition.vertex_id()))) {
       number_of_fired_tasks++;
-      debug_assert(number_of_fired_tasks == 1,
+      legacy_embedded_debug_assert(number_of_fired_tasks == 1,
                    "Multiple tasks ([{}]) were fired during a single iteration of the search.", number_of_fired_tasks);
     }
     return {bpmn::fire(marking_with_num_fired_tasks.marking(), transition), number_of_fired_tasks};
@@ -55,7 +55,7 @@ class adjacency_graph_adaptor {
     auto number_of_fired_tasks{marking_with_num_fired_tasks.num_fired_tasks()};
     if (bpmn::is_task(model_.get_vertex(transition.vertex_id()))) {
       number_of_fired_tasks--;
-      debug_assert(number_of_fired_tasks == 0,
+      legacy_embedded_debug_assert(number_of_fired_tasks == 0,
                    "Multiple tasks ([{}]) were fired during a single iteration of the search.", number_of_fired_tasks);
     }
     return {bpmn::fire_inverse(marking_with_num_fired_tasks.marking(), transition), number_of_fired_tasks};

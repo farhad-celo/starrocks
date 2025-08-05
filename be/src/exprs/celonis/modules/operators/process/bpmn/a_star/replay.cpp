@@ -137,7 +137,7 @@ template <typename SEARCHER>
   }
 
   // We did find a path to the target
-  debug_assert(std::holds_alternative<transitions_t>(linearized_transitions_or_nothing_found));
+  legacy_embedded_debug_assert(std::holds_alternative<transitions_t>(linearized_transitions_or_nothing_found));
   auto linearized_transitions{std::get<transitions_t>(linearized_transitions_or_nothing_found)};
 
   marking_t candidate_marking{fire(initial_marking, linearized_transitions)};
@@ -168,7 +168,7 @@ template <typename SEARCHER>
   }
 
   // We did find a path for the remainder, so we add it to the linearized transitions
-  debug_assert(std::holds_alternative<transitions_t>(remainder_search_result));
+  legacy_embedded_debug_assert(std::holds_alternative<transitions_t>(remainder_search_result));
   const auto remainder_linearized_transitions{std::get<transitions_t>(remainder_search_result)};
   linearized_transitions.insert(linearized_transitions.cend(), remainder_linearized_transitions.cbegin(),
                                 remainder_linearized_transitions.cend());
@@ -199,7 +199,7 @@ replay_return_t replay_trace(const bpmn_graph& model, const marking_t& initial_m
   }
 
   // The trace does conform to the model
-  debug_assert(std::holds_alternative<transitions_t>(linearized_transitions_or_nothing_found));
+  legacy_embedded_debug_assert(std::holds_alternative<transitions_t>(linearized_transitions_or_nothing_found));
   return std::get<transitions_t>(linearized_transitions_or_nothing_found);
 }
 

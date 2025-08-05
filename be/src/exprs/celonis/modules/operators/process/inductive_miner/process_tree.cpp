@@ -8,11 +8,11 @@
 
 #include <boost/graph/graphviz.hpp>
 
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/conversion.h"
 #ifndef CELOSTAR
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/static_array.h"
 #endif
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types.h"
 #include "modules/cube/execution/tracking/stop_token.h"
@@ -26,7 +26,7 @@
 namespace celonis::accelerator::operators::process {
 
 size_t process_tree::num_children() const {
-  return std::visit(ctl::overloaded{[](const redo& p) {
+  return std::visit(legacy_embedded_ctl::overloaded{[](const redo& p) {
                                       std::size_t s = p.children.size();
                                       return s;
                                     },
@@ -52,7 +52,7 @@ size_t process_tree::num_children() const {
 const std::vector<process_tree>& process_tree::get_children() const& {
   static const std::vector<process_tree> empty_{std::vector<process_tree>()};
   return std::visit(
-      ctl::overloaded(  // using parentheses instead of braces here to avoid weird formatting by clang-format
+      legacy_embedded_ctl::overloaded(  // using parentheses instead of braces here to avoid weird formatting by clang-format
           [](const redo& p) -> auto& { return p.children; }, [](const parallel& p) -> auto& { return p.children; },
           [](const exclusive& p) -> auto& { return p.children; }, [](const sequence& p) -> auto& { return p.children; },
           [](const auto& /*unused*/) -> auto& { return empty_; }),
@@ -61,7 +61,7 @@ const std::vector<process_tree>& process_tree::get_children() const& {
 
 std::vector<process_tree> process_tree::get_children() && {
   return std::visit(
-      ctl::overloaded(  // using parentheses instead of braces here to avoid weird formatting by clang-format
+      legacy_embedded_ctl::overloaded(  // using parentheses instead of braces here to avoid weird formatting by clang-format
           [](redo&& p) { return std::move(p.children); }, [](parallel&& p) { return std::move(p.children); },
           [](exclusive&& p) { return std::move(p.children); }, [](sequence&& p) { return std::move(p.children); },
           [](auto&& /*unused*/) { return std::vector<process_tree>{std::vector<process_tree>()}; }),
@@ -69,7 +69,7 @@ std::vector<process_tree> process_tree::get_children() && {
 }
 
 void process_tree::set_children(const std::vector<process_tree>& nc) {
-  std::visit(ctl::overloaded{[nc](redo& p) {
+  std::visit(legacy_embedded_ctl::overloaded{[nc](redo& p) {
                                p.children = nc;
                                p.recalculate_counts();
                              },
@@ -93,7 +93,7 @@ void process_tree::set_children(const std::vector<process_tree>& nc) {
 
 process_tree::count_type process_tree::get_object_count() const {
   return std::visit(
-      ctl::overloaded{[](const redo& p) { return p.object_count; }, [](const parallel& p) { return p.object_count; },
+      legacy_embedded_ctl::overloaded{[](const redo& p) { return p.object_count; }, [](const parallel& p) { return p.object_count; },
                       [](const sequence& p) { return p.object_count; },
                       [](const activity& p) { return p.object_count; },
                       [](const exclusive& p) {
@@ -130,7 +130,7 @@ void process_tree::sequence::recalculate_counts() { object_count = children.fron
 const std::vector<process_tree::count_type>& process_tree::get_redo_count() const {
   static const std::vector<process_tree::count_type> empty_{std::vector<process_tree::count_type>()};
 
-  return std::visit(ctl::overloaded(
+  return std::visit(legacy_embedded_ctl::overloaded(
                         [](const redo& p) -> auto& { return p.child_redo_counts; },
                         [](const auto& /*unused*/) -> auto& { return empty_; }),
                     node);
@@ -177,7 +177,7 @@ bool process_tree::has_tau_child() const {
 }
 
 bool process_tree::allows_empty_trace() const {
-  return std::visit(ctl::overloaded{
+  return std::visit(legacy_embedded_ctl::overloaded{
                         [](const tau& /*unused*/) { return true; },
                         [](const redo& p) { return p.children.front().allows_empty_trace(); },
                         [](const parallel& p) {
@@ -276,7 +276,7 @@ void minimize_children(process_tree::parent& parent_node) {
 }
 
 [[nodiscard]] constexpr size_t count_edges(const process_tree& tree) {
-  return std::visit(ctl::overloaded{[](const process_tree::activity& /*unused*/) { return size_t{}; },
+  return std::visit(legacy_embedded_ctl::overloaded{[](const process_tree::activity& /*unused*/) { return size_t{}; },
                                     [](process_tree::tau /*unused*/) { return size_t{}; },
                                     [](const process_tree::parent& p) {
                                       return std::accumulate(
@@ -299,8 +299,8 @@ class table_sizes {
 
 #ifndef CELOSTAR
 template <class VERTEX_ACTIVITIES_PTR_AC_TYPE>
-void fill_tables(ctl::static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIES_PTR_AC_TYPE& vertex_activities,
-                 ctl::static_array<cel_int_t>& edge_source_ids, ctl::static_array<cel_int_t>& edge_target_ids,
+void fill_tables(legacy_embedded_ctl::static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIES_PTR_AC_TYPE& vertex_activities,
+                 legacy_embedded_ctl::static_array<cel_int_t>& edge_source_ids, legacy_embedded_ctl::static_array<cel_int_t>& edge_target_ids,
                  const process_tree& pt, const cube::execution::tracking::stop_token& stop_token) {
   std::queue<const process_tree*> buffer;
   buffer.push(&pt);
@@ -315,8 +315,8 @@ void fill_tables(ctl::static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIE
     vertex_pt_types[current_vertex_id] = to_vertex_code(current_node);
     auto& current_vertex_activity{vertex_activities[current_vertex_id]};
     using col_pointer_type = typename VERTEX_ACTIVITIES_PTR_AC_TYPE::value_type;
-    std::visit(ctl::overloaded{[&current_vertex_activity](const process_tree::activity& a) {
-                                 current_vertex_activity = ctl::cast<col_pointer_type>(a.activity_id);
+    std::visit(legacy_embedded_ctl::overloaded{[&current_vertex_activity](const process_tree::activity& a) {
+                                 current_vertex_activity = legacy_embedded_ctl::cast<col_pointer_type>(a.activity_id);
                                },
                                [&current_vertex_activity](const process_tree::tau& /*unused*/) {
                                  current_vertex_activity = col_pointer_type{};
@@ -342,15 +342,15 @@ void fill_tables(ctl::static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIE
 struct exec_convert_to_tables {
   row_id num_vertices;
   const process_tree& pt;
-  ctl::static_array<cel_int_t>& vertex_pt_types;
-  ctl::static_array<cel_int_t>& edge_source_ids;
-  ctl::static_array<cel_int_t>& edge_target_ids;
+  legacy_embedded_ctl::static_array<cel_int_t>& vertex_pt_types;
+  legacy_embedded_ctl::static_array<cel_int_t>& edge_source_ids;
+  legacy_embedded_ctl::static_array<cel_int_t>& edge_target_ids;
   const common::execution_context& context;
   const cube::execution::tracking::stop_token& stop_token;
 
   exec_convert_to_tables(const row_id num_vertices, const process_tree& pt,
-                         ctl::static_array<cel_int_t>& vertex_pt_types, ctl::static_array<cel_int_t>& edge_source_ids,
-                         ctl::static_array<cel_int_t>& edge_target_ids, const common::execution_context& context,
+                         legacy_embedded_ctl::static_array<cel_int_t>& vertex_pt_types, legacy_embedded_ctl::static_array<cel_int_t>& edge_source_ids,
+                         legacy_embedded_ctl::static_array<cel_int_t>& edge_target_ids, const common::execution_context& context,
                          const cube::execution::tracking::stop_token& stop_token)
       : num_vertices{num_vertices},
         pt{pt},
@@ -412,7 +412,7 @@ bool is_valid_tree(const process_tree& pt) {
   };
 
   return std::visit(
-      ctl::overloaded{[](const process_tree::sequence& s) {
+      legacy_embedded_ctl::overloaded{[](const process_tree::sequence& s) {
                         if (s.children.empty()) {
                           return false;
                         }
@@ -470,7 +470,7 @@ bool is_valid_tree(const process_tree& pt) {
 
 void minimize(process_tree& pt) {
   std::visit(
-      ctl::overloaded{
+      legacy_embedded_ctl::overloaded{
           [](process_tree::sequence& s) {
             minimize_children(s);
             collapse_children_of_equal_type(s);
@@ -524,22 +524,22 @@ process_tree_ref convert_to_tables(const process_tree& pt, const memory::column_
   process_tree_ref tables{};
   const table_sizes sizes{pt};
   auto vertex_pt_types{
-      ctl::make_static_array_for_overwrite<cel_int_t>(sizes.node_size(), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+      legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(sizes.node_size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   auto edge_source_ids{memory::tracking::make_static_array_for_overwrite<cel_int_t>(
-      sizes.edge_size(), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      sizes.edge_size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
   auto edge_target_ids{memory::tracking::make_static_array_for_overwrite<cel_int_t>(
-      sizes.edge_size(), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      sizes.edge_size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
   const auto& dictionary{activity_column->get_typed_dict<cel_string_t>(context)};
 
-  tables.vertex_table = memory::table::create_query_scope_table(ctl::cast<row_id>(sizes.node_size()),
+  tables.vertex_table = memory::table::create_query_scope_table(legacy_embedded_ctl::cast<row_id>(sizes.node_size()),
                                                                 "vertex_properties", table_row_limit);
   tables.edge_table =
-      memory::table::create_query_scope_table(ctl::cast<row_id>(sizes.edge_size()), "edge_properties", table_row_limit);
+      memory::table::create_query_scope_table(legacy_embedded_ctl::cast<row_id>(sizes.edge_size()), "edge_properties", table_row_limit);
 
   const auto vertex_activities_ptrs{memory::create_tmp_column_pointers(memory::execute_with_column_pointers_type(
-      exec_convert_to_tables{ctl::cast<row_id>(sizes.node_size()), pt, vertex_pt_types, edge_source_ids,
+      exec_convert_to_tables{legacy_embedded_ctl::cast<row_id>(sizes.node_size()), pt, vertex_pt_types, edge_source_ids,
                              edge_target_ids, context, stop_token},
       dictionary->get_size()))};
 
@@ -593,7 +593,7 @@ bool process_tree::redo::operator<(const process_tree::redo& rhs) const noexcept
 }
 
 size_t tree_size(const process_tree& pt) {
-  return std::visit(ctl::overloaded{[](const process_tree::activity& /*unused*/) { return size_t{1}; },
+  return std::visit(legacy_embedded_ctl::overloaded{[](const process_tree::activity& /*unused*/) { return size_t{1}; },
                                     [](process_tree::tau /*unused*/) { return size_t{1}; },
                                     [](const process_tree::parent& p) {
                                       return std::accumulate(
@@ -604,7 +604,7 @@ size_t tree_size(const process_tree& pt) {
 }
 
 size_t count_visible_labels(const process_tree& pt) {
-  return std::visit(ctl::overloaded{[](const process_tree::activity& /*unused*/) { return size_t{1}; },
+  return std::visit(legacy_embedded_ctl::overloaded{[](const process_tree::activity& /*unused*/) { return size_t{1}; },
                                     [](process_tree::tau /*unused*/) { return size_t{}; },
                                     [](const process_tree::parent& p) {
                                       return std::accumulate(begin(p.children), end(p.children), size_t{},
@@ -616,7 +616,7 @@ size_t count_visible_labels(const process_tree& pt) {
 }
 
 size_t count_invisible_labels(const process_tree& pt) {
-  return std::visit(ctl::overloaded{[](process_tree::tau /*unused*/) { return size_t{1}; },
+  return std::visit(legacy_embedded_ctl::overloaded{[](process_tree::tau /*unused*/) { return size_t{1}; },
                                     [](const process_tree::activity& /*unused*/) { return size_t{}; },
                                     [](const process_tree::parent& p) {
                                       return std::accumulate(begin(p.children), end(p.children), size_t{},
@@ -629,7 +629,7 @@ size_t count_invisible_labels(const process_tree& pt) {
 
 bool contains_seq_xors(const process_tree& pt) {
   static constexpr auto is_optional_activity{[](const process_tree& tree) {
-    return std::visit(ctl::overloaded{[](const process_tree::exclusive& e) {
+    return std::visit(legacy_embedded_ctl::overloaded{[](const process_tree::exclusive& e) {
                                         const auto tau_count{static_cast<size_t>(
                                             std::count_if(begin(e.children), end(e.children), is_tau_node))};
                                         return (tau_count + 1 == e.children.size()) &&
@@ -640,7 +640,7 @@ bool contains_seq_xors(const process_tree& pt) {
                                       [](const auto& /*unused*/) { return false; }},
                       tree.node);
   }};
-  return std::visit(ctl::overloaded{[](process_tree::tau /*unused*/) { return false; },
+  return std::visit(legacy_embedded_ctl::overloaded{[](process_tree::tau /*unused*/) { return false; },
                                     [](const process_tree::activity& /*unused*/) { return false; },
                                     [](const process_tree::parent& p) {
                                       return std::any_of(begin(p.children), end(p.children), contains_seq_xors);

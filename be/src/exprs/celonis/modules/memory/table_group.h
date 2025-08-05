@@ -65,7 +65,7 @@ class table_group {
   table_map_t table_map_;
 };
 
-using table_group_t = ctl::checked_shared_ptr<table_group>;
+using table_group_t = legacy_embedded_ctl::checked_shared_ptr<table_group>;
 #endif
 
 }  // namespace celonis::accelerator::memory

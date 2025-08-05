@@ -2,7 +2,7 @@
 
 #include <fmt/format.h>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "log/log.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context.h"
@@ -27,7 +27,7 @@ namespace {
     case mo_bpmn_graph_data_selection_strategy::variant_filter:
       return "VARIANT_FILTER";
   }
-  ctl::assert_unreachable();
+  legacy_embedded_ctl::assert_unreachable();
 }
 
 [[nodiscard]] mo_bpmn_graph_data_selection_strategy::strategy_t extract_strategy_from_query(

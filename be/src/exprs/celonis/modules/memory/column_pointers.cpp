@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #ifndef CELOSTAR
 #include "modules/memory/cache/column_register.h"
 #include "modules/memory/table.h"
@@ -101,7 +101,7 @@ column_ptrs_t create_tmp_column_pointers(const raw_column_ptrs_t& raw_column_poi
 
 template <class COL_PTRS_TYPE>
 raw_immutable_column_ptrs_t column_ptrs_impl<COL_PTRS_TYPE>::create_immutable_view(size_t offset, size_t size) const {
-  debug_assert(offset + size <= this->get_row_count());
+  legacy_embedded_debug_assert(offset + size <= this->get_row_count());
   return std::make_shared<raw_immutable_column_ptrs_impl<COL_PTRS_TYPE>>(get()->get_const_data().shared(), offset,
                                                                          size);
 }
@@ -128,14 +128,14 @@ raw_immutable_column_ptrs_t raw_column_ptrs_impl<COL_PTRS_TYPE>::as_immutable() 
 template <class COL_PTRS_TYPE>
 raw_immutable_column_ptrs_t raw_column_ptrs_impl<COL_PTRS_TYPE>::create_immutable_view(size_t offset,
                                                                                        size_t size) const {
-  debug_assert(offset + size <= this->get_row_count());
+  legacy_embedded_debug_assert(offset + size <= this->get_row_count());
   return raw_immutable_column_ptrs_t{
       new raw_immutable_column_ptrs_impl<COL_PTRS_TYPE>{data_, static_cast<row_id>(offset), static_cast<row_id>(size)}};
 }
 
 template <class COL_PTRS_TYPE>
 raw_column_ptrs_t raw_column_ptrs_impl<COL_PTRS_TYPE>::create_view(size_t offset, size_t size) const {
-  debug_assert(offset + size <= this->get_row_count());
+  legacy_embedded_debug_assert(offset + size <= this->get_row_count());
   return raw_column_ptrs_t{
       new raw_column_ptrs_impl<COL_PTRS_TYPE>{data_, static_cast<row_id>(offset), static_cast<row_id>(size), context}};
 }
@@ -143,7 +143,7 @@ raw_column_ptrs_t raw_column_ptrs_impl<COL_PTRS_TYPE>::create_view(size_t offset
 template <class COL_PTRS_TYPE>
 raw_immutable_column_ptrs_t raw_immutable_column_ptrs_impl<COL_PTRS_TYPE>::create_immutable_view(size_t offset,
                                                                                                  size_t size) const {
-  debug_assert(offset + size <= get_row_count());
+  legacy_embedded_debug_assert(offset + size <= get_row_count());
   return raw_immutable_column_ptrs_t{
       new raw_immutable_column_ptrs_impl<COL_PTRS_TYPE>{data_, static_cast<row_id>(offset), static_cast<row_id>(size)}};
 }

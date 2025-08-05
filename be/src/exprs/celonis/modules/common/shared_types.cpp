@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/common/exceptions.h"
 
 namespace celonis::accelerator {
@@ -27,7 +27,7 @@ namespace {
     case cel_null:
       return "NULL";
   }
-  ctl::assert_unreachable();
+  legacy_embedded_ctl::assert_unreachable();
 }
 
 }  // namespace

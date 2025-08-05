@@ -2,7 +2,7 @@
 
 #include <optional>
 
-#include "modules/ctl/include/ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/replay_types.h"
 #include "modules/operators/process/bpmn/replay_utils.h"
@@ -22,7 +22,7 @@ class adjacency_graph_heuristic {
   adjacency_graph_heuristic(const bpmn::bpmn_graph& model, bpmn::vertex_id_type target_vertex) noexcept
       : model_{model}, target_vertex_{target_vertex} {
     const auto target_type{model_.get_vertex(target_vertex).get_vertex_type()};
-    debug_assert(is_task(target_type) || is_end(target_type));
+    legacy_embedded_debug_assert(is_task(target_type) || is_end(target_type));
   };
 
   [[nodiscard]] static cost_type get_weight(const transition_type& /*transition*/) noexcept { return 1; }

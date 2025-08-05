@@ -7,7 +7,7 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/builders/cache_column_from_dictionary.h"
 #include "modules/memory/builders/result_column_builder.h"
@@ -50,7 +50,7 @@ struct mapper_to_move_buffer {
       case UNMAPPED:
         return UNMAPPED_MOVE_POINTER_OFFSET;
       default:
-        ctl::assert_unreachable();
+        legacy_embedded_ctl::assert_unreachable();
     }
   }
 };
@@ -106,7 +106,7 @@ class exec_execute_fill_output {
         const auto& variant_alignment{alignments.at(variant_id).value()};
 
         for (const auto& move : variant_alignment.data()) {
-          debug_assert(output_col_index < static_cast<size_t>(output_table_size));
+          legacy_embedded_debug_assert(output_col_index < static_cast<size_t>(output_table_size));
           output_ptrs_ac[output_col_index] = static_cast<COL_PTRS_TYPE>(output_mapper(move));
           ++output_col_index;
         }
@@ -188,14 +188,14 @@ class exec_expand_alignments {
     str_buffer_size += NULL_STRING.size();
 
     auto activity_string_buffer{memory::tracking::make_static_array_for_overwrite<char>(
-        str_buffer_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+        str_buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
     // Add 1 to account for the nullptr
     // It's safe to cast from size_t to row_id here because at this point it was already checked
     //  whether the output column size fits into row_id type. Therefore also int_to_buffer_entry.size() fits into it
     const row_id activity_string_pointers_size{static_cast<row_id>(str_mapper_entries.size() + 1)};
     auto activity_string_pointers{memory::tracking::make_static_array_for_overwrite<cel_string_t>(
-        activity_string_pointers_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+        activity_string_pointers_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
     ska::bytell_hash_map<row_id, row_id> int_to_buffer_entry;
     int_to_buffer_entry.reserve(activity_string_pointers_size);
@@ -228,11 +228,11 @@ class exec_expand_alignments {
     constexpr size_t str_buffer_size{NULL_STRING.size() + (NUMBER_OF_MOVES * (MOVE_REPRESENTATION_SIZE + 1))};
 
     auto str_buffer{memory::tracking::make_static_array_for_overwrite<char>(
-        str_buffer_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+        str_buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
     // Add 1 to account for the nullptr
     static constexpr const row_id move_string_pointers_size{NUMBER_OF_MOVES + 1};
     auto move_str_pointer{memory::tracking::make_static_array_for_overwrite<cel_string_t>(
-        move_string_pointers_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+        move_string_pointers_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
 
     // String Buffer of moves consists of this 3 strings and NULL
     std::strncpy(str_buffer.data(), NULL_STRING.data(), NULL_STRING.size());

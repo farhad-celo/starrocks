@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/materialized_data_fwd.h"
 #include "modules/memory/table.h"
@@ -21,7 +21,7 @@ class temp_column_builder {
       : name(std::move(name)), id(std::move(id)), owner(owner), cache_key(std::move(cache_key)) {}
 
   template <typename DATA_TYPE>
-  column_t create_from_data(row_id row_count, ctl::static_array<DATA_TYPE> data, const null_flags_t& null_flags,
+  column_t create_from_data(row_id row_count, legacy_embedded_ctl::static_array<DATA_TYPE> data, const null_flags_t& null_flags,
                             const column_processing_state& state) {
     std::string description{};
     std::shared_ptr<management::managed_memory_group> group{nullptr};
@@ -53,8 +53,8 @@ class temp_column_builder {
                                state)};
   }
 
-  column_t create_from_string_data(row_id row_count, ctl::static_array<cel_string_t> data, size_t str_bfr_size,
-                                   ctl::static_array<char> string_bfr, const null_flags_t& null_flags,
+  column_t create_from_string_data(row_id row_count, legacy_embedded_ctl::static_array<cel_string_t> data, size_t str_bfr_size,
+                                   legacy_embedded_ctl::static_array<char> string_bfr, const null_flags_t& null_flags,
                                    const column_processing_state& state);
 
   column_t create_from_materialized_data(row_id row_count, const materialized_data_t& plain_data,

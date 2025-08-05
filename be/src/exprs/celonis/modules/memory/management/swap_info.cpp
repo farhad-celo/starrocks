@@ -1,6 +1,6 @@
 #include "swap_info.h"
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #ifndef CELOSTAR
 #include "modules/io/storage_manager.h"
 #endif
@@ -24,7 +24,7 @@ swap_info::swap_info(const bool swappable, std::string base_directory, const per
       swap_encryption_key(std::move(encryption_key)) {}
 
 const io::storage_manager& swap_info::storage_manager() const {
-  ctl::abort_assert(!is_no_swap(), "Trying to access the storage manager of a no_swap swap info");
+  legacy_embedded_ctl::abort_assert(!is_no_swap(), "Trying to access the storage manager of a no_swap swap info");
   return *swap_storage_manager;
 }
 #endif

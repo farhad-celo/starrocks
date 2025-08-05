@@ -2,7 +2,7 @@
 #include <bytell_hash_map.hpp>
 
 #include "aligned_blocked_range.h"
-#include "ctl/array_view.h"
+#include "legacy_embedded_ctl/array_view.h"
 #include "modules/common/buffer_types.h"
 #include "shared_types_fwd.h"
 
@@ -21,7 +21,7 @@ class output_string_buffer {
   static constexpr size_t MAP_CAPACITY{1024};
   enum class strategy_t { MATERIALIZED, BEST_EFFORT_DICTIONARY };
 
-  explicit output_string_buffer(ctl::default_tracking_allocator_t<char> allocator,
+  explicit output_string_buffer(legacy_embedded_ctl::default_tracking_allocator_t<char> allocator,
                                 strategy_t strategy = strategy_t::BEST_EFFORT_DICTIONARY);
 
   /**
@@ -48,8 +48,8 @@ class output_string_buffer {
    * reallocates the result buffer strings stored in the current char buffer to the passed target buffer and updates the
    * result buffer pointers to point to the target buffer.
    */
-  void copy_to_given_continuous_buffer(ctl::array_view<char> target_char_buffer,
-                                       ctl::array_view<cel_string_t> result_buffer);
+  void copy_to_given_continuous_buffer(legacy_embedded_ctl::array_view<char> target_char_buffer,
+                                       legacy_embedded_ctl::array_view<cel_string_t> result_buffer);
 
  private:
   [[nodiscard]] std::pair<size_type, char*> copy_to_buffer(std::string_view str);

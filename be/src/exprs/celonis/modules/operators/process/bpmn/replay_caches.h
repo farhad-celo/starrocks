@@ -4,7 +4,7 @@
 
 #include <boost/container_hash/hash.hpp>
 
-#include "ctl/named_type_hash.h"
+#include "legacy_embedded_ctl/named_type_hash.h"
 #include "modules/memory/management/memory_checked_containers.h"
 #include "modules/operators/process/bpmn/a_star/replay.h"
 #include "modules/operators/process/bpmn/bpmn_graph_fwd.h"

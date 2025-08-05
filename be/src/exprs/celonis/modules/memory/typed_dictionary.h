@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "ctl/static_array_fwd.h"
+#include "legacy_embedded_ctl/static_array_fwd.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/memory/dictionary.h"
@@ -99,7 +99,7 @@ class typed_dictionary : public dictionary {
    * @param description The description of the swap file.
    * @return A typed dictionary of datatype T.
    */
-  [[nodiscard]] static dictionary_t create_dictionary(ctl::static_array<T>&& data, const std::string& swap_file_name,
+  [[nodiscard]] static dictionary_t create_dictionary(legacy_embedded_ctl::static_array<T>&& data, const std::string& swap_file_name,
                                                       const management::swap_info& sinfo,
                                                       const std::string& description);
 
@@ -183,8 +183,8 @@ class typed_dictionary<cel_string_t> : public dictionary {
    * @param description The description of the swap file
    * @return A typed dictionary of the string data type.
    */
-  [[nodiscard]] static dictionary_t create_dictionary(ctl::static_array<cel_string_t>&& ptr,
-                                                      ctl::static_array<char>&& buffer, const std::string& swap_file,
+  [[nodiscard]] static dictionary_t create_dictionary(legacy_embedded_ctl::static_array<cel_string_t>&& ptr,
+                                                      legacy_embedded_ctl::static_array<char>&& buffer, const std::string& swap_file,
                                                       const management::swap_info& sinfo,
                                                       const std::string& description);
 
@@ -239,7 +239,7 @@ inline typed_dict_variant_t convert_to_typed_dict(const dictionary_t& dictionary
   if (auto casted_dict{std::dynamic_pointer_cast<null_dictionary>(dictionary)}; casted_dict != nullptr) {
     return casted_dict;
   }
-  ctl::assert_unreachable();
+  legacy_embedded_ctl::assert_unreachable();
 }
 
 }  // namespace celonis::accelerator::memory

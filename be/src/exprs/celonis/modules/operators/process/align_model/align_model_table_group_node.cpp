@@ -86,7 +86,7 @@ align_model_table_group_node::align_model_table_group_node(cube::query_scope& sc
 std::string align_model_table_group_node::make_table_group_cache_key(const memory::column_t& activity_column,
                                                                      const BpmnModelDescription& model,
                                                                      const common::execution_context& context) {
-  debug_assert(!activity_column->get_user_visible_name(context).empty());
+  legacy_embedded_debug_assert(!activity_column->get_user_visible_name(context).empty());
   return fmt::format("$${}-{}-{}$$", get_user_visible_operator_name(), activity_column->get_user_visible_name(context),
                      model.cache_key());
 }
@@ -94,7 +94,7 @@ std::string align_model_table_group_node::make_table_group_cache_key(const memor
 std::string align_model_table_group_node::make_pruned_variant_cache_key(const memory::column_t& activity_column,
                                                                         const BpmnModelDescription& model,
                                                                         const common::execution_context& context) {
-  debug_assert(!activity_column->get_user_visible_name(context).empty());
+  legacy_embedded_debug_assert(!activity_column->get_user_visible_name(context).empty());
   std::set<std::string> ordered_model_node_names{};
   for (const auto& node : model.nodes()) {
     if (node.node_type() == celonis::accelerator::BpmnModelDescription_BpmnNode_BpmnNodeType_TASK &&

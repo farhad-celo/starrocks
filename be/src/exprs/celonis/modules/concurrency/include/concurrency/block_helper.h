@@ -1,6 +1,6 @@
 #include <tbb/parallel_for.h>
 
-#include "ctl/math.h"
+#include "legacy_embedded_ctl/math.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
 
@@ -12,7 +12,7 @@ class block_helper {
 
   const row_id block_size;
   const row_id num_items;
-  const row_id num_blocks{ctl::div_round_up(num_items, block_size)};
+  const row_id num_blocks{legacy_embedded_ctl::div_round_up(num_items, block_size)};
 
   template <typename F>
   void parallel_for_each(F&& f) {

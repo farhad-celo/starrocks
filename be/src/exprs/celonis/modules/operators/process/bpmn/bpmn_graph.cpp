@@ -8,10 +8,10 @@
 
 #include <boost/graph/adjacency_list.hpp>
 
-#include "ctl/algorithm.h"
-#include "ctl/assert.h"
-#include "ctl/conversion.h"
-#include "ctl/hash.h"
+#include "legacy_embedded_ctl/algorithm.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/conversion.h"
+#include "legacy_embedded_ctl/hash.h"
 #include "modules/memory/column.h"
 #include "modules/operators/process/bpmn/bpmn_graph_builder.h"
 #include "modules/operators/process/bpmn/bpmn_validation.h"
@@ -46,7 +46,7 @@ const T& get_cached_or_calculate(std::optional<T>& cache, FUNCTION&& calculate) 
     case proto_bpmn_node_t::END:
       return end{};
   }
-  ctl::assert_unreachable();
+  legacy_embedded_ctl::assert_unreachable();
 }
 
 }  // namespace
@@ -67,7 +67,7 @@ bpmn_graph::bpmn_graph(const std::vector<vertex>& vertices, edge_collection edge
 // change the contract with the front end
 [[nodiscard]] cel_int_t convert_vertex_type_to_int(const vertex_type& type) {
   return std::visit(
-      ctl::overloaded{[&](const bpmn::task& /*task*/) { return 0; }, [&](const bpmn::start& /*start*/) { return 1; },
+      legacy_embedded_ctl::overloaded{[&](const bpmn::task& /*task*/) { return 0; }, [&](const bpmn::start& /*start*/) { return 1; },
                       [&](const bpmn::end& /*end*/) { return 2; },
                       [&](const bpmn::exclusive_choice& /*exclusive*/) { return 3; },
                       [&](const bpmn::parallel& /*parallel*/) { return 4; }},
@@ -92,7 +92,7 @@ bpmn_graph::bpmn_graph(const std::vector<vertex>& vertices, edge_collection edge
 }
 
 bpmn_graph extract_single_object_bpmn_graph(const bpmn_graph& graph, object_id object) {
-  debug_assert(!graph.is_single_object(),
+  legacy_embedded_debug_assert(!graph.is_single_object(),
                "Extracting single object subgraph from a graph that is already single object.");
   bpmn_graph_builder bldr{};
   std::unordered_map<vertex_id_type, vertex_id_type> vertex_mapping{};
@@ -116,20 +116,20 @@ bpmn_graph convert_from_proto(const BpmnModelDescription& bpmn_proto, const memo
                               common::execution_context& operator_context) {
   // Transform proto nodes (i.e., vertices) to internal representation
   std::vector<vertex> vertices{};
-  vertices.reserve(ctl::cast_unsigned(bpmn_proto.nodes_size()));
+  vertices.reserve(legacy_embedded_ctl::cast_unsigned(bpmn_proto.nodes_size()));
   std::transform(bpmn_proto.nodes().cbegin(), bpmn_proto.nodes().cend(), std::back_inserter(vertices),
                  [&activity_column, &operator_context](const auto& proto_node) {
-                   const auto vertex_id{ctl::cast<vertex_id_type>(proto_node.node_id())};
+                   const auto vertex_id{legacy_embedded_ctl::cast<vertex_id_type>(proto_node.node_id())};
                    const auto vertex_type{proto_node_to_vertex(proto_node, activity_column, operator_context)};
                    return vertex{vertex_id, vertex_type};
                  });
 
   // Transform proto edges to internal representation
   bpmn_graph::edge_collection edges{};
-  edges.reserve(ctl::cast_unsigned(bpmn_proto.edges_size()));
+  edges.reserve(legacy_embedded_ctl::cast_unsigned(bpmn_proto.edges_size()));
   std::transform(
       bpmn_proto.edges().cbegin(), bpmn_proto.edges().cend(), std::back_inserter(edges), [](const auto& proto_edge) {
-        return edge{ctl::cast<vertex_id_type>(proto_edge.from()), ctl::cast<vertex_id_type>(proto_edge.to())};
+        return edge{legacy_embedded_ctl::cast<vertex_id_type>(proto_edge.from()), legacy_embedded_ctl::cast<vertex_id_type>(proto_edge.to())};
       });
 
   return bpmn_graph{vertices, edges};
@@ -148,7 +148,7 @@ bpmn_graph convert_from_proto(const BpmnModelDescription& bpmn_proto, const memo
     case BpmnModelDescription_BpmnNode_BpmnNodeType_END:
       return "BPMN_END";
     default:
-      ctl::assert_unreachable();
+      legacy_embedded_ctl::assert_unreachable();
   }
 }
 
@@ -159,10 +159,10 @@ std::pair<bpmn_graph, bpmn_to_string_t> convert_from_proto_and_create_string_map
 
   // Transform proto nodes (i.e., vertices) to internal representation
   std::vector<vertex> vertices{};
-  vertices.reserve(ctl::cast_unsigned(bpmn_proto.nodes_size()));
+  vertices.reserve(legacy_embedded_ctl::cast_unsigned(bpmn_proto.nodes_size()));
   std::transform(bpmn_proto.nodes().cbegin(), bpmn_proto.nodes().cend(), std::back_inserter(vertices),
                  [&activity_column, &operator_context, &bpmn_to_string](const auto& proto_node) {
-                   const auto vertex_id{ctl::cast<vertex_id_type>(proto_node.node_id())};
+                   const auto vertex_id{legacy_embedded_ctl::cast<vertex_id_type>(proto_node.node_id())};
                    const auto vertex_type{proto_node_to_vertex(proto_node, activity_column, operator_context)};
                    const auto string_repr{convert_to_string(proto_node)};
                    bpmn_to_string.emplace(vertex_id, string_repr);
@@ -171,10 +171,10 @@ std::pair<bpmn_graph, bpmn_to_string_t> convert_from_proto_and_create_string_map
 
   // Transform proto edges to internal representation
   bpmn_graph::edge_collection edges{};
-  edges.reserve(ctl::cast_unsigned(bpmn_proto.edges_size()));
+  edges.reserve(legacy_embedded_ctl::cast_unsigned(bpmn_proto.edges_size()));
   std::transform(
       bpmn_proto.edges().cbegin(), bpmn_proto.edges().cend(), std::back_inserter(edges), [](const auto& proto_edge) {
-        return edge{ctl::cast<vertex_id_type>(proto_edge.from()), ctl::cast<vertex_id_type>(proto_edge.to())};
+        return edge{legacy_embedded_ctl::cast<vertex_id_type>(proto_edge.from()), legacy_embedded_ctl::cast<vertex_id_type>(proto_edge.to())};
       });
 
   return {bpmn_graph{vertices, edges}, bpmn_to_string};
@@ -208,7 +208,7 @@ std::ostream& operator<<(std::ostream& os, const bpmn_graph& graph) {
 }
 
 const vertex& bpmn_graph::get_vertex(vertex_id_type id) const {
-  debug_assert(vertices_.at(id).get_vertex_id() == id);
+  legacy_embedded_debug_assert(vertices_.at(id).get_vertex_id() == id);
   return vertices_.at(id);
 }
 
@@ -314,12 +314,12 @@ const std::vector<vertex_id_type>& bpmn_graph::end_vertex_ids() const {
 }
 
 vertex_id_type bpmn_graph::single_start_vertex() const noexcept {
-  debug_assert(start_vertex_ids().size() == 1);
+  legacy_embedded_debug_assert(start_vertex_ids().size() == 1);
   return start_vertex_ids().at(0);
 }
 
 vertex_id_type bpmn_graph::single_end_vertex() const noexcept {
-  debug_assert(end_vertex_ids().size() == 1);
+  legacy_embedded_debug_assert(end_vertex_ids().size() == 1);
   return end_vertex_ids().at(0);
 }
 

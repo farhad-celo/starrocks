@@ -7,8 +7,8 @@
 
 #include <fmt/format.h>
 
-#include "ctl/memory/memory_tracking_strategy.h"
-#include "ctl/mutex.h"
+#include "legacy_embedded_ctl/memory/memory_tracking_strategy.h"
+#include "legacy_embedded_ctl/mutex.h"
 #include "modules/common/tracing/span.h"
 #include "modules/cube/extended_tables.h"
 #include "modules/cube/table_to_user_visible_name_mapping.h"
@@ -47,7 +47,7 @@ class execution_context {
    * Will be inherited to all subcontexts.
    */
   explicit execution_context(const std::string& operation_name,
-                             ctl::abstract_strategy_t memory_tracking_strategy = nullptr) noexcept;
+                             legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy = nullptr) noexcept;
 
 #ifndef CELOSTAR
   /**
@@ -63,7 +63,7 @@ class execution_context {
    * Will be inherited to all subcontexts.
    */
   execution_context(const std::string& operation_name, const CommunicationRequest_ExecutionContext& remote_context,
-                    ctl::abstract_strategy_t memory_tracking_strategy = nullptr) noexcept;
+                    legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy = nullptr) noexcept;
 #endif
 
   // move-constructor only needed for creating sub context, custom implementation required because mutex is not movable
@@ -109,13 +109,13 @@ class execution_context {
    * Changes the memory tracking strategy that will be unsed in the scope of this execution context.
    * @param memory_tracking_strategy The new memory tracking strategy to be used
    */
-  void set_memory_tracking_strategy(ctl::abstract_strategy_t memory_tracking_strategy);
+  void set_memory_tracking_strategy(legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy);
 
   /**
    * @return A memory tracking strategy that should be used for the scope defined by this execution context. If no
    * strategy was set for this execution context, then this will return a nullptr.
    */
-  [[nodiscard]] const ctl::abstract_strategy_t& get_memory_tracking_strategy() const;
+  [[nodiscard]] const legacy_embedded_ctl::abstract_strategy_t& get_memory_tracking_strategy() const;
 
   /**
    * Adds a warning to this context
@@ -175,10 +175,10 @@ class execution_context {
   tracing::span_t span_;
   mutable memory::warnings_container_t warnings_;
   mutable std::shared_timed_mutex warnings_mutex_;
-  ctl::abstract_strategy_t memory_tracking_strategy_{nullptr};
-  ctl::owning_mutex<ctl::checked_shared_ptr<cube::table_to_user_visible_name_mapping>>
+  legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy_{nullptr};
+  legacy_embedded_ctl::owning_mutex<legacy_embedded_ctl::checked_shared_ptr<cube::table_to_user_visible_name_mapping>>
       table_to_user_visible_name_mapping_;
-  ctl::owning_mutex<ctl::checked_shared_ptr<cube::extended_tables>> extended_tables_;
+  legacy_embedded_ctl::owning_mutex<legacy_embedded_ctl::checked_shared_ptr<cube::extended_tables>> extended_tables_;
 };
 
 }  // namespace celonis::accelerator::common

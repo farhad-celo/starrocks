@@ -19,12 +19,12 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
 
-#include "ctl/assert.h"
-#include "ctl/bitset_view.h"
-#include "ctl/dynamic_bitset.h"
-#include "ctl/range_map.h"
-#include "ctl/static_array.h"
-#include "ctl/static_array_fwd.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/bitset_view.h"
+#include "legacy_embedded_ctl/dynamic_bitset.h"
+#include "legacy_embedded_ctl/range_map.h"
+#include "legacy_embedded_ctl/static_array.h"
+#include "legacy_embedded_ctl/static_array_fwd.h"
 #include "log/log.h"
 #include "modules/common/date/celonis_date_storage.h"
 #include "modules/common/exceptions.h"
@@ -77,9 +77,9 @@ using distinct_element_data = details::distinct_element_data;
 using exec_dictify_sort_based_str_step2 = details::exec_dictify_sort_based_str_step2;
 
 // Returns a copy of the column containing only the non null elements with their original column index
-ctl::static_array<std::pair<cel_string_t, row_id>> create_non_null_data(const cel_string_t* data,
+legacy_embedded_ctl::static_array<std::pair<cel_string_t, row_id>> create_non_null_data(const cel_string_t* data,
                                                                         const row_id row_count,
-                                                                        const ctl::bitset_view_t null_flags,
+                                                                        const legacy_embedded_ctl::bitset_view_t null_flags,
                                                                         const row_id block_count, size_t block_size,
                                                                         const common::execution_context& context) {
   struct unsorted_block_data {
@@ -106,7 +106,7 @@ ctl::static_array<std::pair<cel_string_t, row_id>> create_non_null_data(const ce
   }
 
   auto index_prepared{memory::tracking::make_static_array_for_overwrite<std::pair<cel_string_t, row_id>>(
-      non_null_element_count, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context)};
+      non_null_element_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
 
   // copies the non null elements into index_prepared
   tbb::parallel_for<row_id>(0, static_cast<row_id>(unsorted_info.size()),
@@ -129,7 +129,7 @@ ctl::static_array<std::pair<cel_string_t, row_id>> create_non_null_data(const ce
 
 // Scans the sorted data to detect the amount of distinct elements and buffer size.
 // The results are returned for every block and for the whole column
-distinct_element_data scan_sorted_data(ctl::static_array<std::pair<cel_string_t, row_id>>& index_prepared,
+distinct_element_data scan_sorted_data(legacy_embedded_ctl::static_array<std::pair<cel_string_t, row_id>>& index_prepared,
                                        const row_id block_count, const row_id block_size) {
   // Each block covers a range in the index_prepared array.
   std::vector<typename distinct_element_data::block_data> sorted_info(block_count);
@@ -192,10 +192,10 @@ raw_dictionary_and_pointers make_null_dictionary(const row_id row_count, const s
   });
 
   raw_dictionary_t raw_dictionary;
-  auto values{memory::tracking::make_static_array_value_init<T>(1, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+  auto values{memory::tracking::make_static_array_value_init<T>(1, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
   if constexpr (std::is_same_v<T, cel_string_t>) {
-    ctl::static_array<char> string_buffer{memory::tracking::make_static_array_for_overwrite<char>(
-        NULL_STRING.size(), ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+    legacy_embedded_ctl::static_array<char> string_buffer{memory::tracking::make_static_array_for_overwrite<char>(
+        NULL_STRING.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
     strncpy(string_buffer.data(), NULL_STRING.data(), NULL_STRING.size());
     values[0] = string_buffer.data();
     raw_dictionary = std::make_unique<typed_raw_dictionary<cel_string_t>>(std::move(values), std::move(string_buffer));
@@ -225,7 +225,7 @@ void partition(std::vector<dictify_work_item>& work_items, const row_id row_coun
 namespace details {
 
 template <typename TYPE>
-raw_dictionary_and_pointers dictify_impl(std::span<const TYPE> data, ctl::bitset_view_t null_flags,
+raw_dictionary_and_pointers dictify_impl(std::span<const TYPE> data, legacy_embedded_ctl::bitset_view_t null_flags,
                                          const size_t null_flags_count, const size_t estimated_unique_value_count,
                                          const std::string& description, common::execution_context& context,
                                          common::timer& timer) {
@@ -254,7 +254,7 @@ raw_dictionary_and_pointers dictify_impl(std::span<const TYPE> data, ctl::bitset
 
   auto actual_unique_value_count{result.dictionary->get_size()};
   const std::string log_message{"Dictify column"};
-  format::json::json_object_t log_event{{{"algorithm", use_hash_based_algorithm ? "hash" : "sort"},
+  legacy_embedded_format::json::json_object_t log_event{{{"algorithm", use_hash_based_algorithm ? "hash" : "sort"},
                                          {"description", description},
                                          {"column_type", convert_to_string(get_matching_data_type<TYPE>())},
                                          {"column_size", data.size()},
@@ -262,7 +262,7 @@ raw_dictionary_and_pointers dictify_impl(std::span<const TYPE> data, ctl::bitset
                                          {"actual_unique_value_count", actual_unique_value_count},
                                          {"runtime_ms", timer.duration().count()}}};
 
-  if constexpr (ctl::IS_DEBUG_BUILD) {
+  if constexpr (legacy_embedded_ctl::IS_DEBUG_BUILD) {
     log::jdebug(log_message, log_event);
   } else {
     std::random_device rd{};
@@ -286,7 +286,7 @@ raw_dictionary_and_pointers dictify_impl(std::span<const TYPE> data, ctl::bitset
 }
 
 template <typename TYPE>
-raw_dictionary_and_pointers dictify_sort(std::span<const TYPE> data, const ctl::bitset_view_t null_flags,
+raw_dictionary_and_pointers dictify_sort(std::span<const TYPE> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                          const row_id block_size, const common::execution_context& context) {
   // #lizard forgives: This magic string whitelists the current function from lizard warning output.
   const auto row_count{static_cast<row_id>(data.size())};
@@ -309,7 +309,7 @@ raw_dictionary_and_pointers dictify_sort(std::span<const TYPE> data, const ctl::
   // setup data structure
   // the cast avoids calls to default constructor of the tuple
   auto index_prepared{memory::tracking::make_static_array_for_overwrite<std::pair<TYPE, row_id>>(
-      static_cast<size_t>(non_null_value_count), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context)};
+      static_cast<size_t>(non_null_value_count), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
 
   tbb::parallel_for(uint64_t{0}, uint64_t{work_items.size()},
                     [&work_items, &index_prepared, data, &null_flags](uint64_t w) {
@@ -382,7 +382,7 @@ raw_dictionary_and_pointers dictify_sort(std::span<const TYPE> data, const ctl::
   }
 
   auto distinct_values{memory::tracking::make_static_array_for_overwrite<TYPE>(
-      distinct_value_count_with_null, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+      distinct_value_count_with_null, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
 
   // If there are n different values including NULL, the indices are 0..n-1. The largest value to represent is n-1.
   raw_column_ptrs_t raw_column_pointers{memory::execute_with_column_pointers_type(
@@ -398,7 +398,7 @@ raw_dictionary_and_pointers dictify_sort(std::span<const TYPE> data, const ctl::
 }
 
 template <>
-raw_dictionary_and_pointers dictify_sort(std::span<const cel_string_t> data, const ctl::bitset_view_t null_flags,
+raw_dictionary_and_pointers dictify_sort(std::span<const cel_string_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                          const row_id block_size, const common::execution_context& context) {
   const auto row_count{static_cast<row_id>(data.size())};
   // integer division of size / BLOCK_SIZE but the result is rounded up
@@ -419,11 +419,11 @@ raw_dictionary_and_pointers dictify_sort(std::span<const cel_string_t> data, con
                                         block_size, context},
       sorted_description.total_distinct_element_count)};
 
-  ctl::static_array<cel_string_t> distinct_values{memory::tracking::make_static_array_for_overwrite<cel_string_t>(
-      static_cast<size_t>(sorted_description.total_distinct_element_count), ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG),
+  legacy_embedded_ctl::static_array<cel_string_t> distinct_values{memory::tracking::make_static_array_for_overwrite<cel_string_t>(
+      static_cast<size_t>(sorted_description.total_distinct_element_count), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG),
       context)};
-  ctl::static_array<char> string_buffer{memory::tracking::make_static_array_for_overwrite<char>(
-      sorted_description.total_buffer_size, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+  legacy_embedded_ctl::static_array<char> string_buffer{memory::tracking::make_static_array_for_overwrite<char>(
+      sorted_description.total_buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
 
   char* buffer = string_buffer.data();
   cel_string_t* memory_pointers = distinct_values.data();
@@ -467,7 +467,7 @@ raw_dictionary_and_pointers dictify_sort(std::span<const cel_string_t> data, con
  */
 template <typename T>
 raw_dictionary_and_pointers dictify_hash(std::span<const T> data, const size_t estimated_unique_value_count,
-                                         const ctl::bitset_view_t null_flags, const size_t block_size,
+                                         const legacy_embedded_ctl::bitset_view_t null_flags, const size_t block_size,
                                          const common::execution_context& context) {
   parallel_hash_table<T> unique_values{estimated_unique_value_count, context, block_size};
   auto associated_entries{unique_values.batch_insert_or_get(data, null_flags)};
@@ -492,12 +492,12 @@ raw_dictionary_and_pointers dictify_hash(std::span<const T> data, const size_t e
 
   auto total_buffer_size{unique_values.get_total_buffer_size()};
 
-  ctl::static_array<T> distinct_values{memory::tracking::make_static_array_for_overwrite<T>(
-      unique_value_count_including_null, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+  legacy_embedded_ctl::static_array<T> distinct_values{memory::tracking::make_static_array_for_overwrite<T>(
+      unique_value_count_including_null, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
 
   if constexpr (std::is_same_v<T, cel_string_t>) {
-    ctl::static_array<char> string_buffer{memory::tracking::make_static_array_for_overwrite<char>(
-        total_buffer_size + NULL_STRING.size(), ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+    legacy_embedded_ctl::static_array<char> string_buffer{memory::tracking::make_static_array_for_overwrite<char>(
+        total_buffer_size + NULL_STRING.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
 
     char* buffer = string_buffer.data();
     cel_string_t* memory_pointers = distinct_values.data();
@@ -535,7 +535,7 @@ raw_dictionary_and_pointers dictify_hash(std::span<const T> data, const size_t e
 }
 
 template <typename TYPE>
-raw_dictionary_and_pointers dictify(std::span<const TYPE> data, const ctl::bitset_view_t null_flags,
+raw_dictionary_and_pointers dictify(std::span<const TYPE> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                     const std::string& description, common::execution_context& context) {
   common::timer timer{};
 
@@ -556,25 +556,25 @@ raw_dictionary_and_pointers dictify(std::span<const TYPE> data, const ctl::bitse
                                timer);
 }
 
-template raw_dictionary_and_pointers dictify(std::span<const cel_int_t> data, const ctl::bitset_view_t null_flags,
+template raw_dictionary_and_pointers dictify(std::span<const cel_int_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                              const std::string& description, common::execution_context& context);
-template raw_dictionary_and_pointers dictify(std::span<const cel_float_t> data, const ctl::bitset_view_t null_flags,
+template raw_dictionary_and_pointers dictify(std::span<const cel_float_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                              const std::string& description, common::execution_context& context);
-template raw_dictionary_and_pointers dictify(std::span<const cel_date_t> data, const ctl::bitset_view_t null_flags,
+template raw_dictionary_and_pointers dictify(std::span<const cel_date_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                              const std::string& description, common::execution_context& context);
-template raw_dictionary_and_pointers dictify(std::span<const cel_string_t> data, const ctl::bitset_view_t null_flags,
+template raw_dictionary_and_pointers dictify(std::span<const cel_string_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                              const std::string& description, common::execution_context& context);
-template raw_dictionary_and_pointers dictify(std::span<const cel_uuid_t> data, const ctl::bitset_view_t null_flags,
+template raw_dictionary_and_pointers dictify(std::span<const cel_uuid_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                              const std::string& description, common::execution_context& context);
 
 // Special handling of boolean columns
 template <>
-raw_dictionary_and_pointers dictify(std::span<const cel_boolean_t> data, const ctl::bitset_view_t null_flags,
+raw_dictionary_and_pointers dictify(std::span<const cel_boolean_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                     const std::string& /*description*/, common::execution_context& context) {
   const auto row_count{static_cast<row_id>(data.size())};
 
-  ctl::static_array<cel_boolean_t> dict_vals{
-      memory::tracking::make_static_array_for_overwrite<cel_boolean_t>(3, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+  legacy_embedded_ctl::static_array<cel_boolean_t> dict_vals{
+      memory::tracking::make_static_array_for_overwrite<cel_boolean_t>(3, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
   dict_vals[0] = false;
   dict_vals[1] = false;
   dict_vals[2] = true;
@@ -597,7 +597,7 @@ raw_dictionary_and_pointers dictify(std::span<const cel_boolean_t> data, const c
 }
 
 template <typename TYPE>
-size_t legacy_estimate_unique_value_count(std::span<const TYPE> data, const ctl::bitset_view_t null_flags,
+size_t legacy_estimate_unique_value_count(std::span<const TYPE> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                           const common::execution_context& context) {
   // The heuristic estimates the amount of distinct elements in data
   // The implementation of the heuristic is based on ideas from the following paper:
@@ -619,7 +619,7 @@ size_t legacy_estimate_unique_value_count(std::span<const TYPE> data, const ctl:
   using hash_type =
       std::conditional_t<std::is_same_v<TYPE, cel_string_t>, details::cel_string_key::hash, std::hash<TYPE>>;
   memory::management::checked_ska_hash_map_t<key_type, incidence_data, hash_type> unique_values{
-      memory::management::checked_allocator<decltype(unique_values)>(context, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+      memory::management::checked_allocator<decltype(unique_values)>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
 
   for (row_id sample = 0; sample < SAMPLES; sample++) {
     row_id offset = distr(random_engine);
@@ -656,12 +656,12 @@ size_t legacy_estimate_unique_value_count(std::span<const TYPE> data, const ctl:
 }
 
 // Unique estimation is also used on column pointers, not just data.
-template size_t legacy_estimate_unique_value_count(std::span<const int64_t> data, const ctl::bitset_view_t null_flags,
+template size_t legacy_estimate_unique_value_count(std::span<const int64_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                                    const common::execution_context& context);
-template size_t legacy_estimate_unique_value_count(std::span<const int32_t> data, const ctl::bitset_view_t null_flags,
+template size_t legacy_estimate_unique_value_count(std::span<const int32_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                                    const common::execution_context& context);
-template size_t legacy_estimate_unique_value_count(std::span<const int16_t> data, const ctl::bitset_view_t null_flags,
+template size_t legacy_estimate_unique_value_count(std::span<const int16_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                                    const common::execution_context& context);
-template size_t legacy_estimate_unique_value_count(std::span<const int8_t> data, const ctl::bitset_view_t null_flags,
+template size_t legacy_estimate_unique_value_count(std::span<const int8_t> data, const legacy_embedded_ctl::bitset_view_t null_flags,
                                                    const common::execution_context& context);
 }  // namespace celonis::accelerator::memory::transform

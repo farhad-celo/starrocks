@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ctl/checked_ptr.h"
+#include "legacy_embedded_ctl/checked_ptr.h"
 #include "modules/memory/row_id.h"
 
 namespace celonis::accelerator::memory {
@@ -8,7 +8,7 @@ namespace celonis::accelerator::memory {
 class column_processing_state;
 
 class column;
-using column_t = ctl::checked_shared_ptr<column>;
+using column_t = legacy_embedded_ctl::checked_shared_ptr<column>;
 
 struct col_cache_key;
 

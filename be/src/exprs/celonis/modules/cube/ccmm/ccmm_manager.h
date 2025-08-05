@@ -6,9 +6,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "ctl/assert.h"
-#include "ctl/named_type.h"
-#include "ctl/static_array_fwd.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/named_type.h"
+#include "legacy_embedded_ctl/static_array_fwd.h"
 #include "modules/common/exceptions.h"
 #include "modules/cube/ccmm/ccmm_manager_fwd.h"
 #include "modules/cube/ccmm/types.h"

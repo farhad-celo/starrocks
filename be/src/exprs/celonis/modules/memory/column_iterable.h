@@ -14,12 +14,12 @@
 #include <boost/iterator/zip_iterator.hpp>
 #include <tbb/parallel_for.h>
 
-#include "ctl/assert.h"
-#include "ctl/bitset_view.h"
-#include "ctl/dynamic_bitset.h"
-#include "ctl/interval.h"
-#include "ctl/math.h"
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/bitset_view.h"
+#include "legacy_embedded_ctl/dynamic_bitset.h"
+#include "legacy_embedded_ctl/interval.h"
+#include "legacy_embedded_ctl/math.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types_fwd.h"
@@ -120,14 +120,14 @@ template <size_t N>
 class bitset {
  public:
   using block_type = uint64_t;
-  static constexpr size_t BLOCK_SIZE{ctl::dynamic_bitset_t::BLOCK_SIZE};
-  static constexpr size_t BLOCK_COUNT{ctl::div_round_up(N, BLOCK_SIZE)};
+  static constexpr size_t BLOCK_SIZE{legacy_embedded_ctl::dynamic_bitset_t::BLOCK_SIZE};
+  static constexpr size_t BLOCK_COUNT{legacy_embedded_ctl::div_round_up(N, BLOCK_SIZE)};
 
   constexpr bitset() = default;
-  bitset(const ctl::bitset_view_t bitset, ctl::half_open_interval<row_id> range) {
-    debug_assert(range.begin() % BLOCK_SIZE == 0, "Begin of range must be aligned by {}.", BLOCK_SIZE);
+  bitset(const legacy_embedded_ctl::bitset_view_t bitset, legacy_embedded_ctl::half_open_interval<row_id> range) {
+    legacy_embedded_debug_assert(range.begin() % BLOCK_SIZE == 0, "Begin of range must be aligned by {}.", BLOCK_SIZE);
     const auto block_offset{static_cast<size_t>(range.begin()) / BLOCK_SIZE};
-    const auto block_count{ctl::div_round_up(static_cast<size_t>(range.size()), BLOCK_SIZE)};
+    const auto block_count{legacy_embedded_ctl::div_round_up(static_cast<size_t>(range.size()), BLOCK_SIZE)};
     if (block_count > BLOCK_COUNT) {
       throw common::internal_exception{"Bitset with block count {} is not large enough for data with block count {}.",
                                        BLOCK_COUNT, block_count};
@@ -138,8 +138,8 @@ class bitset {
   constexpr void set_block(size_t block_idx, block_type block) { data_[block_idx] = block; }
 
   [[nodiscard]] constexpr bool operator[](size_t index) const noexcept {
-    const auto [block_index, bit_index] = ctl::details::block_and_bit_index::get(index);
-    return (data_[block_index] & ctl::details::BIT_MASK(bit_index)) != 0;
+    const auto [block_index, bit_index] = legacy_embedded_ctl::details::block_and_bit_index::get(index);
+    return (data_[block_index] & legacy_embedded_ctl::details::BIT_MASK(bit_index)) != 0;
   }
 
  private:
@@ -405,7 +405,7 @@ class chunk {
     iterator(const chunk& parent, const row_id index) noexcept : base{index}, parent_{&parent} {}
 
     [[nodiscard]] reference operator*() const noexcept {
-      debug_assert(0 <= this->current() && this->current() < parent_->chunk_size_);
+      legacy_embedded_debug_assert(0 <= this->current() && this->current() < parent_->chunk_size_);
       if (parent_->null_flags_[this->current()]) {
         return std::nullopt;
       }
@@ -417,7 +417,7 @@ class chunk {
   };
 
   constexpr chunk() = default;
-  chunk(const materialized_iterable<T>& iterable, ctl::half_open_interval<row_id> range)
+  chunk(const materialized_iterable<T>& iterable, legacy_embedded_ctl::half_open_interval<row_id> range)
       : chunk_size_{range.size()},
         values_{copy_from(iterable.value_accessor_.get(), range)},
         null_flags_{iterable.null_flags_accessor_.get(), range} {
@@ -427,7 +427,7 @@ class chunk {
   }
 
   template <typename COL_PTR>
-  chunk(const dictified_iterable<T, COL_PTR>& iterable, ctl::half_open_interval<row_id> range)
+  chunk(const dictified_iterable<T, COL_PTR>& iterable, legacy_embedded_ctl::half_open_interval<row_id> range)
       : chunk_size_{range.size()} {
     if (chunk_size_ > MAX_CHUNK_SIZE) {
       throw common::internal_exception{"Cannot create chunk of size {}.", chunk_size_};
@@ -456,7 +456,7 @@ class chunk {
   [[nodiscard]] const null_flags_t& raw_null_flags() const noexcept { return null_flags_; }
 
  private:
-  [[nodiscard]] static values_t copy_from(const T* data, ctl::half_open_interval<row_id> range) {
+  [[nodiscard]] static values_t copy_from(const T* data, legacy_embedded_ctl::half_open_interval<row_id> range) {
     values_t result;
     std::copy_n(data + range.begin(), range.size(), result.data());
     return result;
@@ -488,7 +488,7 @@ class column_pointer_chunk {
     iterator(const column_pointer_chunk& parent, const row_id index) noexcept : base{index}, parent_{&parent} {}
 
     [[nodiscard]] reference operator*() const noexcept {
-      debug_assert(0 <= this->current() && this->current() < parent_->chunk_size_);
+      legacy_embedded_debug_assert(0 <= this->current() && this->current() < parent_->chunk_size_);
       return parent_->ptrs_[this->current()];
     }
 
@@ -499,7 +499,7 @@ class column_pointer_chunk {
   constexpr column_pointer_chunk() = default;
 
   template <typename COL_PTR>
-  column_pointer_chunk(const column_pointer_iterable<T, COL_PTR>& iterable, ctl::half_open_interval<row_id> range)
+  column_pointer_chunk(const column_pointer_iterable<T, COL_PTR>& iterable, legacy_embedded_ctl::half_open_interval<row_id> range)
       : chunk_size_{range.size()}, ptrs_{copy_from(iterable.col_ptrs_accessor_.get(), range)} {
     if (chunk_size_ > MAX_CHUNK_SIZE) {
       throw common::internal_exception{"Cannot create chunk of size {}.", chunk_size_};
@@ -514,9 +514,9 @@ class column_pointer_chunk {
 
  private:
   template <typename COL_PTR>
-  [[nodiscard]] static ptrs_t copy_from(const COL_PTR* data, ctl::half_open_interval<row_id> range) {
+  [[nodiscard]] static ptrs_t copy_from(const COL_PTR* data, legacy_embedded_ctl::half_open_interval<row_id> range) {
     ptrs_t result{};
-    debug_assert(static_cast<row_id>(result.size()) >= range.size());
+    legacy_embedded_debug_assert(static_cast<row_id>(result.size()) >= range.size());
     std::copy_n(data + range.begin(), range.size(), result.data());
     return result;
   }
@@ -574,7 +574,7 @@ class chunked_iterable {
   [[nodiscard]] iterator end() const {
     return iterator{*this,
                     std::visit([chunk_size = chunk_size_](
-                                   const auto& iterable) { return ctl::div_round_up(iterable.size(), chunk_size); },
+                                   const auto& iterable) { return legacy_embedded_ctl::div_round_up(iterable.size(), chunk_size); },
                                value_upstream_)};
   }
 
@@ -632,7 +632,7 @@ class chunked_iterable<T, iterable_type::COLUMN_PTR> {
   [[nodiscard]] iterator end() const {
     return iterator{*this,
                     std::visit([chunk_size = chunk_size_](
-                                   const auto& iterable) { return ctl::div_round_up(iterable.size(), chunk_size); },
+                                   const auto& iterable) { return legacy_embedded_ctl::div_round_up(iterable.size(), chunk_size); },
                                col_ptr_upstream_)};
   }
 

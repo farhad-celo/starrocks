@@ -17,7 +17,7 @@ cel_float_t calculate_density(const bpmn_graph& bpmn_graph) {
 
   for (const auto& [_, v] : bpmn_graph.get_vertices()) {
     std::visit(
-        ctl::overloaded{[](const auto& /*vertex_type*/) {}, [&num_tasks](const task& /*unused*/) { num_tasks++; },
+        legacy_embedded_ctl::overloaded{[](const auto& /*vertex_type*/) {}, [&num_tasks](const task& /*unused*/) { num_tasks++; },
                         [&num_gateways](const parallel& /*unused*/) { num_gateways++; },
                         [&num_gateways](const exclusive_choice& /*unused*/) { num_gateways++; }},
         v.get_vertex_type());

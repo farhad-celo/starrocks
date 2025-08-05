@@ -1,6 +1,6 @@
 #include "join_data_handler.h"
 
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/static_array.h"
 #ifndef CELOSTAR
 #include "modules/io/storage_manager.h"
 #endif
@@ -19,9 +19,9 @@ join_raw_t create_raw_join_impl(row_id row_count, zero_init_t initialize_to_0,
   }
 
   auto data{initialize_to_0.get() ? memory::tracking::make_shared_static_array_value_init<JOIN_TYPE>(
-                                        row_count, ALLOC_MSG(ctl::RETURN_VALUE_MSG), context)
+                                        row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)
                                   : memory::tracking::make_shared_static_array_for_overwrite<JOIN_TYPE>(
-                                        row_count, ALLOC_MSG(ctl::RETURN_VALUE_MSG), context)};
+                                        row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)};
   return data;
 }
 

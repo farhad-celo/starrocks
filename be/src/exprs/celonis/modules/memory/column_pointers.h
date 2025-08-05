@@ -4,10 +4,10 @@
 #include <limits>
 #include <memory>
 
-#include "ctl/assert.h"
-#include "ctl/named_type.h"
-#include "ctl/static_array.h"
-#include "ctl/type_traits.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/named_type.h"
+#include "legacy_embedded_ctl/static_array.h"
+#include "legacy_embedded_ctl/type_traits.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/int_types.h"
@@ -70,7 +70,7 @@ template <class T>
 using column_data_handler_t = management::raw_data_handler_t<T>;
 
 template <typename COL_PTR_TYPE>
-using column_raw_data_t = ctl::shared_static_array<COL_PTR_TYPE>;
+using column_raw_data_t = legacy_embedded_ctl::shared_static_array<COL_PTR_TYPE>;
 
 class raw_column_ptrs_abstract;
 using raw_column_ptrs_t = std::shared_ptr<raw_column_ptrs_abstract>;
@@ -117,7 +117,7 @@ template <typename COL_PTR_TYPE>
   } else if constexpr (std::is_same_v<COL_PTR_TYPE, col_ptr_64_t>) {
     return col_pointer_type::PTR_64;
   } else {
-    static_assert(ctl::always_false_v<COL_PTR_TYPE>, "Unknown column pointer type!");
+    static_assert(legacy_embedded_ctl::always_false_v<COL_PTR_TYPE>, "Unknown column pointer type!");
   }
 }
 
@@ -134,13 +134,13 @@ class column_ptrs_abstract_base {
   col_pointer_type type;
 };
 
-// TODO(l.karnowski) This class can probably be replaced by ctl::shared_static_array<const COL_PTR_TYPE>
+// TODO(l.karnowski) This class can probably be replaced by legacy_embedded_ctl::shared_static_array<const COL_PTR_TYPE>
 template <typename COL_PTR_TYPE>
 class const_column_ptrs_accessor {
  public:
   using type = COL_PTR_TYPE;
 
-  explicit const_column_ptrs_accessor(ctl::shared_static_array<const COL_PTR_TYPE> row_ptr) noexcept
+  explicit const_column_ptrs_accessor(legacy_embedded_ctl::shared_static_array<const COL_PTR_TYPE> row_ptr) noexcept
       : row_ptr_{std::move(row_ptr)} {}
 
   [[nodiscard]] const COL_PTR_TYPE& operator[](const size_t idx) const { return row_ptr_[idx]; }
@@ -151,7 +151,7 @@ class const_column_ptrs_accessor {
   [[nodiscard]] const COL_PTR_TYPE* get() const noexcept { return row_ptr_.get(); }
 
  private:
-  ctl::shared_static_array<const COL_PTR_TYPE> row_ptr_;
+  legacy_embedded_ctl::shared_static_array<const COL_PTR_TYPE> row_ptr_;
 };
 
 }  // namespace details
@@ -221,7 +221,7 @@ class column_ptrs_impl final : public column_ptrs_abstract {
                                             common::execution_context& context) const override {
     auto row_count = ptrs->get_size();
     auto data{memory::tracking::make_static_array_for_overwrite<COL_PTRS_TYPE>(
-        row_count, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG), context)};
+        row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
     std::copy_n(ptrs->get_const_data(context).get(), row_count, data.get());
     auto raw_clone{management::raw_data_handler<COL_PTRS_TYPE>::create_data_handler(
         std::move(data), id + management::COLUMN_PTR_ENDING, sinfo, description + " " + management::COLUMN_PTR_DESC)};
@@ -273,9 +273,9 @@ class raw_column_ptrs_impl final : public raw_column_ptrs_abstract {
                        const common::execution_context& context)
       : raw_column_ptrs_abstract{details::col_ptr_type_to_enum<COL_PTRS_TYPE>()},
         data_{initialize_to_0.get() ? memory::tracking::make_shared_static_array_value_init<COL_PTRS_TYPE>(
-                                          row_count, ALLOC_MSG(ctl::TEMPORARY_COLUMN_MSG), context)
+                                          row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_COLUMN_MSG), context)
                                     : memory::tracking::make_shared_static_array_for_overwrite<COL_PTRS_TYPE>(
-                                          row_count, ALLOC_MSG(ctl::TEMPORARY_COLUMN_MSG), context)},
+                                          row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_COLUMN_MSG), context)},
         context{context} {}
 
   friend raw_column_ptrs_abstract;
@@ -308,7 +308,7 @@ class raw_column_ptrs_impl final : public raw_column_ptrs_abstract {
         // aliasing constructor
         data_{data.sub_array(static_cast<size_t>(offset), static_cast<size_t>(row_count))},
         context{context} {
-    debug_assert(0 <= offset);
+    legacy_embedded_debug_assert(0 <= offset);
   }
 
   memory::column_raw_data_t<COL_PTRS_TYPE> data_{};
@@ -333,7 +333,7 @@ class raw_immutable_column_ptrs_impl final : public raw_immutable_column_ptrs_ab
       : raw_immutable_column_ptrs_abstract{details::col_ptr_type_to_enum<COL_PTRS_TYPE>()},
         // Aliasing constructor
         data_{data.sub_array(static_cast<size_t>(offset), static_cast<size_t>(row_count))} {
-    debug_assert(0 <= offset);
+    legacy_embedded_debug_assert(0 <= offset);
   }
 
   [[nodiscard]] size_t get_row_count() const noexcept override { return data_.size(); }
@@ -359,7 +359,7 @@ struct get_ptr_impl_type_of_decayed {
                     !std::is_same_v<raw_column_ptrs_abstract*, std::remove_reference_t<ABSTRACT_PTR_TYPE>> &&
                     !std::is_same_v<raw_immutable_column_ptrs_abstract*, std::remove_reference_t<ABSTRACT_PTR_TYPE>>,
                 "cast_execute_column_pointers: Require column pointers, not pointer to column pointers.");
-  static_assert(ctl::always_false_v<ABSTRACT_PTR_TYPE>, "Unknown abstract pointer type!");
+  static_assert(legacy_embedded_ctl::always_false_v<ABSTRACT_PTR_TYPE>, "Unknown abstract pointer type!");
 };
 
 template <col_pointer_type PTR_SIZE>
@@ -382,7 +382,7 @@ using get_ptr_impl_type_of_decayed_t = typename get_ptr_impl_type_of_decayed<ABS
 
 template <typename ABSTRACT_PTR_TYPE, col_pointer_type PTR_SIZE>
 using get_ptr_impl_type =
-    ctl::adopt_cvr<ABSTRACT_PTR_TYPE, get_ptr_impl_type_of_decayed_t<std::decay_t<ABSTRACT_PTR_TYPE>, PTR_SIZE>>;
+    legacy_embedded_ctl::adopt_cvr<ABSTRACT_PTR_TYPE, get_ptr_impl_type_of_decayed_t<std::decay_t<ABSTRACT_PTR_TYPE>, PTR_SIZE>>;
 
 template <class ABSTRACT_PTR_TYPE, col_pointer_type PTR_SIZE>
 using get_ptr_impl_type_t = typename get_ptr_impl_type<ABSTRACT_PTR_TYPE, PTR_SIZE>::type;
@@ -429,7 +429,7 @@ requires(std::is_base_of_v<column_ptrs_abstract_base, std::remove_cvref_t<FIRST_
     }
     default:
       throw common::internal_exception{"Unknown column pointer type {}",
-                                       ctl::enum_to_underlying_type(first_arg.get_type())};
+                                       legacy_embedded_ctl::enum_to_underlying_type(first_arg.get_type())};
   }
 }
 

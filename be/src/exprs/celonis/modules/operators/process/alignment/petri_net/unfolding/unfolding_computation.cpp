@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "ctl/source_location.h"
+#include "legacy_embedded_ctl/source_location.h"
 #include "modules/common/exceptions.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::unfolding {
@@ -48,7 +48,7 @@ petri_net_place_id get_place_not_in_preset(const petri_net_transition& pn_transi
   // Therefore, we are sure to have preset.size() < pn_transition.in_places.size()
   //  for all invocations of this method
   // So there's at least one input place not in pre_set and control should never reach here
-  throw common::internal_exception{"ALIGN: Control reached unexpected line {}.", ctl::source_location{}};
+  throw common::internal_exception{"ALIGN: Control reached unexpected line {}.", legacy_embedded_ctl::source_location{}};
 }
 
 }  // namespace

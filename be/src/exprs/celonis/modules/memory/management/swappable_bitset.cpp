@@ -9,12 +9,12 @@
 #include <tbb/parallel_for.h>
 
 #include "concurrency/concurrency_utils.h"
-#include "ctl/array_view.h"
-#include "ctl/bits/dynamic_bitset_utils.h"
-#include "ctl/dynamic_bitset.h"
-#include "ctl/static_array.h"
-#include "ctl/utils/allocation_messages.h"
-#include "ctl/utils/allocation_reason.h"
+#include "legacy_embedded_ctl/array_view.h"
+#include "legacy_embedded_ctl/bits/dynamic_bitset_utils.h"
+#include "legacy_embedded_ctl/dynamic_bitset.h"
+#include "legacy_embedded_ctl/static_array.h"
+#include "legacy_embedded_ctl/utils/allocation_messages.h"
+#include "legacy_embedded_ctl/utils/allocation_reason.h"
 #include "log/log.h"
 #include "modules/common/aligned_blocked_range.h"
 #include "modules/common/exceptions.h"
@@ -39,9 +39,9 @@ namespace {
 // Transform a dynamic_bitset to an array of 64-bit ints.
 // The last element in the array indicates the number of bits,
 // the rest is the bitset data itself.
-[[nodiscard]] ctl::static_array<uint64_t> copy_to_static_array(const ctl::dynamic_bitset_t& data) {
-  auto array{ctl::make_static_array_for_overwrite<uint64_t>(static_cast<size_t>(data.num_blocks()) + 1,
-                                                            ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG))};
+[[nodiscard]] legacy_embedded_ctl::static_array<uint64_t> copy_to_static_array(const legacy_embedded_ctl::dynamic_bitset_t& data) {
+  auto array{legacy_embedded_ctl::make_static_array_for_overwrite<uint64_t>(static_cast<size_t>(data.num_blocks()) + 1,
+                                                            LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG))};
   auto* array_last{std::copy(data.data(), data.data() + data.num_blocks(), array.begin())};
   *array_last = data.size();
   return array;
@@ -51,12 +51,12 @@ namespace {
 // Transform a boolean array to an uint64_t array.
 // The last element in the array indicates the number of bits,
 // the rest is the bitset data itself.
-[[nodiscard]] ctl::static_array<uint64_t> copy_to_static_array(const const_data_accessor<bool>& data) {
-  auto array{ctl::make_static_array_for_overwrite<uint64_t>(
-      static_cast<size_t>(ctl::details::calc_number_of_bitset_blocks(data.size())) + 1,
-      ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG))};
+[[nodiscard]] legacy_embedded_ctl::static_array<uint64_t> copy_to_static_array(const const_data_accessor<bool>& data) {
+  auto array{legacy_embedded_ctl::make_static_array_for_overwrite<uint64_t>(
+      static_cast<size_t>(legacy_embedded_ctl::details::calc_number_of_bitset_blocks(data.size())) + 1,
+      LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG))};
   array.back() = data.size();
-  ctl::bitset_mutable_view_t view{ctl::array_view<uint64_t>{array.begin(), array.end() - 1}, data.size()};
+  legacy_embedded_ctl::bitset_mutable_view_t view{legacy_embedded_ctl::array_view<uint64_t>{array.begin(), array.end() - 1}, data.size()};
 
   tbb::parallel_for(common::safe_aligned_blocked_range<size_t>{0, data.size()},
                     [&view, &data = std::as_const(data)](const auto r) {
@@ -73,7 +73,7 @@ std::shared_ptr<swappable_bitset> swappable_bitset::create_data_handler(const me
                                                                         const std::string& swap_file,
                                                                         const swap_info& sinfo,
                                                                         const std::string& description) {
-  debug_assert(sinfo.is_no_swap() || swap_file.ends_with(NULL_FLAGS_ENDING) ||
+  legacy_embedded_debug_assert(sinfo.is_no_swap() || swap_file.ends_with(NULL_FLAGS_ENDING) ||
                swap_file.ends_with(NULL_FLAGS_NEW_ENDING));
   auto data_handler_data{copy_to_static_array(*data)};
   const std::string swap_file_bs_ending{swap_file.substr(0, swap_file.find_last_of('.')) + BITSET_ENDING};
@@ -87,7 +87,7 @@ std::shared_ptr<swappable_bitset> swappable_bitset::create_data_handler(const me
 #ifndef CELOSTAR
 std::shared_ptr<swappable_bitset> swappable_bitset::init_from_swap(const std::string& swap_file, const swap_info& sinfo,
                                                                    const std::string& description) {
-  debug_assert(sinfo.is_no_swap() || swap_file.ends_with(NULL_FLAGS_ENDING) ||
+  legacy_embedded_debug_assert(sinfo.is_no_swap() || swap_file.ends_with(NULL_FLAGS_ENDING) ||
                swap_file.ends_with(NULL_FLAGS_NEW_ENDING) || swap_file.ends_with(BITSET_ENDING));
   std::shared_ptr<swappable_bitset> ret{nullptr};
   if (swap_file.ends_with(NULL_FLAGS_ENDING) || swap_file.ends_with(NULL_FLAGS_NEW_ENDING)) {
@@ -107,7 +107,7 @@ std::shared_ptr<swappable_bitset> swappable_bitset::init_from_swap(const std::st
 std::shared_ptr<swappable_bitset> swappable_bitset::init_from_swap_byte_array(const std::string& swap_file,
                                                                               const swap_info& sinfo,
                                                                               const std::string& description) {
-  debug_assert(sinfo.is_no_swap() || swap_file.ends_with(NULL_FLAGS_ENDING) ||
+  legacy_embedded_debug_assert(sinfo.is_no_swap() || swap_file.ends_with(NULL_FLAGS_ENDING) ||
                swap_file.ends_with(NULL_FLAGS_NEW_ENDING));
   auto bool_data_handler{raw_data_handler<bool>::init_from_swap(swap_file, sinfo, description)};
   if (bool_data_handler != nullptr) {
@@ -125,7 +125,7 @@ std::shared_ptr<swappable_bitset> swappable_bitset::init_from_swap_byte_array(co
 std::shared_ptr<swappable_bitset> swappable_bitset::init_from_swap_bitset(const std::string& swap_file,
                                                                           const swap_info& sinfo,
                                                                           const std::string& description) {
-  debug_assert(sinfo.is_no_swap() || swap_file.ends_with(BITSET_ENDING));
+  legacy_embedded_debug_assert(sinfo.is_no_swap() || swap_file.ends_with(BITSET_ENDING));
   auto data_handler{raw_data_handler<uint64_t>::init_from_swap(swap_file, sinfo, description)};
   if (data_handler == nullptr) {
     return {};
@@ -173,12 +173,12 @@ void swappable_bitset::write_null_flag_ending_to_disk(common::execution_context&
 
   const auto uint64_array{data_handler_->get_const_data(context).shared()};
 
-  ctl::static_array<bool> out_data{};
+  legacy_embedded_ctl::static_array<bool> out_data{};
   if (!uint64_array.empty()) {
     const size_t size{uint64_array.back()};
     out_data =
-        memory::tracking::make_static_array_value_init<bool>(size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG), context);
-    const ctl::bitset_view_t view{ctl::array_view<const uint64_t>{uint64_array.begin(), uint64_array.end() - 1}, size};
+        memory::tracking::make_static_array_value_init<bool>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context);
+    const legacy_embedded_ctl::bitset_view_t view{legacy_embedded_ctl::array_view<const uint64_t>{uint64_array.begin(), uint64_array.end() - 1}, size};
     view.apply_in_range([&out_data](const size_t i) { out_data[i] = true; });
   }
 
@@ -202,8 +202,8 @@ swappable_bitset::const_data_accessor_t swappable_bitset::get_const_data(
     [[maybe_unused]] const common::execution_context& context) {
   const auto data_mutex_lock{concurrency::lock_shared_with_logging(data_mutex_, LOCK_LOGGING_THRESHOLD)};
   auto data_handler_data{data_handler_->get_const_data(context).shared()};
-  debug_assert(!data_handler_data.empty());
-  const ctl::bitset_view_t view{ctl::array_view<const uint64_t>{data_handler_data.begin(), data_handler_data.end() - 1},
+  legacy_embedded_debug_assert(!data_handler_data.empty());
+  const legacy_embedded_ctl::bitset_view_t view{legacy_embedded_ctl::array_view<const uint64_t>{data_handler_data.begin(), data_handler_data.end() - 1},
                                 data_handler_data.back()};
   return swappable_bitset::const_data_accessor_t{view, std::move(data_handler_data)};
 }

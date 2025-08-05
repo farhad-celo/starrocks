@@ -4,7 +4,7 @@
 #include <optional>
 #include <variant>
 
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/common/exceptions.h"
 #include "modules/operators/process/alignment/petri_net/murata/fusion_series_places.h"
 #include "modules/operators/process/alignment/petri_net/murata/fusion_series_transitions.h"
@@ -62,7 +62,7 @@ petri_net_representation reduce_murata(const petri_net_representation& pn_repr,
 
     auto optional_rule{find_reduction_to_apply(reduced_builder, keep_transitions)};
     if (optional_rule) {
-      std::visit(ctl::overloaded{[&reduced_builder](const auto& rule) { rule.apply(reduced_builder); }},
+      std::visit(legacy_embedded_ctl::overloaded{[&reduced_builder](const auto& rule) { rule.apply(reduced_builder); }},
                  optional_rule.value());
     }
   }

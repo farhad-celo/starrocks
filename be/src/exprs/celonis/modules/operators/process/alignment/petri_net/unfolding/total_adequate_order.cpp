@@ -1,6 +1,6 @@
 #include "total_adequate_order.h"
 
-#include "ctl/assert.h"
+#include "legacy_embedded_ctl/assert.h"
 #include "unfolding_entities.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::unfolding {
@@ -50,7 +50,7 @@ bool compare_foata_forms(const foata_normal_form_t& lhs, const foata_normal_form
   // This method is only called when both local configurations are lexicographically equal
   // In this case, if lhs.size() > rhs.size()
   // the comparison will terminate somewhere before reaching rhs.size()
-  debug_assert(lhs.size() <= rhs.size());
+  legacy_embedded_debug_assert(lhs.size() <= rhs.size());
 
   for (size_t i{0}; i < lhs.size(); ++i) {
     const auto& lhs_local_conf_i{lhs[i]};
@@ -63,7 +63,7 @@ bool compare_foata_forms(const foata_normal_form_t& lhs, const foata_normal_form
   }
 
   // Should reach here only if equal, but not the case in our code
-  debug_assert(false);
+  legacy_embedded_debug_assert(false);
   return false;
 }
 

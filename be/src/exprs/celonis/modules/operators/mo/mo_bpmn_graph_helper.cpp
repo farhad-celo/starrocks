@@ -22,7 +22,7 @@ using process::process_tree;
 namespace process_tree_builder {
 
 void recalculate_counts(process_tree& pt) {
-    std::visit(ctl::overloaded{
+    std::visit(legacy_embedded_ctl::overloaded{
                        [&](process_tree::exclusive &p) {
                            p.recalculate_counts();
                        },
@@ -140,7 +140,7 @@ build(const std::string& process_tree_json, int id, const common::execution_cont
             return Status::InvalidArgument(error.str());
         }
         recalculate_counts(nodes.back());
-        RETURN_IF_ERROR(std::visit(ctl::overloaded{
+        RETURN_IF_ERROR(std::visit(legacy_embedded_ctl::overloaded{
                                            [&](process_tree::exclusive& p) {
                                                p.children.insert(p.children.begin(), std::move(nodes.back()));
                                                return Status::OK();

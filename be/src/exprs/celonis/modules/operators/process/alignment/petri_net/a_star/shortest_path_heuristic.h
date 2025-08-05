@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 
-#include "ctl/algorithm.h"
+#include "legacy_embedded_ctl/algorithm.h"
 #include "modules/operators/process/alignment/petri_net/a_star/petri_net_wrapper.h"
 #include "modules/operators/process/alignment/petri_net/petri_net.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
@@ -27,7 +27,7 @@ class heuristic_to_transition {
   [[nodiscard]] std::optional<cost_type> estimate(const marking_type& marking) const;
 
   [[nodiscard]] bool is_target(const petri_net::marking_type& marking) const {
-    return ctl::contains(petri_net_.get_enabled_transitions(marking), target_);
+    return legacy_embedded_ctl::contains(petri_net_.get_enabled_transitions(marking), target_);
   }
 
  private:
@@ -76,7 +76,7 @@ class heuristic_to_markings {
   [[nodiscard]] std::optional<cost_type> estimate(const petri_net::marking_type& marking) const;
 
   [[nodiscard]] bool is_target(const petri_net::marking_type& marking) const {
-    return ctl::contains(target_markings_, marking);
+    return legacy_embedded_ctl::contains(target_markings_, marking);
   }
 
  private:

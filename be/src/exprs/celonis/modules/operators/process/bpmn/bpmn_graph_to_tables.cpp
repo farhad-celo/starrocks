@@ -17,10 +17,10 @@ memory::table_t build_bpmn_edges_table(const bpmn::bpmn_graph& graph, memory::ta
 
   memory::table_t bpmn_edges_table{memory::table::create_query_scope_table(size, "bpmn_edges")};
 
-  auto source_id_data{ctl::make_static_array_for_overwrite<cel_int_t>(size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
-  auto target_id_data{ctl::make_static_array_for_overwrite<cel_int_t>(size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
-  auto object_id_data{ctl::make_static_array_for_overwrite<cel_int_t>(size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
-  auto object_count_data{ctl::make_static_array_for_overwrite<cel_int_t>(size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto source_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto target_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto object_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto object_count_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   row_id i{0};
   for (const auto& edge : bpmn_edges) {
@@ -54,8 +54,8 @@ memory::table_t build_bpmn_nodes_table(const bpmn::bpmn_graph& graph, memory::ta
 
   memory::table_t bpmn_nodes_table{memory::table::create_query_scope_table(size, "bpmn_nodes")};
 
-  auto node_id_data{ctl::make_static_array_for_overwrite<cel_int_t>(size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
-  auto node_type_data{ctl::make_static_array_for_overwrite<cel_int_t>(size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto node_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto node_type_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   for (int i{0}; const auto& [_, vertex] : bpmn_nodes) {
     node_id_data[i] = static_cast<cel_int_t>(vertex.get_vertex_id());
@@ -77,7 +77,7 @@ memory::table_t build_bpmn_nodes_table(const bpmn::bpmn_graph& graph, memory::ta
  * Returns function that gets a mapping of indices to dict row ids and sets the given column pointers to the dict rid
  * for each index.
  */
-auto exec_dict_mapper(const ctl::static_array<row_id>& dict_rid_mapping) {
+auto exec_dict_mapper(const legacy_embedded_ctl::static_array<row_id>& dict_rid_mapping) {
   return [&dict_rid_mapping](const auto& t) {
     auto output_col_ptrs_ac{std::get<0>(t).get_data()};
 
@@ -96,10 +96,10 @@ memory::table_t build_bpmn_activities(const bpmn_graph& graph, const memory::dic
                [](const bpmn::vertex& vertex) { return std::holds_alternative<bpmn::task>(vertex.get_vertex_type()); });
   const row_id size{static_cast<row_id>(bpmn_activity_nodes.size())};
 
-  auto node_id_data{ctl::make_static_array_for_overwrite<cel_int_t>(size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto node_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   auto activity_name_dict_mapping{
-      ctl::make_static_array_for_overwrite<row_id>(size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+      legacy_embedded_ctl::make_static_array_for_overwrite<row_id>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
 
   for (row_id i{0}; i < size; i++) {
     node_id_data[i] = static_cast<cel_int_t>(bpmn_activity_nodes[i].get_vertex_id());
@@ -202,11 +202,11 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
   }
 
   // Now that we know the total size of the model descriptions, we can allocate the arrays
-  auto object_id_data{ctl::make_static_array_for_overwrite<cel_int_t>(num_objects, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto object_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(num_objects, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   auto model_description_ptrs{
-      ctl::make_static_array_for_overwrite<cel_string_t>(num_objects, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+      legacy_embedded_ctl::make_static_array_for_overwrite<cel_string_t>(num_objects, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   auto column_str_bfr{
-      ctl::make_static_array_for_overwrite<char>(total_model_descriptions_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+      legacy_embedded_ctl::make_static_array_for_overwrite<char>(total_model_descriptions_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   // Write the object ids and descriptions to the buffers
   row_id index{0};
@@ -245,7 +245,7 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
   std::array<size_t, BPMN_BLOCK_TYPE_STRINGS.size()> OFFSETS{};  // offsets to the respective string data beginning
   OFFSETS.at(0) = 0;
   for (size_t idx{0}; const std::string_view BPMN_BLOCK_TYPE_AS_STRING : BPMN_BLOCK_TYPE_STRINGS) {
-    char* BUFFER_OUT_PTR{std::next(BUFFER.data(), ctl::cast_signed(OFFSETS.at(idx)))};
+    char* BUFFER_OUT_PTR{std::next(BUFFER.data(), legacy_embedded_ctl::cast_signed(OFFSETS.at(idx)))};
     // copy the string to the buffer and add a null terminator at the end
     *std::ranges::copy(BPMN_BLOCK_TYPE_AS_STRING, BUFFER_OUT_PTR).out = '\0';
     if (++idx < BPMN_BLOCK_TYPE_STRINGS.size()) {
@@ -271,17 +271,17 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
 
   // column data containers
   auto block_ids_column_data{
-      ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+      legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   auto parent_block_ids_column_data{
-      ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+      legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   auto object_ids_column_data{
-      ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+      legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   static constexpr const auto& BUFFER{BUFFER_AND_OFFSETS.first};
   static constexpr const auto& OFFSETS{BUFFER_AND_OFFSETS.second};
   auto block_type_column_data_pointers{
-      ctl::make_static_array_for_overwrite<cel_string_t>(number_of_blocks, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
-  auto block_type_column_data_buffer{ctl::make_static_array<char>(BUFFER, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+      legacy_embedded_ctl::make_static_array_for_overwrite<cel_string_t>(number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto block_type_column_data_buffer{legacy_embedded_ctl::make_static_array<char>(BUFFER, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   // fill column data
   for (size_t idx{0}; const auto& block : blocks) {
@@ -294,7 +294,7 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
     ++idx;
   }
 
-  auto bpmn_blocks_table{memory::table::create_query_scope_table(ctl::cast_signed(number_of_blocks), "bpmn_blocks")};
+  auto bpmn_blocks_table{memory::table::create_query_scope_table(legacy_embedded_ctl::cast_signed(number_of_blocks), "bpmn_blocks")};
   bpmn_blocks_table->add_column<cel_int_t>(memory::col_name{"BLOCK_ID"}, memory::col_id{"BLOCK_ID"},
                                            std::move(block_ids_column_data),
                                            memory::create_null_flags(number_of_blocks, operator_context),
@@ -327,14 +327,14 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
                       })};
 
   // column data containers
-  auto vertex_ids_column_data{ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
-                                                                              ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
-  auto block_ids_column_data{ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
-                                                                             ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
+  auto vertex_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
+                                                                              LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto block_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
+                                                                             LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   // fill column data
   for (size_t idx{0}; const auto& [vertex_id, block_ids] : vertex_id_to_block_ids_mapping) {
     for (const auto& block_id : block_ids) {
-      vertex_ids_column_data.at(idx) = ctl::cast<cel_int_t>(vertex_id);
+      vertex_ids_column_data.at(idx) = legacy_embedded_ctl::cast<cel_int_t>(vertex_id);
       block_ids_column_data.at(idx) = block_id;
       ++idx;
     }
@@ -342,7 +342,7 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
 
   // Create tables and add the corresponding columns to them
   auto bpmn_nodes_to_blocks_table{memory::table::create_query_scope_table(
-      ctl::cast_signed(number_of_nodes_with_a_related_block), "bpmn_nodes_to_blocks")};
+      legacy_embedded_ctl::cast_signed(number_of_nodes_with_a_related_block), "bpmn_nodes_to_blocks")};
 
   bpmn_nodes_to_blocks_table->add_column<cel_int_t>(
       memory::col_name{"NODE_ID"}, memory::col_id{"NODE_ID"}, std::move(vertex_ids_column_data),

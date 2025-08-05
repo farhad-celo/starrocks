@@ -6,9 +6,9 @@
 #include <fmt/format.h>
 
 #include "concurrency/concurrency_utils.h"
-#include "ctl/source_location.h"
-#include "ctl/static_array.h"
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/source_location.h"
+#include "legacy_embedded_ctl/static_array.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "log/log.h"
 #include "modules/cube/variant_trace_utils.h"
 #include "modules/memory/cache/variant_trace_cache.h"
@@ -39,9 +39,9 @@ size_t variant_trace_cache_manager::size() const {
 #ifndef CELOSTAR
 void variant_trace_cache_manager::create_and_store_variant_cache(const std::string& cache_key,
                                                                  const std::string& table_name,
-                                                                 ctl::static_array<trace_type> traces,
-                                                                 ctl::static_array<trace_buffer_type> trace_buffer,
-                                                                 ctl::static_array<trace_length_type> trace_lengths) {
+                                                                 legacy_embedded_ctl::static_array<trace_type> traces,
+                                                                 legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer,
+                                                                 legacy_embedded_ctl::static_array<trace_length_type> trace_lengths) {
   const details::cached_variants::caching_meta_data caching_meta_data{
       .cache_key = cache_key, .cache_id = get_next_cache_id(), .swap_info = sinfo};
 
@@ -55,8 +55,8 @@ void variant_trace_cache_manager::create_and_store_variant_cache(const std::stri
 }
 
 void variant_trace_cache_manager::create_and_store_variant_cache_col_ptrs(
-    const std::string& cache_key, const std::string& table_name, ctl::static_array<trace_type> traces,
-    ctl::static_array<trace_buffer_type> trace_buffer, ctl::static_array<trace_length_type> trace_lengths,
+    const std::string& cache_key, const std::string& table_name, legacy_embedded_ctl::static_array<trace_type> traces,
+    legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer, legacy_embedded_ctl::static_array<trace_length_type> trace_lengths,
     common::owned_column_ptr_data_t group_id_to_trace_id) {
   const details::cached_variants::caching_meta_data caching_meta_data{
       .cache_key = decorate_cache_key_col_ptrs(cache_key), .cache_id = get_next_cache_id(), .swap_info = sinfo};

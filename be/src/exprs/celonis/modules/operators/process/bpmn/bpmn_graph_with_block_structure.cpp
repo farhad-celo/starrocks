@@ -6,8 +6,8 @@
 
 #include <fmt/format.h>
 
-#include "ctl/assert.h"
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/conversion.h"
 #include "log/log.h"
 #include "modules/common/exceptions.h"
 #include "modules/operators/process/bpmn/bpmn_graph_with_block_structure_utils.h"
@@ -57,8 +57,8 @@ requires std::same_as<typename R1::value_type, typename R2::value_type>
 [[nodiscard]] std::set<typename R1::value_type> make_set_difference(const R1& r1, const R2& r2) {
   using value_type = typename R1::value_type;
   std::set<value_type> set_difference{};
-  debug_assert(std::ranges::is_sorted(r1));
-  debug_assert(std::ranges::is_sorted(r2));
+  legacy_embedded_debug_assert(std::ranges::is_sorted(r1));
+  legacy_embedded_debug_assert(std::ranges::is_sorted(r2));
   std::ranges::set_difference(r1, r2, make_set_inserter(set_difference));
   return set_difference;
 }
@@ -89,7 +89,7 @@ void verify_exactly_one_root_block_per_object(const bpmn_blocks_t& root_blocks,
   // Get all distinct object IDs of root blocks
   distinct_bpmn_block_object_ids_t distinct_oids_in_root_blocks{oids_in_root_blocks.begin(), oids_in_root_blocks.end()};
 
-  debug_assert(make_set_difference(distinct_oids_in_root_blocks, object_ids).empty(),
+  legacy_embedded_debug_assert(make_set_difference(distinct_oids_in_root_blocks, object_ids).empty(),
                "Pre-condition does not hold: The passed object IDs [{}] do not contain all object IDs present in the "
                "root blocks [{}].",
                fmt::join(object_ids, ", "), fmt::join(distinct_oids_in_root_blocks, ", "));
@@ -106,7 +106,7 @@ void verify_exactly_one_root_block_per_object(const bpmn_blocks_t& root_blocks,
                            fmt::join(object_ids_without_root_block, ", "));
 
     // One of the above asserts is expected to throw
-    ctl::assert_unreachable();
+    legacy_embedded_ctl::assert_unreachable();
   }
 }
 
@@ -233,7 +233,7 @@ bpmn_graph_with_block_structure::bpmn_graph_with_block_structure(
   try {
     verify_block_consistency(*this);
     // TODO(n.weber): CPL-10394 - We might want to integrate consistency checks for the vertex to block mapping too
-  } catch (const ctl::internal_error& error) {
+  } catch (const legacy_embedded_ctl::internal_error& error) {
     log::jerror("Error during 'bpmn_graph_with_block_structure' consistency checks.",  //
                 {{"error_message", error.internal_message()},                          //
                  {"bpmn_graph_with_block_structure", to_string(*this)}});
@@ -241,12 +241,12 @@ bpmn_graph_with_block_structure::bpmn_graph_with_block_structure(
   }
   // Not a technical requirement but makes working with the output - especially for testing - much simpler. Also, the
   // ordered'ness is already a byproduct of our structures, so we do not pay (read: compute) anything extra for that.
-  debug_assert(std::ranges::all_of(vertex_id_to_block_id_mapping_, [](const auto& vertex_id_to_block_ids) {
+  legacy_embedded_debug_assert(std::ranges::all_of(vertex_id_to_block_id_mapping_, [](const auto& vertex_id_to_block_ids) {
     const auto& block_ids{vertex_id_to_block_ids.second};
     return std::ranges::is_sorted(block_ids);
   }));
   // Also not a technical requirement but a byproduct if everything works as expected.
-  debug_assert(std::ranges::all_of(blocks_,
+  legacy_embedded_debug_assert(std::ranges::all_of(blocks_,
                                    [object_id_of_finished_blocks = std::unordered_set<bpmn_block_object_id_t>{},
                                     current_object_id = blocks_.front().object_id](const bpmn_block& block) mutable {
                                      const auto& oid{block.object_id};
@@ -361,7 +361,7 @@ bpmn_graph_with_block_structure bpmn_graph_with_block_structure_builder::build_w
 }
 
 bpmn_block_id_t bpmn_graph_with_block_structure_builder::next_block_index() const {
-  return ctl::cast<bpmn_block_id_t>(blocks_.size());
+  return legacy_embedded_ctl::cast<bpmn_block_id_t>(blocks_.size());
 }
 
 }  // namespace celonis::accelerator::operators::process::bpmn

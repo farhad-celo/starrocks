@@ -20,7 +20,7 @@ internal_exception::internal_exception(const std::string& message)
     : internal_exception{constructor_tag{}, INTERNAL_ERROR_EXTERNAL_MESSAGE_PREFIX, std::nullopt} {
   init(message, "internal_exception");
   // For server errors we add the backtrace of the exception to the JSON data
-  add_or_overwrite(format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
+  add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
 }
 
 internal_exception::internal_exception(const std::string& message, const external_error_message& external_message)
@@ -28,10 +28,10 @@ internal_exception::internal_exception(const std::string& message, const externa
     : internal_exception{constructor_tag{}, INTERNAL_ERROR_EXTERNAL_MESSAGE_PREFIX, external_message.value()} {
   init(message, "internal_exception");
   // For server errors we add the backtrace of the exception to the JSON data
-  add_or_overwrite(format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
+  add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
 }
 
-internal_exception internal_exception::with_context(const format::json::json_object_t& json_key_value_container,
+internal_exception internal_exception::with_context(const legacy_embedded_format::json::json_object_t& json_key_value_container,
                                                     const std::string& message) {
   internal_exception ex{message};
   ex.add_or_overwrite(json_key_value_container);
@@ -42,14 +42,14 @@ internal_exception::internal_exception([[maybe_unused]] constructor_tag t,
                                        const std::string_view external_message_prefix,
                                        const std::optional<const std::string_view> optional_external_message_reason)
     // NOLINTNEXTLINE(bugprone-throw-keyword-missing)
-    : ctl::internal_error{external_message_prefix, optional_external_message_reason} {}
+    : legacy_embedded_ctl::internal_error{external_message_prefix, optional_external_message_reason} {}
 
 retryable_internal_exception::retryable_internal_exception(const std::string& message)
     // NOLINTNEXTLINE(bugprone-throw-keyword-missing)
     : internal_exception{constructor_tag{}, RETRYABLE_INTERNAL_ERROR_EXTERNAL_MESSAGE_PREFIX, std::nullopt} {
   init(message, "retryable_internal_exception");
   // For server errors we add the backtrace of the exception to the JSON data
-  add_or_overwrite(format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
+  add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
 }
 
 retryable_internal_exception::retryable_internal_exception(const std::string& message,
@@ -59,11 +59,11 @@ retryable_internal_exception::retryable_internal_exception(const std::string& me
                          external_message.value()} {
   init(message, "retryable_internal_exception");
   // For server errors we add the backtrace of the exception to the JSON data
-  add_or_overwrite(format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
+  add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
 }
 
 retryable_internal_exception retryable_internal_exception::with_context(
-    const format::json::json_object_t& json_key_value_container, const std::string& message) {
+    const legacy_embedded_format::json::json_object_t& json_key_value_container, const std::string& message) {
   retryable_internal_exception ex{message};
   ex.add_or_overwrite(json_key_value_container);
   return ex;
@@ -74,7 +74,7 @@ cpm_exception::cpm_exception(std::string m) : cpm_exception{constructor_tag{}, s
 cpm_exception::cpm_exception([[maybe_unused]] constructor_tag t, std::string message,
                              std::string_view exception_type_as_text)
     // NOLINTNEXTLINE(bugprone-throw-keyword-missing)
-    : ctl::base_exception{std::move(message), exception_type_as_text} {}
+    : legacy_embedded_ctl::base_exception{std::move(message), exception_type_as_text} {}
 
 merge_eventlog_inconsistent_exception::merge_eventlog_inconsistent_exception(std::string m)
     // NOLINTNEXTLINE(bugprone-throw-keyword-missing)
@@ -145,7 +145,7 @@ namespace details {
 
 void runtime_assert_fail(const std::string_view message) { throw internal_exception{std::string{message}}; };
 
-void runtime_assert_fail(const format::json::json_object_t& obj, const std::string_view message) {
+void runtime_assert_fail(const legacy_embedded_format::json::json_object_t& obj, const std::string_view message) {
   throw internal_exception::with_context(obj, std::string{message});
 }
 

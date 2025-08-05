@@ -45,7 +45,7 @@ std::ostream& operator<<(std::ostream& os, const memory::column_t& column) {
       return os << fmt::format("{{NULL column with {} values}}", column->get_row_count());
   }
 
-  ctl::assert_unreachable();
+  legacy_embedded_ctl::assert_unreachable();
 }
 
 nullable_vec_variant to_nullable_vec(const memory::column_t& column) {
@@ -66,7 +66,7 @@ nullable_vec_variant to_nullable_vec(const memory::column_t& column) {
       throw common::internal_exception{"NULL column type is not supported."};
   }
 
-  ctl::assert_unreachable();
+  legacy_embedded_ctl::assert_unreachable();
 }
 
 }  // namespace celonis::accelerator::utils

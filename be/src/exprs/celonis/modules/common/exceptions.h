@@ -7,9 +7,9 @@
 
 #include <fmt/format.h>
 
-#include "ctl/exception_framework.h"
-#include "ctl/exception_traits.h"
-#include "format/json/json.h"
+#include "legacy_embedded_ctl/exception_framework.h"
+#include "legacy_embedded_ctl/exception_traits.h"
+#include "legacy_embedded_format/json/json.h"
 #include "modules/common/int_types.h"
 
 namespace celonis::accelerator::common {
@@ -33,7 +33,7 @@ class external_error_message final {
 };
 
 /** Exceptions inheriting from this class indicate a server error */
-class internal_exception : public virtual ctl::base_exception, public ctl::internal_error {
+class internal_exception : public virtual legacy_embedded_ctl::base_exception, public legacy_embedded_ctl::internal_error {
  public:
   [[nodiscard]] explicit internal_exception(const std::string& message);
 
@@ -45,12 +45,12 @@ class internal_exception : public virtual ctl::base_exception, public ctl::inter
       : internal_exception{fmt::format(fmt, std::forward<ARGS>(args)...)} {}
 
   /** Utility factory which creates the exception and stores the given JSON data in it */
-  [[nodiscard]] static internal_exception with_context(const format::json::json_object_t& json_key_value_container,
+  [[nodiscard]] static internal_exception with_context(const legacy_embedded_format::json::json_object_t& json_key_value_container,
                                                        const std::string& message);
 
   /** Same as above but supports to pass a format string */
   template <typename... ARGS, typename = std::enable_if_t<sizeof...(ARGS) != 0>>
-  [[nodiscard]] static internal_exception with_context(const format::json::json_object_t& json_key_value_container,
+  [[nodiscard]] static internal_exception with_context(const legacy_embedded_format::json::json_object_t& json_key_value_container,
                                                        fmt::format_string<ARGS...> fmt, ARGS&&... args) {
     return with_context(json_key_value_container, fmt::format(std::move(fmt), std::forward<ARGS>(args)...));
   }
@@ -71,7 +71,7 @@ class internal_exception : public virtual ctl::base_exception, public ctl::inter
 };
 
 /** Exceptions inheriting from this class indicate a server error which might be resolved by retrying */
-class retryable_internal_exception : public internal_exception, public ctl::retryable_error {
+class retryable_internal_exception : public internal_exception, public legacy_embedded_ctl::retryable_error {
  public:
   [[nodiscard]] explicit retryable_internal_exception(const std::string& message);
 
@@ -85,12 +85,12 @@ class retryable_internal_exception : public internal_exception, public ctl::retr
 
   /** Utility factory which creates the exception and stores the given JSON data in it */
   [[nodiscard]] static retryable_internal_exception with_context(
-      const format::json::json_object_t& json_key_value_container, const std::string& message);
+      const legacy_embedded_format::json::json_object_t& json_key_value_container, const std::string& message);
 
   /** Same as above but supports to pass a format string */
   template <typename... ARGS, typename = std::enable_if_t<sizeof...(ARGS) != 0>>
   [[nodiscard]] static retryable_internal_exception with_context(
-      const format::json::json_object_t& json_key_value_container, fmt::format_string<ARGS...> fmt, ARGS&&... args) {
+      const legacy_embedded_format::json::json_object_t& json_key_value_container, fmt::format_string<ARGS...> fmt, ARGS&&... args) {
     return with_context(json_key_value_container, fmt::format(std::move(fmt), std::forward<ARGS>(args)...));
   }
 
@@ -103,7 +103,7 @@ class retryable_internal_exception : public internal_exception, public ctl::retr
 };
 
 /** Exceptions inheriting from this class indicate a client error */
-class cpm_exception : public ctl::base_exception {
+class cpm_exception : public legacy_embedded_ctl::base_exception {
  public:
   [[nodiscard]] explicit cpm_exception(std::string m);
 
@@ -229,7 +229,7 @@ namespace details {
 
 [[noreturn]] void runtime_assert_fail(std::string_view message);
 
-[[noreturn]] void runtime_assert_fail(const format::json::json_object_t& obj, std::string_view message);
+[[noreturn]] void runtime_assert_fail(const legacy_embedded_format::json::json_object_t& obj, std::string_view message);
 
 template <class... ARGS>
 [[noreturn]] void runtime_assert_fail(fmt::format_string<ARGS...> fmt, ARGS&&... args) {
@@ -237,7 +237,7 @@ template <class... ARGS>
 }
 
 template <class... ARGS>
-[[noreturn]] void runtime_assert_fail(const format::json::json_object_t& obj, fmt::format_string<ARGS...> fmt,
+[[noreturn]] void runtime_assert_fail(const legacy_embedded_format::json::json_object_t& obj, fmt::format_string<ARGS...> fmt,
                                       ARGS&&... args) {
   runtime_assert_fail(obj, fmt::format<ARGS...>(fmt, std::forward<ARGS>(args)...));
 }
@@ -250,7 +250,7 @@ inline void runtime_assert(bool condition, std::string_view message) {
   }
 }
 
-inline void runtime_assert(bool condition, const format::json::json_object_t& obj, std::string_view message) {
+inline void runtime_assert(bool condition, const legacy_embedded_format::json::json_object_t& obj, std::string_view message) {
   if (!condition) [[unlikely]] {
     details::runtime_assert_fail(obj, message);
   }
@@ -264,7 +264,7 @@ inline void runtime_assert(bool condition, fmt::format_string<ARGS...> fmt, ARGS
 }
 
 template <class... ARGS>
-inline void runtime_assert(bool condition, const format::json::json_object_t& obj, fmt::format_string<ARGS...> fmt,
+inline void runtime_assert(bool condition, const legacy_embedded_format::json::json_object_t& obj, fmt::format_string<ARGS...> fmt,
                            ARGS&&... args) {
   if (!condition) [[unlikely]] {
     details::runtime_assert_fail(obj, fmt, std::forward<ARGS>(args)...);

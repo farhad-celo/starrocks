@@ -5,8 +5,8 @@
 
 #include <boost/date_time/gregorian/greg_calendar.hpp>
 
-#include "ctl/assert.h"
-#include "ctl/type_traits.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/type_traits.h"
 #include "modules/common/int_types.h"
 
 namespace celonis::accelerator {
@@ -58,7 +58,7 @@ class month_type final {
 
   /*getter*/
   [[nodiscard]] constexpr auto enum_val() const noexcept { return month_value; }
-  [[nodiscard]] constexpr auto type_val() const noexcept { return ctl::enum_to_underlying_type(month_value); }
+  [[nodiscard]] constexpr auto type_val() const noexcept { return legacy_embedded_ctl::enum_to_underlying_type(month_value); }
   constexpr explicit operator uint8_t() const noexcept { return type_val(); }
   constexpr operator size_t() const noexcept { return type_val(); }  // NOLINT(google-explicit-constructor)
 
@@ -69,13 +69,13 @@ class month_type final {
   [[nodiscard]] constexpr bool operator!=(month v) const noexcept { return !operator==(v); }
   [[nodiscard]] constexpr bool operator<(month_type rhs) const noexcept { return type_val() < rhs.type_val(); }
   [[nodiscard]] constexpr bool operator<(month v) const noexcept {
-    return type_val() < ctl::enum_to_underlying_type(v);
+    return type_val() < legacy_embedded_ctl::enum_to_underlying_type(v);
   }
   [[nodiscard]] constexpr bool operator<=(month_type rhs) const noexcept { return operator<(rhs) || operator==(rhs); }
   [[nodiscard]] constexpr bool operator<=(month v) const noexcept { return operator<(v) || operator==(v); }
   [[nodiscard]] constexpr bool operator>(month_type rhs) const noexcept { return type_val() > rhs.type_val(); }
   [[nodiscard]] constexpr bool operator>(month v) const noexcept {
-    return type_val() > ctl::enum_to_underlying_type(v);
+    return type_val() > legacy_embedded_ctl::enum_to_underlying_type(v);
   }
   [[nodiscard]] constexpr bool operator>=(month_type rhs) const noexcept { return operator>(rhs) || operator==(rhs); }
   [[nodiscard]] constexpr bool operator>=(month v) const noexcept { return operator>(v) || operator==(v); }
@@ -200,33 +200,33 @@ static constexpr uint16_t MAX_POSSIBLE_YEAR = 9999;
 
 // NOLINTNEXTLINE(google-runtime-int)
 constexpr auto operator""_seconds(const unsigned long long seconds) noexcept -> int64_t {
-  debug_assert(seconds <=
+  legacy_embedded_debug_assert(seconds <=
                static_cast<unsigned long long>(std::numeric_limits<int64_t>::max() / date::MILLIS_PER_SECOND));
   return static_cast<int64_t>(seconds) * date::MILLIS_PER_SECOND;
 }
 
 // NOLINTNEXTLINE(google-runtime-int)
 constexpr auto operator""_minutes(const unsigned long long minutes) noexcept -> int64_t {
-  debug_assert(minutes <=
+  legacy_embedded_debug_assert(minutes <=
                static_cast<unsigned long long>(std::numeric_limits<int64_t>::max() / date::MILLIS_PER_MINUTE));
   return static_cast<int64_t>(minutes) * date::MILLIS_PER_MINUTE;
 }
 
 // NOLINTNEXTLINE(google-runtime-int)
 constexpr auto operator""_hours(const unsigned long long hours) noexcept -> int64_t {
-  debug_assert(hours <= static_cast<unsigned long long>(std::numeric_limits<int64_t>::max() / date::MILLIS_PER_HOUR));
+  legacy_embedded_debug_assert(hours <= static_cast<unsigned long long>(std::numeric_limits<int64_t>::max() / date::MILLIS_PER_HOUR));
   return static_cast<int64_t>(hours) * date::MILLIS_PER_HOUR;
 }
 
 // NOLINTNEXTLINE(google-runtime-int)
 constexpr auto operator""_days(const unsigned long long days) noexcept -> int64_t {
-  debug_assert(days <= static_cast<unsigned long long>(std::numeric_limits<int64_t>::max() / date::MILLIS_PER_DAY));
+  legacy_embedded_debug_assert(days <= static_cast<unsigned long long>(std::numeric_limits<int64_t>::max() / date::MILLIS_PER_DAY));
   return static_cast<int64_t>(days) * date::MILLIS_PER_DAY;
 }
 
 // NOLINTNEXTLINE(google-runtime-int)
 constexpr auto operator""_weeks(const unsigned long long weeks) noexcept -> int64_t {
-  debug_assert(weeks <= static_cast<unsigned long long>(std::numeric_limits<int64_t>::max() / date::MILLIS_PER_WEEK));
+  legacy_embedded_debug_assert(weeks <= static_cast<unsigned long long>(std::numeric_limits<int64_t>::max() / date::MILLIS_PER_WEEK));
   return static_cast<int64_t>(weeks) * date::MILLIS_PER_WEEK;
 }
 

@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <variant>
 
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/bpmn_graph_builder.h"
 
@@ -18,7 +18,7 @@ using activity_id_to_vertex_mapping_t = std::unordered_map<row_id, vertex>;
     const bpmn_graph::vertex_map& vertices) {
   activity_id_to_vertex_mapping_t activity_id_to_vertex_mapping{};
   for (const auto& vertex : vertices) {
-    std::visit(ctl::overloaded{[](const auto& /*vertex_type*/) {},
+    std::visit(legacy_embedded_ctl::overloaded{[](const auto& /*vertex_type*/) {},
                                [&activity_id_to_vertex_mapping, &vertex](const task& task) {
                                  activity_id_to_vertex_mapping.insert({task.activity_id, vertex.second});
                                }},
@@ -64,7 +64,7 @@ using vertex_id_mapping_t = std::unordered_map<vertex_id_type, vertex_id_type>;
   std::ranges::transform(vertices, std::inserter(index_mapping, std::end(index_mapping)),
                          [&bldr, &activity_id_to_vertex_mapping](const auto& vertex) {
                            return std::visit(
-                               ctl::overloaded{[&bldr, &vertex](const auto& v) {
+                               legacy_embedded_ctl::overloaded{[&bldr, &vertex](const auto& v) {
                                                  const auto vertex_id{bldr.add_vertex(v)};
                                                  return std::make_pair(vertex.second.get_vertex_id(), vertex_id);
                                                },

@@ -4,7 +4,7 @@
 #include <memory>
 #include <sstream>
 
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types.h"
@@ -141,7 +141,7 @@ class materialized_typed_data : public materialized_data {
   static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(const std::string& id,
                                                                             const management::swap_info& s_info,
                                                                             const std::string& description,
-                                                                            row_id row_count, ctl::static_array<T> data,
+                                                                            row_id row_count, legacy_embedded_ctl::static_array<T> data,
                                                                             const memory::null_flags_t& null_flags) {
     std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
         null_flags, id + management::NULL_FLAGS_NEW_ENDING, s_info, description + management::NULL_FLAGS_DESC));
@@ -154,7 +154,7 @@ class materialized_typed_data : public materialized_data {
 
   static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(
       const std::string& id, const management::swap_info& s_info, const std::string& description, row_id row_count,
-      const ctl::shared_static_array<T>& data, const memory::null_flags_t& null_flags) {
+      const legacy_embedded_ctl::shared_static_array<T>& data, const memory::null_flags_t& null_flags) {
     std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
         null_flags, id + management::NULL_FLAGS_NEW_ENDING, s_info, description + management::NULL_FLAGS_DESC));
     management::raw_data_handler_t<T> data_handler = management::raw_data_handler<T>::create_data_handler(
@@ -269,8 +269,8 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
 
   static std::shared_ptr<materialized_typed_data<cel_string_t>> init_materialized_data(
       const std::string& id, const management::swap_info& s_info, const std::string& description, row_id row_count,
-      const ctl::shared_static_array<cel_string_t>& ptrs, size_t /*str_bfr_size*/,
-      const ctl::shared_static_array<char>& string_bfr, const memory::null_flags_t& null_flags) {
+      const legacy_embedded_ctl::shared_static_array<cel_string_t>& ptrs, size_t /*str_bfr_size*/,
+      const legacy_embedded_ctl::shared_static_array<char>& string_bfr, const memory::null_flags_t& null_flags) {
     std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
         null_flags, id + management::NULL_FLAGS_ENDING, s_info, description + management::NULL_FLAGS_DESC));
     std::shared_ptr<management::string_data_handler> data_handler =

@@ -2,22 +2,22 @@
 
 #include <vector>
 
-#include "ctl/checked_ptr.h"
-#include "ctl/named_type.h"
+#include "legacy_embedded_ctl/checked_ptr.h"
+#include "legacy_embedded_ctl/named_type.h"
 #include "modules/memory/row_id.h"
 
 namespace celonis::accelerator::memory {
 class table;
-using table_t = ctl::checked_shared_ptr<table>;
+using table_t = legacy_embedded_ctl::checked_shared_ptr<table>;
 using tables_t = std::vector<table_t>;
-using weak_table_ptr_t = ctl::checked_weak_ptr<const table>;
+using weak_table_ptr_t = legacy_embedded_ctl::checked_weak_ptr<const table>;
 using weak_table_ptrs_t = std::vector<weak_table_ptr_t>;
-using raw_table_ptr_t = ctl::checked_raw_ptr<const table>;
-using mut_raw_table_ptr_t = ctl::checked_raw_ptr<table>;
+using raw_table_ptr_t = legacy_embedded_ctl::checked_raw_ptr<const table>;
+using mut_raw_table_ptr_t = legacy_embedded_ctl::checked_raw_ptr<table>;
 using raw_table_ptrs_t = std::vector<raw_table_ptr_t>;
 using mut_raw_table_ptrs_t = std::vector<mut_raw_table_ptr_t>;
 
-using table_row_limit_t = ctl::named_type<row_id, struct table_row_limit_tag>;
+using table_row_limit_t = legacy_embedded_ctl::named_type<row_id, struct table_row_limit_tag>;
 
 class user_visible_table_name;
 

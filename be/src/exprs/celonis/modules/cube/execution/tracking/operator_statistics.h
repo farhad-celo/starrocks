@@ -7,7 +7,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "format/json/json_fwd.h"
+#include "legacy_embedded_format/json/json_fwd.h"
 #include "modules/cube/execution/tracking/operator_statistics_fwd.h"
 
 #ifndef CELOSTAR
@@ -40,7 +40,7 @@ struct resource_usage_data_points {
   resource_usage_data_point output_column_size{};
 };
 
-format::json::json_object_t serialize_data_points(const resource_usage_data_points& data_points);
+legacy_embedded_format::json::json_object_t serialize_data_points(const resource_usage_data_points& data_points);
 
 class averaged_resource_usage_data_points {
  public:

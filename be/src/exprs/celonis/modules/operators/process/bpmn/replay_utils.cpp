@@ -4,8 +4,8 @@
 #include <functional>
 #include <string>
 
-#include "ctl/assert.h"
-#include "ctl/utility.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/utility.h"
 #include "modules/common/exceptions.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 
@@ -74,7 +74,7 @@ marking_t get_initial_marking(const bpmn_graph& model) {
   const auto outgoing_vertices{model.outgoing_vertices().at(model.single_start_vertex())};
 
   // Assume a start vertex can only have one outgoing edge
-  debug_assert(outgoing_vertices.size() == 1);
+  legacy_embedded_debug_assert(outgoing_vertices.size() == 1);
 
   // Only the edge between start and its outgoing vertex has a token
   return marking_t{{model.single_start_vertex(), outgoing_vertices[0]}};
@@ -93,7 +93,7 @@ transitions_t get_enabled_vertex_transitions(const bpmn_graph& model, const mark
 
   // This is a vector since a single vertex can have multiple enabled transitions (exclusive gateway)
   return std::visit(
-      ctl::overloaded{[&](const parallel& /*p*/) {
+      legacy_embedded_ctl::overloaded{[&](const parallel& /*p*/) {
                         // If the gateway is enabled, it has one transition in which it consumes all of
                         // the ingoing tokens and produces tokens on all of the outgoing edges.
                         return transitions_t{
@@ -130,7 +130,7 @@ bool is_enabled(const bpmn_graph& model, const marking_t& marking, const vertex_
   const auto type{model.get_vertex(vertex_id).get_vertex_type()};
   const auto ingoing_vertices{model.ingoing_vertices().at(vertex_id)};
 
-  return std::visit(ctl::overloaded{[&](const parallel& /*p*/) {
+  return std::visit(legacy_embedded_ctl::overloaded{[&](const parallel& /*p*/) {
                                       // A parallel gateway is enabled if all of its input edges are in the marking
                                       return std::ranges::all_of(ingoing_vertices, [&](const auto ingoing_vertex) {
                                         const token_t consumed_token{ingoing_vertex, vertex_id};

@@ -7,7 +7,7 @@
 #include <boost/heap/pairing_heap.hpp>
 #include <bytell_hash_map.hpp>
 
-#include "ctl/type_traits.h"
+#include "legacy_embedded_ctl/type_traits.h"
 #include "modules/memory/management/memory_checked_containers.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::a_star {
@@ -25,14 +25,14 @@ namespace celonis::accelerator::operators::process::alignment::petri_net::a_star
  * @tparam MARKING_EQUALS the type used to compare markings
  */
 template <typename MARKING, typename TRANSITION, typename COST,
-          typename MARKING_HASH = std::hash<ctl::remove_all_cvr_t<MARKING>>,
-          typename MARKING_EQUALS = std::equal_to<ctl::remove_all_cvr_t<MARKING>>>
+          typename MARKING_HASH = std::hash<legacy_embedded_ctl::remove_all_cvr_t<MARKING>>,
+          typename MARKING_EQUALS = std::equal_to<legacy_embedded_ctl::remove_all_cvr_t<MARKING>>>
 class inconsistent_path_construction {
  public:
-  using marking_value_type = ctl::remove_all_cvr_t<MARKING>;
+  using marking_value_type = legacy_embedded_ctl::remove_all_cvr_t<MARKING>;
   using marking_const_reference_type = std::add_lvalue_reference_t<std::add_const_t<MARKING>>;
-  using transition_value_type = ctl::remove_all_cvr_t<TRANSITION>;
-  using cost_value_type = ctl::remove_all_cvr_t<COST>;
+  using transition_value_type = legacy_embedded_ctl::remove_all_cvr_t<TRANSITION>;
+  using cost_value_type = legacy_embedded_ctl::remove_all_cvr_t<COST>;
 
   // NOLINTNEXTLINE(bugprone-exception-escape)
   struct marking_wrapper {
@@ -43,7 +43,7 @@ class inconsistent_path_construction {
   explicit inconsistent_path_construction(const common::execution_context& context)
       : open_set_{context},
         partial_paths_{
-            memory::management::checked_allocator<partial_paths_type>(context, ALLOC_MSG(ctl::MEMBER_INIT_MSG))} {}
+            memory::management::checked_allocator<partial_paths_type>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))} {}
 
   [[nodiscard]] const marking_wrapper& top() const noexcept { return open_set_.top(); }
 
@@ -87,7 +87,7 @@ class inconsistent_path_construction {
   class open_set_type {
    public:
     explicit open_set_type(const common::execution_context& context)
-        : lookup_{memory::management::checked_allocator<lookup_type>(context, ALLOC_MSG(ctl::MEMBER_INIT_MSG))} {}
+        : lookup_{memory::management::checked_allocator<lookup_type>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))} {}
     // NOLINTNEXTLINE(bugprone-exception-escape)
     struct node_type : marking_wrapper {
       cost_value_type estimate;

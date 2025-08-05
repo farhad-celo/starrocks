@@ -8,8 +8,8 @@
 
 #include <boost/dynamic_bitset/dynamic_bitset.hpp>
 
-#include "ctl/assert.h"
-#include "ctl/hash.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/hash.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/memory/row_id.h"
 
@@ -25,11 +25,11 @@ struct dictify_work_item final {
 struct cel_string_key {
  public:
   struct hash {
-    size_t operator()(const cel_string_key& key) const { return ctl::hash_murmur_64a(key.str_without_null_byte()); }
+    size_t operator()(const cel_string_key& key) const { return legacy_embedded_ctl::hash_murmur_64a(key.str_without_null_byte()); }
   };
 
   cel_string_key() = default;
-  cel_string_key(cel_string_t str, size_t len) : str_{str, len} { debug_assert(str_.ends_with('\0')); }
+  cel_string_key(cel_string_t str, size_t len) : str_{str, len} { legacy_embedded_debug_assert(str_.ends_with('\0')); }
   explicit cel_string_key(cel_string_t str) : cel_string_key{str, std::strlen(str) + 1} {}
 
   // NOLINTNEXTLINE(modernize-use-nullptr)
@@ -42,7 +42,7 @@ struct cel_string_key {
     if (str_.empty()) {
       return str_;
     }
-    debug_assert(str_.ends_with('\0'));
+    legacy_embedded_debug_assert(str_.ends_with('\0'));
     return str_.substr(0, str_.length() - 1);
   }
 

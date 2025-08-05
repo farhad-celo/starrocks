@@ -2,7 +2,7 @@
 
 #include <ranges>
 
-#include "ctl/conversion.h"
+#include "legacy_embedded_ctl/conversion.h"
 #include "modules/common/exceptions.h"
 #include "modules/operators/process/alignment/petri_net/petri_net.h"
 
@@ -17,8 +17,8 @@ petri_net_builder::petri_net_builder(const petri_net_representation& pn_repr) {
                          "petri_net_representation object's final_marking has an invalid node.");
 
   for (const auto& place_id : pn_repr.places) {
-    const auto initial_marking_count{ctl::cast<marking_counter_type>(pn_repr.initial_marking.count(place_id))};
-    const auto final_marking_count{ctl::cast<marking_counter_type>(pn_repr.final_marking.count(place_id))};
+    const auto initial_marking_count{legacy_embedded_ctl::cast<marking_counter_type>(pn_repr.initial_marking.count(place_id))};
+    const auto final_marking_count{legacy_embedded_ctl::cast<marking_counter_type>(pn_repr.final_marking.count(place_id))};
     add_place(place_id, {initial_marking_count, final_marking_count});
   }
   for (const auto& [transition_id, label] : pn_repr.transitions) {
@@ -56,7 +56,7 @@ petri_net_representation petri_net_builder::to_petri_net_representation() {
       const auto& transition_id{vertex.id()};
       pn_repr.transitions.emplace(transition_id, transition.label);
     } else {
-      ctl::assert_unreachable();
+      legacy_embedded_ctl::assert_unreachable();
     }
   }
 
@@ -68,14 +68,14 @@ petri_net_representation petri_net_builder::to_petri_net_representation() {
 
     const auto edge_weight{graph_[edge_desc]};
     // For now we do not support weighted graphs
-    debug_assert(edge_weight == 1);
+    legacy_embedded_debug_assert(edge_weight == 1);
     if (src_node.is_place()) {
-      debug_assert(tgt_node.is_transition());
+      legacy_embedded_debug_assert(tgt_node.is_transition());
       for (petri_net_builder::arc_weight_type i{0}; i < edge_weight; ++i) {
         pn_repr.place_transition_arcs.emplace(src_node.id(), tgt_node.id());
       }
     } else {
-      debug_assert(tgt_node.is_place());
+      legacy_embedded_debug_assert(tgt_node.is_place());
       for (petri_net_builder::arc_weight_type i{0}; i < edge_weight; ++i) {
         pn_repr.transition_place_arcs.emplace(src_node.id(), tgt_node.id());
       }

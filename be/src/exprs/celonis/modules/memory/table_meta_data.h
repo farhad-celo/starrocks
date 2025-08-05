@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ctl/assert.h"
-#include "ctl/named_type.h"
-#include "ctl/type_traits.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/named_type.h"
+#include "legacy_embedded_ctl/type_traits.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/table_meta_data_fwd.h"
 
@@ -102,9 +102,9 @@ class table_meta_data final {
   [[nodiscard]] static constexpr table_meta_data make_for_system_catalog_join_table() noexcept;
 
  private:
-  using user_visible_t = ctl::named_type<bool, struct user_visible_tag, ctl::implicitly_convertible_to<bool>::templ>;
-  using generated_t = ctl::named_type<bool, struct generated_tag, ctl::implicitly_convertible_to<bool>::templ>;
-  using system_table_t = ctl::named_type<bool, struct system_table_t, ctl::implicitly_convertible_to<bool>::templ>;
+  using user_visible_t = legacy_embedded_ctl::named_type<bool, struct user_visible_tag, legacy_embedded_ctl::implicitly_convertible_to<bool>::templ>;
+  using generated_t = legacy_embedded_ctl::named_type<bool, struct generated_tag, legacy_embedded_ctl::implicitly_convertible_to<bool>::templ>;
+  using system_table_t = legacy_embedded_ctl::named_type<bool, struct system_table_t, legacy_embedded_ctl::implicitly_convertible_to<bool>::templ>;
 
   constexpr table_meta_data(user_visible_t is_visible, generated_t is_generated, system_table_t is_system_table,
                             table_type table_type,
@@ -211,8 +211,8 @@ constexpr table_meta_data table_meta_data::make_for_type() noexcept {
   } else if constexpr (TABLE_TYPE == table_meta_data::table_type::AUGMENTATION_TABLE) {
     return make_for_augmentation_table();
   } else if constexpr (TABLE_TYPE == table_meta_data::table_type::SYSTEM_CATALOG_TABLE) {
-    static_assert(ctl::always_false_v<decltype(TABLE_TYPE)>, "No factory function for SYSTEM_CATALOG_TABLE exists.");
-    ctl::assert_unreachable();
+    static_assert(legacy_embedded_ctl::always_false_v<decltype(TABLE_TYPE)>, "No factory function for SYSTEM_CATALOG_TABLE exists.");
+    legacy_embedded_ctl::assert_unreachable();
   }
 }
 

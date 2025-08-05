@@ -5,9 +5,9 @@
 #include <variant>
 #include <vector>
 
-#include "ctl/assert.h"
-#include "ctl/source_location.h"
-#include "ctl/type_traits.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/source_location.h"
+#include "legacy_embedded_ctl/type_traits.h"
 #include "modules/memory/column_fwd.h"
 #include "modules/operators/framework/operator_node_fwd.h"
 
@@ -35,13 +35,13 @@ constexpr framework::operator_node_pointers_t concat_operator_nodes(const auto&.
         }
       }
     } else {
-      static_assert(ctl::always_false_v<decltype(arg)>, "Invalid operator nodes argument!");
+      static_assert(legacy_embedded_ctl::always_false_v<decltype(arg)>, "Invalid operator nodes argument!");
     }
   }};
 
   (concat(operator_nodes), ...);
 
-  debug_assert(!concat_operator_nodes.empty());
+  legacy_embedded_debug_assert(!concat_operator_nodes.empty());
   return concat_operator_nodes;
 }
 
@@ -71,7 +71,7 @@ struct all_inputs {
 struct specific_inputs {
   template <typename... ARGS>
   requires(sizeof...(ARGS) > 0 &&
-           (ctl::is_one_of_v<ARGS, framework::operator_node*, framework::operator_node_pointers_t> &&
+           (legacy_embedded_ctl::is_one_of_v<ARGS, framework::operator_node*, framework::operator_node_pointers_t> &&
             ...)) explicit specific_inputs(const ARGS&... operator_nodes)
       : operator_nodes_{details::concat_operator_nodes(operator_nodes...)} {}
 
@@ -91,13 +91,13 @@ using dictify_t = std::variant<dictify::unknown_inputs,    // inputs that have t
 class no_dictify_request {
  public:
   constexpr explicit no_dictify_request(
-      ctl::source_location source_location = ctl::source_location{std::experimental::source_location::current()})
+      legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{std::experimental::source_location::current()})
       : source_location_{source_location} {}
 
-  [[nodiscard]] constexpr const ctl::source_location& get_source_location() const { return source_location_; }
+  [[nodiscard]] constexpr const legacy_embedded_ctl::source_location& get_source_location() const { return source_location_; }
 
  private:
-  ctl::source_location source_location_;
+  legacy_embedded_ctl::source_location source_location_;
 };
 
 }  // namespace celonis::accelerator::operators

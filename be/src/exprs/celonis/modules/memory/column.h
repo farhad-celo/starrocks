@@ -9,8 +9,8 @@
 
 #include "column_fwd.h"  // IWYU pragma: export
 #include "concurrency/concurrency_utils.h"
-#include "ctl/assert.h"
-#include "ctl/named_type.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/named_type.h"
 #include "modules/common/execution_context.h"
 #ifndef CELOSTAR
 #include "modules/cube/query_scope_fwd.h"
@@ -212,7 +212,7 @@ class column {
             return accessor(std::static_pointer_cast<materialized_typed_data<cel_null_t>>(plain_data_));
         }
 #ifndef __clang__
-        ctl::assert_unreachable();
+        legacy_embedded_ctl::assert_unreachable();
 #endif
       }
       case column_loading::column_status::DICTIFIED: {
@@ -235,7 +235,7 @@ class column {
       }
     }
 #ifndef __clang__
-    ctl::assert_unreachable();
+    legacy_embedded_ctl::assert_unreachable();
 #endif
   }
 
@@ -383,7 +383,7 @@ class column {
 
   [[nodiscard]] bool is_constant() {
     bool no_owner = get_owner() == nullptr;
-    debug_assert(!no_owner || get_row_count() == 1);
+    legacy_embedded_debug_assert(!no_owner || get_row_count() == 1);
     return no_owner;
   }
 
@@ -412,7 +412,7 @@ class column {
   void check_implicit_dictification(const no_dictify_request_t& no_dictify_request) const {
     // enable/disable implicit dictification checking
     if (constexpr bool enable_check{false}; enable_check && no_dictify_request) {
-      warning_assert(is_dictified(),
+      legacy_embedded_warning_assert(is_dictified(),
                      fmt::format("Implicit dictification: {}", no_dictify_request->get_source_location()));
     }
   }
@@ -433,7 +433,7 @@ class column {
         managed_group_(std::move(managed_group)),
         processing_state_(std::move(processing_state)),
         column_load_(std::move(column_load)) {
-    ctl::abort_assert(config_.row_count >= 0);
+    legacy_embedded_ctl::abort_assert(config_.row_count >= 0);
   }
 
   /**
@@ -481,6 +481,6 @@ class column {
   static constexpr auto LOCK_LOGGING_THRESHOLD = std::chrono::seconds{1200};
 };
 
-ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column, const common::execution_context& context);
+legacy_embedded_ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column, const common::execution_context& context);
 
 }  // namespace celonis::accelerator::memory

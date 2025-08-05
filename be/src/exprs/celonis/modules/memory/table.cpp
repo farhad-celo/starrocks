@@ -10,8 +10,8 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <fmt/format.h>
 
-#include "ctl/assert.h"
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/assert.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "log/log.h"
 #include "modules/common/call_and_log_unsafe_callable.h"
 #ifndef CELOSTAR
@@ -325,7 +325,7 @@ column_t table::get_column_header(const std::initializer_list<std::string_view>&
     throw common::cpm_exception{std::get<std::string>(column_or_error_message)};
   }
 
-  debug_assert(std::holds_alternative<column_t>(column_or_error_message));
+  legacy_embedded_debug_assert(std::holds_alternative<column_t>(column_or_error_message));
   return std::get<column_t>(column_or_error_message);
 }
 
@@ -368,7 +368,7 @@ column_t table::get_column_header(const std::string_view column_name, const comm
     throw common::cpm_exception{std::get<std::string>(variant)};
   }
 
-  debug_assert(std::holds_alternative<column_t>(variant));
+  legacy_embedded_debug_assert(std::holds_alternative<column_t>(variant));
   return std::get<column_t>(variant);
 }
 
@@ -410,7 +410,7 @@ std::optional<row_id> table::get_rows_optional() const {
 }
 
 bool table::is_query_scope() const noexcept {
-  debug_assert(!get_meta_data().is_query_scope_table() ||
+  legacy_embedded_debug_assert(!get_meta_data().is_query_scope_table() ||
                get_swap_info().is_no_swap());  // query scope table => no swap
   return get_meta_data().is_query_scope_table() || get_meta_data().is_query_scope_result_table() ||
          get_meta_data().is_query_scope_aggregation_table();
@@ -504,7 +504,7 @@ column_t table::add_column_by_blueprint(const col_name& column_name, const col_c
 }
 
 column_t table::add_string_column(const col_name& column_name, const col_id& column_id,
-                                  ctl::static_array<cel_string_t> ptrs, ctl::static_array<char> string_bfr,
+                                  legacy_embedded_ctl::static_array<cel_string_t> ptrs, legacy_embedded_ctl::static_array<char> string_bfr,
                                   const null_flags_t& null_flags, const table_row_limit_t table_row_limit) {
   const auto row_count{ptrs.ssize()};
   const std::string description = create_column_description(column_name);
@@ -542,9 +542,9 @@ column_t table::add_string_column(const col_name& column_name, const col_id& col
   }
 
   auto column_values{memory::tracking::make_static_array_for_overwrite<cel_string_t>(
-      row_count, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
   auto column_str_bfr{memory::tracking::make_static_array_for_overwrite<char>(
-      str_buffer_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG), context)};
+      str_buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
   auto null_flags{memory::create_null_flags(row_count, context)};
 
   // fill buffer

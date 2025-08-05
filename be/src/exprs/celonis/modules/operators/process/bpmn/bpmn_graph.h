@@ -5,7 +5,7 @@
 #include <variant>
 #include <vector>
 
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/operators/process/bpmn/edge.h"
 #include "modules/operators/process/bpmn/vertex.h"
 #include "modules/operators/process/inductive_miner/process_tree.h"

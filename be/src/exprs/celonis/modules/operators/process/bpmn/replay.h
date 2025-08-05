@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ctl/dynamic_bitset_fwd.h"
+#include "legacy_embedded_ctl/dynamic_bitset_fwd.h"
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/join_projection_vector.h"
@@ -21,7 +21,7 @@ namespace celonis::accelerator::operators::process::bpmn {
 /**
  * Replays the eventlog on a bpmn model and generates true/false diagnostics per case
  */
-[[nodiscard]] ctl::dynamic_bitset_t replay_eventlog_for_conformance(const bpmn_graph& model,
+[[nodiscard]] legacy_embedded_ctl::dynamic_bitset_t replay_eventlog_for_conformance(const bpmn_graph& model,
                                                                     const memory::column_t& activity_column,
                                                                     const memory::column_t& case_id_column,
                                                                     common::execution_context& parent_context);

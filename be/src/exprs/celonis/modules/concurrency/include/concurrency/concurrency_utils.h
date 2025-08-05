@@ -5,7 +5,7 @@
 #include <shared_mutex>
 
 #include "concurrency/shared_counting_mutex.h"
-#include "ctl/source_location.h"
+#include "legacy_embedded_ctl/source_location.h"
 
 namespace celonis::accelerator::concurrency {
 
@@ -27,21 +27,21 @@ unsigned int hardware_concurrency() noexcept;
  */
 [[nodiscard]] std::unique_lock<std::shared_timed_mutex> lock_validated(
     std::shared_timed_mutex& mutex, const std::chrono::seconds& duration,
-    ctl::source_location source_location = ctl::source_location{});
+    legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{});
 
 /**
  * @brief same as above but for a different mutex type
  */
 [[nodiscard]] std::unique_lock<std::timed_mutex> lock_validated(
     std::timed_mutex& mutex, const std::chrono::seconds& duration,
-    ctl::source_location source_location = ctl::source_location{});
+    legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{});
 
 /**
  * @brief same as above but for a different mutex type
  */
 [[nodiscard]] std::unique_lock<concurrency::shared_counting_mutex> lock_validated(
     concurrency::shared_counting_mutex& mutex, const std::chrono::seconds& duration,
-    ctl::source_location source_location = ctl::source_location{});
+    legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{});
 
 /**
  * @brief tries to acquire the shared ownership for the given mutex within a given time interval
@@ -53,14 +53,14 @@ unsigned int hardware_concurrency() noexcept;
  */
 [[nodiscard]] std::shared_lock<std::shared_timed_mutex> lock_shared_validated(
     std::shared_timed_mutex& mutex, const std::chrono::seconds& duration,
-    ctl::source_location source_location = ctl::source_location{});
+    legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{});
 
 /**
  * @brief same as above but for a different mutex type
  */
 [[nodiscard]] std::shared_lock<concurrency::shared_counting_mutex> lock_shared_validated(
     concurrency::shared_counting_mutex& mutex, const std::chrono::seconds& duration,
-    ctl::source_location source_location = ctl::source_location{});
+    legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{});
 
 /**
  * @brief acquires unique ownership for the given mutex and produces a log message if it took more than a given time
@@ -72,7 +72,7 @@ unsigned int hardware_concurrency() noexcept;
  */
 [[nodiscard]] std::unique_lock<std::shared_mutex> lock_with_logging(
     std::shared_mutex& mutex, const std::chrono::seconds& threshold,
-    ctl::source_location source_location = ctl::source_location{});
+    legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{});
 
 /**
  * @brief acquires shared ownership for the given mutex and produces a log message if it took more than a given time
@@ -84,6 +84,6 @@ unsigned int hardware_concurrency() noexcept;
  */
 [[nodiscard]] std::shared_lock<std::shared_mutex> lock_shared_with_logging(
     std::shared_mutex& mutex, const std::chrono::seconds& threshold,
-    ctl::source_location source_location = ctl::source_location{});
+    legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{});
 
 }  // namespace celonis::accelerator::concurrency

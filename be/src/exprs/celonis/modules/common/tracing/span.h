@@ -9,8 +9,8 @@
 #include <utility>
 #include <vector>
 
-#include "ctl/checked_ptr.h"
-#include "ctl/mutex.h"
+#include "legacy_embedded_ctl/checked_ptr.h"
+#include "legacy_embedded_ctl/mutex.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace trace {
@@ -28,7 +28,7 @@ namespace celonis::accelerator::common::tracing {
 
 class span;
 
-using span_t = ctl::checked_shared_ptr<span>;
+using span_t = legacy_embedded_ctl::checked_shared_ptr<span>;
 using tag_t = opentelemetry::common::AttributeValue;
 using tags_t = std::vector<std::pair<std::string, tag_t>>;
 using opentelemetry_scope_t = std::experimental::propagate_const<std::unique_ptr<opentelemetry::trace::Scope>>;
@@ -147,7 +147,7 @@ class span final {
   /**
    * The underlying Opentelemetry span which is managed by this class
    */
-  ctl::owning_mutex<opentelemetry_span_t> span_impl_;
+  legacy_embedded_ctl::owning_mutex<opentelemetry_span_t> span_impl_;
   /**
    * The underlying Opentelemetry scope that encapsulates the Opentelemetry span
    */

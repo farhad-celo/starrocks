@@ -32,13 +32,13 @@ is_corrupt_result is_corrupt_entry(const std::shared_future<CACHE_ENTRY_TYPE>& c
   if (cache_entry.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
     try {
       cache_entry.get();
-    } catch (const ctl::oom_error& e) {
+    } catch (const legacy_embedded_ctl::oom_error& e) {
       return {true, CORRUPTION_REASON_BAD_ALLOCATION};
     } catch (const std::bad_alloc& e) {
       return {true, CORRUPTION_REASON_BAD_ALLOCATION};
-    } catch (const ctl::retryable_error& ex) {
+    } catch (const legacy_embedded_ctl::retryable_error& ex) {
       return {true, CORRUPTION_REASON_TRANSIENT_EXCEPTION};
-    } catch (const ctl::base_exception& e) {
+    } catch (const legacy_embedded_ctl::base_exception& e) {
       return {false, CORRUPTION_REASON_EMPTY};
     } catch (...) {
       return {false, CORRUPTION_REASON_EMPTY};

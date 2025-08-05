@@ -1,11 +1,11 @@
 #include "temp_column_builder.h"
 
-#include "ctl/static_array.h"
+#include "legacy_embedded_ctl/static_array.h"
 
 namespace celonis::accelerator::memory::builders {
 
-column_t temp_column_builder::create_from_string_data(row_id row_count, ctl::static_array<cel_string_t> data,
-                                                      size_t str_bfr_size, ctl::static_array<char> string_bfr,
+column_t temp_column_builder::create_from_string_data(row_id row_count, legacy_embedded_ctl::static_array<cel_string_t> data,
+                                                      size_t str_bfr_size, legacy_embedded_ctl::static_array<char> string_bfr,
                                                       const null_flags_t& null_flags,
                                                       const column_processing_state& state) {
   std::string description{};
