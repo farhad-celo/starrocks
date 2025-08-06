@@ -2,13 +2,11 @@
 
 #include <column/column_viewer.h>
 #include <gtest/gtest.h>
-#include <oneapi/tbb/detail/_task.h>
 #include <util/defer_op.h>
 
 #include <utility>
 
 #include "exprs/anyval_util.h"
-#include "util.h"
 
 namespace starrocks {
 
@@ -16,14 +14,17 @@ class CelonisTrimTest : public ::testing::Test {
 protected:
     void SetUp() override {
         auto arg_types = {AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-        auto return_type{AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
         context_.reset(FunctionContext::create_test_context(std::move(arg_types), std::move(return_type)));
     }
 
     void TearDown() override {}
 
     StatusOr<ColumnPtr> RunLtrimConstantCase(ColumnPtr input_column, ColumnPtr characters) const {
-        context_->set_constant_columns({nullptr, characters});
+        Columns constant_columns;
+        constant_columns.push_back(nullptr);
+        constant_columns.push_back(characters);
+        context_->set_constant_columns(constant_columns);
         return RunLtrim(input_column, characters);
     }
 
@@ -32,7 +33,10 @@ protected:
     }
 
     StatusOr<ColumnPtr> RunRtrimConstantCase(ColumnPtr input_column, ColumnPtr characters) const {
-        context_->set_constant_columns({nullptr, characters});
+        Columns constant_columns;
+        constant_columns.push_back(nullptr);
+        constant_columns.push_back(characters);
+        context_->set_constant_columns(constant_columns);
         return RunRtrim(input_column, characters);
     }
 
@@ -47,8 +51,12 @@ private:
         RETURN_IF_ERROR(CelonisTrim::ltrim_prepare(context_.get(), FunctionContext::FRAGMENT_LOCAL));
         DeferOp close_thread_local([this] { CelonisTrim::trim_close(context_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisTrim::ltrim_prepare(context_.get(), FunctionContext::THREAD_LOCAL));
-        const auto result{CelonisTrim::ltrim(context_.get(), {std::move(input_column), std::move(characters)}).value()};
-        return std::move(result);
+        Columns columns;
+        columns.push_back(std::move(input_column));
+        columns.push_back(std::move(characters));
+        auto result_status = CelonisTrim::ltrim(context_.get(), columns);
+        RETURN_IF_ERROR(result_status);
+        return result_status.value();
     }
 
     StatusOr<ColumnPtr> RunRtrim(ColumnPtr input_column, ColumnPtr characters) const {
@@ -57,15 +65,19 @@ private:
         RETURN_IF_ERROR(CelonisTrim::rtrim_prepare(context_.get(), FunctionContext::FRAGMENT_LOCAL));
         DeferOp close_thread_local([this] { CelonisTrim::trim_close(context_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisTrim::rtrim_prepare(context_.get(), FunctionContext::THREAD_LOCAL));
-        const auto result{CelonisTrim::rtrim(context_.get(), {std::move(input_column), std::move(characters)}).value()};
-        return std::move(result);
+        Columns columns;
+        columns.push_back(std::move(input_column));
+        columns.push_back(std::move(characters));
+        auto result_status = CelonisTrim::rtrim(context_.get(), columns);
+        RETURN_IF_ERROR(result_status);
+        return result_status.value();
     }
 
     std::unique_ptr<FunctionContext> context_;
 };
 
 TEST_F(CelonisTrimTest, ltrim_whitespace_trim_arg) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("Example without leading whitespace");
     input_column->append_datum(" Example with leading whitespace");
     input_column->append_datum("          \n PQL");
@@ -75,10 +87,12 @@ TEST_F(CelonisTrimTest, ltrim_whitespace_trim_arg) {
     input_column->append_nulls(1);
     input_column->append_datum(" \n");
 
-    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", input_column->size())};
+    ColumnPtr whitespace = ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", input_column->size());
 
-    const auto result{RunLtrimConstantCase(input_column, whitespace).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunLtrimConstantCase(input_column, whitespace);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 8);
     ASSERT_EQ(result_view.value(0).to_string(), "Example without leading whitespace");
@@ -92,7 +106,7 @@ TEST_F(CelonisTrimTest, ltrim_whitespace_trim_arg) {
 }
 
 TEST_F(CelonisTrimTest, ltrim_empty_trim_arg) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("Example without leading whitespace");
     input_column->append_datum(" Example with leading whitespace");
     input_column->append_datum("          \n PQL");
@@ -102,10 +116,12 @@ TEST_F(CelonisTrimTest, ltrim_empty_trim_arg) {
     input_column->append_nulls(1);
     input_column->append_datum(" \n");
 
-    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>("", input_column->size())};
+    ColumnPtr whitespace = ColumnHelper::create_const_column<TYPE_VARCHAR>("", input_column->size());
 
-    const auto result{RunLtrimConstantCase(input_column, whitespace).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunLtrimConstantCase(input_column, whitespace);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 8);
     ASSERT_EQ(result_view.value(0).to_string(), "Example without leading whitespace");
@@ -119,17 +135,19 @@ TEST_F(CelonisTrimTest, ltrim_empty_trim_arg) {
 }
 
 TEST_F(CelonisTrimTest, ltrim_with_trim_arg) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("xyPQL");
     input_column->append_datum("xxPQL");
     input_column->append_datum("zxPQL");
     input_column->append_datum(" PQL");
     input_column->append_nulls(1);
 
-    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>("x", input_column->size())};
+    ColumnPtr characters = ColumnHelper::create_const_column<TYPE_VARCHAR>("x", input_column->size());
 
-    const auto result{RunLtrimConstantCase(input_column, characters).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunLtrimConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 5);
     ASSERT_EQ(result_view.value(0).to_string(), "yPQL");
@@ -140,15 +158,17 @@ TEST_F(CelonisTrimTest, ltrim_with_trim_arg) {
 }
 
 TEST_F(CelonisTrimTest, ltrim_with_null_trim_arg) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("xPQL");
     input_column->append_datum("yPQL");
     input_column->append_datum(" PQL");
 
-    const auto characters{ColumnHelper::create_const_null_column(input_column->size())};
+    ColumnPtr characters = ColumnHelper::create_const_null_column(input_column->size());
 
-    const auto result{RunLtrimConstantCase(input_column, characters).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunLtrimConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 3);
     ASSERT_TRUE(result->get(0).is_null());
@@ -157,7 +177,7 @@ TEST_F(CelonisTrimTest, ltrim_with_null_trim_arg) {
 }
 
 TEST_F(CelonisTrimTest, ltrim_with_trim_args) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("Example without leading whitespace");
     input_column->append_datum(" Example with leading whitespace");
     input_column->append_datum("          \n PQL");
@@ -167,10 +187,12 @@ TEST_F(CelonisTrimTest, ltrim_with_trim_args) {
     input_column->append_nulls(1);
     input_column->append_datum(" \n");
 
-    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", input_column->size())};
+    ColumnPtr characters = ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", input_column->size());
 
-    const auto result{RunLtrimConstantCase(input_column, characters).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunLtrimConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 8);
     ASSERT_EQ(result_view.value(0).to_string(), "Example without leading whitespace");
@@ -184,7 +206,7 @@ TEST_F(CelonisTrimTest, ltrim_with_trim_args) {
 }
 
 TEST_F(CelonisTrimTest, ltrim_with_string_column) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("000001");
     input_column->append_datum("_____2");
     input_column->append_datum("_ _ 3");
@@ -192,7 +214,7 @@ TEST_F(CelonisTrimTest, ltrim_with_string_column) {
     input_column->append_datum("_5");
     input_column->append_datum(" 6");
 
-    const auto characters{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr characters = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     characters->append_datum("0");
     characters->append_datum("_");
     characters->append_datum(" _");
@@ -200,8 +222,10 @@ TEST_F(CelonisTrimTest, ltrim_with_string_column) {
     characters->append_datum("?");
     characters->append_nulls(1);
 
-    const auto result{RunLtrimNonConstantCase(input_column, characters).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunLtrimNonConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 6);
     ASSERT_EQ(result_view.value(0).to_string(), "1");
@@ -213,17 +237,19 @@ TEST_F(CelonisTrimTest, ltrim_with_string_column) {
 }
 
 TEST_F(CelonisTrimTest, ltrim_all_null_constants) {
-    const auto input_column{ColumnHelper::create_const_null_column(10)};
-    const auto characters{ColumnHelper::create_const_null_column(10)};
+    ColumnPtr input_column = ColumnHelper::create_const_null_column(10);
+    ColumnPtr characters = ColumnHelper::create_const_null_column(10);
 
-    const auto result{RunLtrimConstantCase(input_column, characters).value()};
+    auto result_status = RunLtrimConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     ASSERT_EQ(result->size(), 10);
     ASSERT_TRUE(result->only_null());
 }
 
 TEST_F(CelonisTrimTest, rtrim_whitespace_trim_arg) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("Example without trailing whitespace");
     input_column->append_datum("Example with trailing whitespace ");
     input_column->append_datum("PQL \n");
@@ -233,10 +259,12 @@ TEST_F(CelonisTrimTest, rtrim_whitespace_trim_arg) {
     input_column->append_nulls(1);
     input_column->append_datum("\n ");
 
-    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", input_column->size())};
+    ColumnPtr whitespace = ColumnHelper::create_const_column<TYPE_VARCHAR>(" ", input_column->size());
 
-    const auto result{RunRtrimConstantCase(input_column, whitespace).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunRtrimConstantCase(input_column, whitespace);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 8);
     ASSERT_EQ(result_view.value(0).to_string(), "Example without trailing whitespace");
@@ -250,7 +278,7 @@ TEST_F(CelonisTrimTest, rtrim_whitespace_trim_arg) {
 }
 
 TEST_F(CelonisTrimTest, rtrim_empty_trim_arg) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("Example without trailing whitespace");
     input_column->append_datum("Example with trailing whitespace ");
     input_column->append_datum("PQL \n");
@@ -260,10 +288,12 @@ TEST_F(CelonisTrimTest, rtrim_empty_trim_arg) {
     input_column->append_nulls(1);
     input_column->append_datum("\n ");
 
-    const auto whitespace{ColumnHelper::create_const_column<TYPE_VARCHAR>("", input_column->size())};
+    ColumnPtr whitespace = ColumnHelper::create_const_column<TYPE_VARCHAR>("", input_column->size());
 
-    const auto result{RunRtrimConstantCase(input_column, whitespace).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunRtrimConstantCase(input_column, whitespace);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 8);
     ASSERT_EQ(result_view.value(0).to_string(), "Example without trailing whitespace");
@@ -277,17 +307,19 @@ TEST_F(CelonisTrimTest, rtrim_empty_trim_arg) {
 }
 
 TEST_F(CelonisTrimTest, rtrim_with_trim_arg) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("PQLyx");
     input_column->append_datum("PQLxx");
     input_column->append_datum("PQLxz");
     input_column->append_datum("PQL ");
     input_column->append_nulls(1);
 
-    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>("x", input_column->size())};
+    ColumnPtr characters = ColumnHelper::create_const_column<TYPE_VARCHAR>("x", input_column->size());
 
-    const auto result{RunRtrimConstantCase(input_column, characters).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunRtrimConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 5);
     ASSERT_EQ(result_view.value(0).to_string(), "PQLy");
@@ -298,7 +330,7 @@ TEST_F(CelonisTrimTest, rtrim_with_trim_arg) {
 }
 
 TEST_F(CelonisTrimTest, rtrim_with_trim_args) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("Example without trailing whitespace");
     input_column->append_datum("Example with trailing whitespace ");
     input_column->append_datum("PQL    \n");
@@ -308,10 +340,12 @@ TEST_F(CelonisTrimTest, rtrim_with_trim_args) {
     input_column->append_nulls(1);
     input_column->append_datum("\n ");
 
-    const auto characters{ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", input_column->size())};
+    ColumnPtr characters = ColumnHelper::create_const_column<TYPE_VARCHAR>(" \n", input_column->size());
 
-    const auto result{RunRtrimConstantCase(input_column, characters).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunRtrimConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 8);
     ASSERT_EQ(result_view.value(0).to_string(), "Example without trailing whitespace");
@@ -325,15 +359,17 @@ TEST_F(CelonisTrimTest, rtrim_with_trim_args) {
 }
 
 TEST_F(CelonisTrimTest, rtrim_with_null_trim_arg) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("xPQL");
     input_column->append_datum("yPQL");
     input_column->append_datum(" PQL");
 
-    const auto characters{ColumnHelper::create_const_null_column(input_column->size())};
+    ColumnPtr characters = ColumnHelper::create_const_null_column(input_column->size());
 
-    const auto result{RunRtrimConstantCase(input_column, characters).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunRtrimConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 3);
     ASSERT_TRUE(result->get(0).is_null());
@@ -342,7 +378,7 @@ TEST_F(CelonisTrimTest, rtrim_with_null_trim_arg) {
 }
 
 TEST_F(CelonisTrimTest, rtrim_with_string_column) {
-    const auto input_column{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("100000");
     input_column->append_datum("2_____");
     input_column->append_datum("3 _ _");
@@ -350,7 +386,7 @@ TEST_F(CelonisTrimTest, rtrim_with_string_column) {
     input_column->append_datum("5_");
     input_column->append_datum("6 ");
 
-    const auto characters{ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true)};
+    ColumnPtr characters = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     characters->append_datum("0");
     characters->append_datum("_");
     characters->append_datum(" _");
@@ -358,8 +394,10 @@ TEST_F(CelonisTrimTest, rtrim_with_string_column) {
     characters->append_datum("?");
     characters->append_nulls(1);
 
-    const auto result{RunRtrimNonConstantCase(input_column, characters).value()};
-    const auto result_view{ColumnViewer<TYPE_VARCHAR>(result)};
+    auto result_status = RunRtrimNonConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
 
     ASSERT_EQ(result->size(), 6);
     ASSERT_EQ(result_view.value(0).to_string(), "1");
@@ -371,10 +409,12 @@ TEST_F(CelonisTrimTest, rtrim_with_string_column) {
 }
 
 TEST_F(CelonisTrimTest, rtrim_all_null_constants) {
-    const auto input_column{ColumnHelper::create_const_null_column(10)};
-    const auto characters{ColumnHelper::create_const_null_column(10)};
+    ColumnPtr input_column = ColumnHelper::create_const_null_column(10);
+    ColumnPtr characters = ColumnHelper::create_const_null_column(10);
 
-    const auto result{RunRtrimConstantCase(input_column, characters).value()};
+    auto result_status = RunRtrimConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     ASSERT_EQ(result->size(), 10);
     ASSERT_TRUE(result->only_null());

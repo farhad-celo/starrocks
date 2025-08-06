@@ -126,13 +126,13 @@ public:
     }
 
     [[nodiscard]] ColumnPtr run_serialize(const TestContext& test_ctx) {
-        auto serialization_dst{[&test_ctx]() -> ColumnPtr {
-            auto binary_col{BinaryColumn::create()};
+        auto serialization_dst = [&test_ctx]() -> ColumnPtr {
+            auto binary_col = BinaryColumn::create();
             if (test_ctx.has_null()) {
                 return NullableColumn::create(binary_col, NullColumn::create(0, 0));
             }
             return binary_col;
-        }()};
+        }();
         // execute aggregate function: serialize
         test_ctx.func()->serialize_to_column(func_ctx_.get(), test_ctx.raw_state(), serialization_dst.get());
         return serialization_dst;
@@ -157,8 +157,9 @@ public:
     }
 
     [[nodiscard]] ColumnPtr run_finalize_to_column(const TestContext& test_ctx) {
-        ColumnBuilder<LT> builder{config::vector_chunk_size};
-        ColumnPtr output_column{test_ctx.has_null() ? builder.build_nullable_column() : builder.build(false)};
+        ColumnBuilder<LT> builder(config::vector_chunk_size);
+        auto mut_output_column = test_ctx.has_null() ? builder.build_nullable_column() : builder.build(false);
+        ColumnPtr output_column = std::move(mut_output_column);
         test_ctx.func()->finalize_to_column(func_ctx_.get(), test_ctx.raw_state(), output_column.get());
         return output_column;
     }
@@ -169,7 +170,7 @@ private:
     }
     [[nodiscard]] std::pair<TestContext, ColumnPtr> prepare_function_execution_with_data(
             const nullable_vec_t<ValueType>& input_column_data) {
-        ColumnBuilder<LT> builder{config::vector_chunk_size};
+        ColumnBuilder<LT> builder(config::vector_chunk_size);
         for (const auto& input_column_value : input_column_data) {
             if (input_column_value.has_value()) {
                 builder.append(*input_column_value);
@@ -177,7 +178,8 @@ private:
                 builder.append_null();
             }
         }
-        const auto col_ptr{builder.build(/*is_const*/ false)};
+        auto mut_col_ptr = builder.build(/*is_const*/ false);
+        ColumnPtr col_ptr = std::move(mut_col_ptr);
         return {prepare_function_execution(col_ptr->has_null()), col_ptr};
     }
 
@@ -214,7 +216,8 @@ TYPED_TEST(CelonisModeAggTest, celonis_mode_update_with_null_only_test) {
 
 TYPED_TEST(CelonisModeAggTest, celonis_mode_update_with_clear_most_frequent_test) {
     // GIVEN
-    const auto input_column_data{transform_to<TypeParam>({"2", "1", "2", "3", "2", "3", "1"})}; // 2 is most frequent
+    DatumProxyArray data1 = {"2", "1", "2", "3", "2", "3", "1"};
+    const auto input_column_data{transform_to<TypeParam>(data1)}; // 2 is most frequent
     const auto expected_result{transform_to<TypeParam>("2")};
     // WHEN
     const auto test_ctx{this->run_update(input_column_data)};
@@ -225,8 +228,9 @@ TYPED_TEST(CelonisModeAggTest, celonis_mode_update_with_clear_most_frequent_test
 
 TYPED_TEST(CelonisModeAggTest, celonis_mode_update_with_nulls_and_clear_most_frequent_test) {
     // GIVEN
+    DatumProxyArray data1 = {"2", "1", "2", std::nullopt, "2", "3", "1"};
     const auto input_column_data{
-            transform_to<TypeParam>({"2", "1", "2", std::nullopt, "2", "3", "1"})}; // 2 is most frequent
+            transform_to<TypeParam>(data1)}; // 2 is most frequent
     const auto expected_result{transform_to<TypeParam>("2")};
     // WHEN
     const auto test_ctx{this->run_update(input_column_data)};
@@ -237,8 +241,9 @@ TYPED_TEST(CelonisModeAggTest, celonis_mode_update_with_nulls_and_clear_most_fre
 
 TYPED_TEST(CelonisModeAggTest, celonis_mode_update_with_multiple_most_frequent_test) {
     // GIVEN
+    DatumProxyArray data1 = {"2", "1", "2", "1", "2", "3", "1"};
     const auto input_column_data{
-            transform_to<TypeParam>({"2", "1", "2", "1", "2", "3", "1"})}; // 1 and 2 are most frequent
+            transform_to<TypeParam>(data1)}; // 1 and 2 are most frequent
     const auto expected_result{transform_to<TypeParam>("1")};
     // WHEN
     const auto test_ctx{this->run_update(input_column_data)};
@@ -251,10 +256,11 @@ TYPED_TEST(CelonisModeAggTest, celonis_mode_update_with_multiple_most_frequent_t
 
 TYPED_TEST(CelonisModeAggTest, celonis_mode_serialize_and_deserialize_with_nulls_and_clear_most_frequent_test) {
     // GIVEN
+    DatumProxyArray data1 = {"2", "1", "2", std::nullopt, "2", "3", "1"};
     const auto input_column_data{
-            transform_to<TypeParam>({"2", "1", "2", std::nullopt, "2", "3", "1"})}; // 2 is most frequent
+            transform_to<TypeParam>(data1)}; // 2 is most frequent
     const auto expected_result{transform_to<TypeParam>("2")};
-    const auto test_ctx_and_serialized_data{this->run_update_and_serialize(input_column_data)};
+    const auto test_ctx_and_serialized_data = this->run_update_and_serialize(input_column_data);
     // WHEN
     const auto test_ctx{this->run_deserialize(test_ctx_and_serialized_data)};
     // THEN
@@ -264,10 +270,11 @@ TYPED_TEST(CelonisModeAggTest, celonis_mode_serialize_and_deserialize_with_nulls
 
 TYPED_TEST(CelonisModeAggTest, celonis_mode_serialize_and_deserialize_with_multiple_most_frequent_test) {
     // GIVEN
+    DatumProxyArray data1 = {"2", "1", "2", "1", "2", "3", "1"};
     const auto input_column_data{
-            transform_to<TypeParam>({"2", "1", "2", "1", "2", "3", "1"})}; // 1 and 2 are most frequent
+            transform_to<TypeParam>(data1)}; // 1 and 2 are most frequent
     const auto expected_result{transform_to<TypeParam>("1")};
-    const auto test_ctx_and_serialized_data{this->run_update_and_serialize(input_column_data)};
+    const auto test_ctx_and_serialized_data = this->run_update_and_serialize(input_column_data);
     // WHEN
     const auto test_ctx{this->run_deserialize(test_ctx_and_serialized_data)};
     // THEN
@@ -279,12 +286,15 @@ TYPED_TEST(CelonisModeAggTest, celonis_mode_serialize_and_deserialize_with_multi
 
 TYPED_TEST(CelonisModeAggTest, celonis_mode_merge_with_nulls_and_multiple_most_frequent_after_merge_test) {
     // GIVEN
+    DatumProxyArray data1 = {"2", "1", "2", std::nullopt, "2", "3", "1"};
     const auto input_column_data{
-            transform_to<TypeParam>({"2", "1", "2", std::nullopt, "2", "3", "1"})}; // 2 is most frequent
+            transform_to<TypeParam>(data1)}; // 2 is most frequent
     auto test_ctx{this->run_update(input_column_data)};
     const auto expected_result_before_merge{transform_to<TypeParam>("2")};
-    const auto serialized_data_1{this->run_update_and_serialize(transform_to<TypeParam>({std::nullopt, "1"}))};
-    const auto serialized_data_2{this->run_update_and_serialize(transform_to<TypeParam>({std::nullopt, "3"}))};
+    DatumProxyArray merge_data1 = {std::nullopt, "1"};
+    const auto serialized_data_1 = this->run_update_and_serialize(transform_to<TypeParam>(merge_data1));
+    DatumProxyArray merge_data2 = {std::nullopt, "3"};
+    const auto serialized_data_2 = this->run_update_and_serialize(transform_to<TypeParam>(merge_data2));
     const auto expected_result_after_merge{transform_to<TypeParam>("1")}; // after the merge, 1 and 2 are most frequent
     ASSERT_EQ(expected_result_before_merge, test_ctx.typed_state().most_frequent_or_null());
     // WHEN
@@ -297,10 +307,12 @@ TYPED_TEST(CelonisModeAggTest, celonis_mode_merge_with_nulls_and_multiple_most_f
 
 TYPED_TEST(CelonisModeAggTest, celonis_mode_merge_with_nulls_test) {
     // GIVEN
-    const auto input_data_all_null{transform_to<TypeParam>({std::nullopt, std::nullopt})};
+    DatumProxyArray null_data = {std::nullopt, std::nullopt};
+    const auto input_data_all_null{transform_to<TypeParam>(null_data)};
     auto test_ctx{this->run_update(input_data_all_null)};
-    const auto serialized_data_1{this->run_update_and_serialize(input_data_all_null)};
-    const auto serialized_data_2{this->run_update_and_serialize(transform_to<TypeParam>({"2", "3", "2"}))};
+    const auto serialized_data_1 = this->run_update_and_serialize(input_data_all_null);
+    DatumProxyArray data3 = {"2", "3", "2"};
+    const auto serialized_data_2 = this->run_update_and_serialize(transform_to<TypeParam>(data3));
     const auto expected_result_after_merge{transform_to<TypeParam>("2")}; // after the merge, 1 and 2 are most frequent
     ASSERT_EQ(std::nullopt, test_ctx.typed_state().most_frequent_or_null());
     // WHEN
@@ -313,10 +325,11 @@ TYPED_TEST(CelonisModeAggTest, celonis_mode_merge_with_nulls_test) {
 
 TYPED_TEST(CelonisModeAggTest, celonis_mode_merge_with_nulls_only_test) {
     // GIVEN
-    const auto input_data_all_null{transform_to<TypeParam>({std::nullopt, std::nullopt})};
+    DatumProxyArray null_data = {std::nullopt, std::nullopt};
+    const auto input_data_all_null{transform_to<TypeParam>(null_data)};
     const nullable_val_t<TypeParam> expected_result{std::nullopt};
     auto test_ctx{this->run_update(input_data_all_null)};
-    const auto serialized_data{this->run_update_and_serialize(input_data_all_null)};
+    const auto serialized_data = this->run_update_and_serialize(input_data_all_null);
     ASSERT_EQ(std::nullopt, test_ctx.typed_state().most_frequent_or_null());
     // WHEN
     this->run_merge(serialized_data, test_ctx);

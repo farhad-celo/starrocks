@@ -39,7 +39,7 @@ ProductAggregateState<T> make_overflowed_state() {
 
 template <typename T>
 void test_product_regular_state_update(T initial_value, T next_value, T expected_value) {
-    ProductAggregateState<T> initial_state{make_initialized_state(initial_value)};
+    ProductAggregateState<T> initial_state = make_initialized_state(initial_value);
     initial_state.update(next_value);
     ASSERT_TRUE(initial_state.is_initialized());
     ASSERT_EQ(expected_value, initial_state.get_product());
@@ -64,7 +64,7 @@ TEST(CelonisProductStateUpdate, product_state_update_floating_point_simple) {
 }
 
 bool does_overflow(integer_t initial_value, integer_t next_value) {
-    auto state{make_initialized_state(initial_value)};
+    auto state = make_initialized_state(initial_value);
     state.update(next_value);
     return state.has_overflowed();
 }
@@ -75,79 +75,79 @@ TEST(CelonisProductStateUpdate, product_state_update_integer_overflow) {
 }
 
 TEST(CelonisProductStateUpdate, product_state_update_integer_remains_overflowed) {
-    auto state{make_overflowed_state<integer_t>()};
+    auto state = make_overflowed_state<integer_t>();
     state.update(5);
     ASSERT_TRUE(state.has_overflowed());
 }
 
 TEST(CelonisProductStateUpdate, product_state_update_unitialized_becomes_initialized) {
-    auto state{make_uninitialized_state<integer_t>()};
+    auto state = make_uninitialized_state<integer_t>();
     state.update(5);
     ASSERT_TRUE(state.is_initialized());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_initialized_with_itialized) {
-    auto state1{make_initialized_state<integer_t>(3)};
-    auto state2{make_initialized_state<integer_t>(4)};
+    auto state1 = make_initialized_state<integer_t>(3);
+    auto state2 = make_initialized_state<integer_t>(4);
     state1.merge(state2);
     ASSERT_TRUE(state1.is_initialized());
     ASSERT_EQ(12, state1.get_product());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_unitialized_with_initialized) {
-    auto state1{make_uninitialized_state<integer_t>()};
-    auto state2{make_initialized_state<integer_t>(4)};
+    auto state1 = make_uninitialized_state<integer_t>();
+    auto state2 = make_initialized_state<integer_t>(4);
     state1.merge(state2);
     ASSERT_TRUE(state1.is_initialized());
     ASSERT_EQ(4, state1.get_product());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_initialized_with_uninitialized) {
-    auto state1{make_initialized_state<integer_t>(3)};
-    auto state2{make_uninitialized_state<integer_t>()};
+    auto state1 = make_initialized_state<integer_t>(3);
+    auto state2 = make_uninitialized_state<integer_t>();
     state1.merge(state2);
     ASSERT_TRUE(state1.is_initialized());
     ASSERT_EQ(3, state1.get_product());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_overflowed_with_initialized) {
-    auto state1{make_overflowed_state<integer_t>()};
-    auto state2{make_initialized_state<integer_t>(4)};
+    auto state1 = make_overflowed_state<integer_t>();
+    auto state2 = make_initialized_state<integer_t>(4);
     state1.merge(state2);
     ASSERT_TRUE(state1.has_overflowed());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_initialized_with_overflowed) {
-    auto state1{make_initialized_state<integer_t>(3)};
-    auto state2{make_overflowed_state<integer_t>()};
+    auto state1 = make_initialized_state<integer_t>(3);
+    auto state2 = make_overflowed_state<integer_t>();
     state1.merge(state2);
     ASSERT_TRUE(state1.has_overflowed());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_both_overflowed) {
-    auto state1{make_overflowed_state<integer_t>()};
-    auto state2{make_overflowed_state<integer_t>()};
+    auto state1 = make_overflowed_state<integer_t>();
+    auto state2 = make_overflowed_state<integer_t>();
     state1.merge(state2);
     ASSERT_TRUE(state1.has_overflowed());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_both_unitialized) {
-    auto state1{make_uninitialized_state<integer_t>()};
-    auto state2{make_uninitialized_state<integer_t>()};
+    auto state1 = make_uninitialized_state<integer_t>();
+    auto state2 = make_uninitialized_state<integer_t>();
     state1.merge(state2);
     ASSERT_FALSE(state1.is_initialized());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_unitialized_with_overflowed) {
-    auto state1{make_uninitialized_state<integer_t>()};
-    auto state2{make_overflowed_state<integer_t>()};
+    auto state1 = make_uninitialized_state<integer_t>();
+    auto state2 = make_overflowed_state<integer_t>();
     state1.merge(state2);
     ASSERT_TRUE(state1.has_overflowed());
 }
 
 TEST(CelonisProductStateMerge, product_state_merge_overflowed_with_uninitialized) {
-    auto state1{make_overflowed_state<integer_t>()};
-    auto state2{make_uninitialized_state<integer_t>()};
+    auto state1 = make_overflowed_state<integer_t>();
+    auto state2 = make_uninitialized_state<integer_t>();
     state1.merge(state2);
     ASSERT_TRUE(state1.has_overflowed());
 }
@@ -161,17 +161,18 @@ NullableColumn::Ptr create_serialization_column() {
     Columns columns;
     columns.push_back(std::move(stage_field_col));
     columns.push_back(std::move(product_field_col));
-    auto struct_col = StructColumn::create(std::move(columns), std::vector<std::string>{"Stage", "Product"});
+    std::vector<std::string> field_names = {"Stage", "Product"};
+    auto struct_col = StructColumn::create(std::move(columns), std::move(field_names));
     return NullableColumn::create(std::move(struct_col), NullColumn::create());
 }
 
 template <typename T>
 void verify_serialization_deserialization(const ProductAggregateState<T>& state) {
     static_assert(std::is_same_v<T, integer_t> || std::is_same_v<T, floating_point_t>);
-    auto serialization_column{create_serialization_column<T>()};
-    auto* struct_column{down_cast<StructColumn*>(ColumnHelper::get_data_column(serialization_column.get()))};
+    NullableColumn::Ptr serialization_column = create_serialization_column<T>();
+    auto* struct_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(serialization_column.get()));
     state.append_to_struct_column(*struct_column);
-    auto deserialized_state{ProductAggregateState<T>::read_from_struct_column(*struct_column, 0)};
+    auto deserialized_state = ProductAggregateState<T>::read_from_struct_column(*struct_column, 0);
     ASSERT_EQ(state.get_stage(), deserialized_state.get_stage());
     if (state.is_initialized()) {
         ASSERT_EQ(state.get_product(), deserialized_state.get_product());
@@ -215,7 +216,7 @@ private:
 
 template <typename T>
 NullableColumn::Ptr create_nullable_column_from_data(std::vector<std::optional<T>> values) {
-    auto column{NullableColumn::create(FixedLengthColumn<T>::create(), NullColumn::create())};
+    auto column = NullableColumn::create(FixedLengthColumn<T>::create(), NullColumn::create());
     std::for_each(values.begin(), values.end(), [&column](const std::optional<T>& val) {
         if (val.has_value()) {
             column->append_datum(val.value());
@@ -250,28 +251,28 @@ public:
     void TearDown() override { delete utils; }
 
     void add_column(std::vector<std::optional<RunTimeCppType>> values) {
-        auto managed_state{ManagedAggrState::create(this->ctx, this->aggregate_func)};
-        auto column{create_nullable_column_from_data(std::move(values))};
+        auto managed_state = ManagedAggrState::create(this->ctx, this->aggregate_func);
+        auto column = create_nullable_column_from_data(std::move(values));
 
-        const Column* col_ptr{column.get()};
+        const Column* col_ptr = column.get();
         aggregate_func->update_batch_single_state(this->local_ctx.get(), column->size(), &col_ptr,
                                                   managed_state->state());
         managed_states.emplace_back(std::move(managed_state));
     }
 
     std::optional<RunTimeCppType> compute_product() {
-        NullableColumn::Ptr serialization_column{create_serialization_column<RunTimeCppType>()};
-        auto result_column{NullableColumn::create(RunTimeColumnType<LOGICAL_TYPE>::create(), NullColumn::create())};
+        NullableColumn::Ptr serialization_column = create_serialization_column<RunTimeCppType>();
+        auto result_column = NullableColumn::create(RunTimeColumnType<LOGICAL_TYPE>::create(), NullColumn::create());
         if (managed_states.empty()) {
             return std::nullopt;
         }
-        for (size_t i{1}; i < managed_states.size(); i++) {
+        for (size_t i = 1; i < managed_states.size(); i++) {
             aggregate_func->serialize_to_column(local_ctx.get(), managed_states[i]->state(),
                                                 serialization_column.get());
             serialization_column->check_or_die();
         }
 
-        for (size_t i{0}; i < managed_states.size() - 1; i++) {
+        for (size_t i = 0; i < managed_states.size() - 1; i++) {
             aggregate_func->merge(local_ctx.get(), serialization_column.get(), managed_states.front()->state(), i);
         }
 
@@ -299,7 +300,7 @@ TYPED_TEST_SUITE(CelonisProductTest, TestedTypes);
 TYPED_TEST(CelonisProductTest, product_test_simple_one_column) {
     this->add_column({1, 2, 3});
 
-    auto result{this->compute_product()};
+    auto result = this->compute_product();
 
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(6, result.value());
@@ -309,7 +310,7 @@ TYPED_TEST(CelonisProductTest, product_test_simple_two_columns) {
     this->add_column({1, 2, 3});
     this->add_column({4, 5, 6});
 
-    auto result{this->compute_product()};
+    auto result = this->compute_product();
 
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(720, result.value());
@@ -320,7 +321,7 @@ TYPED_TEST(CelonisProductTest, product_test_simple_three_columns) {
     this->add_column({4, 5, 6});
     this->add_column({7, 8, 9});
 
-    auto result{this->compute_product()};
+    auto result = this->compute_product();
 
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(362880, result.value());
@@ -330,7 +331,7 @@ TYPED_TEST(CelonisProductTest, product_test_null_values) {
     this->add_column({1, 2, {}});
     this->add_column({4, {}, 6});
 
-    auto result{this->compute_product()};
+    auto result = this->compute_product();
 
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(48, result.value());
@@ -340,7 +341,7 @@ TYPED_TEST(CelonisProductTest, product_test_one_column_all_null) {
     this->add_column({1, 2, {}});
     this->add_column({{}, {}, {}});
 
-    auto result{this->compute_product()};
+    auto result = this->compute_product();
 
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(2, result.value());
@@ -350,7 +351,7 @@ TYPED_TEST(CelonisProductTest, product_test_all_null) {
     this->add_column({{}, {}, {}});
     this->add_column({{}, {}, {}});
 
-    auto result{this->compute_product()};
+    auto result = this->compute_product();
 
     ASSERT_FALSE(result.has_value());
 }
@@ -358,7 +359,7 @@ TYPED_TEST(CelonisProductTest, product_test_all_null) {
 TYPED_TEST(CelonisProductTest, product_test_overflow) {
     this->add_column({1, 2, 3});
     this->add_column({4, 5, std::numeric_limits<integer_t>::max()});
-    auto result{this->compute_product()};
+    auto result = this->compute_product();
 
     if constexpr (std::is_integral_v<typename decltype(result)::value_type>) {
         ASSERT_FALSE(result.has_value());
@@ -371,22 +372,22 @@ TYPED_TEST(CelonisProductTest, product_test_overflow) {
 TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format) {
     using T = typename decltype(this->compute_product())::value_type;
     using RawStageFieldType = typename ProductAggregateState<T>::StageFieldcolumnType::ValueType;
-    auto input_column{create_nullable_column_from_data<T>({2, {}, 4, {}})};
-    auto serialization_column{create_serialization_column<T>()};
+    auto input_column = create_nullable_column_from_data<T>({2, {}, 4, {}});
+    NullableColumn::Ptr serialization_column = create_serialization_column<T>();
     ColumnPtr serialization_column_abstract = serialization_column;
 
-    size_t chunk_size{4};
+    size_t chunk_size = 4;
 
     this->aggregate_func->convert_to_serialize_format(this->local_ctx.get(), {input_column}, 4,
                                                       &serialization_column_abstract);
 
     serialization_column->check_or_die();
 
-    auto* serialized_struct_column{down_cast<StructColumn*>(ColumnHelper::get_data_column(serialization_column.get()))};
-    auto* serialized_stage_column{down_cast<FixedLengthColumn<RawStageFieldType>*>(
-            ColumnHelper::get_data_column(serialized_struct_column->fields_column()[0].get()))};
-    auto* serialized_product_column{down_cast<FixedLengthColumn<T>*>(
-            ColumnHelper::get_data_column(serialized_struct_column->fields_column()[1].get()))};
+    auto* serialized_struct_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(serialization_column.get()));
+    auto* serialized_stage_column = down_cast<FixedLengthColumn<RawStageFieldType>*>(
+            ColumnHelper::get_data_column(serialized_struct_column->fields_column()[0].get()));
+    auto* serialized_product_column = down_cast<FixedLengthColumn<T>*>(
+            ColumnHelper::get_data_column(serialized_struct_column->fields_column()[1].get()));
     auto& serialized_stage_data = serialized_stage_column->get_data();
     auto& serialized_product_data = serialized_product_column->get_data();
 
@@ -405,25 +406,25 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format) {
 
 TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format_and_merge) {
     using T = typename decltype(this->compute_product())::value_type;
-    auto input_column{create_nullable_column_from_data<T>({2, {}, 4, {}})};
-    auto result_column{NullableColumn::create(FixedLengthColumn<T>::create(), NullColumn::create())};
-    auto serialization_column{create_serialization_column<T>()};
+    auto input_column = create_nullable_column_from_data<T>({2, {}, 4, {}});
+    auto result_column = NullableColumn::create(FixedLengthColumn<T>::create(), NullColumn::create());
+    NullableColumn::Ptr serialization_column = create_serialization_column<T>();
     ColumnPtr serialization_column_abstract = serialization_column;
 
-    size_t chunk_size{4};
+    size_t chunk_size = 4;
 
-    auto managed_state{ManagedAggrState::create(this->ctx, this->aggregate_func)};
+    auto managed_state = ManagedAggrState::create(this->ctx, this->aggregate_func);
 
     this->aggregate_func->convert_to_serialize_format(this->local_ctx.get(), {input_column}, chunk_size,
                                                       &serialization_column_abstract);
 
-    for (size_t i{0}; i < chunk_size; i++) {
+    for (size_t i = 0; i < chunk_size; i++) {
         this->aggregate_func->merge(this->local_ctx.get(), serialization_column.get(), managed_state->state(), i);
     }
 
     this->aggregate_func->finalize_to_column(this->local_ctx.get(), managed_state->state(), result_column.get());
 
-    auto result_data{ColumnHelper::get_data_column(result_column.get())};
+    auto result_data = ColumnHelper::get_data_column(result_column.get());
 
     ASSERT_EQ(result_column->size(), 1);
     ASSERT_EQ(down_cast<FixedLengthColumn<T>*>(result_data)->get_data()[0], 8);
@@ -431,4 +432,3 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format_and_merg
 }
 
 } // namespace starrocks
-
