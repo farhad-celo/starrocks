@@ -66,7 +66,8 @@ struct Expected {
 
 template<typename T>
 [[nodiscard]] Expected<T> make_expected(std::initializer_list<Datum> values) {
-    Expected<T> ret{.size = values.size()};
+    Expected<T> ret;
+    ret.size = values.size();
     for (const auto& datum: values) {
         const bool is_null{datum.is_null()};
         ret.nulls.push_back(is_null);
@@ -101,10 +102,12 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_single_argument) {
     AddRow({1L});
     AddRow({kNullDatum});
 
-    const auto expected{make_expected<T>({1L, kNullDatum})};
+    const auto expected = make_expected<T>({1L, kNullDatum});
 
     // WHEN
-    const auto result{RunLeast().value()};
+    auto result_status = RunLeast();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -121,7 +124,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_single_argument) {
     const auto expected = make_expected<T>({1.5, kNullDatum});
 
     // WHEN
-    const auto result{RunGreatest().value()};
+    auto result_status = RunGreatest();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -142,7 +147,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_int_data_mixed_nulls) {
     const auto expected = make_expected<T>({3L, 2L, 2L, 3L, kNullDatum, 1L});
 
     // WHEN
-    const auto result{RunGreatest().value()};
+    auto result_status = RunGreatest();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -163,7 +170,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_double_data_mixed_nulls) {
     const auto expected = make_expected<T>({3.5, 2.4, 2.0, 3.0, kNullDatum, 1.0});
 
     // WHEN
-    const auto result{RunGreatest().value()};
+    auto result_status = RunGreatest();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -188,7 +197,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_datetime_data_mixed_nulls) {
     const auto expected = make_expected<T>({3_ts, 2_ts, 2_ts, 3_ts, kNullDatum, 1_ts});
 
     // WHEN
-    const auto result{RunGreatest().value()};
+    auto result_status = RunGreatest();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -209,7 +220,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_varchar_data_mixed_nulls) {
     const auto expected = make_expected<T>({"3", "2", "2", "3", kNullDatum, "1"});
 
     // WHEN
-    const auto result{RunGreatest().value()};
+    auto result_status = RunGreatest();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -230,7 +243,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_int_data_mixed_nulls) {
     const auto expected = make_expected<T>({1L, 1L, 1L, 2L, kNullDatum, 1L});
 
     // WHEN
-    const auto result{RunLeast().value()};
+    auto result_status = RunLeast();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -251,7 +266,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_double_data_mixed_nulls) {
     const auto expected = make_expected<T>({1.5, 1.2, 1.0, 2.0, kNullDatum, 1.0});
 
     // WHEN
-    const auto result{RunLeast().value()};
+    auto result_status = RunLeast();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -272,7 +289,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_datetime_data_mixed_nulls) {
     const auto expected = make_expected<T>({1_ts, 1_ts, 1_ts, 2_ts, kNullDatum, 1_ts});
 
     // WHEN
-    const auto result{RunLeast().value()};
+    auto result_status = RunLeast();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);
@@ -293,7 +312,9 @@ TEST_F(CelonisGreatestLeastTest, celonis_least_varchar_data_mixed_nulls) {
     const auto expected = make_expected<T>({"1", "1", "1", "2", kNullDatum, "1"});
 
     // WHEN
-    const auto result{RunLeast().value()};
+    auto result_status = RunLeast();
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
 
     // THEN
     validate(result, expected);

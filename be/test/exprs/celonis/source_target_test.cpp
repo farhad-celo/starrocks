@@ -110,10 +110,14 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source) {
     evaluator_sources.add_expected(DatumArray{14, 15});
     evaluator_targets.add_expected(DatumArray{15, 16});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -135,10 +139,14 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input) {
     evaluator_sources.add_expected(DatumArray{3});
     evaluator_targets.add_expected(DatumArray{4});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -161,10 +169,14 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input_nullable)
     evaluator_sources.add_expected(DatumArray{3});
     evaluator_targets.add_expected(DatumArray{4});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -172,10 +184,14 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_input) {
     // Input is empty.
     auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     ASSERT_EQ(0, result_sources->size());
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     ASSERT_EQ(0, result_targets->size());
 }
 
@@ -183,10 +199,14 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_input_nullable) {
     // Same as above, but array is Nullable.
     auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     ASSERT_EQ(0, result_sources->size());
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     ASSERT_EQ(0, result_targets->size());
 }
 
@@ -207,10 +227,14 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_null_in_input) {
     evaluator_sources.add_expected(DatumArray{10, kNullDatum});
     evaluator_targets.add_expected(DatumArray{kNullDatum, kNullDatum});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -251,10 +275,14 @@ TEST_F(CelonisSourceTargetTest, source_target_const_column) {
     evaluator_sources.add_expected(DatumArray{1, 2, 3});
     evaluator_targets.add_expected(DatumArray{2, 3, 4});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, const_array_col).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, const_array_col);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, const_array_col).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, const_array_col);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -295,10 +323,14 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_string_data) {
     evaluator_sources.add_expected(DatumArray{});
     evaluator_targets.add_expected(DatumArray{});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -319,10 +351,14 @@ TEST_F(CelonisSourceTargetTest, celonis_source_bigint_input) {
     evaluator_sources.add_expected(DatumArray{33L, kNullDatum});
     evaluator_targets.add_expected(DatumArray{kNullDatum, 300L});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -344,10 +380,14 @@ TEST_F(CelonisSourceTargetTest, celonis_source_null_in_input) {
     evaluator_sources.add_expected(DatumArray{});
     evaluator_targets.add_expected(DatumArray{});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, array).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -372,10 +412,14 @@ TEST_F(CelonisSourceTargetTest, array_celonis_sources_targets_with_group) {
     evaluator_sources.add_expected(DatumArray{10, 11, 12});
     evaluator_targets.add_expected(DatumArray{11, 12, 13});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, array, group).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, group);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_VARCHAR, array, group).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_VARCHAR, array, group);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -399,10 +443,14 @@ TEST_F(CelonisSourceTargetTest, source_target_const_column_with_group) {
     evaluator_sources.add_expected(DatumArray{10, 11, 12, 20, 21, 30});
     evaluator_targets.add_expected(DatumArray{11, 12, 13, 21, 22, 31});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_INT, const_array_col, const_group_col).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, const_array_col, const_group_col);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_INT, const_array_col, const_group_col).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, const_array_col, const_group_col);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
@@ -470,15 +518,19 @@ TEST_F(CelonisSourceTargetTest, array_celonis_sources_targets_with_group_string_
     evaluator_sources.add_expected(DatumArray{"string00", kNullDatum, "s02", "s03", kNullDatum});
     evaluator_targets.add_expected(DatumArray{kNullDatum, "s02", "s03", "s04", "s16"});
 
-    auto result_sources = run_celonis_array_sources(TYPE_ARRAY_VARCHAR, array, group).value();
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_VARCHAR, array, group);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    auto result_targets = run_celonis_array_targets(TYPE_ARRAY_VARCHAR, array, group).value();
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_VARCHAR, array, group);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any) {
-    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, false)};
+    ColumnPtr array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
     celonis::TestEvaluator<TYPE_INT> evaluator_sources;
     celonis::TestEvaluator<TYPE_INT> evaluator_targets;
 
@@ -498,15 +550,19 @@ TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any) {
     evaluator_sources.add_expected(DatumArray{6, 6});
     evaluator_targets.add_expected(DatumArray{7, 8});
 
-    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY).value()};
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY).value()};
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_null) {
-    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, true)};
+    ColumnPtr array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
     celonis::TestEvaluator<TYPE_INT> evaluator_sources;
     celonis::TestEvaluator<TYPE_INT> evaluator_targets;
 
@@ -542,15 +598,19 @@ TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_null) {
     evaluator_sources.add_expected(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum});
     evaluator_targets.add_expected(DatumArray{14, kNullDatum, kNullDatum, 15, kNullDatum});
 
-    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY).value()};
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY).value()};
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_with_self) {
-    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, false)};
+    ColumnPtr array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
     celonis::TestEvaluator<TYPE_INT> evaluator_sources;
     celonis::TestEvaluator<TYPE_INT> evaluator_targets;
 
@@ -570,15 +630,19 @@ TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_with_sel
     evaluator_sources.add_expected(DatumArray{6, 6, 6});
     evaluator_targets.add_expected(DatumArray{6, 7, 8});
 
-    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF).value()};
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF).value()};
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_with_self_null) {
-    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, true)};
+    ColumnPtr array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
     celonis::TestEvaluator<TYPE_INT> evaluator_sources;
     celonis::TestEvaluator<TYPE_INT> evaluator_targets;
 
@@ -614,15 +678,19 @@ TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_any_with_sel
     evaluator_sources.add_expected(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum});
     evaluator_targets.add_expected(DatumArray{kNullDatum, 14, kNullDatum, kNullDatum, 15, kNullDatum});
 
-    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF).value()};
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF).value()};
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_ANY_WITH_SELF);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_any_last) {
-    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, false)};
+    ColumnPtr array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
     celonis::TestEvaluator<TYPE_INT> evaluator_sources;
     celonis::TestEvaluator<TYPE_INT> evaluator_targets;
 
@@ -642,15 +710,19 @@ TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_any_last) {
     evaluator_sources.add_expected(DatumArray{6, 7});
     evaluator_targets.add_expected(DatumArray{8, 8});
 
-    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, ANY_TO_LAST).value()};
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, ANY_TO_LAST);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, ANY_TO_LAST).value()};
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array, ANY_TO_LAST);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_any_last_null) {
-    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, true)};
+    ColumnPtr array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
     celonis::TestEvaluator<TYPE_INT> evaluator_sources;
     celonis::TestEvaluator<TYPE_INT> evaluator_targets;
 
@@ -686,15 +758,19 @@ TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_any_last_null) {
     evaluator_sources.add_expected(DatumArray{kNullDatum, 14, kNullDatum, kNullDatum, 15});
     evaluator_targets.add_expected(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum});
 
-    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, ANY_TO_LAST).value()};
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, ANY_TO_LAST);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, ANY_TO_LAST).value()};
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array, ANY_TO_LAST);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_last) {
-    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, false)};
+    ColumnPtr array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
     celonis::TestEvaluator<TYPE_INT> evaluator_sources;
     celonis::TestEvaluator<TYPE_INT> evaluator_targets;
 
@@ -714,15 +790,19 @@ TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_last) {
     evaluator_sources.add_expected(DatumArray{6});
     evaluator_targets.add_expected(DatumArray{8});
 
-    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_LAST).value()};
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_LAST);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_LAST).value()};
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_LAST);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_last_null) {
-    const auto array{ColumnHelper::create_column(TYPE_ARRAY_INT, true)};
+    ColumnPtr array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
     celonis::TestEvaluator<TYPE_INT> evaluator_sources;
     celonis::TestEvaluator<TYPE_INT> evaluator_targets;
 
@@ -758,10 +838,14 @@ TEST_F(CelonisSourceTargetTest, celonis_array_sources_targets_first_last_null) {
     evaluator_sources.add_expected(DatumArray{kNullDatum});
     evaluator_targets.add_expected(DatumArray{kNullDatum});
 
-    const auto result_sources{run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_LAST).value()};
+    auto result_sources_status = run_celonis_array_sources(TYPE_ARRAY_INT, array, FIRST_TO_LAST);
+    ASSERT_TRUE(result_sources_status.ok());
+    auto result_sources = result_sources_status.value();
     evaluator_sources.evaluate(result_sources);
 
-    const auto result_targets{run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_LAST).value()};
+    auto result_targets_status = run_celonis_array_targets(TYPE_ARRAY_INT, array, FIRST_TO_LAST);
+    ASSERT_TRUE(result_targets_status.ok());
+    auto result_targets = result_targets_status.value();
     evaluator_targets.evaluate(result_targets);
 }
 

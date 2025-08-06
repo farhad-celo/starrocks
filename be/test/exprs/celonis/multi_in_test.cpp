@@ -25,22 +25,30 @@ protected:
 
     StatusOr<ColumnPtr> RunConstMatchLists(const Columns& input_fields, const Columns& match_fields) {
         auto utils = std::make_shared<FunctionUtils>();
-        auto input_struct_col = StructColumn(input_fields).create(input_fields);
-        auto match_struct_col = StructColumn(match_fields).create(match_fields);
+        auto input_struct_col = StructColumn::create(input_fields);
+        auto match_struct_col = StructColumn::create(match_fields);
         auto const_match_struct_col = ConstColumn::create(match_struct_col, input_struct_col->size());
-        utils->get_fn_ctx()->set_constant_columns({nullptr, const_match_struct_col});
+        Columns constant_columns;
+        constant_columns.push_back(nullptr);
+        constant_columns.push_back(const_match_struct_col);
+        utils->get_fn_ctx()->set_constant_columns(std::move(constant_columns));
         RETURN_IF_ERROR(CelonisMultiIn::prepare(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL));
-        StatusOr<ColumnPtr> result = CelonisMultiIn::multi_in(utils->get_fn_ctx(),
-                                                              {input_struct_col, match_struct_col});
+        Columns columns;
+        columns.push_back(input_struct_col);
+        columns.push_back(match_struct_col);
+        StatusOr<ColumnPtr> result = CelonisMultiIn::multi_in(utils->get_fn_ctx(), columns);
         RETURN_IF_ERROR(CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL));
         return result;
     }
 
     StatusOr<ColumnPtr> Run(const Columns& input_fields, const Columns& match_fields) {
         auto utils = std::make_shared<FunctionUtils>();
-        auto input_struct_col = StructColumn(input_fields).create(input_fields);
-        auto match_struct_col = StructColumn(match_fields).create(match_fields);
-        utils->get_fn_ctx()->set_constant_columns({nullptr, nullptr});
+        auto input_struct_col = StructColumn::create(input_fields);
+        auto match_struct_col = StructColumn::create(match_fields);
+        Columns constant_columns;
+        constant_columns.push_back(nullptr);
+        constant_columns.push_back(nullptr);
+        utils->get_fn_ctx()->set_constant_columns(std::move(constant_columns));
         DeferOp close_fragment_local([&utils] {
             CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL);
         });
@@ -49,8 +57,10 @@ protected:
             CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::THREAD_LOCAL);
         });
         RETURN_IF_ERROR(CelonisMultiIn::prepare(utils->get_fn_ctx(), FunctionContext::THREAD_LOCAL));
-        StatusOr<ColumnPtr> result = CelonisMultiIn::multi_in(utils->get_fn_ctx(),
-                                                              {input_struct_col, match_struct_col});
+        Columns columns;
+        columns.push_back(input_struct_col);
+        columns.push_back(match_struct_col);
+        StatusOr<ColumnPtr> result = CelonisMultiIn::multi_in(utils->get_fn_ctx(), columns);
         return result;
     }
 
