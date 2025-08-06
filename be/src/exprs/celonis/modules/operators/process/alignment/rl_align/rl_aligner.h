@@ -1,6 +1,6 @@
 #pragma once
 
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net.h"
 #include "modules/operators/process/alignment/petri_net_information.h"
 #include "modules/operators/process/alignment/rl_align/gap_filler.h"
 #include "modules/operators/process/alignment/rl_align/rl_align_configs.h"

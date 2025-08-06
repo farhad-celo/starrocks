@@ -1,4 +1,4 @@
-#include "modules/operators/process/alignment/petri_net/petri_net_conversion.h"
+#include "modules/operators/process/petri_net/petri_net_conversion.h"
 
 #include <algorithm>
 #include <optional>

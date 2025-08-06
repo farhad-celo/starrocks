@@ -3,8 +3,8 @@
 #include <vector>
 
 #include "modules/common/int_types.h"
-#include "modules/operators/process/alignment/petri_net/behavioral_relation.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_fwd.h"
+#include "modules/operators/process/petri_net/behavioral_relation.h"
+#include "modules/operators/process/petri_net/petri_net_fwd.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net {
 

@@ -1,8 +1,8 @@
 #include "fallback_aligner.h"
 
-#include "modules/operators/process/alignment/petri_net/a_star/inconsistent_path_construction.h"
-#include "modules/operators/process/alignment/petri_net/a_star/iterative_a_star.h"
-#include "modules/operators/process/alignment/petri_net/a_star/shortest_path_heuristic.h"
+#include "modules/operators/process/petri_net/a_star/inconsistent_path_construction.h"
+#include "modules/operators/process/petri_net/a_star/iterative_a_star.h"
+#include "modules/operators/process/petri_net/a_star/shortest_path_heuristic.h"
 
 namespace celonis::accelerator::operators::process::alignment::fallback {
 

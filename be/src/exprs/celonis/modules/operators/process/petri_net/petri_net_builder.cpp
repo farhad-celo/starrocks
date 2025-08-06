@@ -1,10 +1,10 @@
-#include "modules/operators/process/alignment/petri_net/petri_net_builder.h"
+#include "modules/operators/process/petri_net/petri_net_builder.h"
 
 #include <ranges>
 
 #include "legacy_embedded_ctl/conversion.h"
 #include "modules/common/exceptions.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net {
 

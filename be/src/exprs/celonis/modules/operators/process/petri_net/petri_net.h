@@ -15,7 +15,7 @@
 #include "modules/memory/management/memory_checked_containers.h"
 #include "modules/memory/row_id.h"
 #include "modules/operators/process/alignment/input_output_mapper.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
+#include "modules/operators/process/petri_net/petri_net_entities.h"
 #include "modules/operators/process/alignment/rl_align/rl_align_configs_fwd.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net {

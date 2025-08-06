@@ -4,7 +4,7 @@
 
 #include "legacy_embedded_ctl/conversion.h"
 #include "modules/memory/typed_dictionary.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
+#include "modules/operators/process/petri_net/petri_net_entities.h"
 
 namespace celonis::accelerator::operators::process::alignment {
 

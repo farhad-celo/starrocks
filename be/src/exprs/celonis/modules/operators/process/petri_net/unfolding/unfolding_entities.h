@@ -3,9 +3,9 @@
 #include <deque>
 #include <vector>
 
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
-#include "modules/operators/process/alignment/petri_net/unfolding/unfolding_entities_fwd.h"
+#include "modules/operators/process/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net_entities.h"
+#include "modules/operators/process/petri_net/unfolding/unfolding_entities_fwd.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::unfolding {
 

@@ -1,10 +1,10 @@
-#include "modules/operators/process/alignment/petri_net/murata/fusion_series_places.h"
+#include "modules/operators/process/petri_net/murata/fusion_series_places.h"
 
 #include <optional>
 #include <unordered_set>
 
-#include "modules/operators/process/alignment/petri_net/murata/reduction_rules_utils.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_builder.h"
+#include "modules/operators/process/petri_net/murata/reduction_rules_utils.h"
+#include "modules/operators/process/petri_net/petri_net_builder.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::murata {
 

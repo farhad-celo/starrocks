@@ -3,7 +3,7 @@
 #include <cpml/model/bpmn/vertex_types.h>
 #include <cpml/model/bpmn_graph_fwd.h>
 
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net.h"
 
 /** !!! This code was migrated to the CPML but for legacy reasons kept here as well because other code in Saola relied
  * on it. If you change anything here, make sure to also make this corresponding change in the CPML!!!

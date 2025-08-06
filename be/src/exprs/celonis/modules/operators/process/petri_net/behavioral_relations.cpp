@@ -1,9 +1,9 @@
 #include "behavioral_relations.h"
 
 #include "legacy_embedded_ctl/assert.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
-#include "modules/operators/process/alignment/petri_net/transition_distances.h"
+#include "modules/operators/process/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net_entities.h"
+#include "modules/operators/process/petri_net/transition_distances.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net {
 

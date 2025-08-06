@@ -4,9 +4,9 @@
 
 #include <boost/functional/hash.hpp>
 
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
-#include "modules/operators/process/alignment/petri_net/unfolding/total_adequate_order.h"
+#include "modules/operators/process/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net_entities.h"
+#include "modules/operators/process/petri_net/unfolding/total_adequate_order.h"
 #include "unfolding_entities.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::unfolding {

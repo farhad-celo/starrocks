@@ -1,6 +1,6 @@
 #include "reduction_rules_utils.h"
 
-#include "modules/operators/process/alignment/petri_net/petri_net_builder.h"
+#include "modules/operators/process/petri_net/petri_net_builder.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::murata {
 

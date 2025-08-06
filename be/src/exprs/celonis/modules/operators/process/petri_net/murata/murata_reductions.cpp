@@ -1,4 +1,4 @@
-#include "modules/operators/process/alignment/petri_net/murata/murata_reductions.h"
+#include "modules/operators/process/petri_net/murata/murata_reductions.h"
 
 #include <algorithm>
 #include <optional>
@@ -6,10 +6,10 @@
 
 #include "legacy_embedded_ctl/utility.h"
 #include "modules/common/exceptions.h"
-#include "modules/operators/process/alignment/petri_net/murata/fusion_series_places.h"
-#include "modules/operators/process/alignment/petri_net/murata/fusion_series_transitions.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_builder.h"
+#include "modules/operators/process/petri_net/murata/fusion_series_places.h"
+#include "modules/operators/process/petri_net/murata/fusion_series_transitions.h"
+#include "modules/operators/process/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net_builder.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::murata {
 

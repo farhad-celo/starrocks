@@ -5,11 +5,11 @@
 #include "legacy_embedded_ctl/conversion.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
-#include "modules/operators/process/alignment/petri_net/a_star/inconsistent_path_construction.h"
-#include "modules/operators/process/alignment/petri_net/a_star/iterative_a_star.h"
-#include "modules/operators/process/alignment/petri_net/a_star/petri_net_wrapper.h"
-#include "modules/operators/process/alignment/petri_net/a_star/shortest_path_heuristic.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
+#include "modules/operators/process/petri_net/a_star/inconsistent_path_construction.h"
+#include "modules/operators/process/petri_net/a_star/iterative_a_star.h"
+#include "modules/operators/process/petri_net/a_star/petri_net_wrapper.h"
+#include "modules/operators/process/petri_net/a_star/shortest_path_heuristic.h"
+#include "modules/operators/process/petri_net/petri_net_entities.h"
 #include "modules/operators/process/alignment/trace_alignment.h"
 
 namespace celonis::accelerator::operators::process::alignment::rl_align {

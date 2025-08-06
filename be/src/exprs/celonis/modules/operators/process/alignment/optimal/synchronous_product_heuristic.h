@@ -3,8 +3,8 @@
 #include <optional>
 #include <vector>
 
-#include "modules/operators/process/alignment/petri_net/a_star/synchronous_product.h"  // TODO(a.swoboda) consider forward declarations for marking_type
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/a_star/synchronous_product.h"  // TODO(a.swoboda) consider forward declarations for marking_type
+#include "modules/operators/process/petri_net/petri_net.h"
 
 namespace celonis::accelerator::operators::process::alignment::optimal {
 

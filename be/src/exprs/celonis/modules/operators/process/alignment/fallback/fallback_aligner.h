@@ -1,7 +1,7 @@
 #pragma once
 
 #include "modules/common/execution_context.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_fwd.h"
+#include "modules/operators/process/petri_net/petri_net_fwd.h"
 #include "modules/operators/process/alignment/petri_net_information.h"
 #include "modules/operators/process/alignment/sequence_aligner.h"
 #include "modules/operators/process/alignment/trace_alignment.h"

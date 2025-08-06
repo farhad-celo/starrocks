@@ -34,7 +34,7 @@
 #include "modules/operators/process/alignment/log_aligner.h"
 #include "modules/operators/process/alignment/log_alignment_result.h"
 #include "modules/operators/process/alignment/log_alignment_result_cache.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_conversion.h"
+#include "modules/operators/process/petri_net/petri_net_conversion.h"
 #include "modules/operators/process/alignment/trace_alignment.h"
 
 namespace celonis::accelerator::operators::process::alignment {

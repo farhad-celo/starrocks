@@ -2,9 +2,9 @@
 
 #include "modules/operators/process/alignment/optimal/synchronous_product_heuristic.h"
 #include "modules/operators/process/alignment/optimal/synchronous_product_path_construction.h"
-#include "modules/operators/process/alignment/petri_net/a_star/iterative_a_star.h"
-#include "modules/operators/process/alignment/petri_net/a_star/synchronous_product.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/a_star/iterative_a_star.h"
+#include "modules/operators/process/petri_net/a_star/synchronous_product.h"
+#include "modules/operators/process/petri_net/petri_net.h"
 
 namespace celonis::accelerator::operators::process::alignment::optimal {
 

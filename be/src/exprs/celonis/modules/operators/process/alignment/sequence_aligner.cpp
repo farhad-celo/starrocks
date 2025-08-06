@@ -4,9 +4,9 @@
 
 #include "legacy_embedded_ctl/conversion.h"
 #include "log/log.h"
-#include "modules/operators/process/alignment/petri_net/a_star/consistent_path_construction.h"
-#include "modules/operators/process/alignment/petri_net/a_star/iterative_a_star.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/a_star/consistent_path_construction.h"
+#include "modules/operators/process/petri_net/a_star/iterative_a_star.h"
+#include "modules/operators/process/petri_net/petri_net.h"
 
 namespace celonis::accelerator::operators::process::alignment {
 

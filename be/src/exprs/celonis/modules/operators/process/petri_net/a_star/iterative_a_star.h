@@ -7,7 +7,7 @@
 #include <variant>
 
 #include "modules/common/exceptions.h"
-#include "modules/operators/process/alignment/petri_net/a_star/shared_types.h"
+#include "modules/operators/process/petri_net/a_star/shared_types.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::a_star {
 

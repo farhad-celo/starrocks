@@ -59,13 +59,13 @@ list(APPEND SOURCES
 add_main_source(operators/process/alignment/fallback)
 add_main_source(operators/process/alignment/fitting_prefix)
 add_main_source(operators/process/alignment/optimal)
-add_main_source(operators/process/alignment/petri_net)
-add_main_source(operators/process/alignment/petri_net/a_star)
-add_main_source(operators/process/alignment/petri_net/murata)
-add_main_source(operators/process/alignment/petri_net/unfolding)
 add_main_source(operators/process/alignment/rl_align)
 add_main_source(operators/process/alignment/rl_align/rl_statistics)
 add_main_source(operators/process/inductive_miner)
+add_main_source(operators/process/petri_net)
+add_main_source(operators/process/petri_net/a_star)
+add_main_source(operators/process/petri_net/murata)
+add_main_source(operators/process/petri_net/unfolding)
 
 # modularization split
 add_module("concurrency")

@@ -8,8 +8,8 @@
 #include "log/log.h"
 #include "modules/common/exceptions.h"
 #include "modules/operators/process/alignment/optimal/synchronous_product_heuristic.h"
-#include "modules/operators/process/alignment/petri_net/a_star/consistent_path_construction.h"
-#include "modules/operators/process/alignment/petri_net/a_star/synchronous_product.h"
+#include "modules/operators/process/petri_net/a_star/consistent_path_construction.h"
+#include "modules/operators/process/petri_net/a_star/synchronous_product.h"
 
 namespace celonis::accelerator::operators::process::alignment::optimal {
 

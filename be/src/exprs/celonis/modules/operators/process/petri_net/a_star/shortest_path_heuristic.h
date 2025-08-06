@@ -5,10 +5,10 @@
 #include <vector>
 
 #include "legacy_embedded_ctl/algorithm.h"
-#include "modules/operators/process/alignment/petri_net/a_star/petri_net_wrapper.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
-#include "modules/operators/process/alignment/petri_net/transition_distances.h"
+#include "modules/operators/process/petri_net/a_star/petri_net_wrapper.h"
+#include "modules/operators/process/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net_entities.h"
+#include "modules/operators/process/petri_net/transition_distances.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::a_star {
 

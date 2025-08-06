@@ -4,7 +4,7 @@
 #include <string>
 
 #include "modules/operators/process/alignment/input_output_mapper.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net.h"
 
 namespace celonis::accelerator {
 

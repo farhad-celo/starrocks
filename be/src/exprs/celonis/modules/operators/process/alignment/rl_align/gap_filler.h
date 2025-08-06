@@ -5,9 +5,9 @@
 
 #include "modules/common/int_types.h"
 #include "modules/memory/row_id.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
-#include "modules/operators/process/alignment/petri_net/transition_distances.h"
+#include "modules/operators/process/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net_entities.h"
+#include "modules/operators/process/petri_net/transition_distances.h"
 #include "modules/operators/process/alignment/sequence_aligner.h"
 #include "modules/operators/process/alignment/trace_alignment.h"
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
-#include "modules/operators/process/alignment/petri_net/petri_net_builder_fwd.h"
+#include "modules/operators/process/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/petri_net_builder_fwd.h"
 
 namespace celonis::accelerator::operators::process::alignment::petri_net::murata {
 

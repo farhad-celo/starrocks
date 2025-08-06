@@ -3,10 +3,10 @@
 #include <optional>
 #include <vector>
 
-#include "modules/operators/process/alignment/petri_net/a_star/consistent_path_construction.h"
-#include "modules/operators/process/alignment/petri_net/a_star/iterative_a_star.h"
-#include "modules/operators/process/alignment/petri_net/a_star/synchronous_product.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/petri_net/a_star/consistent_path_construction.h"
+#include "modules/operators/process/petri_net/a_star/iterative_a_star.h"
+#include "modules/operators/process/petri_net/a_star/synchronous_product.h"
+#include "modules/operators/process/petri_net/petri_net.h"
 #include "modules/operators/process/alignment/trace_alignment.h"
 
 namespace celonis::accelerator::operators::process::alignment::fitting_prefix {
