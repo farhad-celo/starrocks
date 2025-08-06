@@ -1421,6 +1421,7 @@ celostar_functions = [
     [1000307, 'celonis_conformance', True, False, 'ARRAY_BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisConformance::conformance', 'CelonisConformance::conformance_prepare', 'CelonisConformance::conformance_close'],
     [1000308, 'celonis_index_activity', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivity::celonis_index_activity', 'CelonisIndexActivity::celonis_index_activity_prepare', 'CelonisIndexActivity::celonis_index_activity_close'],
     [1000309, 'celonis_readable_conformance', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisConformance::readable_conformance', 'CelonisConformance::conformance_prepare', 'CelonisConformance::conformance_close'],
+    [1000310, 'celonis_readable_conformance_v2', True, False, 'ARRAY_VARCHAR', ['ARRAY_BIGINT', 'ARRAY_VARCHAR'], 'CelonisReadableConformance::readable_conformance'],
     [1000401, 'celonis_in', True, False, 'BOOLEAN', ['INT', 'ARRAY_INT'], 'CelonisIn<TYPE_INT>::in', 'CelonisIn<TYPE_INT>::prepare', 'CelonisIn<TYPE_INT>::close'],
     [1000402, 'celonis_in', True, False, 'BOOLEAN', ['BIGINT', 'ARRAY_BIGINT'], 'CelonisIn<TYPE_BIGINT>::in', 'CelonisIn<TYPE_BIGINT>::prepare', 'CelonisIn<TYPE_BIGINT>::close'],
     [1000403, 'celonis_in', True, False, 'BOOLEAN', ['DOUBLE', 'ARRAY_DOUBLE'], 'CelonisIn<TYPE_DOUBLE>::in', 'CelonisIn<TYPE_DOUBLE>::prepare', 'CelonisIn<TYPE_DOUBLE>::close'],
