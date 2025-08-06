@@ -129,16 +129,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
     // NULL calendar_id
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         year_column->append_datum(1970L);
         year_column->append_datum(1971L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         is_workdays_column->append_datum("0101");
         is_workdays_column->append_datum("1010");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -162,7 +162,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -181,7 +181,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -193,20 +193,20 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     // mixed NULL and non-NULL year, is_workdays, NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         year_column->append_datum(1970L);
         year_column->append_datum(kNullDatum);
         year_column->append_datum(1971L);
         year_column->append_datum(1972L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         is_workdays_column->append_datum("0101");
         is_workdays_column->append_datum("1100");
         is_workdays_column->append_datum("1010");
         is_workdays_column->append_datum(kNullDatum);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
@@ -232,7 +232,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -251,7 +251,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -263,16 +263,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     // non-NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         year_column->append_datum(1970L);
         year_column->append_datum(1971L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         is_workdays_column->append_datum("0101");
         is_workdays_column->append_datum("1010");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id1");
         calendar_id_column->append_datum("id2");
 
@@ -296,7 +296,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
@@ -315,7 +315,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -327,16 +327,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     // result is sorted
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         year_column->append_datum(1971L);
         year_column->append_datum(1970L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         is_workdays_column->append_datum("1010");
         is_workdays_column->append_datum("0101");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id2");
         calendar_id_column->append_datum("id1");
 
@@ -360,14 +360,14 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{year:[1971,1970],is_workdays:['1010','0101'],calendar_id:['id2','id1'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -379,11 +379,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     // empty input
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
 
         std::vector<const Column*> raw_columns;
         raw_columns.resize(3);
@@ -401,7 +401,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -416,7 +416,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -425,16 +425,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     // no valid rows, row one has NULL year, row two has NULL is_workdays
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         year_column->append_datum(kNullDatum);
         year_column->append_datum(1970L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         is_workdays_column->append_datum("1010");
         is_workdays_column->append_datum(kNullDatum);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -455,7 +455,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -470,7 +470,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -479,16 +479,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     // no valid rows, both rows contain NULL year
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         year_column->append_datum(kNullDatum);
         year_column->append_datum(kNullDatum);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         is_workdays_column->append_datum("1010");
         is_workdays_column->append_datum("0101");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -509,7 +509,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -524,7 +524,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -534,11 +534,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
         const int64_t n_rows = 400000;
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         year_column->reserve(n_rows);
         is_workdays_column->reserve(n_rows);
         calendar_id_column->reserve(n_rows);
@@ -564,7 +564,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         EXPECT_EQ(n_rows, agg_state->is_calendar_id_null->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_GT(res_array_col->debug_string().size(), 1000000);
         EXPECT_EQ(1, res_array_col->size());
@@ -608,16 +608,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
     auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
     // NULL calendar_id
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         year_column->append_datum(1970L);
         year_column->append_datum(1971L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         is_workdays_column->append_datum("0101");
         is_workdays_column->append_datum("1010");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -641,7 +641,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -660,7 +660,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -672,20 +672,20 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
     // mixed NULL and non-NULL year, is_workdays, NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         year_column->append_datum(1970L);
         year_column->append_datum(kNullDatum);
         year_column->append_datum(1971L);
         year_column->append_datum(1972L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         is_workdays_column->append_datum("0101");
         is_workdays_column->append_datum("1100");
         is_workdays_column->append_datum("1010");
         is_workdays_column->append_datum(kNullDatum);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
@@ -711,7 +711,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -730,7 +730,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -742,16 +742,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
     // non-NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         year_column->append_datum(1970L);
         year_column->append_datum(1971L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         is_workdays_column->append_datum("0101");
         is_workdays_column->append_datum("1010");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id1");
         calendar_id_column->append_datum("id2");
 
@@ -775,7 +775,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
@@ -794,7 +794,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -806,11 +806,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
     // empty input
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
 
         std::vector<const Column*> raw_columns;
         raw_columns.resize(3);
@@ -828,7 +828,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -843,7 +843,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -852,16 +852,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
     // no valid rows, row one has NULL year, row two has NULL is_workdays
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         year_column->append_datum(kNullDatum);
         year_column->append_datum(1970L);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         is_workdays_column->append_datum("1010");
         is_workdays_column->append_datum(kNullDatum);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -882,7 +882,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -897,7 +897,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -906,16 +906,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
     // no valid rows, both rows contain NULL year
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        ColumnPtr year_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         year_column->append_datum(kNullDatum);
         year_column->append_datum(kNullDatum);
 
-        auto is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr is_workdays_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         is_workdays_column->append_datum("1010");
         is_workdays_column->append_datum("0101");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -936,7 +936,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -951,7 +951,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -991,16 +991,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
     // NULL calendar_id
     {
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
 
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -1024,7 +1024,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -1043,7 +1043,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1055,14 +1055,14 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     // mixed NULL and non-NULL start/end, NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
         start_timestamp_column->append_datum(kNullDatum);
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
         ASSERT_TRUE(start_timestamp_column->is_nullable() && start_timestamp_column->is_null(1));
 
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
@@ -1070,7 +1070,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         ASSERT_TRUE(end_timestamp_column->is_nullable() && end_timestamp_column->is_null(3));
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
@@ -1097,7 +1097,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -1116,7 +1116,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1128,16 +1128,16 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     // non-NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
 
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id1");
         calendar_id_column->append_datum("id2");
 
@@ -1161,7 +1161,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
@@ -1180,7 +1180,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1192,12 +1192,12 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     // empty input
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
 
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
 
         std::vector<const Column*> raw_columns;
         raw_columns.resize(3);
@@ -1215,7 +1215,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -1230,7 +1230,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -1239,19 +1239,19 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     // no valid rows, row one has NULL start timestamp, row two has NULL end timestamp, row 3 has start > end.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
         start_timestamp_column->append_datum(kNullDatum);
         start_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
         start_timestamp_column->append_datum(TimestampValue::create(1972, 1, 1, 0, 0, 0));
 
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
         end_timestamp_column->append_datum(kNullDatum);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
 
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id1");
         calendar_id_column->append_datum("id2");
         calendar_id_column->append_datum("id3");
@@ -1272,7 +1272,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -1287,7 +1287,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -1296,17 +1296,17 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     // no valid rows, both row one and row two have NULL start timestamp.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
         start_timestamp_column->append_datum(kNullDatum);
         start_timestamp_column->append_datum(kNullDatum);
 
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
 
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id1");
         calendar_id_column->append_datum("id2");
 
@@ -1326,7 +1326,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -1341,7 +1341,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -1350,17 +1350,17 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     // negative timestamp
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         start_timestamp_column->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
         start_timestamp_column->append_datum(TimestampValue::create(1969, 12, 30, 0, 0, 0));
 
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
 
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id1");
         calendar_id_column->append_datum("id2");
 
@@ -1384,7 +1384,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{start_timestamp:[1969-12-31 00:00:00,1969-12-30 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
@@ -1403,7 +1403,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1415,17 +1415,17 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     // The result is sorted
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         start_timestamp_column->append_datum(TimestampValue::create(1969, 12, 30, 0, 0, 0));
         start_timestamp_column->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
 
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 2, 0, 0));
         end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
 
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("id2");
         calendar_id_column->append_datum("id1");
 
@@ -1449,7 +1449,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1462,11 +1462,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
         const int64_t n_rows = 40000;
-        auto start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
-        auto end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr start_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        ColumnPtr end_timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         for (auto i = 0; i < n_rows; ++i) {
             start_timestamp_column->append_datum(TimestampValue::create(1969, 12, 31, 0, 0, 0));
             end_timestamp_column->append_datum(TimestampValue::create(1970, 1, 1, 1, 0, 0));
@@ -1489,7 +1489,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         EXPECT_EQ(n_rows, agg_state->is_calendar_id_null->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_GT(res_array_col->debug_string().size(), 1000000);
         EXPECT_EQ(1, res_array_col->size());
@@ -1533,20 +1533,20 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
     auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
     // NULL calendar_id
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         weekday_column->append_datum("MONDAY");
         weekday_column->append_datum("FRIDAY");
 
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         shift_begin_column->append_datum(123L);
         shift_begin_column->append_datum(456L);
 
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         shift_end_column->append_datum(123000L);
         shift_end_column->append_datum(456000L);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -1573,7 +1573,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{weekday:['MONDAY','FRIDAY'],shift_begin:[123,456],shift_end:[123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -1593,7 +1593,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1605,23 +1605,23 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
     // mixed NULL and non-NULL weekday, NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         weekday_column->append_datum("TUESDAY");
         weekday_column->append_datum(kNullDatum);
         weekday_column->append_datum("THURSDAY");
 
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         shift_begin_column->append_datum(123L);
         shift_begin_column->append_datum(123L);
         shift_begin_column->append_datum(456L);
 
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         shift_end_column->append_datum(123000L);
         shift_end_column->append_datum(123000L);
         shift_end_column->append_datum(456000L);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
@@ -1649,7 +1649,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{weekday:['TUESDAY','THURSDAY'],shift_begin:[123,456],shift_end:[123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -1669,7 +1669,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1681,23 +1681,23 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
     // non-NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         weekday_column->append_datum("WEDNESDAY");
         weekday_column->append_datum("FRIDAY");
         weekday_column->append_datum("SATURDAY");
 
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         shift_begin_column->append_datum(123L);
         shift_begin_column->append_datum(123L);
         shift_begin_column->append_datum(456L);
 
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         shift_end_column->append_datum(123000L);
         shift_end_column->append_datum(123000L);
         shift_end_column->append_datum(456000L);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("DE");
         calendar_id_column->append_datum("DE");
         calendar_id_column->append_datum("US");
@@ -1725,7 +1725,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         EXPECT_EQ("[0, 0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{weekday:['WEDNESDAY','FRIDAY','SATURDAY'],shift_begin:[123,123,456],shift_end:[123000,123000,456000],calendar_id:['DE','DE','US'],is_calendar_id_null:[0,0,0]}]",
@@ -1745,7 +1745,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1757,11 +1757,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
     // empty input
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
 
         std::vector<const Column*> raw_columns;
         raw_columns.resize(4);
@@ -1781,7 +1781,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -1797,7 +1797,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -1806,20 +1806,20 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
     // no valid rows, row one has NULL shift_begin, row two has NULL shift_end.
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         weekday_column->append_datum("MONDAY");
         weekday_column->append_datum("FRIDAY");
 
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         shift_begin_column->append_datum(kNullDatum);
         shift_begin_column->append_datum(456L);
 
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         shift_end_column->append_datum(123000L);
         shift_end_column->append_datum(kNullDatum);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
         std::vector<const Column*> raw_columns;
@@ -1840,7 +1840,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         EXPECT_EQ(0, agg_state->is_calendar_id_null->size());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(0, res_struct_col->size());
 
@@ -1856,7 +1856,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         EXPECT_EQ(0, res_struct_col->size());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         // The result factory calendar does not contain any entries.
@@ -1865,20 +1865,20 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
     // negative shift
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         weekday_column->append_datum("MONDAY");
         weekday_column->append_datum("SUNDAY");
 
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         shift_begin_column->append_datum(-123L);
         shift_begin_column->append_datum(456L);
 
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
         shift_end_column->append_datum(-123000L);
         shift_end_column->append_datum(456000L);
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -1905,7 +1905,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{weekday:['MONDAY','SUNDAY'],shift_begin:[-123,456],shift_end:[-123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -1925,7 +1925,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -1970,20 +1970,20 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
     auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
     // NULL calendar_id
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         weekday_column->append_datum("MONDAY");
         weekday_column->append_datum("FRIDAY");
 
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         shift_begin_column->append_datum("09:00");
         shift_begin_column->append_datum("08:00");
 
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         shift_end_column->append_datum("17:00");
         shift_end_column->append_datum("16:00");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, true);
         calendar_id_column->append_datum(kNullDatum);
         calendar_id_column->append_datum(kNullDatum);
 
@@ -2010,7 +2010,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         EXPECT_EQ("[1, 1]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{weekday:['MONDAY','FRIDAY'],shift_begin:[32400000,28800000],shift_end:[61200000,57600000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
@@ -2030,7 +2030,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -2042,20 +2042,20 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
     // Non-NULL calendar_id
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         weekday_column->append_datum("MONDAY");
         weekday_column->append_datum("FRIDAY");
 
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         shift_begin_column->append_datum("00:00");
         shift_begin_column->append_datum("00:00");
 
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         shift_end_column->append_datum("24:00");
         shift_end_column->append_datum("24:00");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("DE");
         calendar_id_column->append_datum("US");
 
@@ -2082,7 +2082,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         EXPECT_EQ("[0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{weekday:['MONDAY','FRIDAY'],shift_begin:[0,0],shift_end:[86400000,86400000],calendar_id:['DE','US'],is_calendar_id_null:[0,0]}]",
@@ -2102,7 +2102,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -2114,26 +2114,26 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
     // Non-NULL calendar_id with some invalid rows
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr weekday_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         weekday_column->append_datum("MONDAY");
         weekday_column->append_datum("FRIDAY");
         weekday_column->append_datum("TUESDAY");
         weekday_column->append_datum("THURSDAY");
 
-        auto shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr shift_begin_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         shift_begin_column->append_datum("00:00");
         shift_begin_column->append_datum("00:00");
         shift_begin_column->append_datum("HELLO");
         shift_begin_column->append_datum("00:15");
 
-        auto shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        ColumnPtr shift_end_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         shift_end_column->append_datum("24:00");
         shift_end_column->append_datum("24:00");
         shift_end_column->append_datum("23:15");
         shift_end_column->append_datum("75:15");
 
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto calendar_id_column = ColumnHelper::create_column(char_type, false);
+        ColumnPtr calendar_id_column = ColumnHelper::create_column(char_type, false);
         calendar_id_column->append_datum("DE");
         calendar_id_column->append_datum("US");
         calendar_id_column->append_datum("DE");
@@ -2162,7 +2162,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         EXPECT_EQ("[0, 0, 0, 0]", agg_state->is_calendar_id_null->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
                 "[{weekday:['MONDAY','FRIDAY','TUESDAY','THURSDAY'],shift_begin:[0,0,-1,900000],shift_end:[86400000,86400000,83700000,-1],calendar_id:['DE','US','DE','US'],is_calendar_id_null:[0,0,0,0]}]",
@@ -2182,7 +2182,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto res_array_col = ColumnHelper::create_column(type_array_char, false);
+        ColumnPtr res_array_col = ColumnHelper::create_column(type_array_char, false);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), res_array_col.get());
         EXPECT_EQ(1, res_array_col->size());
         EXPECT_EQ(1, res_array_col->get(0).get_array().size());
@@ -2227,14 +2227,14 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
     auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
     // No invalid rows
     {
-        auto x_column = ColumnHelper::create_column(type_array_double, false);
+        ColumnPtr x_column = ColumnHelper::create_column(type_array_double, false);
         x_column->append_datum(DatumArray{1.0});
         x_column->append_datum(DatumArray{1.0});
         x_column->append_datum(DatumArray{2.0});
         x_column->append_datum(DatumArray{3.0});
         x_column->append_datum(DatumArray{4.0});
 
-        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        ColumnPtr y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
         y_column->append_datum(100.0);
         y_column->append_datum(300.0);
         y_column->append_datum(400.0);
@@ -2256,7 +2256,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[100, 300, 400, 300, 500]", agg_state->y->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ("[{x:[1,1,2,3,4],y:[100,300,400,300,500]}]", res_struct_col->debug_string());
 
@@ -2270,7 +2270,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[{x:[1,1,2,3,4],y:[100,300,400,300,500]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        ColumnPtr varchar_col = ColumnHelper::create_column(type_varchar, true);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
         ASSERT_EQ(1, varchar_col->size());
         const std::string model = varchar_col->get(0).get_slice().to_string();
@@ -2282,10 +2282,10 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
     // not enough input data
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto x_column = ColumnHelper::create_column(type_array_double, false);
+        ColumnPtr x_column = ColumnHelper::create_column(type_array_double, false);
         x_column->append_datum(DatumArray{1.0});
 
-        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        ColumnPtr y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
         y_column->append_datum(100.0);
 
         std::vector<const Column*> raw_columns;
@@ -2303,7 +2303,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[100]", agg_state->y->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ("[{x:[1],y:[100]}]", res_struct_col->debug_string());
 
@@ -2317,7 +2317,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[{x:[1],y:[100]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        ColumnPtr varchar_col = ColumnHelper::create_column(type_varchar, true);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
         ASSERT_EQ(1, varchar_col->size());
         EXPECT_TRUE(varchar_col->get(0).is_null());
@@ -2325,14 +2325,14 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
     // inconsistent length
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto x_column = ColumnHelper::create_column(type_array_double, false);
+        ColumnPtr x_column = ColumnHelper::create_column(type_array_double, false);
         x_column->append_datum(DatumArray{1.0});
         x_column->append_datum(DatumArray{1.0});
         x_column->append_datum(DatumArray{2.0});
         x_column->append_datum(DatumArray{3.0, 4.0});
         x_column->append_datum(DatumArray{4.0});
 
-        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        ColumnPtr y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
         y_column->append_datum(100.0);
         y_column->append_datum(300.0);
         y_column->append_datum(400.0);
@@ -2354,7 +2354,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[100, 300, 400, 300, 500]", agg_state->y->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ("[{x:[1,1,2,3,4,4],y:[100,300,400,300,500]}]", res_struct_col->debug_string());
 
@@ -2368,7 +2368,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[{x:[1,1,2,3,4,4],y:[100,300,400,300,500]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        ColumnPtr varchar_col = ColumnHelper::create_column(type_varchar, true);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
         ASSERT_EQ(1, varchar_col->size());
         EXPECT_TRUE(varchar_col->get(0).is_null());
@@ -2376,14 +2376,14 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
     // valid rows with different order
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     {
-        auto x_column = ColumnHelper::create_column(TypeDescriptor(type_array_double), false);
+        ColumnPtr x_column = ColumnHelper::create_column(TypeDescriptor(type_array_double), false);
         x_column->append_datum(DatumArray{3.0});
         x_column->append_datum(DatumArray{4.0});
         x_column->append_datum(DatumArray{1.0});
         x_column->append_datum(DatumArray{1.0});
         x_column->append_datum(DatumArray{2.0});
 
-        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        ColumnPtr y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
         y_column->append_datum(300.0);
         y_column->append_datum(500.0);
         y_column->append_datum(100.0);
@@ -2405,7 +2405,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[300, 500, 100, 300, 400]", agg_state->y->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ("[{x:[3,4,1,1,2],y:[300,500,100,300,400]}]", res_struct_col->debug_string());
 
@@ -2419,7 +2419,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[{x:[3,4,1,1,2],y:[300,500,100,300,400]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        ColumnPtr varchar_col = ColumnHelper::create_column(type_varchar, true);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
         ASSERT_EQ(1, varchar_col->size());
         const std::string model = varchar_col->get(0).get_slice().to_string();
@@ -2431,7 +2431,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
     state = ManagedAggrState::create(local_ctx.get(), agg_func);
     // mixed valid and invalid rows
     {
-        auto x_column = ColumnHelper::create_column(type_array_double, true);
+        ColumnPtr x_column = ColumnHelper::create_column(type_array_double, true);
         x_column->append_datum(kNullDatum);
         x_column->append_datum(DatumArray{kNullDatum});
         x_column->append_datum(DatumArray{3.0});
@@ -2442,7 +2442,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         x_column->append_datum(DatumArray{2.0});
         x_column->append_datum(DatumArray{3.0});
 
-        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), true);
+        ColumnPtr y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), true);
         y_column->append_datum(100.0);
         y_column->append_datum(100.0);
         y_column->append_datum(300.0);
@@ -2468,7 +2468,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[300, 500, 100, 300, 400]", agg_state->y->debug_string());
 
         // test serialize_to_column.
-        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        ColumnPtr res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ("[{x:[3,4,1,1,2],y:[300,500,100,300,400]}]", res_struct_col->debug_string());
 
@@ -2482,7 +2482,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ("[{x:[3,4,1,1,2],y:[300,500,100,300,400]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
-        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        ColumnPtr varchar_col = ColumnHelper::create_column(type_varchar, true);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
         ASSERT_EQ(1, varchar_col->size());
         const std::string model = varchar_col->get(0).get_slice().to_string();
@@ -2500,8 +2500,8 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
                                    6.1, 6.1, 6.1, 5.9, 6.2, 6.2, 6.1};
         std::vector<double> ys = {1464, 1394, 1357, 1293, 1256, 1254, 1234, 1195, 1159, 1167, 1130, 1075, 1047, 965,
                                   943, 958, 971, 949, 884, 866, 876, 822, 704, 719};
-        auto x_column = ColumnHelper::create_column(type_array_double, false);
-        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        ColumnPtr x_column = ColumnHelper::create_column(type_array_double, false);
+        ColumnPtr y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
         for (auto i = 0; i < 24; ++i) {
             x_column->append_datum(DatumArray{x1s[i], x2s[i]});
             y_column->append_datum(ys[i]);
@@ -2520,7 +2520,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         EXPECT_EQ(24, agg_state->y->size());
 
         // test finalize_to_column.
-        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        ColumnPtr varchar_col = ColumnHelper::create_column(type_varchar, true);
         agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
         ASSERT_EQ(1, varchar_col->size());
         const std::string model = varchar_col->get(0).get_slice().to_string();
@@ -2570,7 +2570,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
     // nullable columns input
     {
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto char_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr char_column = ColumnHelper::create_column(char_type, true);
         char_column->append_datum(Datum());
         char_column->append_datum("bcd");
         char_column->append_datum("cdrdfe");
@@ -2578,7 +2578,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         char_column->append_datum("esfg");
 
         auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
-        auto int_column = ColumnHelper::create_column(int_type, true);
+        ColumnPtr int_column = ColumnHelper::create_column(int_type, true);
         int_column->append_datum(Datum());
         int_column->append_datum(9);
         int_column->append_datum(Datum());
@@ -2621,7 +2621,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         type_struct_char_int.children.emplace_back(type_array_int);
         type_struct_char_int.field_names.emplace_back("vchar");
         type_struct_char_int.field_names.emplace_back("int");
-        auto serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
+        ColumnPtr serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
         array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
         EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                          "[{vchar:[NULL,'bcd','cdrdfe',NULL,'esfg'],int:[NULL,9,NULL,7,6]}]"), 0);
@@ -2637,7 +2637,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
                          "{vchar:[NULL],int:[7]}, {vchar:['esfg'],int:[6]}]"),
                   0);
 
-        auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR}), true);
+        ColumnPtr res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR}), true);
         array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
         EXPECT_EQ(strcmp(res_col->debug_string().c_str(), "[{col0:[NULL,'cdrdfe','bcd',NULL,'esfg']}]"), 0);
     }
@@ -2645,7 +2645,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
     {
         auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
         auto char_type = TypeDescriptor::create_varchar_type(30);
-        auto char_column = ColumnHelper::create_column(char_type, true);
+        ColumnPtr char_column = ColumnHelper::create_column(char_type, true);
         char_column->append_datum(Datum());
         char_column->append_datum("bcd");
         char_column->append_datum("cdrdfe");
@@ -2653,7 +2653,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         char_column->append_datum("esfg");
 
         auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
-        auto int_column = ColumnHelper::create_column(int_type, true);
+        ColumnPtr int_column = ColumnHelper::create_column(int_type, true);
         int_column->append_datum(Datum());
         int_column->append_datum(9);
         int_column->append_datum(Datum());
@@ -2696,7 +2696,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
         type_struct_char_int.children.emplace_back(type_array_int);
         type_struct_char_int.field_names.emplace_back("vchar");
         type_struct_char_int.field_names.emplace_back("int");
-        auto serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
+        ColumnPtr serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
         array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
         EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                          "[{vchar:[NULL,'bcd','cdrdfe',NULL,'esfg'],int:[NULL,9,NULL,7,6]}]"), 0);
@@ -2710,7 +2710,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
                          "[{vchar:[NULL],int:[NULL]}, {vchar:['bcd'],int:[9]}, {vchar:['cdrdfe'],int:[NULL]}, "
                          "{vchar:[NULL],int:[7]}, {vchar:['esfg'],int:[6]}]"), 0);
 
-        auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR}), false);
+        ColumnPtr res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR}), false);
         local_ctx->state()->set_is_cancelled(true);
         array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
         ASSERT_TRUE(local_ctx->has_error());
@@ -2740,14 +2740,14 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
     auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
 
     auto char_type = TypeDescriptor::create_varchar_type(30);
-    auto char_column_1 = ColumnHelper::create_column(char_type, true);
+    ColumnPtr char_column_1 = ColumnHelper::create_column(char_type, true);
     char_column_1->append_datum(Datum());
     char_column_1->append_datum("bcd");
     char_column_1->append_datum("cdrdfe");
     char_column_1->append_datum(Datum());
     char_column_1->append_datum("esfg");
 
-    auto char_column_2 = ColumnHelper::create_column(char_type, true);
+    ColumnPtr char_column_2 = ColumnHelper::create_column(char_type, true);
     char_column_2->append_datum(Datum());
     char_column_2->append_datum("bcd2");
     char_column_2->append_datum("cdrdfe2");
@@ -2755,7 +2755,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
     char_column_2->append_datum("esfg2");
 
     auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
-    auto int_column = ColumnHelper::create_column(int_type, true);
+    ColumnPtr int_column = ColumnHelper::create_column(int_type, true);
     int_column->append_datum(Datum());
     int_column->append_datum(9);
     int_column->append_datum(Datum());
@@ -2803,7 +2803,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
     type_struct_char_char_int.field_names.emplace_back("vchar1");
     type_struct_char_char_int.field_names.emplace_back("vchar2");
     type_struct_char_char_int.field_names.emplace_back("int");
-    auto serialized_col = ColumnHelper::create_column(type_struct_char_char_int, true);
+    ColumnPtr serialized_col = ColumnHelper::create_column(type_struct_char_char_int, true);
     array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
     EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                      "[{vchar1:[NULL,'bcd','cdrdfe',NULL,'esfg'],"
@@ -2820,7 +2820,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
                      "{vchar1:['cdrdfe'],vchar2:['cdrdfe2'],int:[NULL]}, {vchar1:[NULL],vchar2:[NULL],int:[7]}, "
                      "{vchar1:['esfg'],vchar2:['esfg2'],int:[6]}]"), 0);
 
-    auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}), true);
+    ColumnPtr res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}), true);
     array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
     EXPECT_EQ(strcmp(res_col->debug_string().c_str(),
                      "[{col0:[NULL,'cdrdfe','bcd',NULL,'esfg'],col1:[NULL,'cdrdfe2','bcd2',NULL,'esfg2']}]"), 0);
@@ -2849,7 +2849,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
     auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
 
     auto char_type = TypeDescriptor::create_varchar_type(30);
-    auto char_column_1 = ColumnHelper::create_column(char_type, true);
+    ColumnPtr char_column_1 = ColumnHelper::create_column(char_type, true);
     char_column_1->append_datum(Datum());
     char_column_1->append_datum("A");
     char_column_1->append_datum("B");
@@ -2862,7 +2862,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
     char_column_1->append_datum("F");
     char_column_1->append_datum("G");
 
-    auto char_column_2 = ColumnHelper::create_column(char_type, true);
+    ColumnPtr char_column_2 = ColumnHelper::create_column(char_type, true);
     char_column_2->append_datum(Datum());
     char_column_2->append_datum("a");
     char_column_2->append_datum("b");
@@ -2876,7 +2876,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
     char_column_2->append_datum("g");
 
     auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
-    auto int_column = ColumnHelper::create_column(int_type, true);
+    ColumnPtr int_column = ColumnHelper::create_column(int_type, true);
     int_column->append_datum(Datum());
     int_column->append_datum(1);
     int_column->append_datum(Datum());
@@ -2925,7 +2925,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
     type_struct_char_char_int.field_names.emplace_back("vchar1");
     type_struct_char_char_int.field_names.emplace_back("vchar2");
     type_struct_char_char_int.field_names.emplace_back("int");
-    auto serialized_col = ColumnHelper::create_column(type_struct_char_char_int, true);
+    ColumnPtr serialized_col = ColumnHelper::create_column(type_struct_char_char_int, true);
     array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
     EXPECT_EQ(strcmp(serialized_col->debug_string().c_str(),
                      "[{vchar1:[NULL,'A','B',NULL,'C',NULL,'D','E',NULL,'F','G'],"
@@ -2942,7 +2942,7 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
                      "[{vchar1:[NULL],vchar2:[NULL],int:[NULL]}, {vchar1:['A'],vchar2:['a'],int:[1]}, {vchar1:['B'],vchar2:['b'],int:[NULL]}, {vchar1:[NULL],vchar2:[NULL],int:[2]}, {vchar1:['C'],vchar2:['c'],int:[3]}, {vchar1:[NULL],vchar2:[NULL],int:[NULL]}, {vchar1:['D'],vchar2:['d'],int:[4]}, {vchar1:['E'],vchar2:['e'],int:[NULL]}, {vchar1:[NULL],vchar2:[NULL],int:[5]}, {vchar1:['F'],vchar2:['f'],int:[6]}, {vchar1:['G'],vchar2:['g'],int:[7]}]"),
               0);
 
-    auto res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}), true);
+    ColumnPtr res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}), true);
     array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
     EXPECT_EQ(strcmp(res_col->debug_string().c_str(),
                      "[{col0:[NULL,'E','B',NULL,'G','F',NULL,'D','C',NULL,'A'],col1:[NULL,'e','b',NULL,'g','f',NULL,'d','c',NULL,'a']}]"),

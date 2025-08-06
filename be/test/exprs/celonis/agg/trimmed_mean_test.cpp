@@ -53,7 +53,11 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_1_bigint) {
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(30, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(30, 1);
-    local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
 
     const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_BIGINT, TYPE_DOUBLE, false);
 
@@ -118,7 +122,11 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_2_bigint) {
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(50, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(50, 1);
-    local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
 
     const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_BIGINT, TYPE_DOUBLE, false);
 
@@ -178,7 +186,11 @@ TEST_F(CelonisTrimmedMeanTest, type_double) {
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(20, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(30, 1);
-    local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
 
     const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_DOUBLE, TYPE_DOUBLE, false);
 
@@ -244,7 +256,11 @@ TEST_F(CelonisTrimmedMeanTest, type_double_large_input) {
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(5, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(5, 1);
-    local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
 
     const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_DOUBLE, TYPE_DOUBLE, false);
 
@@ -307,7 +323,11 @@ TEST_F(CelonisTrimmedMeanTest, null_handling) {
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
-    local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
 
     const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_BIGINT, TYPE_DOUBLE, true);
 
@@ -367,7 +387,11 @@ TEST_F(CelonisTrimmedMeanTest, invalid_lower_and_upper) {
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(60, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(50, 1);
-    local_ctx->set_constant_columns({nullptr, const_column_lower, const_column_upper});
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
 
     const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_BIGINT, TYPE_DOUBLE, false);
 
