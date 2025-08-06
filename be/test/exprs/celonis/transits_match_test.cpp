@@ -170,8 +170,8 @@ private:
         StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
         auto fields = st->fields_column();
         ASSERT_EQ(2, fields.size());
-        StructColumn* res_left_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[0].get()));
-        StructColumn* res_right_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[1].get()));
+        const StructColumn* res_left_column = down_cast<const StructColumn*>(ColumnHelper::get_data_column(fields[0].get()));
+        const StructColumn* res_right_column = down_cast<const StructColumn*>(ColumnHelper::get_data_column(fields[1].get()));
         auto res_left_fields = res_left_column->fields();
         auto res_right_fields = res_right_column->fields();
         ASSERT_EQ(res_left_fields.size(), expected_left_arrays.size());
@@ -213,10 +213,14 @@ private:
         });
         RETURN_IF_ERROR(CelonisTransitsMatch::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
-        result = CelonisTransitsMatch::transits_match(ctx_.get(),
-                                                      {left_primary_keys_column_, left_match_column_,
-                                                       right_primary_keys_column_, right_match_column_,
-                                                       left_manual_column_, right_manual_column_});
+        Columns columns;
+        columns.push_back(left_primary_keys_column_);
+        columns.push_back(left_match_column_);
+        columns.push_back(right_primary_keys_column_);
+        columns.push_back(right_match_column_);
+        columns.push_back(left_manual_column_);
+        columns.push_back(right_manual_column_);
+        result = CelonisTransitsMatch::transits_match(ctx_.get(), columns);
         return result;
     }
 

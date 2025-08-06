@@ -171,8 +171,8 @@ private:
         StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
         auto fields = st->fields_column();
         ASSERT_EQ(2, fields.size());
-        StructColumn* res_left_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[0].get()));
-        StructColumn* res_right_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[1].get()));
+        const StructColumn* res_left_column = down_cast<const StructColumn*>(ColumnHelper::get_data_column(fields[0].get()));
+        const StructColumn* res_right_column = down_cast<const StructColumn*>(ColumnHelper::get_data_column(fields[1].get()));
         auto res_left_fields = res_left_column->fields();
         auto res_right_fields = res_right_column->fields();
         ASSERT_EQ(res_left_fields.size(), expected_left_arrays.size());
