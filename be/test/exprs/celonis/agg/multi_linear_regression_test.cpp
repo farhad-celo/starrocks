@@ -66,7 +66,7 @@ protected:
                 FunctionContext::create_context(nullptr, mem_pools_.back().get(), return_type, std::move(arg_types)));
     }
 
-    std::optional<vector<double>>
+    std::optional<std::vector<double>>
     ComputeExpectedBeta(const std::vector<DatumArray>& xs, const std::vector<DatumArray>& ys, bool is_bigint) {
         DCHECK_EQ(xs.size(), ys.size());
         DatumArray x;
@@ -100,9 +100,9 @@ protected:
         }
         const auto n_samples = y.size();
         const auto n_features = x[0].get_array().size();
-        matrix<double> X(n_samples, n_features + 1);
-        vector<double> Y(n_samples);
-        vector<double> beta(n_features + 1);
+        boost::numeric::ublas::matrix<double> X(n_samples, n_features + 1);
+        boost::numeric::ublas::vector<double> Y(n_samples);
+        boost::numeric::ublas::vector<double> beta(n_features + 1);
         for (auto i = 0; i < n_samples; ++i) {
             X(i, 0) = 1.0;
             for (auto j = 0; j < n_features; ++j) {
@@ -119,13 +119,17 @@ protected:
             }
         }
         // compute (X^T * X)
-        matrix<double> XtX = prod(trans(X), X);
+        boost::numeric::ublas::matrix<double> XtX = boost::numeric::ublas::prod(boost::numeric::ublas::trans(X), X);
 
         // compute (X^T * y)
-        vector<double> Xty = prod(trans(X), Y);
+        boost::numeric::ublas::vector<double> Xty = boost::numeric::ublas::prod(boost::numeric::ublas::trans(X), Y);
         // solve for beta using LU decomposition
         if (lu_solve(XtX, Xty, beta)) {
-            return beta;
+            std::vector<double> result(beta.size());
+            for (size_t i = 0; i < beta.size(); ++i) {
+                result[i] = beta[i];
+            }
+            return result;
         } else {
             return std::nullopt;
         }
@@ -159,7 +163,7 @@ protected:
         return {std::move(local_ctx), std::move(state), func};
     }
 
-    void ValidateModel(const vector<double>& expected_beta, const std::string& model) {
+    void ValidateModel(const std::vector<double>& expected_beta, const std::string& model) {
         std::vector<double> beta;
         ASSERT_TRUE(CreateModel(model, beta));
         ASSERT_EQ(expected_beta.size(), beta.size());
@@ -190,7 +194,7 @@ protected:
     }
 
     template<LogicalType LT>
-    void Run(const DatumArray& x, const DatumArray& y, const vector<double>& expected_beta, bool is_null = false) {
+    void Run(const DatumArray& x, const DatumArray& y, const std::vector<double>& expected_beta, bool is_null = false) {
         auto [local_ctx, state, func] = RunUpdate(LT, x, y);
 
         auto result = ColumnHelper::create_column(get_return_type(), true);

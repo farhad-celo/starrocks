@@ -318,7 +318,7 @@ TEST_F(CelonisSortedFirstLastTest, serialize_and_merge_no_row_nullable) {
     auto [local_ctx2, state2, func2] = RunUpdate<TYPE_VARCHAR>("celonis_sorted_first", sort_column_types, input2);
 
     // Serialize
-    auto serde_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARBINARY), true);
+    ColumnPtr serde_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARBINARY), true);
     func2->serialize_to_column(local_ctx2.get(), state2->state(), serde_col.get());
     ASSERT_EQ(serde_col->size(), 1);
     EXPECT_TRUE(down_cast<NullableColumn*>(serde_col.get())->is_null(0));
@@ -416,7 +416,7 @@ TEST_F(CelonisSortedFirstLastTest, convert_to_serialize_format) {
     auto [local_ctx1, columns1, func1] = Prepare<TYPE_VARCHAR>("celonis_sorted_first", sort_column_types, input1);
 
     // Convert to serialize format
-    auto serde_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARBINARY), false);
+    ColumnPtr serde_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARBINARY), false);
     func1->convert_to_serialize_format(local_ctx1.get(), columns1, 4, &serde_col);
     ASSERT_EQ(serde_col->size(), 4);
     auto* serde_binary_column = down_cast<BinaryColumn*>(serde_col.get());
@@ -456,7 +456,7 @@ TEST_F(CelonisSortedFirstLastTest, convert_to_serialize_format_nullable) {
     auto [local_ctx1, columns1, func1] = Prepare<TYPE_VARCHAR>("celonis_sorted_first", sort_column_types, input1);
 
     // Convert to serialize format
-    auto serde_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARBINARY), true);
+    ColumnPtr serde_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARBINARY), true);
     func1->convert_to_serialize_format(local_ctx1.get(), columns1, 4, &serde_col);
     ASSERT_EQ(serde_col->size(), 4);
     auto* serde_nullable_column = down_cast<NullableColumn*>(serde_col.get());

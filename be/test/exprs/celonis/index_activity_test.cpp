@@ -31,11 +31,10 @@ private:
         auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_BIGINT);
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
-        Columns columns{
-            input,
-            ColumnHelper::create_const_column<TYPE_VARCHAR>(mode, input->size()),
-            ColumnHelper::create_const_column<TYPE_VARCHAR>(direction, input->size())
-        };
+        Columns columns;
+        columns.push_back(input);
+        columns.push_back(ColumnHelper::create_const_column<TYPE_VARCHAR>(mode, input->size()));
+        columns.push_back(ColumnHelper::create_const_column<TYPE_VARCHAR>(direction, input->size()));
         ctx->set_constant_columns(columns);
 
         DeferOp op([&ctx] {
@@ -71,7 +70,10 @@ TEST_F(CelonisIndexActivityTest, const_null_column_mode_direction) {
     auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_BIGINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
-    Columns columns{array, mode_column, direction_column};
+    Columns columns;
+    columns.push_back(array);
+    columns.push_back(mode_column);
+    columns.push_back(direction_column);
     ctx->set_constant_columns(columns);
 
     DeferOp op([&ctx] {
