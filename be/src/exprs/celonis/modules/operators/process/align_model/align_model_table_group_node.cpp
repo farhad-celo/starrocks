@@ -31,6 +31,7 @@
 #include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
 #include "modules/query/operators.pb.h"
 #include "replay_aligned_variant.h"
+#include "modules/operators/process/align_model/sr_specific_inflation_glue_code.h"
 
 namespace celonis::accelerator::operators::process::align_model {
 

@@ -26,10 +26,9 @@
 #include "modules/operators/process/bpmn/bpmn_to_pn.h"
 #include "modules/operators/process/bpmn/bpmn_from_proto.h"
 #include "modules/operators/process/petri_net/petri_net_entities.h"
+#include "modules/operators/process/align_model/shared_types.h"
 
 namespace celonis::accelerator::operators::process::align_model {
-// avoid circular includes
-class replay_result_type;
 
 // For now define these as constants, as we plan to use these in a table group anyway there should be no chance of name
 // collision
@@ -63,20 +62,6 @@ struct align_model_config {
   cube::variant_trace_cache_manager* variant_trace_cache_manager_instance;
   alignment::log_aligner_config log_aligner_cfg;
 };
-
-using variants = memory::cache::variant_trace_cache_t;
-
-enum class alignment_move_type { UNMAPPED_MOVE, LOG_MOVE, MODEL_MOVE, SYNC_MOVE, GATEWAY_MOVE };
-
-struct alignment_move {
-  alignment_move_type move_type{alignment_move_type::UNMAPPED_MOVE};
-  std::optional<row_id> move_on_log{std::nullopt};
-  std::optional<cpml::model::bpmn::vertex_id_type> move_on_model{std::nullopt};
-  auto operator<=>(const alignment_move&) const noexcept = default;  // NOLINT(modernize-use-nullptr)
-};
-
-using alignment_t = std::vector<alignment_move>;
-using alignments_t = std::vector<std::optional<alignment_t>>;
 
 using edge_class_id_t = row_id;
 enum class edge_type { SYNC, MODEL, SKIP, LOG, UNMAPPED, L1_MISSING };
@@ -133,8 +118,6 @@ struct edge_type_strings {
       legacy_embedded_ctl::assert_unreachable();
   }
 }
-
-using replay_results_t = std::vector<std::optional<replay_result_type>>;
 
 /**
  * @brief Encapsulates if two BPMN vertices are "parallel" (concurrent)
@@ -207,44 +190,5 @@ std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache
 replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_graph, const alignments_t& alignments,
                                          const parallel_vertex_pairs<>& parallel_vertices,
                                          const common::execution_context& context);
-/**
- * @brief Maps variants back to original traces and creates the table group both with internal joins between and
- * external joins to the activity column.
- *
- * Tables with columns:
- * Alignment: labels and move types - the label for a row is either the name of the activity or the bpmn vertex id of a
- * gateway, along with its type.
- *
- * Association: Has no added columns but has a non-zero number of rows - the individual edges are represented by the
- * join vector between the association and the alignment table and the association and edge class table.
- *
- * Edge Class: Each row in this table represents a separate edge component.
- *
- * @param alignments per variant alignment as produced by @see align_model
- * @param replay_results per variant replay results including relative timestamps as produced by @see
- * replay_aligned_variant
- * @param mapping petri net id to bpmn vertex id
- * @param bpmn_to_string bpmn vertex id to string e.g. start vertex with id 0 ([0 START]) --> "0 START"
- * @param variants the variant trace cache
- * @param activity_column The activity column of the original eventlog
- * @param case_id_column case_id column of the original eventlog
- * @param activity_to_case_join activity table to case table join - since the variants are at the case table level
- * @param model_cache_key bpmn model cache key
- * @param scope
- * @param context
- * @return table_group_stub The table group containing the alignment table, the association table and the edge class
- * table
- */
-memory::table_group_t create_tables(const alignments_t& alignments, const replay_results_t& replay_results,
-                                    const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
-                                    const memory::column_t& activity_column, const memory::column_t& case_id_column,
-                                    const memory::join_projection_vector_t& activity_to_case_join,
-#ifdef CELOSTAR
-                                    const common::execution_context& context, size_t grain_size);
-#else
-                                    const cube::registration_options& options, const common::execution_context& context,
-                                    size_t grain_size, cube::input_dependencies& dependencies,
-                                    const operator_input_columns_t& input_columns);
-#endif
 
 }  // namespace celonis::accelerator::operators::process::align_model
