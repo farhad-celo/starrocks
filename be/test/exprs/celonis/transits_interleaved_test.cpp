@@ -165,7 +165,7 @@ private:
         }
     }
 
-    void Validate(const ColumnPtr& res, size_t row, const std::vector<DatumArray>& expected_left_arrays,
+    void Validate(ColumnPtr& res, size_t row, const std::vector<DatumArray>& expected_left_arrays,
                   const std::vector<DatumArray>& expected_right_arrays) {
         ASSERT_LT(row, res->size());
         StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
@@ -278,7 +278,7 @@ TEST_F(CelonisTransitsInterleavedTest, different_key_length) {
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0), TimestampValue::create(1970, 1, 7, 0, 0, 0)},
                std::nullopt, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1"}}, {DatumArray{"R1"}});
     }
@@ -291,7 +291,7 @@ TEST_F(CelonisTransitsInterleavedTest, different_key_length) {
                std::nullopt,
                right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 7, 0, 0, 0)}, std::nullopt, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L2"}}, {DatumArray{"R1"}});
     }
@@ -397,7 +397,7 @@ TEST_F(CelonisTransitsInterleavedTest, empty_keys) {
     std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{}};
     std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{}};
     AddRow(left_keys_arrays, DatumArray{}, DatumArray{}, right_keys_arrays, DatumArray{}, DatumArray{}, false);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(1, result->size());
     Validate(result, 0, {DatumArray{}}, {DatumArray{}});
 }
@@ -414,7 +414,7 @@ TEST_F(CelonisTransitsInterleavedTest, different_left_key_type_and_right_key_typ
                           TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
                           TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2", "L3", "L3"}}, {DatumArray{1L, 1L, 2L, 2L, 3L}});
     }
@@ -429,7 +429,7 @@ TEST_F(CelonisTransitsInterleavedTest, different_left_key_type_and_right_key_typ
                           TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
                           TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{1L, 2L, 2L, 3L, 3L}}, {DatumArray{"R1", "R1", "R2", "R2", "R3"}});
     }
@@ -447,7 +447,7 @@ TEST_F(CelonisTransitsInterleavedTest, number_of_left_fields_different_from_righ
                           TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
                           TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2", "L3", "L3"}},
                  {DatumArray{"R1", "R1", "R2", "R2", "R3"}, DatumArray{1L, 1L, 2L, 2L, 3L}});
@@ -463,7 +463,7 @@ TEST_F(CelonisTransitsInterleavedTest, number_of_left_fields_different_from_righ
                           TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
                           TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{1L, 2L, 2L, 3L, 3L}, DatumArray{"L11", "L22", "L22", "L33", "L33"}},
                  {DatumArray{"R1", "R1", "R2", "R2", "R3"}});
@@ -481,7 +481,7 @@ TEST_F(CelonisTransitsInterleavedTest, null_left_sorting_element) {
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"1", kNullDatum, "5"}, right_keys_arrays,
            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 0),
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"2", "4", "6"}, false);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(1, result->size());
     EXPECT_TRUE(result->get(0).is_null());
 }
@@ -497,7 +497,7 @@ TEST_F(CelonisTransitsInterleavedTest, left_sortings_inconsistent_with_left_time
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"1", "3", "5", "7"}, right_keys_arrays,
            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 0),
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"2", "4", "6"}, false);
-    const auto result = Run();
+    auto result = Run();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(),
               "If provided, the size of left_sortings_array and left_timestamps_array should not be different.");
@@ -514,7 +514,7 @@ TEST_F(CelonisTransitsInterleavedTest, null_right_sorting_element) {
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"1", "2", "5"}, right_keys_arrays,
            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 0),
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"2", "4", kNullDatum}, false);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(1, result->size());
     EXPECT_TRUE(result->get(0).is_null());
 }
@@ -530,7 +530,7 @@ TEST_F(CelonisTransitsInterleavedTest, right_sortings_inconsistent_with_right_ti
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"1", "3", "5"}, right_keys_arrays,
            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 0),
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"2", "4"}, false);
-    const auto result = Run();
+    auto result = Run();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(),
               "If provided, the size of right_sortings_array and right_timestamps_array should not be different.");
@@ -547,7 +547,7 @@ TEST_F(CelonisTransitsInterleavedTest, first_last_only_with_sortings) {
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{1.5, 3.5, 5.5}, right_keys_arrays,
            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 0),
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{2.5, 4.5, 6.5}, true);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(1, result->size());
     Validate(result, 0, {DatumArray{"L1", "L3"}}, {DatumArray{"R1", "R2"}});
 }
@@ -562,7 +562,7 @@ TEST_F(CelonisTransitsInterleavedTest, empty_right) {
            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 0),
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{1.5, 3.5, 5.5}, right_keys_arrays,
            DatumArray{}, DatumArray{}, true);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(1, result->size());
     Validate(result, 0, {DatumArray{}}, {DatumArray{}});
 }
@@ -576,7 +576,7 @@ TEST_F(CelonisTransitsInterleavedTest, empty_left) {
     AddRow(left_keys_arrays, DatumArray{}, DatumArray{}, right_keys_arrays,
            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 0),
                       TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{2.5, 4.5, 6.5}, true);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(1, result->size());
     Validate(result, 0, {DatumArray{}}, {DatumArray{}});
 }
@@ -593,7 +593,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases_with_sortings) {
                           TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"1", "3", "5"}, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 0),
                           TimestampValue::create(1970, 1, 1, 0, 0, 0)}, DatumArray{"2", "4", "6"}, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2", "L3", "L3"}}, {DatumArray{"R1", "R1", "R2", "R2", "R3"}});
     }
@@ -608,7 +608,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases_with_sortings) {
                           TimestampValue::create(1970, 1, 5, 0, 0, 0)}, DatumArray{"5", "3", "1"}, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
                           TimestampValue::create(1970, 1, 6, 0, 0, 0)}, DatumArray{"6", "4", "2"}, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2", "L3", "L3"}}, {DatumArray{"R1", "R1", "R2", "R2", "R3"}});
     }
@@ -624,7 +624,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases_with_sortings) {
                DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0)},
                DatumArray{2L, 0L},
                false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2"}, DatumArray{"W", "X", "X"}},
                  {DatumArray{"R1", "R1", "R2"}, DatumArray{"Y", "Y", "Z"}});
@@ -643,7 +643,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
                           TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
                           TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2", "L3", "L3"}}, {DatumArray{"R1", "R1", "R2", "R2", "R3"}});
     }
@@ -658,7 +658,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
                           TimestampValue::create(1970, 1, 4, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 3, 0, 0, 0), TimestampValue::create(1970, 1, 3, 0, 0, 0),
                           TimestampValue::create(1970, 1, 3, 0, 0, 0)}, std::nullopt, true);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L2", "L3"}}, {DatumArray{"R1", "R3"}});
     }
@@ -674,7 +674,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0)},
                std::nullopt,
                false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2"}, DatumArray{"W", "X", "X"}},
                  {DatumArray{"R1", "R1", "R2"}, DatumArray{"Y", "Y", "Z"}});
@@ -692,7 +692,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0)},
                std::nullopt,
                false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2"}, DatumArray{"W", "X", "X"}},
                  {DatumArray{"R1", "R1", "R2"}, DatumArray{1L, 1L, 2L}});
@@ -710,7 +710,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0)},
                std::nullopt,
                false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2"}, DatumArray{1L, 2L, 2L}},
                  {DatumArray{"R1", "R1", "R2"}, DatumArray{3L, 3L, 4L}});
@@ -727,7 +727,7 @@ TEST_F(CelonisTransitsInterleavedTest, normal_cases) {
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0)},
                std::nullopt,
                false);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L2", "L2"}, DatumArray{1L, 2L, 2L}},
                  {DatumArray{"R1", "R1", "R2"}});
@@ -741,7 +741,7 @@ TEST_F(CelonisTransitsInterleavedTest, first_last_only) {
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{}};
         AddRow(left_keys_arrays, DatumArray{}, DatumArray{}, right_keys_arrays, DatumArray{}, DatumArray{}, true);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{}}, {DatumArray{}});
     }
@@ -753,7 +753,7 @@ TEST_F(CelonisTransitsInterleavedTest, first_last_only) {
         AddRow(left_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, true);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1"}}, {DatumArray{"R1"}});
     }
@@ -765,7 +765,7 @@ TEST_F(CelonisTransitsInterleavedTest, first_last_only) {
         AddRow(left_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, true);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1"}}, {DatumArray{2L}});
     }
@@ -781,7 +781,7 @@ TEST_F(CelonisTransitsInterleavedTest, first_last_only) {
                           TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 2, 0, 0, 0), TimestampValue::create(1970, 1, 4, 0, 0, 0),
                           TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, true);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L3"}}, {DatumArray{"R1", "R2"}});
     }
@@ -803,7 +803,7 @@ TEST_F(CelonisTransitsInterleavedTest, multiple_rows) {
                       TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, right_keys_arrays,
            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 3, 0, 0, 0),
                       TimestampValue::create(1970, 1, 5, 0, 0, 0)}, std::nullopt, false);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(2, result->size());
     Validate(result, 0, {DatumArray{"L1", "L2", "L2", "L3", "L3"}}, {DatumArray{"R1", "R1", "R2", "R2", "R3"}});
     Validate(result, 1, {DatumArray{"L1", "L1", "L2", "L2", "L3"}}, {DatumArray{"R1", "R2", "R2", "R3", "R3"}});

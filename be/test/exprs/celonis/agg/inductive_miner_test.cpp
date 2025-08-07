@@ -160,7 +160,11 @@ public:
         auto variants = build_variant_column(variant_rows);
         auto threshold_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(imfd_frequency_threshold, variant_rows.size());
 
-        ctx->set_constant_columns({nullptr, nullptr, threshold_column});
+        Columns constant_columns;
+        constant_columns.push_back(nullptr);
+        constant_columns.push_back(nullptr);
+        constant_columns.push_back(threshold_column);
+        ctx->set_constant_columns(constant_columns);
 
         std::vector<const Column*> raw_columns;
         raw_columns.resize(3);
@@ -196,7 +200,7 @@ TEST_F(CelonisInductiveMinerTest, NegativeFilterThresholdLeadsToFailure) {
     // GIVEN
     VariantRows dummy_variants{{"dummy"}};
     const std::string dummy_json{};
-    const auto dummy_weight{build_const_weight_column(1, 1)};
+    const auto dummy_weight = build_const_weight_column(1, 1);
     const double invalid_imfd_frequency_threshold{-0.1};
 
     // WHEN - THEN
@@ -207,7 +211,7 @@ TEST_F(CelonisInductiveMinerTest, FilterThresholdAboveOneLeadsToFailure) {
     // GIVEN
     VariantRows dummy_variants{{"dummy"}};
     const std::string dummy_json{};
-    const auto dummy_weight{build_const_weight_column(1, 1)};
+    const auto dummy_weight = build_const_weight_column(1, 1);
     const double invalid_imfd_frequency_threshold{1.1};
 
     // WHEN - THEN

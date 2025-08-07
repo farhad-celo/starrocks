@@ -85,7 +85,7 @@ private:
         }
     }
 
-    void Validate(const ColumnPtr& res, size_t row, const vector<DatumArray>& expected) {
+    void Validate(ColumnPtr& res, size_t row, const vector<DatumArray>& expected) {
         ASSERT_LT(row, res->size());
         StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
         auto fields = st->fields_column();
@@ -123,7 +123,7 @@ TEST_F(CelonisTransposeArrayOfStructTest, single_field) {
     std::vector<std::optional<DatumStruct>> row2 = std::vector<std::optional<DatumStruct>>({ele3, ele4, ele5});
     AddRow(row2);
     AddNullRow();
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(3, result->size());
     Validate(result, 0, {DatumArray{Datum{"Apple"}, Datum{"Tree"}}});
     Validate(result, 1, {DatumArray{Datum{"hello"}, Datum{"world"}, Datum{""}}});
@@ -143,7 +143,7 @@ TEST_F(CelonisTransposeArrayOfStructTest, two_fields) {
     DatumStruct ele5 = {kNullDatum, Datum{30L}};
     std::vector<std::optional<DatumStruct>> row3 = std::vector<std::optional<DatumStruct>>({ele3, ele4, ele5});
     AddRow(row3);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(4, result->size());
     ASSERT_TRUE(result->is_null(0));
     Validate(result, 1, {DatumArray{Datum{"Apple"}, Datum{"Tree"}}, DatumArray{Datum{1L}, Datum{2L}}});
@@ -165,7 +165,7 @@ TEST_F(CelonisTransposeArrayOfStructTest, all_null_field) {
     DatumStruct ele5 = {kNullDatum, kNullDatum};
     std::vector<std::optional<DatumStruct>> row3 = std::vector<std::optional<DatumStruct>>({ele3, ele4, ele5});
     AddRow(row3);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(4, result->size());
     ASSERT_TRUE(result->is_null(0));
     Validate(result, 1, {DatumArray{Datum{"Apple"}, Datum{"Tree"}}, DatumArray{kNullDatum, kNullDatum}});
@@ -188,7 +188,7 @@ TEST_F(CelonisTransposeArrayOfStructTest, three_fields) {
     std::vector<std::optional<DatumStruct>> row3 = std::vector<std::optional<DatumStruct>>(
             {ele3, ele4, std::nullopt, ele5});
     AddRow(row3);
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(4, result->size());
     ASSERT_TRUE(result->is_null(0));
     Validate(result, 1, {DatumArray{Datum{"apple"}, Datum{"pie"}}, DatumArray{Datum{1L}, Datum{-2L}},

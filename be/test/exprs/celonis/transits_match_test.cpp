@@ -164,7 +164,7 @@ private:
         }
     }
 
-    void Validate(const ColumnPtr& res, size_t row, const std::vector<DatumArray>& expected_left_arrays,
+    void Validate(ColumnPtr& res, size_t row, const std::vector<DatumArray>& expected_left_arrays,
                   const std::vector<DatumArray>& expected_right_arrays) {
         ASSERT_LT(row, res->size());
         StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
@@ -333,7 +333,7 @@ TEST_F(CelonisTransitsMatchTest, different_key_length) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"});
-        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        auto result = RunConstantManual(std::nullopt, std::nullopt).value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(!result->get(0).is_null());
         Validate(result, 0, {DatumArray{"L1", "L1"}}, {DatumArray{"R1", "R3"}});
@@ -346,7 +346,7 @@ TEST_F(CelonisTransitsMatchTest, different_key_length) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"}, std::nullopt, std::nullopt);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(!result->get(0).is_null());
         Validate(result, 0, {DatumArray{"L1", "L1"}}, {DatumArray{"R1", "R3"}});
@@ -364,7 +364,7 @@ TEST_F(CelonisTransitsMatchTest, inconsistent_keys_length) {
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0)}, right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0),
                           TimestampValue::create(1970, 1, 7, 0, 0, 0)}, std::nullopt, std::nullopt);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -378,7 +378,7 @@ TEST_F(CelonisTransitsMatchTest, inconsistent_keys_length) {
                DatumArray{TimestampValue::create(1970, 1, 5, 0, 0, 0), TimestampValue::create(1970, 1, 7, 0, 0, 0)},
                right_keys_arrays,
                DatumArray{TimestampValue::create(1970, 1, 6, 0, 0, 0)}, std::nullopt, std::nullopt);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -390,7 +390,7 @@ TEST_F(CelonisTransitsMatchTest, inconsistent_keys_length) {
                 DatumArray{"R1"}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo"});
-        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        auto result = RunConstantManual(std::nullopt, std::nullopt).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L3"}}, {DatumArray{"R1", "R1"}});
     }
@@ -402,7 +402,7 @@ TEST_F(CelonisTransitsMatchTest, inconsistent_keys_length) {
                 DatumArray{"R1"}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo"}, std::nullopt, std::nullopt);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L3"}}, {DatumArray{"R1", "R1"}});
     }
@@ -526,7 +526,7 @@ TEST_F(CelonisTransitsMatchTest, empty_keys) {
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{}};
         AddRow(left_keys_arrays, DatumArray{}, right_keys_arrays, DatumArray{}, std::nullopt,
                std::nullopt);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{}}, {DatumArray{}});
     }
@@ -535,7 +535,7 @@ TEST_F(CelonisTransitsMatchTest, empty_keys) {
         std::optional<std::vector<DatumArray>> left_keys_arrays = std::vector<DatumArray>{DatumArray{}};
         std::optional<std::vector<DatumArray>> right_keys_arrays = std::vector<DatumArray>{DatumArray{}};
         AddRow(left_keys_arrays, DatumArray{}, right_keys_arrays, DatumArray{}, DatumArray{}, DatumArray{});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{}}, {DatumArray{}});
     }
@@ -550,7 +550,7 @@ TEST_F(CelonisTransitsMatchTest, number_of_left_fields_different_from_right_fiel
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"});
-        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        auto result = RunConstantManual(std::nullopt, std::nullopt).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{1L, 1L, 3L, 3L}, DatumArray{"L1", "L1", "L3", "L3"}},
                  {DatumArray{"R1", "R3", "R1", "R3"}});
@@ -563,7 +563,7 @@ TEST_F(CelonisTransitsMatchTest, number_of_left_fields_different_from_right_fiel
                 DatumArray{"R1", "R2", "R3"}, DatumArray{1L, 2L, 3L}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"});
-        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        auto result = RunConstantManual(std::nullopt, std::nullopt).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}},
                  {DatumArray{"R1", "R3", "R1", "R3"}, DatumArray{1L, 3L, 1L, 3L}});
@@ -579,7 +579,7 @@ TEST_F(CelonisTransitsMatchTest, different_left_key_type_and_right_key_type) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"});
-        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        auto result = RunConstantManual(std::nullopt, std::nullopt).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{1L, 1L, 3L, 3L}}, {DatumArray{"R1", "R3", "R1", "R3"}});
     }
@@ -591,7 +591,7 @@ TEST_F(CelonisTransitsMatchTest, different_left_key_type_and_right_key_type) {
                 DatumArray{1L, 2L, 3L}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"});
-        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        auto result = RunConstantManual(std::nullopt, std::nullopt).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{1L, 3L, 1L, 3L}});
     }
@@ -606,7 +606,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases_const_manual) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"});
-        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        auto result = RunConstantManual(std::nullopt, std::nullopt).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{"R1", "R3", "R1", "R3"}});
     }
@@ -624,7 +624,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases_const_manual) {
                 DatumArray{"RR1", "RR2", "RR3"}};
         AddRow(left_keys_arrays2, DatumArray{"foo", "bar", "foo"}, right_keys_arrays2,
                DatumArray{"foo", "baz", "foo"});
-        const auto result = RunConstantManual(std::nullopt, std::nullopt).value();
+        auto result = RunConstantManual(std::nullopt, std::nullopt).value();
         ASSERT_EQ(2, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{"R1", "R3", "R1", "R3"}});
         Validate(result, 1, {DatumArray{"LL1", "LL1", "LL3", "LL3"}}, {DatumArray{"RR1", "RR3", "RR1", "RR3"}});
@@ -637,7 +637,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases_const_manual) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"});
-        const auto result = RunConstantManual(DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"}).value();
+        auto result = RunConstantManual(DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"}).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{"R1", "R3", "R1", "R3"}});
     }
@@ -649,7 +649,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases_const_manual) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"}, DatumArray{}, DatumArray{});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{}}, {DatumArray{}});
     }
@@ -661,7 +661,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases_const_manual) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"});
-        const auto result = RunConstantManual(DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"}).value();
+        auto result = RunConstantManual(DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"}).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{}}, {DatumArray{}});
     }
@@ -673,7 +673,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases_const_manual) {
                 DatumArray{"R1", "R2", "R3"}, {11L, 12L, 13L}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"});
-        const auto result = RunConstantManual(DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"}).value();
+        auto result = RunConstantManual(DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"}).value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}, DatumArray{1L, 1L, 3L, 3L}},
                  {DatumArray{"R1", "R3", "R1", "R3"}, DatumArray{11L, 13L, 11L, 13L}});
@@ -689,7 +689,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"}, std::nullopt, std::nullopt);
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{"R1", "R3", "R1", "R3"}});
     }
@@ -701,7 +701,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{"R1", "R3", "R1", "R3"}});
     }
@@ -713,7 +713,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}, DatumArray{11L, 11L, 33L, 33L}},
                  {DatumArray{"R1", "R3", "R1", "R3"}});
@@ -727,7 +727,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
                                                                                                       "R3"}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}},
                  {DatumArray{11L, 33L, 11L, 33L}, DatumArray{"R1", "R3", "R1", "R3"}});
@@ -740,7 +740,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"}, DatumArray{}, DatumArray{});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{}}, {DatumArray{}});
     }
@@ -752,7 +752,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
                 DatumArray{"R1", "R2", "R3"}};
         AddRow(left_keys_arrays, DatumArray{"foo", "bar", "foo"}, right_keys_arrays,
                DatumArray{"foo", "baz", "foo"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{}}, {DatumArray{}});
     }
@@ -764,7 +764,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
                 DatumArray{"R1", "R2", "R3"}, {11L, 12L, 13L}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}, DatumArray{1L, 1L, 3L, 3L}},
                  {DatumArray{"R1", "R3", "R1", "R3"}, DatumArray{11L, 13L, 11L, 13L}});
@@ -777,7 +777,7 @@ TEST_F(CelonisTransitsMatchTest, normal_cases) {
                 DatumArray{1L, 2L, 3L}, {11L, 12L, 13L}};
         AddRow(left_keys_arrays, DatumArray{"a", "bar", "b"}, right_keys_arrays,
                DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
-        const auto result = Run().value();
+        auto result = Run().value();
         ASSERT_EQ(1, result->size());
         Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}, DatumArray{1L, 1L, 3L, 3L}},
                  {DatumArray{1L, 3L, 1L, 3L}, DatumArray{11L, 13L, 11L, 13L}});
@@ -800,7 +800,7 @@ TEST_F(CelonisTransitsMatchTest, multiple_rows) {
            DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, std::nullopt);
     AddRow(left_keys_arrays2, DatumArray{"a", "bar", "b"}, right_keys_arrays2,
            DatumArray{"c", "baz", "d"}, DatumArray{"a", "a", "b", "b"}, DatumArray{"c", "d", "c", "d"});
-    const auto result = Run().value();
+    auto result = Run().value();
     ASSERT_EQ(3, result->size());
     Validate(result, 0, {DatumArray{"L1", "L1", "L3", "L3"}}, {DatumArray{"R1", "R3", "R1", "R3"}});
     EXPECT_TRUE(result->get(1).is_null());
