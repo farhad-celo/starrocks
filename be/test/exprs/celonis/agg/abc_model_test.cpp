@@ -57,13 +57,13 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(LogicalType logical_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(logical_type)), // input
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),  // pk_hash
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)),  // sample_ratio
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)),  // A
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)),  // B
+                TypeDescriptor::from_logical_type(logical_type), // input
+                TypeDescriptor::from_logical_type(TYPE_BIGINT),  // pk_hash
+                TypeDescriptor::from_logical_type(TYPE_DOUBLE),  // sample_ratio
+                TypeDescriptor::from_logical_type(TYPE_DOUBLE),  // A
+                TypeDescriptor::from_logical_type(TYPE_DOUBLE),  // B
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
+        auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(

@@ -52,10 +52,10 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(LogicalType logical_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(logical_type)), // input
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))
+                TypeDescriptor::from_logical_type(logical_type), // input
+                TypeDescriptor::from_logical_type(TYPE_BIGINT)
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type(logical_type));
+        auto return_type = get_return_type(logical_type);
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }

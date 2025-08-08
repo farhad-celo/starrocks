@@ -52,12 +52,12 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE))
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                TypeDescriptor::from_logical_type(TYPE_LARGEINT),
+                TypeDescriptor::from_logical_type(TYPE_BIGINT),
+                TypeDescriptor::from_logical_type(TYPE_DOUBLE)
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type());
+        auto return_type = get_return_type();
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }

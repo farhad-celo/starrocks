@@ -61,9 +61,9 @@ protected:
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v4_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -85,9 +85,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v4_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v4_concat_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -114,9 +114,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v4_concat_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -138,9 +138,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_concat_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -167,8 +167,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_concat_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -267,8 +267,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_with_leading_const_columns) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         Columns columns;
@@ -313,8 +313,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_with_leading_const_colum
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         Columns columns;
@@ -394,8 +394,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         Columns columns;
@@ -475,9 +475,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -499,9 +499,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_concat_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -528,9 +528,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_concat_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -553,8 +553,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -653,8 +653,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         Columns columns;
@@ -734,8 +734,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_const_array_input) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -757,8 +757,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_const_array_input) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_array_input) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -858,8 +858,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_array_input) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         Columns columns;
@@ -895,8 +895,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         Columns columns;
@@ -981,9 +981,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -1005,9 +1005,9 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_collision) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_concat_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
     auto column1 = BinaryColumn::create();
@@ -1034,8 +1034,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_concat_collision) 
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_const_array_input) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -1059,8 +1059,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_const_array_input)
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
@@ -1129,8 +1129,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
         Columns columns;

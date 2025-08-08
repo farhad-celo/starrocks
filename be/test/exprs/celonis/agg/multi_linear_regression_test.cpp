@@ -57,10 +57,10 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(LogicalType logical_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(celonis::array_type(logical_type)),               // x
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(logical_type))  // y
+                celonis::array_type(logical_type),               // x
+                TypeDescriptor::from_logical_type(logical_type)  // y
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
+        auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_context(nullptr, mem_pools_.back().get(), return_type, std::move(arg_types)));
@@ -335,3 +335,4 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, not_enough_data_points) {
 }
 
 } // namespace starrocks
+

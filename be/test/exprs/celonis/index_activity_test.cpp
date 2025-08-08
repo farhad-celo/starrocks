@@ -25,10 +25,10 @@ private:
     StatusOr<ColumnPtr> run(const TypeDescriptor& array_type_desc, const std::string& mode,
                             const std::string& direction, ColumnPtr input) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(array_type_desc),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-        auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_BIGINT);
+                array_type_desc,
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        auto return_type = TYPE_ARRAY_BIGINT;
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         Columns columns;
@@ -64,10 +64,10 @@ TEST_F(CelonisIndexActivityTest, const_null_column_mode_direction) {
     auto direction_column = ColumnHelper::create_const_null_column(2);
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_BIGINT);
+            TYPE_ARRAY_INT,
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TYPE_ARRAY_BIGINT;
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     Columns columns;

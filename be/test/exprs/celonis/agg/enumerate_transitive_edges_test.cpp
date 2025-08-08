@@ -95,11 +95,11 @@ private:
 
     std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& value_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(value_type),                                        // outColumns
-                AnyValUtil::column_type_to_type_desc(value_type),                                        // inColumns
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)) // maxLength
+                value_type,                                        // outColumns
+                value_type,                                        // inColumns
+                TypeDescriptor::from_logical_type(TYPE_BIGINT) // maxLength
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type(value_type));
+        auto return_type = get_return_type(value_type);
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }

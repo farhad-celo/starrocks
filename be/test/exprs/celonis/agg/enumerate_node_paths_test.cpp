@@ -106,20 +106,20 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& value_type, const TypeDescriptor& pk_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(value_type),                                      // outColumns
-                AnyValUtil::column_type_to_type_desc(value_type),                                      // inColumns
-                AnyValUtil::column_type_to_type_desc(pk_type),                                         // pkColumns
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // outStart
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // outEnd
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // inStart
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // inEnd
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // outAll
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // inAll
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // allowCycles
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_TINYINT)), // lengthComparison
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))   // length
+                value_type,                                      // outColumns
+                value_type,                                      // inColumns
+                pk_type,                                         // pkColumns
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // outStart
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // outEnd
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // inStart
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // inEnd
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // outAll
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // inAll
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // allowCycles
+                TypeDescriptor::from_logical_type(TYPE_TINYINT), // lengthComparison
+                TypeDescriptor::from_logical_type(TYPE_BIGINT)   // length
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type(value_type));
+        auto return_type = get_return_type(value_type);
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
@@ -157,7 +157,7 @@ protected:
               bool allow_cycles, const std::string& length_comparison, int length) {
         auto value_type = logical_types_to_struct_type(value_logical_types);
         auto pk_type = logical_types_to_struct_type(pk_logical_types);
-        auto bool_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
+        auto bool_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
 
         auto local_ctx = get_ctx(value_type, pk_type);
 

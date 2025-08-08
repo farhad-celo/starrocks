@@ -32,9 +32,9 @@ class CelonisDecodeStringTest : public ::testing::Test {
 protected:
     void SetUp() override {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
-        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
+                TypeDescriptor::from_logical_type(TYPE_INT),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+        auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         dict_id_column_ = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);

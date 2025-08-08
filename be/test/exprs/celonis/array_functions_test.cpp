@@ -2407,8 +2407,8 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_null_elements_in_array) {
 TEST_F(CelonisArrayFunctionsTest, null_to_empty_only_null) {
     auto input_array = ColumnHelper::create_const_null_column(2);
 
-    std::vector<FunctionContext::TypeDesc> arg_types = { AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT) };
-    auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT);
+    std::vector<FunctionContext::TypeDesc> arg_types = { TYPE_ARRAY_INT };
+    auto return_type = TYPE_ARRAY_INT;
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     const auto result = CelonisArrayFunctions::null_to_empty(ctx.get(), {input_array}).value();
     EXPECT_FALSE(result->is_nullable());

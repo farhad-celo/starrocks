@@ -20,10 +20,10 @@ private:
     template<LogicalType LT>
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT));
+                TypeDescriptor::from_logical_type(LT),
+                TypeDescriptor::from_logical_type(TYPE_BIGINT),
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        auto return_type = TypeDescriptor::from_logical_type(TYPE_BIGINT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         value_column_ = ColumnHelper::create_column(TypeDescriptor(LT), true);

@@ -73,14 +73,13 @@ private:
     std::unique_ptr<FunctionContext>
     get_ctx(const TypeDescriptor& left_key_struct_type, const TypeDescriptor& right_key_struct_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(left_key_struct_type),
-                AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-                AnyValUtil::column_type_to_type_desc(right_key_struct_type),
-                AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-                AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-                AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR)};
-        auto return_type = AnyValUtil::column_type_to_type_desc(
-                get_return_type(left_key_struct_type, right_key_struct_type));
+                left_key_struct_type,
+                TYPE_ARRAY_VARCHAR,
+                right_key_struct_type,
+                TYPE_ARRAY_VARCHAR,
+                TYPE_ARRAY_VARCHAR,
+                TYPE_ARRAY_VARCHAR};
+        auto return_type = get_return_type(left_key_struct_type, right_key_struct_type);
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }

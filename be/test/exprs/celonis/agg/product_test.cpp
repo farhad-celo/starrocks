@@ -241,8 +241,8 @@ public:
         ctx = utils->get_fn_ctx();
 
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LOGICAL_TYPE))};
-        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LOGICAL_TYPE));
+                TypeDescriptor::from_logical_type(LOGICAL_TYPE)};
+        auto return_type = TypeDescriptor::from_logical_type(LOGICAL_TYPE);
         local_ctx = std::unique_ptr<FunctionContext>{
                 FunctionContext::create_test_context(std::move(arg_types), return_type)};
 

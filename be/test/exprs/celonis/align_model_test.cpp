@@ -19,9 +19,9 @@ namespace starrocks {
 class CelonisAlignModelTest : public testing::Test {
 protected:
     CelonisAlignModelTest() :
-            arg_types_{{AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-                        AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))}},
-            return_type_(AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))) {
+            arg_types_{{TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)}},
+            return_type_(TypeDescriptor::from_logical_type(TYPE_STRUCT)) {
         // Initialize the struct type descriptor properly
         auto struct_desc = TypeDescriptor::from_logical_type(TYPE_STRUCT);
         struct_desc.children = {
@@ -35,7 +35,7 @@ protected:
                 "alignment_activity_index", "association_edge_class", "association_alignment_index",
                 "edge_class_id", "edge_class_type"
         };
-        return_type_ = AnyValUtil::column_type_to_type_desc(struct_desc);
+        return_type_ = struct_desc;
     }
 
     void SetUp() override {}
@@ -56,9 +56,9 @@ private:
     static const ResultMap LOOP_MODEL_RESULTS;
 
     FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR =
-            AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_VARCHAR));
+            celonis::array_type(TYPE_VARCHAR);
     FunctionContext::TypeDesc TYPEDESC_ARRAY_BIGINT =
-            AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT));
+            celonis::array_type(TYPE_BIGINT);
 
     class Evaluator {
     public:

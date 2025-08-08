@@ -62,12 +62,12 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),    // variant
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT)), // hash
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),   // min_pts
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))    // epsilon
+                TypeDescriptor::from_logical_type(TYPE_ARRAY),    // variant
+                TypeDescriptor::from_logical_type(TYPE_LARGEINT), // hash
+                TypeDescriptor::from_logical_type(TYPE_BIGINT),   // min_pts
+                TypeDescriptor::from_logical_type(TYPE_BIGINT)    // epsilon
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type());
+        auto return_type = get_return_type();
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(

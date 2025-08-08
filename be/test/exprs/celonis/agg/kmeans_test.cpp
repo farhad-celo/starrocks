@@ -58,11 +58,11 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_DOUBLE)),                 // point_column
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),   // NUM_CLUSTERS
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),      // RANDOM_SEED
+                celonis::array_type(TYPE_DOUBLE),                 // point_column
+                TypeDescriptor::from_logical_type(TYPE_BIGINT),   // NUM_CLUSTERS
+                TypeDescriptor::from_logical_type(TYPE_INT),      // RANDOM_SEED
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
+        auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(
@@ -421,4 +421,5 @@ TEST_F(CelonisBuildKMeansModelTest, inconsistent_point_dimension) {
 }
 
 } // namespace starrocks
+
 

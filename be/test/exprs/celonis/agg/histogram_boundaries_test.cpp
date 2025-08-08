@@ -60,12 +60,12 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(LogicalType logical_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(logical_type)), // input
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // no_lower_bound
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // no_upper_bound
-                AnyValUtil::column_type_to_type_desc(celonis::array_type(logical_type))                // boundaries
+                TypeDescriptor::from_logical_type(logical_type), // input
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // no_lower_bound
+                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // no_upper_bound
+                celonis::array_type(logical_type)                // boundaries
         };
-        auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type(logical_type));
+        auto return_type = get_return_type(logical_type);
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_context(nullptr, mem_pools_.back().get(), return_type, std::move(arg_types)));

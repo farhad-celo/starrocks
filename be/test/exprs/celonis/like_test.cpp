@@ -23,9 +23,9 @@ protected:
 private:
     StatusOr<ColumnPtr> Run(const ColumnPtr& input, const ColumnPtr& pattern) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-        auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        auto return_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
         Columns columns;
         columns.push_back(input);
