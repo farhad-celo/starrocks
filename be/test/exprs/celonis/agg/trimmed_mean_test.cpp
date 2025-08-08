@@ -5,6 +5,7 @@
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
+#include "runtime/runtime_state.h"
 #include "testutil/function_utils.h"
 
 namespace starrocks {
@@ -19,9 +20,21 @@ public:
     }
     void TearDown() override { delete utils; }
 
+    std::unique_ptr<FunctionContext> create_function_context(
+            std::vector<FunctionContext::TypeDesc> arg_types,
+            FunctionContext::TypeDesc return_type) {
+        mem_pools_.emplace_back(std::make_unique<MemPool>());
+        runtime_states_.emplace_back(std::make_unique<RuntimeState>());
+        return std::unique_ptr<FunctionContext>(
+                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(),
+                                                return_type, std::move(arg_types)));
+    }
+
 private:
     FunctionUtils* utils{};
     FunctionContext* ctx{};
+    std::vector<std::unique_ptr<MemPool>> mem_pools_;
+    std::vector<std::unique_ptr<RuntimeState>> runtime_states_;
 };
 
 class ManagedAggrState {
@@ -49,7 +62,7 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_1_bigint) {
             TypeDescriptor::from_logical_type(TYPE_INT),
             TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
-    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(30, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(30, 1);
@@ -118,7 +131,7 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_2_bigint) {
             TypeDescriptor::from_logical_type(TYPE_INT),
             TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
-    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(50, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(50, 1);
@@ -182,7 +195,7 @@ TEST_F(CelonisTrimmedMeanTest, type_double) {
             TypeDescriptor::from_logical_type(TYPE_INT),
             TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
-    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(20, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(30, 1);
@@ -252,7 +265,7 @@ TEST_F(CelonisTrimmedMeanTest, type_double_large_input) {
             TypeDescriptor::from_logical_type(TYPE_INT),
             TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
-    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(5, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(5, 1);
@@ -319,7 +332,7 @@ TEST_F(CelonisTrimmedMeanTest, null_handling) {
             TypeDescriptor::from_logical_type(TYPE_INT),
             TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
-    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
@@ -383,7 +396,7 @@ TEST_F(CelonisTrimmedMeanTest, invalid_lower_and_upper) {
             TypeDescriptor::from_logical_type(TYPE_INT),
             TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
-    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(60, 1);
     auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(50, 1);
