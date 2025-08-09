@@ -26,8 +26,9 @@ NAMED_TYPE_DOWNLOAD_FOR_CELONIS_LIBRARIES="https://github.com/joboccara/NamedTyp
 
 # Reference to the Saola release of the Celonis libraries (currently all packaged in the CPML)
 CPML_VERSION="2.231.2"
-CPML_RELEASE="release-${CPML_VERSION}"
-CPML_RESOURCE="CPML-${CPML_VERSION}.tar.gz"
+# Uncomment below for using a locally build CPML
+# Note: When using a locally build CPML, adjust the file path in CPML_VERSION below to point to the local archive
+# CPML_VERSION="/tmp/CPML-main.tar.gz"
 
 # The temporary build directory where all thirdparty dependencies are placed at and where we build the Celonis libraries
 # before copying them to their final install directory
@@ -161,6 +162,26 @@ download_and_build_dependencies_for_celonis_libraries() {
   download_and_build_named_type_for_celonis_libraries
 }
 
+prepare_cpml_archive() {
+  CPML_RESOURCE=$CPML_VERSION
+  if [[ -f $CPML_VERSION ]] ; then
+    echo "Using local CPML archive at $CPML_RESOURCE"
+  else
+    CPML_RELEASE="release-${CPML_VERSION}"
+    CPML_RESOURCE="CPML-${CPML_VERSION}.tar.gz"
+
+    echo "Start to download CPML archive ${CPML_RESOURCE} into current working directory '$(pwd)'"
+
+    gh release download -R celonis/cpm-query-engine $CPML_RELEASE --pattern "${CPML_RESOURCE}"
+
+    echo "Downloading done"
+  fi
+
+  echo "Start to extract CPML archive"
+  tar -xzf $CPML_RESOURCE
+  echo "Extracting done"
+}
+
 # Variable used below to refer to the current Celonis library we want to build
 CURRENT_CELONIS_LIBRARY_TO_BUILD=""
 
@@ -201,15 +222,7 @@ download_and_build_celonis_libraries() {
 
   cd ${CELONIS_LIBRARIES_BUILD_DIR}
 
-  echo "Start to download CPML archive ${CPML_RESOURCE} into current working directory '$(pwd)'"
-
-  gh release download -R celonis/cpm-query-engine $CPML_RELEASE --pattern "${CPML_RESOURCE}"
-
-  echo "Downloading done"
-
-  echo "Start to extract CPML archive"
-  tar -xzf $CPML_RESOURCE
-  echo "Extracting done"
+  prepare_cpml_archive
 
   echo "Start building Celonis libraries"
 
