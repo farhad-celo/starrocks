@@ -72,7 +72,13 @@ void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_to
     }
     LOG(INFO) << get_log_prefix(query_id) << ": started variants sorting\n";
     std::sort(v_count.begin(), v_count.end(),
-              [](const VRef& lhs, const VRef& rhs) { return lhs->second > rhs->second; });
+              [](const VRef& lhs, const VRef& rhs) {
+                  if (lhs->second != rhs->second) {
+                      return lhs->second > rhs->second;
+                  }
+                  // When frequencies are equal, sort by variant data for stable ordering
+                  return lhs->first.data < rhs->first.data;
+              });
     LOG(INFO) << get_log_prefix(query_id) << ": done variants sorting (variant_map_ size = " << variant_map_.size()
               << ")\n";
 
