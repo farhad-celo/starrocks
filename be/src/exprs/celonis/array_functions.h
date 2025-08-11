@@ -38,8 +38,7 @@ public:
      * Aggregates activities in an array into a string (separated by ", "), which represents a variant.
      * NULL activities are ignored.
      * If the activity_array is NULL, its variant is NULL.
-     * If the activity_array is empty, its variant is "".
-     * If the activity_array is not empty and all activities are NULL, its variant is NULL.
+     * If the activity_array is empty or all activities are NULL, its variant is NULL.
      */
     DEFINE_VECTORIZED_FN(activities_to_variant);
 
