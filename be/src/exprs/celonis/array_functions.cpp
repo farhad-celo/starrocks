@@ -402,6 +402,60 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
     return result.build(all_const);
 }
 
+StatusOr<ColumnPtr> CelonisArrayFunctions::string_array_join([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+    DCHECK_EQ(columns.size(), 2);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
+    UnnestedArrayData array_data = prepare_array_input(array_column.get());
+    const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *array_data.elements).get_data().data();
+    const auto& offsets = array_data.offsets->get_data().data();
+
+    ColumnBuilder<TYPE_VARCHAR> result(num_rows);
+    ColumnViewer sep_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
+    faststring joined_string;
+    for (auto row = 0; row < num_rows; ++row) {
+        if ((array_data.null_arrays != nullptr && (*array_data.null_arrays)[row] != 0) ||
+            sep_viewer.is_null(row)) {
+            result.append_nulls(1);
+            continue;
+        }
+        const auto start = offsets[row];
+        const auto end = offsets[row + 1];
+        size_t count = 0;
+        size_t total_length = 0;
+        for (auto i = start; i < end; ++i) {
+            if (array_data.null_elements != nullptr && (*array_data.null_elements)[i] != 0) {
+                continue;
+            }
+            ++count;
+            total_length += strings[i].size;
+        }
+        if (count == 0) {
+            result.append_nulls(1);
+            continue;
+        }
+        Slice separator = sep_viewer.value(row);
+        joined_string.clear();
+        joined_string.reserve(total_length + (count - 1) * separator.size);
+        bool first = true;
+        for (auto i = start; i < end; ++i) {
+            if (array_data.null_elements != nullptr && (*array_data.null_elements)[i] != 0) {
+                continue;
+            }
+            if (!first) {
+                joined_string.append(separator.data, separator.size);
+            }
+            joined_string.append(strings[i].data, strings[i].size);
+            first = false;
+        }
+        result.append(Slice(joined_string.data(), joined_string.size()));
+
+    }
+    return result.build(all_const);
+}
+
 class CelonisArrayLag {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {

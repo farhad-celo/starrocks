@@ -43,6 +43,16 @@ public:
     DEFINE_VECTORIZED_FN(activities_to_variant);
 
     /**
+     * @param: [string_array, sep]
+     * @paramType: [ARRAY_VARCHAR, VARCHAR]
+     * @return: VARCHAR
+     * If string_array or sep is NULL, return NULL.
+     * NULL strings are ignored.
+     * If the string_array is empty or all strings are NULL, return NULL.
+     */
+    DEFINE_VECTORIZED_FN(string_array_join);
+
+    /**
      * @param: [input_array, offset]
      * @paramType: [ANY_ARRAY, BIGINT]
      * @return: input_array type
