@@ -579,4 +579,39 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_lead([[maybe_unused]] FunctionC
     return CelonisArrayLead::process(columns);
 }
 
+class CelonisNullToEmpty {
+public:
+    static StatusOr<ColumnPtr> process(const Columns& columns) {
+        DCHECK_EQ(columns.size(), 1);
+        if (!columns[0]->is_nullable() || !columns[0]->has_null()) {
+            return columns[0]->clone();
+        }
+        size_t n_rows = columns[0]->size();
+        ColumnPtr input_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
+        ColumnPtr output_column = input_column->clone_empty();
+
+        const auto* input_nullable_column = down_cast<const NullableColumn*>(input_column.get());
+        const auto& input_data_column = input_nullable_column->data_column_ref();
+
+        auto* output_nullable_column = down_cast<NullableColumn*>(output_column.get());
+        auto* output_data_column = output_nullable_column->mutable_data_column();
+        auto* output_null_column = output_nullable_column->mutable_null_column();
+        output_null_column->get_data().resize(n_rows, 0);
+        output_nullable_column->set_has_null(false);
+        for (size_t i = 0; i < n_rows; ++i) {
+            if (input_column->is_null(i)) {
+                output_data_column->append_default();
+            } else {
+                output_data_column->append(input_data_column, i, 1);
+            }
+        }
+        return output_column;
+    }
+};
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] FunctionContext* context,
+                                                         const Columns& columns) {
+    return CelonisNullToEmpty::process(columns);
+}
+
 } // namespace starrocks

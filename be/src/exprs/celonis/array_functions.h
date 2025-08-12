@@ -48,6 +48,13 @@ public:
      */
     DEFINE_VECTORIZED_FN(array_lead);
 
+    /**
+     * @param: [input_array]
+     * @paramType columns: [ANY_ARRAY]
+     * @return: input_array type
+     * Returns a new column based on the input column where NULL elements are replaced with empty arrays.
+     */
+    DEFINE_VECTORIZED_FN(null_to_empty);
 };
 
 } // namespace starrocks
