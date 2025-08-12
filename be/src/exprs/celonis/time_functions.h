@@ -27,6 +27,11 @@ public:
     static Status in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status in_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+
+    static Status remap_timestamps_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status remap_timestamps_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
 
 } // namespace starrocks

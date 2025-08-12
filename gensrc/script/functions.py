@@ -1453,7 +1453,7 @@ celostar_functions = [
 
     # Time functions
     [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],
-    [3000110, 'celonis_remap_timestamps_calendar', True, False, 'BIGINT', ['DATETIME', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::remap_timestamps_calendar'],
+    [3000110, 'celonis_remap_timestamps_calendar', True, False, 'BIGINT', ['DATETIME', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::remap_timestamps_calendar', 'CelonisTimeFunctions::remap_timestamps_calendar_prepare', 'CelonisTimeFunctions::remap_timestamps_calendar_close'],
     [3000120, 'celonis_in_calendar', True, False, 'BIGINT', ['DATETIME', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::in_calendar', 'CelonisTimeFunctions::in_calendar_prepare', 'CelonisTimeFunctions::in_calendar_close'],
 
     # String functions

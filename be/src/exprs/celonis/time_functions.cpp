@@ -187,6 +187,8 @@ static void merge_time_ranges(std::vector<TimeRange>& time_ranges) {
 
 class Calendar {
 public:
+    Calendar() = default;
+
     Calendar(const celonis::accelerator::Calendar& calendar_proto) {
         if (calendar_proto.has_weekday_calendar()) {
             handle_weekday_calendar(calendar_proto.weekday_calendar());
@@ -364,6 +366,12 @@ private:
     std::unordered_map<std::string, std::vector<TimeRange>> id_to_time_ranges_;
 };
 
+struct CalendarState {
+    Calendar calendar;
+    bool is_null;
+    bool is_empty;
+};
+
 static bool json_string_to_calendar(const std::string& calendar_json_string, celonis::accelerator::Calendar& calendar) {
     auto status = google::protobuf::util::JsonStringToMessage(calendar_json_string, &calendar);
     return status.ok();
@@ -516,8 +524,50 @@ remap_timestamp_calendar(const TimestampValue& timestamp, const std::string& tim
     return convert_time_unit(time_unit, milliseconds);
 }
 
-StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unused]] FunctionContext* context,
-                                                                    const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionContext* context,
+                                                    const starrocks::Columns& columns,
+                                                    const CalendarState* calendar_state) {
+    DCHECK_EQ(columns.size(), 4);
+    size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
+    ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    const Calendar& calendar = calendar_state->calendar;
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (calendar_state->is_null || timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        std::string time_unit = time_unit_viewer.value(row).to_string();
+        if (TIME_UNIT_TO_MS.find(time_unit) == TIME_UNIT_TO_MS.end()) {
+            return Status::InvalidArgument("time unit must be one of DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
+        }
+        auto timestamp = timestamp_viewer.value(row);
+        std::optional<std::string> calendar_id = std::nullopt;
+        if (!calendar_id_viewer.is_null(row)) {
+            calendar_id = calendar_id_viewer.value(row).to_string();
+        }
+        int64_t milliseconds;
+        if (calendar_state->is_empty) {
+            milliseconds = remap_timestamp_ms(timestamp);
+        } else {
+            if (calendar.requires_calendar_id() && !calendar_id.has_value()) {
+                return Status::InvalidArgument("Calendar ID column not provided.");
+            }
+            if (!calendar.requires_calendar_id()) {
+                calendar_id = std::nullopt;
+            }
+            milliseconds = calendar.remap_timestamp_ms(timestamp, calendar_id);
+        }
+        ASSIGN_OR_RETURN(const int64_t value, convert_time_unit(time_unit, milliseconds));
+        result.append(value);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> remap_timestamps_calendar_general([[maybe_unused]] FunctionContext* context,
+                                                      const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 4);
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
@@ -562,6 +612,19 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unus
         }
     }
     return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unused]] FunctionContext* context,
+                                                                    const starrocks::Columns& columns) {
+    if (context == nullptr) {
+        return remap_timestamps_calendar_general(context, columns);
+    }
+    auto* calendar_state = reinterpret_cast<CalendarState*>(context->get_function_state(
+            FunctionContext::FRAGMENT_LOCAL));
+    if (calendar_state == nullptr) {
+        return remap_timestamps_calendar_general(context, columns);
+    }
+    return remap_timestamps_calendar_const(context, columns, calendar_state);
 }
 
 static StatusOr<std::optional<bool>>
@@ -663,8 +726,8 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar([[maybe_unused]] FunctionC
 }
 
 Status CelonisTimeFunctions::in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-    // context->is_constant_column(1) must not be used to determine if the argument is Array Literal because as of
-    // 2024-01-31 it returns false for Array Literal while get_constant_column(1) returns non nullptr.
+    // context->is_constant_column(index) must not be used to determine if the argument is Array Literal because as of
+    // 2024-01-31 it returns false for Array Literal while get_constant_column(index) returns non nullptr.
     if (scope != FunctionContext::FRAGMENT_LOCAL || context->get_num_args() != 3 ||
         context->get_arg_type(1)->type != TYPE_ARRAY || context->get_constant_column(1) == nullptr) {
         return Status::OK();
@@ -706,6 +769,62 @@ Status CelonisTimeFunctions::in_calendar_close(FunctionContext* context, Functio
         auto* calendar = reinterpret_cast<Calendar*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
         if (calendar != nullptr) {
             delete calendar;
+        }
+    }
+    return Status::OK();
+}
+
+Status CelonisTimeFunctions::remap_timestamps_calendar_prepare(FunctionContext* context,
+                                                               FunctionContext::FunctionStateScope scope) {
+    // context->is_constant_column(index) must not be used to determine if the argument is Array Literal because as of
+    // 2024-01-31 it returns false for Array Literal while get_constant_column(index) returns non nullptr.
+    if (scope != FunctionContext::FRAGMENT_LOCAL || context->get_num_args() != 4 ||
+        context->get_arg_type(2)->type != TYPE_ARRAY || context->get_constant_column(2) == nullptr) {
+        return Status::OK();
+    }
+    const auto calendar_column = context->get_constant_column(2);
+    if (calendar_column->size() == 0) {
+        return Status::OK();
+    }
+
+    if (calendar_column->is_null(0)) {
+        auto* calendar_state = new CalendarState{Calendar(), true, false};
+        context->set_function_state(scope, calendar_state);
+        return Status::OK();
+    }
+
+    std::string calendar_json_string;
+    auto array = calendar_column->get(0).get_array();
+    for (const auto& element: array) {
+        if (element.is_null()) {
+            return Status::InvalidArgument("[prepare] Calendar array can not contain null values.");
+        } else {
+            calendar_json_string += element.get_slice().to_string();
+        }
+    }
+    if (calendar_json_string.empty()) {
+        auto* calendar_state = new CalendarState{Calendar(), false, true};
+        context->set_function_state(scope, calendar_state);
+        return Status::OK();
+    }
+    celonis::accelerator::Calendar calendar_proto;
+    // parse calendar_json_string
+    if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
+        return Status::InvalidArgument("[prepare] Calendar specification column is malformed.");
+    }
+    RETURN_IF_ERROR(validate_calendar(calendar_proto));
+    auto* calendar_state = new CalendarState{Calendar(calendar_proto), false, false};
+    context->set_function_state(scope, calendar_state);
+    return Status::OK();
+}
+
+Status CelonisTimeFunctions::remap_timestamps_calendar_close(FunctionContext* context,
+                                                             FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        auto* calendar_state = reinterpret_cast<CalendarState*>(context->get_function_state(
+                FunctionContext::FRAGMENT_LOCAL));
+        if (calendar_state != nullptr) {
+            delete calendar_state;
         }
     }
     return Status::OK();
