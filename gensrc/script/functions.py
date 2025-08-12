@@ -1412,6 +1412,7 @@ celostar_functions = [
     [1000304, 'celonis_index_activity_order', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivityOrder::celonis_index_activity_order'],
     [1000305, 'celonis_match_process', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisMatchProcess::celonis_match_process', 'CelonisMatchProcess::match_process_prepare', 'CelonisMatchProcess::match_process_close'],
     [1000306, 'celonis_shortened_variant', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'BIGINT'], 'CelonisShortenedVariant::celonis_shortened_variant'],
+    [1000307, 'celonis_conformance', True, False, 'ARRAY_BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisConformance::conformance', 'CelonisConformance::conformance_prepare', 'CelonisConformance::conformance_close'],
     [1000401, 'celonis_in', True, False, 'BOOLEAN', ['INT', 'ARRAY_INT'], 'CelonisIn::celonis_in'],
     [1000402, 'celonis_in', True, False, 'BOOLEAN', ['BIGINT', 'ARRAY_BIGINT'], 'CelonisIn::celonis_in'],
     [1000403, 'celonis_in', True, False, 'BOOLEAN', ['DOUBLE', 'ARRAY_DOUBLE'], 'CelonisIn::celonis_in'],

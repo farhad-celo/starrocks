@@ -1,0 +1,163 @@
+#include "exprs/celonis/conformance.h"
+
+#include <gtest/gtest.h>
+#include <testutil/assert.h>
+
+#include "column/column_helper.h"
+#include "column/vectorized_fwd.h"
+#include "exprs/function_context.h"
+#include "util.h"
+
+namespace starrocks::vectorized {
+
+const int64_t id_A = 958484639;
+const int64_t id_B = 601389851;
+const int64_t id_C = 104740979;
+
+class CelonisConformanceTest : public ::testing::Test {
+protected:
+    void SetUp() override {}
+
+    void TearDown() override {}
+
+    TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
+    TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
+
+    void conform(Columns columns, ColumnPtr expected) {
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+        auto context = ctx.get();
+        context->set_constant_columns(columns);
+
+        ASSERT_OK(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        ASSERT_OK(CelonisConformance::conformance_prepare(context, FunctionContext::FunctionStateScope::THREAD_LOCAL));
+
+        const auto result = CelonisConformance::conformance(context, columns).value();
+
+        ASSERT_EQ(result->size(), expected->size());
+        for (int i = 0; i < result->size(); ++i) {
+            auto result_array = result->get(i).get_array();
+            auto expected_array = expected->get(i).get_array();
+            ASSERT_EQ(result_array.size(), expected_array.size());
+            for (int j = 0; j < result_array.size(); j++) {
+                EXPECT_EQ(result_array[j].get_int64(), expected_array[j].get_int64())
+                                << "row index: " << i << ", element index: " << j;
+            }
+        }
+        ASSERT_OK(CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::THREAD_LOCAL));
+        ASSERT_OK(CelonisConformance::conformance_close(context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+    }
+};
+
+TEST_F(CelonisConformanceTest, pql_conformance_examples) {
+    Slice jsonInput(
+            R"json({
+              "places" : [ "P_0", "P_1", "P_2" ],
+              "transitions" : [ "T_01", "T_12" ],
+              "arcs" : [
+                {
+                  "from" : "P_0",
+                  "to" : "T_01"
+                }, {
+                  "from" : "T_01",
+                  "to" : "P_1"
+                }, {
+                  "from" : "P_1",
+                  "to" : "T_12"
+                }, {
+                  "from" : "T_12",
+                  "to" : "P_2"
+                }
+              ],
+              "mapping" : [
+                {
+                  "from" : "A",
+                  "to" : "T_01"
+                }, {
+                  "from" : "B",
+                  "to" : "T_12"
+                }
+              ],
+              "initial_marking" : [
+                {
+                  "node" : "P_0",
+                  "count" : 1
+                }
+              ],
+              "final_marking" : [
+                {
+                  "node" : "P_2",
+                  "count" : 1
+                }
+              ]
+            })json");
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    auto expected = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+
+    array->append_datum(DatumArray{"A", "B"});
+    expected->append_datum(DatumArray{0L, 0L});
+
+    array->append_datum(DatumArray{"A", "C"});
+    expected->append_datum(DatumArray{0L, /*C is an undesired activity*/ -id_C});
+
+    array->append_datum(DatumArray{"A"});
+    expected->append_datum(DatumArray{2147483647L});
+
+    array->append_datum(DatumArray{"A", "A"});
+    expected->append_datum(DatumArray{0L, /*A is followed by A*/ (id_A << 32) + id_A});
+
+    array->append_datum(DatumArray{"B", "A", "B"});
+    expected->append_datum(DatumArray{/*B executed as start activity */ (MISSING_START_ACTIVITY_KEY << 32) + id_B, 0L, 0L});
+
+    array->append_datum(DatumArray{"A", "C", "A"});
+    expected->append_datum(DatumArray{0L, /*C is an undesired activity*/ -id_C, /*A is followed by A*/(id_A << 32) + id_A});
+
+    // NULL handling. A NULL value conforms with any Petri net.
+    array->append_datum(DatumArray{"A", Datum{}, "B"});
+    expected->append_datum(DatumArray{0L, 0L, 0L});
+
+    auto json_spec = ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, array->size());
+
+    Columns input;
+    input.push_back(array);
+    input.push_back(json_spec);
+
+    conform(input, expected);
+}
+
+#if !defined(__SANITIZE_ADDRESS__)
+TEST_F(CelonisConformanceTest, invalid_json_spec) {
+    Slice jsonInput(
+            R"json({
+              "places" : [ "P_0", "P_1", "P_2" ],
+              "transitions" : [ "T_01", "T_12" ],
+              "initial_marking" : [
+                {
+                  "node" : "P_0",
+                  "count" : 1
+                }
+              ],
+              "final_marking" : [
+                {
+                  "node" : "P_2",
+                  "count" : 1
+                }
+              ]
+            })json");
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    auto dummy_expected = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+    array->append_datum(DatumArray{"A", "B"});
+    dummy_expected->append_datum(DatumArray{0L, 0L});
+
+    auto json_spec = ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, array->size());
+
+
+    Columns input;
+    input.push_back(array);
+    input.push_back(json_spec);
+
+    EXPECT_THROW(conform(input, dummy_expected), std::runtime_error);
+}
+#endif
+
+} // namespace starrocks::vectorized
+

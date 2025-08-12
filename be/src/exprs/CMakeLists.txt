@@ -118,6 +118,7 @@ endif()
 set(CELONIS_FILES
   celonis/array_functions.cpp
   celonis/calc_throughput.cpp
+  celonis/conformance.cpp
   celonis/count_edges.cpp
   celonis/in.cpp
   celonis/index_activity_order.cpp
