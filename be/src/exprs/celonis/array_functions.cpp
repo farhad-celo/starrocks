@@ -475,4 +475,95 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_lag([[maybe_unused]] FunctionCo
     return CelonisArrayLag::process(columns);
 }
 
+class CelonisArrayLead {
+public:
+    static StatusOr<ColumnPtr> process(const Columns& columns) {
+        DCHECK_EQ(columns.size(), 2);
+        if (columns[0]->only_null() || columns[1]->only_null()) {
+            return Status::InvalidArgument("The input array and offset should not be null.");
+        }
+
+        size_t chunk_size = columns[0]->size();
+        ColumnViewer offset_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
+        DCHECK_EQ(offset_viewer.size(), chunk_size);
+
+        for (size_t i = 0; i < chunk_size; ++i) {
+            if (offset_viewer.is_null(i)) {
+                return Status::InvalidArgument("offset column must not contain null.");
+            }
+            if (offset_viewer.value(i) <= 0) {
+                return Status::InvalidArgument("offset must be a positive integer.");
+            }
+        }
+
+        ColumnPtr input_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[0]);
+        ColumnPtr output_column = input_column->clone_empty();
+
+        if (input_column->is_nullable()) {
+            if (input_column->has_null()) {
+                return Status::InvalidArgument("input_array should not be null.");
+            }
+            const auto* input_nullable_column = down_cast<const NullableColumn*>(input_column.get());
+            const auto& input_data_column = input_nullable_column->data_column_ref();
+
+            auto* output_nullable_column = down_cast<NullableColumn*>(output_column.get());
+            auto* output_data_column = output_nullable_column->mutable_data_column();
+            auto* output_null_column = output_nullable_column->mutable_null_column();
+            output_null_column->get_data().resize(chunk_size, 0);
+            output_nullable_column->set_has_null(false);
+            RETURN_IF_ERROR(_array_lead(output_data_column, input_data_column, offset_viewer));
+        } else {
+            RETURN_IF_ERROR(_array_lead(output_column.get(), *input_column, offset_viewer));
+        }
+        return output_column;
+    }
+
+private:
+    static Status _array_lead(Column* output_array_column, const Column& input_array_column,
+                              const ColumnViewer<TYPE_BIGINT>& offset_viewer) {
+        const auto& input_elements_column = down_cast<const ArrayColumn&>(input_array_column).elements();
+        const auto& input_offsets = down_cast<const ArrayColumn&>(input_array_column).offsets().get_data().data();
+
+        auto* output_elements_column = down_cast<ArrayColumn*>(output_array_column)->elements_column().get();
+        auto* output_offsets_column = down_cast<ArrayColumn*>(output_array_column)->offsets_column().get();
+
+        for (size_t i = 0; i < input_array_column.size(); i++) {
+            size_t start = input_offsets[i];
+            size_t end = input_offsets[i + 1];
+            int64_t lead_offset = offset_viewer.value(i);
+            std::deque<size_t> window;
+            std::vector<std::optional<size_t>> idxes;
+            // traverse the elements reversely.
+            for (size_t j = end; j-- > start;) {
+                if (window.size() == lead_offset) {
+                    idxes.emplace_back(window.front());
+                } else {
+                    idxes.emplace_back(std::nullopt);
+                }
+                if (!input_elements_column.get(j).is_null()) {
+                    window.push_back(j);
+                }
+                if (window.size() > lead_offset) {
+                    window.pop_front();
+                }
+            }
+            for (auto it = idxes.rbegin(); it != idxes.rend(); ++it) {
+                if (it->has_value()) {
+                    output_elements_column->append(input_elements_column, it->value(), 1);
+                } else {
+                    output_elements_column->append_nulls(1);
+                }
+            }
+        }
+        output_offsets_column->get_data() = down_cast<const ArrayColumn&>(input_array_column).offsets().get_data();
+        return Status::OK();
+    }
+};
+
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::array_lead([[maybe_unused]] FunctionContext* context,
+                                                      const Columns& columns) {
+    return CelonisArrayLead::process(columns);
+}
+
 } // namespace starrocks

@@ -33,10 +33,20 @@ public:
      * @paramType columns: [ANY_ARRAY, BIGINT]
      * @return: input_array type
      * Returns the element that precedes the current element by offset number of elements.
-     * The lagging value for a NULL value is the same value as the lagging value for the next non-NULL value.
+     * The lagging value for a NULL value is the same value as the lagging value of the next non-NULL value.
      * The offset parameter counts only non-NULL values.
      */
     DEFINE_VECTORIZED_FN(array_lag);
+
+    /**
+     * @param: [input_array, offset]
+     * @paramType columns: [ANY_ARRAY, BIGINT]
+     * @return: input_array type
+     * Returns the element that follows the current element by offset number of elements.
+     * The leading value for a NULL value is the same value as the leading value of the last non-NULL value.
+     * The offset parameter counts only non-NULL values.
+     */
+    DEFINE_VECTORIZED_FN(array_lead);
 
 };
 

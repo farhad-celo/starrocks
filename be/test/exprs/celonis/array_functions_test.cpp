@@ -574,6 +574,217 @@ TEST_F(CelonisArrayFunctionsTest, array_lag_null_offset) {
     EXPECT_EQ(result.status().get_error_msg(), "offset column must not contain null.");
 }
 
+TEST_F(CelonisArrayFunctionsTest, array_lead_datetime) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, false);
+    input_array->append_datum(DatumArray{TimestampValue::create(2020, 8, 10, 1, 32, 32),
+                                         TimestampValue::create(2020, 8, 10, 2, 32, 32),
+                                         TimestampValue::create(2020, 8, 10, 3, 32, 32),
+                                         TimestampValue::create(2020, 8, 10, 4, 32, 32),
+                                         TimestampValue::create(2020, 8, 10, 5, 32, 32)});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+    offset_array->append_datum(3L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(5, result->get(0).get_array().size());
+    EXPECT_EQ(TimestampValue::create(2020, 8, 10, 4, 32, 32), result->get(0).get_array()[0].get_timestamp());
+    EXPECT_EQ(TimestampValue::create(2020, 8, 10, 5, 32, 32), result->get(0).get_array()[1].get_timestamp());
+    EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[4].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_int) {
+    {
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        input_array->append_datum(DatumArray{1, 2, 3, 4, 5, 6});
+
+        auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        offset_array->append_datum(3L);
+
+        const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(6, result->get(0).get_array().size());
+        EXPECT_EQ(4, result->get(0).get_array()[0].get_int32());
+        EXPECT_EQ(5, result->get(0).get_array()[1].get_int32());
+        EXPECT_EQ(6, result->get(0).get_array()[2].get_int32());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[4].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[5].is_null());
+    }
+
+    {
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        input_array->append_datum(DatumArray{1, 2, kNullDatum, 4, 5, 6});
+
+        auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+        offset_array->append_datum(2L);
+
+        const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(6, result->get(0).get_array().size());
+        EXPECT_EQ(4, result->get(0).get_array()[0].get_int32());
+        EXPECT_EQ(5, result->get(0).get_array()[1].get_int32());
+        EXPECT_EQ(5, result->get(0).get_array()[2].get_int32());
+        EXPECT_EQ(6, result->get(0).get_array()[3].get_int32());
+        EXPECT_TRUE(result->get(0).get_array()[4].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[5].is_null());
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_large_offset) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    input_array->append_datum(DatumArray{1, 2, 3, 4, 5, 6});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+    offset_array->append_datum(6L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(6, result->get(0).get_array().size());
+    EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[4].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[5].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_varchar) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{"10", "20", kNullDatum, "three0", "31", "32"});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+    offset_array->append_datum(1L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(6, result->get(0).get_array().size());
+    EXPECT_EQ("20", result->get(0).get_array()[0].get_slice());
+    EXPECT_EQ("three0", result->get(0).get_array()[1].get_slice());
+    EXPECT_EQ("three0", result->get(0).get_array()[2].get_slice());
+    EXPECT_EQ("31", result->get(0).get_array()[3].get_slice());
+    EXPECT_EQ("32", result->get(0).get_array()[4].get_slice());
+    EXPECT_TRUE(result->get(0).get_array()[5].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_all_null) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+    offset_array->append_datum(1L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(4, result->get(0).get_array().size());
+    EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_empty_column) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(0, result->size());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_empty_array) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+    offset_array->append_datum(1L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(0, result->get(0).get_array().size());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_multiple_nulls) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{"10", "20", kNullDatum, "30", kNullDatum, kNullDatum, "40", "50", "60"});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+    offset_array->append_datum(2L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(9, result->get(0).get_array().size());
+    EXPECT_EQ("30", result->get(0).get_array()[0].get_slice());
+    EXPECT_EQ("40", result->get(0).get_array()[1].get_slice());
+    EXPECT_EQ("40", result->get(0).get_array()[2].get_slice());
+    EXPECT_EQ("50", result->get(0).get_array()[3].get_slice());
+    EXPECT_EQ("50", result->get(0).get_array()[4].get_slice());
+    EXPECT_EQ("50", result->get(0).get_array()[5].get_slice());
+    EXPECT_EQ("60", result->get(0).get_array()[6].get_slice());
+    EXPECT_TRUE(result->get(0).get_array()[7].is_null());
+    EXPECT_TRUE(result->get(0).get_array()[8].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_multiple_arrays) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{"10", "20", "30"});
+    input_array->append_datum(DatumArray{"100", "200", "300"});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false);
+    offset_array->append_datum(1L);
+    offset_array->append_datum(2L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array}).value();
+    ASSERT_EQ(2, result->size());
+    ASSERT_EQ(3, result->get(0).get_array().size());
+    ASSERT_EQ(3, result->get(1).get_array().size());
+
+    EXPECT_EQ("20", result->get(0).get_array()[0].get_slice());
+    EXPECT_EQ("30", result->get(0).get_array()[1].get_slice());
+    EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+
+    EXPECT_EQ("300", result->get(1).get_array()[0].get_slice());
+    EXPECT_TRUE(result->get(1).get_array()[1].is_null());
+    EXPECT_TRUE(result->get(1).get_array()[2].is_null());
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_negative_offset) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{"10", "20", "30"});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+    offset_array->append_datum(-1L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array});
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().get_error_msg(), "offset must be a positive integer.");
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_zero_offset) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{"10", "20", "30"});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+    offset_array->append_datum(0L);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array});
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().get_error_msg(), "offset must be a positive integer.");
+}
+
+TEST_F(CelonisArrayFunctionsTest, array_lead_null_offset) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    input_array->append_datum(DatumArray{"10", "20", "30"});
+
+    auto offset_array = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+    offset_array->append_datum(kNullDatum);
+
+    const auto result = CelonisArrayFunctions::array_lead(nullptr, {input_array, offset_array});
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().get_error_msg(), "offset column must not contain null.");
+}
+
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_int) {
     {
         auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),

@@ -1449,6 +1449,7 @@ celostar_functions = [
     [2000110, 'celonis_merge_sorted_arrays', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
     [2000120, 'celonis_dedup_sorted_by', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_VARCHAR'], 'CelonisArrayFunctions::dedup_sorted_by'],
     [2000130, 'celonis_array_lag', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'BIGINT'], 'CelonisArrayFunctions::array_lag'],
+    [2000140, 'celonis_array_lead', True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'BIGINT'], 'CelonisArrayFunctions::array_lead'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis']
