@@ -1406,6 +1406,9 @@ celostar_functions = [
 
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
+
+    # Time functions
+    [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis']
 ]
 
 vectorized_functions.extend(celostar_functions)
