@@ -1,5 +1,6 @@
 #pragma once
 
+#include "exprs/celonis/util.h"
 #include "exprs/function_helper.h"
 
 namespace starrocks {
@@ -7,29 +8,32 @@ namespace starrocks {
 class CelonisSourceTargetFunctions {
 public:
     // Edge configurations for SOURCE/TARGET functions.
-    // TODO(gubichev): expand the list.
+    // TODO(j.kim): expand the list.
     enum EdgeConfig {DEFAULT, ANY_TO_ANY};
 
+    /**
+     * @param: [input_array, edge_configuration, (group_array)]
+     * @paramType columns: [ARRAY of INT | DATETIME | BIGINT | VARCHAR, VARCHAR, (ARRAY of BIGINT)]
+     * @return: input_array type
+     * Supports PQL SOURCE and TARGET https://confluence.celonis.com/display/PQLdevelopment/SOURCE+-+TARGET
+     * Only "any->any" edge_configuration is supported.
+     */
     DEFINE_VECTORIZED_FN(celonis_array_sources);
-
     DEFINE_VECTORIZED_FN(celonis_array_targets);
 
-private:
-    // Constructs a column with results of CELONIS_ARRAY_SOURCES. 'elements' are input array elements (flattened) where
-    // 'offsets' are used to compute the layout of the original arrays. 'null_element_offsets' are null indicators for
-    // elements of the arrays, while 'null_array_offsets' are null indicators for array themselves
-    template <bool has_null, EdgeConfig format>
-    static ColumnPtr _celonis_array_sources_impl(FunctionContext* context, const Column& elements,
-                                                 const UInt32Column& offsets,
-                                                 const NullColumn::Container* null_element_offsets,
-                                                 const NullColumn::Container* null_array_offsets);
+    static Status celonis_array_sources_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status celonis_array_targets_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status celonis_array_sources_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status celonis_array_targets_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
-    // Same as '_celonis_array_sources_impl', but implements CELONIS_ARRAY_TARGETS function.
-    template<bool has_null, EdgeConfig format>
-    static ColumnPtr _celonis_array_targets_impl(FunctionContext* context, const Column& elements,
-                                                 const UInt32Column& offsets,
-                                                 const NullColumn::Container* null_element_offsets,
-                                                 const NullColumn::Container* null_array_offsets);
+private:
+    // Constructs a column with results of CELONIS_ARRAY_SOURCES and CELONIS_ARRAY_TARGETS.
+    template<bool is_source, bool has_group, bool has_null_element, bool has_null_group_element>
+    static ColumnPtr _celonis_array_sources_targets_impl(const UnnestedArrayData& array_data,
+                                                         const UnnestedArrayData& group_array_data);
+    template<bool is_source>
+    static ColumnPtr _celonis_array_sources_targets_impl(const UnnestedArrayData& array_data,
+                                                         const UnnestedArrayData& group_array_data);
 };
 
 } // namespace starrocks
