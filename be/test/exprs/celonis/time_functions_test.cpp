@@ -4,6 +4,8 @@
 #include "types/timestamp_value.h"
 #include "util.h"
 #include <gtest/gtest.h>
+#include "testutil/function_utils.h"
+#include "exprs/anyval_util.h"
 
 namespace starrocks {
 
@@ -1418,22 +1420,216 @@ TEST_F(CelonisTimeFunctionsTest, in_calendar_workday_calendar_with_id) {
     }
 }
 
-TEST_F(CelonisTimeFunctionsTest, in_calendar_invalid_workday_calendar) {
-    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
-    auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-    auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-    timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
-    calendars->append_datum(
-            DatumArray{
-                    R"({"workday_calendar": )",
-                    R"({ "entries": { "year": 1989, )",
-                    get_is_workdays_str(366, {0}).c_str(),
-                    R"( } }})"});
-    calendar_ids->append_datum(kNullDatum);
-    const auto result = CelonisTimeFunctions::in_calendar(nullptr, {timestamps, calendars, calendar_ids});
-    ASSERT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ(result.status().get_error_msg(),
-              "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
+TEST_F(CelonisTimeFunctionsTest, in_calendar_prepare) {
+    // Single row
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 12, 1, 0, 0));
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": {)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 10, 15}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {11}).c_str(),
+                        R"(, calendar_id: "id2"},)",
+                        R"( }})"});
+        calendar_ids->append_datum("id1");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::in_calendar_prepare(utils->get_fn_ctx(),
+                                                              FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::in_calendar(utils->get_fn_ctx(),
+                                                              {timestamps, calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(0L, result->get(0).get_int64());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::in_calendar_close(utils->get_fn_ctx(),
+                                                            FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    // multiple rows
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 12, 1, 0, 0));
+        timestamps->append_datum(TimestampValue::create(1970, 1, 12, 1, 0, 0));
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": {)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {0, 10, 15}).c_str(),
+                        R"(, calendar_id: "id1"},)",
+                        R"("entries": { "year": 1970, )",
+                        get_is_workdays_str(365, {11}).c_str(),
+                        R"(, calendar_id: "id2"},)",
+                        R"( }})"});
+        calendar_ids->append_datum("id1");
+        calendar_ids->append_datum("id2");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 2);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::in_calendar_prepare(utils->get_fn_ctx(),
+                                                              FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::in_calendar(utils->get_fn_ctx(),
+                                                              {timestamps, calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_EQ(0L, result->get(0).get_int64());
+        EXPECT_EQ(1L, result->get(1).get_int64());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::in_calendar_close(utils->get_fn_ctx(),
+                                                            FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 12, 1, 0, 0));
+        calendars->append_datum(DatumArray{});
+        calendar_ids->append_datum("id1");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::in_calendar_prepare(utils->get_fn_ctx(),
+                                                              FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::in_calendar(utils->get_fn_ctx(),
+                                                              {timestamps, calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::in_calendar_close(utils->get_fn_ctx(),
+                                                            FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 12, 1, 0, 0));
+        calendars->append_datum(kNullDatum);
+        calendar_ids->append_datum("id1");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        ASSERT_TRUE(CelonisTimeFunctions::in_calendar_prepare(utils->get_fn_ctx(),
+                                                              FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+        // execute
+        const auto result = CelonisTimeFunctions::in_calendar(utils->get_fn_ctx(),
+                                                              {timestamps, calendars, calendar_ids}).value();
+        ASSERT_EQ(timestamps->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+        // close
+        ASSERT_TRUE(CelonisTimeFunctions::in_calendar_close(utils->get_fn_ctx(),
+                                                            FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 12, 1, 0, 0));
+        calendars->append_datum(DatumArray{"Unknown"});
+        calendar_ids->append_datum("id1");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        const auto result = CelonisTimeFunctions::in_calendar_prepare(utils->get_fn_ctx(),
+                                                                      FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result.is_invalid_argument());
+        EXPECT_EQ(result.get_error_msg(), "[prepare] Calendar specification column is malformed.");
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 12, 1, 0, 0));
+        calendars->append_datum(DatumArray{kNullDatum});
+        calendar_ids->append_datum("id1");
+        auto utils = std::make_shared<FunctionUtils>();
+        auto const_calendars = ConstColumn::create(calendars, 1);
+        utils->get_fn_ctx()->set_constant_columns({nullptr, const_calendars, nullptr});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_DATETIME});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_ARRAY});
+        utils->get_fn_ctx()->_arg_types.emplace_back(FunctionContext::TypeDesc{TYPE_VARCHAR});
+
+        // prepare
+        const auto result = CelonisTimeFunctions::in_calendar_prepare(utils->get_fn_ctx(),
+                                                                      FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result.is_invalid_argument());
+        EXPECT_EQ(result.get_error_msg(), "[prepare] Calendar array can not contain null values.");
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, in_calendar_invalid_calendar) {
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        calendars->append_datum(DatumArray{kNullDatum});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::in_calendar(nullptr, {timestamps, calendars, calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "Calendar array can not contain null values.");
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        calendars->append_datum(DatumArray{"UNKNOWN"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::in_calendar(nullptr, {timestamps, calendars, calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "Calendar specification column is malformed.");
+    }
+    {
+        auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
+        auto calendars = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendar_ids = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        calendars->append_datum(
+                DatumArray{
+                        R"({"workday_calendar": )",
+                        R"({ "entries": { "year": 1989, )",
+                        get_is_workdays_str(366, {0}).c_str(),
+                        R"( } }})"});
+        calendar_ids->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::in_calendar(nullptr, {timestamps, calendars, calendar_ids});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(),
+                  "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
+    }
 }
 
 } // namespace starrocks

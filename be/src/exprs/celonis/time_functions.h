@@ -23,6 +23,10 @@ public:
      * Implements PQL IN_CALENDAR https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11248959/IN+CALENDAR
      */
     DEFINE_VECTORIZED_FN(in_calendar);
+
+    static Status in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status in_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
 
 } // namespace starrocks

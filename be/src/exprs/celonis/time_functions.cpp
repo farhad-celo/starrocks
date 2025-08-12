@@ -202,7 +202,8 @@ public:
         }
     }
 
-    int64_t remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id_column) {
+    int64_t
+    remap_timestamp_ms(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id_column) const {
         const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
         const bool before_epoch = timestamp < epoch;
         const TimeRange time_range = get_time_range(timestamp);
@@ -223,7 +224,8 @@ public:
     }
 
     bool
-    is_timestamp_in_calendar(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id_column) {
+    is_timestamp_in_calendar(const TimestampValue& timestamp,
+                             const std::optional<std::string>& calendar_id_column) const {
         const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
         const int64_t ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
 
@@ -417,7 +419,7 @@ static Status validate_workday_calendar(const celonis::accelerator::WorkdayCalen
 }
 
 static Status validate_calendar(const celonis::accelerator::Calendar& calendar,
-                                const std::optional<std::string>& calendar_id_column) {
+                                const std::optional<std::string>& calendar_id_column = std::nullopt) {
     if (calendar.has_weekday_calendar()) {
         if (calendar_id_column.has_value()) {
             return Status::InvalidArgument("Calendar ID column should not be set for weekday calendar.");
@@ -547,8 +549,7 @@ timestamp_in_calendar(const TimestampValue& timestamp,
     }
 }
 
-StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar([[maybe_unused]] FunctionContext* context,
-                                                      const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 3);
     size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
@@ -556,7 +557,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar([[maybe_unused]] FunctionC
 
     UnnestedArrayData calendar_array_data = prepare_array_input(columns[1].get());
     if (calendar_array_data.null_elements != nullptr) {
-        return Status::InvalidArgument("Calendar array should not have null elements.");
+        return Status::InvalidArgument("Calendar array can not contain null values.");
     }
     DCHECK(calendar_array_data.elements->is_binary());
     const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
@@ -590,6 +591,91 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar([[maybe_unused]] FunctionC
 
     }
     return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> in_calendar_const([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns,
+                                      const Calendar* calendar) {
+    DCHECK_EQ(columns.size(), 3);
+    size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnViewer calendar_id_column_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
+
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (timestamp_viewer.is_null(row) || columns[1]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        auto timestamp = timestamp_viewer.value(row);
+        std::optional<std::string> calendar_id_column = std::nullopt;
+        if (!calendar_id_column_viewer.is_null(row)) {
+            calendar_id_column = calendar_id_column_viewer.value(row).to_string();
+        }
+        const bool is_in = calendar->is_timestamp_in_calendar(timestamp, calendar_id_column);
+        result.append(is_in ? 1L : 0L);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar([[maybe_unused]] FunctionContext* context,
+                                                      const starrocks::Columns& columns) {
+    if (context == nullptr) {
+        return in_calendar_general(context, columns);
+    }
+    auto* calendar = reinterpret_cast<Calendar*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    if (calendar == nullptr) {
+        return in_calendar_general(context, columns);
+    }
+    return in_calendar_const(context, columns, calendar);
+}
+
+Status CelonisTimeFunctions::in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    // context->is_constant_column(1) must not be used to determine if the argument is Array Literal because as of
+    // 2024-01-31 it returns false for Array Literal while get_constant_column(1) returns non nullptr.
+    if (scope != FunctionContext::FRAGMENT_LOCAL || context->get_num_args() != 3 ||
+        context->get_arg_type(1)->type != TYPE_ARRAY || context->get_constant_column(1) == nullptr) {
+        return Status::OK();
+    }
+    const auto calendar_column = context->get_constant_column(1);
+    if (calendar_column->size() == 0) {
+        return Status::OK();
+    }
+
+    if (calendar_column->is_null(0)) {
+        return Status::OK();
+    }
+
+    std::string calendar_json_string;
+    auto array = calendar_column->get(0).get_array();
+    for (const auto& element: array) {
+        if (element.is_null()) {
+            return Status::InvalidArgument("[prepare] Calendar array can not contain null values.");
+        } else {
+            calendar_json_string += element.get_slice().to_string();
+        }
+    }
+    if (calendar_json_string.empty()) {
+        return Status::OK();
+    }
+    celonis::accelerator::Calendar calendar_proto;
+    // parse calendar_json_string
+    if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
+        return Status::InvalidArgument("[prepare] Calendar specification column is malformed.");
+    }
+    RETURN_IF_ERROR(validate_calendar(calendar_proto));
+    auto* calendar = new Calendar(calendar_proto);
+    context->set_function_state(scope, calendar);
+    return Status::OK();
+}
+
+Status CelonisTimeFunctions::in_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        auto* calendar = reinterpret_cast<Calendar*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+        if (calendar != nullptr) {
+            delete calendar;
+        }
+    }
+    return Status::OK();
 }
 
 } // namespace starrocks
