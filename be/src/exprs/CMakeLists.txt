@@ -119,6 +119,7 @@ set(CELONIS_FILES
   celonis/array_functions.cpp
   celonis/calc_throughput.cpp
   celonis/count_edges.cpp
+  celonis/in.cpp
   celonis/index_activity_order.cpp
   celonis/match_activities.cpp
   celonis/match_process.cpp
@@ -128,7 +129,6 @@ set(CELONIS_FILES
   celonis/string_functions.cpp
   celonis/time_functions.cpp
   celonis/util.cpp
-  celonis/variant_stats.cpp
-)
+  celonis/variant_stats.cpp)
 
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})
