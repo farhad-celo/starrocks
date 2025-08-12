@@ -14,8 +14,8 @@ ColumnPtr _celonis_match_activities_impl(FunctionContext* context, const Column&
                                          const NullColumn::Container* null_offsets, const SliceHashSet& nodes) {
     const size_t num_array = offsets.size() - 1;
     auto offsets_ptr = offsets.get_data().data();
-    auto result_column = BooleanColumn::create(num_array, 0);
-    unsigned char *result_data = result_column->get_data().data();
+    auto result_column = Int32Column::create(num_array, 0);
+    int* result_data = result_column->get_data().data();
     using ValueType = RunTimeCppType<TYPE_VARCHAR>;
     auto elements_ptr = (const ValueType *) (elements.raw_data());
     // Collects the nodes that pass any of the 'NODES' filter.
@@ -57,7 +57,7 @@ StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities(Fu
         std::stringstream error;
         error << "unexpected null activities array as input to celonis_match_activities" << std::endl;
         context->set_error(error.str().c_str());
-        return BooleanColumn::create(columns[0]->size(), 0);
+        return Int32Column::create(columns[0]->size(), 0);
     }
 
     const auto& array_column = extract_array_column(columns[0].get());
