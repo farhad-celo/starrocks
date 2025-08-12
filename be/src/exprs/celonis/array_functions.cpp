@@ -1,9 +1,11 @@
 #include "exprs/celonis/array_functions.h"
 
+#include <vector>
 #include <utility>
 
 #include "column/array_column.h"
 #include "exprs/celonis/util.h"
+#include "column/column_viewer.h"
 
 namespace starrocks {
 
@@ -154,6 +156,7 @@ do {                                                                            
         return _array_is_sorted_non_nullable(down_cast<const ArrayColumn&>(array));
     }
 };
+
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::array_is_sorted([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     const ColumnPtr& arg0 = columns[0]; // array
@@ -388,6 +391,88 @@ private:
 StatusOr<ColumnPtr> CelonisArrayFunctions::dedup_sorted_by([[maybe_unused]] FunctionContext* context,
                                                            const Columns& columns) {
     return CelonisDedupSortedBy::process(columns);
+}
+
+class CelonisArrayLag {
+public:
+    static StatusOr<ColumnPtr> process(const Columns& columns) {
+        DCHECK_EQ(columns.size(), 2);
+        if (columns[0]->only_null() || columns[1]->only_null()) {
+            return Status::InvalidArgument("The input array and offset should not be null.");
+        }
+
+        size_t chunk_size = columns[0]->size();
+        ColumnViewer offset_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
+        DCHECK_EQ(offset_viewer.size(), chunk_size);
+
+        for (size_t i = 0; i < chunk_size; ++i) {
+            if (offset_viewer.is_null(i)) {
+                return Status::InvalidArgument("offset column must not contain null.");
+            }
+            if (offset_viewer.value(i) <= 0) {
+                return Status::InvalidArgument("offset must be a positive integer.");
+            }
+        }
+
+        ColumnPtr input_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[0]);
+        ColumnPtr output_column = input_column->clone_empty();
+
+        if (input_column->is_nullable()) {
+            if (input_column->has_null()) {
+                return Status::InvalidArgument("input_array should not be null.");
+            }
+            const auto* input_nullable_column = down_cast<const NullableColumn*>(input_column.get());
+            const auto& input_data_column = input_nullable_column->data_column_ref();
+
+            auto* output_nullable_column = down_cast<NullableColumn*>(output_column.get());
+            auto* output_data_column = output_nullable_column->mutable_data_column();
+            auto* output_null_column = output_nullable_column->mutable_null_column();
+            output_null_column->get_data().resize(chunk_size, 0);
+            output_nullable_column->set_has_null(false);
+            RETURN_IF_ERROR(_array_lag(output_data_column, input_data_column, offset_viewer));
+        } else {
+            RETURN_IF_ERROR(_array_lag(output_column.get(), *input_column, offset_viewer));
+        }
+        return output_column;
+    }
+
+private:
+    static Status _array_lag(Column* output_array_column, const Column& input_array_column,
+                             const ColumnViewer<TYPE_BIGINT>& offset_viewer) {
+        const auto& input_elements_column = down_cast<const ArrayColumn&>(input_array_column).elements();
+        const auto& input_offsets = down_cast<const ArrayColumn&>(input_array_column).offsets().get_data().data();
+
+        auto* output_elements_column = down_cast<ArrayColumn*>(output_array_column)->elements_column().get();
+        auto* output_offsets_column = down_cast<ArrayColumn*>(output_array_column)->offsets_column().get();
+
+        for (size_t i = 0; i < input_array_column.size(); i++) {
+            size_t start = input_offsets[i];
+            size_t end = input_offsets[i + 1];
+            int64_t lag_offset = offset_viewer.value(i);
+            std::deque<size_t> window;
+            for (size_t j = start; j < end; ++j) {
+                if (window.size() == lag_offset) {
+                    output_elements_column->append(input_elements_column, window.front(), 1);
+                } else {
+                    output_elements_column->append_nulls(1);
+                }
+                if (!input_elements_column.get(j).is_null()) {
+                    window.push_back(j);
+                }
+                if (window.size() > lag_offset) {
+                    window.pop_front();
+                }
+            }
+        }
+        output_offsets_column->get_data() = down_cast<const ArrayColumn&>(input_array_column).offsets().get_data();
+        return Status::OK();
+    }
+};
+
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::array_lag([[maybe_unused]] FunctionContext* context,
+                                                     const Columns& columns) {
+    return CelonisArrayLag::process(columns);
 }
 
 } // namespace starrocks

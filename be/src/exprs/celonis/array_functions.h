@@ -27,6 +27,17 @@ public:
      * key_array should not be NULL and should not have NULL elements.
      */
     DEFINE_VECTORIZED_FN(dedup_sorted_by);
+
+    /**
+     * @param: [input_array, offset]
+     * @paramType columns: [ANY_ARRAY, BIGINT]
+     * @return: input_array type
+     * Returns the element that precedes the current element by offset number of elements.
+     * The lagging value for a NULL value is the same value as the lagging value for the next non-NULL value.
+     * The offset parameter counts only non-NULL values.
+     */
+    DEFINE_VECTORIZED_FN(array_lag);
+
 };
 
 } // namespace starrocks
