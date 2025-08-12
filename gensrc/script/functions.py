@@ -1384,6 +1384,12 @@ vectorized_functions = [
 ]
 
 # Celostar: start ----->
+# Note on ordering the functions with the same name: SR optimizer iterates over
+# the functions with the same name in the order specificed by this file, and
+# picks the first one that can be used (based on type casting). Since most of
+# the types can be cast to VARCHAR, it is important to put the ARRAY_VARCHAR
+# overload to be the last, otherwise the query plan will cast the input array
+# to the ARRAY_VARCHAR.
 celostar_functions = [
     # PQL functions
     [1000100, 'celonis_array_sources', True, False, 'ARRAY_INT', ['ARRAY_INT', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
@@ -1391,8 +1397,9 @@ celostar_functions = [
     [1000102, 'celonis_array_sources', True, False, 'ARRAY_DATETIME', ['ARRAY_DATETIME', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
     [1000103, 'celonis_array_sources', True, False, 'ARRAY_BIGINT', ['ARRAY_BIGINT', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
 
-    [1000201, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
+    [1000201, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_INT', 'ARRAY_BIGINT', 'INT', 'INT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
     [1000202, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT', 'BIGINT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
+    [1000203, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
 
     [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities'],
     [1000302, 'celonis_remap_timestamp_weekday', True, False, 'ARRAY_BIGINT', ['ARRAY_DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday'],

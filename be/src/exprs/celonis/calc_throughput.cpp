@@ -40,7 +40,16 @@ int findActivity(const ActivityColumn& activity_data, const NullColumn::Containe
                 found_idx = i;
             }
         } else {
-            auto s = activity_data.get(i).get_int64();
+            int64_t s = 0;
+            if constexpr(std::is_same_v<ActivityType, int64>) {
+                s = activity_data.get(i).get_int64();
+            } else if constexpr(std::is_same_v<ActivityType, int>){
+                s = activity_data.get(i).get_int32();
+            } else {
+                std::stringstream error;
+                error << "unsupported input data type in celonis_calc_throughput " << typeid(ActivityType).name() << std::endl;
+                throw std::runtime_error(error.str());
+            }
             if (s == name) {
                 if (label == FIRST) {
                     found_idx = i;
@@ -210,6 +219,12 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions::celonis_calc_throughput(Func
     } else if (typeid(*activity_elements) == typeid(Int64Column)) {
         return _celonis_calc_throughput_impl<Int64Column, TYPE_BIGINT>(
                 *down_cast<const Int64Column*>(activity_elements),
+                activity_offsets, activity_nulls, activity_array_nulls,
+                columns[1], columns[2], columns[3], columns[4],
+                columns[5]);
+    } else if (typeid(*activity_elements) == typeid(Int32Column)) {
+        return _celonis_calc_throughput_impl<Int32Column, TYPE_INT>(
+                *down_cast<const Int32Column*>(activity_elements),
                 activity_offsets, activity_nulls, activity_array_nulls,
                 columns[1], columns[2], columns[3], columns[4],
                 columns[5]);

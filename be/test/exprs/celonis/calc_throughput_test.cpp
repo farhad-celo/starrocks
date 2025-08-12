@@ -61,6 +61,7 @@ protected:
     }
 
     TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
+    TypeDescriptor TYPE_ARRAY_INT = celonis::array_type(TYPE_INT);
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
 };
 
@@ -70,7 +71,7 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirst) {
 }
 
 TEST_F(CelonisCalcThroughputTest, FirstToFirstInt) {
-    // Same as above but activities are INT.
+    // Same as above but activities are INT64.
     auto activity_array = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
     activity_array->append_datum(DatumArray{1L, 1L, 1L, 2L, 2L, 3L, 3L});
     auto timestamp_array = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
@@ -80,6 +81,28 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstInt) {
 
     auto end_activity_col = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
     end_activity_col->append_datum(2L);
+    auto start_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
+    start_label_col->append_datum(Slice("first"));
+
+    auto end_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
+    end_label_col->append_datum(Slice("first"));
+    const auto result = CelonisCalcThroughputFunctions::celonis_calc_throughput(
+            nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
+    ASSERT_EQ(1, result->size());
+    EXPECT_EQ(9L, result->get(0).get_int64());
+}
+
+TEST_F(CelonisCalcThroughputTest, FirstToFirstInt32) {
+    // Same as above but activities are INT32.
+    auto activity_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+    activity_array->append_datum(DatumArray{1, 1, 1, 2, 2, 3, 3});
+    auto timestamp_array = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true);
+    timestamp_array->append_datum(DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L});
+    auto start_activity_col = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false, true, 0);
+    start_activity_col->append_datum(1);
+
+    auto end_activity_col = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false, true, 0);
+    end_activity_col->append_datum(2);
     auto start_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     start_label_col->append_datum(Slice("first"));
 
