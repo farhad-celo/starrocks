@@ -4,6 +4,7 @@
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "column/array_column.h"
+#include "exprs/celonis/util.h"
 #include "google/protobuf/util/json_util.h"
 #include "modules/query/calendars.pb.h"
 
@@ -92,6 +93,10 @@ struct TimeRange {
         int64_t end = std::min(end_ms, other.end_ms);
         return (end > start) ? end - start : 0;
     }
+
+    virtual bool is_ms_in(int64_t ms) const {
+        return ms >= begin_ms && ms <= end_ms;
+    }
 };
 
 struct PeriodicTimeRange : public TimeRange {
@@ -140,6 +145,18 @@ struct PeriodicTimeRange : public TimeRange {
             cur_end += abs_period;
         }
         return rv;
+    }
+
+    bool is_ms_in(int64_t ms) const override {
+        // std::cerr << "ms: " << ms << std::endl;
+        // std::cerr << "period_ms: " << period_ms << std::endl;
+        int64_t diff_mod = (ms - begin_ms) % period_ms;
+        if (diff_mod < 0) {
+            diff_mod += period_ms;
+        }
+        int64_t adjusted_ms = begin_ms + diff_mod;
+        // std::cerr << "adjusted_ms: " << adjusted_ms << std::endl;
+        return begin_ms <= adjusted_ms && adjusted_ms <= end_ms;
     }
 };
 
@@ -203,6 +220,30 @@ public:
             }
         }
         return before_epoch ? -rv : rv;
+    }
+
+    bool
+    is_timestamp_in_calendar(const TimestampValue& timestamp, const std::optional<std::string>& calendar_id_column) {
+        const TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
+        const int64_t ms = timestamp.diff_microsecond(epoch) / NUM_MICROSECONDS_PER_MILLISECONDS;
+
+        if (!calendar_id_column.has_value()) {
+            for (const auto& cur_time_range: time_ranges_) {
+                if (cur_time_range->is_ms_in(ms)) {
+                    return true;
+                }
+            }
+        } else {
+            auto itr = id_to_time_ranges_.find(calendar_id_column.value());
+            if (itr != id_to_time_ranges_.end()) {
+                for (const auto& cur_time_range: itr->second) {
+                    if (cur_time_range.is_ms_in(ms)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
 private:
@@ -447,23 +488,18 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unus
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnViewer time_unit_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     ColumnViewer calendar_id_column_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
-    ColumnPtr calendar_column_ptr = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[2]);
-    ColumnPtr calendar_array_data = calendar_column_ptr;
-    if (calendar_column_ptr->is_nullable()) {
-        calendar_array_data = down_cast<const NullableColumn*>(calendar_column_ptr.get())->data_column();
-    }
-    const auto& calendar_element_column = down_cast<ArrayColumn*>(calendar_array_data.get())->elements();
-    if (calendar_element_column.has_null()) {
+    UnnestedArrayData calendar_array_data = prepare_array_input(columns[2].get());
+    if (calendar_array_data.null_elements != nullptr) {
         return Status::InvalidArgument("Calendar array should not have null elements.");
     }
-    const auto& calendar_data_column = down_cast<const NullableColumn&>(calendar_element_column).data_column_ref();
-    const auto& calendar_data = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(calendar_data_column).get_data();
-    const auto& calendar_offsets = down_cast<const ArrayColumn*>(
-            calendar_array_data.get())->offsets().get_data().data();
+    DCHECK(calendar_array_data.elements->is_binary());
+    const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *calendar_array_data.elements).get_data().data();
+    const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
 
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
     for (size_t row = 0; row < n_rows; ++row) {
-        if (timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) || calendar_column_ptr->is_null(row)) {
+        if (timestamp_viewer.is_null(row) || time_unit_viewer.is_null(row) || columns[2]->is_null(row)) {
             result.append_null();
             continue;
         }
@@ -471,7 +507,7 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unus
         if (TIME_UNIT_TO_MS.find(time_unit) == TIME_UNIT_TO_MS.end()) {
             return Status::InvalidArgument("time unit must be one of DAYS/HOURS/MINUTES/SECONDS/MILLISECONDS.");
         }
-        auto timestamp = (TimestampValue) timestamp_viewer.value(row);
+        auto timestamp = timestamp_viewer.value(row);
         size_t start = calendar_offsets[row];
         size_t end = calendar_offsets[row + 1];
         std::string calendar_json_string;
@@ -480,20 +516,78 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::remap_timestamps_calendar([[maybe_unus
             calendar_id_column = calendar_id_column_viewer.value(row).to_string();
         }
         for (size_t id = start; id < end; ++id) {
-            calendar_json_string += calendar_data[id].to_string();
+            calendar_json_string += calendars[id].to_string();
         }
-        StatusOr<std::optional<int64_t>> status_or_time = remap_timestamp_calendar(timestamp, time_unit,
-                                                                                   calendar_json_string,
-                                                                                   calendar_id_column);
-        if (status_or_time.ok()) {
-            if (status_or_time.value().has_value()) {
-                result.append(status_or_time.value().value());
-            } else {
-                result.append_null();
-            }
+        ASSIGN_OR_RETURN(const std::optional<int64_t> time,
+                         remap_timestamp_calendar(timestamp, time_unit, calendar_json_string, calendar_id_column));
+        if (time.has_value()) {
+            result.append(time.value());
         } else {
-            return status_or_time.status();
+            result.append_null();
         }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+static StatusOr<std::optional<bool>>
+timestamp_in_calendar(const TimestampValue& timestamp,
+                      const std::string& calendar_json_string,
+                      const std::optional<std::string>& calendar_id_column) {
+    celonis::accelerator::Calendar calendar_proto;
+    if (calendar_json_string.empty()) {
+        return std::nullopt;
+    } else {
+        // parse calendar_json_string
+        if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
+            return Status::InvalidArgument("Calendar specification column is malformed.");
+        }
+        RETURN_IF_ERROR(validate_calendar(calendar_proto, calendar_id_column));
+        Calendar calendar(calendar_proto);
+        return calendar.is_timestamp_in_calendar(timestamp, calendar_id_column);
+    }
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::in_calendar([[maybe_unused]] FunctionContext* context,
+                                                      const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 3);
+    size_t n_rows = columns[0]->size();
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnViewer calendar_id_column_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
+
+    UnnestedArrayData calendar_array_data = prepare_array_input(columns[1].get());
+    if (calendar_array_data.null_elements != nullptr) {
+        return Status::InvalidArgument("Calendar array should not have null elements.");
+    }
+    DCHECK(calendar_array_data.elements->is_binary());
+    const auto& calendars = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *calendar_array_data.elements).get_data().data();
+    const auto& calendar_offsets = calendar_array_data.offsets->get_data().data();
+
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (timestamp_viewer.is_null(row) || columns[1]->is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        auto timestamp = timestamp_viewer.value(row);
+        size_t start = calendar_offsets[row];
+        size_t end = calendar_offsets[row + 1];
+        std::string calendar_json_string;
+        std::optional<std::string> calendar_id_column = std::nullopt;
+        if (!calendar_id_column_viewer.is_null(row)) {
+            calendar_id_column = calendar_id_column_viewer.value(row).to_string();
+        }
+        for (size_t id = start; id < end; ++id) {
+            calendar_json_string += calendars[id].to_string();
+        }
+        ASSIGN_OR_RETURN(std::optional<bool> is_in,
+                         timestamp_in_calendar(timestamp, calendar_json_string, calendar_id_column));
+        if (is_in.has_value()) {
+            result.append(is_in.value() ? 1L : 0L);
+        } else {
+            result.append_null();
+        }
+
     }
     return result.build(ColumnHelper::is_all_const(columns));
 }

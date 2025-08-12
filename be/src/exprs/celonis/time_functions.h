@@ -15,6 +15,14 @@ public:
      * Implements PQL REMAP_TIMESTAMPS https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245429/REMAP+TIMESTAMPS
      */
     DEFINE_VECTORIZED_FN(remap_timestamps_calendar);
+
+    /**
+     * @param: [timestamp, calendar_specification, calendar_id_column]
+     * @paramType: [DATETIME, ARRAY_VARCHAR, VARCHAR]
+     * @return: BIGINT
+     * Implements PQL IN_CALENDAR https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11248959/IN+CALENDAR
+     */
+    DEFINE_VECTORIZED_FN(in_calendar);
 };
 
 } // namespace starrocks
