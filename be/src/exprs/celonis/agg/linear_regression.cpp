@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "linear_regression.h"
+#include "exprs/celonis/agg/util.h"
 #include "modules/query/calendars.pb.h"
 #include <google/protobuf/util/json_util.h>
 #include <boost/numeric/ublas/matrix.hpp>
@@ -116,8 +117,26 @@ void LinearRegressionAggregateFunction::merge(FunctionContext* ctx, const Column
                                               size_t row_num) const {
     auto& input_columns = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column))->fields();
     auto& state_impl = this->data(state);
-    state_impl.x->append_datum(input_columns.at(0)->get(row_num));
-    state_impl.y->append_datum(input_columns.at(1)->get(row_num));
+    auto x_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(0).get()));
+    auto y_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(1).get()));
+    auto& x_offsets = x_column->offsets().get_data();
+    const auto x_start = x_offsets[row_num];
+    const auto x_end = x_offsets[row_num + 1];
+    auto& y_offsets = y_column->offsets().get_data();
+    const auto y_start = y_offsets[row_num];
+    const auto y_end = y_offsets[row_num + 1];
+    DCHECK((x_end - x_start) % (y_end - y_start) == 0);
+    const auto n_features = (x_end - x_start) / (y_end - y_start);
+    for (auto i = y_start; i < y_end; ++i) {
+        state_impl.y->append_datum(y_column->elements().get(i));
+        DatumArray x_array;
+        const auto start = x_start + n_features * (i - y_start);
+        const auto end = start + n_features;
+        for (auto j = start; j < end; ++j) {
+            x_array.push_back(x_column->elements().get(j));
+        }
+        state_impl.x->append_datum(x_array);
+    }
 }
 
 void LinearRegressionAggregateFunction::serialize_to_column(starrocks::FunctionContext* ctx,
@@ -125,19 +144,29 @@ void LinearRegressionAggregateFunction::serialize_to_column(starrocks::FunctionC
                                                             starrocks::Column* to) const {
     auto& state_impl = this->data(state);
     auto& columns = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
-    const auto size = state_impl.x->size();
-    if (to->is_nullable()) {
-        down_cast<NullableColumn*>(to)->mutable_null_column()->get_data().resize(size, 0);
-    }
-    down_cast<NullableColumn*>(columns[0].get())->mutable_null_column()->get_data().resize(size, 0);
-    down_cast<NullableColumn*>(columns[1].get())->mutable_null_column()->get_data().resize(size, 0);
-    auto x = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(columns[0].get()));
-    for (size_t i = 0; i < size; ++i) {
-        x->append_datum(state_impl.x->get(i));
-    }
-    auto y = down_cast<DoubleColumn*>(ColumnHelper::get_data_column(columns[1].get()));
-    for (size_t i = 0; i < size; ++i) {
-        y->append(state_impl.y->get(i).get_double());
+    if (!state_impl.x->empty()) {
+        if (to->is_nullable()) {
+            down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
+        }
+        // y
+        ::starrocks::serialize_to_column(state_impl.y, columns.at(1));
+        // x
+        if (columns.at(0)->is_nullable()) {
+            down_cast<NullableColumn*>(columns.at(0).get())->null_column_data().emplace_back(0);
+        }
+        auto x_col = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(columns.at(0).get()));
+        const auto x_size = state_impl.x->size();
+        size_t size = 0;
+        auto& elements = x_col->elements_column();
+        for (auto i = 0; i < x_size; ++i) {
+            auto array = state_impl.x->get(i).get_array();
+            for (auto j = 0; j < array.size(); ++j) {
+                elements->append_datum(array[j]);
+                ++size;
+            }
+        }
+        auto& offsets = x_col->offsets_column()->get_data();
+        offsets.push_back(offsets.back() + size);
     }
 }
 
@@ -225,23 +254,22 @@ void LinearRegressionAggregateFunction::convert_to_serialize_format(FunctionCont
         valid_indexes.push_back(row);
     }
     auto columns = down_cast<StructColumn*>(ColumnHelper::get_data_column(dst->get()))->fields_column();
-    if (dst->get()->is_nullable()) {
-        for (size_t i = 0; i < valid_indexes.size(); i++) {
+    if (!valid_indexes.empty()) {
+        if (dst->get()->is_nullable()) {
             down_cast<NullableColumn*>(dst->get())->null_column_data().emplace_back(0);
         }
-    }
-    for (auto& column: columns) {
-        if (column.get()->is_nullable()) {
-            down_cast<NullableColumn*>(column.get())->mutable_null_column()->get_data().resize(valid_indexes.size(), 0);
+        DatumArray x_array;
+        DatumArray y_array;
+        for (auto i: valid_indexes) {
+            auto array = src[0]->get(i).get_array();
+            const auto length = array.size();
+            for (auto j = 0; j < length; ++j) {
+                x_array.push_back(array[j]);
+            }
+            y_array.push_back(src[1]->get(i));
         }
-    }
-    auto x = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(columns[0].get()));
-    for (auto i: valid_indexes) {
-        x->append_datum(src[0]->get(i));
-    }
-    auto y = down_cast<DoubleColumn*>(ColumnHelper::get_data_column(columns[1].get()));
-    for (auto i: valid_indexes) {
-        y->append_datum(src[1]->get(i));
+        columns[0]->append_datum(x_array);
+        columns[1]->append_datum(y_array);
     }
 }
 

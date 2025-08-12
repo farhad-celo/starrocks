@@ -873,7 +873,7 @@ public class FunctionAnalyzer {
             fn = fn.copy();
             ArrayList<StructField> sf = Lists.newArrayList();
             sf.add(new StructField("xs", Type.ARRAY_DOUBLE));
-            sf.add(new StructField("ys", Type.DOUBLE));
+            sf.add(new StructField("ys", Type.ARRAY_DOUBLE));
             ((AggregateFunction) fn).setIntermediateType(new StructType(sf));
         } else if (fnName.equals(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR)) {
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR, argumentTypes,

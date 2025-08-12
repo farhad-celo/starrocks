@@ -33,8 +33,8 @@ namespace starrocks {
 struct LinearRegressionAggregateState {
     ~LinearRegressionAggregateState();
 
-    std::unique_ptr<ArrayColumn> x = nullptr;
-    std::unique_ptr<DoubleColumn> y = nullptr;
+    std::unique_ptr<Column> x = nullptr;
+    std::unique_ptr<Column> y = nullptr;
 };
 
 class LinearRegressionAggregateFunction

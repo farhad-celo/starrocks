@@ -1759,8 +1759,8 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
     type_array_double.children[0].len = -1;
     TypeDescriptor type_struct;
     type_struct.type = LogicalType::TYPE_STRUCT;
-    type_struct.children.emplace_back(type_array_double);
-    type_struct.children.emplace_back(type_double);
+    type_struct.children.emplace_back(celonis::array_type(TYPE_DOUBLE));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_DOUBLE));
     type_struct.field_names.emplace_back("x");
     type_struct.field_names.emplace_back("y");
 
@@ -1802,9 +1802,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         // test serialize_to_column.
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
-        EXPECT_EQ(
-                "[{x:[1],y:100}, {x:[1],y:300}, {x:[2],y:400}, {x:[3],y:300}, {x:[4],y:500}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[1,1,2,3,4],y:[100,300,400,300,500]}]", res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
         res_struct_col->resize(0);
@@ -1813,9 +1811,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         columns.push_back(y_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, x_column->size(),
                                               &res_struct_col);
-        EXPECT_EQ(
-                "[{x:[1],y:100}, {x:[1],y:300}, {x:[2],y:400}, {x:[3],y:300}, {x:[4],y:500}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[1,1,2,3,4],y:[100,300,400,300,500]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
         auto varchar_col = ColumnHelper::create_column(type_varchar, true);
@@ -1853,9 +1849,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         // test serialize_to_column.
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
-        EXPECT_EQ(
-                "[{x:[1],y:100}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[1],y:[100]}]", res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
         res_struct_col->resize(0);
@@ -1864,9 +1858,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         columns.push_back(y_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, x_column->size(),
                                               &res_struct_col);
-        EXPECT_EQ(
-                "[{x:[1],y:100}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[1],y:[100]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
         auto varchar_col = ColumnHelper::create_column(type_varchar, true);
@@ -1908,9 +1900,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         // test serialize_to_column.
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
-        EXPECT_EQ(
-                "[{x:[1],y:100}, {x:[1],y:300}, {x:[2],y:400}, {x:[3,4],y:300}, {x:[4],y:500}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[1,1,2,3,4,4],y:[100,300,400,300,500]}]", res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
         res_struct_col->resize(0);
@@ -1919,9 +1909,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         columns.push_back(y_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, x_column->size(),
                                               &res_struct_col);
-        EXPECT_EQ(
-                "[{x:[1],y:100}, {x:[1],y:300}, {x:[2],y:400}, {x:[3,4],y:300}, {x:[4],y:500}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[1,1,2,3,4,4],y:[100,300,400,300,500]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
         auto varchar_col = ColumnHelper::create_column(type_varchar, true);
@@ -1963,9 +1951,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         // test serialize_to_column.
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
-        EXPECT_EQ(
-                "[{x:[3],y:300}, {x:[4],y:500}, {x:[1],y:100}, {x:[1],y:300}, {x:[2],y:400}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[3,4,1,1,2],y:[300,500,100,300,400]}]", res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
         res_struct_col->resize(0);
@@ -1974,9 +1960,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         columns.push_back(y_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, x_column->size(),
                                               &res_struct_col);
-        EXPECT_EQ(
-                "[{x:[3],y:300}, {x:[4],y:500}, {x:[1],y:100}, {x:[1],y:300}, {x:[2],y:400}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[3,4,1,1,2],y:[300,500,100,300,400]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
         auto varchar_col = ColumnHelper::create_column(type_varchar, true);
@@ -2030,9 +2014,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         // test serialize_to_column.
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
-        EXPECT_EQ(
-                "[{x:[3],y:300}, {x:[4],y:500}, {x:[1],y:100}, {x:[1],y:300}, {x:[2],y:400}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[3,4,1,1,2],y:[300,500,100,300,400]}]", res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
         res_struct_col->resize(0);
@@ -2041,9 +2023,7 @@ TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
         columns.push_back(y_column);
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, x_column->size(),
                                               &res_struct_col);
-        EXPECT_EQ(
-                "[{x:[3],y:300}, {x:[4],y:500}, {x:[1],y:100}, {x:[1],y:300}, {x:[2],y:400}]",
-                res_struct_col->debug_string());
+        EXPECT_EQ("[{x:[3,4,1,1,2],y:[300,500,100,300,400]}]", res_struct_col->debug_string());
 
         // test finalize_to_column.
         auto varchar_col = ColumnHelper::create_column(type_varchar, true);
