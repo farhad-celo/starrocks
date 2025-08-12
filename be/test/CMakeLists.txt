@@ -144,11 +144,12 @@ set(EXEC_FILES
         ./exprs/unary_function_test.cpp
         ./exprs/celonis/array_functions_test.cpp
         ./exprs/celonis/calc_throughput_test.cpp
+        ./exprs/celonis/count_edges_test.cpp
         ./exprs/celonis/match_activities_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/source_target_test.cpp
+        ./exprs/celonis/string_fn_translate_test.cpp
         ./exprs/celonis/time_functions_test.cpp
-        ./exprs/celonis/count_edges_test.cpp
         ./exprs/celonis/util.cpp
         ./exprs/decimal_cast_expr_decimal_test.cpp
         ./exprs/decimal_cast_expr_integer_test.cpp

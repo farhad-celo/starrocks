@@ -117,13 +117,14 @@ endif()
 
 set(CELONIS_FILES
   celonis/array_functions.cpp
-  celonis/count_edges.cpp
-  celonis/source_target.cpp
   celonis/calc_throughput.cpp
+  celonis/count_edges.cpp
   celonis/match_activities.cpp
   celonis/remap_timestamp_weekday.cpp
-  celonis/util.cpp
+  celonis/source_target.cpp
+  celonis/string_functions.cpp
   celonis/time_functions.cpp
+  celonis/util.cpp
 )
 
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})
