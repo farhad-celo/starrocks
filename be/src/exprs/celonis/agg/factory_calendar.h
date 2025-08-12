@@ -33,10 +33,10 @@ namespace starrocks {
 struct FactoryCalendarAggregateState {
     ~FactoryCalendarAggregateState();
 
-    std::unique_ptr<TimestampColumn> start_timestamp = nullptr;
-    std::unique_ptr<TimestampColumn> end_timestamp = nullptr;
-    std::unique_ptr<BinaryColumn> calendar_id = nullptr;
-    std::unique_ptr<BooleanColumn> is_calendar_id_null = nullptr;
+    std::unique_ptr<Column> start_timestamp = nullptr;
+    std::unique_ptr<Column> end_timestamp = nullptr;
+    std::unique_ptr<Column> calendar_id = nullptr;
+    std::unique_ptr<Column> is_calendar_id_null = nullptr;
 };
 
 class FactoryCalendarAggregateFunction

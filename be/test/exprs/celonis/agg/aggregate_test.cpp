@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "../util.h"
 #include "column/column_builder.h"
 #include "column/fixed_length_column.h"
 #include "column/vectorized_fwd.h"
@@ -71,7 +72,7 @@ public:
 
         int len = base64_decode2(encoded_string.data(), encoded_string.length(), p.get());
         std::string decoded_string(p.get(), len);
-        celonis::accelerator::Calendar calendar_proto;
+        ::celonis::accelerator::Calendar calendar_proto;
         bool success = calendar_proto.ParseFromString(decoded_string);
         if (!success) {
             return std::nullopt;
@@ -554,10 +555,10 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
     type_boolean.type = LogicalType::TYPE_BOOLEAN;
     TypeDescriptor type_struct;
     type_struct.type = LogicalType::TYPE_STRUCT;
-    type_struct.children.emplace_back(type_timestamp);
-    type_struct.children.emplace_back(type_timestamp);
-    type_struct.children.emplace_back(type_varchar);
-    type_struct.children.emplace_back(type_boolean);
+    type_struct.children.emplace_back(celonis::array_type(TYPE_DATETIME));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_DATETIME));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BOOLEAN));
     type_struct.field_names.emplace_back("start_timestamp");
     type_struct.field_names.emplace_back("end_timestamp");
     type_struct.field_names.emplace_back("calendar_id");
@@ -606,7 +607,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'',is_calendar_id_null:1}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'',is_calendar_id_null:1}]",
+                "[{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -618,7 +619,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                R"([{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'',is_calendar_id_null:1}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'',is_calendar_id_null:1}])",
+                R"([{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['',''],is_calendar_id_null:[1,1]}])",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -678,7 +679,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'',is_calendar_id_null:1}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'',is_calendar_id_null:1}]",
+                "[{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -690,7 +691,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                R"([{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'',is_calendar_id_null:1}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'',is_calendar_id_null:1}])",
+                R"([{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['',''],is_calendar_id_null:[1,1]}])",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -741,7 +742,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'id1',is_calendar_id_null:0}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'id2',is_calendar_id_null:0}]",
+                "[{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -753,7 +754,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                R"([{start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'id1',is_calendar_id_null:0}, {start_timestamp:1970-01-01 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'id2',is_calendar_id_null:0}])",
+                R"([{start_timestamp:[1970-01-01 00:00:00,1970-01-01 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}])",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -960,7 +961,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{start_timestamp:1969-12-31 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'id1',is_calendar_id_null:0}, {start_timestamp:1969-12-30 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'id2',is_calendar_id_null:0}]",
+                "[{start_timestamp:[1969-12-31 00:00:00,1969-12-30 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -972,7 +973,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, start_timestamp_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{start_timestamp:1969-12-31 00:00:00,end_timestamp:1970-01-01 01:00:00,calendar_id:'id1',is_calendar_id_null:0}, {start_timestamp:1969-12-30 00:00:00,end_timestamp:1970-01-01 02:00:00,calendar_id:'id2',is_calendar_id_null:0}]",
+                "[{start_timestamp:[1969-12-31 00:00:00,1969-12-30 00:00:00],end_timestamp:[1970-01-01 01:00:00,1970-01-01 02:00:00],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
