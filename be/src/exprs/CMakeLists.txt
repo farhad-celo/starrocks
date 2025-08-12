@@ -119,6 +119,7 @@ set(CELONIS_FILES
   celonis/array_functions.cpp
   celonis/calc_throughput.cpp
   celonis/count_edges.cpp
+  celonis/index_activity_order.cpp
   celonis/match_activities.cpp
   celonis/remap_timestamp_weekday.cpp
   celonis/source_target.cpp

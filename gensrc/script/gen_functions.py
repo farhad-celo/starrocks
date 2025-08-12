@@ -72,6 +72,7 @@ ${license}
 #include "exprs/dict_functions.h"
 #include "exprs/celonis/array_functions.h"
 #include "exprs/celonis/calc_throughput.h"
+#include "exprs/celonis/index_activity_order.h"
 #include "exprs/celonis/match_activities.h"
 #include "exprs/celonis/remap_timestamp_weekday.h"
 #include "exprs/celonis/source_target.h"
