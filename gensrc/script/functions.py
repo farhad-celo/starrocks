@@ -1394,7 +1394,7 @@ celostar_functions = [
     [1000201, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
     [1000202, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT', 'BIGINT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
 
-    [1000301, 'celonis_match_activities',True, False,  'INT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities'],
+    [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities'],
 ]
 
 vectorized_functions.extend(celostar_functions)
