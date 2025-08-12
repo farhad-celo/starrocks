@@ -1028,19 +1028,13 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
 
     const AggregateFunction* agg_func = get_aggregate_function("celonis_make_weekday_calendar", TYPE_BIGINT, TYPE_ARRAY,
                                                                false);
-    TypeDescriptor type_bigint;
-    type_bigint.type = LogicalType::TYPE_BIGINT;
-    TypeDescriptor type_varchar;
-    type_varchar.type = LogicalType::TYPE_VARCHAR;
-    TypeDescriptor type_boolean;
-    type_boolean.type = LogicalType::TYPE_BOOLEAN;
     TypeDescriptor type_struct;
     type_struct.type = LogicalType::TYPE_STRUCT;
-    type_struct.children.emplace_back(type_varchar);
-    type_struct.children.emplace_back(type_bigint);
-    type_struct.children.emplace_back(type_bigint);
-    type_struct.children.emplace_back(type_varchar);
-    type_struct.children.emplace_back(type_boolean);
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BIGINT));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BIGINT));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BOOLEAN));
     type_struct.field_names.emplace_back("weekday");
     type_struct.field_names.emplace_back("shift_begin");
     type_struct.field_names.emplace_back("shift_end");
@@ -1097,7 +1091,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:123,shift_end:123000,calendar_id:'',is_calendar_id_null:1}, {weekday:'FRIDAY',shift_begin:456,shift_end:456000,calendar_id:'',is_calendar_id_null:1}]",
+                "[{weekday:['MONDAY','FRIDAY'],shift_begin:[123,456],shift_end:[123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -1110,7 +1104,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:123,shift_end:123000,calendar_id:'',is_calendar_id_null:1}, {weekday:'FRIDAY',shift_begin:456,shift_end:456000,calendar_id:'',is_calendar_id_null:1}]",
+                "[{weekday:['MONDAY','FRIDAY'],shift_begin:[123,456],shift_end:[123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -1172,7 +1166,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{weekday:'TUESDAY',shift_begin:123,shift_end:123000,calendar_id:'',is_calendar_id_null:1}, {weekday:'THURSDAY',shift_begin:456,shift_end:456000,calendar_id:'',is_calendar_id_null:1}]",
+                "[{weekday:['TUESDAY','THURSDAY'],shift_begin:[123,456],shift_end:[123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -1185,7 +1179,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{weekday:'TUESDAY',shift_begin:123,shift_end:123000,calendar_id:'',is_calendar_id_null:1}, {weekday:'THURSDAY',shift_begin:456,shift_end:456000,calendar_id:'',is_calendar_id_null:1}]",
+                "[{weekday:['TUESDAY','THURSDAY'],shift_begin:[123,456],shift_end:[123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -1243,7 +1237,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{weekday:'WEDNESDAY',shift_begin:123,shift_end:123000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'SATURDAY',shift_begin:456,shift_end:456000,calendar_id:'US',is_calendar_id_null:0}]",
+                "[{weekday:['WEDNESDAY','SATURDAY'],shift_begin:[123,456],shift_end:[123000,456000],calendar_id:['DE','US'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -1256,7 +1250,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{weekday:'WEDNESDAY',shift_begin:123,shift_end:123000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'SATURDAY',shift_begin:456,shift_end:456000,calendar_id:'US',is_calendar_id_null:0}]",
+                "[{weekday:['WEDNESDAY','SATURDAY'],shift_begin:[123,456],shift_end:[123000,456000],calendar_id:['DE','US'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -1422,7 +1416,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:-123,shift_end:-123000,calendar_id:'',is_calendar_id_null:1}, {weekday:'SUNDAY',shift_begin:456,shift_end:456000,calendar_id:'',is_calendar_id_null:1}]",
+                "[{weekday:['MONDAY','SUNDAY'],shift_begin:[-123,456],shift_end:[-123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -1435,7 +1429,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:-123,shift_end:-123000,calendar_id:'',is_calendar_id_null:1}, {weekday:'SUNDAY',shift_begin:456,shift_end:456000,calendar_id:'',is_calendar_id_null:1}]",
+                "[{weekday:['MONDAY','SUNDAY'],shift_begin:[-123,456],shift_end:[-123000,456000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -1503,19 +1497,13 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
 
     const AggregateFunction* agg_func = get_aggregate_function("celonis_make_weekday_calendar", TYPE_BIGINT, TYPE_ARRAY,
                                                                false);
-    TypeDescriptor type_bigint;
-    type_bigint.type = LogicalType::TYPE_BIGINT;
-    TypeDescriptor type_varchar;
-    type_varchar.type = LogicalType::TYPE_VARCHAR;
-    TypeDescriptor type_boolean;
-    type_boolean.type = LogicalType::TYPE_BOOLEAN;
     TypeDescriptor type_struct;
     type_struct.type = LogicalType::TYPE_STRUCT;
-    type_struct.children.emplace_back(type_varchar);
-    type_struct.children.emplace_back(type_bigint);
-    type_struct.children.emplace_back(type_bigint);
-    type_struct.children.emplace_back(type_varchar);
-    type_struct.children.emplace_back(type_boolean);
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BIGINT));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BIGINT));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BOOLEAN));
     type_struct.field_names.emplace_back("weekday");
     type_struct.field_names.emplace_back("shift_begin");
     type_struct.field_names.emplace_back("shift_end");
@@ -1572,7 +1560,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:32400000,shift_end:61200000,calendar_id:'',is_calendar_id_null:1}, {weekday:'FRIDAY',shift_begin:28800000,shift_end:57600000,calendar_id:'',is_calendar_id_null:1}]",
+                "[{weekday:['MONDAY','FRIDAY'],shift_begin:[32400000,28800000],shift_end:[61200000,57600000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -1585,7 +1573,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:32400000,shift_end:61200000,calendar_id:'',is_calendar_id_null:1}, {weekday:'FRIDAY',shift_begin:28800000,shift_end:57600000,calendar_id:'',is_calendar_id_null:1}]",
+                "[{weekday:['MONDAY','FRIDAY'],shift_begin:[32400000,28800000],shift_end:[61200000,57600000],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -1643,7 +1631,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:0,shift_end:86400000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'FRIDAY',shift_begin:0,shift_end:86400000,calendar_id:'US',is_calendar_id_null:0}]",
+                "[{weekday:['MONDAY','FRIDAY'],shift_begin:[0,0],shift_end:[86400000,86400000],calendar_id:['DE','US'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -1656,7 +1644,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:0,shift_end:86400000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'FRIDAY',shift_begin:0,shift_end:86400000,calendar_id:'US',is_calendar_id_null:0}]",
+                "[{weekday:['MONDAY','FRIDAY'],shift_begin:[0,0],shift_end:[86400000,86400000],calendar_id:['DE','US'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -1722,7 +1710,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:0,shift_end:86400000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'FRIDAY',shift_begin:0,shift_end:86400000,calendar_id:'US',is_calendar_id_null:0}, {weekday:'TUESDAY',shift_begin:-1,shift_end:83700000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'THURSDAY',shift_begin:900000,shift_end:-1,calendar_id:'US',is_calendar_id_null:0}]",
+                "[{weekday:['MONDAY','FRIDAY','TUESDAY','THURSDAY'],shift_begin:[0,0,-1,900000],shift_end:[86400000,86400000,83700000,-1],calendar_id:['DE','US','DE','US'],is_calendar_id_null:[0,0,0,0]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -1735,7 +1723,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, weekday_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{weekday:'MONDAY',shift_begin:0,shift_end:86400000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'FRIDAY',shift_begin:0,shift_end:86400000,calendar_id:'US',is_calendar_id_null:0}, {weekday:'TUESDAY',shift_begin:-1,shift_end:83700000,calendar_id:'DE',is_calendar_id_null:0}, {weekday:'THURSDAY',shift_begin:900000,shift_end:-1,calendar_id:'US',is_calendar_id_null:0}]",
+                "[{weekday:['MONDAY','FRIDAY','TUESDAY','THURSDAY'],shift_begin:[0,0,-1,900000],shift_end:[86400000,86400000,83700000,-1],calendar_id:['DE','US','DE','US'],is_calendar_id_null:[0,0,0,0]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
