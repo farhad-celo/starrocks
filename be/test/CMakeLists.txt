@@ -148,7 +148,7 @@ set(EXEC_FILES
         ./exprs/celonis/conformance_test.cpp
         ./exprs/celonis/count_edges_test.cpp
         ./exprs/celonis/in_test.cpp
-        ./exprs/celonis/index_activity_order_test.cpp
+        ./exprs/celonis/index_activity_test.cpp
         ./exprs/celonis/inductive_miner_test.cpp
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/match_activities_test.cpp
@@ -627,7 +627,7 @@ if ("${USE_STAROS}" STREQUAL "ON")
 endif ()
 
 if (USE_AVX2)
-    set(EXEC_FILES ${EXEC_FILES} ./column/avx_numeric_column_test.cpp exprs/celonis/in_test.cpp)
+    set(EXEC_FILES ${EXEC_FILES} ./column/avx_numeric_column_test.cpp)
 endif ()
 
 add_library(starrocks_test_objs OBJECT ${EXEC_FILES})

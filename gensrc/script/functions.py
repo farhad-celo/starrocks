@@ -1417,16 +1417,19 @@ celostar_functions = [
     [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities'],
     [1000302, 'celonis_remap_timestamp_weekday', True, False, 'BIGINT', ['DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday_scalar'],
     [1000303, 'celonis_remap_timestamp_weekday', True, False, 'ARRAY_BIGINT', ['ARRAY_DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday'],
-    [1000304, 'celonis_index_activity_order', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivityOrder::celonis_index_activity_order'],
+    # TODO(j.kim): Remove celonis_index_activity_order() after pql2sql is migrated to celonis_index_activity().
+    [1000304, 'celonis_index_activity_order', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivity::celonis_index_activity', 'CelonisIndexActivity::celonis_index_activity_prepare', 'CelonisIndexActivity::celonis_index_activity_close'],
     [1000305, 'celonis_match_process', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisMatchProcess::celonis_match_process', 'CelonisMatchProcess::match_process_prepare', 'CelonisMatchProcess::match_process_close'],
     [1000306, 'celonis_shortened_variant', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'BIGINT'], 'CelonisShortenedVariant::celonis_shortened_variant'],
     [1000307, 'celonis_conformance', True, False, 'ARRAY_BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisConformance::conformance', 'CelonisConformance::conformance_prepare', 'CelonisConformance::conformance_close'],
+    [1000308, 'celonis_index_activity', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivity::celonis_index_activity', 'CelonisIndexActivity::celonis_index_activity_prepare', 'CelonisIndexActivity::celonis_index_activity_close'],
     [1000401, 'celonis_in', True, False, 'BOOLEAN', ['INT', 'ARRAY_INT'], 'CelonisIn::celonis_in'],
     [1000402, 'celonis_in', True, False, 'BOOLEAN', ['BIGINT', 'ARRAY_BIGINT'], 'CelonisIn::celonis_in'],
     [1000403, 'celonis_in', True, False, 'BOOLEAN', ['DOUBLE', 'ARRAY_DOUBLE'], 'CelonisIn::celonis_in'],
     [1000404, 'celonis_in', True, False, 'BOOLEAN', ['DATETIME', 'ARRAY_DATETIME'], 'CelonisIn::celonis_in'],
     [1000405, 'celonis_in', True, False, 'BOOLEAN', ['VARCHAR', 'ARRAY_VARCHAR'], 'CelonisIn::celonis_in'],
     [1000501, 'celonis_like', True, False, 'BOOLEAN', ['VARCHAR', 'VARCHAR'], 'CelonisLike::like', 'CelonisLike::like_prepare', 'CelonisLike::like_close'],
+
     # The fields of STRUCT are set in ExpressionAnalyzer.java in FE.
     [1000601, 'celonis_align_model', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisAlignModel::align_model', 'CelonisAlignModel::align_model_prepare', 'CelonisAlignModel::align_model_close'],
 
