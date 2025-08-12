@@ -123,6 +123,7 @@ set(CELONIS_FILES
   celonis/match_activities.cpp
   celonis/match_process.cpp
   celonis/remap_timestamp_weekday.cpp
+  celonis/shortened_variant.cpp
   celonis/source_target.cpp
   celonis/string_functions.cpp
   celonis/time_functions.cpp

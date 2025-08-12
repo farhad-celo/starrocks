@@ -76,6 +76,7 @@ ${license}
 #include "exprs/celonis/match_activities.h"
 #include "exprs/celonis/match_process.h"
 #include "exprs/celonis/remap_timestamp_weekday.h"
+#include "exprs/celonis/shortened_variant.h"
 #include "exprs/celonis/source_target.h"
 #include "exprs/celonis/string_functions.h"
 #include "exprs/celonis/time_functions.h"
