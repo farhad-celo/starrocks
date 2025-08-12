@@ -14,6 +14,16 @@ public:
      */
     DEFINE_VECTORIZED_FN(translate);
 
+    /**
+     * @param: [string_value]
+     * @paramType: [BinaryColumn]
+     * @return: BinaryColumn
+     *
+     * Sanitizes an invalid UTF-8 character sequence by replacing all invalid UTF-8 characters with '?'.
+     * Implements format::utf::sanitize_invalid_utf8() of cpm-query-engine.
+     */
+    DEFINE_VECTORIZED_FN(sanitize_invalid_utf8);
+
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };

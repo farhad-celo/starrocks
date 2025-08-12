@@ -156,7 +156,7 @@ set(EXEC_FILES
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/shortened_variant_test.cpp
         ./exprs/celonis/source_target_test.cpp
-        ./exprs/celonis/string_fn_translate_test.cpp
+        ./exprs/celonis/string_function_test.cpp
         ./exprs/celonis/time_functions_test.cpp
         ./exprs/celonis/util.cpp
         ./exprs/celonis/variant_agg_test.cpp

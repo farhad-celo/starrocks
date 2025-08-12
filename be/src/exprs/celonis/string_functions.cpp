@@ -1,5 +1,6 @@
 #include "exprs/celonis/string_functions.h"
 
+#include <boost/locale/utf.hpp>
 #include <utility>
 
 #include "column/binary_column.h"
@@ -123,6 +124,41 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
             }
         }
         result.append(Slice(result_str.data(), result_str.size()));
+    }
+
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+    StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::FunctionContext *context,
+                                                                      const starrocks::Columns &columns) {
+    auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+
+    auto size = columns[0]->size();
+    ColumnBuilder<TYPE_VARCHAR> result(size);
+    for (int row = 0; row < size; ++row) {
+        if (str_viewer.is_null(row)) {
+            result.append_null();
+            continue;
+        }
+
+        // Sanitization logic is copied from query-engine/src/main/native/cpm-accelerator/modules/format/src/utf/utf_utils.cpp
+        // in cpm-query-engine repository.
+        auto input = std::string_view(str_viewer.value(row));
+        std::string sanitized;
+        sanitized.reserve(input.length());
+
+        constexpr char REPLACEMENT_CHAR{'?'};
+
+        for (const auto* itr{input.begin()}; itr != input.end();) {
+            const auto decoded{boost::locale::utf::utf_traits<char>::decode(itr, input.end())};
+            if (decoded == boost::locale::utf::illegal || decoded == boost::locale::utf::incomplete) {
+                sanitized.push_back(REPLACEMENT_CHAR);
+            } else {
+                boost::locale::utf::utf_traits<char>::encode(decoded, std::back_inserter(sanitized));
+            }
+        }
+
+        result.append(Slice(sanitized));
     }
 
     return result.build(ColumnHelper::is_all_const(columns));

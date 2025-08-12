@@ -7,7 +7,7 @@
 
 namespace starrocks {
 
-class StringFunctionsTranslateTest : public testing::Test {
+class CelonisStringFunctionsTranslateTest : public testing::Test {
 protected:
     void translate(Columns columns, const std::vector<std::string> & res) {
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
@@ -30,7 +30,7 @@ protected:
     }
 };
 
-TEST_F(StringFunctionsTranslateTest, nullTest) {
+TEST_F(CelonisStringFunctionsTranslateTest, nullTest) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -66,7 +66,7 @@ TEST_F(StringFunctionsTranslateTest, nullTest) {
                     .ok());
 }
 
-TEST_F(StringFunctionsTranslateTest, singleCharTest) {
+TEST_F(CelonisStringFunctionsTranslateTest, singleCharTest) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -81,7 +81,7 @@ TEST_F(StringFunctionsTranslateTest, singleCharTest) {
     translate(columns, {"a", "äaaäaz"});
 }
 
-TEST_F(StringFunctionsTranslateTest, singleCharUtf8Test) {
+TEST_F(CelonisStringFunctionsTranslateTest, singleCharUtf8Test) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -96,7 +96,7 @@ TEST_F(StringFunctionsTranslateTest, singleCharUtf8Test) {
     translate(columns, {"Ä", "Aa Zz ÄÄÄ Öö Üü", "ÄÄÄÄ öÖ üÜ"});
 }
 
-TEST_F(StringFunctionsTranslateTest, multiCharSymbolTest) {
+TEST_F(CelonisStringFunctionsTranslateTest, multiCharSymbolTest) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -111,7 +111,7 @@ TEST_F(StringFunctionsTranslateTest, multiCharSymbolTest) {
     translate(columns, {",.", ".,", "33,333.33"});
 }
 
-TEST_F(StringFunctionsTranslateTest, multiCharCharSymbolCombinationTest) {
+TEST_F(CelonisStringFunctionsTranslateTest, multiCharCharSymbolCombinationTest) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -126,7 +126,7 @@ TEST_F(StringFunctionsTranslateTest, multiCharCharSymbolCombinationTest) {
     translate(columns, {"Z+", "+Z", "ZOO+BAR"});
 }
 
-TEST_F(StringFunctionsTranslateTest, multiCharSymbolCharCombinationTest) {
+TEST_F(CelonisStringFunctionsTranslateTest, multiCharSymbolCharCombinationTest) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -141,7 +141,7 @@ TEST_F(StringFunctionsTranslateTest, multiCharSymbolCharCombinationTest) {
     translate(columns, {"Z+", "+Z", "ZOO+BAR"});
 }
 
-TEST_F(StringFunctionsTranslateTest, multiCharDigit2CharTest) {
+TEST_F(CelonisStringFunctionsTranslateTest, multiCharDigit2CharTest) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -156,7 +156,7 @@ TEST_F(StringFunctionsTranslateTest, multiCharDigit2CharTest) {
     translate(columns, {"ABCDEFGHIJ", "JIHGFEDCBA", "AA.AAA,AA", "BB.BBB,BB", "JJ.JJJ,JJ"});
 }
 
-TEST_F(StringFunctionsTranslateTest, lowerUtf8Test) {
+TEST_F(CelonisStringFunctionsTranslateTest, lowerUtf8Test) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -171,7 +171,7 @@ TEST_F(StringFunctionsTranslateTest, lowerUtf8Test) {
     translate(columns, {"aouzäöü", "ü ö ä a o u z", "0ääa 0ööo 0üüu zz"});
 }
 
-TEST_F(StringFunctionsTranslateTest, upperUtf8Test) {
+TEST_F(CelonisStringFunctionsTranslateTest, upperUtf8Test) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -184,6 +184,31 @@ TEST_F(StringFunctionsTranslateTest, upperUtf8Test) {
     columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("AOUZÄÖÜ", 1));
 
     translate(columns, {"AOUZÄÖÜ", "Ü Ö Ä A O U Z", "0ÄÄA 0ÖÖO 0ÜÜU ZZ"});
+}
+
+TEST(CelonisStringFunctionsSanitizeStringTest, Simple) {
+    constexpr const char* VALID_STR{"ßäöü asdfinasodf2 ifu 8we9fdfn k298e7"};
+
+    auto input = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+
+    input->append_nulls(1);
+    input->append_datum(VALID_STR);
+    input->append_datum("\xFF");
+    input->append_datum("\xC1\xBF");  // 11000001 10111111 must be encoded as ASCII
+    input->append_datum("This is \xC3\xE4 invalid");
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    const auto result = CelonisStringFunctions::sanitize_invalid_utf8(ctx.get(), {input}).value();
+
+    ASSERT_EQ(input->size(), result->size());
+    const auto v = ColumnHelper::as_column<NullableColumn>(result);
+    ASSERT_TRUE(v->has_null());
+    ASSERT_TRUE(v->is_null(0));
+
+    EXPECT_EQ(v->get(1).get_slice(), VALID_STR);
+    EXPECT_EQ(v->get(2).get_slice(), "?");
+    EXPECT_EQ(v->get(3).get_slice(), "??");
+    EXPECT_EQ(v->get(4).get_slice(), "This is ? invalid");
 }
 
 } // namespace starrocks

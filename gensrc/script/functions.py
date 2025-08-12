@@ -1432,6 +1432,7 @@ celostar_functions = [
 
     # String functions
     [4000100, 'celonis_translate', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisStringFunctions::translate', 'CelonisStringFunctions::translate_prepare', 'CelonisStringFunctions::translate_close' ],
+    [4000200, 'celonis_sanitize_invalid_utf8', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::sanitize_invalid_utf8'],
 ]
 
 vectorized_functions.extend(celostar_functions)
