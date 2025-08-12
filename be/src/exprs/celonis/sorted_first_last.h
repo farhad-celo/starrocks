@@ -10,64 +10,228 @@
 
 namespace starrocks {
 
-template <bool is_first>
-struct CelonisSortedFirstLastAggregateState {
-    void set_new_data_columns(FunctionContext* ctx, const Column** columns, size_t row_num) {
-        size_t new_buffer_size = 0;
-        for (int i = 0; i < ctx->get_num_args(); ++i) {
-            if (!columns[i]->is_null(row_num) && ctx->get_arg_type(i)->type == TYPE_VARCHAR) {
-                new_buffer_size += columns[i]->get(row_num).get_slice().size;
+namespace celonis {
+class RowAccessor {
+public:
+    using SliceSizeType = uint32_t;
+
+    RowAccessor(FunctionContext* ctx) : ctx_(ctx) {};
+    virtual ~RowAccessor() = default;
+
+    // Seeks to the next column and returns true if it is NULL.
+    virtual bool seek_and_is_null() const = 0;
+
+    // This must be called once after seek_and_is_null() returns false;
+    virtual Datum get() const = 0;
+
+    // Rewinds the current pointer to the beginning.
+    virtual void rewind() = 0;
+
+    // Seeks to the next column.
+    void seek() {
+        if (!seek_and_is_null()) {
+            get();
+        }
+    }
+
+    // Returns size when the row is serialized.
+    // As a side effect, it changes the current pointer.
+    virtual size_t serialized_size() {
+        rewind();
+        size_t result = 0;
+        for (int i = 0; i < ctx_->get_num_args(); ++i) {
+            result += sizeof(uint8_t); // Is NULL
+            if (seek_and_is_null()) {
+                continue;
+            }
+            auto logical_type = ctx_->get_arg_type(i)->type;
+            switch (logical_type) {
+                case TYPE_VARCHAR:
+                    result += sizeof(SliceSizeType) + get().get_slice().size;
+                    break;
+#define M(type) \
+                case type: \
+                    result += sizeof(RunTimeCppType<type>); \
+                    break;
+
+                APPLY_FOR_ALL_NUMBER_TYPE(M)
+                M(TYPE_DATETIME)
+#undef M
+                default:
+                    break;
             }
         }
-        size_t offset = 0;
-        buffer.resize(new_buffer_size);
-        for (int i = 0; i < ctx->get_num_args(); ++i) {
-            if (columns[i]->is_null(row_num)) {
-                data[i] = kNullDatum;
-            } else if (ctx->get_arg_type(i)->type == TYPE_VARCHAR) {
-                auto& slice = columns[i]->get(row_num).get_slice();
-                memcpy(buffer.data() + offset, slice.data, slice.size);
-                data[i] = Slice(buffer.data() + offset, slice.size);
-                offset += slice.size;
-            } else {
-                data[i] = columns[i]->get(row_num);
+        return result;
+    }
+
+    // Serializes the row.
+    // As a side effect, it changes the current pointer.
+    virtual void serialize(uint8_t* dst) {
+        rewind();
+        for (int i = 0; i < ctx_->get_num_args(); ++i) {
+            uint8_t is_null = seek_and_is_null();
+            memcpy(dst, &is_null, sizeof(uint8_t));
+            dst += sizeof(uint8_t);
+            if (is_null) {
+                continue;
+            }
+            auto logical_type = ctx_->get_arg_type(i)->type;
+            switch (logical_type) {
+                case TYPE_VARCHAR: {
+                    auto slice = get().get_slice();
+                    SliceSizeType size = slice.size;
+                    memcpy(dst, &size, sizeof(SliceSizeType));
+                    dst += sizeof(SliceSizeType);
+                    memcpy(dst, slice.data, slice.size);
+                    dst += slice.size;
+                    break;
+                }
+#define M(type) \
+                case type: {\
+                    RunTimeCppType<type> value = get().get<RunTimeCppType<type>>(); \
+                    memcpy(dst, &value, sizeof(RunTimeCppType<type>)); \
+                    dst += sizeof(RunTimeCppType<type>); \
+                    break; \
+                }
+
+                APPLY_FOR_ALL_NUMBER_TYPE(M)
+                M(TYPE_DATETIME)
+#undef M
+                default:
+                    break;
             }
         }
     }
 
-    void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
-        if (data.empty()) {
-            data.resize(ctx->get_num_args());
-            set_new_data_columns(ctx, columns, row_num);
+protected:
+    FunctionContext* ctx_;
+};
+
+class ColumnsRowAccessor : public RowAccessor {
+public:
+    ColumnsRowAccessor(FunctionContext* ctx, const Column **columns, size_t row_num)
+            : RowAccessor(ctx), columns_(columns), row_num_(row_num), index_(-1) {}
+
+    bool seek_and_is_null() const override {
+        index_++;
+        return columns_[index_]->is_null(row_num_);
+    }
+
+    Datum get() const override { return columns_[index_]->get(row_num_); }
+
+    void rewind() override { index_ = -1; }
+
+private:
+    const Column **columns_;
+    size_t row_num_;
+    mutable int index_;
+};
+
+class SerializedRowAccessor : public RowAccessor {
+public:
+    explicit SerializedRowAccessor(FunctionContext* ctx, const uint8_t* row, size_t length)
+            : RowAccessor(ctx), row_(row), size_(length), current_(row), index_(-1) {}
+
+    bool seek_and_is_null() const override {
+        index_++;
+        uint8_t is_null;
+        memcpy(&is_null, current_, sizeof(uint8_t));
+        current_ += sizeof(uint8_t);
+        return is_null;
+    }
+
+    Datum get() const override {
+        auto logical_type = ctx_->get_arg_type(index_)->type;
+        switch (logical_type) {
+            case TYPE_VARCHAR: {
+                SliceSizeType size;
+                memcpy(&size, current_, sizeof(SliceSizeType));
+                current_ += sizeof(SliceSizeType);
+                auto value = Slice(current_, size);
+                current_ += size;
+                return value;
+            }
+#define M(type) \
+            case type: { \
+                auto value = *reinterpret_cast<const RunTimeCppType<type>*>(current_); \
+                current_ += sizeof(RunTimeCppType<type>);                                \
+                return value; \
+            }
+
+            APPLY_FOR_ALL_NUMBER_TYPE(M)
+            M(TYPE_DATETIME)
+#undef M
+            default:
+                throw std::runtime_error(fmt::format("Unsupported column type {}", logical_type));
+        }
+    }
+
+    void rewind() override {
+        index_ = -1;
+        current_ = row_;
+    }
+
+    size_t serialized_size() override { return size_; }
+
+    virtual void serialize(uint8_t* dst) override {
+        memcpy(dst, row_, size_);
+    }
+
+private:
+    const uint8_t* row_;
+    size_t size_;
+    mutable const uint8_t* current_;
+    mutable int index_;
+};
+} // namespace celonis
+
+template <bool is_first>
+struct CelonisSortedFirstLastAggregateState {
+    void set_new_row(celonis::RowAccessor& row_accessor) {
+        buffer.resize(row_accessor.serialized_size());
+        row_accessor.serialize(buffer.data());
+    }
+
+    void update(FunctionContext* ctx, celonis::RowAccessor& new_row_accessor) {
+        if (buffer.empty()) {
+            set_new_row(new_row_accessor);
             return;
         }
+
+        auto row_accessor = celonis::SerializedRowAccessor{ctx, buffer.data(), buffer.size()};
+        // Skip the first column
+        row_accessor.seek();
+        new_row_accessor.rewind();
+        new_row_accessor.seek();
+
         const auto& is_asc_order = ctx->get_is_asc_order();
         const auto& null_firsts = ctx->get_nulls_first();
-        for (int i = 1; i < data.size(); ++i) {
+        int num_args = ctx->get_num_args();
+        for (int i = 1; i < num_args; ++i) {
             auto order_index = i - 1;
-            if (data[i].is_null()) {
-                if (columns[i]->is_null(row_num)) {
+            if (row_accessor.seek_and_is_null()) {
+                if (new_row_accessor.seek_and_is_null()) {
                     continue;
                 }
                 if (null_firsts[order_index]) {
                     if constexpr (!is_first) {
-                        set_new_data_columns(ctx, columns, row_num);
+                        set_new_row(new_row_accessor);
                     }
                 } else {
                     if constexpr (is_first) {
-                        set_new_data_columns(ctx, columns, row_num);
+                        set_new_row(new_row_accessor);
                     }
                 }
                 return;
             }
-            if (columns[i]->is_null(row_num)) {
+            if (new_row_accessor.seek_and_is_null()) {
                 if (null_firsts[order_index]) {
                     if constexpr (is_first) {
-                        set_new_data_columns(ctx, columns, row_num);
+                        set_new_row(new_row_accessor);
                     }
                 } else {
                     if constexpr (!is_first) {
-                        set_new_data_columns(ctx, columns, row_num);
+                        set_new_row(new_row_accessor);
                     }
                 }
                 return;
@@ -76,39 +240,57 @@ struct CelonisSortedFirstLastAggregateState {
             auto logical_type = ctx->get_arg_type(i)->type;
             switch (logical_type) {
 #define M(type) \
-                case type: \
-                        cmp = SorterComparator<RunTimeCppType<type>>::compare( \
-                                data[i].get<RunTimeCppType<type>>(), \
-                                columns[i]->get(row_num).get<RunTimeCppType<type>>()); \
-                        break;
+                case type: {\
+                    cmp = SorterComparator<RunTimeCppType<type>>::compare( \
+                            row_accessor.get().get<RunTimeCppType<type>>(), \
+                            new_row_accessor.get().get<RunTimeCppType<type>>()); \
+                    break; \
+                }
 
-                    APPLY_FOR_ALL_NUMBER_TYPE(M)
-                    M(TYPE_DATETIME)
-                    M(TYPE_VARCHAR)
+                APPLY_FOR_ALL_NUMBER_TYPE(M)
+                M(TYPE_DATETIME)
+                M(TYPE_VARCHAR)
 #undef M
                 default:
                     throw std::runtime_error(fmt::format("Unsupported column type {}", logical_type));
-                    break;
             }
             if (cmp == 0) {
                 continue;
             } else if ((cmp < 0) == is_asc_order[order_index]) {
                 if constexpr (!is_first) {
-                    set_new_data_columns(ctx, columns, row_num);
+                    set_new_row(new_row_accessor);
                 }
                 return;
             } else {
                 if constexpr (is_first) {
-                    set_new_data_columns(ctx, columns, row_num);
+                    set_new_row(new_row_accessor);
                 }
                 return;
             }
         }
     }
 
+    size_t serialized_size() const {
+        return buffer.size();
+    }
+
+    void serialize(FunctionContext* ctx, uint8_t* dst) const {
+        if (buffer.empty()) {
+          return;
+        }
+        memcpy(dst, buffer.data(), buffer.size());
+    }
+
+    void deserialize_and_merge(FunctionContext* ctx, const uint8_t* src, size_t len) {
+        if (len == 0) {
+            return;
+        }
+        auto row_accessor = celonis::SerializedRowAccessor{ctx, src, len};
+        update(ctx, row_accessor);
+    }
+
     ~CelonisSortedFirstLastAggregateState() {}
 
-    DatumStruct data;
     raw::RawVector<uint8_t> buffer;
 };
 
@@ -131,51 +313,44 @@ class CelonisSortedFirstLastAggregateFunction
 public:
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const override {
         auto& state_impl = this->data(state);
-        state_impl.data.clear();
         state_impl.buffer.clear();
     }
 
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
                 size_t row_num) const override {
         if (columns[0]->is_null(row_num)) return;
-        this->data(state).update(ctx, columns, row_num);
+        auto row_accessor = celonis::ColumnsRowAccessor(ctx, columns, row_num);
+        this->data(state).update(ctx, row_accessor);
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
-        if (column->is_null(row_num)) {
-            return;
-        }
-        auto& input_columns = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column))->fields();
-        std::vector<const Column*> columns;
-        for (auto i = 0; i < input_columns.size(); ++i) {
-            columns.push_back(input_columns[i].get());
-        }
-        this->data(state).update(ctx, columns.data(), row_num);
+        DCHECK(column->is_binary());
+        const auto* input_column = down_cast<const BinaryColumn*>(column);
+        auto slice = input_column->get_slice(row_num);
+        this->data(state).deserialize_and_merge(ctx, (const uint8_t*)slice.data, slice.size);
     }
 
-    // serialize each state->column to a field in a [nullable] struct
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
-        auto& state_impl = this->data(state);
-        auto& columns = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
-        if (state_impl.data.empty()) {
-            to->append_default();
-            return;
-        }
-        if (to->is_nullable()) {
-            down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
-        }
-        for (auto i = 0; i < columns.size(); ++i) {
-            columns[i]->append_datum(state_impl.data[i]);
-        }
+        auto* column = down_cast<BinaryColumn*>(to);
+        size_t old_size = column->get_bytes().size();
+        size_t new_size = old_size + this->data(state).serialized_size();
+        column->get_bytes().resize(new_size);
+        this->data(state).serialize(ctx, column->get_bytes().data() + old_size);
+        column->get_offset().emplace_back(new_size);
     }
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         auto& state_impl = this->data(state);
-        if (state_impl.data.empty()) {
+        if (state_impl.buffer.empty()) {
             to->append_default();
             return;
         }
-        to->append_datum(state_impl.data[0]);
+        auto row_accessor = celonis::SerializedRowAccessor{ctx, state_impl.buffer.data(), state_impl.buffer.size()};
+        if (row_accessor.seek_and_is_null()) {
+            to->append_nulls(1);
+            return;
+        }
+        to->append_datum(row_accessor.get());
     }
 
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,

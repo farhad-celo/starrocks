@@ -1133,11 +1133,11 @@ public class FunctionSet {
                 false, false, false));
         // celonis_sorted_first
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_SORTED_FIRST,
-                Lists.newArrayList(Type.ANY_ELEMENT), Type.ANY_ELEMENT, Type.ANY_STRUCT, true,
+                Lists.newArrayList(Type.ANY_ELEMENT), Type.ANY_ELEMENT, Type.VARBINARY, true,
                 false, false, false));
         // celonis_sorted_last
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_SORTED_LAST,
-                Lists.newArrayList(Type.ANY_ELEMENT), Type.ANY_ELEMENT, Type.ANY_STRUCT, true,
+                Lists.newArrayList(Type.ANY_ELEMENT), Type.ANY_ELEMENT, Type.VARBINARY, true,
                 false, false, false));
         // celonis_histogram_boundaries
         for (Type type : CELONIS_TYPES) {

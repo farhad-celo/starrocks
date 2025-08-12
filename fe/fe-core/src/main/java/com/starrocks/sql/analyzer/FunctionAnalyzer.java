@@ -881,11 +881,6 @@ public class FunctionAnalyzer {
                 argsTypes[i] = argumentTypes[i] == Type.NULL ? Type.BOOLEAN : argumentTypes[i];
             }
             fn.setArgsType(argsTypes); // as accepting various types
-            ArrayList<Type> structFields = new ArrayList<>(argsTypes.length);
-            for (Type t : argsTypes) {
-                structFields.add(t);
-            }
-            ((AggregateFunction) fn).setIntermediateType(new StructType(structFields));
             ((AggregateFunction) fn).setIsAscOrder(isAscOrder);
             ((AggregateFunction) fn).setNullsFirst(nullsFirst);
             fn.setRetType(argsTypes[0]);     // return null if scalar agg with empty input
