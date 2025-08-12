@@ -871,6 +871,16 @@ public class FunctionAnalyzer {
             sf.add(new StructField("calendar_id", Type.VARCHAR));
             sf.add(new StructField("is_calendar_id_null", Type.BOOLEAN));
             ((AggregateFunction) fn).setIntermediateType(new StructType(sf));
+        } else if (fnName.equals(FunctionSet.CELONIS_MAKE_WORKDAY_CALENDAR)) {
+            fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_MAKE_WORKDAY_CALENDAR, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            ArrayList<StructField> sf = Lists.newArrayList();
+            sf.add(new StructField("year", Type.BIGINT));
+            sf.add(new StructField("is_workdays", Type.VARCHAR));
+            sf.add(new StructField("calendar_id", Type.VARCHAR));
+            sf.add(new StructField("is_calendar_id_null", Type.BOOLEAN));
+            ((AggregateFunction) fn).setIntermediateType(new StructType(sf));
         } else if (fnName.equals(FunctionSet.CELONIS_SORTED_FIRST) ||
                 fnName.equals(FunctionSet.CELONIS_SORTED_LAST)) {
             // move order by expr to node child, and extract is_asc and null_first information.

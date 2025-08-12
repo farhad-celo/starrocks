@@ -52,6 +52,9 @@ void AggregateFuncResolver::register_celonis() {
     add_general_mapping_notnull("celonis_make_factory_calendar", false,
                                 AggregateFactory::MakeCelonisMakeFactoryCalendarAggregateFunction());
 
+    add_general_mapping_notnull("celonis_make_workday_calendar", false,
+                                AggregateFactory::MakeCelonisMakeWorkdayCalendarAggregateFunction());
+
     add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_BIGINT, CelonisModeState<TYPE_BIGINT>>(
             "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_BIGINT>());
     add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, CelonisModeState<TYPE_DOUBLE>>(

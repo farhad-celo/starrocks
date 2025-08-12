@@ -133,6 +133,7 @@ add_library(celonis_calendars_protos ${PROTO_GENERATED_SRCS} ${PROTO_GENERATED_H
 
 set(CELONIS_FILES
   celonis/agg/factory_calendar.cpp
+  celonis/agg/workday_calendar.cpp
   celonis/agg/inductive_miner.cpp
   celonis/agg/variant_agg.cpp
   celonis/agg/variant_stats.cpp

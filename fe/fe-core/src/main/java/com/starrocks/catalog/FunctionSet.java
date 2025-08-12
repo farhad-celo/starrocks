@@ -314,6 +314,7 @@ public class FunctionSet {
     public static final String CELONIS_TRIMMED_MEAN = "celonis_trimmed_mean";
     public static final String CELONIS_VARIANT_STATS = "celonis_variant_stats";
     public static final String CELONIS_MAKE_FACTORY_CALENDAR = "celonis_make_factory_calendar";
+    public static final String CELONIS_MAKE_WORKDAY_CALENDAR = "celonis_make_workday_calendar";
 
     // Bitmap functions:
     public static final String BITMAP_AND = "bitmap_and";
@@ -1096,6 +1097,10 @@ public class FunctionSet {
         // celonis_make_factory_calendar
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR,
                     Lists.newArrayList(Type.DATETIME, Type.DATETIME, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
+                    true, false, true));
+        // celonis_make_workday_calendar
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_WORKDAY_CALENDAR,
+                    Lists.newArrayList(Type.BIGINT, Type.VARCHAR, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
                     true, false, true));
         // celonis_inductive_miner
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_INDUCTIVE_MINER,
