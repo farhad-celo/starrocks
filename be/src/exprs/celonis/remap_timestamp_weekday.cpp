@@ -4,6 +4,7 @@
 #include "column/column.h"
 #include "column/column_builder.h"
 #include "column/column_hash.h"
+#include "column/column_viewer.h"
 #include "exprs/celonis/util.h"
 
 namespace starrocks {
@@ -13,6 +14,12 @@ static int weekday[] = {0, 1, 2, 2, 2, 3, 4};
 
 // Number of days since the start of the unix epoch.
 static constexpr JulianDate UNIX_EPOCH_JULIAN = 2440588;
+
+static int64_t convert_timestamp_to_weekday(long timestamp_val) {
+    JulianDate year_in_days = timestamp::to_julian(timestamp_val);
+    int64_t days_from_unix_epoch = year_in_days - UNIX_EPOCH_JULIAN;
+    return (days_from_unix_epoch/7) * 5 + weekday[days_from_unix_epoch % 7];
+}
 
 template <bool has_null>
 ColumnPtr CelonisRemapTimestampWeekday::_celonis_remap_timestamp_weekday_impl(FunctionContext* context,
@@ -43,16 +50,27 @@ ColumnPtr CelonisRemapTimestampWeekday::_celonis_remap_timestamp_weekday_impl(Fu
                 }
             }
             const TimestampValue& val = timestamp_elements.get(j).get_timestamp();
-            // to_julian is just a bitshift operation, should be fast.
-            JulianDate year_in_days = timestamp::to_julian(val.timestamp());
-            int64_t days_from_unix_epoch = year_in_days - UNIX_EPOCH_JULIAN;
-            int64_t res = (days_from_unix_epoch/7) * 5 + weekday[days_from_unix_epoch % 7];
-            result.append(res);
+            result.append(convert_timestamp_to_weekday(val.timestamp()));
         }
     }
     return ArrayColumn::create(
             ColumnHelper::cast_to_nullable_column(result.build(false)),
             UInt32Column::create(timestamp_offsets));
+}
+
+StatusOr<ColumnPtr> CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday_scalar(FunctionContext* context, const Columns& columns) {
+    ColumnViewer<TYPE_DATETIME> viewer(columns[0]);
+    size_t size = columns[0]->size();
+    ColumnBuilder<TYPE_BIGINT> builder(size);
+    for (int row = 0; row < size; ++row) {
+        if (viewer.is_null(row)) {
+            builder.append_null();
+        } else {
+            const long timestamp_val = viewer.value(row).timestamp();
+            builder.append(convert_timestamp_to_weekday(timestamp_val));
+        }
+    }
+    return builder.build(ColumnHelper::is_all_const(columns));
 }
 
 StatusOr<ColumnPtr> CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday(FunctionContext* context, const Columns& columns) {

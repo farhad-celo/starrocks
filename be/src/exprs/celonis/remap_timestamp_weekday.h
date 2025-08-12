@@ -9,6 +9,8 @@ class CelonisRemapTimestampWeekday {
 public:
     DEFINE_VECTORIZED_FN(celonis_remap_timestamp_weekday);
 
+    DEFINE_VECTORIZED_FN(celonis_remap_timestamp_weekday_scalar);
+
 private:
     template <bool has_null>
     static ColumnPtr

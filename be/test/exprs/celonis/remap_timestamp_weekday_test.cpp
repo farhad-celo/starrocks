@@ -57,4 +57,17 @@ TEST_F(CelonisRemapTimestampWeekdayTest, remap_weekdays_with_nulls) {
     EXPECT_TRUE(result->get(1).is_null());
     EXPECT_EQ(0, result->get(2).get_array().size());
 }
+
+TEST_F(CelonisRemapTimestampWeekdayTest, remap_weekdays_scalar) {
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    auto input = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+    input->append_datum(Datum(TimestampValue::create(2017, 10, 19, 17, 32, 32)));
+    input->append_datum(Datum());
+    input->append_datum(Datum(TimestampValue::create(2017, 10, 19, 18, 30, 30)));
+    const auto result = CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday_scalar(ctx.get(), {input}).value();
+    ASSERT_EQ(3, result->size());
+    EXPECT_EQ(12470L, result->get(0).get_int64());
+    EXPECT_TRUE(result->get(1).is_null());
+    EXPECT_EQ(12470L, result->get(2).get_int64());
+}
 } // namespace starrocks

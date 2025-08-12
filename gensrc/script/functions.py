@@ -1410,6 +1410,7 @@ celostar_functions = [
     [1000302, 'celonis_remap_timestamp_weekday', True, False, 'ARRAY_BIGINT', ['ARRAY_DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday'],
     [1000303, 'celonis_index_activity_order', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivityOrder::celonis_index_activity_order'],
     [1000304, 'celonis_match_process', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisMatchProcess::celonis_match_process', 'CelonisMatchProcess::match_process_prepare', 'CelonisMatchProcess::match_process_close'],
+    [1000305, 'celonis_match_process', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisMatchProcess::celonis_match_process', 'CelonisMatchProcess::match_process_prepare', 'CelonisMatchProcess::match_process_close'],
 
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
