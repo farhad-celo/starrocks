@@ -872,7 +872,7 @@ public class FunctionAnalyzer {
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             fn = fn.copy();
             ArrayList<StructField> sf = Lists.newArrayList();
-            sf.add(new StructField("xs", Type.DOUBLE));
+            sf.add(new StructField("xs", Type.ARRAY_DOUBLE));
             sf.add(new StructField("ys", Type.DOUBLE));
             ((AggregateFunction) fn).setIntermediateType(new StructType(sf));
         } else if (fnName.equals(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR)) {

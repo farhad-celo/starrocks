@@ -15,40 +15,38 @@
 #include "linear_regression.h"
 #include "modules/query/calendars.pb.h"
 #include <google/protobuf/util/json_util.h>
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/vector.hpp>
+#include <boost/numeric/ublas/io.hpp>
+#include <boost/numeric/ublas/lu.hpp>
+
 
 namespace starrocks {
 
+using namespace boost::numeric::ublas;
+
 namespace {
 
-double mean(const std::vector<double>& v) {
-    double sum = 0.0;
-    for (auto& i: v) sum += i;
-    return sum / v.size();
+// Performs in-place LU factorization and then solve for X in AX=B
+bool lu_solve(const matrix<double>& A, const vector<double>& B, vector<double>& X) {
+    matrix<double> A_lu(A);
+    permutation_matrix<std::size_t> perm(A.size1());
+    int res = lu_factorize(A_lu, perm);
+    if (res != 0) return false;
+    X.assign(B);
+    lu_substitute(A_lu, perm, X);
+    return true;
 }
 
-double covariance(const std::vector<double>& x, const std::vector<double>& y) {
-    double sum = 0.0;
-    double x_mean = mean(x);
-    double y_mean = mean(y);
-    for (size_t i = 0; i < x.size(); i++) {
-        sum += (x[i] - x_mean) * (y[i] - y_mean);
+std::string to_model_str(const vector<double>& beta) {
+    std::string sep = "";
+    std::string rv = "";
+    for (double v: beta) {
+        rv += sep;
+        rv += std::to_string(v);
+        sep = ":";
     }
-    return sum;
-}
-
-double variance(const std::vector<double>& v) {
-    double x_mean = mean(v);
-    double sum = 0.0;
-    for (auto& i: v) {
-        sum += (i - x_mean) * (i - x_mean);
-    }
-    return sum;
-}
-
-std::pair<double, double> linear_regression(const std::vector<double>& x, const std::vector<double>& y) {
-    double b1 = covariance(x, y) / variance(x);
-    double b0 = mean(y) - b1 * mean(x);
-    return std::make_pair(b0, b1); // Returns a pair of coefficients (intercept, slope)
+    return rv;
 }
 
 }
@@ -63,10 +61,10 @@ LinearRegressionAggregateState::~LinearRegressionAggregateState() {
 }
 
 void LinearRegressionAggregateFunction::create(FunctionContext* ctx, AggDataPtr __restrict ptr) const {
-    auto num = ctx->get_num_args();
-    DCHECK(num == 2);
+    DCHECK(ctx->get_num_args() == 2);
     auto* state = new(ptr) LinearRegressionAggregateState;
-    state->x = std::make_unique<DoubleColumn>();
+    state->x = std::make_unique<ArrayColumn>(NullableColumn::create(DoubleColumn::create(), NullColumn::create()),
+                                             UInt32Column::create());
     state->y = std::make_unique<DoubleColumn>();
 }
 
@@ -85,19 +83,30 @@ void
 LinearRegressionAggregateFunction::update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
                                           size_t row_num) const {
     DCHECK(ctx->get_num_args() == 2);
-    for (auto i = 0; i < ctx->get_num_args(); ++i) {
+    for (auto i = 0; i < 2; ++i) {
         if (UNLIKELY(columns[i]->size() <= row_num)) {
             ctx->set_error(std::string(get_name() + "'s update row number overflow").c_str(), false);
             return;
         }
     }
-    // x or y is NULL, ignore.
+    // x_array or y is NULL, ignore.
     for (auto i = 0; i < 2; ++i) {
         if ((columns[i]->is_nullable() && columns[i]->is_null(row_num)) || columns[i]->only_null()) {
             return;
         }
     }
-
+    // if x_array contains NULL, ignore
+    bool has_null = false;
+    auto array = columns[0]->get(row_num).get_array();
+    for (const auto& v: array) {
+        if (v.is_null()) {
+            has_null = true;
+            break;
+        }
+    }
+    if (has_null) {
+        return;
+    }
     auto& state_impl = this->data(state);
     state_impl.x->append_datum(columns[0]->get(row_num));
     state_impl.y->append_datum(columns[1]->get(row_num));
@@ -122,9 +131,9 @@ void LinearRegressionAggregateFunction::serialize_to_column(starrocks::FunctionC
     }
     down_cast<NullableColumn*>(columns[0].get())->mutable_null_column()->get_data().resize(size, 0);
     down_cast<NullableColumn*>(columns[1].get())->mutable_null_column()->get_data().resize(size, 0);
-    auto x = down_cast<DoubleColumn*>(ColumnHelper::get_data_column(columns[0].get()));
+    auto x = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(columns[0].get()));
     for (size_t i = 0; i < size; ++i) {
-        x->append(state_impl.x->get(i).get_double());
+        x->append_datum(state_impl.x->get(i));
     }
     auto y = down_cast<DoubleColumn*>(ColumnHelper::get_data_column(columns[1].get()));
     for (size_t i = 0; i < size; ++i) {
@@ -149,20 +158,43 @@ void LinearRegressionAggregateFunction::finalize_to_column(FunctionContext* ctx,
     auto& state_impl = this->data(state);
     const auto size = state_impl.x->size();
     DCHECK(state_impl.y->size() == size);
-    std::vector<double> xs;
-    std::vector<double> ys;
-    xs.reserve(size);
-    ys.reserve(size);
-    for (int i = 0; i < size; ++i) {
-        xs.push_back(state_impl.x->get(i).get_double());
-        ys.push_back(state_impl.y->get(i).get_double());
+    std::optional<size_t> num_features = std::nullopt;
+    bool len_inconsistent = false;
+    for (auto i = 0; i < size; ++i) {
+        if (num_features.has_value()) {
+            if (num_features != state_impl.x->get(i).get_array().size()) {
+                len_inconsistent = true;
+                break;
+            }
+        } else {
+            num_features = state_impl.x->get(i).get_array().size();
+        }
     }
-    auto [intercept, slope] = linear_regression(xs, ys);
-    if (std::isnan(intercept) || std::isnan(slope)) {
+    if (!num_features.has_value() || len_inconsistent || num_features < 1) {
         to->append_datum(kNullDatum);
-    } else {
-        const std::string model = std::to_string(intercept) + ":" + std::to_string(slope);
+        return;
+    }
+    matrix<double> X(size, num_features.value() + 1);
+    vector<double> y(size);
+    vector<double> beta(num_features.value() + 1);
+    for (auto i = 0; i < size; ++i) {
+        X(i, 0) = 1.0;
+        for (auto j = 0; j < num_features.value(); ++j) {
+            X(i, j + 1) = state_impl.x->get(i).get_array()[j].get_double();
+        }
+        y(i) = state_impl.y->get(i).get_double();
+    }
+    // compute (X^T * X)
+    matrix<double> XtX = prod(trans(X), X);
+
+    // compute (X^T * y)
+    vector<double> Xty = prod(trans(X), y);
+    // solve for beta using LU decomposition
+    if (lu_solve(XtX, Xty, beta)) {
+        const std::string model = to_model_str(beta);
         to->append_datum(model.c_str());
+    } else {
+        to->append_datum(kNullDatum);
     }
 }
 
@@ -179,6 +211,17 @@ void LinearRegressionAggregateFunction::convert_to_serialize_format(FunctionCont
         if ((src[1]->is_nullable() && src[1]->is_null(row)) || src[1]->only_null()) {
             continue;
         }
+        bool has_null = false;
+        auto array = src[0]->get(row).get_array();
+        for (const auto& v: array) {
+            if (v.is_null()) {
+                has_null = true;
+                break;
+            }
+        }
+        if (has_null) {
+            continue;
+        }
         valid_indexes.push_back(row);
     }
     auto columns = down_cast<StructColumn*>(ColumnHelper::get_data_column(dst->get()))->fields_column();
@@ -192,7 +235,7 @@ void LinearRegressionAggregateFunction::convert_to_serialize_format(FunctionCont
             down_cast<NullableColumn*>(column.get())->mutable_null_column()->get_data().resize(valid_indexes.size(), 0);
         }
     }
-    auto x = down_cast<DoubleColumn*>(ColumnHelper::get_data_column(columns[0].get()));
+    auto x = down_cast<ArrayColumn*>(ColumnHelper::get_data_column(columns[0].get()));
     for (auto i: valid_indexes) {
         x->append_datum(src[0]->get(i));
     }

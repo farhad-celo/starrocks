@@ -1107,7 +1107,7 @@ public class FunctionSet {
     private void initCelonisAggregateBuiltins() {
         // celonis_build_linear_regression_model
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_LINEAR_REGRESSION_MODEL,
-                    Lists.newArrayList(Type.DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.ANY_STRUCT,
+                    Lists.newArrayList(Type.ARRAY_DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.ANY_STRUCT,
                     true, false, true));
         // celonis_make_factory_calendar
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR,
