@@ -1415,6 +1415,7 @@ celostar_functions = [
 
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
+    [2000101, 'celonis_null_to_empty', True, False, 'ANY_ARRAY', ['ANY_ARRAY'], 'CelonisArrayFunctions::null_to_empty'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis']

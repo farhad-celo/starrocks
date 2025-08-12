@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "column/array_column.h"
+#include "exprs/celonis/util.h"
 
 namespace starrocks {
 
@@ -159,6 +160,32 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_is_sorted([[maybe_unused]] Func
     const ColumnPtr& arg0 = columns[0]; // array
 
     return CelonisArrayIsSortedImpl::evaluate(*arg0);
+}
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+    const Column* array = columns[0].get();
+    UnnestedArrayData array_data = prepare_array_input(array);
+    if (array_data.null_arrays == nullptr) {
+        return columns[0];
+    }
+    auto offsets_ptr = array_data.offsets->get_data().data();
+    const auto& array_column = extract_array_column(array);
+
+    auto result_array = ArrayColumn::create(array_column);
+    UInt32Column::Container& result_offsets = result_array->offsets_column()->get_data();
+    result_offsets.clear();
+    const size_t num_array = array_data.offsets->size() - 1;
+    int new_offset = 0;
+    result_offsets.push_back(new_offset);
+    for (size_t i = 0; i < num_array; i++) {
+        if ((*array_data.null_arrays)[i]) {
+            result_offsets.push_back(new_offset);
+        } else {
+            new_offset = offsets_ptr[i + 1];
+            result_offsets.push_back(new_offset);
+        }
+    }
+    return result_array;
 }
 
 } // namespace starrocks

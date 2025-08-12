@@ -235,4 +235,34 @@ TEST_F(CelonisArrayFunctionsTest, array_is_sorted_nullable_array) {
     }
 }
 
+
+TEST_F(CelonisArrayFunctionsTest, array_null_to_empty) {
+    auto array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+    array->append_datum(DatumArray{"abc", Datum(), "bcd"});
+    array->append_datum(DatumArray());
+    array->append_datum(DatumArray{Datum{}});
+    array->append_datum(DatumArray{Datum{}, Datum{}});
+
+    const auto result = CelonisArrayFunctions::null_to_empty(nullptr, {array}).value();
+    ASSERT_EQ(4, result->size());
+    auto first_row = result->get(0).get_array();
+    ASSERT_EQ(3, first_row.size());
+
+    EXPECT_EQ("abc", first_row[0].get_slice());
+    EXPECT_TRUE(first_row[1].is_null());
+    EXPECT_EQ("bcd", first_row[2].get_slice());
+
+    auto second_row = result->get(1).get_array();
+    EXPECT_EQ(0, second_row.size());
+
+    auto third_row = result->get(2).get_array();
+    ASSERT_EQ(1, third_row.size());
+    EXPECT_TRUE(third_row[0].is_null());
+
+    auto fourth_row = result->get(3).get_array();
+    ASSERT_EQ(2, fourth_row.size());
+    EXPECT_TRUE(fourth_row[0].is_null());
+    EXPECT_TRUE(fourth_row[1].is_null());
+}
+
 } // namespace starrocks
