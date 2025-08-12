@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "column/array_column.h"
+#include "exprs/celonis/util.h"
 
 namespace starrocks {
 
@@ -154,11 +155,239 @@ do {                                                                            
     }
 };
 
-
 StatusOr<ColumnPtr> CelonisArrayFunctions::array_is_sorted([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     const ColumnPtr& arg0 = columns[0]; // array
 
     return CelonisArrayIsSortedImpl::evaluate(*arg0);
+}
+
+class CelonisMergeSortedArrays {
+public:
+    static StatusOr<ColumnPtr> process(const Columns& columns) {
+        DCHECK_EQ(columns.size(), 4);
+
+        size_t chunk_size = columns[0]->size();
+
+        ColumnPtr timestamp_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[1]);
+        if (timestamp_column->has_null()) {
+            return Status::InvalidArgument("timestamp_array should not be NULL.");
+        }
+        UnnestedArrayData timestamp_array_data = prepare_array_input(timestamp_column.get());
+        if (timestamp_array_data.null_elements != nullptr) {
+            return Status::InvalidArgument("timestamp_array should not have NULL elements.");
+        }
+        DCHECK(timestamp_array_data.elements->is_timestamp());
+        const auto& timestamps =
+                down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*timestamp_array_data.elements).get_data().data();
+        const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
+
+        ColumnPtr size_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[2]);
+        if (size_column->has_null()) {
+            return Status::InvalidArgument("size_array should not be NULL.");
+        }
+        UnnestedArrayData size_array_data = prepare_array_input(size_column.get());
+        if (size_array_data.null_elements != nullptr) {
+            return Status::InvalidArgument("size_array should not have NULL elements.");
+        }
+        const auto& sizes = down_cast<const RunTimeColumnType<TYPE_INT>&>(*size_array_data.elements).get_data().data();
+        const auto& size_offsets = size_array_data.offsets->get_data().data();
+
+        ColumnPtr priority_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[3]);
+        if (priority_column->has_null()) {
+            return Status::InvalidArgument("priority_array should not be NULL.");
+        }
+        UnnestedArrayData priority_array_data = prepare_array_input(priority_column.get());
+        if (priority_array_data.null_elements != nullptr) {
+            return Status::InvalidArgument("priority_array should not have NULL elements.");
+        }
+        const auto& priorities =
+                down_cast<const RunTimeColumnType<TYPE_INT>&>(*priority_array_data.elements).get_data().data();
+        const auto& priority_offsets = priority_array_data.offsets->get_data().data();
+
+        ColumnPtr src_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[0]);
+        auto* src_data_column = src_column.get();
+
+        ColumnPtr dest_column = src_column->clone_empty();
+        auto* dest_data_column = dest_column.get();
+
+        if (src_column->is_nullable()) {
+            if (src_column->has_null()) {
+                return Status::InvalidArgument("input_array should not be null.");
+            }
+            const auto* src_nullable_column = down_cast<const NullableColumn*>(src_column.get());
+            src_data_column = src_nullable_column->data_column().get();
+
+            auto* dest_nullable_column = down_cast<NullableColumn*>(dest_column.get());
+            dest_data_column = dest_nullable_column->mutable_data_column();
+            auto* dest_null_column = dest_nullable_column->mutable_null_column();
+            dest_null_column->get_data().resize(chunk_size, 0);
+            dest_nullable_column->set_has_null(false);
+        }
+
+        const auto& src_elements = down_cast<const ArrayColumn*>(src_data_column)->elements();
+        const auto& src_offsets = down_cast<const ArrayColumn*>(src_data_column)->offsets().get_data().data();
+        auto* dest_elements_column = down_cast<ArrayColumn*>(dest_data_column)->elements_column().get();
+        auto* dest_offsets_column = down_cast<ArrayColumn*>(dest_data_column)->offsets_column().get();
+
+        std::vector<uint32_t> src_index;
+        src_index.reserve(src_elements.size());
+        int new_offset = 0;
+
+        for (size_t row = 0; row < chunk_size; row++) {
+            size_t src_timestamp_start = src_offsets[row];
+            size_t src_timestamp_end = src_offsets[row + 1];
+            if (timestamp_offsets[row + 1] != src_timestamp_end) {
+                return Status::InvalidArgument("The size of input_array and timestamp_array should not be different.");
+            }
+            size_t size_priority_start = size_offsets[row];
+            size_t size_priority_end = size_offsets[row + 1];
+            if (priority_offsets[row + 1] != size_priority_end) {
+                return Status::InvalidArgument("The size of size_array and priority_array should not be different.");
+            }
+
+            struct Array {
+                Array(size_t start, size_t end, const TimestampValue* timestamp, int priority)
+                        : index(start), end(end), timestamp(timestamp), priority(priority) {}
+                size_t index;
+                size_t end;
+                const TimestampValue* timestamp;
+                int priority;
+            };
+            struct CompareArrayElement {
+                bool operator()(const Array& lhs, const Array& rhs) {
+                    return *lhs.timestamp > *rhs.timestamp ||
+                           (*lhs.timestamp == *rhs.timestamp && lhs.priority < rhs.priority);
+                }
+            };
+            std::priority_queue<Array, std::vector<Array>, CompareArrayElement> pq;
+            size_t start = src_timestamp_start;
+            size_t next = 0;
+            for (size_t i = size_priority_start; i < size_priority_end; i++) {
+                next = start + sizes[i];
+                if (next > src_timestamp_end) {
+                    return Status::InvalidArgument(
+                            "The size of input_array and timestamp_array should not be different than the sum of "
+                            "size_array.");
+                }
+                pq.emplace(start, next, timestamps + start, priorities[i]);
+                start = next;
+            }
+            if (next != src_timestamp_end) {
+                return Status::InvalidArgument(
+                        "The size of input_array and timestamp_array should not be different than the sum of "
+                        "size_array.");
+            }
+            while (!pq.empty()) {
+                Array curr = pq.top();
+                pq.pop();
+                src_index.push_back(curr.index);
+                new_offset++;
+                if (++curr.index < curr.end) {
+                    curr.timestamp++;
+                    pq.push(curr);
+                }
+            }
+            dest_offsets_column->get_data().push_back(new_offset);
+        }
+        dest_elements_column->append_selective(src_elements, src_index);
+        return dest_column;
+    }
+};
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::merge_sorted_arrays([[maybe_unused]] FunctionContext* context,
+                                                               const Columns& columns) {
+    return CelonisMergeSortedArrays::process(columns);
+}
+
+class CelonisDedupSortedBy {
+public:
+    static StatusOr<ColumnPtr> process(const Columns& columns) {
+        DCHECK_EQ(columns.size(), 2);
+        if (columns[0]->only_null() || columns[1]->only_null()) {
+            return Status::InvalidArgument("The arrays should not be null.");
+        }
+
+        size_t chunk_size = columns[0]->size();
+
+        ColumnPtr src_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[0]);
+        ColumnPtr dest_column = src_column->clone_empty();
+        ColumnPtr key_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[1]);
+
+        if (src_column->is_nullable()) {
+            if (src_column->has_null()) {
+                return Status::InvalidArgument("input_array should not be null.");
+            }
+            const auto* src_nullable_column = down_cast<const NullableColumn*>(src_column.get());
+            const auto& src_data_column = src_nullable_column->data_column_ref();
+
+            auto* dest_nullable_column = down_cast<NullableColumn*>(dest_column.get());
+            auto* dest_data_column = dest_nullable_column->mutable_data_column();
+            auto* dest_null_column = dest_nullable_column->mutable_null_column();
+            dest_null_column->get_data().resize(chunk_size, 0);
+            dest_nullable_column->set_has_null(false);
+            RETURN_IF_ERROR(_dedup_array_column(dest_data_column, src_data_column, key_column));
+        } else {
+            RETURN_IF_ERROR(_dedup_array_column(dest_column.get(), *src_column, key_column));
+        }
+        return dest_column;
+    }
+
+private:
+    static Status _dedup_array_column(Column* dest_array_column, const Column& src_array_column,
+                                      const ColumnPtr key_array_ptr) {
+        ColumnPtr key_array_data = key_array_ptr;
+        if (key_array_ptr->is_nullable()) { // Nullable(array(Nullable(element), offsets), null_map)
+            if (key_array_ptr->has_null()) {
+                return Status::InvalidArgument("key_array should not be null.");
+            }
+            key_array_data = down_cast<const NullableColumn*>(key_array_ptr.get())->data_column();
+        }
+        // key_array_data is of array(Nullable(element), offsets)
+
+        const auto& key_element_column = down_cast<ArrayColumn*>(key_array_data.get())->elements();
+        if (key_element_column.has_null()) {
+            return Status::InvalidArgument("key_array should not have null elements.");
+        }
+        const auto& key_offsets = down_cast<ArrayColumn*>(key_array_data.get())->offsets().get_data().data();
+
+        const auto& src_elements_column = down_cast<const ArrayColumn&>(src_array_column).elements();
+        const auto& src_offsets = down_cast<const ArrayColumn&>(src_array_column).offsets().get_data().data();
+
+        auto* dest_elements_column = down_cast<ArrayColumn*>(dest_array_column)->elements_column().get();
+        auto* dest_offsets_column = down_cast<ArrayColumn*>(dest_array_column)->offsets_column().get();
+
+        size_t chunk_size = src_array_column.size();
+        std::vector<uint32_t> src_index;
+        src_index.reserve(src_elements_column.size());
+        int new_offset = 0;
+
+        const auto& key_data_column = down_cast<const NullableColumn&>(key_element_column).data_column_ref();
+        const auto& key_data = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(key_data_column).get_data();
+
+        for (size_t i = 0; i < chunk_size; i++) {
+            Slice prev;
+            size_t start = src_offsets[i];
+            size_t end = src_offsets[i + 1];
+            if (end != key_offsets[i + 1]) {
+                return Status::InvalidArgument("The size of input_array and key_array should not be different.");
+            }
+            for (auto id = start; id < end; ++id) {
+                if (id == start || prev != key_data[id]) {
+                    src_index.push_back(id);
+                    new_offset++;
+                    prev = key_data[id];
+                }
+            }
+            dest_offsets_column->get_data().push_back(new_offset);
+        }
+        dest_elements_column->append_selective(src_elements_column, src_index);
+        return Status::OK();
+    }
+};
+
+StatusOr<ColumnPtr> CelonisArrayFunctions::dedup_sorted_by([[maybe_unused]] FunctionContext* context,
+                                                           const Columns& columns) {
+    return CelonisDedupSortedBy::process(columns);
 }
 
 } // namespace starrocks
