@@ -901,10 +901,10 @@ public class FunctionAnalyzer {
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             fn = fn.copy();
             ArrayList<StructField> sf = Lists.newArrayList();
-            sf.add(new StructField("year", Type.BIGINT));
-            sf.add(new StructField("is_workdays", Type.VARCHAR));
-            sf.add(new StructField("calendar_id", Type.VARCHAR));
-            sf.add(new StructField("is_calendar_id_null", Type.BOOLEAN));
+            sf.add(new StructField("year", Type.ARRAY_BIGINT));
+            sf.add(new StructField("is_workdays", Type.ARRAY_VARCHAR));
+            sf.add(new StructField("calendar_id", Type.ARRAY_VARCHAR));
+            sf.add(new StructField("is_calendar_id_null", Type.ARRAY_BOOLEAN));
             ((AggregateFunction) fn).setIntermediateType(new StructType(sf));
         } else if (fnName.equals(FunctionSet.CELONIS_SORTED_FIRST) ||
                 fnName.equals(FunctionSet.CELONIS_SORTED_LAST)) {

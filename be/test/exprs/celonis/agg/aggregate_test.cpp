@@ -122,18 +122,12 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
 
     const AggregateFunction* agg_func = get_aggregate_function("celonis_make_workday_calendar", TYPE_BIGINT, TYPE_ARRAY,
                                                                false);
-    TypeDescriptor type_bigint;
-    type_bigint.type = LogicalType::TYPE_BIGINT;
-    TypeDescriptor type_varchar;
-    type_varchar.type = LogicalType::TYPE_VARCHAR;
-    TypeDescriptor type_boolean;
-    type_boolean.type = LogicalType::TYPE_BOOLEAN;
     TypeDescriptor type_struct;
     type_struct.type = LogicalType::TYPE_STRUCT;
-    type_struct.children.emplace_back(type_bigint);
-    type_struct.children.emplace_back(type_varchar);
-    type_struct.children.emplace_back(type_varchar);
-    type_struct.children.emplace_back(type_boolean);
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BIGINT));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_VARCHAR));
+    type_struct.children.emplace_back(celonis::array_type(TYPE_BOOLEAN));
     type_struct.field_names.emplace_back("year");
     type_struct.field_names.emplace_back("is_workdays");
     type_struct.field_names.emplace_back("calendar_id");
@@ -182,7 +176,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{year:1970,is_workdays:'0101',calendar_id:'',is_calendar_id_null:1}, {year:1971,is_workdays:'1010',calendar_id:'',is_calendar_id_null:1}]",
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -194,7 +188,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{year:1970,is_workdays:'0101',calendar_id:'',is_calendar_id_null:1}, {year:1971,is_workdays:'1010',calendar_id:'',is_calendar_id_null:1}]",
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -251,7 +245,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{year:1970,is_workdays:'0101',calendar_id:'',is_calendar_id_null:1}, {year:1971,is_workdays:'1010',calendar_id:'',is_calendar_id_null:1}]",
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -263,7 +257,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{year:1970,is_workdays:'0101',calendar_id:'',is_calendar_id_null:1}, {year:1971,is_workdays:'1010',calendar_id:'',is_calendar_id_null:1}]",
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['',''],is_calendar_id_null:[1,1]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -314,7 +308,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         auto res_struct_col = ColumnHelper::create_column(type_struct, true);
         agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
         EXPECT_EQ(
-                "[{year:1970,is_workdays:'0101',calendar_id:'id1',is_calendar_id_null:0}, {year:1971,is_workdays:'1010',calendar_id:'id2',is_calendar_id_null:0}]",
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test convert_to_serialize_format.
@@ -326,7 +320,7 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
         agg_func->convert_to_serialize_format(local_ctx.get(), columns, year_column->size(),
                                               &res_struct_col);
         EXPECT_EQ(
-                "[{year:1970,is_workdays:'0101',calendar_id:'id1',is_calendar_id_null:0}, {year:1971,is_workdays:'1010',calendar_id:'id2',is_calendar_id_null:0}]",
+                "[{year:[1970,1971],is_workdays:['0101','1010'],calendar_id:['id1','id2'],is_calendar_id_null:[0,0]}]",
                 res_struct_col->debug_string());
 
         // test finalize_to_column.
@@ -547,12 +541,6 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
 
     const AggregateFunction* agg_func = get_aggregate_function("celonis_make_factory_calendar", TYPE_BIGINT, TYPE_ARRAY,
                                                                false);
-    TypeDescriptor type_timestamp;
-    type_timestamp.type = LogicalType::TYPE_DATETIME;
-    TypeDescriptor type_varchar;
-    type_varchar.type = LogicalType::TYPE_VARCHAR;
-    TypeDescriptor type_boolean;
-    type_boolean.type = LogicalType::TYPE_BOOLEAN;
     TypeDescriptor type_struct;
     type_struct.type = LogicalType::TYPE_STRUCT;
     type_struct.children.emplace_back(celonis::array_type(TYPE_DATETIME));

@@ -100,10 +100,19 @@ void WorkdayCalendarAggregateFunction::merge(FunctionContext* ctx, const Column*
                                              size_t row_num) const {
     auto& input_columns = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column))->fields();
     auto& state_impl = this->data(state);
-    state_impl.year->append_datum(input_columns.at(0)->get(row_num));
-    state_impl.is_workdays->append_datum(input_columns.at(1)->get(row_num));
-    state_impl.calendar_id->append_datum(input_columns.at(2)->get(row_num));
-    state_impl.is_calendar_id_null->append_datum(input_columns.at(3)->get(row_num));
+    auto year_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(0).get()));
+    auto is_workdays_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(1).get()));
+    auto calendar_id_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(2).get()));
+    auto is_calendar_id_null_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(3).get()));
+    auto& offsets = year_column->offsets().get_data();
+    const auto start = offsets[row_num];
+    const auto end = offsets[row_num + 1];
+    for (auto i = start; i < end; ++i) {
+        state_impl.year->append_datum(year_column->elements().get(i));
+        state_impl.is_workdays->append_datum(is_workdays_column->elements().get(i));
+        state_impl.calendar_id->append_datum(calendar_id_column->elements().get(i));
+        state_impl.is_calendar_id_null->append_datum(is_calendar_id_null_column->elements().get(i));
+    }
 }
 
 void WorkdayCalendarAggregateFunction::serialize_to_column(starrocks::FunctionContext* ctx,
@@ -111,29 +120,14 @@ void WorkdayCalendarAggregateFunction::serialize_to_column(starrocks::FunctionCo
                                                            starrocks::Column* to) const {
     auto& state_impl = this->data(state);
     auto& columns = down_cast<StructColumn*>(ColumnHelper::get_data_column(to))->fields_column();
-    const auto size = state_impl.year->size();
-    if (to->is_nullable()) {
-        down_cast<NullableColumn*>(to)->mutable_null_column()->get_data().resize(size, 0);
-    }
-    down_cast<NullableColumn*>(columns[0].get())->mutable_null_column()->get_data().resize(size, 0);
-    down_cast<NullableColumn*>(columns[1].get())->mutable_null_column()->get_data().resize(size, 0);
-    down_cast<NullableColumn*>(columns[2].get())->mutable_null_column()->get_data().resize(size, 0);
-    down_cast<NullableColumn*>(columns[3].get())->mutable_null_column()->get_data().resize(size, 0);
-    auto year = down_cast<Int64Column*>(ColumnHelper::get_data_column(columns[0].get()));
-    for (size_t i = 0; i < size; ++i) {
-        year->append(state_impl.year->get(i).get_int64());
-    }
-    auto is_workdays = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(columns[1].get()));
-    for (size_t i = 0; i < size; ++i) {
-        is_workdays->append(state_impl.is_workdays->get(i).get_slice());
-    }
-    auto calendar_id = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(columns[2].get()));
-    for (size_t i = 0; i < size; ++i) {
-        calendar_id->append(state_impl.calendar_id->get(i).get_slice());
-    }
-    auto is_calendar_id_null = down_cast<BooleanColumn*>(ColumnHelper::get_data_column(columns[3].get()));
-    for (size_t i = 0; i < size; ++i) {
-        is_calendar_id_null->append(state_impl.is_calendar_id_null->get(i).get_uint8());
+    if (!state_impl.year->empty()) {
+        if (to->is_nullable()) {
+            down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
+        }
+        ::starrocks::serialize_to_column(state_impl.year, columns.at(0));
+        ::starrocks::serialize_to_column(state_impl.is_workdays, columns.at(1));
+        ::starrocks::serialize_to_column(state_impl.calendar_id, columns.at(2));
+        ::starrocks::serialize_to_column(state_impl.is_calendar_id_null, columns.at(3));
     }
 }
 
@@ -152,7 +146,6 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         return;
     }
     auto& state_impl = this->data(state);
-    // TimestampValue epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
     const auto n_rows = state_impl.year->size();
     DCHECK(state_impl.is_workdays->size() == n_rows);
     DCHECK(state_impl.calendar_id->size() == n_rows);
@@ -212,34 +205,29 @@ void WorkdayCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
         valid_indexes.push_back(row);
     }
     auto columns = down_cast<StructColumn*>(ColumnHelper::get_data_column(dst->get()))->fields_column();
-    if (dst->get()->is_nullable()) {
-        for (size_t i = 0; i < valid_indexes.size(); i++) {
+    if (!valid_indexes.empty()) {
+        if (dst->get()->is_nullable()) {
             down_cast<NullableColumn*>(dst->get())->null_column_data().emplace_back(0);
         }
-    }
-    for (auto& column: columns) {
-        if (column.get()->is_nullable()) {
-            down_cast<NullableColumn*>(column.get())->mutable_null_column()->get_data().resize(valid_indexes.size(), 0);
+        DatumArray year_array;
+        DatumArray is_workdays_array;
+        DatumArray calendar_id_array;
+        DatumArray is_calendar_id_null_array;
+        for (auto i: valid_indexes) {
+            year_array.push_back(src[0]->get(i));
+            is_workdays_array.push_back(src[1]->get(i));
+            if (src[2]->is_null(i)) {
+                calendar_id_array.push_back("");
+                is_calendar_id_null_array.push_back(true);
+            } else {
+                calendar_id_array.push_back(src[2]->get(i));
+                is_calendar_id_null_array.push_back(false);
+            }
         }
-    }
-    auto year = down_cast<Int64Column*>(ColumnHelper::get_data_column(columns[0].get()));
-    for (auto i: valid_indexes) {
-        year->append_datum(src[0]->get(i));
-    }
-    auto is_workdays = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(columns[1].get()));
-    for (auto i: valid_indexes) {
-        is_workdays->append_datum(src[1]->get(i));
-    }
-    auto calendar_id = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(columns[2].get()));
-    auto is_calendar_id_null = down_cast<BooleanColumn*>(ColumnHelper::get_data_column(columns[3].get()));
-    for (auto i: valid_indexes) {
-        if (src[2]->is_null(i)) {
-            calendar_id->append_default();
-            is_calendar_id_null->append(true);
-        } else {
-            calendar_id->append_datum(src[2]->get(i));
-            is_calendar_id_null->append(false);
-        }
+        columns[0]->append_datum(year_array);
+        columns[1]->append_datum(is_workdays_array);
+        columns[2]->append_datum(calendar_id_array);
+        columns[3]->append_datum(is_calendar_id_null_array);
     }
 }
 
