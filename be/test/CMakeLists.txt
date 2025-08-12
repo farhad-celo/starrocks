@@ -193,6 +193,7 @@ set(EXEC_FILES
         ./exprs/celonis/table_function/generate_range_test.cpp
         ./exprs/celonis/time_functions_test.cpp
         ./exprs/celonis/transits_interleaved_test.cpp
+        ./exprs/celonis/transits_match_test.cpp
         ./exprs/celonis/util.cpp
         ./exprs/decimal_cast_expr_decimal_test.cpp
         ./exprs/decimal_cast_expr_integer_test.cpp

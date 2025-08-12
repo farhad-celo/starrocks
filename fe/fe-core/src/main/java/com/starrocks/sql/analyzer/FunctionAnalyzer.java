@@ -852,6 +852,25 @@ public class FunctionAnalyzer {
             fn = fn.copy();
             fn.setArgsType(argumentTypes); // as accepting various types
             fn.setRetType(Type.BOOLEAN);
+        } else if (FunctionSet.CELONIS_TRANSITS_MATCH.equals(fnName)) {
+            fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_TRANSITS_MATCH, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            fn.setArgsType(argumentTypes); // as accepting various types
+            ArrayList<StructField> sf1 = Lists.newArrayList();
+            ArrayList<StructField> fields1 = ((StructType) argumentTypes[0]).getFields();
+            for (int i = 0; i < fields1.size(); i++) {
+                sf1.add(new StructField(fields1.get(i).getName(), fields1.get(i).getType()));
+            }
+            ArrayList<StructField> sf2 = Lists.newArrayList();
+            ArrayList<StructField> fields2 = ((StructType) argumentTypes[2]).getFields();
+            for (int i = 0; i < fields2.size(); i++) {
+                sf2.add(new StructField(fields2.get(i).getName(), fields2.get(i).getType()));
+            }
+            ArrayList<StructField> sf = Lists.newArrayList();
+            sf.add(new StructField("left", new StructType(sf1)));
+            sf.add(new StructField("right", new StructType(sf2)));
+            fn.setRetType(new StructType(sf));
         } else if (FunctionSet.CELONIS_TRANSITS_INTERLEAVED.equals(fnName)) {
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_TRANSITS_INTERLEAVED, argumentTypes,
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);

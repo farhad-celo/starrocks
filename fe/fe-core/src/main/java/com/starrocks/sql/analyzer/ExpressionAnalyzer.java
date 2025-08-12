@@ -1172,6 +1172,37 @@ public class ExpressionAnalyzer {
                         throw new SemanticException(fnName + "'s 5th input firstLastOnly should not be NULL", node.getPos());
                     }
                     break;
+                case FunctionSet.CELONIS_TRANSITS_MATCH:
+                    if (node.getChildren().size() != 6) {
+                        throw new SemanticException(fnName + " should have 6 inputs, but really have "
+                                + node.getChildren().size() + " inputs. 6 inputs are STRUCT leftPrimaryKeys, "
+                                + "ANY_ARRAY leftMatch, STRUCT rightPrimaryKeys, ANY_ARRAY rightMatch, "
+                                + "ANY_ARRAY leftManual and ANY_ARRAY rightManual", node.getPos());
+                    }
+                    if (!node.getChild(0).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s first input outColumns " + node.getChild(0).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(0).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(2).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s third input inColumns " + node.getChild(2).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(2).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(0).getType().matchesType(node.getChild(2).getType())) {
+                        throw new SemanticException(fnName + "'s first input " + node.getChild(0).toSql() +
+                                " and third input " + node.getChild(2).toSql() +
+                                " should be the same struct types, but real types are " +
+                                node.getChild(0).getType().toSql() + " and " +
+                                node.getChild(2).getType().toSql(), node.getPos());
+                    }
+                    if (node.getChild(1).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 2th input leftMatch should not be NULL", node.getPos());
+                    }
+                    if (node.getChild(3).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 4th input rightMatch should not be NULL", node.getPos());
+                    }
+                    break;
                 case FunctionSet.CELONIS_ENUMERATE_TRANSITIVE_EDGES:
                     if (node.getChildren().size() != 3) {
                         throw new SemanticException(fnName + " should have 3 inputs, but really have "

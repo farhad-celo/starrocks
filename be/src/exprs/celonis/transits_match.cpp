@@ -1,0 +1,209 @@
+#include "exprs/celonis/transits_match.h"
+
+#include "column/array_column.h"
+#include "column/column_viewer.h"
+#include "column/struct_column.h"
+#include "column/column_helper.h"
+#include "exprs/builtin_functions.h"
+#include "exprs/function_context.h"
+
+namespace starrocks {
+
+namespace {
+
+struct Edge {
+    size_t left_index;
+    size_t right_index;
+};
+
+void AppendFields(const Columns& source_fields, std::vector<DatumArray>& arrays, size_t row, size_t index) {
+    const auto n_fields = source_fields.size();
+    for (auto i = 0; i < n_fields; ++i) {
+        arrays[i].push_back(source_fields[i]->get(row).get_array()[index]);
+    }
+}
+
+void
+AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const Columns& right_key_fields,
+         Columns& res_left_fields, Columns& res_right_fields, NullableColumn* null_column, size_t row) {
+    const auto n_fields = left_key_fields.size();
+    std::vector<DatumArray> left_arrays;
+    std::vector<DatumArray> right_arrays;
+    for (auto i = 0; i < n_fields; ++i) {
+        DatumArray array;
+        array.reserve(edges.size());
+        left_arrays.push_back(array);
+        right_arrays.push_back(array);
+    }
+
+    for (const auto& edge: edges) {
+        AppendFields(left_key_fields, left_arrays, row, edge.left_index);
+        AppendFields(right_key_fields, right_arrays, row, edge.right_index);
+    }
+    null_column->null_column_data().emplace_back(0);
+    for (auto i = 0; i < n_fields; ++i) {
+        res_left_fields[i]->append_datum(left_arrays[i]);
+        res_right_fields[i]->append_datum(right_arrays[i]);
+    }
+}
+
+std::optional<std::map<DatumKey, std::set<DatumKey>>>
+build_map(const std::optional<DatumArray>& left_manual_array, const std::optional<DatumArray>& right_manual_array) {
+    if (!left_manual_array.has_value() || !right_manual_array.has_value()) {
+        return std::nullopt;
+    }
+    std::map<DatumKey, std::set<DatumKey>> rv;
+    const auto size = left_manual_array->size();
+    DCHECK_EQ(size, right_manual_array->size());
+    for (auto i = 0; i < size; ++i) {
+        rv[left_manual_array.value()[i].convert2DatumKey()].insert(right_manual_array.value()[i].convert2DatumKey());
+    }
+    return rv;
+}
+
+std::vector<Edge> compute_edges(const DatumArray& left_match_array, const DatumArray& right_match_array,
+                                const std::optional<std::map<DatumKey, std::set<DatumKey>>>& manual_map) {
+    std::vector<Edge> edges;
+    const auto size = left_match_array.size();
+    std::map<DatumKey, std::vector<size_t>> right_key_to_indexes;
+    for (size_t i = 0; i < size; ++i) {
+        right_key_to_indexes[right_match_array[i].convert2DatumKey()].push_back(i);
+    }
+    for (size_t i = 0; i < size; ++i) {
+        const auto left_datum_key = left_match_array[i].convert2DatumKey();
+        // compute matched keys
+        std::set matched_keys = {left_datum_key};
+        if (manual_map.has_value()) {
+            auto it = manual_map->find(left_datum_key);
+            if (it != manual_map->end()) {
+                matched_keys = it->second;
+            } else {
+                matched_keys = {};
+            }
+        }
+        for (auto matched_key: matched_keys) {
+            auto it = right_key_to_indexes.find(matched_key);
+            if (it != right_key_to_indexes.end()) {
+                for (auto j: it->second) {
+                    edges.push_back({i, j});
+                }
+            }
+        }
+    }
+    return edges;
+}
+
+}
+
+StatusOr<ColumnPtr>
+CelonisTransitsMatch::transits_match([[maybe_unused]] starrocks::FunctionContext* context,
+                                     const starrocks::Columns& columns) {
+    DCHECK_EQ(6, columns.size());
+    const size_t n_rows = columns[0]->size();
+    auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
+    auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();
+
+    const auto n_fields = left_key_fields.size();
+    ColumnPtr res = context->create_column(context->get_return_type(), true);
+    auto null_column = down_cast<NullableColumn*>(res.get());
+    StructColumn* st = down_cast<StructColumn*>(ColumnHelper::get_data_column(res.get()));
+    auto fields = st->fields_column();
+    DCHECK_EQ(2, fields.size());
+    StructColumn* res_left_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[0].get()));
+    StructColumn* res_right_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(fields[1].get()));
+    auto res_left_fields = res_left_column->fields_column();
+    auto res_right_fields = res_right_column->fields_column();
+    for (auto row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row) || columns[1]->is_null(row) || columns[2]->is_null(row) ||
+            columns[3]->is_null(row) || right_key_fields.size() != n_fields || n_fields == 0 ||
+            (columns[4]->is_null(row) != columns[5]->is_null(row))) {
+            res->append_nulls(1);
+            continue;
+        }
+        const auto length = left_key_fields[0]->get(row).get_array().size();
+        bool inconsistent_length = false;
+        for (auto i = 0; i < n_fields; ++i) {
+            if (left_key_fields[i]->get(row).get_array().size() != length ||
+                right_key_fields[i]->get(row).get_array().size() != length) {
+                inconsistent_length = true;
+                break;
+            }
+        }
+        if (inconsistent_length) {
+            res->append_nulls(1);
+            continue;
+        }
+        auto left_match_array = columns[1]->get(row).get_array();
+        auto right_match_array = columns[3]->get(row).get_array();
+        if (length != left_match_array.size() || length != right_match_array.size()) {
+            res->append_nulls(1);
+            continue;
+        }
+
+        bool has_null_match_value = false;
+        for (size_t i = 0; i < length; ++i) {
+            if (left_match_array[i].is_null()) {
+                has_null_match_value = true;
+                break;
+            }
+        }
+        for (size_t i = 0; i < length; ++i) {
+            if (right_match_array[i].is_null()) {
+                has_null_match_value = true;
+                break;
+            }
+        }
+        if (has_null_match_value) {
+            res->append_nulls(1);
+            continue;
+        }
+        std::optional<DatumArray> left_manual_array;
+        if (!columns[4]->get(row).is_null()) {
+            left_manual_array = columns[4]->get(row).get_array();
+        }
+        std::optional<DatumArray> right_manual_array;
+        if (!columns[5]->get(row).is_null()) {
+            right_manual_array = columns[5]->get(row).get_array();
+        }
+        if (left_manual_array.has_value()) {
+            DCHECK(right_manual_array.has_value());
+            if (left_manual_array->size() != right_manual_array->size()) {
+                res->append_nulls(1);
+                continue;
+            }
+            const auto manual_length = left_manual_array->size();
+            bool has_null_manual_value = false;
+            for (size_t i = 0; i < manual_length; ++i) {
+                if (left_manual_array.value()[i].is_null()) {
+                    has_null_manual_value = true;
+                    break;
+                }
+            }
+            for (size_t i = 0; i < manual_length; ++i) {
+                if (right_manual_array.value()[i].is_null()) {
+                    has_null_manual_value = true;
+                    break;
+                }
+            }
+            if (has_null_manual_value) {
+                res->append_nulls(1);
+                continue;
+            }
+        }
+
+        if (fields[0]->is_nullable()) {
+            auto null_column_1 = down_cast<NullableColumn*>(fields[0].get());
+            null_column_1->null_column_data().emplace_back(0);
+        }
+        if (fields[1]->is_nullable()) {
+            auto null_column_2 = down_cast<NullableColumn*>(fields[1].get());
+            null_column_2->null_column_data().emplace_back(0);
+        }
+        std::vector<Edge> edges = compute_edges(left_match_array, right_match_array,
+                                                build_map(left_manual_array, right_manual_array));
+        AddEdges(edges, left_key_fields, right_key_fields, res_left_fields, res_right_fields, null_column, row);
+    }
+    return res;
+}
+
+} // namespace starrocks
