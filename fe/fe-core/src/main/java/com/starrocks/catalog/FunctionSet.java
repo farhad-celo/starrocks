@@ -520,6 +520,7 @@ public class FunctionSet {
     public static final String CELONIS_ALIGN_MODEL = "celonis_align_model";
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";
+    public static final String CELONIS_MULTI_IN = "celonis_multi_in";
 
     // JSON functions
     public static final Function JSON_QUERY_FUNC = new Function(

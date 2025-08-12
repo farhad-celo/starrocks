@@ -1451,6 +1451,7 @@ celostar_functions = [
     [1000912, 'celonis_remap_values', True, False, 'DOUBLE', ['DOUBLE', 'ARRAY_DOUBLE', 'ARRAY_DOUBLE', 'DOUBLE'], 'CelonisRemapValues<TYPE_DOUBLE>::remap_values', 'CelonisRemapValues<TYPE_DOUBLE>::prepare', 'CelonisRemapValues<TYPE_DOUBLE>::close'],
     [1000913, 'celonis_remap_values', True, False, 'DATETIME', ['DATETIME', 'ARRAY_DATETIME', 'ARRAY_DATETIME', 'DATETIME'], 'CelonisRemapValues<TYPE_DATETIME>::remap_values', 'CelonisRemapValues<TYPE_DATETIME>::prepare', 'CelonisRemapValues<TYPE_DATETIME>::close'],
     [1000914, 'celonis_remap_values', True, False, 'VARCHAR', ['VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisRemapValues<TYPE_VARCHAR>::remap_values', 'CelonisRemapValues<TYPE_VARCHAR>::prepare', 'CelonisRemapValues<TYPE_VARCHAR>::close'],
+    [1001000, 'celonis_multi_in', True, False, 'BOOLEAN', ['ANY_STRUCT', 'ANY_STRUCT'], 'CelonisMultiIn::multi_in'],
 
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],

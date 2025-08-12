@@ -846,6 +846,12 @@ public class FunctionAnalyzer {
                 sf.add(new StructField(literal.getStringValue(), node.getChild(i + 1).getType()));
             }
             fn.setRetType(new StructType(sf));
+        } else if (FunctionSet.CELONIS_MULTI_IN.equals(fnName)) {
+            fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_MULTI_IN, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            fn.setArgsType(argumentTypes); // as accepting various types
+            fn.setRetType(Type.BOOLEAN);
         } else if (FunctionSet.CELONIS_ALIGN_MODEL.equals(fnName)) {
             // Set struct type
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_ALIGN_MODEL, argumentTypes,
