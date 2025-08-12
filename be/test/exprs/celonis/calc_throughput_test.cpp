@@ -2,8 +2,7 @@
 
 #include "column/column_helper.h"
 #include "exprs/function_context.h"
-#include "runtime/types.h"
-#include "types/logical_type.h"
+#include "util.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -11,15 +10,6 @@
 namespace starrocks {
 
 namespace {
-TypeDescriptor array_type(const LogicalType& child_type) {
-    TypeDescriptor t;
-    t.type = TYPE_ARRAY;
-    t.children.resize(1);
-    t.children[0].type = child_type;
-    t.children[0].len = child_type == TYPE_VARCHAR ? 10 : child_type == TYPE_CHAR ? 10 : -1;
-    return t;
-} // namespace
-
 void create_const_params(ColumnPtr* start_activity, ColumnPtr* end_activity, ColumnPtr* start_label, ColumnPtr* end_label) {
     *start_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     (*start_activity)->append_datum(Slice("a"));
@@ -33,7 +23,7 @@ void create_const_params(ColumnPtr* start_activity, ColumnPtr* end_activity, Col
     *end_label = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     (*end_label)->append_datum(Slice("first"));
 }
-} // namespace
+}  // namespace
 
 class CelonisCalcThroughputTest : public ::testing::Test {
 protected:
@@ -70,8 +60,8 @@ protected:
         }
     }
 
-    TypeDescriptor TYPE_ARRAY_BIGINT = array_type(TYPE_BIGINT);
-    TypeDescriptor TYPE_ARRAY_VARCHAR = array_type(TYPE_VARCHAR);
+    TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
+    TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
 };
 
 TEST_F(CelonisCalcThroughputTest, FirstToFirst) {

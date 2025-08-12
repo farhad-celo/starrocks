@@ -2,24 +2,11 @@
 
 #include "column/column_helper.h"
 #include "exprs/function_context.h"
-#include "runtime/types.h"
-#include "types/logical_type.h"
-
+#include "util.h"
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
 namespace starrocks {
-namespace {
-TypeDescriptor array_type(const LogicalType &child_type) {
-    TypeDescriptor t;
-    t.type = TYPE_ARRAY;
-    t.children.resize(1);
-    t.children[0].type = child_type;
-    // specify length for VARCHAR(10) type.
-    t.children[0].len = child_type == TYPE_VARCHAR ? 10 : child_type == TYPE_CHAR ? 10 : -1;
-    return t;
-}
-} // namespace
 
 class CelonisMatchActivitiesTest : public ::testing::Test {
 protected:
@@ -27,7 +14,7 @@ protected:
 
     void TearDown() override {}
 
-    TypeDescriptor TYPE_ARRAY_VARCHAR = array_type(TYPE_VARCHAR);
+    TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
 };
 
 TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_string_data) {
@@ -102,4 +89,5 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_unsupported_filter) 
                                                                             other_filters, other_filters}),
                  std::runtime_error);
 }
+
 } // namespace starrocks

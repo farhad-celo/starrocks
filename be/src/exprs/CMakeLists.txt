@@ -119,7 +119,7 @@ set(CELONIS_FILES
   celonis/source_target.cpp
   celonis/calc_throughput.cpp
   celonis/match_activities.cpp
-  celonis/util.cpp
-)
+  celonis/remap_timestamp_weekday.cpp
+  celonis/util.cpp)
 
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})

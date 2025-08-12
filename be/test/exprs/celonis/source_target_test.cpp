@@ -2,24 +2,12 @@
 
 #include "column/column_helper.h"
 #include "exprs/function_context.h"
-#include "runtime/types.h"
-#include "types/logical_type.h"
+#include "util.h"
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
 namespace starrocks {
-
-namespace {
-TypeDescriptor array_type(const LogicalType& child_type) {
-    TypeDescriptor t;
-    t.type = TYPE_ARRAY;
-    t.children.resize(1);
-    t.children[0].type = child_type;
-    t.children[0].len = child_type == TYPE_VARCHAR ? 10 : child_type == TYPE_CHAR ? 10 : -1;
-    return t;
-}
-} // namespace
 
 class CelonisSourceTargetTest : public ::testing::Test {
 protected:
@@ -27,9 +15,9 @@ protected:
 
     void TearDown() override {}
 
-    TypeDescriptor TYPE_ARRAY_INT = array_type(TYPE_INT);
-    TypeDescriptor TYPE_ARRAY_BIGINT = array_type(TYPE_BIGINT);
-    TypeDescriptor TYPE_ARRAY_VARCHAR = array_type(TYPE_VARCHAR);
+    TypeDescriptor TYPE_ARRAY_INT = celonis::array_type(TYPE_INT);
+    TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
+    TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
 };
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source) {
