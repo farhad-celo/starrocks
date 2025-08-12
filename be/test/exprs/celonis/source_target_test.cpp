@@ -32,17 +32,29 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source) {
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
 
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(nullptr, {array, modifier}).value();
-    EXPECT_EQ(3, result->size());
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(nullptr, {array, modifier}).value();
+    ASSERT_EQ(3, result_sources->size());
     // First row is an empty array.
-    EXPECT_EQ(0, result->get(0).get_array().size());
+    EXPECT_EQ(0, result_sources->get(0).get_array().size());
     // Second row is [3].
-    EXPECT_EQ(1, result->get(1).get_array().size());
-    EXPECT_EQ(3, result->get(1).get_array()[0].get_int32());
+    EXPECT_EQ(1, result_sources->get(1).get_array().size());
+    EXPECT_EQ(3, result_sources->get(1).get_array()[0].get_int32());
     // Third row is [14, 15].
-    EXPECT_EQ(2, result->get(2).get_array().size());
-    EXPECT_EQ(14, result->get(2).get_array()[0].get_int32());
-    EXPECT_EQ(15, result->get(2).get_array()[1].get_int32());
+    EXPECT_EQ(2, result_sources->get(2).get_array().size());
+    EXPECT_EQ(14, result_sources->get(2).get_array()[0].get_int32());
+    EXPECT_EQ(15, result_sources->get(2).get_array()[1].get_int32());
+
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(nullptr, {array, modifier}).value();
+    ASSERT_EQ(3, result_targets->size());
+    // First row is an empty array.
+    EXPECT_EQ(0, result_targets->get(0).get_array().size());
+    // Second row is [4].
+    EXPECT_EQ(1, result_targets->get(1).get_array().size());
+    EXPECT_EQ(4, result_targets->get(1).get_array()[0].get_int32());
+    // Third row is [15, 16].
+    EXPECT_EQ(2, result_targets->get(2).get_array().size());
+    EXPECT_EQ(15, result_targets->get(2).get_array()[0].get_int32());
+    EXPECT_EQ(16, result_targets->get(2).get_array()[1].get_int32());
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input) {
@@ -57,12 +69,20 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input) {
     array->append_datum(DatumArray{3, 4});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
-    EXPECT_EQ(3, result->size());
-    EXPECT_EQ(0, result->get(0).get_array().size());
-    EXPECT_EQ(0, result->get(1).get_array().size());
-    EXPECT_EQ(1, result->get(2).get_array().size());
-    EXPECT_EQ(3, result->get(2).get_array()[0].get_int32());
+
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_sources->size());
+    EXPECT_EQ(0, result_sources->get(0).get_array().size());
+    EXPECT_EQ(0, result_sources->get(1).get_array().size());
+    EXPECT_EQ(1, result_sources->get(2).get_array().size());
+    EXPECT_EQ(3, result_sources->get(2).get_array()[0].get_int32());
+
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_targets->size());
+    EXPECT_EQ(0, result_targets->get(0).get_array().size());
+    EXPECT_EQ(0, result_targets->get(1).get_array().size());
+    EXPECT_EQ(1, result_targets->get(2).get_array().size());
+    EXPECT_EQ(4, result_targets->get(2).get_array()[0].get_int32());
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input_nullable) {
@@ -78,14 +98,21 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_array_input_nullable)
     array->append_datum(DatumArray{3, 4});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
-    EXPECT_EQ(3, result->size());
-    EXPECT_EQ(0, result->get(0).get_array().size());
-    EXPECT_EQ(0, result->get(1).get_array().size());
-    EXPECT_EQ(1, result->get(2).get_array().size());
-    EXPECT_EQ(3, result->get(2).get_array()[0].get_int32());
-}
 
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_sources->size());
+    EXPECT_EQ(0, result_sources->get(0).get_array().size());
+    EXPECT_EQ(0, result_sources->get(1).get_array().size());
+    EXPECT_EQ(1, result_sources->get(2).get_array().size());
+    EXPECT_EQ(3, result_sources->get(2).get_array()[0].get_int32());
+
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_targets->size());
+    EXPECT_EQ(0, result_targets->get(0).get_array().size());
+    EXPECT_EQ(0, result_targets->get(1).get_array().size());
+    EXPECT_EQ(1, result_targets->get(2).get_array().size());
+    EXPECT_EQ(4, result_targets->get(2).get_array()[0].get_int32());
+}
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_input) {
     // Input is empty.
@@ -93,8 +120,11 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_input) {
     auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
-    EXPECT_EQ(0, result->size());
+
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(0, result_sources->size());
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(0, result_targets->size());
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_input_nullable) {
@@ -103,8 +133,11 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_empty_input_nullable) {
     auto array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
-    EXPECT_EQ(0, result->size());
+
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(0, result_sources->size());
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(0, result_targets->size());
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_null_in_input) {
@@ -119,17 +152,30 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_null_in_input) {
     array->append_datum(DatumArray{Datum(10), Datum(), Datum()});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
-    EXPECT_EQ(3, result->size());
+
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_sources->size());
     // First row is an empty array.
-    EXPECT_EQ(0, result->get(0).get_array().size());
+    EXPECT_EQ(0, result_sources->get(0).get_array().size());
     // Second row is [NULL].
-    EXPECT_EQ(1, result->get(1).get_array().size());
-    EXPECT_TRUE(result->get(1).get_array()[0].is_null());
+    EXPECT_EQ(1, result_sources->get(1).get_array().size());
+    EXPECT_TRUE(result_sources->get(1).get_array()[0].is_null());
     // Third row is [10, NULL]
-    EXPECT_EQ(2, result->get(2).get_array().size());
-    EXPECT_EQ(10, result->get(2).get_array()[0].get_int32());
-    EXPECT_TRUE(result->get(2).get_array()[1].is_null());
+    EXPECT_EQ(2, result_sources->get(2).get_array().size());
+    EXPECT_EQ(10, result_sources->get(2).get_array()[0].get_int32());
+    EXPECT_TRUE(result_sources->get(2).get_array()[1].is_null());
+
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_targets->size());
+    // First row is an empty array.
+    EXPECT_EQ(0, result_targets->get(0).get_array().size());
+    // Second row is [10].
+    EXPECT_EQ(1, result_targets->get(1).get_array().size());
+    EXPECT_EQ(10, result_targets->get(1).get_array()[0].get_int32());
+    // Third row is [NULL, NULL]
+    EXPECT_EQ(2, result_targets->get(2).get_array().size());
+    EXPECT_TRUE(result_targets->get(2).get_array()[0].is_null());
+    EXPECT_TRUE(result_targets->get(2).get_array()[1].is_null());
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_unsupported_mode) {
@@ -140,6 +186,7 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_unsupported_mode) {
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->all");
     EXPECT_THROW(CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}), std::runtime_error);
+    EXPECT_THROW(CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}), std::runtime_error);
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_string_data) {
@@ -154,41 +201,68 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_string_data) {
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
 
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(nullptr, {array, modifier}).value();
-    EXPECT_EQ(3, result->size());
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(nullptr, {array, modifier}).value();
+    ASSERT_EQ(3, result_sources->size());
     // First row is ["string1"].
-    EXPECT_EQ(1, result->get(0).get_array().size());
-    EXPECT_EQ("string1", result->get(0).get_array()[0].get_slice());
+    EXPECT_EQ(1, result_sources->get(0).get_array().size());
+    EXPECT_EQ("string1", result_sources->get(0).get_array()[0].get_slice());
 
     // Second row is [NULL, "string4", NULL].
-    EXPECT_EQ(3, result->get(1).get_array().size());
-    EXPECT_TRUE(result->get(1).get_array()[0].is_null());
-    EXPECT_EQ("string3", result->get(1).get_array()[1].get_slice());
-    EXPECT_TRUE(result->get(1).get_array()[2].is_null());
+    EXPECT_EQ(3, result_sources->get(1).get_array().size());
+    EXPECT_TRUE(result_sources->get(1).get_array()[0].is_null());
+    EXPECT_EQ("string3", result_sources->get(1).get_array()[1].get_slice());
+    EXPECT_TRUE(result_sources->get(1).get_array()[2].is_null());
     // Third row is [].
-    EXPECT_EQ(0, result->get(2).get_array().size());
+    EXPECT_EQ(0, result_sources->get(2).get_array().size());
+
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(nullptr, {array, modifier}).value();
+    ASSERT_EQ(3, result_targets->size());
+    // First row is ["string2"].
+    EXPECT_EQ(1, result_targets->get(0).get_array().size());
+    EXPECT_EQ("string2", result_targets->get(0).get_array()[0].get_slice());
+    // Second row is ["string3", NULL, "string4"].
+    EXPECT_EQ(3, result_targets->get(1).get_array().size());
+    EXPECT_EQ("string3", result_targets->get(1).get_array()[0].get_slice());
+    EXPECT_TRUE(result_targets->get(1).get_array()[1].is_null());
+    EXPECT_EQ("string4", result_targets->get(1).get_array()[2].get_slice());
+    // Third row is [].
+    EXPECT_EQ(0, result_targets->get(2).get_array().size());
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_source_bigint_input) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
     auto array = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
     array->append_datum(DatumArray{(int64_t) 2000});
-    array->append_datum(DatumArray{(int64_t) 200000000, (int64_t) 121, (int64_t) 300});
+    array->append_datum(DatumArray{(int64_t) 200000000, (int64_t) 121, (int64_t) 30000000});
     array->append_datum(DatumArray{(int64_t) 33, Datum(), (int64_t) 300});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
-    EXPECT_EQ(3, result->size());
+
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_sources->size());
     // First row is an empty array.
-    EXPECT_EQ(0, result->get(0).get_array().size());
+    EXPECT_EQ(0, result_sources->get(0).get_array().size());
     // Second row is [200000000, 121].
-    EXPECT_EQ(2, result->get(1).get_array().size());
-    EXPECT_EQ(200000000, result->get(1).get_array()[0].get_int64());
-    EXPECT_EQ(121, result->get(1).get_array()[1].get_int64());
+    EXPECT_EQ(2, result_sources->get(1).get_array().size());
+    EXPECT_EQ(200000000, result_sources->get(1).get_array()[0].get_int64());
+    EXPECT_EQ(121, result_sources->get(1).get_array()[1].get_int64());
     // Third row is [33, NULL]
-    EXPECT_EQ(2, result->get(2).get_array().size());
-    EXPECT_EQ(33, result->get(2).get_array()[0].get_int64());
-    EXPECT_TRUE(result->get(2).get_array()[1].is_null());
+    EXPECT_EQ(2, result_sources->get(2).get_array().size());
+    EXPECT_EQ(33, result_sources->get(2).get_array()[0].get_int64());
+    EXPECT_TRUE(result_sources->get(2).get_array()[1].is_null());
+
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_targets->size());
+    // First row is an empty array.
+    EXPECT_EQ(0, result_targets->get(0).get_array().size());
+    // Second row is [121, 30000000].
+    EXPECT_EQ(2, result_targets->get(1).get_array().size());
+    EXPECT_EQ(121, result_targets->get(1).get_array()[0].get_int64());
+    EXPECT_EQ(30000000, result_targets->get(1).get_array()[1].get_int64());
+    // Third row is [NULL, 300]
+    EXPECT_EQ(2, result_targets->get(2).get_array().size());
+    EXPECT_TRUE(result_targets->get(2).get_array()[0].is_null());
+    EXPECT_EQ(300, result_targets->get(2).get_array()[1].get_int64());
 }
 
 TEST_F(CelonisSourceTargetTest, celonis_source_null_in_input) {
@@ -202,17 +276,30 @@ TEST_F(CelonisSourceTargetTest, celonis_source_null_in_input) {
     array->append_datum(DatumArray{});
     auto modifier = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     modifier->append_datum("any->any");
-    const auto result = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
-    EXPECT_EQ(3, result->size());
+
+    const auto result_sources = CelonisSourceTargetFunctions::celonis_array_sources(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_sources->size());
     // Result:
     // row 0: NULL
     // row 1: [NULL]
     // row 2: []
-    EXPECT_TRUE(result->get(0).is_null());
-    EXPECT_EQ(1, result->get(1).get_array().size());
-    EXPECT_TRUE(result->get(1).get_array()[0].is_null());
-    EXPECT_FALSE(result->get(2).is_null());
-    EXPECT_EQ(0, result->get(2).get_array().size());
+    EXPECT_TRUE(result_sources->get(0).is_null());
+    EXPECT_EQ(1, result_sources->get(1).get_array().size());
+    EXPECT_TRUE(result_sources->get(1).get_array()[0].is_null());
+    EXPECT_FALSE(result_sources->get(2).is_null());
+    EXPECT_EQ(0, result_sources->get(2).get_array().size());
+
+    const auto result_targets = CelonisSourceTargetFunctions::celonis_array_targets(ctx.get(), {array, modifier}).value();
+    ASSERT_EQ(3, result_targets->size());
+    // Result:
+    // row 0: NULL
+    // row 1: [NULL]
+    // row 2: []
+    EXPECT_TRUE(result_targets->get(0).is_null());
+    EXPECT_EQ(1, result_targets->get(1).get_array().size());
+    EXPECT_TRUE(result_targets->get(1).get_array()[0].is_null());
+    EXPECT_FALSE(result_targets->get(2).is_null());
+    EXPECT_EQ(0, result_targets->get(2).get_array().size());
 }
 
 } // namespace starrocks

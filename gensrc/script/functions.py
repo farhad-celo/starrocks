@@ -1397,6 +1397,11 @@ celostar_functions = [
     [1000102, 'celonis_array_sources', True, False, 'ARRAY_DATETIME', ['ARRAY_DATETIME', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
     [1000103, 'celonis_array_sources', True, False, 'ARRAY_BIGINT', ['ARRAY_BIGINT', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
 
+    [1000104, 'celonis_array_targets', True, False, 'ARRAY_INT', ['ARRAY_INT', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_targets'],
+    [1000105, 'celonis_array_targets', True, False, 'ARRAY_DATETIME', ['ARRAY_DATETIME', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_targets'],
+    [1000106, 'celonis_array_targets', True, False, 'ARRAY_BIGINT', ['ARRAY_BIGINT', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_targets'],
+    [1000107, 'celonis_array_targets', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_targets'],
+
     [1000201, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_INT', 'ARRAY_BIGINT', 'INT', 'INT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
     [1000202, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT', 'BIGINT', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
     [1000203, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
