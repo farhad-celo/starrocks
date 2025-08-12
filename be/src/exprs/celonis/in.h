@@ -4,6 +4,7 @@
 
 namespace starrocks {
 
+template <LogicalType LT>
 class CelonisIn {
 public:
     /**
@@ -13,17 +14,14 @@ public:
      * Supports PQL IN https://docs.celonis.com/en/in.html
      * A match value can also be NULL. A NULL value matches with a NULL value in the match array.
      */
-    DEFINE_VECTORIZED_FN(celonis_in);
+    DEFINE_VECTORIZED_FN(in);
+
+    static Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
 private:
-    template <LogicalType Type>
-    static ColumnPtr celonis_in_constant_match(const Columns& columns);
-
-    template <LogicalType Type>
-    static ColumnPtr celonis_in_non_constant_match(const Columns& columns);
-
-    template <LogicalType Type>
-    static ColumnPtr celonis_in_impl(const Columns& columns);
+    DEFINE_VECTORIZED_FN(in_constant_match);
+    DEFINE_VECTORIZED_FN(in_non_constant_match);
 };
 
 } // namespace starrocks

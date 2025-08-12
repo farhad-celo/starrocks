@@ -1423,13 +1423,12 @@ celostar_functions = [
     [1000306, 'celonis_shortened_variant', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'BIGINT'], 'CelonisShortenedVariant::celonis_shortened_variant'],
     [1000307, 'celonis_conformance', True, False, 'ARRAY_BIGINT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisConformance::conformance', 'CelonisConformance::conformance_prepare', 'CelonisConformance::conformance_close'],
     [1000308, 'celonis_index_activity', True, False, 'ARRAY_BIGINT', ['ANY_ARRAY','VARCHAR','VARCHAR'], 'CelonisIndexActivity::celonis_index_activity', 'CelonisIndexActivity::celonis_index_activity_prepare', 'CelonisIndexActivity::celonis_index_activity_close'],
-    [1000401, 'celonis_in', True, False, 'BOOLEAN', ['INT', 'ARRAY_INT'], 'CelonisIn::celonis_in'],
-    [1000402, 'celonis_in', True, False, 'BOOLEAN', ['BIGINT', 'ARRAY_BIGINT'], 'CelonisIn::celonis_in'],
-    [1000403, 'celonis_in', True, False, 'BOOLEAN', ['DOUBLE', 'ARRAY_DOUBLE'], 'CelonisIn::celonis_in'],
-    [1000404, 'celonis_in', True, False, 'BOOLEAN', ['DATETIME', 'ARRAY_DATETIME'], 'CelonisIn::celonis_in'],
-    [1000405, 'celonis_in', True, False, 'BOOLEAN', ['VARCHAR', 'ARRAY_VARCHAR'], 'CelonisIn::celonis_in'],
+    [1000401, 'celonis_in', True, False, 'BOOLEAN', ['INT', 'ARRAY_INT'], 'CelonisIn<TYPE_INT>::in', 'CelonisIn<TYPE_INT>::prepare', 'CelonisIn<TYPE_INT>::close'],
+    [1000402, 'celonis_in', True, False, 'BOOLEAN', ['BIGINT', 'ARRAY_BIGINT'], 'CelonisIn<TYPE_BIGINT>::in', 'CelonisIn<TYPE_BIGINT>::prepare', 'CelonisIn<TYPE_BIGINT>::close'],
+    [1000403, 'celonis_in', True, False, 'BOOLEAN', ['DOUBLE', 'ARRAY_DOUBLE'], 'CelonisIn<TYPE_DOUBLE>::in', 'CelonisIn<TYPE_DOUBLE>::prepare', 'CelonisIn<TYPE_DOUBLE>::close'],
+    [1000404, 'celonis_in', True, False, 'BOOLEAN', ['DATETIME', 'ARRAY_DATETIME'], 'CelonisIn<TYPE_DATETIME>::in', 'CelonisIn<TYPE_DATETIME>::prepare', 'CelonisIn<TYPE_DATETIME>::close'],
+    [1000405, 'celonis_in', True, False, 'BOOLEAN', ['VARCHAR', 'ARRAY_VARCHAR'], 'CelonisIn<TYPE_VARCHAR>::in', 'CelonisIn<TYPE_VARCHAR>::prepare', 'CelonisIn<TYPE_VARCHAR>::close'],
     [1000501, 'celonis_like', True, False, 'BOOLEAN', ['VARCHAR', 'VARCHAR'], 'CelonisLike::like', 'CelonisLike::like_prepare', 'CelonisLike::like_close'],
-
     # The fields of STRUCT are set in ExpressionAnalyzer.java in FE.
     [1000601, 'celonis_align_model', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisAlignModel::align_model', 'CelonisAlignModel::align_model_prepare', 'CelonisAlignModel::align_model_close'],
     [1000701, 'celonis_mo_bpmn_graph', True, False, 'VARCHAR', ['VARCHAR', '...'], 'CelonisMoBpmnGraph::mo_bpmn_graph'],

@@ -13,47 +13,60 @@
 namespace starrocks {
 
 /*
+2024-01-19T20:01:36+00:00
+Running ./be/build_Release/src/bench/celonis/output/in_bench
+Run on (32 X 2650 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x16)
+  L1 Instruction 32 KiB (x16)
+  L2 Unified 512 KiB (x16)
+  L3 Unified 32768 KiB (x2)
+Load Average: 1.83, 4.27, 10.99
 Args: Number of rows / Number of possible values / Size of match list
------------------------------------------------------------------------------------------------
-Benchmark                                     Time             CPU   Iterations UserCounters...
------------------------------------------------------------------------------------------------
-BM_InNonConstantVARCHAR/1000/20/5        236715 ns       236554 ns         3046 RowInvRate=236.554ns
-BM_InNonConstantVARCHAR/10000/20/5      2326251 ns      2326178 ns          303 RowInvRate=232.618ns
-BM_InNonConstantVARCHAR/100000/20/5    23320265 ns     23318973 ns           30 RowInvRate=233.19ns
-BM_InNonConstantVARCHAR/1000/40/5        235520 ns       235436 ns         2964 RowInvRate=235.436ns
-BM_InNonConstantVARCHAR/10000/40/5      2320640 ns      2320565 ns          301 RowInvRate=232.056ns
-BM_InNonConstantVARCHAR/100000/40/5    23483022 ns     23481988 ns           30 RowInvRate=234.82ns
-BM_InNonConstantVARCHAR/1000/60/5        234473 ns       234400 ns         2996 RowInvRate=234.4ns
-BM_InNonConstantVARCHAR/10000/60/5      2334787 ns      2334563 ns          302 RowInvRate=233.456ns
-BM_InNonConstantVARCHAR/100000/60/5    23322036 ns     23318611 ns           30 RowInvRate=233.186ns
-BM_InNonConstantVARCHAR/1000/20/10       364457 ns       364379 ns         1931 RowInvRate=364.379ns
-BM_InNonConstantVARCHAR/10000/20/10     3647502 ns      3647007 ns          192 RowInvRate=364.701ns
-BM_InNonConstantVARCHAR/100000/20/10   36523167 ns     36518251 ns           19 RowInvRate=365.183ns
-BM_InNonConstantVARCHAR/1000/40/10       366788 ns       366717 ns         1911 RowInvRate=366.717ns
-BM_InNonConstantVARCHAR/10000/40/10     3642717 ns      3642433 ns          192 RowInvRate=364.243ns
-BM_InNonConstantVARCHAR/100000/40/10   36638526 ns     36635546 ns           19 RowInvRate=366.355ns
-BM_InNonConstantVARCHAR/1000/60/10       364774 ns       364683 ns         1919 RowInvRate=364.683ns
-BM_InNonConstantVARCHAR/10000/60/10     3612456 ns      3612297 ns          194 RowInvRate=361.23ns
-BM_InNonConstantVARCHAR/100000/60/10   35933528 ns     35930520 ns           19 RowInvRate=359.305ns
-BM_InConstantVARCHAR/1000/20/5            19449 ns        19444 ns        36064 RowInvRate=19.4438ns
-BM_InConstantVARCHAR/10000/20/5          185556 ns       185564 ns         3765 RowInvRate=18.5564ns
-BM_InConstantVARCHAR/100000/20/5        1827856 ns      1827643 ns          382 RowInvRate=18.2764ns
-BM_InConstantVARCHAR/1000/40/5            17706 ns        17705 ns        40648 RowInvRate=17.7045ns
-BM_InConstantVARCHAR/10000/40/5          164599 ns       164606 ns         4224 RowInvRate=16.4606ns
-BM_InConstantVARCHAR/100000/40/5        1749046 ns      1748930 ns          423 RowInvRate=17.4893ns
-BM_InConstantVARCHAR/1000/60/5            16039 ns        16034 ns        43576 RowInvRate=16.0344ns
-BM_InConstantVARCHAR/10000/60/5          153260 ns       153260 ns         4658 RowInvRate=15.326ns
-BM_InConstantVARCHAR/100000/60/5        1485737 ns      1485674 ns          471 RowInvRate=14.8567ns
-BM_InConstantVARCHAR/1000/20/10           22202 ns        22196 ns        31544 RowInvRate=22.196ns
-BM_InConstantVARCHAR/10000/20/10         209789 ns       209774 ns         3334 RowInvRate=20.9774ns
-BM_InConstantVARCHAR/100000/20/10       2056274 ns      2055890 ns          337 RowInvRate=20.5589ns
-BM_InConstantVARCHAR/1000/40/10           19155 ns        19162 ns        36132 RowInvRate=19.1617ns
-BM_InConstantVARCHAR/10000/40/10         178992 ns       179005 ns         3925 RowInvRate=17.9005ns
-BM_InConstantVARCHAR/100000/40/10       1761785 ns      1761722 ns          397 RowInvRate=17.6172ns
-BM_InConstantVARCHAR/1000/60/10           17684 ns        17677 ns        39527 RowInvRate=17.6766ns
-BM_InConstantVARCHAR/10000/60/10         163728 ns       163722 ns         4287 RowInvRate=16.3722ns
-BM_InConstantVARCHAR/100000/60/10       1613342 ns      1613203 ns          437 RowInvRate=16.132ns
- */
+-------------------------------------------------------------------------------------------------------------
+Benchmark                                                   Time             CPU   Iterations UserCounters...
+-------------------------------------------------------------------------------------------------------------
+BM_InNonConstantVARCHAR/1000/20/5                      259291 ns       259228 ns         2697 RowInvRate=259.228ns
+BM_InNonConstantVARCHAR/10000/20/5                    2561811 ns      2561652 ns          274 RowInvRate=256.165ns
+BM_InNonConstantVARCHAR/100000/20/5                  25313299 ns     25309867 ns           28 RowInvRate=253.099ns
+BM_InNonConstantVARCHAR/1000/40/5                      256184 ns       256112 ns         2699 RowInvRate=256.112ns
+BM_InNonConstantVARCHAR/10000/40/5                    2526863 ns      2526348 ns          278 RowInvRate=252.635ns
+BM_InNonConstantVARCHAR/100000/40/5                  24906728 ns     24902593 ns           28 RowInvRate=249.026ns
+BM_InNonConstantVARCHAR/1000/60/5                      253687 ns       253613 ns         2767 RowInvRate=253.613ns
+BM_InNonConstantVARCHAR/10000/60/5                    2495249 ns      2494897 ns          280 RowInvRate=249.49ns
+BM_InNonConstantVARCHAR/100000/60/5                  24645085 ns     24640734 ns           28 RowInvRate=246.407ns
+BM_InNonConstantVARCHAR/1000/20/10                     391609 ns       391444 ns         1784 RowInvRate=391.444ns
+BM_InNonConstantVARCHAR/10000/20/10                   3898118 ns      3897729 ns          180 RowInvRate=389.773ns
+BM_InNonConstantVARCHAR/100000/20/10                 39516776 ns     39510530 ns           18 RowInvRate=395.105ns
+BM_InNonConstantVARCHAR/1000/40/10                     389378 ns       389191 ns         1804 RowInvRate=389.191ns
+BM_InNonConstantVARCHAR/10000/40/10                   3875267 ns      3874613 ns          181 RowInvRate=387.461ns
+BM_InNonConstantVARCHAR/100000/40/10                 39049559 ns     39043171 ns           18 RowInvRate=390.432ns
+BM_InNonConstantVARCHAR/1000/60/10                     383504 ns       383311 ns         1823 RowInvRate=383.311ns
+BM_InNonConstantVARCHAR/10000/60/10                   3829041 ns      3828562 ns          184 RowInvRate=382.856ns
+BM_InNonConstantVARCHAR/100000/60/10                 38633265 ns     38629740 ns           18 RowInvRate=386.297ns
+BM_InConstantVARCHAR/1000/20/5                          19962 ns        19955 ns        35099 RowInvRate=19.9548ns
+BM_InConstantVARCHAR/10000/20/5                        186428 ns       186385 ns         3752 RowInvRate=18.6385ns
+BM_InConstantVARCHAR/100000/20/5                      1845073 ns      1844850 ns          380 RowInvRate=18.4485ns
+BM_InConstantVARCHAR/1000/40/5                          17050 ns        17045 ns        41087 RowInvRate=17.0452ns
+BM_InConstantVARCHAR/10000/40/5                        156252 ns       156229 ns         4480 RowInvRate=15.6229ns
+BM_InConstantVARCHAR/100000/40/5                      1538310 ns      1538117 ns          455 RowInvRate=15.3812ns
+BM_InConstantVARCHAR/1000/60/5                          15485 ns        15481 ns        45171 RowInvRate=15.4809ns
+BM_InConstantVARCHAR/10000/60/5                        142317 ns       142280 ns         4928 RowInvRate=14.228ns
+BM_InConstantVARCHAR/100000/60/5                      1395170 ns      1395066 ns          498 RowInvRate=13.9507ns
+BM_InConstantVARCHAR/1000/20/10                         22807 ns        22800 ns        30675 RowInvRate=22.7998ns
+BM_InConstantVARCHAR/10000/20/10                       210042 ns       210031 ns         3342 RowInvRate=21.0031ns
+BM_InConstantVARCHAR/100000/20/10                     2070983 ns      2070784 ns          337 RowInvRate=20.7078ns
+BM_InConstantVARCHAR/1000/40/10                         19387 ns        19381 ns        36146 RowInvRate=19.3809ns
+BM_InConstantVARCHAR/10000/40/10                       177853 ns       177799 ns         3939 RowInvRate=17.7799ns
+BM_InConstantVARCHAR/100000/40/10                     1746370 ns      1746246 ns          402 RowInvRate=17.4625ns
+BM_InConstantVARCHAR/1000/60/10                         17364 ns        17358 ns        40357 RowInvRate=17.3584ns
+BM_InConstantVARCHAR/10000/60/10                       157857 ns       157845 ns         4429 RowInvRate=15.7845ns
+BM_InConstantVARCHAR/100000/60/10                     1557082 ns      1556930 ns          449 RowInvRate=15.5693ns
+BM_InConstantLargeMatchesVARCHAR/1000/5000/3000        187360 ns       187357 ns         3733 RowInvRate=187.357ns
+BM_InConstantLargeMatchesVARCHAR/10000/5000/3000       367474 ns       367439 ns         1907 RowInvRate=36.7439ns
+BM_InConstantLargeMatchesVARCHAR/100000/5000/3000     2162743 ns      2162634 ns          320 RowInvRate=21.6263ns
+BM_InConstantLargeMatchesVARCHAR/1000000/5000/3000   28135377 ns     28132480 ns           25 RowInvRate=28.1325ns
+*/
 
 enum MatchType {
     CONSTANT,
@@ -117,7 +130,11 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
         }
 
         state.ResumeTiming();
-        ASSERT_TRUE(CelonisIn::celonis_in(ctx.get(), {input_column, match_column}).ok());
+        ASSERT_TRUE(CelonisIn<TYPE_VARCHAR>::prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
+        ASSERT_TRUE(CelonisIn<TYPE_VARCHAR>::prepare(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
+        ASSERT_TRUE(CelonisIn<TYPE_VARCHAR>::in(ctx.get(), {input_column, match_column}).ok());
+        ASSERT_TRUE(CelonisIn<TYPE_VARCHAR>::close(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
+        ASSERT_TRUE(CelonisIn<TYPE_VARCHAR>::close(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
@@ -131,9 +148,14 @@ static void BM_InConstantVARCHAR(benchmark::State& state) {
     do_bench(state, CONSTANT);
 }
 
+static void BM_InConstantLargeMatchesVARCHAR(benchmark::State& state) {
+    do_bench(state, CONSTANT);
+}
+
 // Args: Number of rows / Number of possible values / Size of match list
 BENCHMARK(BM_InNonConstantVARCHAR)->ArgsProduct({{1000, 10000, 100000}, {20, 40, 60}, {5, 10}});
 BENCHMARK(BM_InConstantVARCHAR)->ArgsProduct({{1000, 10000, 100000}, {20, 40, 60}, {5, 10}});
+BENCHMARK(BM_InConstantLargeMatchesVARCHAR)->ArgsProduct({{1000, 10000, 100000, 1000000}, {5000}, {3000}});
 
 } // namespace starrocks
 

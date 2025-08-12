@@ -17,16 +17,16 @@ protected:
     void TearDown() override {}
 
 private:
-    template <LogicalType TYPE>
+    template <LogicalType LT>
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE)),
+                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT)),
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
         auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
-        value_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE), true);
-        match_array_column_ = ColumnHelper::create_column(celonis::array_type(TYPE), false);
+        value_column_ = ColumnHelper::create_column(TypeDescriptor(LT), true);
+        match_array_column_ = ColumnHelper::create_column(celonis::array_type(LT), false);
     }
 
     void AddRow(const Datum& value, const DatumArray& match_array) {
@@ -34,15 +34,22 @@ private:
         match_array_column_->append_datum(match_array);
     }
 
+    template <LogicalType LT>
     StatusOr<ColumnPtr> Run() {
-        return CelonisIn::celonis_in(ctx_.get(), {value_column_, match_array_column_});
+        RETURN_IF_ERROR(CelonisIn<LT>::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        RETURN_IF_ERROR(CelonisIn<LT>::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
+        auto result = CelonisIn<LT>::in(ctx_.get(), {value_column_, match_array_column_});
+        RETURN_IF_ERROR(CelonisIn<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL));
+        RETURN_IF_ERROR(CelonisIn<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        return result;
     }
 
+    template <LogicalType LT>
     StatusOr<ColumnPtr> RunConstantMatch(DatumArray match_array) {
         EXPECT_FALSE(match_array_column_->is_constant());
         match_array_column_->append_datum(match_array);
         match_array_column_ = ConstColumn::create(match_array_column_, value_column_->size());
-        return Run();
+        return Run<LT>();
     }
 
     std::unique_ptr<FunctionContext> ctx_;
@@ -51,7 +58,8 @@ private:
 };
 
 TEST_F(CelonisInTest, celonis_in_string_data_no_null_in_match_list) {
-    Prepare<TYPE_VARCHAR>();
+    const LogicalType LT = TYPE_VARCHAR;
+    Prepare<LT>();
 
     value_column_->append_datum("string1");
     value_column_->append_datum("string2");
@@ -60,7 +68,7 @@ TEST_F(CelonisInTest, celonis_in_string_data_no_null_in_match_list) {
 
     auto match_array = DatumArray{"string1", "string3"};
 
-    const auto result = RunConstantMatch(match_array).value();
+    const auto result = RunConstantMatch<LT>(match_array).value();
     EXPECT_EQ(4, result->size());
     EXPECT_EQ(true, result->get(0).get_uint8());
     EXPECT_EQ(false, result->get(1).get_uint8());
@@ -69,7 +77,8 @@ TEST_F(CelonisInTest, celonis_in_string_data_no_null_in_match_list) {
 }
 
 TEST_F(CelonisInTest, celonis_in_string_data_null_in_match_list) {
-    Prepare<TYPE_VARCHAR>();
+    const LogicalType LT = TYPE_VARCHAR;
+    Prepare<LT>();
 
     value_column_->append_datum("string1");
     value_column_->append_datum("string2");
@@ -78,7 +87,7 @@ TEST_F(CelonisInTest, celonis_in_string_data_null_in_match_list) {
 
     auto match_array = DatumArray{"string1", "string3", Datum()};
 
-    const auto result = RunConstantMatch(match_array).value();
+    const auto result = RunConstantMatch<LT>(match_array).value();
     EXPECT_EQ(4, result->size());
     EXPECT_EQ(true, result->get(0).get_uint8());
     EXPECT_EQ(false, result->get(1).get_uint8());
@@ -87,7 +96,8 @@ TEST_F(CelonisInTest, celonis_in_string_data_null_in_match_list) {
 }
 
 TEST_F(CelonisInTest, celonis_in_string_empty_match_list) {
-    Prepare<TYPE_VARCHAR>();
+    const LogicalType LT = TYPE_VARCHAR;
+    Prepare<LT>();
 
     value_column_->append_datum("string1");
     value_column_->append_datum("string2");
@@ -96,7 +106,7 @@ TEST_F(CelonisInTest, celonis_in_string_empty_match_list) {
 
     auto match_array = DatumArray{};
 
-    const auto result = RunConstantMatch(match_array).value();
+    const auto result = RunConstantMatch<LT>(match_array).value();
     EXPECT_EQ(4, result->size());
     EXPECT_EQ(false, result->get(0).get_uint8());
     EXPECT_EQ(false, result->get(1).get_uint8());
@@ -105,7 +115,8 @@ TEST_F(CelonisInTest, celonis_in_string_empty_match_list) {
 }
 
 TEST_F(CelonisInTest, celonis_in_int) {
-    Prepare<TYPE_INT>();
+    const LogicalType LT = TYPE_INT;
+    Prepare<LT>();
 
     value_column_->append_datum(1);
     value_column_->append_datum(2);
@@ -114,7 +125,7 @@ TEST_F(CelonisInTest, celonis_in_int) {
 
     auto match_array = DatumArray{Datum{}, 2};
 
-    const auto result = RunConstantMatch(match_array).value();
+    const auto result = RunConstantMatch<LT>(match_array).value();
     EXPECT_EQ(4, result->size());
     EXPECT_EQ(false, result->get(0).get_uint8());
     EXPECT_EQ(true, result->get(1).get_uint8());
@@ -123,7 +134,8 @@ TEST_F(CelonisInTest, celonis_in_int) {
 }
 
 TEST_F(CelonisInTest, celonis_in_bigint) {
-    Prepare<TYPE_BIGINT>();
+    const LogicalType LT = TYPE_BIGINT;
+    Prepare<LT>();
 
     value_column_->append_datum(1L);
     value_column_->append_datum(2L);
@@ -133,7 +145,7 @@ TEST_F(CelonisInTest, celonis_in_bigint) {
 
     auto match_array = DatumArray{1L, INT64_MIN};
 
-    const auto result = RunConstantMatch(match_array).value();
+    const auto result = RunConstantMatch<LT>(match_array).value();
     EXPECT_EQ(5, result->size());
     EXPECT_EQ(true, result->get(0).get_uint8());
     EXPECT_EQ(false, result->get(1).get_uint8());
@@ -143,7 +155,8 @@ TEST_F(CelonisInTest, celonis_in_bigint) {
 }
 
 TEST_F(CelonisInTest, celonis_in_double) {
-    Prepare<TYPE_DOUBLE>();
+    const LogicalType LT = TYPE_DOUBLE;
+    Prepare<LT>();
 
     value_column_->append_datum(1.1);
     value_column_->append_datum(2.2);
@@ -152,7 +165,7 @@ TEST_F(CelonisInTest, celonis_in_double) {
 
     auto match_array = DatumArray{1.1, 3.3};
 
-    const auto result = RunConstantMatch(match_array).value();
+    const auto result = RunConstantMatch<LT>(match_array).value();
     EXPECT_EQ(4, result->size());
     EXPECT_EQ(true, result->get(0).get_uint8());
     EXPECT_EQ(false, result->get(1).get_uint8());
@@ -161,7 +174,8 @@ TEST_F(CelonisInTest, celonis_in_double) {
 }
 
 TEST_F(CelonisInTest, celonis_in_datetime) {
-    Prepare<TYPE_DATETIME>();
+    const LogicalType LT = TYPE_DATETIME;
+    Prepare<LT>();
 
     auto datetime1 = TimestampValue::create(2017, 10, 1, 2, 32, 32);
     auto datetime2 = TimestampValue::create(2017, 10, 2, 2, 32, 32);
@@ -175,7 +189,7 @@ TEST_F(CelonisInTest, celonis_in_datetime) {
 
     auto match_array = DatumArray{datetime1, datetime2, datetime3, Datum{}};
 
-    const auto result = RunConstantMatch(match_array).value();
+    const auto result = RunConstantMatch<LT>(match_array).value();
     EXPECT_EQ(4, result->size());
     EXPECT_EQ(true, result->get(0).get_uint8());
     EXPECT_EQ(true, result->get(1).get_uint8());
@@ -184,14 +198,15 @@ TEST_F(CelonisInTest, celonis_in_datetime) {
 }
 
 TEST_F(CelonisInTest, celonis_in_non_constant_string) {
-    Prepare<TYPE_VARCHAR>();
+    const LogicalType LT = TYPE_VARCHAR;
+    Prepare<LT>();
 
     AddRow("s1", {"s1", "s2", "s3"});
     AddRow("s1", {Datum{}, "s2", "s3"});
     AddRow(Datum{}, {"s1", "s2", "s3"});
     AddRow(Datum{}, {"s1", "s2", "s3", Datum{}});
 
-    const auto result = Run().value();
+    const auto result = Run<LT>().value();
     EXPECT_EQ(4, result->size());
     EXPECT_EQ(true, result->get(0).get_uint8());
     EXPECT_EQ(false, result->get(1).get_uint8());
@@ -200,7 +215,8 @@ TEST_F(CelonisInTest, celonis_in_non_constant_string) {
 }
 
 TEST_F(CelonisInTest, celonis_in_non_constant_int) {
-    Prepare<TYPE_INT>();
+    const LogicalType LT = TYPE_INT;
+    Prepare<LT>();
 
     AddRow(1, {10, 20, 30});
     AddRow(100, {100, 200, 300, Datum{}});
@@ -208,7 +224,7 @@ TEST_F(CelonisInTest, celonis_in_non_constant_int) {
     AddRow(Datum{}, {1, 2, 3});
     AddRow(Datum{}, {Datum{}});
 
-    const auto result = Run().value();
+    const auto result = Run<LT>().value();
     EXPECT_EQ(5, result->size());
     EXPECT_EQ(false, result->get(0).get_uint8());
     EXPECT_EQ(true, result->get(1).get_uint8());
@@ -216,13 +232,5 @@ TEST_F(CelonisInTest, celonis_in_non_constant_int) {
     EXPECT_EQ(false, result->get(3).get_uint8());
     EXPECT_EQ(true, result->get(4).get_uint8());
 }
-
-#if !defined(__SANITIZE_ADDRESS__)
-TEST_F(CelonisInTest, celonis_in_unsupported_type) {
-    Prepare<TYPE_DECIMALV2>();
-
-    EXPECT_THROW(RunConstantMatch(DatumArray{}), std::runtime_error);
-}
-#endif
 
 } // namespace starrocks

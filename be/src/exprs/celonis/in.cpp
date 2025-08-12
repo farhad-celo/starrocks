@@ -5,6 +5,7 @@
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "column/hash_set.h"
+#include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
 
 namespace starrocks {
@@ -13,29 +14,79 @@ namespace {
 
 // To use SliceHashSet for TYPE_VARCHAR. Copied from ../in_const_predicate.hpp.
 
-template <LogicalType Type, typename Enable = void>
+template <LogicalType LT, typename Enable = void>
 struct LHashSet {
-    using LType = HashSet<RunTimeCppType<Type>>;
+    using LType = HashSet<RunTimeCppType<LT>>;
 };
 
-template <LogicalType Type>
-struct LHashSet<Type, std::enable_if_t<isSliceLT<Type>>> {
+template <LogicalType LT>
+struct LHashSet<LT, std::enable_if_t<isSliceLT<LT>>> {
     using LType = SliceHashSet;
 };
 
-template <LogicalType Type>
-using LHashSetType = typename LHashSet<Type>::LType;
+template <LogicalType LT>
+using LHashSetType = typename LHashSet<LT>::LType;
 
 } // namespace
 
-template <LogicalType Type>
-ColumnPtr CelonisIn::celonis_in_non_constant_match(const Columns& columns) {
+template<LogicalType LT>
+struct InStateThreadLocal {
+    LHashSetType<LT> match_set;
+    bool match_has_null = false;
+    ScalarFunction function;
+};
+
+template<LogicalType LT>
+Status CelonisIn<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::THREAD_LOCAL) {
+        return Status::OK();
+    }
+
+    auto state = new InStateThreadLocal<LT>();
+    context->set_function_state(scope, state);
+
+    if (!context->is_constant_column(1)) {
+        state->function = in_non_constant_match;
+        return Status::OK();
+    }
+    state->function = in_constant_match;
+
+    auto match_column = context->get_constant_column(1);
+    if (match_column->is_null(0)) {
+        return Status::OK();
+    }
+
+    auto match_array = match_column->get(0).get_array();
+    for (const auto& element : match_array) {
+        if (element.is_null()) {
+            state->match_has_null = true;
+        } else {
+            state->match_set.insert(element.get<RunTimeCppType<LT>>());
+        }
+    }
+
+    return Status::OK();
+}
+
+template<LogicalType LT>
+Status CelonisIn<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::THREAD_LOCAL) {
+        const auto* state = reinterpret_cast<const InStateThreadLocal<LT>*>(
+                context->get_function_state(FunctionContext::THREAD_LOCAL));
+        delete state;
+    }
+    return Status::OK();
+}
+
+template<LogicalType LT>
+StatusOr<ColumnPtr> CelonisIn<LT>::in_non_constant_match([[maybe_unused]]FunctionContext* context,
+                                                         const Columns& columns) {
     const auto& value_column = columns[0];
     const auto& match_column = columns[1];
     auto num_rows = value_column->size();
     DCHECK_EQ(match_column->size(), num_rows);
 
-    ColumnViewer<Type> value_viewer(value_column);
+    ColumnViewer<LT> value_viewer(value_column);
     ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
 
     for (int row = 0; row < num_rows; ++row) {
@@ -67,68 +118,39 @@ ColumnPtr CelonisIn::celonis_in_non_constant_match(const Columns& columns) {
     return result.build(/*is_const=*/false);
 }
 
-template <LogicalType Type>
-ColumnPtr CelonisIn::celonis_in_constant_match(const Columns& columns) {
+template<LogicalType LT>
+StatusOr<ColumnPtr> CelonisIn<LT>::in_constant_match([[maybe_unused]]FunctionContext* context, const Columns& columns) {
     const auto& value_column = columns[0];
-    const auto& match_column = columns[1];
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
 
-    ColumnViewer<Type> value_viewer(value_column);
+    ColumnViewer<LT> value_viewer(value_column);
     ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
 
-    auto match_array = match_column->get(0).get_array();
-    bool match_has_null = false;
-    LHashSetType<Type> hash_set;
-
-    for (const auto& element : match_array) {
-        if (element.is_null()) {
-            match_has_null = true;
-        } else {
-            hash_set.insert(element.get<RunTimeCppType<Type>>());
-        }
-    }
+    const auto* state = reinterpret_cast<const InStateThreadLocal<LT>*>(
+            context->get_function_state(FunctionContext::THREAD_LOCAL));
 
     for (int row = 0; row < num_rows; ++row) {
         if (value_viewer.is_null(row)) {
-            result.append(match_has_null);
+            result.append(state->match_has_null);
         } else {
-            result.append(hash_set.count(value_viewer.value(row)) > 0);
+            result.append(state->match_set.count(value_viewer.value(row)) > 0);
         }
     }
 
     return result.build(all_const);
 }
 
-template <LogicalType Type>
-ColumnPtr CelonisIn::celonis_in_impl(const Columns& columns) {
-    if (columns[1]->is_constant()) {
-        return celonis_in_constant_match<Type>(columns);
-    } else {
-        return celonis_in_non_constant_match<Type>(columns);
-    }
+template<LogicalType LT>
+StatusOr<ColumnPtr> CelonisIn<LT>::in(FunctionContext* context, const Columns& columns) {
+    const auto* state = reinterpret_cast<const InStateThreadLocal<LT>*>(
+            context->get_function_state(FunctionContext::THREAD_LOCAL));
+    return state->function(context, columns);
 }
 
-StatusOr<ColumnPtr> CelonisIn::celonis_in(FunctionContext* context, const Columns& columns) {
-    DCHECK_EQ(columns.size(), 2);
-    DCHECK_EQ(context->get_arg_type(1)->type, TYPE_ARRAY);
-    DCHECK(ColumnHelper::get_data_column(columns[1].get())->is_array());
-
-    switch (context->get_arg_type(0)->type) {
-    case TYPE_VARCHAR:
-        return celonis_in_impl<TYPE_VARCHAR>(columns);
-    case TYPE_INT:
-        return celonis_in_impl<TYPE_INT>(columns);
-    case TYPE_BIGINT:
-        return celonis_in_impl<TYPE_BIGINT>(columns);
-    case TYPE_DOUBLE:
-        return celonis_in_impl<TYPE_DOUBLE>(columns);
-    case TYPE_DATETIME:
-        return celonis_in_impl<TYPE_DATETIME>(columns);
-    default:
-        std::stringstream error_msq;
-        error_msq << "unhandled input type " << logical_type_to_string(context->get_arg_type(0)->type);
-        throw std::runtime_error(error_msq.str());
-    }
-}
+template class CelonisIn<TYPE_INT>;
+template class CelonisIn<TYPE_BIGINT>;
+template class CelonisIn<TYPE_DOUBLE>;
+template class CelonisIn<TYPE_DATETIME>;
+template class CelonisIn<TYPE_VARCHAR>;
 
 } // namespace starrocks
