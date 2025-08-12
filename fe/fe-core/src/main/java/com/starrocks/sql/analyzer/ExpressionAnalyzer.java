@@ -1138,6 +1138,67 @@ public class ExpressionAnalyzer {
                         throw new SemanticException(fnName + "'s 12th input length should not be NULL", node.getPos());
                     }
                     break;
+                case FunctionSet.CELONIS_TRANSITS_INTERLEAVED:
+                    if (node.getChildren().size() != 5) {
+                        throw new SemanticException(fnName + " should have 5 inputs, but really have "
+                                + node.getChildren().size() + " inputs. 5 inputs are STRUCT leftPrimaryKeys, "
+                                + "ARRAY_DATETIME leftTimestamps, STRUCT rightPrimaryKeys, "
+                                + "ARRAY_DATETIME rightTimestamps and BOOLEAN firstLastOnly", node.getPos());
+                    }
+                    if (!node.getChild(0).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s first input outColumns " + node.getChild(0).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(0).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(2).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s third input inColumns " + node.getChild(2).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(2).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(0).getType().matchesType(node.getChild(2).getType())) {
+                        throw new SemanticException(fnName + "'s first input " + node.getChild(0).toSql() +
+                                " and third input " + node.getChild(2).toSql() +
+                                " should be the same struct types, but real types are " +
+                                node.getChild(0).getType().toSql() + " and " +
+                                node.getChild(2).getType().toSql(), node.getPos());
+                    }
+                    if (node.getChild(1).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 2th input leftTimestamps should not be NULL", node.getPos());
+                    }
+                    if (node.getChild(3).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 4th input rightTimestamps should not be NULL", node.getPos());
+                    }
+                    if (node.getChild(4).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 5th input firstLastOnly should not be NULL", node.getPos());
+                    }
+                    break;
+                case FunctionSet.CELONIS_ENUMERATE_TRANSITIVE_EDGES:
+                    if (node.getChildren().size() != 3) {
+                        throw new SemanticException(fnName + " should have 3 inputs, but really have "
+                                + node.getChildren().size() + " inputs. 3 inputs are STRUCT outColumns, "
+                                + "STRUCT inColumns and BIGINT max_length", node.getPos());
+                    }
+                    if (!node.getChild(0).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s first input outColumns " + node.getChild(0).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(0).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(1).getType().isStructType()) {
+                        throw new SemanticException(fnName + "'s second input inColumns " + node.getChild(1).toSql() +
+                                " should be a struct, but real type is " +
+                                node.getChild(1).getType().toSql(), node.getPos());
+                    }
+                    if (!node.getChild(0).getType().matchesType(node.getChild(1).getType())) {
+                        throw new SemanticException(fnName + "'s first input " + node.getChild(0).toSql() +
+                                " and second input " + node.getChild(1).toSql() +
+                                " should be the same struct types, but real types are " +
+                                node.getChild(0).getType().toSql() + " and " +
+                                node.getChild(1).getType().toSql(), node.getPos());
+                    }
+                    if (node.getChild(2).getType().isNull()) {
+                        throw new SemanticException(fnName + "'s 3rd input max_length should not be NULL", node.getPos());
+                    }
+                    break;
                 case FunctionSet.TIME_SLICE:
                 case FunctionSet.DATE_SLICE:
                     if (!(node.getChild(1) instanceof IntLiteral)) {

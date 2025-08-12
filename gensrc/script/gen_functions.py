@@ -98,6 +98,7 @@ ${license}
 #include "exprs/celonis/stringhash.h"
 #include "exprs/celonis/string_functions.h"
 #include "exprs/celonis/time_functions.h"
+#include "exprs/celonis/transits_interleaved.h"
 #include "exprs/map_functions.h"
 #include "exprs/struct_functions.h"
 #include "exprs/math_functions.h"

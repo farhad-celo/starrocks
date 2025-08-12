@@ -527,6 +527,7 @@ public class FunctionSet {
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";
     public static final String CELONIS_MULTI_IN = "celonis_multi_in";
+    public static final String CELONIS_TRANSITS_INTERLEAVED = "celonis_transits_interleaved";
     public static final String CELONIS_XX_HASH3_128 = "celonis_xx_hash3_128";
 
     // JSON functions

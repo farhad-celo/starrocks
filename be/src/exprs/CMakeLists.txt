@@ -158,6 +158,7 @@ set(CELONIS_FILES
   celonis/string_functions.cpp
   celonis/table_function/count_edges.cpp
   celonis/time_functions.cpp
+  celonis/transits_interleaved.cpp
   celonis/util.cpp
 )
 
