@@ -127,8 +127,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
-    StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::FunctionContext *context,
-                                                                      const starrocks::Columns &columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::FunctionContext *context,
+                                                                  const starrocks::Columns &columns) {
     auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
 
     auto size = columns[0]->size();
@@ -162,6 +162,177 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
     }
 
     return result.build(ColumnHelper::is_all_const(columns));
+}
+
+
+static bool split_index(const Slice& haystack, const Slice& delimiter, int32_t part_number, Slice& res) {
+    if (part_number >= 0) {
+        part_number++;
+        if (delimiter.size == 1) {
+            // if delimiter is a char, use memchr to split
+            // Record the two adjacent offsets when matching delimiter.
+            // If no matching, return NULL.
+            // Else return the string between two adjacent offsets.
+            int32_t pre_offset = -1;
+            int32_t offset = -1;
+            int32_t num = 0;
+            while (num < part_number) {
+                pre_offset = offset;
+                size_t n = haystack.size - offset - 1;
+                char* pos = reinterpret_cast<char*>(memchr(haystack.data + offset + 1, delimiter.data[0], n));
+                if (pos != nullptr) {
+                    offset = pos - haystack.data;
+                    num++;
+                } else {
+                    offset = haystack.size;
+                    num = (num == 0) ? 0 : num + 1;
+                    break;
+                }
+            }
+
+            if (num == part_number) {
+                res.data = haystack.data + pre_offset + 1;
+                res.size = offset - pre_offset - 1;
+                return true;
+            }
+        } else {
+            // if delimiter is a string, use memmem to split
+            int32_t pre_offset = -static_cast<int32_t>(delimiter.size);
+            int32_t offset = -static_cast<int32_t>(delimiter.size);
+            int32_t num = 0;
+            while (num < part_number) {
+                pre_offset = offset;
+                size_t n = haystack.size - offset - delimiter.size;
+                char* pos = reinterpret_cast<char*>(
+                        memmem(haystack.data + offset + delimiter.size, n, delimiter.data, delimiter.size));
+                if (pos != nullptr) {
+                    offset = pos - haystack.data;
+                    num++;
+                } else {
+                    offset = haystack.size;
+                    num = (num == 0) ? 0 : num + 1;
+                    break;
+                }
+            }
+
+            if (num == part_number) {
+                res.data = haystack.data + pre_offset + delimiter.size;
+                res.size = offset - pre_offset - delimiter.size;
+                return true;
+            }
+        }
+    } else {
+        part_number = -part_number;
+        auto haystack_str = haystack.to_string();
+        int32_t offset = haystack.size;
+        int32_t pre_offset = offset;
+        int32_t num = 1;
+        auto substr = haystack_str;
+        while (num <= part_number && offset >= 0) {
+            offset = (int)substr.rfind(delimiter, offset);
+            if (offset != -1) {
+                if (num == part_number) {
+                    break;
+                }
+                pre_offset = offset;
+                offset = offset - 1;
+                substr = haystack_str.substr(0, pre_offset);
+                num++;
+            } else {
+                break;
+            }
+        }
+        if (num == part_number) {
+            if (offset == -1) {
+                res.data = haystack.data;
+                res.size = pre_offset;
+            } else {
+                res.data = haystack.data + offset + delimiter.size;
+                res.size = pre_offset - offset - delimiter.size;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * @param: [haystack, delimiter, part_number]
+ * @paramType: [BinaryColumn, BinaryColumn, IntColumn]
+ * @return: BinaryColumn
+ */
+ // The implementation is based on StringFunctions::split_part() and modified to match PQL behaviors.
+StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* context, const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 3);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+
+    ColumnViewer haystack_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+    ColumnViewer delimiter_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
+    ColumnViewer part_number_viewer = ColumnViewer<TYPE_INT>(columns[2]);
+
+    size_t size = columns[0]->size();
+    ColumnBuilder<TYPE_VARCHAR> res(size);
+    Slice slice;
+    for (int i = 0; i < size; ++i) {
+        if (haystack_viewer.is_null(i) || delimiter_viewer.is_null(i) || part_number_viewer.is_null(i)) {
+            res.append_null();
+            continue;
+        }
+
+        int32_t part_number = part_number_viewer.value(i);
+        Slice haystack = haystack_viewer.value(i);
+        Slice delimiter = delimiter_viewer.value(i);
+        if (delimiter.size == 0) {
+            // Keep Consistent with split.
+            if (haystack.size == 0 && (part_number == 0 || part_number == 1)) {
+                res.append(haystack);
+            } else if (part_number >= 0) {
+                if (part_number >= haystack.size) {
+                    res.append_null();
+                } else {
+                    int char_size = 0, h = 0;
+                    for (auto num = 0; h < haystack.size && num < part_number; h += char_size) {
+                        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[h])];
+                        ++num;
+                    }
+                    if (h >= haystack.size) {
+                        if (part_number == 0) {
+                            res.append(haystack);
+                        } else {
+                            res.append_null();
+                        }
+                    } else {
+                        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[h])];
+                        res.append(Slice(haystack.data + h, char_size));
+                    }
+                }
+            } else {
+                part_number = -part_number;
+                std::vector<int> utf8_char_offsets;
+                int char_size = 0;
+                for (int h = 0; h < haystack.size ; h += char_size) {
+                    utf8_char_offsets.push_back(h);
+                    char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[h])];
+                }
+                if (part_number > utf8_char_offsets.size()) {
+                    res.append_null();
+                } else {
+                    auto offset = utf8_char_offsets[utf8_char_offsets.size() - part_number];
+                    char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[offset])];
+                    res.append(Slice(haystack.data + offset, char_size));
+                }
+            }
+        } else {
+            if (split_index(haystack, delimiter, part_number, slice)) {
+                res.append(slice);
+            } else if (part_number == 0) {
+                res.append(haystack);
+            } else {
+                res.append_null();
+            }
+        }
+    }
+    return res.build(ColumnHelper::is_all_const(columns));
 }
 
 } // namespace starrocks

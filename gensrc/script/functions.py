@@ -1434,15 +1434,15 @@ celostar_functions = [
     [1000601, 'celonis_align_model', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisAlignModel::align_model', 'CelonisAlignModel::align_model_prepare', 'CelonisAlignModel::align_model_close'],
     [1000701, 'celonis_mo_bpmn_graph', True, False, 'VARCHAR', ['VARCHAR', '...'], 'CelonisMoBpmnGraph::mo_bpmn_graph'],
 
-    [1000800, 'celonis_greatest', 'BIGINT', ['BIGINT', 'BIGINT', '...'], 'CelonisGreatestLeast::celonis_greatest'],
-    [1000801, 'celonis_greatest', 'DOUBLE', ['DOUBLE', 'DOUBLE', '...'], 'CelonisGreatestLeast::celonis_greatest'],
-    [1000802, 'celonis_greatest', 'DATETIME', ['DATETIME', 'DATETIME', '...'], 'CelonisGreatestLeast::celonis_greatest'],
-    [1000803, 'celonis_greatest', 'VARCHAR', ['VARCHAR', 'VARCHAR', '...'], 'CelonisGreatestLeast::celonis_greatest'],
+    [1000800, 'celonis_greatest', True, False, 'BIGINT', ['BIGINT', 'BIGINT', '...'], 'CelonisGreatestLeast::celonis_greatest'],
+    [1000801, 'celonis_greatest', True, False, 'DOUBLE', ['DOUBLE', 'DOUBLE', '...'], 'CelonisGreatestLeast::celonis_greatest'],
+    [1000802, 'celonis_greatest', True, False, 'DATETIME', ['DATETIME', 'DATETIME', '...'], 'CelonisGreatestLeast::celonis_greatest'],
+    [1000803, 'celonis_greatest', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', '...'], 'CelonisGreatestLeast::celonis_greatest'],
 
-    [1000810, 'celonis_least', 'BIGINT', ['BIGINT', 'BIGINT', '...'], 'CelonisGreatestLeast::celonis_least'],
-    [1000811, 'celonis_least', 'DOUBLE', ['DOUBLE', 'DOUBLE', '...'], 'CelonisGreatestLeast::celonis_least'],
-    [1000812, 'celonis_least', 'DATETIME', ['DATETIME', 'DATETIME', '...'], 'CelonisGreatestLeast::celonis_least'],
-    [1000813, 'celonis_least', 'VARCHAR', ['VARCHAR', 'VARCHAR', '...'], 'CelonisGreatestLeast::celonis_least'],
+    [1000810, 'celonis_least', True, False, 'BIGINT', ['BIGINT', 'BIGINT', '...'], 'CelonisGreatestLeast::celonis_least'],
+    [1000811, 'celonis_least', True, False, 'DOUBLE', ['DOUBLE', 'DOUBLE', '...'], 'CelonisGreatestLeast::celonis_least'],
+    [1000812, 'celonis_least', True, False, 'DATETIME', ['DATETIME', 'DATETIME', '...'], 'CelonisGreatestLeast::celonis_least'],
+    [1000813, 'celonis_least', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', '...'], 'CelonisGreatestLeast::celonis_least'],
 
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
@@ -1455,6 +1455,7 @@ celostar_functions = [
     # String functions
     [4000100, 'celonis_translate', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisStringFunctions::translate', 'CelonisStringFunctions::translate_prepare', 'CelonisStringFunctions::translate_close' ],
     [4000200, 'celonis_sanitize_invalid_utf8', True, False, 'VARCHAR', ['VARCHAR'], 'CelonisStringFunctions::sanitize_invalid_utf8'],
+    [4000300, 'celonis_string_split', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', 'INT'], 'CelonisStringFunctions::string_split'],
 ]
 
 vectorized_functions.extend(celostar_functions)

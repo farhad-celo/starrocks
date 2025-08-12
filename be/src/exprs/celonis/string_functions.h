@@ -24,6 +24,14 @@ public:
      */
     DEFINE_VECTORIZED_FN(sanitize_invalid_utf8);
 
+    /**
+     * @param: [string_value, delimiter, field]
+     * @paramType: [BinaryColumn, BinaryColumn, IntColumn]
+     * @return: BinaryColumn
+     * Implements PQL STRING_SPLIT https://docs.celonis.com/en/string_split.html
+     */
+    DEFINE_VECTORIZED_FN(string_split);
+
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };

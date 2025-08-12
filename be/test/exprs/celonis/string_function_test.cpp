@@ -238,4 +238,106 @@ TEST(CelonisStringFunctionsSanitizeStringTest, NullTerminated) {
     EXPECT_EQ(v->get(3).get_slice(), "Invalid ? and ");
 }
 
+TEST(CelonisStringFunctionsStringSplitTest, All) {
+    auto string  = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    auto pattern = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    auto index = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+
+    std::vector<DatumStruct> test_input = {
+            // Return the first split after splitting on ','.
+            {"äö,ü,abc",                        ",",   0, "äö"},
+            // Return the first split after splitting on the multi-character pattern ', '.
+            {"FirstName, MiddleName, LastName", ", ",  0, "FirstName"},
+            {"Date, Notes",                     ", ",  0, "Date"},
+            {"",                                ", ",  0, ""},
+            {kNullDatum,                        ", ",  0, kNullDatum},
+            {", ",                              ", ",  0, ""},
+            {", abcd, ",                        ", ",  0, ""},
+            {", , ",                            ", ",  0, ""},
+            // Return the second split after splitting on the single-character pattern '-'.
+            {"Customer-X",                      "-",   1, "X"},
+            {"Customer-Y",                      "-",   1, "Y"},
+            // Return the second split after splitting on the multi-character pattern ', '.
+            {"FirstName, MiddleName, LastName", ", ",  1, "MiddleName"},
+            {"Date, Notes",                     ", ",  1, "Notes"},
+            {"",                                ", ",  1, kNullDatum},
+            {kNullDatum,                        ", ",  1, kNullDatum},
+            {", ",                              ", ",  1, ""},
+            {", abcd, ",                        ", ",  1, "abcd"},
+            {", , ",                            ", ",  1, ""},
+            // Extract the second character from the input using an empty pattern string.
+            {"FirstName, LastName",             "",    1, "i"},
+            {"äö,ü,",                           "",    1, "ö"},
+            {"abcd",                            "",    1, "b"},
+            {"",                                "",    1, ""},
+            {kNullDatum,                        "",    1, kNullDatum},
+            // Return from the end of the input using a negative index.
+            // Multi-character pattern
+            {"FirstName, LastName",             ", ", -1, "LastName"},
+            {"FirstName, LastName",             ", ", -2, "FirstName"},
+            {"FirstName, LastName",             ", ", -3, kNullDatum},
+            {"Query",                           ", ", -1, "Query"},
+            {"Query",                           ", ", -2, kNullDatum},
+            {kNullDatum,                        ", ", -1, kNullDatum},
+            {kNullDatum,                        ", ", -2, kNullDatum},
+            // Single-character pattern
+            {"FirstName,LastName",              ",",  -1, "LastName"},
+            {"FirstName,LastName",              ",",  -2, "FirstName"},
+            {"FirstName,LastName",              ",",  -3, kNullDatum},
+            {"Query",                           ",",  -1, "Query"},
+            {"Query",                           ",",  -2, kNullDatum},
+            {kNullDatum,                        ",",  -1, kNullDatum},
+            {kNullDatum,                        ",",  -2, kNullDatum},
+            // Empty pattern
+            {"äö",                              "",   -1, "ö"},
+            {"äö",                              "",   -2, "ä"},
+            {"äö",                              "",   -3, kNullDatum},
+            {kNullDatum,                        "",   -1, kNullDatum},
+            // Return the entire string if pattern does not exist in the string and split-index is zero.
+            {"",                                ", ",  0, ""},
+            {"abc",                             ", ",  0, "abc"},
+            {"abc",                             ",",   0, "abc"},
+            // pattern is identical to input-string and split-index is either zero or one: An empty string is returned.
+            {"",                                "",    0, ""},
+            {"",                                "",    1, ""},
+            {"",                                "",    2, kNullDatum},
+            {"a",                               "a",   0, ""},
+            {"a",                               "a",   1, ""},
+            {"a",                               "a",   2, kNullDatum},
+            {"abc",                             "abc", 0, ""},
+            {"abc",                             "abc", 1, ""},
+            {"abc",                             "abc", 2, kNullDatum}
+    };
+    for (const auto& st : test_input) {
+        if (st[0].is_null()) {
+            string->append_nulls(1);
+        } else {
+            string->append_datum(st[0]);
+        }
+        pattern->append_datum(st[1]);
+        index->append_datum(st[2]);
+    }
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    const auto result = CelonisStringFunctions::string_split(ctx.get(), {string, pattern, index}).value();
+
+    ASSERT_EQ(test_input.size(), result->size());
+    const auto v = ColumnHelper::as_column<NullableColumn>(result);
+    ASSERT_TRUE(v->has_null());
+    for (int i = 0; i < v->size(); ++i) {
+        auto debug_string = [&]() {
+            return fmt::format("case: {}, string: '{}', pattern: '{}', index: {}", i,
+                               test_input[i][0].is_null() ? "NULL" : test_input[i][0].get_slice(),
+                               test_input[i][1].get_slice(), test_input[i][2].get_int32());
+        };
+        if (test_input[i][3].is_null()) {
+            EXPECT_TRUE(v->is_null(i)) << debug_string();
+        } else if (v->is_null(i)) {
+            EXPECT_FALSE(v->is_null(i)) << debug_string();
+        } else {
+            EXPECT_EQ(v->get(i).get_slice(), test_input[i][3].get_slice()) << debug_string();
+        }
+    }
+}
+
 } // namespace starrocks
