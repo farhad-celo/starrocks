@@ -4,7 +4,6 @@
 #include "column/column_builder.h"
 #include "column/hash_set.h"
 #include "exprs/celonis/util.h"
-#include "exprs/function_context.h"
 
 namespace starrocks {
 

@@ -121,6 +121,7 @@ set(CELONIS_FILES
   celonis/count_edges.cpp
   celonis/index_activity_order.cpp
   celonis/match_activities.cpp
+  celonis/match_process.cpp
   celonis/remap_timestamp_weekday.cpp
   celonis/source_target.cpp
   celonis/string_functions.cpp

@@ -147,6 +147,7 @@ set(EXEC_FILES
         ./exprs/celonis/count_edges_test.cpp
         ./exprs/celonis/index_activity_order_test.cpp
         ./exprs/celonis/match_activities_test.cpp
+        ./exprs/celonis/match_process_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/source_target_test.cpp
         ./exprs/celonis/string_fn_translate_test.cpp
