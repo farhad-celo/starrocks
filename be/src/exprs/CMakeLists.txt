@@ -115,6 +115,22 @@ if(STARROCKS_JIT_ENABLE)
 
 endif()
 
+# Celonis proto sources
+message(STATUS "Proto sources will be created at ${BUILD_DIR}/generated/modules/query/")
+foreach (name calendars)
+    list(APPEND PROTO_GENERATED_SRCS "${BUILD_DIR}/generated/modules/query/${name}.pb.cc")
+    list(APPEND PROTO_GENERATED_HDRS "${BUILD_DIR}/generated/modules/query/${name}.pb.h")
+    list(APPEND PROTO_SRCS "${SRC_DIR}/exprs/celonis/protos/${name}.proto")
+endforeach()
+
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated/modules/query")
+add_custom_command(
+    OUTPUT ${PROTO_GENERATED_SRCS} ${PROTO_GENERATED_HDRS}
+    COMMAND ${THIRDPARTY_DIR}/bin/protoc -I=${SRC_DIR}/exprs/celonis/protos --cpp_out=${CMAKE_BINARY_DIR}/generated/modules/query ${PROTO_SRCS}
+    DEPENDS ${PROTO_SRCS}
+    )
+add_library(celonis_calendars_protos ${PROTO_GENERATED_SRCS} ${PROTO_GENERATED_HDRS})
+
 set(CELONIS_FILES
   celonis/align_model.cpp
   celonis/array_functions.cpp
@@ -138,6 +154,9 @@ set(CELONIS_FILES
   celonis/time_functions.cpp
   celonis/util.cpp
   celonis/variant_agg.cpp
-  celonis/variant_stats.cpp)
+  celonis/variant_stats.cpp
+)
 
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})
+target_include_directories(Exprs PRIVATE "${BUILD_DIR}/generated")
+target_link_libraries(Exprs PRIVATE celonis_calendars_protos)

@@ -1,0 +1,58 @@
+syntax = "proto2";
+package celonis.accelerator;
+
+message WeekdayCalendarEntryShift {
+  optional int32 begin = 1;
+  optional int32 end = 2;
+}
+
+message WeekdayCalendarEntry {
+  optional bool use_day = 1;
+  optional WeekdayCalendarEntryShift shift = 2;
+}
+
+message WeekdayCalendar {
+  optional WeekdayCalendarEntry monday = 1;
+  optional WeekdayCalendarEntry tuesday = 2;
+  optional WeekdayCalendarEntry wednesday = 3;
+  optional WeekdayCalendarEntry thursday = 4;
+  optional WeekdayCalendarEntry friday = 5;
+  optional WeekdayCalendarEntry saturday = 6;
+  optional WeekdayCalendarEntry sunday = 7;
+}
+
+
+message FactoryCalendarEntry {
+  optional int64 start_date = 1;
+  optional int64 end_date = 2;
+  optional string calendar_id = 3;
+}
+
+message FactoryCalendar {
+  repeated FactoryCalendarEntry entries = 1;
+}
+
+// TODO: do we actually need this or can it be converted to a WeekdayCalendar?
+message WorkdayCalendarEntry {
+  optional int64 year = 1;
+  repeated bool is_workday = 2;
+}
+
+message WorkdayCalendar {
+  repeated WorkdayCalendarEntry entries = 1;
+}
+
+message IntersectCalendar {
+  optional Calendar calendar1 = 1;
+  optional Calendar calendar2 = 2;
+}
+
+message Calendar {
+  oneof calendar_type {
+    IntersectCalendar intersect_calendar = 1;
+    WeekdayCalendar weekday_calendar = 2;
+    FactoryCalendar factory_calendar = 3;
+    WorkdayCalendar workday_calendar = 4;
+  }
+}
+
