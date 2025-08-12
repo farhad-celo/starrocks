@@ -164,7 +164,9 @@ class inductive_miner_statistics {
    */
   void insert_or_increment(const std::string& key);
 
-#ifndef CELOSTAR
+#ifdef CELOSTAR
+  std::unordered_map<std::string, size_t>& data() { return data_; }
+#else
   void log_to_operator_statistics(
       const cube::execution::tracking::add_telemetry_counter_fn& add_telemetry_counter) const;
 #endif

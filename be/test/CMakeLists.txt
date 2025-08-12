@@ -153,6 +153,7 @@ set(EXEC_FILES
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/match_activities_test.cpp
         ./exprs/celonis/match_process_test.cpp
+        ./exprs/celonis/mo_bpmn_graph_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/shortened_variant_test.cpp
         ./exprs/celonis/source_target_test.cpp

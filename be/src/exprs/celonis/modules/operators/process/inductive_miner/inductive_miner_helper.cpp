@@ -29,13 +29,14 @@ InductiveMinerHelper::InductiveMinerHelper(const starrocks::VariantHashMap& vari
                                                grain_size, filter_config};
     auto dfg{dfg::initialize_dfg(miner_config.eventlog(), dummy_context, miner_config.grain_size())};
 
-    inductive_miner_statistics dummy_miner_statistics;
+    inductive_miner_statistics statistics;
     cube::execution::tracking::stop_token dummy_stop_token{"INDUCTIVE_MINER", std::chrono::minutes(10)};
-    process_tree pt = inductive_miner(miner_config, dfg, dummy_miner_statistics, dummy_stop_token).tree;
+    process_tree pt = inductive_miner(miner_config, dfg, statistics, dummy_stop_token).tree;
 
     auto tables = convert_to_tables(pt);
     vertex_table_ = std::move(tables.vertex_table);
     edge_table_ = std::move(tables.edge_table);
+    statistics_ = std::move(statistics.data());
 }
 
 } // namespace celonis::accelerator::operators::process

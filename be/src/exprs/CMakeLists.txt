@@ -127,6 +127,7 @@ set(CELONIS_FILES
   celonis/like.cpp
   celonis/match_activities.cpp
   celonis/match_process.cpp
+  celonis/mo_bpmn_graph.cpp
   celonis/remap_timestamp_weekday.cpp
   celonis/shortened_variant.cpp
   celonis/source_target.cpp

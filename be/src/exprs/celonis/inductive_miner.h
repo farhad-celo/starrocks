@@ -7,14 +7,15 @@ namespace starrocks {
 
 class InductiveMinerFinalizer : public VariantAggregateFinalizer {
 public:
-    InductiveMinerFinalizer(FunctionContext* ctx, const VariantAggregateState& state)
+    InductiveMinerFinalizer(FunctionContext *ctx, const VariantAggregateState &state)
             : VariantAggregateFinalizer(ctx, state) {}
 
     std::string finalize() override;
 
 private:
-    std::string json_string(const SliceHashMap& activity_map,
-                            const celonis::ResultTable& vertex_table, const celonis::ResultTable& edge_table);
+    std::string json_string(const SliceHashMap &activity_map,
+                            const celonis::ResultTable &vertex_table, const celonis::ResultTable &edge_table,
+                            const std::unordered_map<std::string, size_t> &statistics_map);
 };
 
 // Extends VariantAggregateFunction and runs the inductive miner algorithm.

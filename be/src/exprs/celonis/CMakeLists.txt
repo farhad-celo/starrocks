@@ -44,14 +44,22 @@ add_main_source(memory/transform)
 add_main_source(operators/aggregation)
 add_main_source(operators/process/align_model)
 list(APPEND SOURCES
+        modules/operators/mo/mo_bpmn_graph_helper.cpp
+        modules/operators/mo/mo_bpmn_graph_operator.cpp
         modules/operators/process/alignment/input_output_mapper.cpp
         modules/operators/process/alignment/log_aligner.cpp
         modules/operators/process/alignment/sequence_aligner.cpp
         modules/operators/process/alignment/trace_alignment.cpp
         modules/operators/process/bpmn/bpmn_graph.cpp
         modules/operators/process/bpmn/bpmn_graph_builder.cpp
+        modules/operators/process/bpmn/bpmn_graph_to_tables.cpp
+        modules/operators/process/bpmn/bpmn_graph_with_block_structure.cpp
+        modules/operators/process/bpmn/bpmn_graph_with_block_structure_utils.cpp
+        modules/operators/process/bpmn/bpmn_overlay_graphs.cpp
+        modules/operators/process/bpmn/bpmn_remap_task_ids.cpp
         modules/operators/process/bpmn/bpmn_to_pn.cpp
         modules/operators/process/bpmn/bpmn_validation.cpp
+        modules/operators/process/bpmn/process_tree_to_bpmn.cpp
         modules/operators/process/bpmn/replay_types.cpp
         modules/operators/process/bpmn/replay_utils.cpp
 )

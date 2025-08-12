@@ -1432,6 +1432,7 @@ celostar_functions = [
 
     # The fields of STRUCT are set in ExpressionAnalyzer.java in FE.
     [1000601, 'celonis_align_model', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisAlignModel::align_model', 'CelonisAlignModel::align_model_prepare', 'CelonisAlignModel::align_model_close'],
+    [1000701, 'celonis_mo_bpmn_graph', True, False, 'VARCHAR', ['VARCHAR', '...'], 'CelonisMoBpmnGraph::mo_bpmn_graph'],
 
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],

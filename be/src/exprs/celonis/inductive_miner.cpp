@@ -39,7 +39,8 @@ VariantHashMap increment_id(const VariantHashMap& input_variant_map) {
 
 std::string InductiveMinerFinalizer::json_string(const SliceHashMap& activity_map,
                                                  const celonis::ResultTable& vertex_table,
-                                                 const celonis::ResultTable& edge_table) {
+                                                 const celonis::ResultTable& edge_table,
+                                                 const std::unordered_map<std::string, size_t>& statistics_map) {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
@@ -56,6 +57,7 @@ std::string InductiveMinerFinalizer::json_string(const SliceHashMap& activity_ma
     rapidjson::Value vertex_properties(rapidjson::kArrayType);
     const auto& process_tree_type = vertex_table.column<cel_int_t>("process_tree_type");
     const auto& activity = vertex_table.nullable_column<cel_int_t>("activity");
+    const auto& object_count = vertex_table.nullable_column<cel_int_t>("object_count");
     for (int i = 0; i < vertex_table.size(); i++) {
         rapidjson::Value obj(rapidjson::kObjectType);
         obj.AddMember("process_tree_type", process_tree_type[i], allocator);
@@ -65,6 +67,9 @@ std::string InductiveMinerFinalizer::json_string(const SliceHashMap& activity_ma
             auto& slice = activities[activity[i]];
             obj.AddMember("activity", rapidjson::Value().SetString(slice.get_data(), slice.get_size(), allocator),
                           allocator);
+        }
+        if (!object_count.is_null(i)) {
+            obj.AddMember("object_count", object_count[i], allocator);
         }
         vertex_properties.PushBack(obj, allocator);
     }
@@ -80,6 +85,17 @@ std::string InductiveMinerFinalizer::json_string(const SliceHashMap& activity_ma
         edge_properties.PushBack(obj, allocator);
     }
     d.AddMember("edge_properties", edge_properties, allocator);
+
+    rapidjson::Value statistics(rapidjson::kArrayType);
+    for (const auto& [key, value] : statistics_map) {
+        rapidjson::Value obj(rapidjson::kObjectType);
+        obj.AddMember("key", rapidjson::Value().SetString(key.c_str(), key.length(), allocator), allocator);
+        auto value_str = std::to_string(value);
+        obj.AddMember("value", rapidjson::Value().SetString(value_str.c_str(), value_str.length(), allocator),
+                      allocator);
+        statistics.PushBack(obj, allocator);
+    }
+    d.AddMember("statistics", statistics, allocator);
 
     // Encode to string.
     rapidjson::StringBuffer buf;
@@ -100,7 +116,7 @@ std::string InductiveMinerFinalizer::finalize() {
     }
 
     InductiveMinerHelper helper(variant_map, imfd_frequency_threshold);
-    return json_string(activity_map, helper.vertex_table(), helper.edge_table());
+    return json_string(activity_map, helper.vertex_table(), helper.edge_table(), helper.statistics());
 }
 
 } // namespace starrocks

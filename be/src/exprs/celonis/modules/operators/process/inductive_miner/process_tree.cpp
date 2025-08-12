@@ -307,8 +307,8 @@ class table_sizes {
 
 #ifdef CELOSTAR
 void fill_tables(ResultColumn<cel_int_t>& vertex_pt_types, NullableResultColumn<cel_int_t>& vertex_activities,
-                 ResultColumn<cel_int_t>& edge_source_ids, ResultColumn<cel_int_t>& edge_target_ids,
-                 const process_tree& pt) {
+                 NullableResultColumn<cel_int_t>& vertex_object_counts, ResultColumn<cel_int_t>& edge_source_ids,
+                 ResultColumn<cel_int_t>& edge_target_ids, const process_tree& pt) {
 #else
 template <class VERTEX_ACTIVITIES_PTR_AC_TYPE>
 void fill_tables(ctl::static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIES_PTR_AC_TYPE& vertex_activities,
@@ -331,12 +331,15 @@ void fill_tables(ctl::static_array<cel_int_t>& vertex_pt_types, VERTEX_ACTIVITIE
 #ifdef CELOSTAR
     std::visit(ctl::overloaded{[&](const process_tree::activity& a) {
                                  vertex_activities[current_vertex_id] = a.activity_id;
+                                 vertex_object_counts[current_vertex_id] = a.object_count;
                                },
-                               [&](const process_tree::tau& /*unused*/) {
+                               [&](const process_tree::tau& t) {
                                  vertex_activities.set_null(current_vertex_id);
+                                 vertex_object_counts[current_vertex_id] = t.object_count;
                                },
                                [&](const process_tree::parent& p) {
                                  vertex_activities.set_null(current_vertex_id);
+                                 vertex_object_counts.set_null(current_vertex_id);
 #else
     auto& current_vertex_activity{vertex_activities[current_vertex_id]};
     using col_pointer_type = typename VERTEX_ACTIVITIES_PTR_AC_TYPE::value_type;
@@ -550,12 +553,13 @@ process_tree_ref convert_to_tables(const process_tree& pt) {
   auto vertex_table = std::make_unique<ResultTable>("vertex_properties", sizes.node_size());
   auto& vertex_pt_types = vertex_table->AddColumn<cel_int_t>("process_tree_type");
   auto& vertex_activities = vertex_table->AddNullableColumn<cel_int_t>("activity");
+  auto& vertex_object_counts = vertex_table->AddNullableColumn<cel_int_t>("object_count");
 
   auto edge_table = std::make_unique<ResultTable>("edge_properties", sizes.edge_size());
   auto& edge_source_ids = edge_table->AddColumn<cel_int_t>("edge_source_id");
   auto& edge_target_ids = edge_table->AddColumn<cel_int_t>("edge_target_id");
 
-  fill_tables(vertex_pt_types, vertex_activities, edge_source_ids, edge_target_ids, pt);
+  fill_tables(vertex_pt_types, vertex_activities, vertex_object_counts, edge_source_ids, edge_target_ids, pt);
 
   return process_tree_ref(std::move(vertex_table), std::move(edge_table));
 }

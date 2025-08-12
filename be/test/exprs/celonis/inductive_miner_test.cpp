@@ -102,7 +102,7 @@ public:
     }
 
     void Run(const VariantRows& variant_rows, std::string expected, Column::Ptr weight_column,
-             double imfd_frequency_threshold = 0.0) {
+             double imfd_frequency_threshold = 0.0, bool for_mo_bpmn_graph = false) {
         const AggregateFunction* func = get_aggregate_function("celonis_inductive_miner", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto variants = build_variant_column(variant_rows);
         auto threshold_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(imfd_frequency_threshold, variant_rows.size());
@@ -129,6 +129,10 @@ public:
         auto rs = result->get_slice(0).to_string();
         // TODO(j.kim): Make tests less fragile.
         re2::RE2::GlobalReplace(&rs, "[\\t ]+", "");
+        if (!for_mo_bpmn_graph) {
+            re2::RE2::GlobalReplace(&rs, R"((?s),\n\"statistics\":.*])", "");
+            re2::RE2::GlobalReplace(&rs, R"((?s),\n\"object_count\":[\d]+)", "");
+        }
         re2::RE2::GlobalReplace(&expected, "[\\t ]+", "");
         EXPECT_EQ(rs, expected);
     }
@@ -1665,5 +1669,323 @@ TEST_F(CelonisInductiveMinerTest, LowThresholdNoFiltering) {
 }
 
 // While there are 10 more tests in Saola inductive_miner_test.cpp, the above tests would be enough to check porting.
+
+TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
+    VariantRows variants = {{"A", "B", "C"},
+                            {"A", "B", "D"}};
+    std::string expected =
+            R"json({
+            "vertex_properties": [
+                {
+                    "process_tree_type": 3,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "A",
+                    "object_count": 2
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "B",
+                    "object_count": 2
+                },
+                {
+                    "process_tree_type": 2,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "C",
+                    "object_count": 1
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "D",
+                    "object_count": 1
+                }
+            ],
+            "edge_properties": [
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 1
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 2
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 3
+                },
+                {
+                    "edge_source_id": 3,
+                    "edge_target_id": 4
+                },
+                {
+                    "edge_source_id": 3,
+                    "edge_target_id": 5
+                }
+            ],
+            "statistics": [
+                {
+                    "key":"m2a_precision_times_1E4",
+                    "value":"0"
+                },
+                {
+                    "key":"flower_fallback_count",
+                    "value":"0"
+                },
+                {
+                    "key":"has_seq_xor",
+                    "value":"0"
+                },
+                {
+                    "key":"slack_tau_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_once_per_trace_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_subfinds_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_find_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_par_count",
+                    "value":"0"
+                },
+                {
+                    "key":"tree_size",
+                    "value":"0"
+                },
+                {
+                    "key":"strict_tau_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"empty_traces_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"par_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_xor_count",
+                    "value":"0"
+                },
+                {
+                    "key":"tau_transitions_count",
+                    "value":"0"
+                },
+                {
+                    "key":"empty_log_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_single_activity_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"single_activity_base_case_count",
+                    "value":"4"
+                },
+                {
+                    "key":"xor_count",
+                    "value":"1"
+                },
+                {
+                    "key":"noisy_seq_count",
+                    "value":"0"
+                },
+                {
+                    "key":"seq_count",
+                    "value":"1"
+                },
+                {
+                    "key":"loop_count",
+                    "value":"0"
+                }
+            ]
+        })json";
+    Run(variants, expected, build_const_weight_column(1, variants.size()), 0.0, /*for_mo_bpmn_graph=*/true);
+}
+
+TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
+    VariantRows variants = {{"E", "B", "C"},
+                            {"B", "C"}};
+    std::string expected =
+            R"json({
+            "vertex_properties": [
+                {
+                    "process_tree_type": 3,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 2,
+                    "activity": null
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "B",
+                    "object_count": 2
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "C",
+                    "object_count": 2
+                },
+                {
+                    "process_tree_type": 0,
+                    "activity": null,
+                    "object_count": 1
+                },
+                {
+                    "process_tree_type": 1,
+                    "activity": "E",
+                    "object_count": 1
+                }
+            ],
+            "edge_properties": [
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 1
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 2
+                },
+                {
+                    "edge_source_id": 0,
+                    "edge_target_id": 3
+                },
+                {
+                    "edge_source_id": 1,
+                    "edge_target_id": 4
+                },
+                {
+                    "edge_source_id": 1,
+                    "edge_target_id": 5
+                }
+            ],
+            "statistics": [
+                {
+                    "key":"m2a_precision_times_1E4",
+                    "value":"0"
+                },
+                {
+                    "key":"flower_fallback_count",
+                    "value":"0"
+                },
+                {
+                    "key":"has_seq_xor",
+                    "value":"0"
+                },
+                {
+                    "key":"slack_tau_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_once_per_trace_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_subfinds_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_find_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_concurrent_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_par_count",
+                    "value":"0"
+                },
+                {
+                    "key":"tree_size",
+                    "value":"0"
+                },
+                {
+                    "key":"strict_tau_loop_count",
+                    "value":"0"
+                },
+                {
+                    "key":"empty_traces_base_case_count",
+                    "value":"1"
+                },
+                {
+                    "key":"par_count",
+                    "value":"0"
+                },
+                {
+                    "key":"activity_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_xor_count",
+                    "value":"0"
+                },
+                {
+                    "key":"tau_transitions_count",
+                    "value":"0"
+                },
+                {
+                    "key":"empty_log_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_single_activity_base_case_count",
+                    "value":"0"
+                },
+                {
+                    "key":"single_activity_base_case_count",
+                    "value":"3"
+                },
+                {
+                    "key":"xor_count",
+                    "value":"0"
+                },
+                {
+                    "key":"noisy_seq_count",
+                    "value":"0"
+                },
+                {
+                    "key":"seq_count",
+                    "value":"1"
+                },
+                {
+                    "key":"loop_count",
+                    "value":"0"
+                }
+            ]
+        })json";
+    Run(variants, expected, build_const_weight_column(1, variants.size()), 0.0, /*for_mo_bpmn_graph=*/true);
+}
 
 } // namespace starrocks
