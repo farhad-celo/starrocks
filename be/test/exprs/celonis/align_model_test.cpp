@@ -9,6 +9,7 @@
 #include "exprs/celonis/align_model.h"
 #include "exprs/celonis/variant_stats.h"
 #include "runtime/mem_pool.h"
+#include "testutil/assert.h"
 #include "testutil/function_utils.h"
 #include "util.h"
 #include "util/slice.h"
@@ -137,11 +138,18 @@ private:
         columns.push_back(model_column);
         ctx->set_constant_columns(columns);
 
+        ASSERT_OK(CelonisAlignModel::align_model_prepare(
+                ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        ASSERT_OK(CelonisAlignModel::align_model_prepare(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+
         const auto result = CelonisAlignModel::align_model(ctx.get(), columns).value();
         ASSERT_TRUE(result->is_struct());
         StructColumn* st = down_cast<StructColumn*>(result.get());
         Evaluator evaluator(*st, expected, return_type);
         evaluator.evaluate();
+
+        ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+        ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
     }
 };
 

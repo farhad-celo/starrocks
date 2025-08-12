@@ -25,6 +25,9 @@ public:
      *    }
      */
     DEFINE_VECTORIZED_FN(align_model);
+
+    static Status align_model_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status align_model_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
 
 } // namespace starrocks

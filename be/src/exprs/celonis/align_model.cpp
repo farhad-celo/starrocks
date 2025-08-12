@@ -53,11 +53,39 @@ void AddNulls(Columns& fields) {
 
 } // namespace
 
+struct AlignModelStateFragmentLocal {
+    std::string json_bpmn_model_description;
+};
+
+Status CelonisAlignModel::align_model_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        if (!context->is_constant_column(1)) {
+            return Status::InvalidArgument(
+                    "The second parameter of celonis_align_model() only accepts a literal value");
+        }
+        auto state = new AlignModelStateFragmentLocal();
+        // As of 2023-10-11, get_const_value() is not thread-safe. So it shouldn't be called in align_model().
+        state->json_bpmn_model_description =
+                ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(1)).to_string();
+        context->set_function_state(scope, state);
+    }
+
+    return Status::OK();
+}
+
+Status CelonisAlignModel::align_model_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        const auto *align_model_state_fragment_local = reinterpret_cast<const AlignModelStateFragmentLocal *>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+        delete align_model_state_fragment_local;
+    }
+    return Status::OK();
+}
+
 StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, const Columns& columns) {
-    DCHECK_EQ(columns.size(), 2);
-    auto json_bpmn_model_description =
-            ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(1)).to_string();
-    DCHECK(ColumnHelper::get_data_column(columns[0].get())->is_array());
+    const auto* align_model_state_fragment_local = reinterpret_cast<const AlignModelStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    const auto& json_bpmn_model_description = align_model_state_fragment_local->json_bpmn_model_description;
 
     ColumnPtr res = context->create_column(context->get_return_type(), false);
 
