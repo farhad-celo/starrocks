@@ -36,7 +36,7 @@ protected:
     }
 };
 
-TEST_F(CelonisStringFunctionsTest, null_input) {
+TEST_F(CelonisStringFunctionsTest, translate_null_input) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -74,7 +74,7 @@ TEST_F(CelonisStringFunctionsTest, null_input) {
                     .ok());
 }
 
-TEST_F(CelonisStringFunctionsTest, single_char) {
+TEST_F(CelonisStringFunctionsTest, translate_single_char) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -89,7 +89,7 @@ TEST_F(CelonisStringFunctionsTest, single_char) {
     translate(columns, {"a", "äaaäaz"});
 }
 
-TEST_F(CelonisStringFunctionsTest, single_char_utf8) {
+TEST_F(CelonisStringFunctionsTest, translate_single_char_utf8) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -104,7 +104,7 @@ TEST_F(CelonisStringFunctionsTest, single_char_utf8) {
     translate(columns, {"Ä", "Aa Zz ÄÄÄ Öö Üü", "ÄÄÄÄ öÖ üÜ"});
 }
 
-TEST_F(CelonisStringFunctionsTest, multi_char_symbol) {
+TEST_F(CelonisStringFunctionsTest, translate_multi_char_symbol) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -119,7 +119,7 @@ TEST_F(CelonisStringFunctionsTest, multi_char_symbol) {
     translate(columns, {",.", ".,", "33,333.33"});
 }
 
-TEST_F(CelonisStringFunctionsTest, multi_char_char_symbol_combination) {
+TEST_F(CelonisStringFunctionsTest, translate_multi_char_char_symbol_combination) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -134,7 +134,7 @@ TEST_F(CelonisStringFunctionsTest, multi_char_char_symbol_combination) {
     translate(columns, {"Z+", "+Z", "ZOO+BAR"});
 }
 
-TEST_F(CelonisStringFunctionsTest, multi_char_symbol_char_combination) {
+TEST_F(CelonisStringFunctionsTest, translate_multi_char_symbol_char_combination) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -149,7 +149,7 @@ TEST_F(CelonisStringFunctionsTest, multi_char_symbol_char_combination) {
     translate(columns, {"Z+", "+Z", "ZOO+BAR"});
 }
 
-TEST_F(CelonisStringFunctionsTest, multi_char_digit_2_char) {
+TEST_F(CelonisStringFunctionsTest, translate_multi_char_digit_2_char) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -164,7 +164,7 @@ TEST_F(CelonisStringFunctionsTest, multi_char_digit_2_char) {
     translate(columns, {"ABCDEFGHIJ", "JIHGFEDCBA", "AA.AAA,AA", "BB.BBB,BB", "JJ.JJJ,JJ"});
 }
 
-TEST_F(CelonisStringFunctionsTest, lower_utf8) {
+TEST_F(CelonisStringFunctionsTest, translate_lower_utf8) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -179,7 +179,7 @@ TEST_F(CelonisStringFunctionsTest, lower_utf8) {
     translate(columns, {"aouzäöü", "ü ö ä a o u z", "0ääa 0ööo 0üüu zz"});
 }
 
-TEST_F(CelonisStringFunctionsTest, upper_utf8) {
+TEST_F(CelonisStringFunctionsTest, translate_upper_utf8) {
     Columns columns;
 
     auto str = BinaryColumn::create();
@@ -440,7 +440,7 @@ TEST(CelonisStringFunctionsStringToDoubleTest, All) {
     }
 }
 
-TEST_F(CelonisStringFunctionsTest, normal_cases) {
+TEST_F(CelonisStringFunctionsTest, in_like_normal_cases) {
     {
         auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
@@ -512,14 +512,14 @@ TEST_F(CelonisStringFunctionsTest, normal_cases) {
     }
 }
 
-TEST_F(CelonisStringFunctionsTest, empty_input) {
+TEST_F(CelonisStringFunctionsTest, in_like_empty_input) {
     auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     const auto result = CelonisStringFunctions::in_like(nullptr, {input_strings, patterns}).value();
     ASSERT_EQ(input_strings->size(), result->size());
 }
 
-TEST_F(CelonisStringFunctionsTest, null_in_pattern) {
+TEST_F(CelonisStringFunctionsTest, in_like_null_in_pattern) {
     auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     input_strings->append_datum("asddqqW_A_W");
@@ -545,7 +545,7 @@ TEST_F(CelonisStringFunctionsTest, null_in_pattern) {
     EXPECT_EQ(0L, result->get(7).get_int64());
 }
 
-TEST_F(CelonisStringFunctionsTest, null_pattern) {
+TEST_F(CelonisStringFunctionsTest, in_like_null_pattern) {
     auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     auto patterns = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
     input_strings->append_datum("asddqqW_A_W");
@@ -569,6 +569,159 @@ TEST_F(CelonisStringFunctionsTest, null_pattern) {
     EXPECT_EQ(0L, result->get(5).get_int64());
     EXPECT_EQ(1L, result->get(6).get_int64());
     EXPECT_EQ(0L, result->get(7).get_int64());
+}
+
+TEST_F(CelonisStringFunctionsTest, match_strings_normal_cases) {
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        input_strings->append_datum("Shirt");
+        input_strings->append_datum("Pants");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            match_strings->append_datum(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"});
+            top_ks->append_datum(kNullDatum);
+            separators->append_datum(kNullDatum);
+        }
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ("T-Shirt", result->get(0).get_slice());
+        EXPECT_EQ("Sweatpants", result->get(1).get_slice());
+    }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        input_strings->append_datum("Shirt");
+        input_strings->append_datum("Pants");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            match_strings->append_datum(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"});
+            top_ks->append_datum(2);
+            separators->append_datum("##");
+        }
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ("T-Shirt##Sweatshirt", result->get(0).get_slice());
+        EXPECT_EQ("Sweatpants##Short pants", result->get(1).get_slice());
+    }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        input_strings->append_datum("xyz");
+        input_strings->append_datum("T-Shirt");
+        input_strings->append_datum("abc");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            match_strings->append_datum(DatumArray{"Shirt", "Sweatshirt"});
+            top_ks->append_datum(2);
+            separators->append_datum(kNullDatum);
+        }
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ("", result->get(0).get_slice());
+        EXPECT_EQ("Shirt, Sweatshirt", result->get(1).get_slice());
+        EXPECT_EQ("Sweatshirt", result->get(2).get_slice());
+    }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        input_strings->append_datum("Shirt");
+        input_strings->append_datum("Pants");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            match_strings->append_datum(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"});
+            top_ks->append_datum(2);
+            separators->append_datum(kNullDatum);
+        }
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ("T-Shirt, Sweatpants", result->get(0).get_slice());
+        EXPECT_EQ("Sweatpants, T-Shirt", result->get(1).get_slice());
+    }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        input_strings->append_datum("Shirt");
+        input_strings->append_datum("");
+        for (auto i = 0; i < input_strings->size(); ++i) {
+            match_strings->append_datum(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum});
+            top_ks->append_datum(2);
+        }
+        separators->append_datum("#");
+        separators->append_datum("%");
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_EQ("T-Shirt#Sweatpants", result->get(0).get_slice());
+        EXPECT_EQ("", result->get(1).get_slice());
+    }
+}
+
+TEST_F(CelonisStringFunctionsTest, null_input) {
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        input_strings->append_datum(kNullDatum);
+        match_strings->append_datum(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"});
+        top_ks->append_datum(kNullDatum);
+        separators->append_datum(kNullDatum);
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        input_strings->append_datum("Shirt");
+        match_strings->append_datum(kNullDatum);
+        top_ks->append_datum(kNullDatum);
+        separators->append_datum(kNullDatum);
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        input_strings->append_datum(kNullDatum);
+        match_strings->append_datum(kNullDatum);
+        top_ks->append_datum(kNullDatum);
+        separators->append_datum(kNullDatum);
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(input_strings->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+}
+
+TEST_F(CelonisStringFunctionsTest, empty_input) {
+    {
+        auto input_strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto match_strings = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto top_ks = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto separators = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        const auto result = CelonisStringFunctions::match_strings(nullptr, {input_strings, match_strings, top_ks,
+                                                                            separators}).value();
+        ASSERT_EQ(0, result->size());
+    }
 }
 
 } // namespace starrocks

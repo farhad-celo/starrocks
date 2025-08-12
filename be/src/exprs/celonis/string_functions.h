@@ -41,11 +41,19 @@ public:
 
     /**
      * @param: [input_string, patterns]
-     * @paramType: [VARCHAR, TYPE_VARCHAR]
+     * @paramType: [VARCHAR, ARRAY_VARCHAR]
      * @return: BIGINT
      * Implements PQL IN_LIKE https://docs.celonis.com/en/in_like.html
      */
     DEFINE_VECTORIZED_FN(in_like);
+
+    /**
+     * @param: [input_string, match_strings, top_k, separator]
+     * @paramType: [VARCHAR, ARRAY_VARCHAR, INT, VARCHAR]
+     * @return: VARCHAR
+     * Implements PQL MATCH_STRINGS https://docs.celonis.com/en/match_strings.html
+     */
+    DEFINE_VECTORIZED_FN(match_strings);
 
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
