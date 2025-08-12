@@ -1,7 +1,11 @@
 #include "exprs/celonis/string_functions.h"
 
 #include <boost/locale/utf.hpp>
-#include <utility>
+#include <cfloat>
+#include <iostream>
+#include <optional>
+#include <sstream>
+#include <string>
 
 #include "column/binary_column.h"
 #include "column/column_builder.h"
@@ -331,6 +335,56 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
                 res.append_null();
             }
         }
+    }
+    return res.build(ColumnHelper::is_all_const(columns));
+}
+
+static std::optional<double> to_double(const std::string& input_string) {
+    // Set the numeric locale to "en_US.UTF-8" for proper parsing
+    std::locale::global(std::locale("en_US.UTF-8"));
+    // std::istringstream is about 2.5x faster than atof on large inputs
+    std::istringstream iss(input_string);
+    double result;
+
+    // Attempt to convert the input string to a double
+    iss >> result;
+
+    // Check if the conversion was successful and the entire input was consumed
+    if (iss.eof() && !iss.fail()) {
+        if (std::isnan(result) || std::isinf(result)) {
+            // Conversion result is NaN or infinity, return nullopt;
+            return std::nullopt;
+        }
+        return result;
+    } else {
+        return std::nullopt;
+    }
+}
+
+/**
+ * @param: [haystack]
+ * @paramType: [BinaryColumn]
+ * @return: DoubleColumn
+ */
+StatusOr<ColumnPtr> CelonisStringFunctions::string_to_double(FunctionContext* context, const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+    ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+    size_t size = columns[0]->size();
+    ColumnBuilder<TYPE_DOUBLE> res(size);
+    for (int i = 0; i < size; ++i) {
+        if (input_string_viewer.is_null(i)) {
+            res.append_null();
+            continue;
+        }
+        std::string input_string = input_string_viewer.value(i).to_string();
+        std::optional<double> result = to_double(input_string);
+        if (result.has_value()) {
+            res.append(std::move(result.value()));
+        } else {
+            res.append_null();
+        }
+
     }
     return res.build(ColumnHelper::is_all_const(columns));
 }

@@ -32,6 +32,13 @@ public:
      */
     DEFINE_VECTORIZED_FN(string_split);
 
+    /**
+     * @param: [string_value]
+     * @paramType: [BinaryColumn]
+     * @return: DoubleColumn
+     */
+    DEFINE_VECTORIZED_FN(string_to_double);
+
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
