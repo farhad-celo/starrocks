@@ -19,27 +19,53 @@ inputs:
     description: 'Whether to clean up the artifact image'
     required: false
     default: true
+  aws_access_key_id:
+    required: false
+    description: "aws access key id"
+  aws_secret_access_key:
+    required: false
+    description: "aws access key"
+  to_push:
+    required: false
+    default: 'true'
+    description: "Whether to push the image to remote"
 
 runs:
   using: composite
   steps:
     - name: GHCR login
       shell: bash
-      run: |
-        echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+      run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+    - name: Configure prod AWS credentials
+      if: ${{ inputs.to_push == 'true' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: eu-central-1
+
+    - name: prod Amazon ECR login
+      if: ${{ inputs.to_push == 'true' }}
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
     - name: Pull artifact image
-      if: ${{inputs.pull_artifact == 'true'}}
+      if: ${{ inputs.pull_artifact == 'true' }}
       shell: bash
-      run: |
-        docker pull ${{inputs.artifact_image}}
+      run: docker pull "${{ inputs.artifact_image }}"
 
-    - name: Build allin1 image
+    - name: Build allin1 image with buildx
       shell: bash
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
       run: |
-        git branch
+        set -e
 
-        # Need to set the flag to make Celostar compliance test pass.
+        IMAGE_TAG="${{ inputs.image_tag }}"
+        ARTIFACT_IMAGE="${{ inputs.artifact_image }}"
+
+        # Add config
         echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf
 
         if [[ "${{ inputs.for_dic }}" == "true" ]]; then
@@ -54,29 +80,12 @@ runs:
           } >> docker/dockerfiles/allin1/be.conf
         fi
 
-        # Build image and always remove intermediate containers.
-        DOCKER_BUILDKIT=1 docker build --force-rm=true \
+        docker build \
           --build-arg WITH_DEBUG_INFO=true \
-          --build-arg ARTIFACTIMAGE=${{ inputs.artifact_image }} \
+          --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
           -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile \
-          -t ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.image_tag }} \
-          --push .
+          -t ghcr.io/celonis/celostar/starrocks-allin1:$IMAGE_TAG \
+          -t $ECR_REGISTRY/celostar/starrocks-allin1:$IMAGE_TAG .
 
-# Skip this step as we are using runs-on runner which is ephemeral.
-#    - name: Clean up artifact image
-#      if: ${{inputs.clean_up_artifact_image == 'true'}}
-#      shell: bash
-#      run: |
-#        docker rmi -f $(docker images -q ${{inputs.artifact_image}})
-#      continue-on-error: true
-
-# Skip this step as we are using runs-on runner which is ephemeral.
-#    - name: Clean up
-#      if: ${{ always() }}
-#      shell: bash
-#      run: |
-#        docker rmi -f $(docker images -q starrocks-allin1:${{inputs.image_tag}}) || true
-#        docker system prune -f
-#        docker volume prune -f
-#        docker logout ghcr.io
-#      continue-on-error: true
+        docker push ghcr.io/celonis/celostar/starrocks-allin1:$IMAGE_TAG
+        docker push $ECR_REGISTRY/celostar/starrocks-allin1:$IMAGE_TAG
