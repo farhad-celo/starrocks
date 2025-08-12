@@ -15,15 +15,23 @@ inputs:
     description: 'Whether the allin1 is for DIC purpose'
     required: false
     default: false
+  clean_up_artifact_image:
+    description: 'Whether to clean up the artifact image'
+    required: false
+    default: true
 
 runs:
   using: composite
   steps:
+    - name: GHCR login
+      shell: bash
+      run: |
+        echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+
     - name: Pull artifact image
       if: ${{inputs.pull_artifact == 'true'}}
       shell: bash
       run: |
-        echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
         docker pull ${{inputs.artifact_image}}
 
     - name: Build allin1 image
@@ -36,7 +44,7 @@ runs:
 
         # Need to set the flag to make Celostar compliance test pass.
         echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf
-        
+
         if [[ "${{inputs.for_dic}}" == "true" ]]; then
           echo "Adding more configs for DIC"
           {
@@ -62,12 +70,18 @@ runs:
         local_image: starrocks-allin1:${{inputs.image_tag}}
         remote_image: ghcr.io/celonis/celostar/starrocks-allin1:${{inputs.image_tag}}
 
+    - name: Clean up artifact image
+      if: ${{inputs.clean_up_artifact_image == 'true'}}
+      shell: bash
+      run: |
+        docker rmi -f $(docker images -q ${{inputs.artifact_image}})
+      continue-on-error: true
+
     - name: Clean up
       if: ${{ always() }}
       shell: bash
       run: |
         docker rmi -f $(docker images -q starrocks-allin1:${{inputs.image_tag}}) || true
-        docker rmi -f $(docker images -q ${{inputs.artifact_image}}) || true
         docker system prune -f
         docker volume prune -f
         docker logout ghcr.io

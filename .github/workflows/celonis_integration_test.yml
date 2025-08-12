@@ -20,8 +20,7 @@ on:
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.2
-  TEST_BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-ef2f161a-locale-cpml2.177-ubuntu
-  RELEASE_BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-ef2f161a-locale-cpml2.177-ubuntu-brpc1.8
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-8107c630-locale-cpml2.177-ubuntu
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
@@ -149,12 +148,12 @@ jobs:
       - name: Pull dev env image
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
-          docker pull ${TEST_BUILDER}
+          docker pull ${BUILDER}
 
       - name: Test
         uses: ./.github/actions/presubmit-test
         with:
-          builder: ${TEST_BUILDER}
+          builder: ${BUILDER}
           branch: ${{env.test_branch}}
 
   build-artifact:
@@ -176,7 +175,7 @@ jobs:
         id: build-artifact
         uses: ./.github/actions/build-artifact
         with:
-          dev_env_image: ${RELEASE_BUILDER}
+          dev_env_image: ${BUILDER}
           image_tag: ${test_image_tag}
           branch: ${test_branch}
 
@@ -347,7 +346,7 @@ jobs:
       - name: build and push artifact image
         uses: ./.github/actions/build-artifact
         with:
-          dev_env_image: ${RELEASE_BUILDER}
+          dev_env_image: ${BUILDER}
           image_tag: ${test_image_tag}
           is_asan_mode: 'yes'
           branch: ${test_branch}

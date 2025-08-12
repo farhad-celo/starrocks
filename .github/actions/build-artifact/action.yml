@@ -38,9 +38,6 @@ runs:
           build_type="Release"
         fi
         echo "Build type is ${build_type}"
-        
-        # Build without starcache; otherwise it won't compile with brpc 1.8.
-        sed -i 's/--enable-shared-data/--without-starcache --with-brpc-keepalive/g' docker/dockerfiles/artifacts/artifact.Dockerfile
 
         # Build image and always remove intermediate containers.
         DOCKER_BUILDKIT=1 docker buildx build --force-rm=true \
