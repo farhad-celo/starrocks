@@ -867,6 +867,14 @@ public class FunctionAnalyzer {
             sf.add(new StructField("edge_class_id", Type.ARRAY_BIGINT));
             sf.add(new StructField("edge_class_type", Type.ARRAY_VARCHAR));
             fn.setRetType(new StructType(sf));
+        } else if (fnName.equals(FunctionSet.CELONIS_BUILD_LINEAR_REGRESSION_MODEL)) {
+            fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_BUILD_LINEAR_REGRESSION_MODEL, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            ArrayList<StructField> sf = Lists.newArrayList();
+            sf.add(new StructField("xs", Type.DOUBLE));
+            sf.add(new StructField("ys", Type.DOUBLE));
+            ((AggregateFunction) fn).setIntermediateType(new StructType(sf));
         } else if (fnName.equals(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR)) {
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR, argumentTypes,
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);

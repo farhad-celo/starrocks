@@ -9,6 +9,7 @@
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
 #include "exprs/celonis/agg/factory_calendar.h"
+#include "exprs/celonis/agg/linear_regression.h"
 #include "exprs/celonis/agg/weekday_calendar.h"
 #include "exprs/celonis/agg/workday_calendar.h"
 #include "exprs/function_context.h"
@@ -27,6 +28,15 @@ public:
     }
 
     void TearDown() override { delete utils; }
+
+    bool parse_model(const std::string& model, double& intercept, double& slope) {
+        std::istringstream iss(model);
+        char delim;
+        if (!(iss >> intercept >> delim >> slope)) {
+            return false;
+        }
+        return true;
+    }
 
 private:
     FunctionUtils* utils{};
@@ -1677,6 +1687,217 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
         EXPECT_EQ(
                 R"(['{"multiWeekdayCalendar":{"calendars":[{"monday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"DE"},{"friday":{"useDay":true,"shift":{"begin":0,"end":86400000}},"calendarId":"US"}]}}'])",
                 res_array_col->debug_string());
+    }
+}
+
+TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE))};
+
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    local_ctx->set_runtime_state(runtime_state.get());
+
+    const AggregateFunction* agg_func = get_aggregate_function("celonis_build_linear_regression_model", TYPE_BIGINT,
+                                                               TYPE_VARCHAR,
+                                                               false);
+    TypeDescriptor type_double;
+    type_double.type = LogicalType::TYPE_DOUBLE;
+    TypeDescriptor type_struct;
+    type_struct.type = LogicalType::TYPE_STRUCT;
+    type_struct.children.emplace_back(type_double);
+    type_struct.children.emplace_back(type_double);
+    type_struct.field_names.emplace_back("x");
+    type_struct.field_names.emplace_back("y");
+
+    TypeDescriptor type_varchar;
+    type_varchar.type = LogicalType::TYPE_VARCHAR;
+    const double abs_error = 0.000001;
+
+    auto state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    // No invalid rows
+    {
+        auto x_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        x_column->append_datum(1.0);
+        x_column->append_datum(1.0);
+        x_column->append_datum(2.0);
+        x_column->append_datum(3.0);
+        x_column->append_datum(4.0);
+
+        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        y_column->append_datum(100.0);
+        y_column->append_datum(300.0);
+        y_column->append_datum(400.0);
+        y_column->append_datum(300.0);
+        y_column->append_datum(500.0);
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(2);
+        raw_columns[0] = x_column.get();
+        raw_columns[1] = y_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), x_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (LinearRegressionAggregateState*) (state->state());
+        EXPECT_EQ(5, agg_state->x->size());
+        EXPECT_EQ(5, agg_state->y->size());
+        EXPECT_EQ("[1, 1, 2, 3, 4]", agg_state->x->debug_string());
+        EXPECT_EQ("[100, 300, 400, 300, 500]", agg_state->y->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{x:1,y:100}, {x:1,y:300}, {x:2,y:400}, {x:3,y:300}, {x:4,y:500}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(x_column);
+        columns.push_back(y_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, x_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{x:1,y:100}, {x:1,y:300}, {x:2,y:400}, {x:3,y:300}, {x:4,y:500}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
+        ASSERT_EQ(1, varchar_col->size());
+        const std::string model = varchar_col->get(0).get_slice().to_string();
+        double intercept, slope;
+        ASSERT_TRUE(parse_model(model, intercept, slope));
+        EXPECT_NEAR(132.352941, intercept, abs_error);
+        EXPECT_NEAR(85.294118, slope, abs_error);
+    }
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    // valid rows with different order
+    {
+        auto x_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        x_column->append_datum(3.0);
+        x_column->append_datum(4.0);
+        x_column->append_datum(1.0);
+        x_column->append_datum(1.0);
+        x_column->append_datum(2.0);
+
+        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), false);
+        y_column->append_datum(300.0);
+        y_column->append_datum(500.0);
+        y_column->append_datum(100.0);
+        y_column->append_datum(300.0);
+        y_column->append_datum(400.0);
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(2);
+        raw_columns[0] = x_column.get();
+        raw_columns[1] = y_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), x_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (LinearRegressionAggregateState*) (state->state());
+        EXPECT_EQ(5, agg_state->x->size());
+        EXPECT_EQ(5, agg_state->y->size());
+        EXPECT_EQ("[3, 4, 1, 1, 2]", agg_state->x->debug_string());
+        EXPECT_EQ("[300, 500, 100, 300, 400]", agg_state->y->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{x:3,y:300}, {x:4,y:500}, {x:1,y:100}, {x:1,y:300}, {x:2,y:400}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(x_column);
+        columns.push_back(y_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, x_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{x:3,y:300}, {x:4,y:500}, {x:1,y:100}, {x:1,y:300}, {x:2,y:400}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
+        ASSERT_EQ(1, varchar_col->size());
+        const std::string model = varchar_col->get(0).get_slice().to_string();
+        double intercept, slope;
+        ASSERT_TRUE(parse_model(model, intercept, slope));
+        EXPECT_NEAR(132.352941, intercept, abs_error);
+        EXPECT_NEAR(85.294118, slope, abs_error);
+    }
+    state = ManagedAggrState::create(local_ctx.get(), agg_func);
+    // mixed valid and invalid rows
+    {
+        auto x_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), true);
+        x_column->append_datum(kNullDatum);
+        x_column->append_datum(3.0);
+        x_column->append_datum(4.0);
+        x_column->append_datum(kNullDatum);
+        x_column->append_datum(1.0);
+        x_column->append_datum(1.0);
+        x_column->append_datum(2.0);
+        x_column->append_datum(3.0);
+
+        auto y_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DOUBLE), true);
+        y_column->append_datum(100.0);
+        y_column->append_datum(300.0);
+        y_column->append_datum(500.0);
+        y_column->append_datum(kNullDatum);
+        y_column->append_datum(100.0);
+        y_column->append_datum(300.0);
+        y_column->append_datum(400.0);
+        y_column->append_datum(kNullDatum);
+
+        std::vector<const Column*> raw_columns;
+        raw_columns.resize(2);
+        raw_columns[0] = x_column.get();
+        raw_columns[1] = y_column.get();
+
+        // test update
+        agg_func->update_batch_single_state(local_ctx.get(), x_column->size(), raw_columns.data(),
+                                            state->state());
+        auto agg_state = (LinearRegressionAggregateState*) (state->state());
+        EXPECT_EQ(5, agg_state->x->size());
+        EXPECT_EQ(5, agg_state->y->size());
+        EXPECT_EQ("[3, 4, 1, 1, 2]", agg_state->x->debug_string());
+        EXPECT_EQ("[300, 500, 100, 300, 400]", agg_state->y->debug_string());
+
+        // test serialize_to_column.
+        auto res_struct_col = ColumnHelper::create_column(type_struct, true);
+        agg_func->serialize_to_column(local_ctx.get(), state->state(), res_struct_col.get());
+        EXPECT_EQ(
+                "[{x:3,y:300}, {x:4,y:500}, {x:1,y:100}, {x:1,y:300}, {x:2,y:400}]",
+                res_struct_col->debug_string());
+
+        // test convert_to_serialize_format.
+        res_struct_col->resize(0);
+        std::vector<ColumnPtr> columns;
+        columns.push_back(x_column);
+        columns.push_back(y_column);
+        agg_func->convert_to_serialize_format(local_ctx.get(), columns, x_column->size(),
+                                              &res_struct_col);
+        EXPECT_EQ(
+                "[{x:3,y:300}, {x:4,y:500}, {x:1,y:100}, {x:1,y:300}, {x:2,y:400}]",
+                res_struct_col->debug_string());
+
+        // test finalize_to_column.
+        auto varchar_col = ColumnHelper::create_column(type_varchar, true);
+        agg_func->finalize_to_column(local_ctx.get(), state->state(), varchar_col.get());
+        ASSERT_EQ(1, varchar_col->size());
+        const std::string model = varchar_col->get(0).get_slice().to_string();
+        double intercept, slope;
+        ASSERT_TRUE(parse_model(model, intercept, slope));
+        EXPECT_NEAR(132.352941, intercept, abs_error);
+        EXPECT_NEAR(85.294118, slope, abs_error);
     }
 }
 

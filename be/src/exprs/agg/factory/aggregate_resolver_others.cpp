@@ -52,6 +52,9 @@ void AggregateFuncResolver::register_celonis() {
 
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_inductive_miner");
 
+    add_general_mapping_notnull("celonis_build_linear_regression_model", false,
+                                AggregateFactory::MakeCelonisBuildLinearRegressionModelAggregateFunction());
+
     add_general_mapping_notnull("celonis_make_factory_calendar", false,
                                 AggregateFactory::MakeCelonisMakeFactoryCalendarAggregateFunction());
 

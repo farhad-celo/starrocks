@@ -137,6 +137,7 @@ set(CELONIS_FILES
   celonis/agg/factory_calendar.cpp
   celonis/agg/workday_calendar.cpp
   celonis/agg/inductive_miner.cpp
+  celonis/agg/linear_regression.cpp
   celonis/agg/product.cpp
   celonis/agg/variant_agg.cpp
   celonis/agg/variant_stats.cpp

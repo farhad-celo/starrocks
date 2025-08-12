@@ -318,6 +318,7 @@ public class FunctionSet {
     public static final String CELONIS_MAKE_FACTORY_CALENDAR = "celonis_make_factory_calendar";
     public static final String CELONIS_MAKE_WEEKDAY_CALENDAR = "celonis_make_weekday_calendar";
     public static final String CELONIS_MAKE_WORKDAY_CALENDAR = "celonis_make_workday_calendar";
+    public static final String CELONIS_BUILD_LINEAR_REGRESSION_MODEL = "celonis_build_linear_regression_model";
 
     // Bitmap functions:
     public static final String BITMAP_AND = "bitmap_and";
@@ -1104,6 +1105,10 @@ public class FunctionSet {
     }
 
     private void initCelonisAggregateBuiltins() {
+        // celonis_build_linear_regression_model
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_BUILD_LINEAR_REGRESSION_MODEL,
+                    Lists.newArrayList(Type.DOUBLE, Type.DOUBLE), Type.VARCHAR, Type.ANY_STRUCT,
+                    true, false, true));
         // celonis_make_factory_calendar
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_MAKE_FACTORY_CALENDAR,
                     Lists.newArrayList(Type.DATETIME, Type.DATETIME, Type.VARCHAR), Type.ARRAY_VARCHAR, Type.ANY_STRUCT,
