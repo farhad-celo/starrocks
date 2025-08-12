@@ -800,7 +800,6 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
   const auto& variant_table_size = table_sizes.variant_table_size;
 
   auto result_table = std::make_unique<ResultTable>("align_model", variant_table_size);
-  auto& variant = result_table->AddColumn<std::vector<std::string>>("variant");
   auto& alignment_model_vertex_id =
       result_table->AddColumn<std::vector<std::optional<size_t>>>("alignment_model_vertex_id");
   auto& alignment_vertex_label = result_table->AddColumn<std::vector<std::string>>("alignment_vertex_label");
@@ -844,7 +843,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
       blocks,
       // It is safe to fill blocks of the `storage` data in parallel
 #ifdef CELOSTAR
-      [&variant, &alignment_model_vertex_id, &alignment_vertex_label, &alignment_move_type, &alignment_activity_index,
+      [&alignment_model_vertex_id, &alignment_vertex_label, &alignment_move_type, &alignment_activity_index,
        &association_edge_class, &association_alignment_index, &edge_class_id, &edge_class_type, &activity_column,
        &case_id_column = std::as_const(case_id_column), &case_to_trace_ptrs = std::as_const(case_to_trace_ptrs),
        &activity_to_case_join = std::as_const(activity_to_case_join), &alignments = std::as_const(alignments),
@@ -899,13 +898,6 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                     const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
                     const auto& alignment_for_case{alignments.at(variant_trace_id)};
                     const replay_result_type& replay_result_for_case{replay_results.at(variant_trace_id)};
-
-#ifdef CELOSTAR
-                    variant[current_variant_row].reserve(interval.end() - interval.begin());
-                    for (auto activity_index = interval.begin(); activity_index < interval.end(); activity_index++) {
-                      variant[current_variant_row].push_back(activity_column->get_string_value(activity_index));
-                    }
-#endif
 
                     // 1. Fill the association table
 #ifdef CELOSTAR

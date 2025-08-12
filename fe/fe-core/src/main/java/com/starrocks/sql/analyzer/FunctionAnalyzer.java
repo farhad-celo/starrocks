@@ -852,7 +852,6 @@ public class FunctionAnalyzer {
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             fn = fn.copy();
             ArrayList<StructField> sf = Lists.newArrayList();
-            sf.add(new StructField("variant", Type.ARRAY_VARCHAR));
             sf.add(new StructField("alignment_model_vertex_id", Type.ARRAY_BIGINT));
             sf.add(new StructField("alignment_vertex_label", Type.ARRAY_VARCHAR));
             sf.add(new StructField("alignment_move_type", Type.ARRAY_VARCHAR));

@@ -50,7 +50,7 @@ StatusOr<BpmnModelDescription> build(const std::string& json_bpmn_model_descript
     const rapidjson::Value& nodes_values = document["nodes"];
     for (rapidjson::SizeType i = 0; i < nodes_values.Size(); ++i) {
         auto node = bpmn.add_nodes();
-        node->set_node_id(nodes_values[i]["node_id"].GetInt64());
+        node->set_node_id(std::stoll(nodes_values[i]["node_id"].GetString()));
         node->set_node_type(
                 static_cast<BpmnModelDescription_BpmnNode_BpmnNodeType>(nodes_values[i]["node_type"].GetInt()));
         if (node->node_type() == BpmnModelDescription_BpmnNode_BpmnNodeType_TASK) {
@@ -66,8 +66,8 @@ StatusOr<BpmnModelDescription> build(const std::string& json_bpmn_model_descript
     const rapidjson::Value& edges_values = document["edges"];
     for (rapidjson::SizeType i = 0; i < edges_values.Size(); ++i) {
         auto node = bpmn.add_edges();
-        node->set_from(edges_values[i]["from"].GetInt64());
-        node->set_to(edges_values[i]["to"].GetInt64());
+        node->set_from(std::stoll(edges_values[i]["from"].GetString()));
+        node->set_to(std::stoll(edges_values[i]["to"].GetString()));
     }
 
     if (!document.HasMember("cache_key")) {
@@ -85,6 +85,7 @@ StatusOr<BpmnModelDescription> build(const std::string& json_bpmn_model_descript
 Status AlignModelHelper::execute(const std::vector<std::vector<std::string>>& variants,
                                  const std::string& json_bpmn_model_description) {
     // Convert json bpmn model description to BpmnModelDescription protobuf.
+    // TODO(j.kim): Use https://protobuf.dev/reference/cpp/api-docs/google.protobuf.util.json_util/.
     ASSIGN_OR_RETURN(auto bpmn_model_description, bpmn_builder::build(json_bpmn_model_description));
 
     // Convert variant_map and activitity_map to Saola event_table, case_table and activity_to_case_join.
