@@ -28,6 +28,9 @@ static const int64_t NUM_DAYS_PER_WEEK = 7L;
 static const int64_t NUM_MILLISECONDS_PER_DAY = 86400000L;
 
 static const int64_t NUM_MICROSECONDS_PER_MILLISECONDS = 1000L;
+
+// SR places an upper limit of 1M of STRING. We use 900K which is less than 1M.
+static const size_t MAX_STRING_SIZE = 900000;
 }
 
 StatusOr<ColumnPtr>
@@ -828,6 +831,79 @@ Status CelonisTimeFunctions::remap_timestamps_calendar_close(FunctionContext* co
         }
     }
     return Status::OK();
+}
+
+static StatusOr<celonis::accelerator::Calendar>
+get_calendar(const Slice* const calendars, const unsigned int* const offsets, int row) {
+    size_t start = offsets[row];
+    size_t end = offsets[row + 1];
+    std::string calendar_json_string;
+    for (size_t i = start; i < end; ++i) {
+        calendar_json_string += calendars[i].to_string();
+    }
+    celonis::accelerator::Calendar calendar_proto;
+    if (!json_string_to_calendar(calendar_json_string, calendar_proto)) {
+        return Status::InvalidArgument("Calendar json string is malformed.");
+    }
+    RETURN_IF_ERROR(validate_calendar(calendar_proto));
+    return calendar_proto;
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::make_intersect_calendar(starrocks::FunctionContext* context,
+                                                                  const starrocks::Columns& columns) {
+    DCHECK_EQ(columns.size(), 2);
+    size_t n_rows = columns[0]->size();
+
+    UnnestedArrayData calendar1_array_data = prepare_array_input(columns[0].get());
+    if (calendar1_array_data.null_elements != nullptr) {
+        return Status::InvalidArgument("calendar1 array must not contain null values.");
+    }
+    DCHECK(calendar1_array_data.elements->is_binary());
+    const auto& calendars1 = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *calendar1_array_data.elements).get_data().data();
+    const auto& calendar1_offsets = calendar1_array_data.offsets->get_data().data();
+
+    UnnestedArrayData calendar2_array_data = prepare_array_input(columns[1].get());
+    if (calendar2_array_data.null_elements != nullptr) {
+        return Status::InvalidArgument("calendar2 array must not contain null values.");
+    }
+    DCHECK(calendar2_array_data.elements->is_binary());
+    const auto& calendars2 = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
+            *calendar2_array_data.elements).get_data().data();
+    const auto& calendar2_offsets = calendar2_array_data.offsets->get_data().data();
+
+    ColumnPtr output_column = columns[0]->clone_empty();
+    output_column = NullableColumn::wrap_if_necessary(output_column);
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (columns[0]->is_null(row) || columns[1]->is_null(row)) {
+            output_column->append_nulls(1);
+            continue;
+        }
+        StatusOr<celonis::accelerator::Calendar> status_or_calendar1 = get_calendar(calendars1, calendar1_offsets, row);
+        StatusOr<celonis::accelerator::Calendar> status_or_calendar2 = get_calendar(calendars2, calendar2_offsets, row);
+        if (!status_or_calendar1.ok() || !status_or_calendar2.ok()) {
+            output_column->append_nulls(1);
+            continue;
+        }
+        celonis::accelerator::Calendar calendar_proto;
+        calendar_proto.mutable_intersect_calendar()->mutable_calendar1()->CopyFrom(status_or_calendar1.value());
+        calendar_proto.mutable_intersect_calendar()->mutable_calendar2()->CopyFrom(status_or_calendar2.value());
+        std::string calendar_json;
+        google::protobuf::util::MessageToJsonString(calendar_proto, &calendar_json);
+
+        std::vector<std::string> calendar_pieces;
+        calendar_pieces.reserve((calendar_json.size() + MAX_STRING_SIZE - 1) / MAX_STRING_SIZE);
+        for (size_t i = 0; i < calendar_json.size(); i += MAX_STRING_SIZE) {
+            calendar_pieces.emplace_back(calendar_json.substr(i, MAX_STRING_SIZE));
+        }
+        DatumArray array;
+        for (const auto& calendar_piece: calendar_pieces) {
+            array.emplace_back(calendar_piece.c_str());
+        }
+
+        output_column->append_datum(array);
+    }
+    return output_column;
 }
 
 } // namespace starrocks

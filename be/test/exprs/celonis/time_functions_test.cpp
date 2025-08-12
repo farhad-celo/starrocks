@@ -1946,4 +1946,230 @@ TEST_F(CelonisTimeFunctionsTest, remap_timestamps_prepare) {
     }
 }
 
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar) {
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_EQ(
+                R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"weekdayCalendar":{"friday":{"useDay":true,"shift":{"begin":0,"end":1000}}}}}})",
+                result->get(0).get_array()[0].get_slice().to_string());
+    }
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{
+                R"({"factory_calendar": {)",
+                R"("entries": {"start_date": -100, "end_date": 100 })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_EQ(
+                R"({"intersectCalendar":{"calendar1":{"weekdayCalendar":{"thursday":{"useDay":true,"shift":{"begin":0,"end":1000}}}},"calendar2":{"factoryCalendar":{"entries":[{"startDate":"-100","endDate":"100"}]}}}})",
+                result->get(0).get_array()[0].get_slice().to_string());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_long_calendar) {
+    auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    const size_t n_entries = 10000;
+    DatumArray array;
+    array.emplace_back(R"({"factory_calendar": {)");
+    for (size_t i = 0; i < n_entries; ++i) {
+        array.emplace_back(R"("entries": {"start_date": -86400000, "end_date": 3600000, "calendar_id": "id1" }, )");
+    }
+    array.emplace_back(R"(} })");
+    calendars1->append_datum(array);
+    calendars2->append_datum(array);
+    const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+    ASSERT_EQ(calendars1->size(), result->size());
+    EXPECT_EQ(2L, result->get(0).get_array().size());
+}
+
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_empty_calendar_array) {
+    // calendar1 array is empty
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    // calendar2 array is empty
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("thursday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    // both calendar1 and calendar2 arrays are empty
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{});
+        calendars2->append_datum(DatumArray{});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_null_input) {
+    // calendar1 is NULL
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(kNullDatum);
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    // calendar2 is NULL
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    // both calendar1 and calendar2 is NULL
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true);
+        calendars1->append_datum(kNullDatum);
+        calendars2->append_datum(kNullDatum);
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_null_value_in_calendar_array) {
+    // null value in calendar1 array
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                kNullDatum,
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "calendar1 array must not contain null values.");
+    }
+    // null value in calendar2 array
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                kNullDatum,
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "calendar2 array must not contain null values.");
+    }
+    // null value in both calendar1 and calendar2
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                kNullDatum,
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                kNullDatum,
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().get_error_msg(), "calendar1 array must not contain null values.");
+    }
+}
+
+TEST_F(CelonisTimeFunctionsTest, make_intersect_calendar_malformed_calendar) {
+    // calendar1 is malformed
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{"Unknown"});
+        calendars2->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    // calendar2 is malformed
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{
+                R"({"weekday_calendar": {)",
+                R"("friday": {"use_day": true, "shift": {"begin": 0, "end": 1000} })",
+                R"(} })"});
+        calendars2->append_datum(DatumArray{"Unknown"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    // both calendar1 and calendar2 are malformed
+    {
+        auto calendars1 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        auto calendars2 = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        calendars1->append_datum(DatumArray{"Unknown"});
+        calendars2->append_datum(DatumArray{"Unknown"});
+        const auto result = CelonisTimeFunctions::make_intersect_calendar(nullptr, {calendars1, calendars2}).value();
+        ASSERT_EQ(calendars1->size(), result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+}
+
 } // namespace starrocks

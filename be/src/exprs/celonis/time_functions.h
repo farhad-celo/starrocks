@@ -24,6 +24,13 @@ public:
      */
     DEFINE_VECTORIZED_FN(in_calendar);
 
+    /**
+     * @param: [calendar1, calendar2]
+     * @paramType: [ARRAY_VARCHAR, ARRAY_VARCHAR]
+     * @return: ARRAY_VARCHAR
+     */
+    DEFINE_VECTORIZED_FN(make_intersect_calendar);
+
     static Status in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status in_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
