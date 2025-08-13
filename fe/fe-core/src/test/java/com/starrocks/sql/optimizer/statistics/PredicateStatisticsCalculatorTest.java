@@ -127,7 +127,7 @@ public class PredicateStatisticsCalculatorTest {
         Statistics estimatedStatistics =
                 PredicateStatisticsCalculator.statisticsCalculate(binaryPredicateOperator, statistics);
 
-        Assert.assertEquals(125, estimatedStatistics.getOutputRowCount(), 0.1);
+        Assertions.assertEquals(125, estimatedStatistics.getOutputRowCount(), 0.1);
 
         // Nullable version
         hashC1 = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.BIGINT,
@@ -139,7 +139,7 @@ public class PredicateStatisticsCalculatorTest {
         estimatedStatistics =
                 PredicateStatisticsCalculator.statisticsCalculate(binaryPredicateOperator, statistics);
 
-        Assert.assertEquals(12.49, estimatedStatistics.getOutputRowCount(), 0.1);
+        Assertions.assertEquals(12.49, estimatedStatistics.getOutputRowCount(), 0.1);
     }
 
     @Test
