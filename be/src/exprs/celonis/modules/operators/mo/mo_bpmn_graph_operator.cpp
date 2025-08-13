@@ -3,7 +3,7 @@
 #include <cmath>
 #include <mutex>
 
-#include <cpml/model/process_tree_to_bpmn.h>
+#include <cpml/model/transformations.h>
 #include <cpml/model/bpmn/merge.h>
 #include <cpml/model/process_tree.h>
 #include <cpml/model/pt/node_to_counts_mapping.h>
@@ -491,7 +491,8 @@ mo_bpmn_graph_operator::compute_graph_result mo_bpmn_graph_operator::compute_gra
 #ifdef CELOSTAR
   const auto transform_func{[oid = 0](const process::process_tree& process_tree) mutable {
     const auto pt_and_counts{transform(process_tree)};
-    return cpml::model::convert_to_bpmn_graph_with_block_structure(pt_and_counts, oid++);
+    const auto ctx{starrocks::celonis::cpml_utils::make_sr_function_context()};
+    return cpml::model::to_bpmn_graph_with_block_structure(pt_and_counts, oid++, ctx);
   }};
   const auto graphs{ctl::transform_to<std::vector<cpml::model::bpmn_graph_with_block_structure>>(process_trees_, transform_func)};
 

@@ -16,6 +16,7 @@
 #include "modules/common/exceptions.h"
 #include "modules/memory/row_id.h"
 #include "modules/operators/process/petri_net/petri_net.h"
+#include "exprs/celonis/cpml_utils/sr_context.h"
 
 namespace celonis::accelerator::operators::process::bpmn {
 
@@ -216,7 +217,7 @@ bpmn_to_petri_net_result_t bpmn_to_petri_net_with_mapping(const cpml::model::bpm
           // We allow to reduce transitions which do not correspond to a vertex
           const auto& transition_str_id{transition.id().get()};
           return !pn_str_id_to_bpmn.contains(transition_str_id);
-        });
+        }, starrocks::celonis::cpml_utils::make_sr_function_context());
 
     petri_net = to_pn_repr(cpml_pn);
   }

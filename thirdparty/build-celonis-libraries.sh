@@ -25,7 +25,7 @@ NAMED_TYPE_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES="${NAMED_TYPE_DIR_NAME_FOR_CELONIS
 NAMED_TYPE_DOWNLOAD_FOR_CELONIS_LIBRARIES="https://github.com/joboccara/NamedType/archive/${NAMED_TYPE_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES}"
 
 # Reference to the Saola release of the Celonis libraries (currently all packaged in the CPML)
-CPML_VERSION="2.231.2"
+CPML_VERSION="2.232.0"
 # Uncomment below for using a locally build CPML
 # Note: When using a locally build CPML, adjust the file path in CPML_VERSION below to point to the local archive
 # CPML_VERSION="/tmp/CPML-main.tar.gz"
