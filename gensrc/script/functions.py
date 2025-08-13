@@ -1462,6 +1462,8 @@ celostar_functions = [
     [1001102, 'celonis_adjust_daily_timestamps', True, False, 'ANY_STRUCT', ['ARRAY_DATETIME', 'ARRAY_BOOLEAN'], 'CelonisAdjustDailyTimestamps::celonis_adjust_daily_timestamps'],
     [1001200, 'celonis_transits_interleaved', True, False, 'ANY_STRUCT', ['ANY_STRUCT', 'ARRAY_DATETIME', 'ANY_ARRAY', 'ANY_STRUCT', 'ARRAY_DATETIME', 'ANY_ARRAY', 'BOOLEAN'], 'CelonisTransitsInterleaved::transits_interleaved'],
     [1001300, 'celonis_transits_match', True, False, 'ANY_STRUCT', ['ANY_STRUCT', 'ANY_ARRAY', 'ANY_STRUCT', 'ANY_ARRAY', 'ANY_ARRAY', 'ANY_ARRAY'], 'CelonisTransitsMatch::transits_match', 'CelonisTransitsMatch::prepare', 'CelonisTransitsMatch::close'],
+    [1001601, 'celonis_remap_int_array', True, False, 'ARRAY_BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'BIGINT'], 'CelonisRemapIntArray::remap_int_array', 'CelonisRemapIntArray::prepare', 'CelonisRemapIntArray::close'],
+    [1001602, 'celonis_remap_int_array', True, False, 'ARRAY_BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT'], 'CelonisRemapIntArray::remap_int_array', 'CelonisRemapIntArray::prepare', 'CelonisRemapIntArray::close'],
 
     [1001401, 'celonis_in_json', False, False, 'BOOLEAN', ['INT', 'VARCHAR'], 'CelonisInJson<TYPE_INT>::in_json', 'CelonisInJson<TYPE_INT>::prepare', 'CelonisInJson<TYPE_INT>::close'],
     [1001402, 'celonis_in_json', False, False, 'BOOLEAN', ['BIGINT', 'VARCHAR'], 'CelonisInJson<TYPE_BIGINT>::in_json', 'CelonisInJson<TYPE_BIGINT>::prepare', 'CelonisInJson<TYPE_BIGINT>::close'],

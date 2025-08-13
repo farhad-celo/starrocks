@@ -99,6 +99,7 @@ ${license}
 #include "exprs/celonis/patindex.h"
 #include "exprs/celonis/peek_merged_sorted_arrays.h"
 #include "exprs/celonis/qnorm.h"
+#include "exprs/celonis/remap_int_array.h"
 #include "exprs/celonis/remap_timestamp_weekday.h"
 #include "exprs/celonis/remap_values.h"
 #include "exprs/celonis/shortened_variant.h"

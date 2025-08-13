@@ -171,6 +171,7 @@ set(CELONIS_FILES
   celonis/peek_merged_sorted_arrays.cpp
   celonis/qnorm.cpp
   celonis/remap_timestamp_weekday.cpp
+  celonis/remap_int_array.cpp
   celonis/remap_values.cpp
   celonis/row_buffer.cpp
   celonis/serialization_utils.cpp

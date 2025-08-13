@@ -202,6 +202,7 @@ set(EXEC_FILES
         ./exprs/celonis/patindex_test.cpp
         ./exprs/celonis/peek_merged_sorted_arrays_test.cpp
         ./exprs/celonis/qnorm_test.cpp
+        ./exprs/celonis/remap_int_array_test.cpp
         ./exprs/celonis/remap_values_const_test.cpp
         ./exprs/celonis/remap_values_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
