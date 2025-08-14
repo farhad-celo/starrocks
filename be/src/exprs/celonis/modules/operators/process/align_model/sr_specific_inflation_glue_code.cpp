@@ -27,7 +27,7 @@ namespace {
 
 using buffer_lookup_t = std::unordered_set<std::string_view>;
 struct buffer_with_lookup {
-  legacy_embedded_ctl::static_array<char> buffer;
+  ctl::static_array<char> buffer;
   buffer_lookup_t buffer_lookup;
 };
 
@@ -38,8 +38,8 @@ struct buffer_with_lookup {
  */
 struct petri_net_label_id_to_string_mapper {
   [[nodiscard]] cel_string_t operator()(const alignment_move& move) const {
-    if (move.move_on_log.has_value() && move.move_on_log < string_dict.get_size()) {
-      const auto petri_net_label{*move.move_on_log};
+    if (move.move_on_log().has_value() && move.move_on_log() < string_dict.get_size()) {
+      const auto petri_net_label{*move.move_on_log()};
       const auto iter{buffer_lookup.find(string_dict.get_string_value(petri_net_label))};
       if (iter == buffer_lookup.end()) {
         throw common::internal_exception{"Could not find activity name {} with id {} in the buffer.",
@@ -48,8 +48,8 @@ struct petri_net_label_id_to_string_mapper {
       return iter->data();
     }
 
-    legacy_embedded_debug_assert(move.move_on_model.has_value());
-    const auto bpmn_vertex_id{*move.move_on_model};
+    debug_assert(move.move_on_model().has_value());
+    const auto bpmn_vertex_id{*move.move_on_model()};
     const auto iter{buffer_lookup.find(bpmn_to_string.at(bpmn_vertex_id))};
     if (iter == buffer_lookup.end()) {
       throw common::internal_exception{"Could not find bpmn vertex with name {} and id {} in the buffer.",
@@ -77,13 +77,13 @@ struct petri_net_label_id_to_string_mapper {
   }
 
   // The NULL string must be part of the string dict
-  legacy_embedded_debug_assert(buffer_entries.contains(std::string(NULL_STRING.data())));
+  debug_assert(buffer_entries.contains(std::string(NULL_STRING.data())));
 
   auto buffer_size{std::accumulate(std::begin(buffer_entries), std::end(buffer_entries), size_t{0},
                                    [](const auto acc, const auto& entry) { return acc + entry.size() + 1; })};
 
-  auto buffer{memory::tracking::make_static_array_for_overwrite<char>(
-      buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG), context)};
+  auto buffer{
+      ctl::make_static_array_for_overwrite<char>(buffer_size, ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   std::unordered_set<std::string_view> buffer_lookup;
 
@@ -157,8 +157,7 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
 
                 const auto& optional_alignment_for_case{alignments.at(variant_trace_id)};
                 const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
-                legacy_embedded_debug_assert(optional_alignment_for_case.has_value() ==
-                                             optional_replay_result_for_case.has_value());
+                debug_assert(optional_alignment_for_case.has_value() == optional_replay_result_for_case.has_value());
                 if (!optional_alignment_for_case) {
                   return;
                 }
@@ -171,7 +170,7 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
           std::ranges::copy(block_vector, std::back_inserter(flattened_blocks));
         }
         std::ranges::sort(flattened_blocks, std::ranges::less{}, &parallel_block_info::first);
-        legacy_embedded_debug_assert(flattened_blocks.front().first == 0);
+        debug_assert(flattened_blocks.front().first == 0);
 
         std::vector<parallel_block> result(flattened_blocks.size());
 
@@ -257,8 +256,8 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                     const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
                     const auto& optional_alignment_for_case{alignments.at(variant_trace_id)};
                     const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
-                    legacy_embedded_debug_assert(optional_alignment_for_case.has_value() ==
-                                                 optional_replay_result_for_case.has_value());
+                    debug_assert(optional_alignment_for_case.has_value() ==
+                                 optional_replay_result_for_case.has_value());
                     if (!optional_alignment_for_case) {
                       return;
                     }
@@ -295,15 +294,16 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                     for (size_t offset{0}; offset != alignment_size; ++offset) {
                       const auto& move{alignment_for_case.at(offset)};
                       alignment_vertex_label[current_variant_row].emplace_back(petri_net_to_string_mapper(move));
-                      alignment_move_type[current_variant_row].emplace_back(alignment_move_to_string(move.move_type));
-                      if (move.move_on_model) {
-                        alignment_model_vertex_id[current_variant_row].push_back(move.move_on_model.value());
+                      alignment_move_type[current_variant_row].emplace_back(alignment_move_to_string(move.move_type()));
+                      if (move.move_on_model()) {
+                        alignment_model_vertex_id[current_variant_row].push_back(move.move_on_model().value());
                       } else {
                         alignment_model_vertex_id[current_variant_row].emplace_back();
                       }
                     }
-                    for (auto index : replay_result_for_case.alignment_to_timestamp()) {
-                      alignment_activity_index[current_variant_row].push_back(index);
+                    for (auto index : replay_result_for_case.alignment_to_preceding_move()) {
+                      alignment_activity_index[current_variant_row].push_back(
+                          replay_result_for_case.alignment_idx_to_log_idx().at(index));
                     }
 
                     current_variant_row++;

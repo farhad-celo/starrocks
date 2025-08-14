@@ -10,7 +10,7 @@
 #include "modules/cube/variant_trace_cache_manager.h"
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table.h"
-#include "modules/operators/process/align_model/align_model_table_group_node.h"
+#include "modules/operators/process/align_model/create_align_model_tables.h"
 #include "modules/query/operators.pb.h"
 #include "rapidjson/document.h"
 #include "utils/builders/column_builder.h"
@@ -97,11 +97,11 @@ Status AlignModelHelper::execute(const std::vector<std::vector<std::string>>& va
     cube::variant_trace_cache_manager variant_trace_cache_manager(memory::management::no_swap());
 
     auto align_model = align_model::create_align_model_tables{
-        activity_column, case_id_column, case_table, activity_to_case_join, &variant_trace_cache_manager,
+        activity_column, case_id_column, case_table, activity_to_case_join, variant_trace_cache_manager,
         bpmn_model_description};
 
     common::execution_context context;
-    auto tables = align_model.operate(context);
+    auto tables = align_model(context);
     result_table_ = std::move(tables.at("align_model"));
 
     return Status::OK();

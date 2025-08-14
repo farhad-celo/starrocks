@@ -4,7 +4,7 @@
 
 #include <boost/graph/adjacency_list.hpp>
 
-#include "align_model.h"
+#include "align_model_types.h"
 
 namespace celonis::accelerator::operators::process::align_model {
 
@@ -20,6 +20,7 @@ struct partial_order_edge_properties {
   edge_type type{edge_type::UNMAPPED};
 };
 
+// Note: When changing this, please beware that we use the fact that node iterators are random-access in several places.
 using partial_order_graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
                                                   partial_order_vertex_properties, partial_order_edge_properties>;
 

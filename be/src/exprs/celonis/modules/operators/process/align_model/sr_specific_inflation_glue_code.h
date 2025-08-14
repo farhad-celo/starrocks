@@ -4,6 +4,7 @@
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table_group.h"
 #include "modules/operators/process/align_model/shared_types.h"
+#include "modules/operators/process/align_model/align_model_types.h"
 #include "modules/operators/process/bpmn/bpmn_from_proto.h"
 
 namespace celonis::accelerator::operators::process::align_model {

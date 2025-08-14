@@ -6,9 +6,11 @@
 
 #include <boost/graph/depth_first_search.hpp>
 #include <boost/graph/filtered_graph.hpp>
-#include <cpml/model/bpmn_graph.h>
 
-#include "legacy_embedded_ctl/conversion.h"
+#include <cpml/model/bpmn/bpmn_graph_builder.h>
+#include <cpml/model/bpmn_graph.h>
+#include <ctl/conversion.h>
+
 #include "modules/common/exceptions.h"
 #include "modules/operators/process/bpmn/replay_types.h"
 #include "modules/operators/process/bpmn/replay_utils.h"
@@ -25,42 +27,47 @@ namespace {
  * take the transition that appears first since it might be possible to reach that vertex through a different path in
  * the model.
  */
-bpmn::transitions_t::const_iterator find_next_transition(const cpml::model::bpmn_graph& graph, const alignment_t& alignment,
-                                                         size_t index, const bpmn::transitions_t& next_transitions) {
+bpmn::transitions_t::const_iterator find_next_transition(const cpml::model::bpmn_graph& graph,
+                                                         const alignment_view_t alignment, size_t index,
+                                                         const bpmn::transitions_t& next_transitions) {
   const auto move{alignment.at(index)};
-  legacy_embedded_debug_assert(move.move_type != alignment_move_type::LOG_MOVE && move.move_type != alignment_move_type::UNMAPPED_MOVE);
-  const auto alignment_vertex_id{move.move_on_model.value()};
+  common::runtime_assert(!move.is_log_move() && !move.is_unmapped_move() && move.move_on_model().has_value(),
+                         "Invalid move in 'find_next_transition'. Move [{}] is not allowed to be a log/unmapped move "
+                         "and must contain a move_on_model value.",
+                         move);
+  const auto alignment_vertex_id{move.move_on_model().value()};
   // If unmapped, then this is (hopefully) empty
-  std::vector outgoing_edges{graph.get_outgoing_edges(alignment_vertex_id)};
+  const auto& outgoing_edges{graph.get_outgoing_edges(alignment_vertex_id)};
 
   using transition_iter_t = bpmn::transitions_t::const_iterator;
 
   std::vector<std::pair<transition_iter_t, size_t>> distances;
   // the search space starts from the next element in the alignment
-  auto alignment_begin_iter{
-      std::next(alignment.begin(), legacy_embedded_ctl::cast<decltype(alignment.begin())::difference_type>(index + 1))};
+  const auto* alignment_begin_iter{std::next(alignment.begin(), ctl::cast_signed(index + 1))};
 
   // go over all the next transitions
   for (auto iter{next_transitions.cbegin()}; iter < next_transitions.cend(); iter++) {
     // get the iterator to the outgoing edge matching the transition
-    const auto edge_iter{std::find_if(outgoing_edges.cbegin(), outgoing_edges.cend(), [&iter](const auto& edge) {
-      legacy_embedded_debug_assert(iter->produced().size() == 1);
-      return edge == iter->produced()[0];
+    const auto edge_iter{std::ranges::find_if(outgoing_edges, [&iter](const auto& edge) {
+      debug_assert(iter->produced().size() == 1);
+      return edge == iter->produced().at(0);
     })};
 
     // should never be the case since the transitions generate tokens on the outgoing edges...
-    legacy_embedded_debug_assert(edge_iter != outgoing_edges.end());
+    debug_assert(edge_iter != outgoing_edges.end());
 
     auto target_vertex{edge_iter->get_target_id()};
-    auto alignment_iter{std::find_if(alignment_begin_iter, alignment.end(), [target_vertex](const alignment_move& mv) {
-      return mv.move_type != alignment_move_type::LOG_MOVE && mv.move_on_model == target_vertex;
-    })};
+    const auto* alignment_iter{
+        std::find_if(alignment_begin_iter, alignment.end(), [target_vertex](const alignment_move& mv) {
+          return !mv.is_log_move() && mv.move_on_model() == target_vertex;
+        })};
 
     // compute distance from next alignment element to the next instance (if present) of the outgoing vertex in the
     // alignment
     distances.emplace_back(iter, std::distance(alignment_begin_iter, alignment_iter));
   }
 
+  debug_assert(!distances.empty());
   auto min_element{std::ranges::min_element(
       distances, [](const std::pair<transition_iter_t, size_t>& pair_a,
                     const std::pair<transition_iter_t, size_t>& pair_b) { return pair_a.second < pair_b.second; })};
@@ -75,7 +82,7 @@ void add_components_to_graph(const replay_components_t& components, partial_orde
   for (const auto& component : components) {
     const auto component_type{component.component_type};
     const auto& component_vertices{component.edges_as_vertices};
-    legacy_embedded_debug_assert(component_vertices.size() >= 2);  // an edge needs at least two vertices
+    debug_assert(component_vertices.size() >= 2);  // an edge needs at least two vertices
 
     boost::add_edge(component_vertices.at(0), component_vertices.at(1), partial_order_edge_properties{component_type},
                     run_graph);
@@ -110,19 +117,80 @@ auto sync_successor(auto it, auto last, const partial_order_graph& run_graph, co
 }
 
 auto get_parallel_test(const std::optional<cpml::model::bpmn::vertex_id_type>& bpmn_id,
-                       const parallel_vertex_pairs<>& parallel_vertices) {
-  return [&bpmn_id, &parallel_vertices](cpml::model::bpmn::vertex_id_type other_id) {
-    return bpmn_id.has_value() && parallel_vertices.test(other_id, bpmn_id.value());
+                       const cpml::conformance::behavioral_relations& relations) {
+  return [&bpmn_id, &relations](cpml::model::bpmn::vertex_id_type other_id) {
+    return bpmn_id.has_value() && relations.is_parallel({other_id, bpmn_id.value()});
   };
 }
 
-log_and_unmapped_components construct_log_and_unmapped_components(const partial_order_graph& run_graph,
-                                                                  const cpml::model::bpmn_graph& graph,
-                                                                  const parallel_vertex_pairs<>& parallel_vertices) {
+class surrounding_sync_move_lookup {
+ public:
+  explicit surrounding_sync_move_lookup(const partial_order_graph& run_graph) {
+    auto [first, past_end]{boost::vertices(run_graph)};
+    if (std::distance(first, past_end) < 3) {  // besides start and end, there has to be at least one other move
+      return;
+    }
+    const auto end_vertex_it{std::prev(past_end)};
+
+    front_it_ = first;
+    back_it_ = end_vertex_it;
+
+    const std::vector initial_iterators_vector{{front_it_}};
+
+    for (auto it{std::next(first)}; it != end_vertex_it; ++it) {
+      if (const auto& [optional_bpmn_vertex_id, move_type]{run_graph[*it]};
+          move_type == alignment_move_type::SYNC_MOVE) {
+        lookup_.try_emplace(*optional_bpmn_vertex_id, initial_iterators_vector);
+        lookup_[*optional_bpmn_vertex_id].emplace_back(it);
+      }
+    }
+    std::ranges::for_each(lookup_ | std::views::values,
+                          [back_it = std::as_const(back_it_)](auto& v) { v.emplace_back(back_it); });
+  }
+
+  using run_graph_iterator_t = typename partial_order_graph::vertex_iterator;
+
+  struct prev_next_iterators {
+    run_graph_iterator_t prev;
+    run_graph_iterator_t next;
+  };
+
+  /// Will return iterators to two sync moves: The first one is the first non-parallel SYNC move preceding this move (or
+  /// the START gateway), and the second one is either the first non-parallel SYNC move succeeding this move, or the END
+  /// gateway
+  [[nodiscard]] prev_next_iterators find_closest_non_parallel_sync_moves(
+      run_graph_iterator_t it, const std::predicate<cpml::model::bpmn::vertex_id_type> auto& is_parallel) const {
+    prev_next_iterators result{.prev = front_it_, .next = back_it_};
+    for (const auto& [bpmn_vertex_id, iterators] : lookup_) {
+      if (!is_parallel(bpmn_vertex_id)) {
+        const auto lower_bound{std::ranges::lower_bound(iterators, it)};
+        debug_assert(lower_bound != std::ranges::end(iterators));
+        const auto prev_candidate{*std::ranges::prev(lower_bound, 1, std::ranges::begin(iterators))};
+        result.prev = std::max(result.prev, prev_candidate);
+        const auto next_candidate{
+            *lower_bound > it ? *lower_bound
+                              : *std::ranges::next(lower_bound, 1, std::ranges::prev(std::ranges::end(iterators)))};
+        result.next = std::min(result.next, next_candidate);
+      }
+    }
+    return result;
+  }
+
+ private:
+  run_graph_iterator_t front_it_{};
+  run_graph_iterator_t back_it_{};
+  /// Given a run graph, we store all SYNC moves per vertex ID and in order of their appearance.
+  /// This way, we can find the closest SYNC moves for all run graph elements in linearithmic time
+  std::unordered_map<cpml::model::bpmn::vertex_id_type, std::vector<run_graph_iterator_t>> lookup_{};
+};
+
+log_and_unmapped_components construct_log_and_unmapped_components(
+    const partial_order_graph& run_graph, const cpml::model::bpmn_graph& graph,
+    const cpml::conformance::behavioral_relations& relations) {
   // this could be a lot simpler if we created filtered views with std::ranges but that does not work with clang-14 :(
   static_assert(std::is_same_v<typename partial_order_graph::vertex_list_selector, boost::vecS>);
-  legacy_embedded_debug_assert(run_graph[0].bpmn_vertex_id.has_value());
-  legacy_embedded_debug_assert(is_start(graph.get_vertex(run_graph[0].bpmn_vertex_id.value())));
+  debug_assert(run_graph[0].bpmn_vertex_id.has_value());
+  debug_assert(cpml::model::bpmn::is_start(graph.get_vertex(run_graph[0].bpmn_vertex_id.value())));
 
   replay_components_t log_components{};
   replay_components_t unmapped_components{};
@@ -133,20 +201,19 @@ log_and_unmapped_components construct_log_and_unmapped_components(const partial_
     return {std::move(log_components), std::move(unmapped_components)};
   }
   const auto end_vertex_it{std::prev(past_end)};
-  legacy_embedded_debug_assert(run_graph[*end_vertex_it].bpmn_vertex_id.has_value());
-  legacy_embedded_debug_assert(is_end(graph.get_vertex(run_graph[*end_vertex_it].bpmn_vertex_id.value())));
+  debug_assert(run_graph[*end_vertex_it].bpmn_vertex_id.has_value());
+  debug_assert(cpml::model::bpmn::is_end(graph.get_vertex(run_graph[*end_vertex_it].bpmn_vertex_id.value())));
+
+  surrounding_sync_move_lookup sync_lookup{run_graph};
 
   for (auto it{std::next(first)}; it != end_vertex_it; ++it) {
     const auto& [bpmn_vertex_id, move_type]{run_graph[*it]};
-    const auto& bpmn_id{bpmn_vertex_id};  // making clang happy, so that we can use it in a lambda capture
     if (move_type != alignment_move_type::LOG_MOVE && move_type != alignment_move_type::UNMAPPED_MOVE) {
       continue;
     }
-    const auto is_parallel{get_parallel_test(bpmn_id, parallel_vertices)};
-    // find the preceding sync move that is not parallel
-    auto prev_it{sync_predecessor(first, std::prev(it), run_graph, is_parallel)};
-    // find the succeeding sync move that is not parallel
-    const auto next_it{sync_successor(std::next(it), end_vertex_it, run_graph, is_parallel)};
+    const auto is_parallel{get_parallel_test(bpmn_vertex_id, relations)};
+    // find the preceding and succeeding sync moves that are not parallel
+    auto [prev_it, next_it]{sync_lookup.find_closest_non_parallel_sync_moves(it, is_parallel)};
     auto [components, edge_type]{move_type == alignment_move_type::LOG_MOVE
                                      ? std::make_pair(std::ref(log_components), edge_type::LOG)
                                      : std::make_pair(std::ref(unmapped_components), edge_type::UNMAPPED)};
@@ -157,6 +224,7 @@ log_and_unmapped_components construct_log_and_unmapped_components(const partial_
 }
 
 using bpmn_to_partial_order_map_t = std::multimap<cpml::model::bpmn::vertex_id_type, partial_vertex_t>;
+using alignment_to_partial_order_map_t = std::unordered_map<size_t, partial_vertex_t>;
 using map_iter_t = std::multimap<cpml::model::bpmn::vertex_id_type, partial_vertex_t>::const_iterator;
 
 /**
@@ -165,7 +233,7 @@ using map_iter_t = std::multimap<cpml::model::bpmn::vertex_id_type, partial_vert
 map_iter_t get_last_added_for(const bpmn_to_partial_order_map_t::key_type& key,
                               const bpmn_to_partial_order_map_t& bpmn_to_partial_order) {
   auto [range_begin_iter, range_end_iter]{bpmn_to_partial_order.equal_range(key)};
-  legacy_embedded_debug_assert(range_begin_iter != bpmn_to_partial_order.end());
+  debug_assert(range_begin_iter != bpmn_to_partial_order.end());
   return std::prev(range_end_iter);
 }
 
@@ -184,10 +252,10 @@ void construct_edges_and_add_to_partial_order_graph(BeginIter edge_begin, EndIte
                                                     partial_order_graph& run_graph) {
   // source/target are either MODEL, SYNC or GATEWAY moves - in particular, not LOG or UNMAPPED move.
   const auto get_edge_type{[](alignment_move_type source, alignment_move_type target) -> edge_type {
-    legacy_embedded_debug_assert(source != alignment_move_type::LOG_MOVE);
-    legacy_embedded_debug_assert(target != alignment_move_type::LOG_MOVE);
-    legacy_embedded_debug_assert(source != alignment_move_type::UNMAPPED_MOVE);
-    legacy_embedded_debug_assert(target != alignment_move_type::UNMAPPED_MOVE);
+    debug_assert(source != alignment_move_type::LOG_MOVE);
+    debug_assert(target != alignment_move_type::LOG_MOVE);
+    debug_assert(source != alignment_move_type::UNMAPPED_MOVE);
+    debug_assert(target != alignment_move_type::UNMAPPED_MOVE);
 
     if (source == alignment_move_type::MODEL_MOVE || target == alignment_move_type::MODEL_MOVE) {
       return edge_type::MODEL;
@@ -198,7 +266,7 @@ void construct_edges_and_add_to_partial_order_graph(BeginIter edge_begin, EndIte
 
   for (; edge_begin != edge_end; edge_begin++) {
     const auto& edge{*edge_begin};
-    legacy_embedded_debug_assert(edge_target == edge.get_target_id());
+    debug_assert(edge_target == edge.get_target_id());
 
     cpml::model::bpmn::vertex_id_type source_bpmn_id{edge.get_source_id()};
     cpml::model::bpmn::vertex_id_type target_bpmn_id{edge.get_target_id()};
@@ -220,9 +288,10 @@ void construct_edges_and_add_to_partial_order_graph(BeginIter edge_begin, EndIte
 }  // namespace celonis::accelerator::operators::process::align_model
 
 struct replay_result {
-  partial_order_graph run_graph;            // only contains model and sync edges
-  replay_components_t log_components;       // log components do not intersect with unmapped
-  replay_components_t unmapped_components;  // unmapped components do not intersect with log
+  partial_order_graph run_graph;                                     // only contains model and sync edges
+  replay_components_t log_components;                                // log components do not intersect with unmapped
+  replay_components_t unmapped_components;                           // unmapped components do not intersect with log
+  alignment_to_partial_order_map_t alignment_partial_order_mapping;  // mapping from the alignment to the partial order
 };
 
 /**
@@ -232,31 +301,34 @@ struct replay_result {
  * @param alignment aligned variant
  * @return
  */
-replay_result build_partial_order_graph(const cpml::model::bpmn_graph& graph, const alignment_t& alignment,
-                                        const parallel_vertex_pairs<>& parallel_vertices) {
-  legacy_embedded_debug_assert(!alignment.empty());
-  legacy_embedded_debug_assert(graph.is_single_object());
+replay_result build_partial_order_graph(const cpml::model::bpmn_graph& graph, const alignment_view_t alignment,
+                                        const cpml::conformance::behavioral_relations& relations) {
+  debug_assert(!alignment.empty());
+  debug_assert(graph.is_single_object());
 
   const auto start_move{alignment.front()};
   const auto end_move{alignment.back()};
-  legacy_embedded_debug_assert(start_move.move_type == alignment_move_type::GATEWAY_MOVE);
-  legacy_embedded_debug_assert(end_move.move_type == alignment_move_type::GATEWAY_MOVE);
+  debug_assert(start_move.is_gateway_move());
+  debug_assert(end_move.is_gateway_move());
 
-  const auto start_vertex_id{start_move.move_on_model.value()};
-  const auto end_vertex_id{end_move.move_on_model.value()};
+  const auto start_vertex_id{start_move.move_on_model().value()};
+  const auto end_vertex_id{end_move.move_on_model().value()};
 
-  legacy_embedded_debug_assert(is_start(graph.get_vertex(start_vertex_id)));
-  legacy_embedded_debug_assert(is_end(graph.get_vertex(end_vertex_id)));
+  debug_assert(cpml::model::bpmn::is_start(graph.get_vertex(start_vertex_id)));
+  debug_assert(cpml::model::bpmn::is_end(graph.get_vertex(end_vertex_id)));
 
   // since a bpmn_vertex may be visited multiple times, this is a multimap. This way, we can also handle self loops.
-  bpmn_to_partial_order_map_t bpmn_to_partial_order;
-  partial_order_graph run_graph;
+  bpmn_to_partial_order_map_t bpmn_to_partial_order{};
+  alignment_to_partial_order_map_t alignment_to_partial_order{};
+  partial_order_graph run_graph{};
 
-  partial_vertex_t start_descriptor{boost::add_vertex(
-      partial_order_vertex_properties{start_vertex_id, start_move.move_type},
-      run_graph)};
+  partial_vertex_t start_descriptor{
+      boost::add_vertex(partial_order_vertex_properties{ctl::cast<cpml::model::bpmn::vertex_id_type>(start_vertex_id),
+                                                        start_move.move_type()},
+                        run_graph)};
 
-  bpmn_to_partial_order.emplace(legacy_embedded_ctl::cast<cpml::model::bpmn::vertex_id_type>(start_vertex_id), start_descriptor);
+  bpmn_to_partial_order.emplace(ctl::cast<cpml::model::bpmn::vertex_id_type>(start_vertex_id), start_descriptor);
+  alignment_to_partial_order.try_emplace(size_t{0}, start_descriptor);
 
   // there should only ever be a single marking - if we get an XOR then we look ahead and see which path to take
   bpmn::marking_t marking{bpmn::get_initial_marking(graph)};
@@ -264,41 +336,44 @@ replay_result build_partial_order_graph(const cpml::model::bpmn_graph& graph, co
 
   // since this is an aligned trace - we should always be able to replay it
   for (size_t index{1}; index < alignment.size() - 1; index++) {
-    const auto& move{alignment[index]};
+    const auto& move{alignment.at(index)};
 
     // corresponds to the alignment in that index == current_run_graph_vertex since
     // boost::adjacency_list VertexList == boost::vecS
     partial_vertex_t current_vertex_descriptor{
-        boost::add_vertex(partial_order_vertex_properties{move.move_on_model, move.move_type}, run_graph)};
+        boost::add_vertex(partial_order_vertex_properties{move.move_on_model(), move.move_type()}, run_graph)};
+    // We have the guarantee that this is mapping is the identity, but we still make the mapping explicit here
+    alignment_to_partial_order.try_emplace(index, current_vertex_descriptor);
 
     // cannot replay LOG_MOVE or UNMAPPED_MOVE vertices
-    if (move.move_type == alignment_move_type::LOG_MOVE || move.move_type == alignment_move_type::UNMAPPED_MOVE) {
+    if (move.is_log_move() || move.is_unmapped_move()) {
       continue;
     }
 
-    const auto current_bpmn_vertex_id{move.move_on_model.value()};
+    const auto current_bpmn_vertex_id{move.move_on_model().value()};
 
     // a single bpmn_vertex can of course be associated with multiple vertices in the partial order graph.
-    // Additionally note that we do not store mapping for LOG and UNMAPPED moves because we use this mapping for
+    // Additionally, note that we do not store mapping for LOG and UNMAPPED moves because we use this mapping for
     // generating partial order graph edges from bpmn edges - but there are no bpmn edges for LOG/UNMAPPED moves
     bpmn_to_partial_order.emplace(current_bpmn_vertex_id, current_vertex_descriptor);
 
     // we need an enabled transition on the current_bpmn_vertex_id that we can fire in order to evolve the marking
     // (i.e. our position in the model)
     next_transitions = bpmn::get_enabled_vertex_transitions(graph, marking, current_bpmn_vertex_id);
-    // NB: aligned, so there is always at least one transition. Usually, there is only one enabled transition. If
-    // there are multiple, find the next by looking ahead in the alignment.
+    common::runtime_assert(!next_transitions.empty(), "NB: aligned, so there is always at least one transition.");
+    // Usually, there is only one enabled transition. If there are multiple, find the next by looking ahead in the
+    // alignment.
     bpmn::transition next_transition{next_transitions.size() > 1
                                          ? *find_next_transition(graph, alignment, index, next_transitions)
                                          : next_transitions.at(0)};
     marking = bpmn::fire(marking, next_transition);
 
     // produce edges from firing transition
-    const auto& consumed_edges{next_transition.consumed()};
+    const auto consumed_edges{next_transition.consumed()};
 
     // bpmn edges -> partial_order_graph edges
-    construct_edges_and_add_to_partial_order_graph(consumed_edges.begin(), consumed_edges.end(),
-                                                   current_bpmn_vertex_id, move.move_type, bpmn_to_partial_order,
+    construct_edges_and_add_to_partial_order_graph(std::cbegin(consumed_edges), std::cend(consumed_edges),
+                                                   current_bpmn_vertex_id, move.move_type(), bpmn_to_partial_order,
                                                    run_graph);
   }
 
@@ -307,29 +382,29 @@ replay_result build_partial_order_graph(const cpml::model::bpmn_graph& graph, co
   }
 
   partial_vertex_t end_descriptor{
-      boost::add_vertex(partial_order_vertex_properties{end_vertex_id, end_move.move_type}, run_graph)};
+      boost::add_vertex(partial_order_vertex_properties{end_vertex_id, end_move.move_type()}, run_graph)};
 
   // should not have seen the end node before
-  legacy_embedded_debug_assert(!bpmn_to_partial_order.contains(end_vertex_id));
+  debug_assert(!bpmn_to_partial_order.contains(end_vertex_id));
   bpmn_to_partial_order.emplace(end_vertex_id, end_descriptor);
+  alignment_to_partial_order.try_emplace(alignment.size() - 1, end_descriptor);
 
   // add end edge
-  legacy_embedded_debug_assert(marking.size() == 1);
-  construct_edges_and_add_to_partial_order_graph(marking.cbegin(), marking.cend(), end_vertex_id, end_move.move_type,
+  debug_assert(marking.size() == 1);
+  construct_edges_and_add_to_partial_order_graph(marking.cbegin(), marking.cend(), end_vertex_id, end_move.move_type(),
                                                  bpmn_to_partial_order, run_graph);
 
-  auto [log_components,
-        unmapped_components]{construct_log_and_unmapped_components(run_graph, graph, parallel_vertices)};
+  auto [log_components, unmapped_components]{construct_log_and_unmapped_components(run_graph, graph, relations)};
   add_components_to_graph(log_components, run_graph);
   add_components_to_graph(unmapped_components, run_graph);
 
-  return {run_graph, std::move(log_components), std::move(unmapped_components)};
+  return {run_graph, std::move(log_components), std::move(unmapped_components), std::move(alignment_to_partial_order)};
 }
 
 using run_graph_edges_t = std::vector<partial_edge_t>;
 
 [[nodiscard]] replay_component to_result_component_type(const run_graph_edges_t& edges, edge_type component_type) {
-  legacy_embedded_debug_assert(!edges.empty());
+  debug_assert(!edges.empty());
 
   if (edges.size() == 1) {
     const auto& edge{edges.at(0)};
@@ -340,7 +415,7 @@ using run_graph_edges_t = std::vector<partial_edge_t>;
   // multiple edges
   edges_as_vertices_t vertex_list = {edges.at(0).m_source, edges.at(0).m_target};
   for (size_t idx{1}; idx < edges.size(); idx++) {
-    legacy_embedded_debug_assert(edges.at(idx - 1).m_target == edges.at(idx).m_source);
+    debug_assert(edges.at(idx - 1).m_target == edges.at(idx).m_source);
     vertex_list.emplace_back(edges.at(idx).m_target);
   }
   return {std::move(vertex_list), component_type};
@@ -363,7 +438,7 @@ class dfs_edge_component_collector {
       : bpmn_graph_{bpmn_graph}, run_graph_{run_graph}, components_{} {}
 
   void add_edge(partial_edge_t edge) {
-    legacy_embedded_debug_assert(run_graph_[edge].type == TYPE);
+    debug_assert(run_graph_[edge].type == TYPE);
 
     if (components_.empty() || !are_adjacent_edges(components_.back().back(), edge)) {
       components_.emplace_back(1, edge);
@@ -383,15 +458,17 @@ class dfs_edge_component_collector {
   [[nodiscard]] bool are_adjacent_edges(partial_edge_t edge1, partial_edge_t edge2) const {
     if constexpr (TYPE == edge_type::MODEL) {
       // model edge are not adjacent through gateways i.e edges 2->3 and 3->4 are not adjacent if 3 is a gateway
-      legacy_embedded_debug_assert(run_graph_[edge1.m_target].bpmn_vertex_id.has_value());
-      const cpml::model::bpmn::vertex_id_type target_1_bpmn_vertex_id{run_graph_[edge1.m_target].bpmn_vertex_id.value()};
+      debug_assert(run_graph_[edge1.m_target].bpmn_vertex_id.has_value());
+      const cpml::model::bpmn::vertex_id_type target_1_bpmn_vertex_id{
+          run_graph_[edge1.m_target].bpmn_vertex_id.value()};
 
-      bool target_1_is_gateway(is_gateway(bpmn_graph_.get_vertex(target_1_bpmn_vertex_id).get_vertex_type()));
+      bool target_1_is_gateway(
+          cpml::model::bpmn::is_gateway(bpmn_graph_.get_vertex(target_1_bpmn_vertex_id).get_vertex_type()));
       const bool are_adjacent{!target_1_is_gateway && (edge1.m_target == edge2.m_source)};
 
       if (are_adjacent) {
         // make sure the underlying bpmn vertex ids are also consistent
-        legacy_embedded_debug_assert(run_graph_[edge2.m_source].bpmn_vertex_id == target_1_bpmn_vertex_id);
+        debug_assert(run_graph_[edge2.m_source].bpmn_vertex_id == target_1_bpmn_vertex_id);
       }
       return are_adjacent;
 
@@ -400,9 +477,10 @@ class dfs_edge_component_collector {
 
       if (are_adjacent) {
         // if adjacent, check that the bpmn edge ids are also valid
-        legacy_embedded_debug_assert(run_graph_[edge1.m_target].bpmn_vertex_id.has_value());
-        const cpml::model::bpmn::vertex_id_type target_1_bpmn_vertex_id{run_graph_[edge1.m_target].bpmn_vertex_id.value()};
-        legacy_embedded_debug_assert(run_graph_[edge2.m_source].bpmn_vertex_id == target_1_bpmn_vertex_id);
+        debug_assert(run_graph_[edge1.m_target].bpmn_vertex_id.has_value());
+        const cpml::model::bpmn::vertex_id_type target_1_bpmn_vertex_id{
+            run_graph_[edge1.m_target].bpmn_vertex_id.value()};
+        debug_assert(run_graph_[edge2.m_source].bpmn_vertex_id == target_1_bpmn_vertex_id);
       }
 
       return are_adjacent;
@@ -439,50 +517,48 @@ class partial_order_graph_dfs_visitor : public boost::default_dfs_visitor {
   std::shared_ptr<dfs_edge_component_collector<TYPE>> edge_collector_;
 };
 
-using timestamp_join_map_t = std::vector<size_t>;
-
 /**
  * Finds the maximum input to the target vertex in the partial order graph: by the maximum input, we mean the
  * predecessor of target_vertex that was executed latest. We can do this by just looking at the vertex descriptor
  * of the input vertices to the target_vertex since by construction, the partial order graph must ensure this
  * property.
  */
-partial_vertex_t compute_max_input_vertex(partial_vertex_t target_vertex, const partial_order_graph& run_graph,
-                                          const timestamp_join_map_t& timestamp_join_map) {
-  legacy_embedded_debug_assert(boost::in_degree(target_vertex, run_graph) > 0);
+partial_vertex_t compute_max_input_vertex(
+    partial_vertex_t target_vertex, const partial_order_graph& run_graph,
+    const alignment_to_preceding_move_join_map_t& alignment_to_preceding_move_join_map) {
+  debug_assert(boost::in_degree(target_vertex, run_graph) > 0);
   const auto [begin_iter, end_iter]{boost::in_edges(target_vertex, run_graph)};
 
-  // get edge with maximum timestamp
+  // get edge with from source that happened last
   const partial_in_edge_iter max_edge_iter{
       std::max_element(begin_iter, end_iter,
-                       [&run_graph = std::as_const(run_graph), &timestamp_join_map = std::as_const(timestamp_join_map)](
+                       [&run_graph = std::as_const(run_graph),
+                        &alignment_to_preceding_move_join_map = std::as_const(alignment_to_preceding_move_join_map)](
                            const partial_edge_t& edge1, const partial_edge_t& edge2) {
                          const partial_vertex_t edge1_source{boost::source(edge1, run_graph)};
                          const partial_vertex_t edge2_source{boost::source(edge2, run_graph)};
 
-                         return timestamp_join_map.at(edge1_source) < timestamp_join_map.at(edge2_source);
+                         return alignment_to_preceding_move_join_map.at(edge1_source) <
+                                alignment_to_preceding_move_join_map.at(edge2_source);
                        })};
 
-  return timestamp_join_map.at(boost::source(*max_edge_iter, run_graph));
+  return alignment_to_preceding_move_join_map.at(boost::source(*max_edge_iter, run_graph));
 }
-
-using alignment_idx_to_log_idx_t = std::unordered_map<size_t, size_t>;
 
 /**
  * Assign an order to each non-model activity in the alignment - these are the activities that also occur in the input
- * eventlog in this exact same order. We need to do this because we want to generate the timestamp join map relative
+ * eventlog in this exact same order. We need to do this because we want to generate the join map relative
  * to the order of the activities in the input activity column.
  *
  * The assumption we need here is that the alignment cannot reorder activities in the eventlog - which is the case for
  * any valid alignment.
  */
-alignment_idx_to_log_idx_t map_alignment_activities_to_eventlog_idx(const alignment_t& alignment) {
+alignment_idx_to_log_idx_t map_alignment_activities_to_eventlog_idx(const alignment_view_t alignment) {
   size_t num_seen_activities{0};
   alignment_idx_to_log_idx_t result;
-
   for (size_t idx{0}; idx < alignment.size(); idx++) {
     const auto& move{alignment.at(idx)};
-    if (move.move_on_log) {
+    if (move.move_on_log()) {
       // Sync, log or unmapped moves
       result.emplace(idx, num_seen_activities);
       num_seen_activities++;
@@ -505,22 +581,23 @@ alignment_idx_to_log_idx_t map_alignment_activities_to_eventlog_idx(const alignm
 }
 
 /**
- * Iterate over the vertices in the Partial Order graph and compute the timestamp join map. By a 'timestamp join map'
- * here, we mean a mapping from each item x in the alignment to an activity in the input log e.g. the start
- * vertex gets the timestmap 0 - meaning that we join it to the first activity in the input log. We can do this,
- * since the alignment cannot reorder activities in the input log.
+ * Iterate over the vertices in the Partial Order graph and compute the preceding move join map. By a
+ * 'alignment_to_preceding_move_join_map' here, we mean a mapping from each move x in the alignment to a previous SYNC,
+ * LOG or UNMAPPED MOVE, i.e. a move that corresponds to an activity in the input log e.g. the start vertex gets the
+ * joins to the first activity in the input log. We can do this, since the alignment cannot reorder activities in the
+ * input log.
  *
  * @param alignment a vector containing the alignment. We assume that the first element in the alignment array
  * corresponds to the 'start' vertex and the last to the 'end' vertex.
  *
  * @param run_graph a run graph containing at least the SYNC, MODEL LOG and UNMAPPED edges. SKIP edges do not
- * contribute to timestamps since they skip over model-move components.
+ * contribute to the joins since they skip over model-move components.
  */
-timestamp_join_map_t generate_timestamp_join_map(const partial_order_graph& run_graph,
-                                                 const cpml::model::bpmn_graph& bpmn_graph, const alignment_t& alignment) {
-  legacy_embedded_debug_assert(!alignment.empty());
+alignment_to_preceding_move_join_map_t generate_alignment_to_preceding_move_join_map(
+    const partial_order_graph& run_graph, const cpml::model::bpmn_graph& bpmn_graph, const alignment_view_t alignment) {
+  debug_assert(!alignment.empty());
   // By construction of the partial order graph, vertex id / descriptor (boost::vecS) IS the index in the vector
-  legacy_embedded_debug_assert(std::all_of(boost::vertices(run_graph).first, boost::vertices(run_graph).second,
+  debug_assert(std::all_of(boost::vertices(run_graph).first, boost::vertices(run_graph).second,
                            [index = size_t{0}](const auto& vertex_id) mutable {
                              const auto index_equals_descriptor{index == vertex_id};
                              index++;
@@ -531,58 +608,54 @@ timestamp_join_map_t generate_timestamp_join_map(const partial_order_graph& run_
     throw common::internal_exception{"ALIGN_MODEL: Cannot compute timestamp joins with unordered partial graph."};
   }
 
-  const auto alignment_idx_to_log_idx{map_alignment_activities_to_eventlog_idx(alignment)};
-
-  if (alignment_idx_to_log_idx.empty()) {
-    // if there are no non-model-move activities then the trace is empty and we cannot generate any 'timestamps'
-    return timestamp_join_map_t(alignment.size(), 0);
-  }
-
-  // start gets joined to first activity in the log i.e. idx 0
-  const size_t start_vertex_timestamp_join{0};
-  timestamp_join_map_t timestamp_join_map(alignment.size(), start_vertex_timestamp_join);
+  // start gets joined to first activity in the log i.e. the first move that has `move_on_log` set
+  const size_t start_vertex_move_join{ctl::cast_unsigned(
+      std::distance(alignment.begin(),
+                    std::ranges::find_if(alignment, [](const auto& move) { return move.move_on_log().has_value(); })))};
+  alignment_to_preceding_move_join_map_t alignment_to_preceding_move_join_map(alignment.size(), start_vertex_move_join);
 
   // skip start
   auto [v_begin, v_end]{boost::vertices(run_graph)};
   for (const auto target_vertex : boost::make_iterator_range(std::next(v_begin), v_end)) {
-    // the timestamp join at the vertex depends on the timestamp joins of all the incoming edges into the vertex
+    // the join at the vertex depends on the joins of all the incoming edges into the vertex
     const auto bpmn_vertex_id{run_graph[target_vertex].bpmn_vertex_id};
     if (run_graph[target_vertex].move_type == alignment_move_type::LOG_MOVE ||
         run_graph[target_vertex].move_type == alignment_move_type::UNMAPPED_MOVE) {
-      timestamp_join_map.at(target_vertex) = alignment_idx_to_log_idx.at(target_vertex);
+      alignment_to_preceding_move_join_map.at(target_vertex) = target_vertex;
       continue;
     }
     const auto& bpmn_vertex{bpmn_graph.get_vertex(bpmn_vertex_id.value())};
     const auto move_type{run_graph[target_vertex].move_type};
 
-    // we go over all vertices and compute the 'timestamp' by looking at the input edges - by construction of the
-    // partial order graph, we should have already processed all the input vertices of a vertex 't' when processing
-    // 't' itself.
-    const auto target_timestamp{
-        std::visit(legacy_embedded_ctl::overloaded{[&](const cpml::model::bpmn::task& /*task*/) {
-                                     // if non-model-move activity, timestamp join is identity
-                                     if (move_type != alignment_move_type::MODEL_MOVE) {
-                                       legacy_embedded_debug_assert(move_type == alignment_move_type::SYNC_MOVE);
-                                       return alignment_idx_to_log_idx.at(target_vertex);
-                                     }
-                                     // otherwise, this is a model move activity - without SKIP edges this should only
-                                     // have a single incoming edge
-                                     legacy_embedded_debug_assert(std::distance(boost::in_edges(target_vertex, run_graph).first,
-                                                                boost::in_edges(target_vertex, run_graph).second) == 1);
-                                     return compute_max_input_vertex(target_vertex, run_graph, timestamp_join_map);
-                                   },
-                                   [&](const auto& /*parallel_exclusive_or_end*/) {
-                                     return compute_max_input_vertex(target_vertex, run_graph, timestamp_join_map);
-                                   },
-                                   [&](const cpml::model::bpmn::start& /*start*/) {
-                                     legacy_embedded_ctl::assert_unreachable();
-                                     return size_t{0};
-                                   }},
-                   bpmn_vertex.get_vertex_type())};
+    // we go over all vertices and compute the correct move to join to by looking at the input edges - by construction
+    // of the partial order graph, we should have already processed all the input vertices of a vertex 't' when
+    // processing 't' itself.
+    const auto target_move_idx{std::visit(
+        ctl::overloaded{
+            [&](const cpml::model::bpmn::task& /*task*/) {
+              // if non-model-move task, it is a sync move and the join is identity
+              if (move_type != alignment_move_type::MODEL_MOVE) {
+                debug_assert(move_type == alignment_move_type::SYNC_MOVE);
+                return target_vertex;
+              }
+              // otherwise, this is a model move activity - without SKIP edges this should only
+              // have a single incoming edge
+              debug_assert(std::distance(boost::in_edges(target_vertex, run_graph).first,
+                                         boost::in_edges(target_vertex, run_graph).second) == 1);
+              return compute_max_input_vertex(target_vertex, run_graph, alignment_to_preceding_move_join_map);
+            },
+            [&](const auto& /*parallel_exclusive_or_end*/) {
+              return compute_max_input_vertex(target_vertex, run_graph, alignment_to_preceding_move_join_map);
+            },
+            [&](const cpml::model::bpmn::start& /*start*/) {
+              ctl::assert_unreachable();
+              return size_t{0};
+            }},
+        bpmn_vertex.get_vertex_type())};
 
-    timestamp_join_map.at(target_vertex) = target_timestamp;
+    alignment_to_preceding_move_join_map.at(target_vertex) = target_move_idx;
   }
-  return timestamp_join_map;
+  return alignment_to_preceding_move_join_map;
 }
 
 struct sync_and_model_components {
@@ -626,13 +699,109 @@ sync_and_model_components create_sync_and_model_components(const partial_order_g
   return {std::move(sync_components_edges), std::move(model_components_edges)};
 }
 
+struct exclusive_violation_info {
+  partial_vertex_t violated_gateway;
+  partial_vertex_t violating_move;  // TODO(a.swoboda) check the visualization whether we rather need the next move
+                                    // after the violated gateway
+  std::vector<partial_vertex_t> evidence;
+  exclusive_violation_info(partial_vertex_t violated_gateway, partial_vertex_t violating_move,
+                           std::vector<partial_vertex_t> evidence)
+      : violated_gateway{violated_gateway}, violating_move{violating_move}, evidence{std::move(evidence)} {}
+  [[nodiscard]] size_t size() const { return evidence.size() + 2; }
+};
+
+struct activity_vertex_ids {
+  row_id activity_id{};
+  cpml::model::bpmn::vertex_id_type vertex_id{};
+};
+
+std::vector<activity_vertex_ids> activities_with_only_log_moves(const alignment_view_t aligned_variant) {
+  std::unordered_map<row_id, cpml::model::bpmn::vertex_id_type> activities_with_log_moves{};
+  std::unordered_set<cpml::model::bpmn::vertex_id_type> activities_with_sync_or_model_moves{};
+  for (const auto& move : aligned_variant) {
+    using enum celonis::accelerator::operators::process::align_model::alignment_move_type;
+    if (move.is_log_move()) {
+      activities_with_log_moves.try_emplace(move.move_on_log().value(), move.move_on_model().value());
+    } else if (move.is_model_move() || move.is_sync_move()) {
+      activities_with_sync_or_model_moves.emplace(move.move_on_model().value());
+    }
+  }
+  std::vector<activity_vertex_ids> result{};
+  for (const auto& [activity, vertex_id] : activities_with_log_moves) {
+    if (!activities_with_sync_or_model_moves.contains(vertex_id)) {
+      result.emplace_back(activity_vertex_ids{.activity_id = activity, .vertex_id = vertex_id});
+    }
+  }
+  return result;
+}
+
+[[nodiscard]] bool executed_on_model(const alignment_move& move) {
+  return move.is_gateway_move() || move.is_sync_move() || move.is_model_move();
+}
+
+std::vector<exclusive_violation_info> exclusive_violation_components(
+    const alignment_view_t aligned_variant, const alignment_to_partial_order_map_t& alignment_map,
+    const cpml::conformance::behavioral_relations& behavior) {
+  // get all activities with only LOG moves (no SYNC/MODEL moves of the same activity)
+  const auto relevant_activities{activities_with_only_log_moves(aligned_variant)};
+
+  if (relevant_activities.empty()) {
+    return {};
+  }
+
+  std::vector<exclusive_violation_info> result{};
+
+  // for each of these LOG moves, find all exclusive SYNC/MODEL/GATEWAY moves
+  for (const auto activity : relevant_activities) {
+    // TODO(a.swoboda) look for different groups of exclusive moves depending on the log move
+    // go through the moves and find the last sequenced-before vertex (gateway) that is not exclusive to activity
+    const auto* first_exclusive_iter{std::ranges::find_if(
+        aligned_variant, [&behavior = std::as_const(behavior), vertex_id = activity.vertex_id](const auto& move) {
+          return executed_on_model(move) && behavior.is_exclusive({vertex_id, move.move_on_model().value()});
+        })};
+    const auto last_sequenced_before_reverse_iter{std::ranges::find_if(
+        std::reverse_iterator{first_exclusive_iter}, aligned_variant.rend(),
+        [behavior = std::as_const(behavior), vertex_id = activity.vertex_id](const auto& move) {
+          return move.is_gateway_move() && behavior.is_sequential({move.move_on_model().value(), vertex_id});
+        })};
+    debug_assert(last_sequenced_before_reverse_iter != aligned_variant.rend());
+    const auto* last_sequenced_before_iter{std::ranges::prev(last_sequenced_before_reverse_iter.base())};
+    debug_assert(last_sequenced_before_iter->is_gateway_move());
+    // get iterators to all the exclusive moves on the model ("evidence")
+    const auto* first_sequenced_after_iter{std::ranges::find_if(
+        last_sequenced_before_iter, end(aligned_variant),
+        [&behavior = std::as_const(behavior), vertex_id = activity.vertex_id](const auto& move) {
+          return executed_on_model(move) && behavior.is_sequential({vertex_id, move.move_on_model().value()});
+        })};
+    std::vector<partial_vertex_t> exclusive_moves{};
+    const auto iter_to_partial_vertex{
+        [&alignment_map = std::as_const(alignment_map), &aligned_variant = std::as_const(aligned_variant)](auto iter) {
+          return alignment_map.at(std::distance(begin(aligned_variant), iter));
+        }};
+    for (const auto* iter{last_sequenced_before_iter}; iter != first_sequenced_after_iter; ++iter) {
+      if (executed_on_model(*iter) && behavior.is_exclusive({iter->move_on_model().value(), activity.vertex_id})) {
+        exclusive_moves.emplace_back(iter_to_partial_vertex(iter));
+      }
+    }
+
+    for (size_t i{0}; i != aligned_variant.size(); ++i) {
+      if (const auto& move{aligned_variant[i]};
+          move.move_on_log().has_value() && move.move_on_log().value() == activity.activity_id) {
+        result.emplace_back(iter_to_partial_vertex(last_sequenced_before_iter), alignment_map.at(i), exclusive_moves);
+      }
+    }
+  }
+  return result;
+}
+
 }  // namespace
 
-replay_result_type replay_aligned_variant(const cpml::model::bpmn_graph& bpmn_graph, const alignment_t& aligned_variant,
-                                          const parallel_vertex_pairs<>& parallel_vertices) {
+replay_result_type replay_aligned_variant(const cpml::model::bpmn_graph& bpmn_graph,
+                                          const alignment_view_t aligned_variant,
+                                          const cpml::conformance::behavioral_relations& relations) {
   // get the run_graph with model and sync edges and additionally the log_edges
-  auto [run_graph_, log_components,
-        unmapped_components]{build_partial_order_graph(bpmn_graph, aligned_variant, parallel_vertices)};
+  auto [run_graph_, log_components, unmapped_components,
+        alignment_map]{build_partial_order_graph(bpmn_graph, aligned_variant, relations)};
   auto& run_graph{run_graph_};  // for lambda capture below
 
   const auto [sync_components_edges, model_components_edges]{create_sync_and_model_components(run_graph, bpmn_graph)};
@@ -657,10 +826,13 @@ replay_result_type replay_aligned_variant(const cpml::model::bpmn_graph& bpmn_gr
   }
 
   // the L1_MISSING components are almost the same as the model components, except that we do not connect to gateways
-  auto missing_components_edges_size{model_components_edges.size()};
+  const auto missing_components_edges_size{model_components_edges.size()};
+
+  const auto l1_exclusive_violations{exclusive_violation_components(aligned_variant, alignment_map, relations)};
 
   const size_t num_components{sync_components_edges.size() + model_components_edges.size() + log_components.size() +
-                              unmapped_components.size() + skip_components.size() + missing_components_edges_size};
+                              unmapped_components.size() + skip_components.size() + missing_components_edges_size +
+                              l1_exclusive_violations.size()};
 
   replay_components_t result_components(num_components);
   replay_components_t::iterator next_component_start_iter{result_components.begin()};
@@ -691,27 +863,39 @@ replay_result_type replay_aligned_variant(const cpml::model::bpmn_graph& bpmn_gr
   const auto first_last{boost::vertices(run_graph)};
   next_component_start_iter = std::transform(
       model_components_first, model_components_last, next_component_start_iter,
-      [&run_graph, &parallel_vertices, first = first_last.first, last = first_last.second](auto component) {
-        legacy_embedded_debug_assert(component.component_type == edge_type::MODEL);
+      [&run_graph, &relations, first = first_last.first, last = first_last.second](auto component) {
+        debug_assert(component.component_type == edge_type::MODEL);
         component.component_type = edge_type::L1_MISSING;
         const auto front_it{std::ranges::find(first, last, component.edges_as_vertices.front())};
         const auto back_it{std::ranges::find(front_it, last, component.edges_as_vertices.back())};
-        const auto first_sync_it{sync_predecessor(
-            first, front_it, run_graph, get_parallel_test(run_graph[*front_it].bpmn_vertex_id, parallel_vertices))};
+        const auto first_sync_it{sync_predecessor(first, front_it, run_graph,
+                                                  get_parallel_test(run_graph[*front_it].bpmn_vertex_id, relations))};
         component.edges_as_vertices.front() = *first_sync_it;
-        const auto last_sync_it{
-            sync_successor(back_it, std::prev(last), run_graph,
-                           get_parallel_test(run_graph[*back_it].bpmn_vertex_id, parallel_vertices))};
+        const auto last_sync_it{sync_successor(back_it, std::prev(last), run_graph,
+                                               get_parallel_test(run_graph[*back_it].bpmn_vertex_id, relations))};
         component.edges_as_vertices.back() = *last_sync_it;
         return component;
       });
 
-  legacy_embedded_debug_assert(next_component_start_iter == result_components.end());
+  // Add the L1 exclusive gateway violations
+  for (const auto& component : l1_exclusive_violations) {
+    auto& flattened{*next_component_start_iter};
+    flattened.component_type = edge_type::L1_EXCLUSIVE_VIOLATION;
+    flattened.edges_as_vertices.reserve(component.size());
+    flattened.edges_as_vertices.emplace_back(component.violated_gateway);
+    flattened.edges_as_vertices.emplace_back(component.violating_move);
+    std::ranges::copy(component.evidence, std::back_inserter(flattened.edges_as_vertices));
+    ++next_component_start_iter;
+  }
+
+  debug_assert(next_component_start_iter == result_components.end());
 
   // ensure that results are always generated in a certain order to ensure output stability
   std::ranges::sort(result_components);
 
-  return {std::move(result_components), generate_timestamp_join_map(run_graph, bpmn_graph, aligned_variant)};
+  return {std::move(result_components),
+          generate_alignment_to_preceding_move_join_map(run_graph, bpmn_graph, aligned_variant),
+          map_alignment_activities_to_eventlog_idx(aligned_variant)};
 }
 
 }  // namespace celonis::accelerator::operators::process::align_model

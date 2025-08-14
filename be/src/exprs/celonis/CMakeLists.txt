@@ -46,26 +46,12 @@ add_main_source(operators/process/align_model)
 list(APPEND SOURCES
         modules/operators/mo/mo_bpmn_graph_helper.cpp
         modules/operators/mo/mo_bpmn_graph_operator.cpp
-        modules/operators/process/alignment/input_output_mapper.cpp
-        modules/operators/process/alignment/log_aligner.cpp
-        modules/operators/process/alignment/sequence_aligner.cpp
-        modules/operators/process/alignment/trace_alignment.cpp
         modules/operators/process/bpmn/bpmn_from_proto.cpp
         modules/operators/process/bpmn/bpmn_graph_to_tables.cpp
-        modules/operators/process/bpmn/bpmn_to_pn.cpp
         modules/operators/process/bpmn/replay_types.cpp
         modules/operators/process/bpmn/replay_utils.cpp
 )
-add_main_source(operators/process/alignment/fallback)
-add_main_source(operators/process/alignment/fitting_prefix)
-add_main_source(operators/process/alignment/optimal)
-add_main_source(operators/process/alignment/rl_align)
-add_main_source(operators/process/alignment/rl_align/rl_statistics)
 add_main_source(operators/process/inductive_miner)
-add_main_source(operators/process/petri_net)
-add_main_source(operators/process/petri_net/a_star)
-add_main_source(operators/process/petri_net/murata)
-add_main_source(operators/process/petri_net/unfolding)
 
 # modularization split
 add_module("concurrency")

@@ -1,164 +1,18 @@
 #pragma once
 
-#include <optional>
-#include <unordered_map>
+#include <string>
 #include <utility>
-#include <vector>
 
-#include <cpml/model/bpmn_graph.h>
+#include <cpml/conformance/alignment_types.h>
+#include <cpml/model/bpmn/vertex_types.h>
+#include <cpml/model/bpmn_graph_fwd.h>
 
-#include "align_model_statistics.h"
-#ifndef CELOSTAR
-#include "modules/cube/query_scope_fwd.h"
-#include "modules/cube/table_registry/input_dependencies.h"
-#include "modules/cube/table_registry/table_registry.h"
-#endif
-#include "modules/cube/variant_trace_cache_manager.h"
-#include "modules/memory/column_fwd.h"
-#include "modules/memory/join_projection_vector.h"
-#include "modules/memory/row_id.h"
-#include "modules/memory/table_fwd.h"
-#include "modules/memory/table_group.h"
-#ifndef CELOSTAR
-#include "modules/operators/framework/cached_operator_fwd.h"
-#endif
-#include "modules/operators/process/alignment/log_aligner.h"
-#include "modules/operators/process/bpmn/bpmn_to_pn.h"
-#include "modules/operators/process/bpmn/bpmn_from_proto.h"
-#include "modules/operators/process/petri_net/petri_net_entities.h"
+#include "modules/memory/cache/variant_trace_cache_fwd.h"
+#include "modules/operators/process/align_model/align_model_statistics.h"
+#include "modules/operators/process/align_model/align_model_types.h"
 #include "modules/operators/process/align_model/shared_types.h"
 
 namespace celonis::accelerator::operators::process::align_model {
-
-// For now define these as constants, as we plan to use these in a table group anyway there should be no chance of name
-// collision
-constexpr std::string_view INTERNAL_ALIGNMENT_TABLE_NAME{"ALIGNMENT"};
-constexpr std::string_view USER_VISIBLE_ALIGNMENT_TABLE_NAME{INTERNAL_ALIGNMENT_TABLE_NAME};
-constexpr std::string_view INTERNAL_ASSOCIATION_TABLE_NAME{"ASSOCIATION"};
-constexpr std::string_view USER_VISIBLE_ASSOCIATION_TABLE_NAME{INTERNAL_ASSOCIATION_TABLE_NAME};
-constexpr std::string_view INTERNAL_EDGE_CLASS_TABLE_NAME{"EDGE_CLASS"};
-constexpr std::string_view USER_VISIBLE_EDGE_CLASS_TABLE_NAME{INTERNAL_EDGE_CLASS_TABLE_NAME};
-constexpr std::string_view TABLE_GROUP_NAME{"ALIGN_MODEL_GROUP"};
-
-// alignments columns
-constexpr std::string_view ALIGNMENT_MODEL_VERTEX_ID{"MODEL_VERTEX_ID"};
-constexpr std::string_view ALIGNMENT_ACTIVITY_LABEL{"VERTEX_LABEL"};
-constexpr std::string_view ALIGNMENT_MOVE_TYPE{"MOVE_TYPE"};
-// association columns
-constexpr std::string_view ASSOCIATION_COLUMN_NAME{"EDGE_CLASS"};
-// edge class columns
-constexpr std::string_view EDGE_CLASS_ID{"ID"};
-constexpr std::string_view EDGE_CLASS_TYPE{"TYPE"};
-
-struct align_model_config {
-  static constexpr size_t ALIGN_MODEL_GRAIN_SIZE{1u << 15};
-
-  [[nodiscard]] static align_model_config make(
-      std::string pruned_variant_cache_key, cube::variant_trace_cache_manager* trace_cache_manager,
-      const std::optional<alignment::log_aligner_config>& aligner_cfg = std::nullopt);
-
-  size_t grain_size{};
-  std::string pruned_variant_cache_key;
-  cube::variant_trace_cache_manager* variant_trace_cache_manager_instance;
-  alignment::log_aligner_config log_aligner_cfg;
-};
-
-using edge_class_id_t = row_id;
-enum class edge_type { SYNC, MODEL, SKIP, LOG, UNMAPPED, L1_MISSING };
-
-struct alignment_move_type_strings {
-  constexpr static std::string_view GATEWAY{"GATEWAY_MOVE"};
-  constexpr static std::string_view SYNC{"SYNC_MOVE"};
-  constexpr static std::string_view MODEL{"MODEL_MOVE"};
-  constexpr static std::string_view LOG{"LOG_MOVE"};
-  constexpr static std::string_view UNMAPPED{"UNMAPPED_MOVE"};
-};
-
-[[nodiscard]] constexpr static std::string_view alignment_move_to_string(alignment_move_type move_type) {
-  switch (move_type) {
-    case alignment_move_type::GATEWAY_MOVE:
-      return alignment_move_type_strings::GATEWAY;
-    case alignment_move_type::UNMAPPED_MOVE:
-      return alignment_move_type_strings::UNMAPPED;
-    case alignment_move_type::LOG_MOVE:
-      return alignment_move_type_strings::LOG;
-    case alignment_move_type::MODEL_MOVE:
-      return alignment_move_type_strings::MODEL;
-    case alignment_move_type::SYNC_MOVE:
-      return alignment_move_type_strings::SYNC;
-    default:
-      legacy_embedded_ctl::assert_unreachable();
-  }
-}
-
-struct edge_type_strings {
-  constexpr static std::string_view SYNC{"SYNC_EDGE"};
-  constexpr static std::string_view MODEL{"MODEL_EDGE"};
-  constexpr static std::string_view SKIP{"SKIP_EDGE"};
-  constexpr static std::string_view LOG{"LOG_EDGE"};
-  constexpr static std::string_view UNMAPPED{"UNMAPPED_EDGE"};
-  constexpr static std::string_view L1_MISSING{"L1_MISSING"};
-};
-
-[[nodiscard]] constexpr std::string_view edge_type_to_string(edge_type edge) {
-  switch (edge) {
-    case edge_type::SYNC:
-      return edge_type_strings::SYNC;
-    case edge_type::MODEL:
-      return edge_type_strings::MODEL;
-    case edge_type::LOG:
-      return edge_type_strings::LOG;
-    case edge_type::SKIP:
-      return edge_type_strings::SKIP;
-    case edge_type::UNMAPPED:
-      return edge_type_strings::UNMAPPED;
-    case edge_type::L1_MISSING:
-      return edge_type_strings::L1_MISSING;
-    default:
-      legacy_embedded_ctl::assert_unreachable();
-  }
-}
-
-/**
- * @brief Encapsulates if two BPMN vertices are "parallel" (concurrent)
- * @tparam ALLOCATOR
- */
-template <typename ALLOCATOR = std::allocator<std::array<cpml::model::bpmn::vertex_id_type, 2>>>
-class parallel_vertex_pairs {
- public:
-  parallel_vertex_pairs() = default;
-  explicit parallel_vertex_pairs(const ALLOCATOR& allocator) : data_(allocator) {}
-  /**
-   * @brief add a pair of mutually parallel vertices to the internal data structure
-   *
-   * @param i one BPMN vertex id
-   * @param j another BPMN vertex id
-   *
-   * Note that the order of the two arguments does not matter, as the "parallel" relation is symmetric
-   */
-  void add(cpml::model::bpmn::vertex_id_type i, cpml::model::bpmn::vertex_id_type j) {
-    data_.emplace(std::array{std::min(i, j), std::max(i, j)});
-  }
-
-  /**
-   * @brief test whether two BPMN vertex ids are parallel
-   *
-   * @param i a BPMN vertex id
-   * @param j another BPMN vertex id
-   * @return true if the two input BPMN vertex ids are parallel, else false
-   *
-   * Note that the order of the two arguments does not matter, as the "parallel" relation is symmetric
-   */
-  [[nodiscard]] bool test(cpml::model::bpmn::vertex_id_type i, cpml::model::bpmn::vertex_id_type j) const {
-    return data_.contains(std::array{std::min(i, j), std::max(i, j)});
-  }
-
- private:
-  struct hash {
-    size_t operator()(const std::array<cpml::model::bpmn::vertex_id_type, 2>& v) const { return legacy_embedded_ctl::hash_range(v); }
-  };
-  std::unordered_set<std::array<cpml::model::bpmn::vertex_id_type, 2>, hash, std::ranges::equal_to, ALLOCATOR> data_{};
-};
 
 /**
  * @brief Aligns the variants in the variants log with the petri net model
@@ -172,12 +26,10 @@ class parallel_vertex_pairs {
  *
  * Note: We compute the behavioral profile for the relaxation-labeling, and extract the parallel relation from there.
  */
-std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache::variant_trace_cache_t& variants,
-                                                             const bpmn::bpmn_to_petri_net_result_t& result,
-                                                             const align_model_config& config,
-                                                             align_model_statistics& stats,
-                                                             const std::string& activity_table_name,
-                                                             const common::execution_context& context);
+std::pair<alignments_t, cpml::conformance::behavioral_relations> align_model(
+    const memory::cache::variant_trace_cache_t& variants, const cpml::model::bpmn_graph& bpmn_model,
+    const align_model_config& config, align_model_statistics& stats, const std::string& activity_table_name,
+    const common::execution_context& context);
 /**
  * @brief Replays the aligned variants on the model creating their partial execution orders.
  * Also creates joins for all synchronous and model moves to the alignments
@@ -187,8 +39,8 @@ std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache
  * @param config Configuration parameters of the align model algorithm
  * @return replay_results_t The partial order executions of all variants as well as groupers and edge types
  */
-replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_graph, const alignments_t& alignments,
-                                         const parallel_vertex_pairs<>& parallel_vertices,
+replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_graph, alignments_view_t alignments,
+                                         const cpml::conformance::behavioral_relations& parallel_vertices,
                                          const common::execution_context& context);
 
 }  // namespace celonis::accelerator::operators::process::align_model
