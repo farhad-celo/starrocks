@@ -493,6 +493,41 @@ TEST_F(CelonisAlignModelTest, InvalidModel) {
     ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
 }
 
+TEST_F(CelonisAlignModelTest, LongVariant) {
+    // Test that variants longer than 40000 activities are now supported
+    // Previously this would throw an InternalError
+    std::vector<std::string> long_variant;
+    long_variant.reserve(40005);
+
+    // Create a variant with 40005 activities
+    for (int i = 0; i < 40005; i++) {
+        long_variant.push_back("A");
+    }
+
+    VariantRows variants = {long_variant};
+
+    auto array_column = build_variant_column(variants);
+    auto model_column = ColumnHelper::create_const_column<TYPE_VARCHAR>(PARALLEL_MODEL, 1);
+
+    Columns columns;
+    columns.push_back(array_column);
+    columns.push_back(model_column);
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types_), return_type_));
+    ctx->set_constant_columns(columns);
+
+    ASSERT_OK(CelonisAlignModel::align_model_prepare(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+    ASSERT_OK(CelonisAlignModel::align_model_prepare(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+
+    // This should not throw an InternalError about variants longer than 40000
+    const auto result = CelonisAlignModel::align_model(ctx.get(), columns);
+    ASSERT_TRUE(result.ok()) << "Expected variants longer than 40000 to be supported after CPML fix, but got error: "
+                             << result.status().message();
+
+    ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+    ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+}
+
 TEST_F(CelonisAlignModelTest, Concurrency) {
     int num_inputs = 100;
     int num_threads = 1000;
