@@ -233,36 +233,32 @@ const std::string CelonisAlignModelTest::PARALLEL_MODEL =
         })json";
 
 const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RESULTS = {
-        {
-                {"A", "C"},
-                {
-                        // alignment
-                        {0, 1, 2, 4, 3, 5, 6},
-                        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                        {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                                "GATEWAY_MOVE"},
-                        {0, 0, 0, 1, 0, 1, 1},
-                        // association
-                        {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
-                        {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
-                        // edge_class
-                        {0, 1, 2, 3},
-                        {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"}
-                }
-        },
+        {{"A", "C"},
+         {
+
+                 // alignment
+                 {0, 1, 2, 4, 3, 5, 6},
+                 {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
+                 {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
+                         "GATEWAY_MOVE"},
+                 {0, 0, 0, 1, 0, 1, 1},
+                 // association
+                 {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
+                 {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
+                 // edge_class
+                 {0, 1, 2, 3},
+                 {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"}}},
         {
                 {"A", "B", "C"},
-                {
-                        {0, 1, 2, 3, 4, 5, 6},
-                        {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
-                        {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE",
-                                "GATEWAY_MOVE"},
-                        {0, 0, 0, 1, 2, 2, 2},
-                        {0, 0, 0, 0, 0, 0, 1, 1, 1},
-                        {0, 1, 2, 3, 5, 6, 2, 4, 5},
-                        {0, 1},
-                        {"SYNC_EDGE", "SYNC_EDGE"}
-                },
+                {{0, 1, 2, 3, 4, 5, 6},
+                 {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
+                 {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE",
+                         "GATEWAY_MOVE"},
+                 {0, 0, 0, 1, 2, 2, 2},
+                 {0, 0, 0, 0, 0, 0, 1, 1, 1},
+                 {0, 1, 2, 3, 5, 6, 2, 4, 5},
+                 {0, 1},
+                 {"SYNC_EDGE", "SYNC_EDGE"}},
         },
         {
                 {"C", "B", "B"},
@@ -277,6 +273,52 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RES
                         {0, 1, 2, 3, 4, 5},
                         {"SYNC_EDGE", "SYNC_EDGE",  "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE", "L1_MISSING"}
                 }
+        },
+        {
+                {"C", "B", "null", "B"},
+                {
+                        {0, 1, 2, 4, 3, 3, 5, 6},
+                        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B",             "BPMN_PARALLEL", "BPMN_END"},
+                        {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE",  "LOG_MOVE",
+                                "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 0, 1, 3, 1, 3},
+                        {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5},
+                        {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7, 0, 1, 3},
+                        {0, 1, 2, 3, 4, 5},
+                        {"SYNC_EDGE", "SYNC_EDGE",  "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE", "L1_MISSING"}
+                }
+        },
+        {
+            {"A", "null", "null", "C"},
+         {
+                 // alignment
+                 {0, 1, 2, 4, 3, 5, 6},
+                 {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
+                 {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
+                         "GATEWAY_MOVE"},
+                 {0, 0, 0, 3, 0, 3, 3},
+                 // association
+                 {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
+                 {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
+                 // edge_class
+                 {0, 1, 2, 3},
+                 {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"}}
+        },
+        {  
+            {"null", "A", "null", "C", "null"},
+            {
+                 // alignment
+                 {0, 1, 2, 4, 3, 5, 6},
+                 {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
+                 {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
+                         "GATEWAY_MOVE"},
+                 {1, 1, 1, 3, 1, 3, 3},
+                 // association
+                 {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
+                 {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
+                 // edge_class
+                 {0, 1, 2, 3},
+                 {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"}}
         }
 };
 
@@ -399,7 +441,7 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::LOOP_MODEL_RESULTS
 TEST_F(CelonisAlignModelTest, Parallel) {
     VariantRows variants = {{"A", "C"},
                             {"A", "B", "C"},
-                            {"C", "B", "B"}};
+                            {"C", "B", "null", "B"}};
     std::vector<Result> expected = {
             PARALLEL_MODEL_RESULTS.at(variants[0]),
             PARALLEL_MODEL_RESULTS.at(variants[1]),
@@ -424,7 +466,7 @@ TEST_F(CelonisAlignModelTest, Parallel_DuplicatedVariants) {
     VariantRows variants = {{"A", "C"},
                             {"A", "B", "C"},
                             {"A", "C"},
-                            {"C", "B", "B"}};
+                            {"C", "B", "null", "B"}};
     std::vector<Result> expected = {
             PARALLEL_MODEL_RESULTS.at(variants[0]),
             PARALLEL_MODEL_RESULTS.at(variants[1]),
@@ -439,8 +481,8 @@ TEST_F(CelonisAlignModelTest, Parallel_NULL) {
                             {"A",    "B",    "C"},
                             {},
                             {"null", "null"},
-                            {"C",    "null", "B",    "B"},
                             {"C",    "B",    "B"},
+                            {"C", "B", "null", "B"},
                             {"A",    "null", "null", "C"},
                             {"null", "A",    "null", "C", "null"},
                             {"A",    "null", "null", "C"},
@@ -450,11 +492,11 @@ TEST_F(CelonisAlignModelTest, Parallel_NULL) {
             PARALLEL_MODEL_RESULTS.at({"A", "B", "C"}),
             {},
             {},
-            PARALLEL_MODEL_RESULTS.at({"C", "B", "B"}),
-            PARALLEL_MODEL_RESULTS.at({"C", "B", "B"}),
-            PARALLEL_MODEL_RESULTS.at({"A", "C"}),
-            PARALLEL_MODEL_RESULTS.at({"A", "C"}),
-            PARALLEL_MODEL_RESULTS.at({"A", "C"}),
+            PARALLEL_MODEL_RESULTS.at({"C",    "B",    "B"}),
+            PARALLEL_MODEL_RESULTS.at({"C", "B", "null", "B"}),
+            PARALLEL_MODEL_RESULTS.at({"A",    "null", "null", "C"}),
+            PARALLEL_MODEL_RESULTS.at({"null", "A",    "null", "C", "null"}),
+            PARALLEL_MODEL_RESULTS.at({"A",    "null", "null", "C"}),
             {}
     };
     Run(variants, PARALLEL_MODEL, expected);
@@ -488,7 +530,7 @@ TEST_F(CelonisAlignModelTest, InvalidModel) {
     const auto result = CelonisAlignModel::align_model(ctx.get(), columns);
     ASSERT_FALSE(result.ok());
     EXPECT_TRUE(result.status().is_invalid_argument());
-
+    
     ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
     ASSERT_OK(CelonisAlignModel::align_model_close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
 }

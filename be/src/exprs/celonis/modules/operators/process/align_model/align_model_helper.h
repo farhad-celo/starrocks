@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "common/status.h"
@@ -12,10 +13,13 @@ namespace celonis::accelerator::operators::process::align_model {
 
 class AlignModelHelper {
 public:
-    AlignModelHelper() {};
+    using activity_name_t = std::string;
+    using trace_t = std::vector<std::optional<activity_name_t>>;
+    using traces_t = std::vector<trace_t>;
 
-    Status execute(const std::vector<std::vector<std::string>>& variants,
-                   const std::string& bpmn_model_description_json);
+    AlignModelHelper() = default;
+
+    Status execute(const traces_t& traces, const std::string& bpmn_model_description_json);
 
     const ResultTable& result_table() { return *result_table_; }
 

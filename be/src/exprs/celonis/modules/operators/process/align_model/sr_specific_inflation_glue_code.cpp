@@ -189,6 +189,23 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
       case_id_column, *case_to_trace_ptrs, activity_to_case_join);
 }
 
+using variant_idx_to_row_t = std::vector<row_id>;
+template <typename ACTIVITY_ACCESSOR>
+[[nodiscard]] variant_idx_to_row_t compute_variant_idx_to_case_idx_map(
+    const legacy_embedded_ctl::half_open_interval<row_id> interval_for_case,
+    const ACTIVITY_ACCESSOR& activity_accessor) {
+  // we filter nulls from the variant, therefore to get the right event to join to we need to map the variant idx to
+  // the case idx.
+  variant_idx_to_row_t variant_idx_to_log_idx{};
+  // the intervals are disjunct per thread an the activity_accessor is readonly, therefore this access is threadsafe
+  std::ranges::copy_if(std::views::iota(interval_for_case.begin(), interval_for_case.end()),
+                       std::back_inserter(variant_idx_to_log_idx), [&](const auto idx) {
+                         // we skip over nulls since they do not contribute to the idx in the variant
+                         return activity_accessor.at(idx) != 0;
+                       });
+  return variant_idx_to_log_idx;
+}
+
 memory::table_group_t inflate(const alignments_t& alignments, const replay_results_t& replay_results,
                               const memory::join_projection_vector_t& activity_to_case_join,
                               const memory::column_ptrs_t& case_to_trace_ptrs,
@@ -229,15 +246,16 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
        &case_id_column = std::as_const(case_id_column), &case_to_trace_ptrs = std::as_const(case_to_trace_ptrs),
        &activity_to_case_join = std::as_const(activity_to_case_join), &alignments = std::as_const(alignments),
        &replay_results = std::as_const(replay_results),
-       &petri_net_to_string_mapper = std::as_const(petri_net_to_string_mapper)](const parallel_block& block) {
+       &petri_net_to_string_mapper = std::as_const(petri_net_to_string_mapper), &context](const parallel_block& block) {
         memory::cast_execute_column_pointers(
             [&](auto tup) {
-              const auto case_accessor{std::get<0>(tup).get_const_accessor()};
+              const auto activity_accessor{std::get<0>(tup).get_const_accessor()};
+              const auto case_accessor{std::get<1>(tup).get_const_accessor()};
               if (case_accessor.size() == 0) {
                 return;
               }
-              const auto case_to_trace_accessor{std::get<1>(tup).get_const_accessor()};
-              const auto& activity_to_case_join_vec{std::get<2>(tup)};
+              const auto case_to_trace_accessor{std::get<2>(tup).get_const_accessor()};
+              const auto& activity_to_case_join_vec{std::get<3>(tup)};
 
               auto current_variant_row{block.offset_variant};
 
@@ -301,15 +319,24 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                         alignment_model_vertex_id[current_variant_row].emplace_back();
                       }
                     }
-                    for (auto index : replay_result_for_case.alignment_to_preceding_move()) {
-                      alignment_activity_index[current_variant_row].push_back(
-                          replay_result_for_case.alignment_idx_to_log_idx().at(index));
+
+                    auto variant_idx_to_row_map{compute_variant_idx_to_case_idx_map(interval, activity_accessor)};
+                    for (auto alignment_idx : replay_result_for_case.alignment_to_preceding_move()) {
+                      auto variant_idx{replay_result_for_case.alignment_idx_to_log_idx().at(alignment_idx)};
+                      // variant_idx is an index into the variant, which points to an activity
+                      // Then we map the index into the variant to an index into the case (these indices may
+                      // differ if the case has null activities, e.g. B in case <A,null,B> would have variant
+                      // index 1 but case index 2)
+                      const auto row_idx{variant_idx_to_row_map.at(variant_idx)};
+                      // row_idx indexes into the entire column, however the join in our result array is relative to the
+                      // start of the case so we need to subtract by the start of the case
+                      alignment_activity_index[current_variant_row].push_back(row_idx - interval.begin());
                     }
 
                     current_variant_row++;
                   });
             },
-            case_id_column, *case_to_trace_ptrs, activity_to_case_join);
+            activity_column->get_column_pointers(context), case_id_column, *case_to_trace_ptrs, activity_to_case_join);
       });
 
   // Make table group
