@@ -1,5 +1,7 @@
 #include "exprs/celonis/source_target.h"
 
+#include <exprs/builtin_functions.h>
+
 #include <map>
 
 #include "column/array_column.h"
@@ -9,17 +11,22 @@
 
 namespace starrocks {
 
-template<bool is_source, bool has_group, bool has_null_element, bool has_null_group_element>
-ColumnPtr CelonisSourceTargetFunctions::_celonis_array_sources_targets_impl(
-        const UnnestedArrayData& array_data, const UnnestedArrayData& group_array_data) {
+namespace {
+
+struct SourceTargetStateFragmentLocal {
+    ScalarFunction function;
+};
+
+template <bool is_source, SourceTargetEdgeConfig /* edge_config */, bool has_group, bool has_null_element,
+          bool has_null_group_element>
+ColumnPtr array_sources_targets_impl(const UnnestedArrayData& array_data, const UnnestedArrayData& group_array_data) {
     const size_t num_array = array_data.offsets->size() - 1;
     auto offsets_ptr = array_data.offsets->get_data().data();
     const UInt32Column::Container::value_type* group_offsets_ptr = nullptr;
     const RunTimeCppType<TYPE_BIGINT>* group_elements = nullptr;
     if constexpr (has_group) {
         group_offsets_ptr = group_array_data.offsets->get_data().data();
-        group_elements =
-                down_cast<const RunTimeColumnType<TYPE_BIGINT>*>(group_array_data.elements)->get_data().data();
+        group_elements = down_cast<const RunTimeColumnType<TYPE_BIGINT>*>(group_array_data.elements)->get_data().data();
     }
     auto result_array = ArrayColumn::create(
             NullableColumn::create(array_data.elements->clone_empty(), NullColumn::create()), UInt32Column::create());
@@ -42,7 +49,7 @@ ColumnPtr CelonisSourceTargetFunctions::_celonis_array_sources_targets_impl(
                 result_offsets.push_back(new_offset);
                 continue;
             }
-            std::map<int64_t, std::vector<uint32_t>> index_map;  // Ordered map
+            std::map<int64_t, std::vector<uint32_t>> index_map; // Ordered map
             if constexpr (has_null_group_element) {
                 bool group_has_null = false;
                 for (int j = 0; j < array_size; j++) {
@@ -61,8 +68,8 @@ ColumnPtr CelonisSourceTargetFunctions::_celonis_array_sources_targets_impl(
                     index_map[group_elements[group_offset + j]].push_back(offset + j);
                 }
             }
-            for (auto it: index_map) {
-                auto &index = it.second;
+            for (auto it : index_map) {
+                auto& index = it.second;
                 if constexpr (is_source) {
                     index.pop_back();
                 } else {
@@ -101,167 +108,148 @@ ColumnPtr CelonisSourceTargetFunctions::_celonis_array_sources_targets_impl(
     return result_array;
 }
 
-template<bool is_source>
-ColumnPtr CelonisSourceTargetFunctions::_celonis_array_sources_targets_impl(
-        const UnnestedArrayData& array_data, const UnnestedArrayData& group_array_data) {
+template <bool is_source, SourceTargetEdgeConfig edge_config>
+ColumnPtr array_sources_targets_impl(const UnnestedArrayData& array_data, const UnnestedArrayData& group_array_data) {
     if (group_array_data.elements != nullptr) {
         if (array_data.null_elements != nullptr) {
             if (group_array_data.null_elements != nullptr) {
-                return _celonis_array_sources_targets_impl
-                        <is_source, /*has_group=*/true, /*has_null_element=*/true, /*has_null_group_element=*/true>
-                        (array_data, group_array_data);
+                return array_sources_targets_impl<is_source, edge_config, /*has_group=*/true,
+                                                  /*has_null_element=*/true,
+                                                  /*has_null_group_element=*/true>(array_data, group_array_data);
             } else {
-                return _celonis_array_sources_targets_impl
-                        <is_source, /*has_group=*/true, /*has_null_element=*/true, /*has_null_group_element=*/false>
-                        (array_data, group_array_data);
+                return array_sources_targets_impl<is_source, edge_config, /*has_group=*/true,
+                                                  /*has_null_element=*/true,
+                                                  /*has_null_group_element=*/false>(array_data, group_array_data);
             }
         } else {
             if (group_array_data.null_elements != nullptr) {
-                return _celonis_array_sources_targets_impl
-                        <is_source, /*has_group=*/true, /*has_null_element=*/false, /*has_null_group_element=*/true>
-                        (array_data, group_array_data);
+                return array_sources_targets_impl<is_source, edge_config, /*has_group=*/true,
+                                                  /*has_null_element=*/false,
+                                                  /*has_null_group_element=*/true>(array_data, group_array_data);
             } else {
-                return _celonis_array_sources_targets_impl
-                        <is_source, /*has_group=*/true, /*has_null_element=*/false, /*has_null_group_element=*/false>
-                        (array_data, group_array_data);
+                return array_sources_targets_impl<is_source, edge_config, /*has_group=*/true,
+                                                  /*has_null_element=*/false,
+                                                  /*has_null_group_element=*/false>(array_data, group_array_data);
             }
         }
     } else {
         if (array_data.null_elements != nullptr) {
             if (group_array_data.null_elements != nullptr) {
-                return _celonis_array_sources_targets_impl
-                        <is_source, /*has_group=*/false, /*has_null_element=*/true, /*has_null_group_element=*/true>
-                        (array_data, group_array_data);
+                return array_sources_targets_impl<is_source, edge_config, /*has_group=*/false,
+                                                  /*has_null_element=*/true,
+                                                  /*has_null_group_element=*/true>(array_data, group_array_data);
             } else {
-                return _celonis_array_sources_targets_impl
-                        <is_source, /*has_group=*/false, /*has_null_element=*/true, /*has_null_group_element=*/false>
-                        (array_data, group_array_data);
+                return array_sources_targets_impl<is_source, edge_config, /*has_group=*/false,
+                                                  /*has_null_element=*/true,
+                                                  /*has_null_group_element=*/false>(array_data, group_array_data);
             }
         } else {
             if (group_array_data.null_elements != nullptr) {
-                return _celonis_array_sources_targets_impl
-                        <is_source, /*has_group=*/false, /*has_null_element=*/false, /*has_null_group_element=*/true>
-                        (array_data, group_array_data);
+                return array_sources_targets_impl<is_source, edge_config, /*has_group=*/false,
+                                                  /*has_null_element=*/false,
+                                                  /*has_null_group_element=*/true>(array_data, group_array_data);
             } else {
-                return _celonis_array_sources_targets_impl
-                        <is_source, /*has_group=*/false, /*has_null_element=*/false, /*has_null_group_element=*/false>
-                        (array_data, group_array_data);
+                return array_sources_targets_impl<is_source, edge_config, /*has_group=*/false,
+                                                  /*has_null_element=*/false,
+                                                  /*has_null_group_element=*/false>(array_data, group_array_data);
             }
         }
     }
 }
 
-static CelonisSourceTargetFunctions::EdgeConfig getEdgeConfig(const std::string& format) {
+template <SourceTargetType SOURCE_TARGET_TYPE, SourceTargetEdgeConfig EDGE_CONFIG>
+StatusOr<ColumnPtr> array_sources_targets_impl(FunctionContext* context, const Columns& columns) {
+    const auto array_column{ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0])};
+    const auto array_data{prepare_array_input(array_column.get())};
+    ColumnPtr group_column;
+    UnnestedArrayData group_array_data;
+    if (columns.size() == 3) {
+        if (columns[2]->only_null()) {
+            // If columns[2] is only NULL, SR passes not an array column with null but a const null column. We simply
+            // ignore the column instead of trying returning empty arrays which is the behavior when a single array of
+            // columns[2] is NULL.
+        } else {
+            group_column = ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]);
+            group_array_data = prepare_array_input(group_column.get());
+        }
+    }
+
+    auto result{array_sources_targets_impl < /*is_source=*/SOURCE_TARGET_TYPE == SourceTargetType::SOURCE,
+                EDGE_CONFIG > (array_data, group_array_data)};
+    if (array_data.null_arrays != nullptr) {
+        return NullableColumn::create(std::move(result),
+                                      down_cast<const NullableColumn*>(array_column.get())->null_column());
+    }
+    return result;
+}
+
+SourceTargetEdgeConfig getEdgeConfig(const std::string& format) {
     if (format == "any->any") {
-        return CelonisSourceTargetFunctions::ANY_TO_ANY;
+        return SourceTargetEdgeConfig::ANY_TO_ANY;
     }
-    return CelonisSourceTargetFunctions::DEFAULT;
+    return SourceTargetEdgeConfig::DEFAULT;
 }
 
-Status CelonisSourceTargetFunctions::celonis_array_sources_prepare(starrocks::FunctionContext *context,
-                                                                   FunctionContext::FunctionStateScope scope) {
+} // namespace
+
+template <SourceTargetType SOURCE_TARGET_TYPE>
+StatusOr<ColumnPtr> CelonisSourceTarget<SOURCE_TARGET_TYPE>::array_sources_targets(FunctionContext* context,
+                                                                                   const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
+    const auto* state{reinterpret_cast<const SourceTargetStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL))};
+    return state->function(context, columns);
+}
+
+template <SourceTargetType SOURCE_TARGET_TYPE>
+Status CelonisSourceTarget<SOURCE_TARGET_TYPE>::array_sources_targets_prepare(
+        FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         if (!context->is_constant_column(1)) {
+            constexpr auto function_name{SOURCE_TARGET_TYPE == SourceTargetType::SOURCE ? "celonis_array_sources()"
+                                                                                        : "celonis_array_targets()"};
             return Status::InvalidArgument(
-                    "The second parameter of celonis_array_sources() only accepts a literal value");
+                    fmt::format("The second parameter of {} only accepts a literal value", function_name));
         }
         if (!context->is_notnull_constant_column(1)) {
             return Status::OK();
         }
-        auto edge_config_column = context->get_constant_column(1);
-        CelonisSourceTargetFunctions::EdgeConfig edge_config = getEdgeConfig(
-                ColumnHelper::get_const_value<TYPE_VARCHAR>(edge_config_column).to_string());
-        if (edge_config != ANY_TO_ANY) {
-            // TODO(j.kim): support other edge configurations.
-            return Status::InvalidArgument("unsupported edge configuration in celonis_array_targets()");
+        const auto edge_config_column{context->get_constant_column(1)};
+        const auto edge_config{
+                getEdgeConfig(ColumnHelper::get_const_value<TYPE_VARCHAR>(edge_config_column).to_string())};
+
+        const auto state{new SourceTargetStateFragmentLocal{}};
+        context->set_function_state(scope, state);
+
+        // TODO (mkennecke): Support other edge configurations
+        switch (edge_config) {
+        case SourceTargetEdgeConfig::ANY_TO_ANY:
+            state->function = array_sources_targets_impl<SOURCE_TARGET_TYPE, SourceTargetEdgeConfig::ANY_TO_ANY>;
+            break;
+        default:
+            constexpr auto function_name{SOURCE_TARGET_TYPE == SourceTargetType::SOURCE ? "celonis_array_sources()"
+                                                                                        : "celonis_array_targets()"};
+            return Status::InvalidArgument(fmt::format("unsupported edge configuration in {}", function_name));
         }
     }
 
     return Status::OK();
 }
 
-Status CelonisSourceTargetFunctions::celonis_array_sources_close(starrocks::FunctionContext *context,
-                                                                 FunctionContext::FunctionStateScope scope) {
-    return Status::OK();
-}
-
-Status CelonisSourceTargetFunctions::celonis_array_targets_prepare(starrocks::FunctionContext *context,
-                                                                   FunctionContext::FunctionStateScope scope) {
+template <SourceTargetType SOURCE_TARGET_TYPE>
+Status CelonisSourceTarget<SOURCE_TARGET_TYPE>::array_sources_targets_close(FunctionContext* context,
+                                                                            FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
-        if (!context->is_constant_column(1)) {
-            return Status::InvalidArgument(
-                    "The second parameter of celonis_array_targets() only accepts a literal value");
-        }
-        if (!context->is_notnull_constant_column(1)) {
-            return Status::OK();
-        }
-        auto edge_config_column = context->get_constant_column(1);
-        CelonisSourceTargetFunctions::EdgeConfig edge_config = getEdgeConfig(
-                ColumnHelper::get_const_value<TYPE_VARCHAR>(edge_config_column).to_string());
-        if (edge_config != ANY_TO_ANY) {
-            // TODO(j.kim): support other edge configurations.
-            return Status::InvalidArgument("unsupported edge configuration in celonis_array_targets()");
-        }
+        const auto* state = reinterpret_cast<const SourceTargetStateFragmentLocal*>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+        delete state;
     }
-
     return Status::OK();
 }
 
-Status CelonisSourceTargetFunctions::celonis_array_targets_close(starrocks::FunctionContext *context,
-                                                                 FunctionContext::FunctionStateScope scope) {
-    return Status::OK();
-}
+template class CelonisSourceTarget<SourceTargetType::SOURCE>;
 
-StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_sources(FunctionContext* context, const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
-
-    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
-    UnnestedArrayData array_data = prepare_array_input(array_column.get());
-    ColumnPtr group_column;
-    UnnestedArrayData group_array_data;
-    if (columns.size() == 3) {
-        if (columns[2]->only_null()) {
-            // If columns[2] is only NULL, SR passes not an array column with null but a const null column. We simply
-            // ignore the column instead of trying returning empty arrays which is the behavior when a single array of
-            // columns[2] is NULL.
-        } else {
-            group_column = ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]);
-            group_array_data = prepare_array_input(group_column.get());
-        }
-    }
-
-    auto result = _celonis_array_sources_targets_impl</*is_source=*/true>(array_data, group_array_data);
-    if (array_data.null_arrays != nullptr) {
-        return NullableColumn::create(std::move(result), down_cast<const NullableColumn *>(array_column.get())->null_column());
-    }
-    return result;
-}
-
-StatusOr<ColumnPtr> CelonisSourceTargetFunctions::celonis_array_targets(FunctionContext* context, const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
-    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
-
-    ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
-    UnnestedArrayData array_data = prepare_array_input(array_column.get());
-    ColumnPtr group_column;
-    UnnestedArrayData group_array_data;
-    if (columns.size() == 3) {
-        if (columns[2]->only_null()) {
-            // If columns[2] is only NULL, SR passes not an array column with null but a const null column. We simply
-            // ignore the column instead of trying returning empty arrays which is the behavior when a single array of
-            // columns[2] is NULL.
-        } else {
-            group_column = ColumnHelper::unpack_and_duplicate_const_column(columns[2]->size(), columns[2]);
-            group_array_data = prepare_array_input(group_column.get());
-        }
-    }
-
-    auto result = _celonis_array_sources_targets_impl</*is_source=*/false>(array_data, group_array_data);
-    if (array_data.null_arrays != nullptr) {
-        return NullableColumn::create(std::move(result), down_cast<const NullableColumn *>(array_column.get())->null_column());
-    }
-    return result;
-}
+template class CelonisSourceTarget<SourceTargetType::TARGET>;
 
 } // namespace starrocks

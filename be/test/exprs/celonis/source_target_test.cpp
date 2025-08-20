@@ -2,6 +2,8 @@
 
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <util/defer_op.h>
+
 #include <optional>
 
 #include "column/column_helper.h"
@@ -11,21 +13,29 @@
 
 namespace starrocks {
 
+namespace {
+
+// TODO (mkennecke): Support other edge configurations
+const std::string ANY_TO_ANY{"any->any"};
+
+} // namespace
+
 class CelonisSourceTargetTest : public ::testing::Test {
 protected:
     void SetUp() override {}
 
     void TearDown() override {}
 
-private:
     TypeDescriptor TYPE_ARRAY_INT = celonis::array_type(TYPE_INT);
     TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
 
     StatusOr<ColumnPtr> run(const TypeDescriptor& array_type_desc, ColumnPtr input, std::optional<ColumnPtr> group,
                             Status (*prepare_fn)(FunctionContext*, FunctionContext::FunctionStateScope),
-                            StatusOr<ColumnPtr> (*fn)(FunctionContext*, const Columns&)) {
-        auto modifier = ColumnHelper::create_const_column<TYPE_VARCHAR>("any->any", input->size());
+                            Status (*close_fn)(FunctionContext*, FunctionContext::FunctionStateScope),
+                            StatusOr<ColumnPtr> (*fn)(FunctionContext*, const Columns&),
+                            const std::string& config = ANY_TO_ANY) {
+        auto modifier = ColumnHelper::create_const_column<TYPE_VARCHAR>(config, input->size());
         std::vector<FunctionContext::TypeDesc> arg_types = {
                 AnyValUtil::column_type_to_type_desc(array_type_desc),
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
@@ -41,30 +51,40 @@ private:
             columns.push_back(group.value());
         }
         ctx->set_constant_columns(columns);
+        DeferOp close_fragment_local([&ctx, close_fn] { close_fn(ctx.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(prepare_fn(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([&ctx, close_fn] { close_fn(ctx.get(), FunctionContext::THREAD_LOCAL); });
+        RETURN_IF_ERROR(prepare_fn(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+
         return fn(ctx.get(), columns);
     }
 
-    StatusOr<ColumnPtr> run_celonis_array_sources(const TypeDescriptor& array_type_desc, ColumnPtr input) {
-        return run_celonis_array_sources(array_type_desc, std::move(input), std::nullopt);
+    StatusOr<ColumnPtr> run_celonis_array_sources(const TypeDescriptor& array_type_desc, ColumnPtr input,
+                                                  const std::string& config = ANY_TO_ANY) {
+        return run_celonis_array_sources(array_type_desc, std::move(input), std::nullopt, config);
     }
 
     StatusOr<ColumnPtr> run_celonis_array_sources(const TypeDescriptor& array_type_desc, ColumnPtr input,
-                                                  std::optional<ColumnPtr> group) {
+                                                  std::optional<ColumnPtr> group,
+                                                  const std::string& config = ANY_TO_ANY) {
         return run(array_type_desc, std::move(input), std::move(group),
-                   &CelonisSourceTargetFunctions::celonis_array_sources_prepare,
-                   &CelonisSourceTargetFunctions::celonis_array_sources);
-    }
-
-    StatusOr<ColumnPtr> run_celonis_array_targets(const TypeDescriptor& array_type_desc, ColumnPtr input) {
-        return run_celonis_array_targets(array_type_desc, std::move(input), std::nullopt);
+                   &CelonisSourceTarget<SourceTargetType::SOURCE>::array_sources_targets_prepare,
+                   &CelonisSourceTarget<SourceTargetType::SOURCE>::array_sources_targets_close,
+                   &CelonisSourceTarget<SourceTargetType::SOURCE>::array_sources_targets, config);
     }
 
     StatusOr<ColumnPtr> run_celonis_array_targets(const TypeDescriptor& array_type_desc, ColumnPtr input,
-                                                  std::optional<ColumnPtr> group) {
+                                                  const std::string& config = ANY_TO_ANY) {
+        return run_celonis_array_targets(array_type_desc, std::move(input), std::nullopt, config);
+    }
+
+    StatusOr<ColumnPtr> run_celonis_array_targets(const TypeDescriptor& array_type_desc, ColumnPtr input,
+                                                  std::optional<ColumnPtr> group,
+                                                  const std::string& config = ANY_TO_ANY) {
         return run(array_type_desc, std::move(input), std::move(group),
-                   &CelonisSourceTargetFunctions::celonis_array_targets_prepare,
-                   &CelonisSourceTargetFunctions::celonis_array_targets);
+                   &CelonisSourceTarget<SourceTargetType::TARGET>::array_sources_targets_prepare,
+                   &CelonisSourceTarget<SourceTargetType::TARGET>::array_sources_targets_close,
+                   &CelonisSourceTarget<SourceTargetType::TARGET>::array_sources_targets, config);
     }
 
     ColumnPtr modifier_column_;
@@ -199,10 +219,16 @@ TEST_F(CelonisSourceTargetTest, source_target_const_null_column) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
     ctx->set_constant_columns({nullptr, modifier});
 
-    EXPECT_TRUE(CelonisSourceTargetFunctions::celonis_array_sources_prepare(
-            ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
-    EXPECT_TRUE(CelonisSourceTargetFunctions::celonis_array_targets_prepare(
-            ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
+    EXPECT_TRUE(CelonisSourceTarget<SourceTargetType::SOURCE>::array_sources_targets_prepare(
+                        ctx.get(), FunctionContext::FRAGMENT_LOCAL)
+                        .ok());
+    CelonisSourceTarget<SourceTargetType::SOURCE>::array_sources_targets_close(ctx.get(),
+                                                                               FunctionContext::FRAGMENT_LOCAL);
+    EXPECT_TRUE(CelonisSourceTarget<SourceTargetType::TARGET>::array_sources_targets_prepare(
+                        ctx.get(), FunctionContext::FRAGMENT_LOCAL)
+                        .ok());
+    CelonisSourceTarget<SourceTargetType::TARGET>::array_sources_targets_close(ctx.get(),
+                                                                               FunctionContext::FRAGMENT_LOCAL);
 }
 
 TEST_F(CelonisSourceTargetTest, source_target_const_column) {
@@ -218,7 +244,7 @@ TEST_F(CelonisSourceTargetTest, source_target_const_column) {
 
     evaluator_sources.add_expected(DatumArray{1, 2, 3});
     evaluator_targets.add_expected(DatumArray{2, 3, 4});
-    
+
     evaluator_sources.add_expected(DatumArray{1, 2, 3});
     evaluator_targets.add_expected(DatumArray{2, 3, 4});
 
@@ -237,10 +263,16 @@ TEST_F(CelonisSourceTargetTest, array_celonis_source_unsupported_mode) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
     ctx->set_constant_columns({array, modifier});
 
-    EXPECT_TRUE(CelonisSourceTargetFunctions::celonis_array_sources_prepare(
-            ctx.get(), FunctionContext::FRAGMENT_LOCAL).is_invalid_argument());
-    EXPECT_TRUE(CelonisSourceTargetFunctions::celonis_array_targets_prepare(
-            ctx.get(), FunctionContext::FRAGMENT_LOCAL).is_invalid_argument());
+    EXPECT_TRUE(CelonisSourceTarget<SourceTargetType::SOURCE>::array_sources_targets_prepare(
+                        ctx.get(), FunctionContext::FRAGMENT_LOCAL)
+                        .is_invalid_argument());
+    CelonisSourceTarget<SourceTargetType::SOURCE>::array_sources_targets_close(ctx.get(),
+                                                                               FunctionContext::FRAGMENT_LOCAL);
+    EXPECT_TRUE(CelonisSourceTarget<SourceTargetType::TARGET>::array_sources_targets_prepare(
+                        ctx.get(), FunctionContext::FRAGMENT_LOCAL)
+                        .is_invalid_argument());
+    CelonisSourceTarget<SourceTargetType::TARGET>::array_sources_targets_close(ctx.get(),
+                                                                               FunctionContext::FRAGMENT_LOCAL);
 }
 
 TEST_F(CelonisSourceTargetTest, array_celonis_source_string_data) {
