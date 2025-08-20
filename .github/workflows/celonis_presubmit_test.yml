@@ -9,7 +9,8 @@ on:
       - 'celonis/assets/**'
       - '.github/**'
       - '!.github/workflows/celonis_presubmit_test.yml'
-      - 'celonis/docker/veracode/**'
+      - 'celonis/tools/**'
+      - 'celonis/docker/**'
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 
@@ -22,7 +23,7 @@ env:
   RELEASE_VERSION: presubmit-test
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  Builder: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-393a8a87-locale-cpml2.161.2-ubuntu-blake2
+  Builder: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-c39ac1cf-locale-cpml2.161.2-ubuntu
 
 jobs:
   presubmit-test:

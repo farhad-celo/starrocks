@@ -8,7 +8,8 @@ on:
       - '**.png'
       - 'celonis/assets/**'
       - '.github/**'
-      - 'celonis/docker/veracode/**'
+      - 'celonis/tools/**'
+      - 'celonis/docker/**'
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 
