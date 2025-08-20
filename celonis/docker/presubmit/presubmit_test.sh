@@ -21,4 +21,7 @@ cd /celostar-starrocks;
 # TODO: consolidate this after rebasing https://github.com/StarRocks/starrocks/pull/43991
 echo "Start to run BE UT"
 export LD_LIBRARY_PATH=/var/local/thirdparty/installed/lib
-./run-be-ut.sh --use-staros --clean -j `nproc` --test "Celonis*"
+export GTEST_PARALLEL=celonis/tools/gtest-parallel/gtest-parallel
+export PYTHON=python3
+
+./run-be-ut.sh --clean
