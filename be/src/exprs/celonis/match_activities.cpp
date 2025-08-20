@@ -24,10 +24,17 @@ struct MatchConfig {
     SliceHashSet any_nodes;
     // any_nodes_mode is set to true when only any_nodes is non-empty.
     bool any_nodes_mode = false;
+    // nodes_mode is set to true when only nodes is non-empty.
+    bool nodes_mode = false;
 
     void set_any_nodes_mode() {
         any_nodes_mode = ((!any_nodes.empty()) && start_nodes.empty() && nodes.empty() && end_nodes.empty() &&
                           excluding_nodes.empty() && excluding_all_nodes.empty());
+    }
+
+    void set_nodes_mode() {
+        nodes_mode = ((!nodes.empty()) && start_nodes.empty() && any_nodes.empty() && end_nodes.empty() &&
+                      excluding_nodes.empty() && excluding_all_nodes.empty());
     }
 };
 
@@ -46,7 +53,8 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
                   const SliceHashSet& excluding_nodes,
                   const SliceHashSet& excluding_all_nodes,
                   const SliceHashSet& any_nodes,
-                  bool any_nodes_mode) {
+                  bool any_nodes_mode,
+                  bool nodes_mode) {
     const auto& null_elements = activity_array_data.null_elements;
     SliceHashSet nodes_seen;
     nodes_seen.reserve(nodes.size());
@@ -90,6 +98,9 @@ _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
         last_visit_index = index;
         const auto& value = activities[index];
         if (nodes.find(value) != nodes.end()) {
+            if (nodes_mode && nodes_seen.size() + 1 == nodes.size()) {
+                return 1L;
+            }
             nodes_seen.insert(value);
         }
 
@@ -182,6 +193,7 @@ Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* cont
     _populate_filter(excluding_all_nodes_column, 0, state->match_config.excluding_all_nodes);
     _populate_filter(any_nodes_column, 0, state->match_config.any_nodes);
     state->match_config.set_any_nodes_mode();
+    state->match_config.set_nodes_mode();
     return Status::OK();
 }
 
@@ -227,9 +239,11 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(st
         _populate_filter(columns[6], row, any_nodes);
         bool any_nodes_mode = ((!any_nodes.empty()) && start_nodes.empty() && nodes.empty() && end_nodes.empty() &&
                                excluding_nodes.empty() && excluding_all_nodes.empty());
+        bool nodes_mode = ((!nodes.empty()) && start_nodes.empty() && any_nodes.empty() && end_nodes.empty() &&
+                           excluding_nodes.empty() && excluding_all_nodes.empty());
         result.append(
                 _match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes, end_nodes,
-                                  excluding_nodes, excluding_all_nodes, any_nodes, any_nodes_mode));
+                                  excluding_nodes, excluding_all_nodes, any_nodes, any_nodes_mode, nodes_mode));
     }
 
     return result.build(all_const);
@@ -259,7 +273,8 @@ CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(starro
                                   state->match_config.start_nodes, state->match_config.nodes,
                                   state->match_config.end_nodes,
                                   state->match_config.excluding_nodes, state->match_config.excluding_all_nodes,
-                                  state->match_config.any_nodes, state->match_config.any_nodes_mode));
+                                  state->match_config.any_nodes, state->match_config.any_nodes_mode,
+                                  state->match_config.nodes_mode));
     }
 
     return result.build(all_const);
