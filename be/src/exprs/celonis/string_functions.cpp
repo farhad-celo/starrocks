@@ -1225,7 +1225,7 @@ struct CelonisMatchStringsState {
 
     HashSet<std::string> match_strings;
     bool null_match_array = false;
-    int top_k = 1;
+    int64_t top_k = 1;
     std::string separator = ", ";
     ScalarFunction function;
 };
@@ -1251,7 +1251,7 @@ CelonisStringFunctions::match_strings_prepare(FunctionContext* context, Function
         return Status::OK();
     }
     if (!top_k_column->is_null(0)) {
-        state->top_k = ColumnHelper::get_const_value<TYPE_INT>(top_k_column);
+        state->top_k = ColumnHelper::get_const_value<TYPE_BIGINT>(top_k_column);
     }
     if (state->top_k <= 0) {
         return Status::InvalidArgument("CELONIS_MATCH_STRINGS: top_k must be positive.");
@@ -1284,7 +1284,7 @@ CelonisStringFunctions::match_strings_close(FunctionContext* context, FunctionCo
 }
 
 std::string
-get_match_strings_result(const std::string& input_string, const HashSet<std::string>& match_strings, int top_k,
+get_match_strings_result(const std::string& input_string, const HashSet<std::string>& match_strings, int64_t top_k,
                          const std::string& separator) {
     HashSet<char> char_set(input_string.begin(), input_string.end());
     const std::string chars(char_set.begin(), char_set.end());
@@ -1294,7 +1294,7 @@ get_match_strings_result(const std::string& input_string, const HashSet<std::str
             pairs.emplace_back(edit_distance(input_string, match_string), match_string);
         }
     }
-    top_k = std::min(top_k, static_cast<int>(pairs.size()));
+    top_k = std::min(top_k, static_cast<int64_t>(pairs.size()));
     std::partial_sort(pairs.begin(), pairs.begin() + top_k, pairs.end());
     std::string sep = "";
     std::string joined = "";
@@ -1322,7 +1322,7 @@ CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionCont
     const auto& match_strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
             *match_string_data.elements).get_data().data();
     const auto& offsets = match_string_data.offsets->get_data().data();
-    ColumnViewer top_k_viewer = ColumnViewer<TYPE_INT>(columns[2]);
+    ColumnViewer top_k_viewer = ColumnViewer<TYPE_BIGINT>(columns[2]);
     ColumnViewer separator_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
     ColumnBuilder<TYPE_VARCHAR> result(n_rows);
     for (size_t row = 0; row < n_rows; ++row) {
@@ -1331,7 +1331,7 @@ CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionCont
             continue;
         }
         const std::string input_string = input_string_viewer.value(row).to_string();
-        int top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
+        int64_t top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
         const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
@@ -1360,11 +1360,9 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     const auto* state = reinterpret_cast<const CelonisMatchStringsState*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    ColumnViewer top_k_viewer = ColumnViewer<TYPE_INT>(columns[2]);
-    ColumnViewer separator_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
     ColumnBuilder<TYPE_VARCHAR> result(n_rows);
     phmap::flat_hash_map<Slice, std::string, SliceHashWithSeed<PhmapSeed1>, SliceEqual> cache;
-    const int top_k = state->top_k;
+    const int64_t top_k = state->top_k;
     const std::string& separator = state->separator;
     for (size_t row = 0; row < n_rows; ++row) {
         if (columns[0]->is_null(row) || state->null_match_array) {

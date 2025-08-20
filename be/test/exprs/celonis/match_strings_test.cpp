@@ -22,14 +22,14 @@ private:
         std::vector<FunctionContext::TypeDesc> arg_types = {
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
                 AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
         auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         string_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         match_strings_column_ = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
-        top_k_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        top_k_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         separator_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     }
 
@@ -83,7 +83,7 @@ TEST_F(CelonisMatchStringsTest, empty_input) {
     }
     {
         Prepare();
-        const auto result = RunConstantMatch(DatumArray{"match"}, 5, ";").value();
+        const auto result = RunConstantMatch(DatumArray{"match"}, 5L, ";").value();
         EXPECT_EQ(0, result->size());
     }
 }
@@ -113,7 +113,7 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_2) {
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum("Pants");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2,
+    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2L,
                                          "##").value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt##Sweatshirt", result->get(0).get_slice());
@@ -125,7 +125,7 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_3) {
     string_column_->append_datum("xyz");
     string_column_->append_datum("T-Shirt");
     string_column_->append_datum("abc");
-    const auto result = RunConstantMatch(DatumArray{"Shirt", "Sweatshirt"}, 2, kNullDatum).value();
+    const auto result = RunConstantMatch(DatumArray{"Shirt", "Sweatshirt"}, 2L, kNullDatum).value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("", result->get(0).get_slice());
     EXPECT_EQ("Shirt, Sweatshirt", result->get(1).get_slice());
@@ -136,7 +136,7 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_4) {
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum("Pants");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 2,
+    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 2L,
                                          kNullDatum).value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt, Sweatpants", result->get(0).get_slice());
@@ -147,7 +147,7 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_5) {
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum("Pants");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 10,
+    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 10L,
                                          kNullDatum).value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt, Sweatpants", result->get(0).get_slice());
@@ -160,7 +160,7 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_6) {
     string_column_->append_datum("Pants");
     string_column_->append_datum("Pants");
     string_column_->append_datum("Shirt");
-    const auto result = RunConstantMatch(DatumArray{"BSP", "CSP", "DSP", "ASP"}, 10,
+    const auto result = RunConstantMatch(DatumArray{"BSP", "CSP", "DSP", "ASP"}, 10L,
                                          kNullDatum).value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(0).get_slice());
@@ -174,7 +174,7 @@ TEST_F(CelonisMatchStringsTest, null_input_string_and_const_match_strings) {
     string_column_->append_datum("Shirt");
     string_column_->append_datum(kNullDatum);
     string_column_->append_datum("Shirt");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2,
+    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2L,
                                          "##").value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt##Sweatshirt", result->get(0).get_slice());
@@ -186,7 +186,7 @@ TEST_F(CelonisMatchStringsTest, null_input_string_and_null_const_match_strings) 
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum(kNullDatum);
-    const auto result = RunConstantMatch(kNullDatum, 2, "##").value();
+    const auto result = RunConstantMatch(kNullDatum, 2L, "##").value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_TRUE(result->get(1).is_null());
@@ -195,7 +195,7 @@ TEST_F(CelonisMatchStringsTest, null_input_string_and_null_const_match_strings) 
 TEST_F(CelonisMatchStringsTest, const_match_strings_zero_top_k) {
     Prepare();
     string_column_->append_datum("Shirt");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 0, "##");
+    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 0L, "##");
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
 }
@@ -203,15 +203,15 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_zero_top_k) {
 TEST_F(CelonisMatchStringsTest, const_match_strings_negative_top_k) {
     Prepare();
     string_column_->append_datum("Shirt");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, -1, "##");
+    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, -1L, "##");
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
 }
 
 TEST_F(CelonisMatchStringsTest, null_input_string_and_non_const_match_strings) {
     Prepare();
-    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2, "#");
-    AddRow(kNullDatum, DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2, "%");
+    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2L, "#");
+    AddRow(kNullDatum, DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2L, "%");
     const auto result = Run().value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt#Sweatpants", result->get(0).get_slice());
@@ -220,9 +220,9 @@ TEST_F(CelonisMatchStringsTest, null_input_string_and_non_const_match_strings) {
 
 TEST_F(CelonisMatchStringsTest, non_const_match_strings_normal_case) {
     Prepare();
-    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2, "#");
-    AddRow("", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2, "%");
-    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 10, ";");
+    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2L, "#");
+    AddRow("", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 2L, "%");
+    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 10L, ";");
     const auto result = Run().value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt#Sweatpants", result->get(0).get_slice());
@@ -232,7 +232,7 @@ TEST_F(CelonisMatchStringsTest, non_const_match_strings_normal_case) {
 
 TEST_F(CelonisMatchStringsTest, non_const_match_strings_zero_top_k) {
     Prepare();
-    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 0, "#");
+    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, 0L, "#");
     const auto result = Run();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
@@ -240,7 +240,7 @@ TEST_F(CelonisMatchStringsTest, non_const_match_strings_zero_top_k) {
 
 TEST_F(CelonisMatchStringsTest, non_const_match_strings_negative_top_k) {
     Prepare();
-    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, -2, "#");
+    AddRow("Shirt", DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants", kNullDatum}, -2L, "#");
     const auto result = Run();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "CELONIS_MATCH_STRINGS: top_k must be positive.");
