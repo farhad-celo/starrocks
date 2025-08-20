@@ -18,6 +18,16 @@ public:
     DEFINE_VECTORIZED_FN(timestamp_millis);
 
     /**
+     * @param: [entry_index, calendar_specification, calendar_id_column]
+     * @paramType: [INT, ARRAY_VARCHAR, VARCHAR]
+     * @return: BIGINT
+     * Calendar sorts (based on begin time) and merges the time ranges. This function returns the begin mills of the
+     * entry_index-th time range. NULL is returned when calendar_id does not exist or entry_index is invalid.
+     * This function returns Status::NotSupported when non-const calendar column is given.
+     */
+    DEFINE_VECTORIZED_FN(get_calendar_entry_start);
+
+    /**
      * @param: [timestamp, time_unit, calendar_specification, calendar_id_column]
      * @paramType: [DATETIME, VARCHAR, ARRAY_VARCHAR, VARCHAR]
      * @return: BIGINT
@@ -70,6 +80,10 @@ public:
      * Implements PQL DATE_MATCH: https://docs.celonis.com/en/date_match.html
      */
     DEFINE_VECTORIZED_FN(date_match);
+
+    static Status get_calendar_entry_start_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status get_calendar_entry_start_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status in_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 

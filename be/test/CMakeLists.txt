@@ -168,6 +168,7 @@ set(EXEC_FILES
         ./exprs/celonis/conformance_test.cpp
         ./exprs/celonis/date_match_test.cpp
         ./exprs/celonis/eventlog_utils.cpp
+        ./exprs/celonis/get_calendar_entry_start_test.cpp
         ./exprs/celonis/greatest_least_test.cpp
         ./exprs/celonis/in_calendar_test.cpp
         ./exprs/celonis/in_test.cpp

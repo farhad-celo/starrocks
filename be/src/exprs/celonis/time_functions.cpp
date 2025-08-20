@@ -437,6 +437,18 @@ public:
         return false;
     }
 
+    std::optional<int64_t> get_entry_start(int index, const std::optional<std::string>& calendar_id) const {
+        auto itr = id_to_time_ranges_.find(calendar_id);
+        if (itr != id_to_time_ranges_.end()) {
+            const auto& time_ranges = itr->second;
+            if (index < 0 || index >= time_ranges.size()) {
+                return std::nullopt;
+            }
+            return time_ranges[index].begin_ms;
+        }
+        return std::nullopt;
+    }
+
 private:
     using IdToTimeRangesMap = std::unordered_map<std::optional<std::string>, std::vector<TimeRange>>;
     using IdToWeekdayMap = std::unordered_map<std::optional<std::string>, std::unordered_map<int, celonis::accelerator::WeekdayCalendarEntry>>;
@@ -1433,6 +1445,62 @@ timestamp_in_calendar(const TimestampValue& timestamp,
         Calendar calendar(calendar_proto);
         return calendar.is_timestamp_in(timestamp, calendar_id);
     }
+}
+
+StatusOr<ColumnPtr> get_calendar_entry_start_general([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+    LOG(INFO) << "Non-const version of get_calendar_entry_start is called.\n";
+    DCHECK_EQ(columns.size(), 3);
+    size_t n_rows = columns[0]->size();
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    if (n_rows == 0) {
+        return result.build(ColumnHelper::is_all_const(columns));
+    }
+    return Status::NotSupported("Non-const calendar is not supported in get_calendar_entry_start.");
+}
+
+StatusOr<ColumnPtr> get_calendar_entry_start_const([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns,
+                                      const CalendarState* calendar_state) {
+    DCHECK_EQ(columns.size(), 3);
+    size_t n_rows = columns[0]->size();
+    ColumnViewer index_viewer = ColumnViewer<TYPE_INT>(columns[0]);
+    ColumnViewer calendar_id_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
+
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    const Calendar& calendar = calendar_state->calendar;
+    for (size_t row = 0; row < n_rows; ++row) {
+        if (calendar_state->is_null || calendar_state->is_empty || index_viewer.is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        auto index = index_viewer.value(row);
+        std::optional<std::string> calendar_id = std::nullopt;
+        if (!calendar_id_viewer.is_null(row)) {
+            calendar_id = calendar_id_viewer.value(row).to_string();
+        }
+        const std::optional<int64_t> begin_ms = calendar.get_entry_start(index, calendar_id);
+        if (begin_ms.has_value()) {
+            result.append(begin_ms.value());
+        } else {
+            result.append_null();
+        }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::get_calendar_entry_start(FunctionContext* context,
+                                                                   const starrocks::Columns& columns) {
+    return func(context, columns, get_calendar_entry_start_const, get_calendar_entry_start_general);
+}
+
+Status CelonisTimeFunctions::get_calendar_entry_start_prepare(FunctionContext* context,
+                                                              FunctionContext::FunctionStateScope scope) {
+    RETURN_IF_ERROR(prepare(context, scope, 3, 1));
+    return Status::OK();
+}
+
+Status CelonisTimeFunctions::get_calendar_entry_start_close(FunctionContext* context,
+                                                            FunctionContext::FunctionStateScope scope) {
+    return close(context, scope);
 }
 
 StatusOr<ColumnPtr> in_calendar_general([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {

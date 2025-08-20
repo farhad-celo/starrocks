@@ -1494,15 +1494,16 @@ celostar_functions = [
     [2000230, 'celonis_array_bool_or', True, False, 'BOOLEAN', ['ARRAY_BOOLEAN'], 'CelonisArrayFunctions::array_bool_or'],
 
     # Time functions
-    [3000100, 'celonis_timestamp_millis', True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],
-    [3000110, 'celonis_remap_timestamps_calendar', True, False, 'BIGINT', ['DATETIME', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::remap_timestamps_calendar', 'CelonisTimeFunctions::remap_timestamps_calendar_prepare', 'CelonisTimeFunctions::remap_timestamps_calendar_close'],
-    [3000120, 'celonis_in_calendar', True, False, 'BIGINT', ['DATETIME', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::in_calendar', 'CelonisTimeFunctions::in_calendar_prepare', 'CelonisTimeFunctions::in_calendar_close'],
-    [3000130, 'celonis_make_intersect_calendar', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisTimeFunctions::make_intersect_calendar'],
-    [3000140, 'celonis_timeunits_between_calendar', True, False, 'DOUBLE', ['DATETIME', 'DATETIME', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::timeunits_between_calendar', 'CelonisTimeFunctions::timeunits_between_calendar_prepare', 'CelonisTimeFunctions::timeunits_between_calendar_close'],
-    [3000150, 'celonis_add_timeunits_calendar', True, False, 'DATETIME', ['DATETIME', 'BIGINT', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::add_timeunits_calendar', 'CelonisTimeFunctions::add_timeunits_calendar_prepare', 'CelonisTimeFunctions::add_timeunits_calendar_close'],
-    [3000160, 'celonis_date_between', True, False, 'BIGINT', ['DATETIME', 'DATETIME', 'DATETIME'], 'CelonisTimeFunctions::date_between'],
-    [3000170, 'celonis_millis_timestamp', True, False, 'BIGINT', ['DATETIME'], 'CelonisTimeFunctions::millis_timestamp'],
-    [3000180, 'celonis_date_match', True, False, 'BIGINT', ['DATETIME', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT'], 'CelonisTimeFunctions::date_match'],
+    [3000100, 'celonis_timestamp_millis',            True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],
+    [3000110, 'celonis_remap_timestamps_calendar',   True, False, 'BIGINT', ['DATETIME', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::remap_timestamps_calendar', 'CelonisTimeFunctions::remap_timestamps_calendar_prepare', 'CelonisTimeFunctions::remap_timestamps_calendar_close'],
+    [3000120, 'celonis_in_calendar',                 True, False, 'BIGINT', ['DATETIME', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::in_calendar', 'CelonisTimeFunctions::in_calendar_prepare', 'CelonisTimeFunctions::in_calendar_close'],
+    [3000130, 'celonis_make_intersect_calendar',     True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisTimeFunctions::make_intersect_calendar'],
+    [3000140, 'celonis_timeunits_between_calendar',  True, False, 'DOUBLE', ['DATETIME', 'DATETIME', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::timeunits_between_calendar', 'CelonisTimeFunctions::timeunits_between_calendar_prepare', 'CelonisTimeFunctions::timeunits_between_calendar_close'],
+    [3000150, 'celonis_add_timeunits_calendar',      True, False, 'DATETIME', ['DATETIME', 'BIGINT', 'VARCHAR', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::add_timeunits_calendar', 'CelonisTimeFunctions::add_timeunits_calendar_prepare', 'CelonisTimeFunctions::add_timeunits_calendar_close'],
+    [3000160, 'celonis_date_between',                True, False, 'BIGINT', ['DATETIME', 'DATETIME', 'DATETIME'], 'CelonisTimeFunctions::date_between'],
+    [3000170, 'celonis_millis_timestamp',            True, False, 'BIGINT', ['DATETIME'], 'CelonisTimeFunctions::millis_timestamp'],
+    [3000180, 'celonis_date_match',                  True, False, 'BIGINT', ['DATETIME', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT', 'ARRAY_BIGINT'], 'CelonisTimeFunctions::date_match', 'CelonisTimeFunctions::date_match_prepare', 'CelonisTimeFunctions::date_match_close'],
+    [3000190, 'celonis_get_calendar_entry_start',    True, False, 'BIGINT', ['INT', 'ARRAY_VARCHAR', 'VARCHAR'], 'CelonisTimeFunctions::get_calendar_entry_start', 'CelonisTimeFunctions::get_calendar_entry_start_prepare', 'CelonisTimeFunctions::get_calendar_entry_start_close'],
 
     # String functions
     [4000100, 'celonis_translate', True, False, 'VARCHAR', ['VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisStringFunctions::translate', 'CelonisStringFunctions::translate_prepare', 'CelonisStringFunctions::translate_close' ],
