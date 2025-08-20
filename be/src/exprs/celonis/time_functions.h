@@ -88,6 +88,15 @@ public:
     static Status add_timeunits_calendar_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status add_timeunits_calendar_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status date_match_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+    static Status date_match_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+private:
+    DEFINE_VECTORIZED_FN(date_match_constant_filters);
+
+    DEFINE_VECTORIZED_FN(date_match_non_constant_filters);
 };
 
 } // namespace starrocks

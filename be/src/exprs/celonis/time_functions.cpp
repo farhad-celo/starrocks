@@ -5,6 +5,7 @@
 #include "column/column_viewer.h"
 #include "column/array_column.h"
 #include "exprs/base64.h"
+#include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
 #include "exprs/celonis/agg/util.h"
 #include "google/protobuf/util/json_util.h"
@@ -1542,6 +1543,7 @@ add_timeunits(const TimestampValue& timestamp, const std::string& time_unit, int
 
 class DateFilters {
 public:
+    DateFilters() {}
     DateFilters(size_t row, ColumnPtr years_column, ColumnPtr quarters_column, ColumnPtr months_column,
                 ColumnPtr weeks_column, ColumnPtr days_column) {
         populate_filters(years_, row, years_column);
@@ -1551,7 +1553,7 @@ public:
         populate_filters(days_, row, days_column);
     }
 
-    bool matches(const TimestampValue& timestamp) {
+    bool matches(const TimestampValue& timestamp) const {
         int year, month, day, hour, minute, second, usec;
         timestamp.to_timestamp(&year, &month, &day, &hour, &minute, &second, &usec);
         if (!years_.empty() && !years_.count(year)) {
@@ -1602,9 +1604,25 @@ private:
     std::unordered_set<int64_t> days_;
 };
 
+struct DateMatchStateFragmentLocal {
+    DateFilters date_filters;
+    ScalarFunction function;
+    bool has_null_filter = false;
+};
+
 StatusOr<ColumnPtr> CelonisTimeFunctions::date_match([[maybe_unused]] FunctionContext* context,
                                                      const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 6);
+    if (context == nullptr) {
+        return date_match_non_constant_filters(context, columns);
+    }
+    const auto* state = reinterpret_cast<const DateMatchStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return state->function(context, columns);
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_non_constant_filters([[maybe_unused]] FunctionContext *context,
+                                                                          const starrocks::Columns &columns) {
     const size_t n_rows = columns[0]->size();
     ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
     ColumnBuilder<TYPE_BIGINT> result(n_rows);
@@ -1619,6 +1637,64 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::date_match([[maybe_unused]] FunctionCo
         result.append(date_filters.matches(timestamp) ? 1L : 0L);
     }
     return result.build(ColumnHelper::is_all_const(columns));
+}
+
+StatusOr<ColumnPtr> CelonisTimeFunctions::date_match_constant_filters([[maybe_unused]] FunctionContext *context,
+                                                                      const starrocks::Columns &columns) {
+    const size_t n_rows = columns[0]->size();
+    const auto* state = reinterpret_cast<const DateMatchStateFragmentLocal*>(
+            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    ColumnBuilder<TYPE_BIGINT> result(n_rows);
+    if (state->has_null_filter) {
+        result.append_nulls(n_rows);
+        return result.build(true);
+    }
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    for (auto row = 0; row < n_rows; ++row) {
+        auto timestamp = timestamp_viewer.value(row);
+        result.append(state->date_filters.matches(timestamp) ? 1L : 0L);
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
+}
+
+Status CelonisTimeFunctions::date_match_prepare(FunctionContext *context, FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+    auto state = new DateMatchStateFragmentLocal();
+    context->set_function_state(scope, state);
+
+    auto years_column = context->get_constant_column(1);
+    auto quarters_column = context->get_constant_column(2);
+    auto months_column = context->get_constant_column(3);
+    auto weeks_column = context->get_constant_column(4);
+    auto days_column = context->get_constant_column(5);
+    if (years_column == nullptr || quarters_column == nullptr || months_column == nullptr || weeks_column == nullptr ||
+        days_column == nullptr) {
+        state->function = date_match_non_constant_filters;
+        return Status::OK();
+    }
+    state->function = date_match_constant_filters;
+    if (years_column->empty() || quarters_column->empty() || months_column->empty() || weeks_column->empty() ||
+        days_column->empty()) {
+        return Status::OK();
+    }
+    if (years_column->is_null(0) || quarters_column->is_null(0) || months_column->is_null(0) ||
+        weeks_column->is_null(0) || days_column->is_null(0)) {
+        state->has_null_filter = true;
+        return Status::OK();
+    }
+    state->date_filters = DateFilters(0, years_column, quarters_column, months_column, weeks_column, days_column);
+    return Status::OK();
+}
+
+Status CelonisTimeFunctions::date_match_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        const auto* state = reinterpret_cast<const DateMatchStateFragmentLocal*>(
+                context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+        delete state;
+    }
+    return Status::OK();
 }
 
 Status CelonisTimeFunctions::timeunits_between_calendar_prepare(FunctionContext* context,
