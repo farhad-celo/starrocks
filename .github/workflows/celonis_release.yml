@@ -27,7 +27,11 @@ jobs:
   build-image:
     runs-on: [self-hosted, celostar]
     env:
+<<<<<<< HEAD
       BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-f2acbad2-locale-cpml2.161.2
+=======
+      BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.2-393a8a87-locale-cpml2.161.2-ubuntu-blake2
+>>>>>>> 77bcd04a (Use new dev env with blake2 (#923))
     steps:
       - name: checkout repository
         uses: actions/checkout@v4
