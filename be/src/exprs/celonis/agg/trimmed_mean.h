@@ -149,7 +149,13 @@ class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggre
             return;
         }
 
-        pdqsort(new_vector.begin(), new_vector.end());
+        if (first > 0) {
+            std::nth_element(new_vector.begin(), new_vector.begin() + first, new_vector.end());
+        }
+        if (last < new_vector.size()) {
+            std::nth_element(new_vector.begin() + first, new_vector.begin() + last, new_vector.end());
+        }
+
         CppType sum;
         // Use parallel execution only for large arrays (> parallel_threshold)
         const auto count = static_cast<int64_t>(last) - static_cast<int64_t>(first);
