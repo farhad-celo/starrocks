@@ -3,12 +3,28 @@
 #include <execution>
 #include <numeric>
 
-#include "column/datum.h"
-#include "exprs/agg/percentile_cont.h"
+#include "column/column_helper.h"
+#include "column/object_column.h"
+#include "column/vectorized_fwd.h"
+#include "exprs/agg/aggregate.h"
 #include "exprs/function_context.h"
+#include "gutil/casts.h"
+#include "runtime/mem_pool.h"
 #include "util/orlp/pdqsort.h"
 
 namespace starrocks {
+
+template <LogicalType LT, typename = guard::Guard>
+struct TrimmedMeanState {
+    using CppType = RunTimeCppType<LT>;
+    void update(CppType item) { items.emplace_back(item); }
+    void update_batch(const std::vector<CppType>& vec) {
+        size_t old_size = items.size();
+        items.resize(old_size + vec.size());
+        memcpy(items.data() + old_size, vec.data(), vec.size() * sizeof(CppType));
+    }
+    std::vector<CppType> items;
+};
 
 template<LogicalType LT>
 struct TrimmedMeanParallelExecutionThreshold {
@@ -90,8 +106,10 @@ struct TrimmedMeanParallelExecutionThreshold<TYPE_DOUBLE> {
  * upper_cutoff (optional) : Between 0 and 100. Default is 5.
  * Supports PQL TRIMMED_MEAN https://confluence.celonis.com/display/PQLdevelopment/TRIMMED_MEAN
  */
-template <LogicalType LT>
-class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggregateFunction<LT> {
+template<LogicalType LT>
+class CelonisTrimmedMeanAggregateFunction final
+        : public AggregateFunctionBatchHelper<TrimmedMeanState<LT>, CelonisTrimmedMeanAggregateFunction<LT>> {
+public:
     using InputCppType = RunTimeCppType<LT>;
     using InputColumnType = RunTimeColumnType<LT>;
     static constexpr auto ResultLT = TYPE_DOUBLE;
@@ -108,6 +126,41 @@ class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggre
                                    AggDataPtr __restrict state) const override {
         const auto& column = down_cast<const InputColumnType&>(*columns[0]);
         this->data(state).update_batch(column.get_data());
+    }
+
+    void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
+        DCHECK(column->is_binary());
+
+        const Slice slice = column->get(row_num).get_slice();
+        size_t items_size = *reinterpret_cast<const size_t*>(slice.data);
+        auto data_ptr = slice.data + sizeof(size_t);
+
+        auto& items = this->data(state).items;
+        size_t old_size = items.size();
+        items.resize(old_size + items_size);
+        memcpy(items.data() + old_size, data_ptr, items_size * sizeof(InputCppType));
+    }
+
+    void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
+        auto* column = down_cast<BinaryColumn*>(to);
+        Bytes& bytes = column->get_bytes();
+        size_t old_size = bytes.size();
+        size_t items_size = this->data(state).items.size();
+
+        // Serialization Format:
+        // [items_size: 8 bytes][item1][item2][item3]...[itemN]
+        size_t new_size = old_size + sizeof(size_t) + items_size * sizeof(InputCppType);
+        bytes.resize(new_size);
+        memcpy(bytes.data() + old_size, &items_size, sizeof(size_t));
+        memcpy(bytes.data() + old_size + sizeof(size_t), this->data(state).items.data(),
+               items_size * sizeof(InputCppType));
+        column->get_offset().emplace_back(new_size);
+    }
+
+    void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
+                                     ColumnPtr* dst) const override {
+        // Used for streaming aggregation passthrough. Not implemented.
+        throw std::runtime_error("celonis_trimmed_mean: convert_to_serialize_format not supported");
     }
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
@@ -135,13 +188,13 @@ class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggre
         }
 
         using CppType = RunTimeCppType<LT>;
+        auto new_vector = this->data(state).items;
 
-        const int64_t parallel_threshold = TrimmedMeanParallelExecutionThreshold<LT>::value;
-
-        auto new_vector = std::move(this->data(state).items);
-        for (auto& innerData : this->data(state).grid) {
-            std::move(innerData.begin() + 1, innerData.end() - 1, std::back_inserter(new_vector));
+        if (new_vector.empty()) {
+            column->append_default();
+            return;
         }
+
         int first = new_vector.size() * lower_cutoff / 100;
         int last = new_vector.size() - new_vector.size() * upper_cutoff / 100;
         if (first >= last) {
@@ -157,6 +210,7 @@ class CelonisTrimmedMeanAggregateFunction final : public PercentileContDiscAggre
         }
 
         CppType sum;
+        const int64_t parallel_threshold = TrimmedMeanParallelExecutionThreshold<LT>::value;
         // Use parallel execution only for large arrays (> parallel_threshold)
         const auto count = static_cast<int64_t>(last) - static_cast<int64_t>(first);
         if (count > parallel_threshold) {
