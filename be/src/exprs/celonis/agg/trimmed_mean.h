@@ -241,15 +241,25 @@ public:
             return;
         }
 
+        const int64_t parallel_threshold = TrimmedMeanParallelExecutionThreshold<LT>::value;
         if (first > 0) {
-            std::nth_element(new_vector.begin(), new_vector.begin() + first, new_vector.end());
+            if (new_vector.size() > parallel_threshold) {
+                std::nth_element(std::execution::par_unseq, new_vector.begin(), new_vector.begin() + first,
+                                 new_vector.end());
+            } else {
+                std::nth_element(new_vector.begin(), new_vector.begin() + first, new_vector.end());
+            }
         }
         if (last < new_vector.size()) {
-            std::nth_element(new_vector.begin() + first, new_vector.begin() + last, new_vector.end());
+            if (new_vector.size() > parallel_threshold) {
+                std::nth_element(std::execution::par_unseq, new_vector.begin() + first, new_vector.begin() + last,
+                                 new_vector.end());
+            } else {
+                std::nth_element(new_vector.begin() + first, new_vector.begin() + last, new_vector.end());
+            }
         }
 
         CppType sum;
-        const int64_t parallel_threshold = TrimmedMeanParallelExecutionThreshold<LT>::value;
         // Use parallel execution only for large arrays (> parallel_threshold)
         const auto count = static_cast<int64_t>(last) - static_cast<int64_t>(first);
         if (count > parallel_threshold) {
