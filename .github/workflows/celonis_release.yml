@@ -167,8 +167,8 @@ jobs:
           docker manifest push "$mul_arch_tag"
           
           mul_arch_tag="ghcr.io/celonis/celostar/starrocks-fe:${fe_be_image_tag}"
-          arm_tag="ghcr.io/celonis/celostar/starrocks-be:${arm_image_tag}"
-          x86_tag="ghcr.io/celonis/celostar/starrocks-be:${x86_image_tag}"
+          arm_tag="ghcr.io/celonis/celostar/starrocks-fe:${arm_image_tag}"
+          x86_tag="ghcr.io/celonis/celostar/starrocks-fe:${x86_image_tag}"
 
           docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
 
