@@ -644,7 +644,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::array_lead([[maybe_unused]] FunctionC
 class CelonisNullToEmpty {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
-        if (!columns[0]->is_nullable() || !columns[0]->has_null()) {
+        if (!columns[0]->is_nullable()) {
             return columns[0];
         }
         size_t n_rows = columns[0]->size();
@@ -654,6 +654,9 @@ public:
         const auto& input_data_column = input_nullable_column->data_column_ref();
 
         // It should return a non-nullable column because it is registered in celonisAlwaysReturnNonNullableFunctions.
+        // We remove the nullability column and just return the data column.
+        // This is correct because an array column, composed of null column and data column, the data column
+        // encodes null value in the same way as empty array
         return input_data_column.clone();
     }
 };
