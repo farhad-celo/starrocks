@@ -18,11 +18,6 @@ template <LogicalType LT, typename = guard::Guard>
 struct TrimmedMeanState {
     using CppType = RunTimeCppType<LT>;
     void update(CppType item) { items.emplace_back(item); }
-    void update_batch(const std::vector<CppType>& vec) {
-        size_t old_size = items.size();
-        items.resize(old_size + vec.size());
-        memcpy(items.data() + old_size, vec.data(), vec.size() * sizeof(CppType));
-    }
     std::vector<CppType> items;
 };
 
@@ -125,7 +120,11 @@ public:
     void update_batch_single_state(FunctionContext* ctx, size_t chunk_size, const Column** columns,
                                    AggDataPtr __restrict state) const override {
         const auto& column = down_cast<const InputColumnType&>(*columns[0]);
-        this->data(state).update_batch(column.get_data());
+        const auto& data = column.get_data();
+        auto& items = this->data(state).items;
+        size_t old_size = items.size();
+        items.resize(old_size + data.size());
+        memcpy(items.data() + old_size, data.data(), data.size() * sizeof(InputCppType));
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
