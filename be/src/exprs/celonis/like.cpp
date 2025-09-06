@@ -13,8 +13,39 @@
 #include "exprs/like_predicate.h"
 #include "gutil/strings/substitute.h"
 #include "util/utf8.h"
+#include <algorithm>
 
 namespace starrocks {
+
+// Converts string to lowercase (handles German ÄÖÜ characters).
+static std::string to_lowercase(const Slice& slice) {
+    std::string result;
+    result.reserve(slice.size);
+
+    const char* src_ptr = slice.data;
+    const size_t size = slice.size;
+    for (size_t i = 0; i < size; ++i) {
+        char ch = src_ptr[i];
+        if ('A' <= ch && ch <= 'Z') {
+            result.push_back(ch + 32);
+        } else if (ch == '\xC3' && (i + 1) < size) {
+            // Character: Ä | UTF-8 Bytes: ['0xC3', '0x84'] -> ä ['0xC3', '0xA4']
+            // Character: Ö | UTF-8 Bytes: ['0xC3', '0x96'] -> ö ['0xC3', '0xB6']
+            // Character: Ü | UTF-8 Bytes: ['0xC3', '0x9C'] -> ü ['0xC3', '0xBC']
+            char next_ch = src_ptr[i + 1];
+            if (next_ch == '\x84' || next_ch == '\x96' || next_ch == '\x9C') {
+                result.push_back(ch);
+                result.push_back(next_ch + 32);
+                ++i; // Skip the next byte since we processed it
+            } else {
+                result.push_back(ch);
+            }
+        } else {
+            result.push_back(ch);
+        }
+    }
+    return result;
+}
 
 enum class LikeFunctionType {
     LIKE_NON_CONSTANT,
@@ -23,7 +54,7 @@ enum class LikeFunctionType {
 };
 
 struct LikeStateFragmentLocal {
-    std::shared_ptr<re2::RE2> pattern_re2;
+    std::string lowercase_pattern;  // For optimized case-insensitive substring search
     ScalarFunction function;
     LikeFunctionType function_type;
 };
@@ -54,13 +85,10 @@ Status CelonisLike::like_prepare(FunctionContext* context, FunctionContext::Func
             return Status::OK();
         }
 
-        RE2::Options opts;
-        opts.set_never_nl(false);
-        opts.set_dot_nl(true);
-        opts.set_log_errors(false);
-        opts.set_case_sensitive(false);
-
-        state->pattern_re2 = std::make_shared<re2::RE2>(re_pattern_str, opts);
+        // For patterns without wildcards, use optimized case-insensitive substring search
+        // Use the processed pattern (after escape handling) instead of the original pattern
+        Slice processed_pattern(re_pattern_str.data(), re_pattern_str.size());
+        state->lowercase_pattern = to_lowercase(processed_pattern);
         state->function = like_constant_no_wildcard;
         state->function_type = LikeFunctionType::LIKE_CONSTANT_NO_WILDCARD;
 
@@ -176,11 +204,7 @@ StatusOr<ColumnPtr> CelonisLike::like_constant_no_wildcard(FunctionContext* cont
 
     const auto* like_state_fragment_local = reinterpret_cast<const LikeStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    const auto& pattern_re2 = *like_state_fragment_local->pattern_re2;
-    if (!pattern_re2.ok()) {
-        context->set_error(strings::Substitute("Invalid regex: $0", pattern_re2.error()).c_str());
-        return ColumnHelper::create_const_null_column(num_rows);
-    }
+    const auto& lowercase_pattern = like_state_fragment_local->lowercase_pattern;
 
     ColumnViewer<TYPE_VARCHAR> value_viewer(value_column);
     ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
@@ -190,9 +214,11 @@ StatusOr<ColumnPtr> CelonisLike::like_constant_no_wildcard(FunctionContext* cont
             result.append_null();
             continue;
         }
-        auto v = RE2::PartialMatch(re2::StringPiece(value_viewer.value(row).data, value_viewer.value(row).size),
-                                   pattern_re2);
-        result.append(v);
+
+        // Convert value to lowercase and do substring search
+        std::string lowercase_value = to_lowercase(value_viewer.value(row));
+        bool found = lowercase_value.find(lowercase_pattern) != std::string::npos;
+        result.append(found);
     }
 
     return result.build(all_const);
