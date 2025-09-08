@@ -187,7 +187,8 @@ public:
         }
 
         using CppType = RunTimeCppType<LT>;
-        auto new_vector = this->data(state).items;
+        // Move ownership of items to avoid copying and automatically clear original vector
+        auto new_vector = std::move(const_cast<TrimmedMeanState<LT>&>(this->data(state)).items);
 
         if (new_vector.empty()) {
             column->append_default();
