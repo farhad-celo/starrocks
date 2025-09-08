@@ -1,18 +1,17 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: celostar-starrocks
-  title: celostar-starrocks
-  description: celostar-starrocks is the query engine behind Celostar
+  name: celostar-be
+  title: celostar-be
+  description: celostar-be is the BackEnd of the query engine behind Celostar. BEs are responsible for data storage and SQL execution.
   tags:
     - celostar
   annotations:
     github.com/project-slug: celonis/celostar-starrocks
-    argocd/app-selector: app=celostar
-    cd.celonis.dev/cfg-ibc-folder: celostar-starrocks
+    argocd/app-selector: app=celostar-starrocks
     sonarqube.org/project-key: celonis_celostar-starrocks
     backstage.io/code-coverage: scm-only
-    backstage.io/techdocs-ref: dir:celostar-docs
+    backstage.io/techdocs-entity: system:celostar
   links:
     - title: Celostar JIRA
       url: https://celonis.atlassian.net/jira/software/c/projects/CELOSTAR/boards/925
@@ -38,3 +37,4 @@ spec:
   system: system:default/celostar
   dependencyOf:
     - component:celostar-gateway
+    - component:celostar-fe
