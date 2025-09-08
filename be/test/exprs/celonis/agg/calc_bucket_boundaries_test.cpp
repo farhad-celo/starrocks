@@ -1,12 +1,14 @@
-#include <algorithm>
+#include "exprs/celonis/agg/calc_bucket_boundaries.h"
+
 #include <gtest/gtest.h>
+
+#include <algorithm>
 
 #include "../util.h"
 #include "column/struct_column.h"
 #include "column/type_traits.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/agg/calc_bucket_boundaries.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 
@@ -46,9 +48,7 @@ protected:
 
     void TearDown() override {}
 
-    TypeDescriptor get_return_type(LogicalType logical_type) {
-        return celonis::array_type(logical_type);
-    }
+    TypeDescriptor get_return_type(LogicalType logical_type) { return celonis::array_type(logical_type); }
 
     std::unique_ptr<FunctionContext> get_ctx(LogicalType logical_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
@@ -60,7 +60,7 @@ protected:
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Evaluate(Column* result, const std::optional<Datum>& expected) {
         if (!expected.has_value()) {
             EXPECT_EQ(result->size(), 0);
@@ -77,29 +77,27 @@ protected:
         auto result_array = result->get(0).get_array();
         ASSERT_EQ(result_array.size(), expected_array.size());
         for (int i = 0; i < expected_array.size(); ++i) {
-            auto debug_string = [&]() {
-                return fmt::format("index: {}", i);
-            };
+            auto debug_string = [&]() { return fmt::format("index: {}", i); };
             if (expected_array[i].is_null()) {
                 EXPECT_TRUE(result_array[i].is_null()) << debug_string();
             } else if (result_array[i].is_null()) {
                 EXPECT_FALSE(result_array[i].is_null()) << debug_string();
             } else {
                 EXPECT_EQ(result_array[i].get<RunTimeCppType<LT>>(), expected_array[i].get<RunTimeCppType<LT>>())
-                                    << debug_string();
+                        << debug_string();
             }
         }
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(LogicalType logical_type, const DatumArray& input, int count) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            LogicalType logical_type, const DatumArray& input, int count) {
         auto local_ctx = get_ctx(logical_type);
 
         const AggregateFunction* func =
                 get_aggregate_function("celonis_calc_bucket_count_boundaries", logical_type, TYPE_ARRAY, false);
 
         auto input_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(logical_type), true);
-        for (const auto& datum: input) {
+        for (const auto& datum : input) {
             input_col->append_datum(datum);
         }
 
@@ -117,7 +115,7 @@ protected:
         return {std::move(local_ctx), std::move(state), func};
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void RunNoMerge(const DatumArray& input, int count, const std::optional<Datum>& expected) {
         auto [local_ctx, state, func] = RunUpdate(LT, input, count);
 
@@ -127,7 +125,7 @@ protected:
         Evaluate<LT>(result.get(), expected);
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void RunMerge(const DatumArray& input1, const DatumArray& input2, int count, const std::optional<Datum>& expected) {
         auto [local_ctx1, state1, func] = RunUpdate(LT, input1, count);
         auto [local_ctx2, state2, func2] = RunUpdate(LT, input2, count);
@@ -146,9 +144,9 @@ protected:
         Evaluate<LT>(result.get(), expected);
     }
 
-    template<LogicalType LT>
-    void
-    RunMergeToNew(const DatumArray& input1, const DatumArray& input2, int count, const std::optional<Datum>& expected) {
+    template <LogicalType LT>
+    void RunMergeToNew(const DatumArray& input1, const DatumArray& input2, int count,
+                       const std::optional<Datum>& expected) {
         auto [local_ctx1, state1, func] = RunUpdate(LT, input1, count);
         auto [local_ctx2, state2, func2] = RunUpdate(LT, input2, count);
 
@@ -170,7 +168,7 @@ protected:
         Evaluate<LT>(result.get(), expected);
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Run(const DatumArray& input1, const DatumArray& input2, int count, const std::optional<Datum>& expected) {
         RunMerge<LT>(input1, input2, count, expected);
         RunMergeToNew<LT>(input1, input2, count, expected);
@@ -189,16 +187,11 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, bigint_merge) {
 }
 
 TEST_F(CelonisCalcBucketCountBoundariesTest, bigint_merge_outlier) {
-    auto input1 = DatumArray{1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
-                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L};
+    auto input1 = DatumArray{1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+                             1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L};
     auto input2 = DatumArray{100L};
     int count = 10;
     auto expected = DatumArray{1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 101L};
@@ -233,7 +226,7 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, bigint_merge_one_row_and_null) {
 
 TEST_F(CelonisCalcBucketCountBoundariesTest, too_many_buckets) {
     // 2 * length > MAX_NUM_BUCKETS
-    const int64_t length = 550000;
+    const int64_t length = (MAX_NUM_BUCKETS / 2) + 10;
     auto input1 = DatumArray{};
     input1.reserve(length);
     for (int64_t i = 0; i < length; ++i) {
@@ -244,7 +237,7 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, too_many_buckets) {
     for (int64_t i = 0; i < length; ++i) {
         input2.emplace_back(i + length);
     }
-    int count = 1050000;
+    int count = MAX_NUM_BUCKETS * 2;
     auto expected = std::nullopt;
     Run<TYPE_BIGINT>(input1, input2, count, expected);
 }
@@ -267,14 +260,13 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, double_merge_null_and_one_row) {
 }
 
 TEST_F(CelonisCalcBucketCountBoundariesTest, datetime_input) {
-    auto input1 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 10),
-                             TimestampValue::create(1970, 1, 1, 0, 0, 5)};
+    auto input1 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 10), TimestampValue::create(1970, 1, 1, 0, 0, 5)};
     auto input2 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 20)};
     int count = 4;
-    auto expected = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
-                               TimestampValue::create(1970, 1, 1, 0, 0, 10),
-                               TimestampValue::create(1970, 1, 1, 0, 0, 15),
-                               TimestampValue::create(1970, 1, 1, 0, 0, 20, 1000)};
+    auto expected =
+            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
+                       TimestampValue::create(1970, 1, 1, 0, 0, 10), TimestampValue::create(1970, 1, 1, 0, 0, 15),
+                       TimestampValue::create(1970, 1, 1, 0, 0, 20, 1000)};
 
     Run<TYPE_DATETIME>(input1, input2, count, expected);
 }
@@ -285,10 +277,10 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, datetime_input_with_nulls) {
     auto input2 = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 20),
                              kNullDatum};
     int count = 4;
-    auto expected = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
-                               TimestampValue::create(1970, 1, 1, 0, 0, 10),
-                               TimestampValue::create(1970, 1, 1, 0, 0, 15),
-                               TimestampValue::create(1970, 1, 1, 0, 0, 20, 1000)};
+    auto expected =
+            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 1, 0, 0, 5),
+                       TimestampValue::create(1970, 1, 1, 0, 0, 10), TimestampValue::create(1970, 1, 1, 0, 0, 15),
+                       TimestampValue::create(1970, 1, 1, 0, 0, 20, 1000)};
 
     Run<TYPE_DATETIME>(input1, input2, count, expected);
 }

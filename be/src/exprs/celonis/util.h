@@ -16,29 +16,31 @@ constexpr std::string_view XXHASH3_128_NULL_STRING = "_$CeL0nIs_ReSeRvEd_NuLl_";
 constexpr std::string_view XXHASH3_128_NULL_ARRAY_STRING = "_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_";
 
 const double EPS = 1e-9;
-// maximum number of buckets output by CALC_(STRING_)BUCKET_COUNT/WIDTH_BOUNDARIES
-const int64_t MAX_NUM_BUCKETS = 1000000;
+// maximum number of buckets output by CALC_(STRING_)BUCKET_COUNT/WIDTH_BOUNDARIES.
+// Internal limit is set to 12,000 to be close to the user-facing BUCKET_COUNT limit of 10,000,
+// which is validated in PQL2SQL.
+const int64_t MAX_NUM_BUCKETS = 12000;
 const double HISTOGRAM_MIN_TARGET_QUANTILE = 0.05;
 const double HISTOGRAM_MAX_TARGET_QUANTILE = 0.95;
 
-template<LogicalType LT>
+template <LogicalType LT>
 inline double to_histogram_value(const RunTimeCppType<LT>& value) {
     return static_cast<double>(value);
 }
 
-template<>
+template <>
 inline double to_histogram_value<TYPE_DATETIME>(const TimestampValue& value) {
     const auto epoch = TimestampValue::create(1970, 1, 1, 0, 0, 0);
     // convert it to milliseconds
     return static_cast<double>(value.diff_microsecond(epoch) / 1000L);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 inline RunTimeCppType<LT> from_histogram_value(const double& value) {
     return static_cast<RunTimeCppType<LT>>(value);
 }
 
-template<>
+template <>
 inline TimestampValue from_histogram_value<TYPE_DATETIME>(const double& millis) {
     TimestampValue result;
     result.from_unix_second(static_cast<int64_t>(millis) / 1000L);
