@@ -17,7 +17,7 @@ int VariantStatsFinalizer::compute_happy_variant(const std::vector<VRef>& sorted
     // Happy path
     // find top start activity
     // find top end activity which is not top start
-    // find top variant with start end from above
+    // find top variant with start and end from above
     // if not found use top variant
 
     int top_start = 0;
@@ -158,11 +158,11 @@ VariantStatsFinalizer::json_string(const std::vector<VList>& activity_top_varian
     if (edge_count_ >= 0) {
         d.AddMember("e_count", edge_map_.size(), allocator);
         std::map<Slice, int32_t> ordered_activity_map(activity_map_.begin(), activity_map_.end());
-        std::vector<int32_t> activity_unorderd_to_ordered(activity_map_.size());
+        std::vector<int32_t> activity_unordered_to_ordered(activity_map_.size());
         int index = 0;
         for (auto it = ordered_activity_map.begin(); it != ordered_activity_map.end(); ++it, ++index) {
-            DCHECK_LT(it->second, activity_unorderd_to_ordered.size());
-            activity_unorderd_to_ordered[it->second] = index;
+            DCHECK_LT(it->second, activity_unordered_to_ordered.size());
+            activity_unordered_to_ordered[it->second] = index;
         }
         struct EdgeOrderedID {
             int32_t ordered_src;
@@ -176,7 +176,7 @@ VariantStatsFinalizer::json_string(const std::vector<VList>& activity_top_varian
         };
         std::priority_queue<EdgeOrderedID, std::vector<EdgeOrderedID>, CmpOnEdgeOrderedID> pq;
         for (auto it = edge_map_.cbegin(); it != edge_map_.cend(); ++it) {
-            pq.push({activity_unorderd_to_ordered[it->first.src], activity_unorderd_to_ordered[it->first.dst], it});
+            pq.push({activity_unordered_to_ordered[it->first.src], activity_unordered_to_ordered[it->first.dst], it});
             if (pq.size() > edge_count_) {
                 pq.pop();
             }
@@ -265,11 +265,11 @@ VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_
     if (edge_count_ >= 0) {
         statistics_proto.set_e_count(edge_map_.size());
         std::map<Slice, int32_t> ordered_activity_map(activity_map_.begin(), activity_map_.end());
-        std::vector<int32_t> activity_unorderd_to_ordered(activity_map_.size());
+        std::vector<int32_t> activity_unordered_to_ordered(activity_map_.size());
         int index = 0;
         for (auto it = ordered_activity_map.begin(); it != ordered_activity_map.end(); ++it, ++index) {
-            DCHECK_LT(it->second, activity_unorderd_to_ordered.size());
-            activity_unorderd_to_ordered[it->second] = index;
+            DCHECK_LT(it->second, activity_unordered_to_ordered.size());
+            activity_unordered_to_ordered[it->second] = index;
         }
         struct EdgeOrderedID {
             int32_t ordered_src;
@@ -283,7 +283,7 @@ VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_
         };
         std::priority_queue<EdgeOrderedID, std::vector<EdgeOrderedID>, CmpOnEdgeOrderedID> pq;
         for (auto it = edge_map_.cbegin(); it != edge_map_.cend(); ++it) {
-            pq.push({activity_unorderd_to_ordered[it->first.src], activity_unorderd_to_ordered[it->first.dst], it});
+            pq.push({activity_unordered_to_ordered[it->first.src], activity_unordered_to_ordered[it->first.dst], it});
             if (pq.size() > edge_count_) {
                 pq.pop();
             }

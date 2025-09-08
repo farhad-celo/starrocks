@@ -180,7 +180,7 @@ struct CelonisVariantStatsAggregateV2State {
         return result;
     }
 
-    // Writes and binary encoded version of the object to dst.
+    // Writes a binary encoded version of the object to dst.
     void serialize(uint8_t* dst) const {
         // Serialization format
         // length of activity_array
@@ -491,8 +491,8 @@ private:
 };
 
 /**
- * @param: [ variant_column, count_column, activity_array, [, edge_count [, disable_top_variant_stats [, enable_proto_encoding ] ] ] ]
- * @paramType columns: [ ARRAY_INT, BIGINT, ARRAY_VARCHAR, [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
+ * @param: [ variant_column, count_column, activity_array [, edge_count [, disable_top_variant_stats [, enable_proto_encoding ] ] ] ]
+ * @paramType columns: [ ARRAY_INT, BIGINT, ARRAY_VARCHAR [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
  * @return: json or base64 encoded binary proto string
  * variant_column: Encoded variant. The implementation assumes the input variant_column does not contain duplicates.
  * count_column: Indicates the frequency of the variant.
