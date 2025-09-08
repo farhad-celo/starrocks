@@ -177,11 +177,46 @@ protected:
     std::vector<std::unique_ptr<MemPool>> mem_pools_;
 };
 
+TEST_F(CelonisCalcBucketCountBoundariesTest, bigint) {
+    auto input1 = DatumArray{100L, 500L};
+    int count = 10;
+    auto expected = DatumArray{100L, 300L, 501L};
+
+    RunNoMerge<TYPE_BIGINT>(input1, count, expected);
+}
+
 TEST_F(CelonisCalcBucketCountBoundariesTest, bigint_merge) {
     auto input1 = DatumArray{1L, 2L, 3L, 4L, 5L};
     auto input2 = DatumArray{6L, 7L, 8L, 9L, 10L};
     int count = 10;
     auto expected = DatumArray{1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L};
+
+    Run<TYPE_BIGINT>(input1, input2, count, expected);
+}
+
+TEST_F(CelonisCalcBucketCountBoundariesTest, distinct_values_size_greate_than_bucket_count_after_merge) {
+    auto input1 = DatumArray{1L, 2L, 3L, 4L, 5L};
+    auto input2 = DatumArray{6L, 7L, 8L, 9L, 10L, 11L, 12L};
+    int count = 10;
+    auto expected = DatumArray{1L, 3L, 5L, 7L, 9L, 11L, 13L};
+
+    Run<TYPE_BIGINT>(input1, input2, count, expected);
+}
+
+TEST_F(CelonisCalcBucketCountBoundariesTest, bigint_merge_more_values_on_node_2) {
+    auto input1 = DatumArray{1L, 2L, 3L, 4L, 5L};
+    auto input2 = DatumArray{6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L};
+    int count = 10;
+    auto expected = DatumArray{1L, 3L, 5L, 7L, 9L, 11L, 13L, 15L, 17L};
+
+    Run<TYPE_BIGINT>(input1, input2, count, expected);
+}
+
+TEST_F(CelonisCalcBucketCountBoundariesTest, bigint_merge_more_values_on_node_1) {
+    auto input1 = DatumArray{1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L};
+    auto input2 = DatumArray{11L, 12L, 13L, 14L, 15L};
+    int count = 10;
+    auto expected = DatumArray{1L, 3L, 5L, 7L, 9L, 11L, 13L, 15L, 17L};
 
     Run<TYPE_BIGINT>(input1, input2, count, expected);
 }
@@ -237,7 +272,7 @@ TEST_F(CelonisCalcBucketCountBoundariesTest, too_many_buckets) {
     for (int64_t i = 0; i < length; ++i) {
         input2.emplace_back(i + length);
     }
-    int count = MAX_NUM_BUCKETS * 2;
+    int count = MAX_NUM_BUCKETS + 10;
     auto expected = std::nullopt;
     Run<TYPE_BIGINT>(input1, input2, count, expected);
 }

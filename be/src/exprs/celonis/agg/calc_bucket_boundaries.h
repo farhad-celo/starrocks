@@ -12,7 +12,7 @@
 
 namespace starrocks {
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct CelonisCalcBucketBoundariesState {
 public:
     using CppType = RunTimeCppType<LT>;
@@ -32,12 +32,45 @@ public:
         true_max = std::max<CppType>(true_max, value);
         percentile->add(to_histogram_value<LT>(value));
         is_null = false;
+        if (distinct_count_seen < bucket_count) {
+            if (const auto [_, inserted] = distinct_values.insert(value); inserted) {
+                distinct_count_seen++;
+            }
+            if (distinct_count_seen == bucket_count) {
+                // The number of distinct values seen is now == bucket_count on at least one leaf,
+                // so we can stop tracking them. bucket_count will be used for the final number of buckets.
+                distinct_values.clear();
+            }
+        }
     }
 
     void deserialize_and_merge(const uint8_t* src) {
-        CountType src_count;
-        memcpy(&src_count, src, sizeof(CountType));
+        CountType src_bucket_count;
+        memcpy(&src_bucket_count, src, sizeof(CountType));
         src += sizeof(CountType);
+        bucket_count = src_bucket_count;
+        CountType src_distinct_count_seen;
+        memcpy(&src_distinct_count_seen, src, sizeof(CountType));
+        src += sizeof(CountType);
+        if (distinct_count_seen >= bucket_count || src_distinct_count_seen >= bucket_count) {
+            if (src_distinct_count_seen < bucket_count) {
+                src += sizeof(CppType) * src_distinct_count_seen;
+            }
+            distinct_count_seen = bucket_count;
+        } else {
+            for (size_t i = 0; i < src_distinct_count_seen; i++) {
+                CppType tmp;
+                memcpy(&tmp, src, sizeof(CppType));
+                distinct_values.insert(tmp);
+                src += sizeof(CppType);
+            }
+            distinct_count_seen = std::min(static_cast<CountType>(distinct_values.size()), bucket_count);
+        }
+        if (distinct_count_seen >= bucket_count) {
+            // The number of distinct values seen is now >= bucket_count on at least one leaf,
+            // so we can stop tracking them and use the bucket_count for the final number of buckets.
+            distinct_values.clear();
+        }
         CppType src_true_min;
         memcpy(&src_true_min, src, sizeof(CppType));
         src += sizeof(CppType);
@@ -45,9 +78,8 @@ public:
         memcpy(&src_true_max, src, sizeof(CppType));
         src += sizeof(CppType);
         PercentileValue src_percentile;
-        src_percentile.deserialize((const char*) src);
+        src_percentile.deserialize((const char*)src);
 
-        count = src_count;
         true_min = std::min<CppType>(true_min, src_true_min);
         true_max = std::max<CppType>(true_max, src_true_max);
         percentile->merge(&src_percentile);
@@ -56,7 +88,12 @@ public:
 
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(CountType); // count
+        result += sizeof(CountType); // bucket_count
+        result += sizeof(CountType); // distinct_count_seen
+        if (distinct_count_seen < bucket_count) {
+            DCHECK_EQ(distinct_count_seen, distinct_values.size());
+            result += sizeof(CppType) * distinct_count_seen; // distinct_values
+        }
         result += sizeof(CppType); // true_min
         result += sizeof(CppType); // true_max
         result += percentile->serialize_size();
@@ -64,8 +101,17 @@ public:
     }
 
     void serialize(uint8_t* dst) const {
-        memcpy(dst, &count, sizeof(CountType));
+        memcpy(dst, &bucket_count, sizeof(CountType));
         dst += sizeof(CountType);
+        memcpy(dst, &distinct_count_seen, sizeof(CountType));
+        dst += sizeof(CountType);
+        if (distinct_count_seen < bucket_count) {
+            for (auto it = distinct_values.begin(); it != distinct_values.end(); ++it) {
+                CppType val = *it;
+                memcpy(dst, &val, sizeof(CppType));
+                dst += sizeof(CppType);
+            }
+        }
         memcpy(dst, &true_min, sizeof(CppType));
         dst += sizeof(CppType);
         memcpy(dst, &true_max, sizeof(CppType));
@@ -73,11 +119,13 @@ public:
         percentile->serialize(dst);
     }
 
-    CountType count = 10;
+    CountType bucket_count = 10;
     CppType true_min = RunTimeTypeLimits<LT>::max_value();
     CppType true_max = RunTimeTypeLimits<LT>::min_value();
     std::unique_ptr<PercentileValue> percentile;
     bool is_null = true;
+    CountType distinct_count_seen = 0;
+    std::unordered_set<CppType> distinct_values;
 };
 
 /**
@@ -90,11 +138,12 @@ public:
  * mode BUCKET_COUNT. https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245736/HISTOGRAM
  *
  * Note: PercentileValue uses float so it may lose some precision especially with DATETIME with narrow ranges.
+ * The number of buckets is limited by the number of unique values in the given column.
  */
-template<LogicalType LT>
+template <LogicalType LT>
 class CelonisCalcBucketBoundariesAggregateFunction final
         : public AggregateFunctionBatchHelper<CelonisCalcBucketBoundariesState<LT>,
-                CelonisCalcBucketBoundariesAggregateFunction<LT>> {
+                                              CelonisCalcBucketBoundariesAggregateFunction<LT>> {
 public:
     using CppType = RunTimeCppType<LT>;
     using ColumnType = RunTimeColumnType<LT>;
@@ -114,14 +163,13 @@ public:
         if (this->data(state).is_null && ctx->get_num_args() == 2) {
             DCHECK(!columns[1]->only_null());
             DCHECK(!columns[1]->is_null(0));
-            CountType count = columns[1]->get(0).get<CountType>();
-            if (count > 0) {
-                this->data(state).count = count;
+            CountType bucket_count = columns[1]->get(0).get<CountType>();
+            if (bucket_count > 0) {
+                this->data(state).bucket_count = bucket_count;
             }
         }
 
         this->data(state).update(column_value);
-
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
@@ -137,7 +185,7 @@ public:
             src = binary_column->get_slice(row_num);
         }
 
-        this->data(state).deserialize_and_merge((const uint8_t*) src.data);
+        this->data(state).deserialize_and_merge((const uint8_t*)src.data);
     }
 
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
@@ -162,6 +210,8 @@ public:
 
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const override {
+        // TODO(mkennecke): Implement this function.
+        throw std::runtime_error("celonis_calc_bucket_count_boundaries: convert_to_serialize_format not supported.");
         const ColumnType* input = nullptr;
         BinaryColumn* result = nullptr;
         // get input data column
@@ -184,10 +234,10 @@ public:
             }
         }
 
-        CountType count = 10;
+        CountType bucket_count = 10;
         if (ctx->get_num_args() == 2) {
             DCHECK(src[1]->is_constant());
-            count = src[1]->get(0).get<CountType>();
+            bucket_count = src[1]->get(0).get<CountType>();
         }
 
         Bytes& bytes = result->get_bytes();
@@ -217,7 +267,7 @@ public:
                 size_t new_size = old_size + sizeof(CountType) + sizeof(CppType) * 2 + percentile.serialize_size();
                 bytes.resize(new_size);
                 uint8_t* dst = bytes.data() + old_size;
-                memcpy(dst, &count, sizeof(CountType)); // count
+                memcpy(dst, &bucket_count, sizeof(CountType)); // bucket_count
                 dst += sizeof(CountType);
                 memcpy(dst, &value, sizeof(CppType)); // true_min
                 dst += sizeof(CppType);
@@ -250,22 +300,23 @@ public:
 
         double min_value = state_impl.percentile->quantile(HISTOGRAM_MIN_TARGET_QUANTILE);
         double max_value = state_impl.percentile->quantile(HISTOGRAM_MAX_TARGET_QUANTILE);
+        // The number of buckets cannot exceed the number of distinct values in the given column.
+        // Therefore, cap the bucket count at the number of distinct values.
+        const auto bucket_count = std::min(state_impl.distinct_count_seen, state_impl.bucket_count);
 
-        generate_boundaries(ctx, min_value, max_value, state_impl.true_min, state_impl.true_max, state_impl.count,
+        generate_boundaries(ctx, min_value, max_value, state_impl.true_min, state_impl.true_max, bucket_count,
                             down_cast<ArrayColumn*>(data_column), null_data);
     }
 
     std::string get_name() const override { return "celonis_calc_bucket_count_boundaries"; }
 
 private:
-    void
-    generate_boundaries(FunctionContext* ctx, double min_value, double max_value, CppType true_min, CppType true_max,
-                        CountType count,
-                        ArrayColumn* to, NullData* null_data) const {
+    void generate_boundaries(FunctionContext* ctx, double min_value, double max_value, CppType true_min,
+                             CppType true_max, CountType bucket_count, ArrayColumn* to, NullData* null_data) const {
         double true_min_value = to_histogram_value<LT>(true_min);
         double true_max_value = to_histogram_value<LT>(true_max);
 
-        double width = static_cast<double>(max_value - min_value) / static_cast<double>(count);
+        double width = static_cast<double>(max_value - min_value) / static_cast<double>(bucket_count);
         if (width == 0) {
             width = 1;
         }
@@ -276,12 +327,12 @@ private:
         } else {
             width = std::ceil(width);
         }
-        count = std::min(count, static_cast<CountType>(std::ceil((true_max_value - true_min_value + 1) / width)));
+        bucket_count = std::min(bucket_count,
+                                static_cast<CountType>(std::ceil((true_max_value - true_min_value + 1) / width)));
 
-        if (count > MAX_NUM_BUCKETS) {
-            ctx->set_error(
-                    std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
-                    false);
+        if (bucket_count > MAX_NUM_BUCKETS) {
+            ctx->set_error(std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
+                           false);
             return;
         }
         // The output column is nullable, populate null_data.
@@ -289,15 +340,16 @@ private:
             null_data->push_back(0);
         }
 
-        if (min_value + (width * static_cast<double>(count)) > true_max_value && min_value > true_min_value) {
-            min_value = min_value - std::min(min_value - true_min_value,
-                                             (min_value + (width * static_cast<double>(count))) - true_max_value);
+        if (min_value + (width * static_cast<double>(bucket_count)) > true_max_value && min_value > true_min_value) {
+            min_value =
+                    min_value - std::min(min_value - true_min_value,
+                                         (min_value + (width * static_cast<double>(bucket_count))) - true_max_value);
         }
 
         if constexpr (LT != TYPE_DOUBLE) {
             min_value = min_value < 0 ? std::ceil(min_value - 0.5) : std::floor(min_value + 0.5);
         }
-        max_value = min_value + static_cast<double>(count) * width;
+        max_value = min_value + static_cast<double>(bucket_count) * width;
 
         auto* elements_column = to->elements_column().get();
         auto* offsets_column = to->offsets_column().get();
@@ -307,7 +359,7 @@ private:
         elements_column->append_datum(lower_bound);
         new_offset++;
         Datum prev_boundary = lower_bound;
-        for (int i = 1; i < count; i++) {
+        for (int i = 1; i < bucket_count; i++) {
             const Datum boundary = from_histogram_value<LT>(min_value + (static_cast<double>(i) * width));
             if (prev_boundary.convert2DatumKey() != boundary.convert2DatumKey()) {
                 elements_column->append_datum(boundary);
