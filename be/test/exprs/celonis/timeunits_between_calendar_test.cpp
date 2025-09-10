@@ -146,6 +146,45 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_empty_calendar) {
     EXPECT_EQ(1000.0, result->get(9).get_double());
 }
 
+TEST_F(CelonisTimeunitsBetweenCalendarTest, workdays_between_const_factory_calendar) {
+    Prepare();
+    from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+    to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 6, 0, 0, 0));
+    calendar_id_column_->append_datum(kNullDatum);
+    const auto result = RunConstantCalendar(
+            {R"({"factory_calendar": {)",
+             R"("entries": [)",
+             R"({"start_date": 115200000, "end_date": 147600000},)", // 1970-01-02 08:00:00 → 1970-01-02 17:00:00
+             R"({"start_date": 288000000, "end_date": 306000000},)", // 1970-01-04 08:00:00 → 1970-01-04 13:00:00
+             R"({"start_date": 316800000, "end_date": 320400000},)", // 1970-01-04 16:00:00 → 1970-01-04 17:00:00
+             R"({"start_date": 460800000, "end_date": 493200000})",  // 1970-01-06 08:00:00 → 1970-01-06 17:00:00
+             R"(] })",
+             R"(})"}, "WORKDAYS").value();
+    ASSERT_EQ(from_timestamp_column_->size(), result->size());
+    EXPECT_EQ(2, result->get(0).get_double());
+}
+
+TEST_F(CelonisTimeunitsBetweenCalendarTest, workdays_between_non_const_factory_calendar) {
+    Prepare();
+    from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
+    to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 6, 0, 0, 0));
+    time_unit_column_->append_datum("WORKDAYS");
+    calendar_id_column_->append_datum(kNullDatum);
+    calendar_column_->append_datum(DatumArray{
+            R"({"factory_calendar": {)",
+            R"("entries": [)",
+            R"({"start_date": 115200000, "end_date": 147600000},)", // 1970-01-02 08:00:00 → 1970-01-02 17:00:00
+            R"({"start_date": 288000000, "end_date": 306000000},)", // 1970-01-04 08:00:00 → 1970-01-04 13:00:00
+            R"({"start_date": 316800000, "end_date": 320400000},)", // 1970-01-04 16:00:00 → 1970-01-04 17:00:00
+            R"({"start_date": 460800000, "end_date": 493200000})",  // 1970-01-06 08:00:00 → 1970-01-06 17:00:00
+            R"(] })",
+            R"(})"
+    });
+    const auto result = Run().value();
+    ASSERT_EQ(from_timestamp_column_->size(), result->size());
+    EXPECT_EQ(2, result->get(0).get_double());
+}
+
 TEST_F(CelonisTimeunitsBetweenCalendarTest, non_const_weekday_calendar) {
     Prepare();
     from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));

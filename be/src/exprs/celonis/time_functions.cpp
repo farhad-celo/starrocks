@@ -412,6 +412,8 @@ private:
                 round_time_range.end_ms = ceil_to_nearest_multiple(round_time_range.end_ms, NUM_MILLISECONDS_PER_DAY);
                 round_time_ranges.push_back(round_time_range);
             }
+            // time_ranges do not have overlap, after rounding, round_time_ranges may have overlap, we need to merge.
+            merge_non_weekly_time_ranges(round_time_ranges);
             id_to_round_time_ranges_.emplace(kv.first, std::move(round_time_ranges));
         }
     }
