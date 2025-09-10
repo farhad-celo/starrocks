@@ -1319,8 +1319,9 @@ Status prepare(FunctionContext* context, FunctionContext::FunctionStateScope sco
         }
         time_unit = time_unit_column->get(0).get_slice().to_string();
     }
+    const bool reject_year_gap = (func == CalendarFunction::TIMEUNITS_BETWEEN_CALENDAR);
     ASSIGN_OR_RETURN(CalendarState calendar_state,
-                     CalendarState::create_calendar_state(calendar_column, 0, true, false, time_unit, func));
+                     CalendarState::create_calendar_state(calendar_column, 0, true, reject_year_gap, time_unit, func));
     auto* calendar_state_ptr = new CalendarState(std::move(calendar_state));
     context->set_function_state(scope, calendar_state_ptr);
     return Status::OK();

@@ -655,4 +655,27 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, year_gaps_in_workday_calendar) {
     }
 }
 
+TEST_F(CelonisTimeunitsBetweenCalendarTest, const_year_gaps_in_workday_calendar) {
+    // Const-path should also reject year gaps in WorkdayCalendar
+    Prepare();
+    from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 1, 0, 0));
+    to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 6, 1, 0, 0));
+    calendar_id_column_->append_datum("id1");
+
+    std::string y1970_mask = celonis::get_workday_mask_str(365, {0, 10, 15});
+    std::string y1972_mask = celonis::get_workday_mask_str(366, {11});
+
+    const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
+                                             R"("entries": { "year": 1970, )",
+                                             y1970_mask,
+                                             R"(, calendar_id: "id1"},)",
+                                             R"("entries": { "year": 1972, )",
+                                             y1972_mask,
+                                             R"(, calendar_id: "id1"},)",
+                                             R"( }})"},
+                                            "DAYS");
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().message(), "Year gaps are found in the workday calendar configuration.");
+}
+
 } // namespace starrocks
