@@ -186,8 +186,17 @@ public:
         process_time_ranges();
         set_cum_sum();
         set_no_weekly();
-        // TODO(y.zhang): Add more optimization for other calendar functions.
-        if (func != CalendarFunction::REMAP_TIMESTAMPS_CALENDAR) {
+        // Only some calendar functions need scope/rounded precomputations.
+        // - REMAP_TIMESTAMPS_CALENDAR: does not need scope or rounded data.
+        // - GET_CALENDAR_ENTRY_START: only accesses raw time_ranges; no scope/rounded data needed.
+        // - IN_CALENDAR / TIMEUNITS_BETWEEN_CALENDAR / ADD_TIMEUNITS_CALENDAR: rely on scope, and may
+        //   rely on rounded ranges (WORKDAYS), so keep precomputations enabled.
+        if (func == CalendarFunction::IN_CALENDAR) {
+            // IN_CALENDAR uses scope checks but does not use rounded ranges.
+            set_scope();
+        } else if (func == CalendarFunction::TIMEUNITS_BETWEEN_CALENDAR ||
+                   func == CalendarFunction::ADD_TIMEUNITS_CALENDAR) {
+            // These may require WORKDAYS handling which uses rounded ranges and their cumulative sums.
             set_scope();
             set_round_time_ranges();
             set_round_cum_sum();
