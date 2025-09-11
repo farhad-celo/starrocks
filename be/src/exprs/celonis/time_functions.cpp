@@ -112,6 +112,12 @@ static int get_year(int64_t millis) {
     return get_year(t);
 }
 
+static int get_year_for_end_timestamp(int64_t millis) {
+    // Subtract 1ms to handle the case where end_ms is the last millisecond of the year
+    TimestampValue t = timestamp_from_unix_millis(millis - 1);
+    return get_year(t);
+}
+
 static int get_week_number(int year, int month, int day) {
     return DateValue::create(year, month, day).get_week_of_year();
 }
@@ -459,7 +465,7 @@ private:
             if (has_weekly_range) {
                 id_to_scope_[id] = std::nullopt;
             } else {
-                id_to_scope_[id] = Scope{get_year(min_begin), get_year(max_end)};
+                id_to_scope_[id] = Scope{get_year(min_begin), get_year_for_end_timestamp(max_end)};
             }
         }
     }

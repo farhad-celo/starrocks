@@ -717,4 +717,39 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_year_gaps_in_workday_calendar)
     EXPECT_EQ(result.status().message(), "Year gaps are found in the workday calendar configuration.");
 }
 
+TEST_F(CelonisTimeunitsBetweenCalendarTest, year_boundary_edge_case) {
+    Prepare();
+    // 2023
+    from_timestamp_column_->append_datum(TimestampValue::create(2023, 1, 1, 0, 0, 0));
+    to_timestamp_column_->append_datum(TimestampValue::create(2023, 12, 31, 0, 0, 0));
+
+    // 2024
+    from_timestamp_column_->append_datum(TimestampValue::create(2024, 1, 1, 0, 0, 0));
+    to_timestamp_column_->append_datum(TimestampValue::create(2024, 1, 2, 0, 0, 0));
+
+    // 2025
+    from_timestamp_column_->append_datum(TimestampValue::create(2025, 1, 1, 0, 0, 0));
+    to_timestamp_column_->append_datum(TimestampValue::create(2025, 1, 2, 0, 0, 0));
+
+    // Calendar that spans 2024 full year
+    DatumArray calendar_array{
+            R"({"factory_calendar": {)",
+            R"("entries": {"start_date": 1704067200000, "end_date": 1735689600000} )",
+            R"(} })"
+    };
+
+    for (auto i = 0; i < from_timestamp_column_->size(); ++i) {
+        time_unit_column_->append_datum("DAYS");
+        calendar_column_->append_datum(calendar_array);
+        calendar_id_column_->append_datum(kNullDatum);
+    }
+
+    const auto result = Run().value();
+    ASSERT_EQ(from_timestamp_column_->size(), result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_FALSE(result->get(1).is_null());
+    EXPECT_TRUE(result->get(2).is_null());
+    EXPECT_EQ(1.0, result->get(1).get_double());
+}
+
 } // namespace starrocks
