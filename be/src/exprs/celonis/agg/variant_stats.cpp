@@ -4,6 +4,7 @@
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
+#include "exprs/celonis/agg/variant_stats_edge_utils.h"
 #include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -157,43 +158,10 @@ VariantStatsFinalizer::json_string(const std::vector<VList>& activity_top_varian
     rapidjson::Value e_stats(rapidjson::kArrayType);
     if (edge_count_ >= 0) {
         d.AddMember("e_count", edge_map_.size(), allocator);
-        std::map<Slice, int32_t> ordered_activity_map(activity_map_.begin(), activity_map_.end());
-        std::vector<int32_t> activity_unordered_to_ordered(activity_map_.size());
-        int index = 0;
-        for (auto it = ordered_activity_map.begin(); it != ordered_activity_map.end(); ++it, ++index) {
-            DCHECK_LT(it->second, activity_unordered_to_ordered.size());
-            activity_unordered_to_ordered[it->second] = index;
-        }
-        struct EdgeOrderedID {
-            int32_t ordered_src;
-            int32_t ordered_dst;
-            EdgeHashMap::const_iterator it;
-        };
-        struct CmpOnEdgeOrderedID {
-            bool operator()(const EdgeOrderedID& x, const EdgeOrderedID& y) const {
-                return std::tie(x.ordered_src, x.ordered_dst) < std::tie(y.ordered_src, y.ordered_dst);
-            }
-        };
-        std::priority_queue<EdgeOrderedID, std::vector<EdgeOrderedID>, CmpOnEdgeOrderedID> pq;
-        for (auto it = edge_map_.cbegin(); it != edge_map_.cend(); ++it) {
-            pq.push({activity_unordered_to_ordered[it->first.src], activity_unordered_to_ordered[it->first.dst], it});
-            if (pq.size() > edge_count_) {
-                pq.pop();
-            }
-        }
-        // Pop first to list them in reverse sorted order
-        std::vector<EdgeHashMap::const_iterator> popped;
-        popped.reserve(pq.size());
-        while (!pq.empty()) {
-            popped.push_back(pq.top().it);
-            pq.pop();
-        }
-        for (auto rit = popped.rbegin(); rit != popped.rend(); ++rit) {
-            rapidjson::Value obj = (*rit)->second.to_json(allocator);
-            obj.AddMember("src", (*rit)->first.src, allocator);
-            obj.AddMember("dst", (*rit)->first.dst, allocator);
-            e_stats.PushBack(obj, allocator);
-        }
+        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(
+                edge_map_, activity_map_, edge_count_);
+        e_stats = EdgeStatsProcessor<SliceHashMap>::build_edge_stats_json(
+                sorted_edges, allocator);
     }
     d.AddMember("e_stats", e_stats, allocator);
 
@@ -264,45 +232,10 @@ VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_
     // Edge stats
     if (edge_count_ >= 0) {
         statistics_proto.set_e_count(edge_map_.size());
-        std::map<Slice, int32_t> ordered_activity_map(activity_map_.begin(), activity_map_.end());
-        std::vector<int32_t> activity_unordered_to_ordered(activity_map_.size());
-        int index = 0;
-        for (auto it = ordered_activity_map.begin(); it != ordered_activity_map.end(); ++it, ++index) {
-            DCHECK_LT(it->second, activity_unordered_to_ordered.size());
-            activity_unordered_to_ordered[it->second] = index;
-        }
-        struct EdgeOrderedID {
-            int32_t ordered_src;
-            int32_t ordered_dst;
-            EdgeHashMap::const_iterator it;
-        };
-        struct CmpOnEdgeOrderedID {
-            bool operator()(const EdgeOrderedID& x, const EdgeOrderedID& y) const {
-                return std::tie(x.ordered_src, x.ordered_dst) < std::tie(y.ordered_src, y.ordered_dst);
-            }
-        };
-        std::priority_queue<EdgeOrderedID, std::vector<EdgeOrderedID>, CmpOnEdgeOrderedID> pq;
-        for (auto it = edge_map_.cbegin(); it != edge_map_.cend(); ++it) {
-            pq.push({activity_unordered_to_ordered[it->first.src], activity_unordered_to_ordered[it->first.dst], it});
-            if (pq.size() > edge_count_) {
-                pq.pop();
-            }
-        }
-        // Pop first to list them in reverse sorted order
-        std::vector<EdgeHashMap::const_iterator> popped;
-        popped.reserve(pq.size());
-        while (!pq.empty()) {
-            popped.push_back(pq.top().it);
-            pq.pop();
-        }
-        for (auto rit = popped.rbegin(); rit != popped.rend(); ++rit) {
-            celonis::accelerator::EdgeStatsEntry entry;
-            entry.set_count((*rit)->second.count);
-            entry.set_count_case((*rit)->second.count_case);
-            entry.set_src((*rit)->first.src);
-            entry.set_dst((*rit)->first.dst);
-            *statistics_proto.add_e_stats() = entry;
-        }
+        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(
+                edge_map_, activity_map_, edge_count_);
+        EdgeStatsProcessor<SliceHashMap>::build_edge_stats_proto(
+                sorted_edges, statistics_proto);
     }
     // Variants
     if (!disable_top_variant_stats_) {
