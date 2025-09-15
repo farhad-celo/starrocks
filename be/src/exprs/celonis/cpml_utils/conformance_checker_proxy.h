@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "column/vectorized_fwd.h"
+#include "column/column.h"
 #include "common/statusor.h"
 
 namespace starrocks::celonis::cpml_utils {
