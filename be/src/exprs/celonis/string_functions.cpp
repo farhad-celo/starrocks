@@ -482,7 +482,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     DCHECK(state != nullptr);
     if (state->pattern_chars.empty()) {
-        return columns[0];
+        return columns[0]->clone_shared();
     }
     const auto& translate_mapping = state->translate_mapping;
 
