@@ -710,8 +710,9 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
         result->append_nulls(n_rows);
         return Status::OK();
     }
-    const std::string begin_activity = begin_mode == "ALL" ? "" : begin_activity_viewer.value(0).to_string();
-    const std::string end_activity = end_mode == "ALL" ? "" : end_activity_viewer.value(0).to_string();
+    // An empty Slice() is used to represent the 'ALL' mode
+    const Slice begin_activity = begin_mode == "ALL" ? Slice() : begin_activity_viewer.value(0);
+    const Slice end_activity = end_mode == "ALL" ? Slice() : end_activity_viewer.value(0);
     if (begin_mode != "FIRST" && begin_mode != "LAST" && begin_mode != "ALL") {
         return Status::InvalidArgument("begin range mode must be FIRST/LAST/ALL.");
     }
@@ -742,14 +743,13 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
                 if (activity_array_data.null_elements != nullptr && (*activity_array_data.null_elements)[i] != 0) {
                     continue;
                 }
-                const std::string activity = activities[i].to_string();
-                if (activity == begin_activity) {
+                if (activities[i] == begin_activity) {
                     last_begin_index = i;
                     if (!first_begin_index.has_value()) {
                         first_begin_index = i;
                     }
                 }
-                if (activity == end_activity) {
+                if (activities[i] == end_activity) {
                     last_end_index = i;
                     if (!first_end_index.has_value()) {
                         first_end_index = i;

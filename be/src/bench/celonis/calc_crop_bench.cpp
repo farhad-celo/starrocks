@@ -13,58 +13,58 @@
 namespace starrocks {
 
 /*
-2025-03-28T21:38:06+00:00
+2025-09-14T22:12:17+00:00
 Running ./be/build_Release/src/bench/celonis/output/calc_crop_bench
-Run on (32 X 3241.36 MHz CPU s)
+Run on (32 X 3245.5 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 9.92, 8.61, 7.48
+Load Average: 3.19, 1.69, 1.17
 // Args: Number of rows / Array Length
 -----------------------------------------------------------------------------------------------
 Benchmark                                     Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------------------------
-BM_CalcCropAllAll/1000/10                106544 ns       106515 ns         6612 RowInvRate=106.515ns
-BM_CalcCropAllAll/10000/10               995596 ns       995583 ns          704 RowInvRate=99.5583ns
-BM_CalcCropAllAll/100000/10            12033376 ns     12033518 ns           58 RowInvRate=120.335ns
-BM_CalcCropAllAll/1000/20                183288 ns       183269 ns         3875 RowInvRate=183.269ns
-BM_CalcCropAllAll/10000/20              1752623 ns      1752605 ns          379 RowInvRate=175.261ns
-BM_CalcCropAllAll/100000/20            22515220 ns     22514710 ns           33 RowInvRate=225.147ns
-BM_CalcCropAllAll/1000/40                335323 ns       335312 ns         2080 RowInvRate=335.312ns
-BM_CalcCropAllAll/10000/40              3317356 ns      3317227 ns          215 RowInvRate=331.723ns
-BM_CalcCropAllAll/100000/40            40689986 ns     40689355 ns           17 RowInvRate=406.894ns
+BM_CalcCropAllAll/1000/10                103844 ns       103824 ns         6679 RowInvRate=103.824ns
+BM_CalcCropAllAll/10000/10               994866 ns       994815 ns          712 RowInvRate=99.4815ns
+BM_CalcCropAllAll/100000/10            11651687 ns     11650957 ns           60 RowInvRate=116.51ns
+BM_CalcCropAllAll/1000/20                179862 ns       179808 ns         3902 RowInvRate=179.808ns
+BM_CalcCropAllAll/10000/20              1938285 ns      1937310 ns          400 RowInvRate=193.731ns
+BM_CalcCropAllAll/100000/20            21450770 ns     21450251 ns           33 RowInvRate=214.503ns
+BM_CalcCropAllAll/1000/40                348629 ns       348539 ns         2057 RowInvRate=348.539ns
+BM_CalcCropAllAll/10000/40              3275723 ns      3275552 ns          214 RowInvRate=327.555ns
+BM_CalcCropAllAll/100000/40            39298764 ns     39295396 ns           18 RowInvRate=392.954ns
 
-BM_CalcCropFirstLast/1000/10             331591 ns       331564 ns         2116 RowInvRate=331.564ns
-BM_CalcCropFirstLast/10000/10           3355245 ns      3355265 ns          211 RowInvRate=335.527ns
-BM_CalcCropFirstLast/100000/10         35140459 ns     35139827 ns           20 RowInvRate=351.398ns
-BM_CalcCropFirstLast/1000/20             576083 ns       575855 ns         1224 RowInvRate=575.855ns
-BM_CalcCropFirstLast/10000/20           5666673 ns      5666596 ns          126 RowInvRate=566.66ns
-BM_CalcCropFirstLast/100000/20         58950170 ns     58947797 ns           12 RowInvRate=589.478ns
-BM_CalcCropFirstLast/1000/40            1144238 ns      1144039 ns          611 RowInvRate=1.14404us
-BM_CalcCropFirstLast/10000/40          11681807 ns     11681730 ns           60 RowInvRate=1.16817us
-BM_CalcCropFirstLast/100000/40        119435216 ns    119432698 ns            6 RowInvRate=1.19433us
+BM_CalcCropFirstLast/1000/10             243607 ns       243599 ns         2890 RowInvRate=243.599ns
+BM_CalcCropFirstLast/10000/10           2343223 ns      2343103 ns          298 RowInvRate=234.31ns
+BM_CalcCropFirstLast/100000/10         25417985 ns     25417202 ns           27 RowInvRate=254.172ns
+BM_CalcCropFirstLast/1000/20             440352 ns       440308 ns         1602 RowInvRate=440.308ns
+BM_CalcCropFirstLast/10000/20           4273845 ns      4273737 ns          166 RowInvRate=427.374ns
+BM_CalcCropFirstLast/100000/20         46416448 ns     46414293 ns           16 RowInvRate=464.143ns
+BM_CalcCropFirstLast/1000/40             853304 ns       853251 ns          813 RowInvRate=853.251ns
+BM_CalcCropFirstLast/10000/40           8248778 ns      8248772 ns           85 RowInvRate=824.877ns
+BM_CalcCropFirstLast/100000/40         87511630 ns     87509870 ns            8 RowInvRate=875.099ns
 
-BM_CalcCropToNullAllAll/1000/10          210720 ns       210680 ns         3322 RowInvRate=210.68ns
-BM_CalcCropToNullAllAll/10000/10        2042746 ns      2042640 ns          344 RowInvRate=204.264ns
-BM_CalcCropToNullAllAll/100000/10      22818095 ns     22818065 ns           29 RowInvRate=228.181ns
-BM_CalcCropToNullAllAll/1000/20          401819 ns       401805 ns         1756 RowInvRate=401.805ns
-BM_CalcCropToNullAllAll/10000/20        4003038 ns      4002950 ns          176 RowInvRate=400.295ns
-BM_CalcCropToNullAllAll/100000/20      46955656 ns     46955684 ns           15 RowInvRate=469.557ns
-BM_CalcCropToNullAllAll/1000/40          743373 ns       743259 ns          947 RowInvRate=743.259ns
-BM_CalcCropToNullAllAll/10000/40        7511412 ns      7511474 ns           93 RowInvRate=751.147ns
-BM_CalcCropToNullAllAll/100000/40      91297874 ns     91295750 ns            8 RowInvRate=912.957ns
+BM_CalcCropToNullAllAll/1000/10          212937 ns       212943 ns         3265 RowInvRate=212.943ns
+BM_CalcCropToNullAllAll/10000/10        2059556 ns      2059589 ns          339 RowInvRate=205.959ns
+BM_CalcCropToNullAllAll/100000/10      25104726 ns     25105263 ns           28 RowInvRate=251.053ns
+BM_CalcCropToNullAllAll/1000/20          399735 ns       399708 ns         1755 RowInvRate=399.708ns
+BM_CalcCropToNullAllAll/10000/20        3872763 ns      3872603 ns          177 RowInvRate=387.26ns
+BM_CalcCropToNullAllAll/100000/20      48794767 ns     48790001 ns           14 RowInvRate=487.9ns
+BM_CalcCropToNullAllAll/1000/40          754648 ns       754453 ns          929 RowInvRate=754.453ns
+BM_CalcCropToNullAllAll/10000/40        7490427 ns      7490556 ns           95 RowInvRate=749.056ns
+BM_CalcCropToNullAllAll/100000/40      91621381 ns     91618794 ns            8 RowInvRate=916.188ns
 
-BM_CalcCropToNullFirstLast/1000/10       397157 ns       397155 ns         1760 RowInvRate=397.155ns
-BM_CalcCropToNullFirstLast/10000/10     3865196 ns      3865108 ns          180 RowInvRate=386.511ns
-BM_CalcCropToNullFirstLast/100000/10   40820423 ns     40820516 ns           17 RowInvRate=408.205ns
-BM_CalcCropToNullFirstLast/1000/20       697809 ns       697768 ns         1016 RowInvRate=697.768ns
-BM_CalcCropToNullFirstLast/10000/20     6956093 ns      6955897 ns           98 RowInvRate=695.59ns
-BM_CalcCropToNullFirstLast/100000/20   72605519 ns     72605420 ns            9 RowInvRate=726.054ns
-BM_CalcCropToNullFirstLast/1000/40      1426281 ns      1426231 ns          498 RowInvRate=1.42623us
-BM_CalcCropToNullFirstLast/10000/40    13929618 ns     13929530 ns           49 RowInvRate=1.39295us
-BM_CalcCropToNullFirstLast/100000/40  152507679 ns    152505615 ns            5 RowInvRate=1.52506us
+BM_CalcCropToNullFirstLast/1000/10       306154 ns       306138 ns         2284 RowInvRate=306.138ns
+BM_CalcCropToNullFirstLast/10000/10     2949495 ns      2949466 ns          236 RowInvRate=294.947ns
+BM_CalcCropToNullFirstLast/100000/10   31356059 ns     31351757 ns           22 RowInvRate=313.518ns
+BM_CalcCropToNullFirstLast/1000/20       566443 ns       566282 ns         1233 RowInvRate=566.282ns
+BM_CalcCropToNullFirstLast/10000/20     5564754 ns      5564499 ns          126 RowInvRate=556.45ns
+BM_CalcCropToNullFirstLast/100000/20   59342231 ns     59337271 ns           12 RowInvRate=593.373ns
+BM_CalcCropToNullFirstLast/1000/40      1087052 ns      1086553 ns          650 RowInvRate=1086.55ns
+BM_CalcCropToNullFirstLast/10000/40    10642852 ns     10642344 ns           64 RowInvRate=1064.23ns
+BM_CalcCropToNullFirstLast/100000/40  113311574 ns    113310947 ns            6 RowInvRate=1.13311us
 */
 
 using ScalarFunction = StatusOr<ColumnPtr> (*)(FunctionContext* context, const Columns& columns);
