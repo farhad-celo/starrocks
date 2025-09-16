@@ -76,28 +76,7 @@ void CelonisVariantStatsAggregateV2State::compute_top_variants(std::vector<std::
         sorted_indexes.push_back(i);
     }
     std::sort(sorted_indexes.begin(), sorted_indexes.end(),
-              [&](size_t a, size_t b) {
-                  // Primary sort: by count (descending)
-                  if (counts_[a] != counts_[b]) {
-                      return counts_[a] > counts_[b];
-                  }
-
-                  // Tiebreaker: lexicographically compare variant data
-                  auto [lo_a, hi_a] = get_offsets(a);
-                  auto [lo_b, hi_b] = get_offsets(b);
-
-                  // Compare variants lexicographically
-                  for (size_t i = lo_a, j = lo_b; i < hi_a && j < hi_b; ++i, ++j) {
-                      int32_t activity_a = get_activity(i);
-                      int32_t activity_b = get_activity(j);
-                      if (activity_a != activity_b) {
-                          return activity_a < activity_b;
-                      }
-                  }
-
-                  // If one is a prefix of the other, shorter one comes first
-                  return (hi_a - lo_a) < (hi_b - lo_b);
-              });
+              [&](size_t a, size_t b) { return counts_[a] > counts_[b]; });
 
     // 2. find a happy variant
     size_t happy_v = compute_happy_variant(sorted_indexes);

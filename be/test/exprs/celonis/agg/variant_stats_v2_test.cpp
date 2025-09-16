@@ -418,47 +418,4 @@ TEST_F(CelonisVariantStatsV2Test, proto_encoding_enabled_with_no_activities) {
     RunMergeNew(variants1, counts1, variants2, counts2, activity_array, 1000, true, true, {"{}"});
 }
 
-TEST_F(CelonisVariantStatsV2Test, tie_breaker_lexicographic_sorting) {
-    // Test the tie breaker behavior when variants have the same count
-    // The sorting should fall back to lexicographic comparison of activity sequences
-    std::vector<std::optional<DatumArray>> variants1 = {
-            DatumArray{2, 1, 0},  // count will be 2
-            DatumArray{0, 1, 2}   // count will be 2 (same as above, should trigger tie breaker)
-    };
-    std::vector<int64_t> counts1 = {2, 2};
-
-    std::vector<std::optional<DatumArray>> variants2 = {
-            DatumArray{1, 0},     // count will be 2
-            DatumArray{0, 2}      // count will be 2
-    };
-    std::vector<int64_t> counts2 = {2, 2};
-
-    DatumArray activity_array = {"A", "B", "C"};
-
-    // Expected order after tie breaker (lexicographic): [0,1,2], [0,2], [1,0], [2,1,0]
-    // Since they all have same count (2), lexicographic comparison determines order
-    Run(variants1, counts1, variants2, counts2, activity_array, 1000, false, false,
-        {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"}],\"a_stats\":[{\"count\":8,\"count_case\":8,\"count_start\":4,\"count_end\":4,\"id\":0},{\"count\":6,\"count_case\":6,\"count_start\":2,\"count_end\":0,\"id\":1},{\"count\":6,\"count_case\":6,\"count_start\":2,\"count_end\":4,\"id\":2}],\"e_count\":5,\"e_stats\":[{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":2},{\"count\":4,\"count_case\":4,\"src\":1,\"dst\":0},{\"count\":2,\"count_case\":2,\"src\":1,\"dst\":2},{\"count\":2,\"count_case\":2,\"src\":2,\"dst\":1}],\"top\":[{\"id\":0,\"top\":[{\"variant\":[0,1,2],\"count\":2},{\"variant\":[0,2],\"count\":2},{\"variant\":[1,0],\"count\":2},{\"variant\":[2,1,0],\"count\":2}]},{\"id\":1,\"top\":[{\"variant\":[0,1,2],\"count\":2},{\"variant\":[1,0],\"count\":2},{\"variant\":[2,1,0],\"count\":2}]},{\"id\":2,\"top\":[{\"variant\":[0,1,2],\"count\":2},{\"variant\":[0,2],\"count\":2},{\"variant\":[2,1,0],\"count\":2}]}],\"happy\":{\"variant\":[0,1,2],\"count\":2}}"""});
-}
-
-TEST_F(CelonisVariantStatsV2Test, tie_breaker_prefix_variants) {
-    // Test the tie breaker behavior when one variant is a prefix of another
-    // Shorter variant should come first when counts are equal
-    std::vector<std::optional<DatumArray>> variants1 = {
-            DatumArray{0, 1, 2, 3},  // count will be 1 (longer variant)
-    };
-    std::vector<int64_t> counts1 = {1};
-
-    std::vector<std::optional<DatumArray>> variants2 = {
-            DatumArray{0, 1, 2}      // count will be 1 (shorter variant, should come first)
-    };
-    std::vector<int64_t> counts2 = {1};
-
-    DatumArray activity_array = {"A", "B", "C", "D"};
-
-    // Expected order: [0,1,2] comes before [0,1,2,3] due to prefix rule
-    Run(variants1, counts1, variants2, counts2, activity_array, 1000, false, false,
-        {"""{\"dict\":[{\"id\":0,\"name\":\"A\"},{\"id\":1,\"name\":\"B\"},{\"id\":2,\"name\":\"C\"},{\"id\":3,\"name\":\"D\"}],\"a_stats\":[{\"count\":2,\"count_case\":2,\"count_start\":2,\"count_end\":0,\"id\":0},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":0,\"id\":1},{\"count\":2,\"count_case\":2,\"count_start\":0,\"count_end\":1,\"id\":2},{\"count\":1,\"count_case\":1,\"count_start\":0,\"count_end\":1,\"id\":3}],\"e_count\":3,\"e_stats\":[{\"count\":2,\"count_case\":2,\"src\":0,\"dst\":1},{\"count\":2,\"count_case\":2,\"src\":1,\"dst\":2},{\"count\":1,\"count_case\":1,\"src\":2,\"dst\":3}],\"top\":[{\"id\":0,\"top\":[{\"variant\":[0,1,2],\"count\":1},{\"variant\":[0,1,2,3],\"count\":1}]},{\"id\":1,\"top\":[{\"variant\":[0,1,2],\"count\":1},{\"variant\":[0,1,2,3],\"count\":1}]},{\"id\":2,\"top\":[{\"variant\":[0,1,2],\"count\":1},{\"variant\":[0,1,2,3],\"count\":1}]},{\"id\":3,\"top\":[{\"variant\":[0,1,2,3],\"count\":1}]}],\"happy\":{\"variant\":[0,1,2],\"count\":1}}"""});
-}
-
 } // namespace starrocks
