@@ -26,7 +26,7 @@ public:
             edge_count_ = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
         }
         if (ctx->is_notnull_constant_column(3)) {
-            disable_top_variant_stats_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(3));
+            skip_variant_analysis_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(3));
         }
         if (ctx->is_notnull_constant_column(4)) {
             enable_proto_encoding_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(4));
@@ -36,7 +36,7 @@ public:
 
     size_t serialized_size() const override {
         size_t result = sizeof(int64_t); // edge_count_
-        result += sizeof(uint8_t);       // disable_top_variant_stats_
+        result += sizeof(uint8_t);       // skip_variant_analysis_
         result += sizeof(uint8_t);       // enable_proto_encoding_
         result += VariantAggregateState::serialized_size();
         return result;
@@ -45,7 +45,7 @@ public:
     void serialize(uint8_t* dst) const override {
         memcpy(dst, &edge_count_, sizeof(int64_t));
         dst += sizeof(int64_t);
-        memcpy(dst, &disable_top_variant_stats_, sizeof(uint8_t));
+        memcpy(dst, &skip_variant_analysis_, sizeof(uint8_t));
         dst += sizeof(uint8_t);
         memcpy(dst, &enable_proto_encoding_, sizeof(uint8_t));
         dst += sizeof(uint8_t);
@@ -59,7 +59,7 @@ public:
         memcpy(&edge_count_, src, sizeof(int64_t));
         src += sizeof(int64_t);
         len -= sizeof(int64_t);
-        memcpy(&disable_top_variant_stats_, src, sizeof(uint8_t));
+        memcpy(&skip_variant_analysis_, src, sizeof(uint8_t));
         src += sizeof(uint8_t);
         len -= sizeof(uint8_t);
         memcpy(&enable_proto_encoding_, src, sizeof(uint8_t));
@@ -74,7 +74,7 @@ public:
 
     int64_t edge_count() const { return edge_count_; }
 
-    bool disable_top_variant_stats() const { return disable_top_variant_stats_; }
+    bool skip_variant_analysis() const { return skip_variant_analysis_; }
 
     bool enable_proto_encoding() const { return enable_proto_encoding_; }
 
@@ -87,7 +87,7 @@ public:
 
 private:
     int64_t edge_count_ = (1LL << 32); // very large number to output all edges.
-    bool disable_top_variant_stats_ = false;
+    bool skip_variant_analysis_ = false;
     bool enable_proto_encoding_ = false;
     uint64_t merging_microseconds_ = 0;
     uint64_t merging_bytes_ = 0;
@@ -103,7 +103,7 @@ public:
             : VariantAggregateFinalizer(ctx, static_cast<const VariantAggregateState&>(state)),
               activity_stats_(activity_map_.size()),
               edge_count_(state.edge_count()),
-              disable_top_variant_stats_(state.disable_top_variant_stats()),
+              skip_variant_analysis_(state.skip_variant_analysis()),
               enable_proto_encoding_(state.enable_proto_encoding()),
               uuid_string_(ThreadLocalUUIDGenerator::next_uuid_string()),
               merging_microseconds_(state.merging_microseconds()),
@@ -141,7 +141,7 @@ private:
     std::vector<ActivityStats> activity_stats_;
     EdgeHashMap edge_map_;
     const int64_t edge_count_;
-    const bool disable_top_variant_stats_;
+    const bool skip_variant_analysis_;
     const bool enable_proto_encoding_;
     const std::string uuid_string_;
     const uint64_t merging_microseconds_;
@@ -150,19 +150,19 @@ private:
 };
 
 /**
- * @param: [ input_column, weight_column [, edge_count [, disable_top_variant_stats [, enable_proto_encoding ] ] ] ]
+ * @param: [ input_column, weight_column [, edge_count [, skip_variant_analysis [, enable_proto_encoding ] ] ] ]
  * @paramType columns: [ ARRAY_VARCHAR, BIGINT [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
  * @return: json or base64 encoded binary proto string
  * variant_column: variant column.
  * weight_column: Indicates the frequency of the input (variant).
  * edge_count (optional): Limits the size of the edge table. if edge_count <= 0, edge stats is not populated and output. default = 1LL << 32 to output all the edges.
- * disable_top_variant_stats (optional): Disables top variant stats, default = false.
+ * skip_variant_analysis (optional): Disables top variant stats and happy path, default = false.
  * enable_proto_encoding (optional): Enable base64 encoded binary proto output, default = false.
  *
  * Used to support PQL EXPLORE_PROCESS and GRAPH
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245719/EXPLORE+PROCESS
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11248519/GRAPH+Query
- * Below are the 3 use cases
+ * Below are the 3 use cases:
  * 1. explore_process will pass in edge_count = -1. It needs self-loop stats but it does not need overall edge count or the edge table;
  * 2. graph with edge_count = 0. It needs overall edge count but does not need the edge table;
  * 3. graph with a positive edge_count. It needs overall edge count and the edge table (trimmed by edge count).

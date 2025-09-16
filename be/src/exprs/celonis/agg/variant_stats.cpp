@@ -64,7 +64,6 @@ void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_to
         // No data.
         return;
     }
-
     // 1. sort variants by count
     std::vector<VRef> v_count(variant_map_.size());
     int index = 0;
@@ -87,13 +86,8 @@ void VariantStatsFinalizer::compute_top_variants(std::vector<VList>& activity_to
     int happy_v = compute_happy_variant(v_count);
     happy = v_count[happy_v];
 
-    if (disable_top_variant_stats_) {
-        return;
-    }
-
     // 3. find top-10 variants for each activity
     // Make sure we get enough variants so that each activity has 10 entries
-
     activity_top_variants.resize(activity_map_.size());
     for (int i = 0; i < activity_top_variants.size(); i++) {
         activity_top_variants[i].reserve(10);
@@ -165,8 +159,8 @@ VariantStatsFinalizer::json_string(const std::vector<VList>& activity_top_varian
     }
     d.AddMember("e_stats", e_stats, allocator);
 
-    // Variants
-    if (!disable_top_variant_stats_) {
+    // Variants and happy path
+    if (!skip_variant_analysis_) {
         rapidjson::Value topv(rapidjson::kArrayType);
         for (int i = 0; i < activity_top_variants.size(); i++) {
             rapidjson::Value obj(rapidjson::kObjectType);
@@ -184,16 +178,14 @@ VariantStatsFinalizer::json_string(const std::vector<VList>& activity_top_varian
             topv.PushBack(obj, allocator);
         }
         d.AddMember("top", topv, allocator);
+        // Happy path
+        size_t happy_count = happy->second;
+        rapidjson::Value happy_obj(rapidjson::kObjectType);
+        rapidjson::Value happy_var = happy->first.to_json(allocator);
+        happy_obj.AddMember("variant", happy_var, allocator);
+        happy_obj.AddMember("count", happy_count, allocator);
+        d.AddMember("happy", happy_obj, allocator);
     }
-
-    // Happy path
-    size_t happy_count = happy->second;
-    rapidjson::Value happy_obj(rapidjson::kObjectType);
-    rapidjson::Value happy_var = happy->first.to_json(allocator);
-    happy_obj.AddMember("variant", happy_var, allocator);
-    happy_obj.AddMember("count", happy_count, allocator);
-    d.AddMember("happy", happy_obj, allocator);
-
     // Encode to string.
     rapidjson::StringBuffer buf;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
@@ -237,8 +229,8 @@ VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_
         EdgeStatsProcessor<SliceHashMap>::build_edge_stats_proto(
                 sorted_edges, statistics_proto);
     }
-    // Variants
-    if (!disable_top_variant_stats_) {
+    // Variants and happy path
+    if (!skip_variant_analysis_) {
         uint32_t total_variants = 0;
         for (int i = 0; i < activity_top_variants.size(); i++) {
             celonis::accelerator::VariantEntry entry;
@@ -257,17 +249,12 @@ VariantStatsFinalizer::base64_encoded_string(const std::vector<VList>& activity_
             *statistics_proto.add_top() = entry;
         }
         LOG(INFO) << get_log_prefix(query_id) << ": total number of top variants = " << total_variants << "\n";
+        celonis::accelerator::VariantCountPair& happy_variant_with_count = *statistics_proto.mutable_happy();
+        happy_variant_with_count.set_count(happy->second);
+        for (const auto& activity : happy->first.data) {
+            happy_variant_with_count.add_variant(activity);
+        }
     }
-    // Happy path
-    celonis::accelerator::VariantCountPair count_pair;
-    size_t happy_count = happy->second;
-    count_pair.set_count(happy_count);
-    const auto& data = happy->first.data;
-    for (int i = 0; i < data.size(); i++) {
-        count_pair.add_variant(data[i]);
-    }
-    *statistics_proto.mutable_happy() = count_pair;
-
     // set size limit to 100M.
     std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto, (100LL << 20), false);
     if (!encoded_string.has_value()) {
@@ -347,7 +334,9 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     LOG(INFO) << log_prefix << ": started finding top\n";
     std::vector<VList> activity_top_variants;
     VRef happy;
-    compute_top_variants(activity_top_variants, happy, query_id);
+    if (!skip_variant_analysis_) {
+        compute_top_variants(activity_top_variants, happy, query_id);
+    }
     LOG(INFO) << log_prefix << ": done finding top (activity_top_variants size = "
               << activity_top_variants.size()
               << ")\n";

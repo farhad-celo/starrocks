@@ -86,22 +86,22 @@ struct VariantStatsResult {
         if (document.HasParseError()) {
             return false;
         }
-        if (!dict_from_json(document)) {
+        if (!parse_dict_from_json(document)) {
             return false;
         }
-        if (!a_stats_from_json(document)) {
+        if (!parse_a_stats_from_json(document)) {
             return false;
         }
-        if (!e_stats_from_json(document)) {
+        if (!parse_e_stats_from_json(document)) {
             return false;
         }
-        if (!e_count_from_json(document)) {
+        if (!parse_e_count_from_json(document)) {
             return false;
         }
-        if (!top_from_json(document)) {
+        if (!try_parse_top_from_json(document)) {
             return false;
         }
-        if (!happy_from_json(document)) {
+        if (!try_parse_happy_from_json(document)) {
             return false;
         }
         return true;
@@ -236,7 +236,7 @@ struct VariantStatsResult {
         return ss.str();
     }
 
-    bool dict_from_json(const rapidjson::Document& document) {
+    bool parse_dict_from_json(const rapidjson::Document& document) {
         if (!document.HasMember("dict")) {
             return false;
         }
@@ -257,7 +257,7 @@ struct VariantStatsResult {
         return true;
     }
 
-    bool a_stats_from_json(const rapidjson::Document& document) {
+    bool parse_a_stats_from_json(const rapidjson::Document& document) {
         if (!document.HasMember("dict")) {
             return false;
         }
@@ -284,7 +284,7 @@ struct VariantStatsResult {
         return true;
     }
 
-    bool e_stats_from_json(const rapidjson::Document& document) {
+    bool parse_e_stats_from_json(const rapidjson::Document& document) {
         if (!document["e_stats"].IsArray()) {
             return false;
         }
@@ -303,14 +303,14 @@ struct VariantStatsResult {
         return true;
     }
 
-    bool e_count_from_json(const rapidjson::Document& document) {
+    bool parse_e_count_from_json(const rapidjson::Document& document) {
         if (document.HasMember("e_count")) {
             e_count = document["e_count"].GetInt64();
         }
         return true;
     }
 
-    Variant variant_from_json(const rapidjson::Value& v) {
+    Variant parse_variant_from_json(const rapidjson::Value& v) {
         Variant result(v.Size());
         for (int i = 0; i < v.Size(); i++) {
             result.add(v[i].GetInt64(), 0);
@@ -318,8 +318,10 @@ struct VariantStatsResult {
         return result;
     }
 
-    bool top_from_json(const rapidjson::Document& document) {
-        if (!document.HasMember("top")) return true;
+    bool try_parse_top_from_json(const rapidjson::Document& document) {
+        if (!document.HasMember("top")) {
+            return true;
+        }
         const auto& a = document["top"].GetArray();
         top.resize(a.Size());
         for (int i = 0; i < a.Size(); i++) {
@@ -331,7 +333,7 @@ struct VariantStatsResult {
             const auto& t = obj["top"].GetArray();
             for (int j = 0; j < t.Size(); j++) {
                 std::pair<Variant, int> av;
-                av.first = variant_from_json(t[j]["variant"]);
+                av.first = parse_variant_from_json(t[j]["variant"]);
                 av.second = t[j]["count"].GetInt64();
                 top[id].push_back(av);
             }
@@ -339,12 +341,15 @@ struct VariantStatsResult {
         return true;
     }
 
-    bool happy_from_json(const rapidjson::Document& document) {
+    bool try_parse_happy_from_json(const rapidjson::Document& document) {
+        if (!document.HasMember("happy")) {
+            return true;
+        }
         const auto& obj = document["happy"];
         if (!obj["variant"].IsArray()) {
             return false;
         }
-        happy.first = variant_from_json(obj["variant"]);
+        happy.first = parse_variant_from_json(obj["variant"]);
         happy.second = obj["count"].GetInt64();
         return true;
     }
@@ -2032,11 +2037,7 @@ TEST_F(CelonisVariantStatsTest, test_disable_top_variant_stats) {
                     "src": 1,
                     "dst": 2
                 }
-            ],
-            "happy": {
-                "variant": [0,1,0,1],
-                "count": 10
-            }
+            ]
         })json";
     match(e_s, rs);
 }
@@ -2072,7 +2073,7 @@ TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding) {
     auto json_string = to_statistics_json_string(encoded_string);
     ASSERT_TRUE(json_string.has_value());
     EXPECT_EQ(
-            "{\"dict\":[{\"id\":3,\"name\":\"a4\"},{\"id\":5,\"name\":\"a6\"},{\"id\":4,\"name\":\"a5\"},{\"id\":6,\"name\":\"a7\"},{\"id\":9,\"name\":\"a02\"},{\"id\":2,\"name\":\"a3\"},{\"id\":7,\"name\":\"a00\"},{\"id\":0,\"name\":\"a1\"},{\"id\":1,\"name\":\"a2\"},{\"id\":8,\"name\":\"a01\"}],\"aStats\":[{\"count\":\"21\",\"countCase\":\"11\",\"countStart\":\"11\",\"countEnd\":\"0\",\"id\":0},{\"count\":\"21\",\"countCase\":\"11\",\"countStart\":\"0\",\"countEnd\":\"10\",\"id\":1},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":2},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":3},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":4},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":5},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":6},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":7},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":8},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"1\",\"id\":9}],\"eCount\":\"10\",\"eStats\":[{\"count\":\"1\",\"countCase\":\"1\",\"src\":7,\"dst\":8},{\"count\":\"1\",\"countCase\":\"1\",\"src\":8,\"dst\":9},{\"count\":\"21\",\"countCase\":\"11\",\"src\":0,\"dst\":1},{\"count\":\"10\",\"countCase\":\"10\",\"src\":1,\"dst\":0},{\"count\":\"1\",\"countCase\":\"1\",\"src\":1,\"dst\":2}],\"happy\":{\"variant\":[0,1,0,1],\"count\":\"10\"}}",
+            "{\"dict\":[{\"id\":3,\"name\":\"a4\"},{\"id\":5,\"name\":\"a6\"},{\"id\":4,\"name\":\"a5\"},{\"id\":6,\"name\":\"a7\"},{\"id\":9,\"name\":\"a02\"},{\"id\":2,\"name\":\"a3\"},{\"id\":7,\"name\":\"a00\"},{\"id\":0,\"name\":\"a1\"},{\"id\":1,\"name\":\"a2\"},{\"id\":8,\"name\":\"a01\"}],\"aStats\":[{\"count\":\"21\",\"countCase\":\"11\",\"countStart\":\"11\",\"countEnd\":\"0\",\"id\":0},{\"count\":\"21\",\"countCase\":\"11\",\"countStart\":\"0\",\"countEnd\":\"10\",\"id\":1},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":2},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":3},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":4},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":5},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":6},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":7},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":8},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"1\",\"id\":9}],\"eCount\":\"10\",\"eStats\":[{\"count\":\"1\",\"countCase\":\"1\",\"src\":7,\"dst\":8},{\"count\":\"1\",\"countCase\":\"1\",\"src\":8,\"dst\":9},{\"count\":\"21\",\"countCase\":\"11\",\"src\":0,\"dst\":1},{\"count\":\"10\",\"countCase\":\"10\",\"src\":1,\"dst\":0},{\"count\":\"1\",\"countCase\":\"1\",\"src\":1,\"dst\":2}]}",
             json_string.value());
 }
 
