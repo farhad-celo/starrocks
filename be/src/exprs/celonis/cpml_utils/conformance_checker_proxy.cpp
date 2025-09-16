@@ -19,7 +19,7 @@ namespace starrocks::celonis::cpml_utils {
 // checks are in the petri net class itself (hidden deeper in the CPML conformance callstack).
 // TODO(n.weber): The approach will be re-evaluated as part of PMT-1689 which allows to fail early also client-side.
 StatusOr<petri_net_description_ptr_t> build_petri_net_description_from_json(const json_petri_net_t& petri_net_as_json) {
-    cpml::conformance::deprecated::petri_net_description::builder bldr{};
+    cpml::conformance::deprecated::petri_net_description::builder bldr;
 
     rapidjson::Document document;
     document.Parse(petri_net_as_json.c_str());
@@ -36,7 +36,7 @@ StatusOr<petri_net_description_ptr_t> build_petri_net_description_from_json(cons
         }
         const rapidjson::Value& place_values = document["places"];
 
-        auto places{ctl::make_static_array<std::string>(place_values.Size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+        auto places = ctl::make_static_array<std::string>(place_values.Size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));
 
         std::ranges::transform(place_values.Begin(), place_values.End(), places.begin(),
                                [](const auto& value) -> std::string { return value.GetString(); });
@@ -51,8 +51,8 @@ StatusOr<petri_net_description_ptr_t> build_petri_net_description_from_json(cons
         }
         const rapidjson::Value& transition_values = document["transitions"];
 
-        auto transitions{
-                ctl::make_static_array<std::string>(transition_values.Size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+        auto transitions =
+                ctl::make_static_array<std::string>(transition_values.Size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));
 
         std::ranges::transform(transition_values.Begin(), transition_values.End(), transitions.begin(),
                                [](const auto& value) -> std::string { return value.GetString(); });
@@ -68,7 +68,7 @@ StatusOr<petri_net_description_ptr_t> build_petri_net_description_from_json(cons
         }
         const rapidjson::Value& arc_values = document["arcs"];
 
-        auto arcs{ctl::make_static_array<string_pair_type>(arc_values.Size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+        auto arcs = ctl::make_static_array<string_pair_type>(arc_values.Size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));
 
         std::ranges::transform(arc_values.Begin(), arc_values.End(), arcs.begin(),
                                [](const auto& value) -> string_pair_type {
@@ -86,8 +86,8 @@ StatusOr<petri_net_description_ptr_t> build_petri_net_description_from_json(cons
 
         const rapidjson::Value& mapping_values = document["mapping"];
 
-        auto mapping{
-                ctl::make_static_array<string_pair_type>(mapping_values.Size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+        auto mapping =
+                ctl::make_static_array<string_pair_type>(mapping_values.Size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));
 
         std::ranges::transform(mapping_values.Begin(), mapping_values.End(), mapping.begin(),
                                [](const auto& value) -> string_pair_type {
@@ -105,8 +105,8 @@ StatusOr<petri_net_description_ptr_t> build_petri_net_description_from_json(cons
         }
         const rapidjson::Value& initial_marking_values = document["initial_marking"];
 
-        auto initial_markings{ctl::make_static_array<marking_type>(initial_marking_values.Size(),
-                                                                   ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+        auto initial_markings = ctl::make_static_array<marking_type>(initial_marking_values.Size(),
+                                                                     ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));
 
         std::ranges::transform(initial_marking_values.Begin(), initial_marking_values.End(), initial_markings.begin(),
                                [](const auto& value) -> marking_type {
@@ -124,8 +124,8 @@ StatusOr<petri_net_description_ptr_t> build_petri_net_description_from_json(cons
         }
         const rapidjson::Value& final_marking_values = document["final_marking"];
 
-        auto final_markings{ctl::make_static_array<marking_type>(final_marking_values.Size(),
-                                                                 ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+        auto final_markings = ctl::make_static_array<marking_type>(final_marking_values.Size(),
+                                                                   ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));
 
         std::ranges::transform(final_marking_values.Begin(), final_marking_values.End(), final_markings.begin(),
                                [](const auto& value) -> marking_type {
@@ -157,12 +157,12 @@ template <conformance_or_readable_result_type T>
     using output_column_type =
             std::conditional_t<IS_CONFORMANCE_DATA, RunTimeColumnType<TYPE_BIGINT>, RunTimeColumnType<TYPE_VARCHAR>>;
     /* Transform the CPML output to a SR column output */
-    auto result_array_column{ArrayColumn::create(
+    auto result_array_column = ArrayColumn::create(
             NullableColumn::create(output_column_type::create(), NullColumn::create()),
-            ColumnHelper::as_column<UInt32Column>(original_input_array_column.offsets->clone_shared()))};
+            ColumnHelper::as_column<UInt32Column>(original_input_array_column.offsets->clone()));
 
     // Copy each conformance result value to the output column elements
-    auto& result_elements{result_array_column->elements_column()};
+    auto& result_elements = result_array_column->elements_column();
     std::ranges::for_each(output_data, [&result_elements](const conformance_or_readable_result_type auto& data) {
         if constexpr (IS_CONFORMANCE_DATA) {
             result_elements->append_datum(data); // conformance result
@@ -179,22 +179,22 @@ template <conformance_or_readable_result_type T>
 conformance_violation_result_column_t check_conformance(
         const conformance_input_column_t& activity_array_data,
         const cpml::conformance::deprecated::petri_net_description& petri_net_description) {
-    const auto array_column{
-            ColumnHelper::unpack_and_duplicate_const_column(activity_array_data->size(), activity_array_data)};
+    const auto array_column =
+            ColumnHelper::unpack_and_duplicate_const_column(activity_array_data->size(), activity_array_data);
     /* Prepare CPML call input */
-    const auto array_data{prepare_array_input(array_column.get())};
-    const sr_trace_accessor trace_accessor{array_data};
-    const ctl::stop_token stoken{};
-    const auto function_ctx{make_sr_function_context()};
+    const auto array_data = prepare_array_input(array_column.get());
+    const sr_trace_accessor trace_accessor(array_data);
+    const ctl::stop_token stoken;
+    const auto function_ctx = make_sr_function_context();
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     /* Produce the conformance result output */
-    const auto conformance_result{cpml::conformance::deprecated::check_conformance(
-            trace_accessor, petri_net_description, stoken, function_ctx)};
+    const auto conformance_result =
+            cpml::conformance::deprecated::check_conformance(trace_accessor, petri_net_description, stoken, function_ctx);
 #pragma GCC diagnostic pop
 
-    return make_output_column(ctl::array_view{conformance_result}, array_data);
+    return make_output_column(ctl::array_view(conformance_result), array_data);
 }
 
 namespace {
@@ -203,9 +203,9 @@ namespace {
 //   integer column data view. Is it possible to get a consecutive int* + size from the column input?
 [[nodiscard]] cpml::conformance::deprecated::conformance_result_t from_input_column(
         const conformance_violation_result_column_t& conformance_result) {
-    const auto array_column{
-            ColumnHelper::unpack_and_duplicate_const_column(conformance_result->size(), conformance_result)};
-    const auto array_data{prepare_array_input(array_column.get())};
+    const auto array_column =
+            ColumnHelper::unpack_and_duplicate_const_column(conformance_result->size(), conformance_result);
+    const auto array_data = prepare_array_input(array_column.get());
     // N.B.: Conformance result cannot contain NULL values. If needed, we could relax this limitation and simply map
     // NULL to conforming.
     // TODO(n.weber): It would be possible for users to explicitly remap a CONFORMANCE result value to NULL. Do we need
@@ -213,12 +213,12 @@ namespace {
     DCHECK(array_data.null_arrays == nullptr);
     DCHECK(array_data.null_elements == nullptr);
 
-    const auto& elements_column{*down_cast<const RunTimeColumnType<TYPE_BIGINT>*>(array_data.elements)};
-    const auto& elements_column_data{elements_column.get_data()};
-    auto result{ctl::make_static_array_for_overwrite<cpml::conformance::deprecated::violation_key_t>(
-            elements_column_data.size(), ALLOC_MSG(ctl::RETURN_VALUE_MSG))};
+    const auto& elements_column = *down_cast<const RunTimeColumnType<TYPE_BIGINT>*>(array_data.elements);
+    const auto& elements_column_data = elements_column.get_data();
+    auto result = ctl::make_static_array_for_overwrite<cpml::conformance::deprecated::violation_key_t>(
+            elements_column_data.size(), ALLOC_MSG(ctl::RETURN_VALUE_MSG));
 
-    for (size_t element_idx{0}; element_idx < result.size(); ++element_idx) {
+    for (size_t element_idx = 0; element_idx < result.size(); ++element_idx) {
         result[element_idx] = elements_column_data[element_idx];
     }
 
@@ -230,18 +230,18 @@ namespace {
 readable_conformance_results_t conformance_result_to_readable_diagnostics(
         const conformance_violation_result_column_t& conformance_result,
         const conformance_input_column_t& activity_array_data) {
-    const auto array_column{
-            ColumnHelper::unpack_and_duplicate_const_column(activity_array_data->size(), activity_array_data)};
+    const auto array_column =
+            ColumnHelper::unpack_and_duplicate_const_column(activity_array_data->size(), activity_array_data);
     /* Prepare CPML call input */
-    const auto array_data{prepare_array_input(array_column.get())};
-    const auto conformance_output{from_input_column(conformance_result)};
-    const sr_trace_accessor trace_accessor{array_data};
+    const auto array_data = prepare_array_input(array_column.get());
+    const auto conformance_output = from_input_column(conformance_result);
+    const sr_trace_accessor trace_accessor(array_data);
 
     /* Produce the readable result output */
-    const auto readable_conformance_result{
-            cpml::conformance::deprecated::readable_conformance_result(conformance_output, trace_accessor)};
+    const auto readable_conformance_result =
+            cpml::conformance::deprecated::readable_conformance_result(conformance_output, trace_accessor);
 
-    return make_output_column(ctl::array_view{readable_conformance_result}, array_data);
+    return make_output_column(ctl::array_view(readable_conformance_result), array_data);
 }
 
 } // namespace starrocks::celonis::cpml_utils
