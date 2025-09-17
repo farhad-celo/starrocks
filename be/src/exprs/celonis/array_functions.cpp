@@ -188,7 +188,7 @@ public:
                     if (*lhs.timestamp != *rhs.timestamp) {
                         return *lhs.timestamp > *rhs.timestamp;
                     }
-                    if (lhs.secondary_order_index == -1 || rhs.secondary_order_index == -1) {
+                    if (lhs.secondary_order_index == SIZE_MAX || rhs.secondary_order_index == SIZE_MAX) {
                         return lhs.priority == nullptr || (*lhs.priority < *rhs.priority);
                     }
                     DatumKey lhs_key = get_sorting_key(lhs.secondary_order_index);
@@ -218,7 +218,7 @@ public:
                     continue;
                 }
                 auto local_start = start - src_timestamp_start;
-                pq.emplace(start, next, unix_seconds.data() + local_start, has_secondary_order ? start : -1,
+                pq.emplace(start, next, unix_seconds.data() + local_start, has_secondary_order ? start : SIZE_MAX,
                            (has_priority ? (similar_to_size ? (priorities + i) : (priorities + start)) : nullptr));
                 start = next;
             }
@@ -234,7 +234,7 @@ public:
                     if (curr.priority != nullptr && !similar_to_size) {
                         curr.priority++;
                     }
-                    if (curr.secondary_order_index != -1) {
+                    if (curr.secondary_order_index != SIZE_MAX) {
                         ++curr.secondary_order_index;
                     }
                     pq.push(curr);
