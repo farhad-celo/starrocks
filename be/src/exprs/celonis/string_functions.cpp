@@ -828,12 +828,12 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
 std::string_view trim_spaces(const std::string_view& str) {
     // Find the first non-space character from the beginning
     auto start = std::find_if_not(str.begin(), str.end(), [](char c) {
-        return std::isspace(c);
+        return std::isspace(static_cast<unsigned char>(c));
     });
 
     // Find the first non-space character from the end (reverse iteration)
     auto end = std::find_if_not(str.rbegin(), str.rend(), [](char c) {
-        return std::isspace(c);
+        return std::isspace(static_cast<unsigned char>(c));
     }).base(); // .base() converts reverse_iterator back to iterator
 
     if (start >= end) {
@@ -898,7 +898,7 @@ std::optional<int64_t> to_int64(const std::string_view& str) {
         index++;
     }
     // Must have at least one digit
-    if (index >= str.size() || !std::isdigit(str[index])) {
+    if (index >= str.size() || !std::isdigit(static_cast<unsigned char>(str[index]))) {
         return std::nullopt;
     }
     int64_t result = 0;
@@ -908,7 +908,7 @@ std::optional<int64_t> to_int64(const std::string_view& str) {
     const int64_t limit_before = limit / 10;
 
     // Parse digits
-    while (index < str.size() && std::isdigit(str[index])) {
+    while (index < str.size() && std::isdigit(static_cast<unsigned char>(str[index]))) {
         if (result < limit_before) {
             return std::nullopt;  // Overflow check
         }
@@ -925,7 +925,7 @@ std::optional<int64_t> to_int64(const std::string_view& str) {
     if (index < str.size() && str[index] == '.') {
         index++;
         // Skip decimal digits
-        while (index < str.size() && std::isdigit(str[index])) {
+        while (index < str.size() && std::isdigit(static_cast<unsigned char>(str[index]))) {
             index++;
         }
     }
