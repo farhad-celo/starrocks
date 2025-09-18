@@ -910,6 +910,22 @@ public class FunctionAnalyzer {
             sf.add(new StructField("edge_class_id", Type.ARRAY_BIGINT));
             sf.add(new StructField("edge_class_type", Type.ARRAY_VARCHAR));
             fn.setRetType(new StructType(sf));
+        } else if (FunctionSet.CELONIS_ALIGN_MODEL_V2.equals(fnName)) {
+            // Set struct type
+            fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_ALIGN_MODEL_V2, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            ArrayList<StructField> sf = Lists.newArrayList();
+            sf.add(new StructField("alignment_model_vertex_id", Type.ARRAY_BIGINT));
+            sf.add(new StructField("alignment_vertex_label", Type.ARRAY_VARCHAR));
+            sf.add(new StructField("alignment_move_type", Type.ARRAY_VARCHAR));
+            sf.add(new StructField("alignment_activity_index", Type.ARRAY_BIGINT));
+            sf.add(new StructField("association_edge_class", Type.ARRAY_BIGINT));
+            sf.add(new StructField("association_alignment_index", Type.ARRAY_BIGINT));
+            sf.add(new StructField("edge_class_id", Type.ARRAY_BIGINT));
+            sf.add(new StructField("edge_class_type", Type.ARRAY_VARCHAR));
+            sf.add(new StructField("alignment_deviation_category", Type.ARRAY_VARCHAR));
+            fn.setRetType(new StructType(sf));
         } else if (FunctionSet.CELONIS_PERCENTILE_DISC.equals(fnName)) {
             argumentTypes[1] = Type.DOUBLE;
             fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_IDENTICAL);

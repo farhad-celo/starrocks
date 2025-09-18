@@ -111,6 +111,7 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   auto tables{create_tables(   //
       alignments,              //
       replay_results,          //
+      deviation_categories,    //
       bpmn_to_string,          //
       variants,                //
       activity_column_,        //

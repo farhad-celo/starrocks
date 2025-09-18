@@ -144,7 +144,8 @@ set(CELONIS_FILES
   celonis/cpml_utils/sr_variant_accessor.cpp
   celonis/abc_model.cpp
   celonis/adjust_daily_timestamps.cpp
-  celonis/align_model.cpp
+  celonis/align_model_v1.cpp
+  celonis/align_model_v2.cpp
   celonis/array_avg.cpp
   celonis/array_count_distinct.cpp
   celonis/array_end_finder.cpp

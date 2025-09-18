@@ -1,4 +1,4 @@
-#include "exprs/celonis/align_model.h"
+#include "exprs/celonis/align_model_v2.h"
 
 #include <optional>
 
@@ -16,7 +16,7 @@ using row_id = int32_t;
 namespace starrocks {
 
 namespace {
-void AddArray(ColumnPtr column, std::vector<std::string> input) {
+void AddArray(const ColumnPtr& column, const std::vector<std::string>& input) {
     DatumArray datum;
     datum.reserve(input.size());
     for (const auto& entry : input) {
@@ -25,7 +25,7 @@ void AddArray(ColumnPtr column, std::vector<std::string> input) {
     column->append_datum(datum);
 }
 
-void AddArray(ColumnPtr column, std::vector<row_id> input) {
+void AddArray(const ColumnPtr& column, const std::vector<row_id>& input) {
     DatumArray datum;
     datum.reserve(input.size());
     for (const auto& entry : input) {
@@ -34,7 +34,7 @@ void AddArray(ColumnPtr column, std::vector<row_id> input) {
     column->append_datum(datum);
 }
 
-void AddArray(ColumnPtr column, std::vector<std::optional<size_t>> input) {
+void AddArray(const ColumnPtr& column, const std::vector<std::optional<size_t>>& input) {
     DatumArray datum;
     datum.reserve(input.size());
     for (const auto& entry : input) {
@@ -59,7 +59,7 @@ struct AlignModelStateFragmentLocal {
     std::string json_bpmn_model_description;
 };
 
-Status CelonisAlignModel::align_model_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+Status CelonisAlignModelV2::align_model_v2_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         if (!context->is_constant_column(1)) {
             return Status::InvalidArgument(
@@ -78,7 +78,7 @@ Status CelonisAlignModel::align_model_prepare(FunctionContext* context, Function
     return Status::OK();
 }
 
-Status CelonisAlignModel::align_model_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+Status CelonisAlignModelV2::align_model_v2_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         const auto* align_model_state_fragment_local = reinterpret_cast<const AlignModelStateFragmentLocal*>(
                 context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
@@ -87,7 +87,7 @@ Status CelonisAlignModel::align_model_close(FunctionContext* context, FunctionCo
     return Status::OK();
 }
 
-StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisAlignModelV2::align_model_v2(FunctionContext* context, const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto* align_model_state_fragment_local = reinterpret_cast<const AlignModelStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
@@ -148,6 +148,7 @@ StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, con
             result_table.column<std::vector<std::optional<size_t>>>("alignment_model_vertex_id");
     const auto& alignment_vertex_label = result_table.column<std::vector<std::string>>("alignment_vertex_label");
     const auto& alignment_move_type = result_table.column<std::vector<std::string>>("alignment_move_type");
+    const auto& alignment_deviation_category = result_table.column<std::vector<std::string>>("alignment_deviation_category");
     const auto& alignment_activity_index = result_table.column<std::vector<row_id>>("alignment_activity_index");
     const auto& association_edge_class = result_table.column<std::vector<row_id>>("association_edge_class");
     const auto& association_alignment_index = result_table.column<std::vector<row_id>>("association_alignment_index");
@@ -167,6 +168,7 @@ StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, con
         AddArray(fields[5], association_alignment_index[index]);
         AddArray(fields[6], edge_class_id[index]);
         AddArray(fields[7], edge_class_type[index]);
+        AddArray(fields[8], alignment_deviation_category[index]);
     }
     return res;
 }

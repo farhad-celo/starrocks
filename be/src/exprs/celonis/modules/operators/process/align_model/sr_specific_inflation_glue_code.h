@@ -3,8 +3,9 @@
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table_group.h"
-#include "modules/operators/process/align_model/shared_types.h"
 #include "modules/operators/process/align_model/align_model_types.h"
+#include "modules/operators/process/align_model/deviation_category.h"
+#include "modules/operators/process/align_model/shared_types.h"
 #include "modules/operators/process/bpmn/bpmn_from_proto.h"
 
 namespace celonis::accelerator::operators::process::align_model {
@@ -38,6 +39,7 @@ namespace celonis::accelerator::operators::process::align_model {
  * table
  */
 memory::table_group_t create_tables(const alignments_t& alignments, const replay_results_t& replay_results,
+                                    const deviation_categories_for_cases_view_t deviation_categories,
                                     const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
                                     const memory::column_t& activity_column, const memory::column_t& case_id_column,
                                     const memory::join_projection_vector_t& activity_to_case_join,

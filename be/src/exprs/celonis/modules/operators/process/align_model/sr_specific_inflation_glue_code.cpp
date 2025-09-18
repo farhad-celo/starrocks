@@ -15,6 +15,7 @@
 #include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/table_group.h"
+#include "modules/operators/process/align_model/deviation_category.h"
 #include "modules/operators/process/align_model/replay_aligned_variant.h"
 #include "utils/nullable_pql_value.h"
 
@@ -70,7 +71,7 @@ struct petri_net_label_id_to_string_mapper {
   std::unordered_set<std::string> buffer_entries{};
 
   for (const auto* dict_ptr : string_dict.get_const_data(context)) {
-    buffer_entries.emplace(std::string{dict_ptr});
+    buffer_entries.emplace(dict_ptr);
   }
   for (const auto& [_, vertex_label] : bpmn_to_string) {
     buffer_entries.emplace(vertex_label);
@@ -207,6 +208,7 @@ template <typename ACTIVITY_ACCESSOR>
 }
 
 memory::table_group_t inflate(const alignments_t& alignments, const replay_results_t& replay_results,
+                              const deviation_categories_for_cases_view_t deviation_categories,
                               const memory::join_projection_vector_t& activity_to_case_join,
                               const memory::column_ptrs_t& case_to_trace_ptrs,
                               const bpmn::bpmn_to_string_t& bpmn_to_string, const memory::column_t& activity_column,
@@ -223,6 +225,8 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
       result_table->AddColumn<std::vector<std::optional<size_t>>>("alignment_model_vertex_id");
   auto& alignment_vertex_label = result_table->AddColumn<std::vector<std::string>>("alignment_vertex_label");
   auto& alignment_move_type = result_table->AddColumn<std::vector<std::string>>("alignment_move_type");
+  auto& alignment_deviation_category =
+      result_table->AddColumn<std::vector<std::string>>("alignment_deviation_category");
   auto& alignment_activity_index = result_table->AddColumn<std::vector<row_id>>("alignment_activity_index");
   auto& association_edge_class = result_table->AddColumn<std::vector<row_id>>("association_edge_class");
   auto& association_alignment_index = result_table->AddColumn<std::vector<row_id>>("association_alignment_index");
@@ -241,12 +245,14 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
   tbb::parallel_for_each(
       blocks,
       // It is safe to fill blocks of the `storage` data in parallel
-      [&alignment_model_vertex_id, &alignment_vertex_label, &alignment_move_type, &alignment_activity_index,
-       &association_edge_class, &association_alignment_index, &edge_class_id, &edge_class_type, &activity_column,
-       &case_id_column = std::as_const(case_id_column), &case_to_trace_ptrs = std::as_const(case_to_trace_ptrs),
+      [&alignment_model_vertex_id, &alignment_vertex_label, &alignment_move_type, &alignment_deviation_category,
+       &alignment_activity_index, &association_edge_class, &association_alignment_index, &edge_class_id,
+       &edge_class_type, &activity_column, &case_id_column = std::as_const(case_id_column),
+       &case_to_trace_ptrs = std::as_const(case_to_trace_ptrs),
        &activity_to_case_join = std::as_const(activity_to_case_join), &alignments = std::as_const(alignments),
        &replay_results = std::as_const(replay_results),
-       &petri_net_to_string_mapper = std::as_const(petri_net_to_string_mapper), &context](const parallel_block& block) {
+       &petri_net_to_string_mapper = std::as_const(petri_net_to_string_mapper), &context,
+       &deviation_categories](const parallel_block& block) {
         memory::cast_execute_column_pointers(
             [&](auto tup) {
               const auto activity_accessor{std::get<0>(tup).get_const_accessor()};
@@ -273,6 +279,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                     }
                     const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
                     const auto& optional_alignment_for_case{alignments.at(variant_trace_id)};
+                    const auto& deviation_categories_for_case{deviation_categories.at(variant_trace_id)};
                     const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
                     debug_assert(optional_alignment_for_case.has_value() ==
                                  optional_replay_result_for_case.has_value());
@@ -313,6 +320,8 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                       const auto& move{alignment_for_case.at(offset)};
                       alignment_vertex_label[current_variant_row].emplace_back(petri_net_to_string_mapper(move));
                       alignment_move_type[current_variant_row].emplace_back(alignment_move_to_string(move.move_type()));
+                      alignment_deviation_category[current_variant_row].emplace_back(
+                          deviation_category_to_string(deviation_categories_for_case.at(offset)));
                       if (move.move_on_model()) {
                         alignment_model_vertex_id[current_variant_row].push_back(move.move_on_model().value());
                       } else {
@@ -349,14 +358,15 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
 }  // anonymous namespace
 
 memory::table_group_t create_tables(const alignments_t& alignments, const replay_results_t& replay_results,
+                                    const deviation_categories_for_cases_view_t deviation_categories,
                                     const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
                                     const memory::column_t& activity_column, const memory::column_t& case_id_column,
                                     const memory::join_projection_vector_t& activity_to_case_join,
                                     const common::execution_context& context, size_t grain_size) {
   auto create_tables_context{context.create_sub_context("create_tables", {})};
-  return inflate(alignments, replay_results, activity_to_case_join, variants->get_case_to_trace_col_ptrs().value(),
-                 bpmn_to_string, activity_column, case_id_column->get_column_pointers(context), grain_size,
-                 create_tables_context);
+  return inflate(alignments, replay_results, deviation_categories, activity_to_case_join,
+                 variants->get_case_to_trace_col_ptrs().value(), bpmn_to_string, activity_column,
+                 case_id_column->get_column_pointers(context), grain_size, create_tables_context);
 }
 
 }  // namespace celonis::accelerator::operators::process::align_model
