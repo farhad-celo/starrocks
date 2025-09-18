@@ -62,13 +62,11 @@ size_t CelonisVariantStatsAggregateV2State::compute_happy_variant(const std::vec
     return happy;
 }
 
-void CelonisVariantStatsAggregateV2State::compute_top_variants(std::vector<std::vector<size_t>>& activity_top_variants,
-                                                               size_t& happy) const {
-    if (no_activities() || no_variants()) {
-        // No data.
-        return;
-    }
-
+CelonisVariantStatsAggregateV2State::VariantAnalysisResult
+CelonisVariantStatsAggregateV2State::analyze_variants() const {
+    DCHECK(!no_activities() && !no_variants());
+    VariantAnalysisResult result;
+    auto& activity_top_variants = result.activity_top_variants;
     // 1. sort variants by count (from high to low)
     std::vector<size_t> sorted_indexes;
     sorted_indexes.reserve(counts_.size());
@@ -80,12 +78,7 @@ void CelonisVariantStatsAggregateV2State::compute_top_variants(std::vector<std::
 
     // 2. find a happy variant
     size_t happy_v = compute_happy_variant(sorted_indexes);
-    happy = sorted_indexes[happy_v];
-
-    if (disable_top_variant_stats_) {
-        return;
-    }
-
+    result.happy = sorted_indexes[happy_v];
     // 3. find top-10 variants for each activity
     // Make sure we get enough variants so that each activity has 10 entries
     activity_top_variants.resize(activity_array_.size());
@@ -116,11 +109,13 @@ void CelonisVariantStatsAggregateV2State::compute_top_variants(std::vector<std::
             break;
         }
     }
+    return result;
 }
 
 std::optional<std::string>
-CelonisVariantStatsAggregateV2State::json_string(const std::vector<std::vector<size_t>>& activity_top_variants,
-                                                 size_t happy) const {
+CelonisVariantStatsAggregateV2State::json_string(const VariantAnalysisResult& analysis_result) const {
+    const std::vector<std::vector<size_t>>& activity_top_variants = analysis_result.activity_top_variants;
+    size_t happy = analysis_result.happy;
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
@@ -160,9 +155,8 @@ CelonisVariantStatsAggregateV2State::json_string(const std::vector<std::vector<s
                 sorted_edges, allocator);
     }
     d.AddMember("e_stats", e_stats, allocator);
-
-    // Variants
-    if (!disable_top_variant_stats_) {
+    // Top variants and happy path
+    if (!skip_variant_analysis_) {
         rapidjson::Value topv(rapidjson::kArrayType);
         for (int i = 0; i < activity_top_variants.size(); i++) {
             rapidjson::Value obj(rapidjson::kObjectType);
@@ -186,19 +180,20 @@ CelonisVariantStatsAggregateV2State::json_string(const std::vector<std::vector<s
             topv.PushBack(obj, allocator);
         }
         d.AddMember("top", topv, allocator);
+        // Happy path
+        if (happy >= 0 && happy < counts_.size()) {
+            size_t happy_count = counts_[happy];
+            rapidjson::Value happy_obj(rapidjson::kObjectType);
+            rapidjson::Value happy_var(rapidjson::kArrayType);
+            auto [lo, hi] = get_offsets(happy);
+            for (size_t i = lo; i < hi; i++) {
+                happy_var.PushBack(get_activity(i), allocator);
+            }
+            happy_obj.AddMember("variant", happy_var, allocator);
+            happy_obj.AddMember("count", happy_count, allocator);
+            d.AddMember("happy", happy_obj, allocator);
+        }
     }
-
-    // Happy path
-    size_t happy_count = counts_[happy];
-    rapidjson::Value happy_obj(rapidjson::kObjectType);
-    rapidjson::Value happy_var(rapidjson::kArrayType);
-    auto [lo, hi] = get_offsets(happy);
-    for (size_t i = lo; i < hi; i++) {
-        happy_var.PushBack(get_activity(i), allocator);
-    }
-    happy_obj.AddMember("variant", happy_var, allocator);
-    happy_obj.AddMember("count", happy_count, allocator);
-    d.AddMember("happy", happy_obj, allocator);
 
     // Encode to string.
     rapidjson::StringBuffer buf;
@@ -209,10 +204,10 @@ CelonisVariantStatsAggregateV2State::json_string(const std::vector<std::vector<s
 }
 
 std::optional<std::string>
-CelonisVariantStatsAggregateV2State::base64_encoded_string(
-        const std::vector<std::vector<size_t>>& activity_top_variants, size_t happy) const {
+CelonisVariantStatsAggregateV2State::base64_encoded_string(const VariantAnalysisResult& analysis_result) const {
+    const std::vector<std::vector<size_t>>& activity_top_variants = analysis_result.activity_top_variants;
+    size_t happy = analysis_result.happy;
     celonis::accelerator::Statistics statistics_proto;
-    // construct proto
     // Dictionary
     for (auto i = 0; i < activity_array_.size(); ++i) {
         celonis::accelerator::DictionaryEntry entry;
@@ -243,8 +238,8 @@ CelonisVariantStatsAggregateV2State::base64_encoded_string(
         EdgeStatsProcessor<std::vector<std::string>>::build_edge_stats_proto(
                 sorted_edges, statistics_proto);
     }
-    // Variants
-    if (!disable_top_variant_stats_) {
+    // Top variants and happy path
+    if (!skip_variant_analysis_) {
         for (int i = 0; i < activity_top_variants.size(); i++) {
             celonis::accelerator::VariantEntry entry;
             entry.set_id(i);
@@ -260,18 +255,19 @@ CelonisVariantStatsAggregateV2State::base64_encoded_string(
             }
             *statistics_proto.add_top() = entry;
         }
+        // Happy path
+        if (happy >= 0 && happy < counts_.size()) {
+            celonis::accelerator::VariantCountPair& happy_variant_with_count = *statistics_proto.mutable_happy();
+            size_t happy_count = counts_[happy];
+            happy_variant_with_count.set_count(happy_count);
+            auto [lo, hi] = get_offsets(happy);
+            for (auto i = lo; i < hi; ++i) {
+                happy_variant_with_count.add_variant(get_activity(i));
+            }
+        }
     }
-    // Happy path
-    celonis::accelerator::VariantCountPair count_pair;
-    size_t happy_count = counts_[happy];
-    count_pair.set_count(happy_count);
-    auto [lo, hi] = get_offsets(happy);
-    for (auto i = lo; i < hi; ++i) {
-        count_pair.add_variant(get_activity(i));
-    }
-    *statistics_proto.mutable_happy() = count_pair;
 
-    // set size limit to 100M.
+    // Limit size to 100M.
     std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto, (100LL << 20), false);
     if (!encoded_string.has_value()) {
         LOG(ERROR) << "CELONIS_VARIANT_STATS_V2: proto serialized size exceeds maximum supported length (100M).\n";
@@ -280,13 +276,8 @@ CelonisVariantStatsAggregateV2State::base64_encoded_string(
 }
 
 std::optional<std::string>
-CelonisVariantStatsAggregateV2State::to_string(const std::vector<std::vector<size_t>>& activity_top_variants,
-                                               size_t happy) const {
-    if (enable_proto_encoding_) {
-        return base64_encoded_string(activity_top_variants, happy);
-    } else {
-        return json_string(activity_top_variants, happy);
-    }
+CelonisVariantStatsAggregateV2State::to_string(const VariantAnalysisResult& analysis_result) const {
+    return enable_proto_encoding_ ? base64_encoded_string(analysis_result) : json_string(analysis_result);
 }
 
 std::string CelonisVariantStateV2AggregationFunction::get_log_prefix(const std::string& query_id) const {
@@ -372,13 +363,15 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
         return;
     }
     LOG(INFO) << log_prefix << ": started finding top\n";
-    std::vector<std::vector<size_t>> activity_top_variants;
-    size_t happy;
-    state_impl.compute_top_variants(activity_top_variants, happy);
-    LOG(INFO) << log_prefix << ": done finding top (activity_top_variants size = " << activity_top_variants.size()
+    CelonisVariantStatsAggregateV2State::VariantAnalysisResult variant_analysis;
+    if (!state_impl.skip_variant_analysis()) {
+        variant_analysis = state_impl.analyze_variants();
+    }
+    LOG(INFO) << log_prefix << ": done finding top (activity_top_variants size = "
+              << variant_analysis.activity_top_variants.size()
               << ")\n";
     LOG(INFO) << log_prefix << ": started to_string\n";
-    auto rv = state_impl.to_string(activity_top_variants, happy);
+    auto rv = state_impl.to_string(variant_analysis);
     if (rv.has_value()) {
         LOG(INFO) << log_prefix << ": done to_string (length = " << rv->size() << ")\n";
         output = rv.value();

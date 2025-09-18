@@ -37,7 +37,7 @@ struct CelonisVariantStatsAggregateV2State {
             edge_count_ = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(3));
         }
         if (ctx->is_notnull_constant_column(4)) {
-            disable_top_variant_stats_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(4));
+            skip_variant_analysis_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(4));
         }
         if (ctx->is_notnull_constant_column(5)) {
             enable_proto_encoding_ = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(5));
@@ -48,7 +48,7 @@ struct CelonisVariantStatsAggregateV2State {
         if (!activity_array_initialized_) {
             DCHECK(!columns[2]->empty());
             if (columns[2]->is_null(0)) {
-              return;
+                return;
             }
             // initialize activity_array: ignore NULLs and dedup.
             activity_array_initialized_ = true;
@@ -168,7 +168,7 @@ struct CelonisVariantStatsAggregateV2State {
         result += (2 * sizeof(int32_t) + 2 * sizeof(size_t)) * edge_stats_.size();
 
         result += sizeof(int64_t);       // edge_count_
-        result += sizeof(uint8_t);       // disable_top_variant_stats_
+        result += sizeof(uint8_t);       // skip_variant_analysis_
         result += sizeof(uint8_t);       // enable_proto_encoding_
         result += sizeof(size_t);        // num_variants
         result += sizeof(size_t);        // total_number_of_activities
@@ -194,7 +194,7 @@ struct CelonisVariantStatsAggregateV2State {
         // [edge_stats_2] src2, dst2, count, count_case
         // ...
         // edge_count
-        // disable_top_variant_stats
+        // skip_variant_analysis
         // enable_proto_encoding
         // num_variants
         // total_number_of_activities (i.e., length1 + length2 + ...)
@@ -245,10 +245,8 @@ struct CelonisVariantStatsAggregateV2State {
 
         memcpy(dst, &edge_count_, sizeof(int64_t));
         dst += sizeof(int64_t);
-        memcpy(dst, &disable_top_variant_stats_, sizeof(uint8_t));
-        dst += sizeof(uint8_t);
-        memcpy(dst, &enable_proto_encoding_, sizeof(uint8_t));
-        dst += sizeof(uint8_t);
+        *dst++ = static_cast<uint8_t>(skip_variant_analysis_);
+        *dst++ = static_cast<uint8_t>(enable_proto_encoding_);
         const size_t num_variants = lengths_.size();
         DCHECK_EQ(num_variants, counts_.size());
         const size_t total = num_activities();
@@ -343,10 +341,8 @@ struct CelonisVariantStatsAggregateV2State {
 
         memcpy(&edge_count_, src, sizeof(int64_t));
         src += sizeof(int64_t);
-        memcpy(&disable_top_variant_stats_, src, sizeof(uint8_t));
-        src += sizeof(uint8_t);
-        memcpy(&enable_proto_encoding_, src, sizeof(uint8_t));
-        src += sizeof(uint8_t);
+        skip_variant_analysis_ = (*src++ != 0);
+        enable_proto_encoding_ = (*src++ != 0);
 
         size_t num_variants;
         memcpy(&num_variants, src, sizeof(size_t));
@@ -386,8 +382,6 @@ struct CelonisVariantStatsAggregateV2State {
         merging_microseconds_ += duration.count();
     }
 
-    int64_t edge_count() const { return edge_count_; }
-
     std::pair<size_t, size_t> get_offsets(size_t idx) const {
         DCHECK_EQ(offsets_.size(), lengths_.size() + 1);
         return {offsets_.at(idx), offsets_.at(idx + 1)};
@@ -401,13 +395,9 @@ struct CelonisVariantStatsAggregateV2State {
         return lengths_.empty();
     }
 
-    bool disable_top_variant_stats() const { return disable_top_variant_stats_; }
+    bool skip_variant_analysis() const { return skip_variant_analysis_; }
 
     bool enable_proto_encoding() const { return enable_proto_encoding_; }
-
-    bool activity_array_initialized() const { return activity_array_initialized_; }
-
-    const std::vector<size_t>& variant_lengths() const { return lengths_; }
 
     size_t num_distinct_variants() const { return lengths_.size(); }
 
@@ -421,31 +411,29 @@ struct CelonisVariantStatsAggregateV2State {
 
     const std::vector<std::string>& activity_array() const { return activity_array_; }
 
-    const std::vector<ActivityStats>& activity_stats() const { return activity_stats_; }
-
-    const EdgeHashMap& edge_stats() const { return edge_stats_; }
-
     uint64_t merging_microseconds() const { return merging_microseconds_; }
 
     uint64_t merging_bytes() const { return merging_bytes_; }
 
     uint64_t merging_states() const { return merging_states_; }
 
-    std::optional<std::string>
-    json_string(const std::vector<std::vector<size_t>>& activity_top_variants, size_t happy) const;
+    struct VariantAnalysisResult {
+        std::vector<std::vector<size_t>> activity_top_variants;
+        size_t happy = 0;
+    };
 
-    std::optional<std::string>
-    base64_encoded_string(const std::vector<std::vector<size_t>>& activity_top_variants, size_t happy) const;
+    std::optional<std::string> json_string(const VariantAnalysisResult& analysis_result) const;
 
-    std::optional<std::string>
-    to_string(const std::vector<std::vector<size_t>>& activity_top_variants, size_t happy) const;
+    std::optional<std::string> base64_encoded_string(const VariantAnalysisResult& analysis_result) const;
+
+    std::optional<std::string> to_string(const VariantAnalysisResult& analysis_result) const;
 
     // Computes the variant that starts and ends with the most common start/end activities,
     // otherwise returns the top most frequent activity.
     size_t compute_happy_variant(const std::vector<size_t>& sorted) const;
 
-    // Computes top-10 variants for each activity and happy variant.
-    void compute_top_variants(std::vector<std::vector<size_t>>& activity_top_variants, size_t& happy) const;
+    // Computes top-10 variants per activity and the happy path variant.
+    VariantAnalysisResult analyze_variants() const;
 
 private:
 
@@ -466,8 +454,8 @@ private:
     }
 
     int64_t edge_count_ = (1LL << 32); // very large number to output all edges.
-    bool disable_top_variant_stats_ = false;
-    bool enable_proto_encoding_ = false;
+    bool skip_variant_analysis_ = false;
+    bool enable_proto_encoding_ = true;
     bool activity_array_initialized_ = false;
     // length of each variant
     std::vector<size_t> lengths_;
@@ -491,20 +479,20 @@ private:
 };
 
 /**
- * @param: [ variant_column, count_column, activity_array [, edge_count [, disable_top_variant_stats [, enable_proto_encoding ] ] ] ]
+ * @param: [ variant_column, count_column, activity_array [, edge_count [, skip_variant_analysis [, enable_proto_encoding ] ] ] ]
  * @paramType columns: [ ARRAY_INT, BIGINT, ARRAY_VARCHAR [, BIGINT [, BOOLEAN [, BOOLEAN ] ] ] ]
  * @return: json or base64 encoded binary proto string
  * variant_column: Encoded variant. The implementation assumes the input variant_column does not contain duplicates.
  * count_column: Indicates the frequency of the variant.
  * activity_array: Activity array used to generate the encoding map.
  * edge_count (optional): Limits the size of the edge table. if edge_count <= 0, edge stats is not populated and output. default = 1LL << 32 to output all the edges.
- * disable_top_variant_stats (optional): Disables top variant stats, default = false.
- * enable_proto_encoding (optional): Enable base64 encoded binary proto output, default = false.
+ * skip_variant_analysis (optional): Disables top variant stats and happy path, default = false.
+ * enable_proto_encoding (optional): Enable base64 encoded binary proto output, default = true.
  *
  * Used to support PQL EXPLORE_PROCESS and GRAPH
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245719/EXPLORE+PROCESS
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11248519/GRAPH+Query
- * Below are the 3 use cases
+ * Below are the 3 use cases:
  * 1. explore_process will pass in edge_count = -1. It needs self-loop stats but it does not need overall edge count or the edge table;
  * 2. graph with edge_count = 0. It needs overall edge count but does not need the edge table;
  * 3. graph with a positive edge_count. It needs overall edge count and the edge table (trimmed by edge count).
