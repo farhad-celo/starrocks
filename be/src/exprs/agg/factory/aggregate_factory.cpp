@@ -146,6 +146,10 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisVariantStatsV2AggregateFunctio
     return std::make_shared<CelonisVariantStateV2AggregationFunction>();
 }
 
+AggregateFunctionPtr AggregateFactory::MakeCelonisGraphAggregateFunction() {
+    return std::make_shared<CelonisGraphAggregationFunction>();
+}
+
 AggregateFunctionPtr AggregateFactory::MakePercentileApproxAggregateFunction() {
     return std::make_shared<PercentileApproxAggregateFunction>();
 }

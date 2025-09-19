@@ -137,6 +137,7 @@ set(CELONIS_FILES
   celonis/agg/variant_stats.cpp
   celonis/agg/variant_stats_v2.cpp
   celonis/agg/variant_stats_edge_utils.cpp
+  celonis/agg/graph.cpp
   celonis/cpml_utils/conformance_checker_proxy.cpp
   celonis/cpml_utils/process_tree_to_table.cpp
   celonis/cpml_utils/sr_context.cpp
