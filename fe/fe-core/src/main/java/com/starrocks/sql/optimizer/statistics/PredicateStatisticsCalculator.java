@@ -20,6 +20,7 @@ import com.starrocks.common.Pair;
 import com.starrocks.sql.optimizer.Utils;
 import com.starrocks.sql.optimizer.operator.OperatorType;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
+import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator;
@@ -433,6 +434,20 @@ public class PredicateStatisticsCalculator {
             } else {
                 return Statistics.buildFrom(statistics).setOutputRowCount(0.0).build();
             }
+        }
+
+        @Override
+        public Statistics visitCall(CallOperator predicate, Void context) {
+            if (!checkNeedEvalEstimate(predicate)) {
+                return statistics;
+            }
+
+            Statistics callStatistics = CelonisPredicateStatisticsCalculator.estimateCall(predicate, statistics);
+            if (callStatistics != null) {
+                return callStatistics;
+            }
+
+            return visit(predicate, context);
         }
 
         private ScalarOperator getChildForCastOperator(ScalarOperator operator) {
