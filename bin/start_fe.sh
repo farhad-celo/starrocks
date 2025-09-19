@@ -111,10 +111,10 @@ fi
 
 final_java_opt=${JAVA_OPTS}
 # Compatible with scenarios upgraded from jdk11
-if [ ! -z "${JAVA_OPTS_FOR_JDK_11}" ] ; then
-    echo "Warning: Configuration parameter JAVA_OPTS_FOR_JDK_11 is not supported, JAVA_OPTS is the only place to set jvm parameters"
-    final_java_opt=${JAVA_OPTS_FOR_JDK_11}
-fi
+#if [ ! -z "${JAVA_OPTS_FOR_JDK_11}" ] ; then
+#    echo "Warning: Configuration parameter JAVA_OPTS_FOR_JDK_11 is not supported, JAVA_OPTS is the only place to set jvm parameters"
+#    final_java_opt=${JAVA_OPTS_FOR_JDK_11}
+#fi
 
 if [ -z "$final_java_opt" ] ; then
     # lookup fails, provide a fixed opts with best guess that may or may not work
