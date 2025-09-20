@@ -45,10 +45,8 @@ public:
     void serialize(uint8_t* dst) const override {
         memcpy(dst, &edge_count_, sizeof(int64_t));
         dst += sizeof(int64_t);
-        memcpy(dst, &skip_variant_analysis_, sizeof(uint8_t));
-        dst += sizeof(uint8_t);
-        memcpy(dst, &enable_proto_encoding_, sizeof(uint8_t));
-        dst += sizeof(uint8_t);
+        *dst++ = static_cast<uint8_t>(skip_variant_analysis_);
+        *dst++ = static_cast<uint8_t>(enable_proto_encoding_);
         VariantAggregateState::serialize(dst);
     }
 
@@ -59,11 +57,9 @@ public:
         memcpy(&edge_count_, src, sizeof(int64_t));
         src += sizeof(int64_t);
         len -= sizeof(int64_t);
-        memcpy(&skip_variant_analysis_, src, sizeof(uint8_t));
-        src += sizeof(uint8_t);
+        skip_variant_analysis_ = (*src++ != 0);
         len -= sizeof(uint8_t);
-        memcpy(&enable_proto_encoding_, src, sizeof(uint8_t));
-        src += sizeof(uint8_t);
+        enable_proto_encoding_ = (*src++ != 0);
         len -= sizeof(uint8_t);
         auto rv = VariantAggregateState::deserialize_and_merge(mem_pool, src, len);
         auto end = std::chrono::high_resolution_clock::now();
@@ -115,18 +111,21 @@ public:
 private:
     // Holds a reference (iterator) to a variant in the VariantHashMap.
     using VRef = VariantHashMap::const_iterator;
-
     // List of variant references, used to hold top-k variants per activity.
     using VList = std::vector<VRef>;
 
-    std::optional<std::string> json_string(const std::vector<VList>& activity_top_variants, const VRef& happy) const;
+    struct VariantAnalysisResult {
+        std::vector<VList> activity_top_variants;
+        VRef happy;
+    };
 
-    std::optional<std::string> base64_encoded_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
-                                                     const std::string& query_id) const;
+    std::optional<std::string> json_string(const VariantAnalysisResult& analysis_result) const;
 
     std::optional<std::string>
-    to_string(const std::vector<VList>& activity_top_variants, const VRef& happy,
-              const std::string& query_id) const;
+    base64_encoded_string(const VariantAnalysisResult& analysis_result, const std::string& query_id) const;
+
+    std::optional<std::string>
+    to_string(const VariantAnalysisResult& analysis_result, const std::string& query_id) const;
 
     std::string get_log_prefix(const std::string& query_id) const;
 
@@ -134,9 +133,8 @@ private:
     // otherwise returns the top most frequent activity.
     int compute_happy_variant(const std::vector<VRef>& sorted) const;
 
-    // Computes top-10 variants for each activity and happy variant.
-    void compute_top_variants(std::vector<VList>& activity_top_variants, VRef& happy,
-                              const std::string& query_id) const;
+    // Computes top-10 variants per activity and the happy path variant.
+    VariantAnalysisResult analyze_variants(const std::string& query_id) const;
 
     std::vector<ActivityStats> activity_stats_;
     EdgeHashMap edge_map_;

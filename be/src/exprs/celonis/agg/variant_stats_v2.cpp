@@ -362,14 +362,14 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
         ctx->set_error("variant_stats_v2 detects cancelled.", false);
         return;
     }
-    LOG(INFO) << log_prefix << ": started finding top\n";
     CelonisVariantStatsAggregateV2State::VariantAnalysisResult variant_analysis;
     if (!state_impl.skip_variant_analysis()) {
+        LOG(INFO) << log_prefix << ": started analyzing variants\n";
         variant_analysis = state_impl.analyze_variants();
+        LOG(INFO) << log_prefix << ": done analyzing variants (activity_top_variants size = "
+                  << variant_analysis.activity_top_variants.size()
+                  << ")\n";
     }
-    LOG(INFO) << log_prefix << ": done finding top (activity_top_variants size = "
-              << variant_analysis.activity_top_variants.size()
-              << ")\n";
     LOG(INFO) << log_prefix << ": started to_string\n";
     auto rv = state_impl.to_string(variant_analysis);
     if (rv.has_value()) {
