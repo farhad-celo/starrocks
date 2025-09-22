@@ -202,7 +202,10 @@ public:
             return;
         }
 
-        const int64_t parallel_threshold = TrimmedMeanParallelExecutionThreshold<LT>::value;
+        // Use INT64_MAX as the threshold to disable parallel execution (relies on TBB).
+        // Using TBB causes CPU oversubscription and memory spike.
+        const int64_t parallel_threshold = std::numeric_limits<int64_t>::max();
+        // const int64_t parallel_threshold = TrimmedMeanParallelExecutionThreshold<LT>::value;
         if (first > 0) {
             if (new_vector.size() > parallel_threshold) {
                 std::nth_element(std::execution::par_unseq, new_vector.begin(), new_vector.begin() + first,

@@ -100,7 +100,10 @@ StatusOr<ColumnPtr> CelonisArrayTrimmedMean<LT>::celonis_array_trimmed_mean(Func
     ColumnViewer<TYPE_BIGINT> upper_cutoff_viewer(columns[2]);
     ColumnBuilder<TYPE_DOUBLE> result_column{static_cast<int32_t>(n_rows)};
 
-    const int64_t parallel_threshold = ParallelExecutionThreshold<LT>::value;
+    // Use INT64_MAX as the threshold to disable parallel execution (relies on TBB).
+    // Using TBB causes CPU oversubscription and memory spike.
+    const int64_t parallel_threshold = std::numeric_limits<int64_t>::max();
+    // const int64_t parallel_threshold = ParallelExecutionThreshold<LT>::value;
 
     std::vector<CppType> buffer;
     for (auto i = 0; i < n_rows; i++) {
