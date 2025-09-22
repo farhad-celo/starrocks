@@ -144,6 +144,16 @@ public:
             }
             size_t size_start = size_offsets[row];
             size_t size_end = size_offsets[row + 1];
+            if (size_end - size_start <= 1) {
+                int64_t num_elements = src_timestamp_end - src_timestamp_start;
+                int64_t num_to_copy = (limit < num_elements) ? limit : num_elements;
+                for (int64_t i = 0; i < num_to_copy; i++) {
+                    src_index.push_back(src_timestamp_start + i);
+                }
+                new_offset += num_to_copy;
+                dest_offsets_column->get_data().push_back(new_offset);
+                continue;
+            }
             size_t total_size = 0;
             for (size_t i = size_start; i < size_end; ++i) {
                 total_size += sizes[i];
