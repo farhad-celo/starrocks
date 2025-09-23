@@ -16,7 +16,7 @@ using row_id = int32_t;
 namespace starrocks {
 
 namespace {
-void AddArray(const ColumnPtr& column, const std::vector<std::string>& input) {
+void AddArray(ColumnPtr& column, const std::vector<std::string>& input) {
     DatumArray datum;
     datum.reserve(input.size());
     for (const auto& entry : input) {
@@ -25,7 +25,7 @@ void AddArray(const ColumnPtr& column, const std::vector<std::string>& input) {
     column->append_datum(datum);
 }
 
-void AddArray(const ColumnPtr& column, const std::vector<row_id>& input) {
+void AddArray(ColumnPtr& column, const std::vector<row_id>& input) {
     DatumArray datum;
     datum.reserve(input.size());
     for (const auto& entry : input) {
@@ -34,7 +34,7 @@ void AddArray(const ColumnPtr& column, const std::vector<row_id>& input) {
     column->append_datum(datum);
 }
 
-void AddArray(const ColumnPtr& column, const std::vector<std::optional<size_t>>& input) {
+void AddArray(ColumnPtr& column, const std::vector<std::optional<size_t>>& input) {
     DatumArray datum;
     datum.reserve(input.size());
     for (const auto& entry : input) {
