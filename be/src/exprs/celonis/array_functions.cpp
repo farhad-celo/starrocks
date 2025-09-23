@@ -655,7 +655,7 @@ class CelonisNullToEmpty {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
         if (!columns[0]->is_nullable()) {
-            return columns[0]->clone_shared();
+            return columns[0]->clone();
         }
         size_t n_rows = columns[0]->size();
         ColumnPtr input_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);

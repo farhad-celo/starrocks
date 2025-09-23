@@ -16,7 +16,7 @@ CelonisToDouble<LT>::to_double([[maybe_unused]] starrocks::FunctionContext* cont
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     if constexpr (LT == TYPE_DOUBLE) {
-        return columns[0]->clone_shared();
+        return columns[0]->clone();
     }
     ColumnViewer value_viewer = ColumnViewer<LT>(columns[0]);
 

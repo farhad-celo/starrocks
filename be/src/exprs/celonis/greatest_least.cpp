@@ -19,7 +19,7 @@ inline constexpr bool always_false_v{false};
 template<ComparisonType CMP_TYPE, LogicalType LT>
 [[nodiscard]] ColumnPtr celonis_greatest_least_impl(FunctionContext* context, const Columns &columns) {
     if (columns.size() == 1) {
-        return columns[0]->clone_shared();
+        return columns[0]->clone();
     }
 
     // If none of the columns contains a null value, we can simply defer the computation to the existing
