@@ -1,7 +1,6 @@
 #include "exprs/celonis/array_functions.h"
 
 #include <vector>
-#include <utility>
 
 #include "column/array_column.h"
 #include "exprs/celonis/util.h"
@@ -15,7 +14,7 @@ namespace starrocks {
 class CelonisMergeSortedArrays {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
-        DCHECK(columns.size() == 4 || columns.size() == 5 || columns.size() == 6);
+        DCHECK(columns.size() >= 4 && columns.size() <= 7);
         if (columns[0]->only_null()) {
             return Status::InvalidArgument("input_array column should not be NULL literal.");
         }
@@ -37,20 +36,68 @@ public:
                 *timestamp_array_data.elements).get_data().data();
         const auto& timestamp_null_elements = timestamp_array_data.null_elements;
 
-        const bool has_secondary_order = (columns.size() >= 5) && (!columns[4]->has_null());
-        ColumnPtr secondary_order_column = has_secondary_order ? ColumnHelper::unpack_and_duplicate_const_column(
-                chunk_size, columns[4]) : nullptr;
+        size_t next_idx = 4;
+        ColumnPtr secondary_order_column = nullptr;
         UnnestedArrayData secondary_order_array_data;
         const Column* sorting_keys = nullptr;
         const NullColumn::Container* null_sorting_keys = nullptr;
-        if (has_secondary_order) {
-            secondary_order_array_data = prepare_array_input(secondary_order_column.get());
-            if (timestamp_array_data.offsets->get_data() != secondary_order_array_data.offsets->get_data()) {
-                return Status::InvalidArgument(
-                        "If provided, the size of secondary_order_array and timestamp_array should not be different.");
+        bool has_secondary_order = false;
+        if (columns.size() > next_idx) {
+            if (!columns[next_idx]->only_null()) {
+                secondary_order_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[next_idx]);
+                secondary_order_array_data = prepare_array_input(secondary_order_column.get());
+                if (timestamp_array_data.offsets->get_data() != secondary_order_array_data.offsets->get_data()) {
+                    return Status::InvalidArgument(
+                            "If provided, the size of secondary_order_array and timestamp_array should not be different.");
+                }
+                sorting_keys = secondary_order_array_data.elements;
+                null_sorting_keys = secondary_order_array_data.null_elements;
+                has_secondary_order = true;
             }
-            sorting_keys = secondary_order_array_data.elements;
-            null_sorting_keys = secondary_order_array_data.null_elements;
+            next_idx++;
+        }
+
+        const auto get_boolean_data = [](const ColumnPtr& col) -> const uint8_t* {
+            const Column* data_column = ColumnHelper::get_data_column(col.get());
+            if (const auto* bool_column = dynamic_cast<const RunTimeColumnType<TYPE_BOOLEAN>*>(data_column);
+                    bool_column != nullptr) {
+                return bool_column->get_data().data();
+            }
+            return nullptr;
+        };
+        const auto is_bigint_column = [](const ColumnPtr& col) -> bool {
+            const Column* data_column = ColumnHelper::get_data_column(col.get());
+            return dynamic_cast<const RunTimeColumnType<TYPE_BIGINT>*>(data_column) != nullptr;
+        };
+
+        const uint8_t* secondary_nulls_first_values = nullptr;
+        bool has_secondary_nulls_first_column = false;
+        if (has_secondary_order && columns.size() > next_idx) {
+            ColumnPtr candidate = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[next_idx]);
+            if (const auto* values = get_boolean_data(candidate); values != nullptr) {
+                if (candidate->has_null()) {
+                    return Status::InvalidArgument("secondary_nulls_first column should not be NULL.");
+                }
+                secondary_nulls_first_values = values;
+                has_secondary_nulls_first_column = true;
+                next_idx++;
+            }
+        }
+
+        ColumnPtr limit_column = nullptr;
+        bool has_limit = false;
+        if (columns.size() > next_idx) {
+            ColumnPtr candidate = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[next_idx]);
+            if (!is_bigint_column(candidate)) {
+                return Status::InvalidArgument("limit must be a BIGINT column.");
+            }
+            limit_column = std::move(candidate);
+            has_limit = true;
+            next_idx++;
+        }
+
+        if (columns.size() != next_idx) {
+            return Status::InvalidArgument("Unexpected number of arguments for merge_sorted_arrays.");
         }
 
         ColumnPtr size_column = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[2]);
@@ -64,12 +111,12 @@ public:
         const auto& sizes = down_cast<const RunTimeColumnType<TYPE_INT>&>(*size_array_data.elements).get_data().data();
         const auto& size_offsets = size_array_data.offsets->get_data().data();
 
-        const bool has_priority = (columns.size() != 6) || (columns.size() == 6 && !columns[3]->has_null());
+        const bool has_priority = !has_limit || !columns[3]->has_null();
         ColumnPtr priority_column = (has_priority ? ColumnHelper::unpack_and_duplicate_const_column(chunk_size,
                                                                                                     columns[3])
                                                   : nullptr);
         const int32_t* priorities = nullptr;
-        const bool similar_to_size = columns.size() != 6;
+        const bool similar_to_size = !has_limit;
         if (has_priority) {
             if (priority_column->has_null()) {
                 return Status::InvalidArgument("priority_array should not be NULL.");
@@ -131,8 +178,8 @@ public:
         int new_offset = 0;
         for (size_t row = 0; row < chunk_size; row++) {
             int64_t limit = INT64_MAX;
-            if (columns.size() == 6 && !columns[5]->is_null(row)) {
-                limit = columns[5]->get(row).get_int64();
+            if (has_limit && !limit_column->is_null(row)) {
+                limit = limit_column->get(row).get_int64();
                 if (limit < 0) {
                     return Status::InvalidArgument("limit must not be negative.");
                 }
@@ -190,35 +237,51 @@ public:
             struct CompareArrayElement {
                 const Column* sorting_keys;
                 const NullColumn::Container* null_sorting_keys;
+                bool nulls_first;
 
-                explicit CompareArrayElement(const Column* sorting_keys, const NullColumn::Container* null_sorting_keys)
-                        : sorting_keys(sorting_keys), null_sorting_keys(null_sorting_keys) {}
+                explicit CompareArrayElement(const Column* sorting_keys, const NullColumn::Container* null_sorting_keys,
+                                             bool nulls_first)
+                        : sorting_keys(sorting_keys), null_sorting_keys(null_sorting_keys), nulls_first(nulls_first) {}
 
-                bool operator()(const Array& lhs, const Array& rhs) {
+                bool operator()(const Array& lhs, const Array& rhs) const {
                     if (*lhs.timestamp != *rhs.timestamp) {
                         return *lhs.timestamp > *rhs.timestamp;
                     }
                     if (lhs.secondary_order_index == SIZE_MAX || rhs.secondary_order_index == SIZE_MAX) {
                         return lhs.priority == nullptr || (*lhs.priority < *rhs.priority);
                     }
-                    DatumKey lhs_key = get_sorting_key(lhs.secondary_order_index);
-                    DatumKey rhs_key = get_sorting_key(rhs.secondary_order_index);
-                    if (lhs_key == rhs_key) {
-                        return lhs.priority == nullptr || (*lhs.priority < *rhs.priority);
+                    const bool lhs_is_null = is_null(lhs.secondary_order_index);
+                    const bool rhs_is_null = is_null(rhs.secondary_order_index);
+                    if (lhs_is_null != rhs_is_null) {
+                        if (nulls_first) {
+                            return !lhs_is_null;
+                        }
+                        return lhs_is_null;
                     }
-                    return lhs_key > rhs_key;
+                    if (!lhs_is_null) {
+                        DatumKey lhs_key = get_sorting_key(lhs.secondary_order_index);
+                        DatumKey rhs_key = get_sorting_key(rhs.secondary_order_index);
+                        if (lhs_key == rhs_key) {
+                            return lhs.priority == nullptr || (*lhs.priority < *rhs.priority);
+                        }
+                        return lhs_key > rhs_key;
+                    }
+                    // Both secondary keys are NULL, fall back to priority comparison.
+                    return lhs.priority == nullptr || (*lhs.priority < *rhs.priority);
                 }
 
-                // The corresponding DatumKey of NULL is std::monostate which is less than any other DatumKey.
-                DatumKey get_sorting_key(size_t index) {
-                    if (null_sorting_keys != nullptr && (*null_sorting_keys)[index] != 0) {
-                        return std::monostate();
-                    }
+                bool is_null(size_t index) const {
+                    return null_sorting_keys != nullptr && (*null_sorting_keys)[index] != 0;
+                }
+
+                DatumKey get_sorting_key(size_t index) const {
                     return sorting_keys->get(index).convert2DatumKey();
                 }
             };
+            const bool row_secondary_nulls_first =
+                    has_secondary_nulls_first_column ? (secondary_nulls_first_values[row] != 0) : true;
             std::priority_queue<Array, std::vector<Array>, CompareArrayElement> pq(
-                    (CompareArrayElement(sorting_keys, null_sorting_keys)));
+                    (CompareArrayElement(sorting_keys, null_sorting_keys, row_secondary_nulls_first)));
             size_t start = src_timestamp_start;
             size_t next = 0;
             for (size_t i = size_start; i < size_end; i++) {

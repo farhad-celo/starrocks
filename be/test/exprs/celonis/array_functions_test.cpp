@@ -2008,11 +2008,44 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_sortings) {
     EXPECT_EQ(10, result->get(2).get_array()[4].get_int32());
 }
 
-TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_monostate_index) {
-    // The implementation (order NULL sorting before non-NULL sorting) relies on
-    // the fact that std::monostate is the first type in the DatumKey variant.
-    DatumKey monostate_value{std::monostate{}};
-    EXPECT_EQ(monostate_value.index(), 0);
+TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_secondary_order_nulls_last) {
+    auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), false);
+    input_array->append_datum(DatumArray{10, 11, 20});
+
+    auto timestamp_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)),
+                                                       false);
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 1),
+            TimestampValue::create(2023, 1, 1, 0, 0, 1),
+            TimestampValue::create(2023, 1, 1, 0, 0, 1),
+    });
+
+    auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                  false);
+    size_array->append_datum(DatumArray{2, 1});
+
+    auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+    priority_array->append_datum(DatumArray{1, 2});
+
+    auto secondary_order_array = ColumnHelper::create_column(
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BIGINT)), true);
+    secondary_order_array->append_datum(DatumArray{1L, Datum{}, 2L});
+
+    auto secondary_nulls_first_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BOOLEAN), false);
+    secondary_nulls_first_column->append_datum(false);
+
+    const auto rs = CelonisArrayFunctions::merge_sorted_arrays(nullptr, {input_array, timestamp_array, size_array,
+                                                                         priority_array, secondary_order_array,
+                                                                         secondary_nulls_first_column});
+    ASSERT_TRUE(rs.ok()) << rs.status().message();
+
+    const auto& result = rs.value();
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ(3, result->get(0).get_array().size());
+    EXPECT_EQ(10, result->get(0).get_array()[0].get_int32());
+    EXPECT_EQ(20, result->get(0).get_array()[1].get_int32());
+    EXPECT_EQ(11, result->get(0).get_array()[2].get_int32());
 }
 
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_varchar_sortings) {
@@ -2521,8 +2554,8 @@ TEST_F(CelonisArrayFunctionsTest, null_to_empty_null_elements_in_array) {
 TEST_F(CelonisArrayFunctionsTest, null_to_empty_only_null) {
     auto input_array = ColumnHelper::create_const_null_column(2);
 
-    std::vector<FunctionContext::TypeDesc> arg_types = { TYPE_ARRAY_INT };
-    auto return_type = TYPE_ARRAY_INT;
+    std::vector<FunctionContext::TypeDesc> arg_types = {AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT)};
+    auto return_type = AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_INT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     const auto result = CelonisArrayFunctions::null_to_empty(ctx.get(), {input_array}).value();
     EXPECT_FALSE(result->is_nullable());
