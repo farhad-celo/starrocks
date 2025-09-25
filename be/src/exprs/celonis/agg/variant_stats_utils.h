@@ -1,11 +1,12 @@
 #pragma once
 
-#include <optional>
 #include "column/column.h"
 #include "rapidjson/document.h"
 #include "variant.h"
 
 namespace starrocks {
+
+constexpr size_t MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES = std::numeric_limits<int16_t>::max();
 
 // Basic statistics on an Edge.
 struct EdgeStats {
@@ -37,6 +38,8 @@ struct ActivityStats {
 
     std::string debug_string() const;
 };
+
+using EdgeHashMap = phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
 
 
 } // namespace starrocks

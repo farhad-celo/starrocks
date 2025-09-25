@@ -1,16 +1,12 @@
 #pragma once
 
-#include <map>
-#include <queue>
 #include <vector>
-#include "exprs/celonis/agg/variant_util.h"
+#include "exprs/celonis/agg/variant_stats_utils.h"
 #include "exprs/celonis/agg/variant.h"
 #include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
 
 namespace starrocks {
-
-using EdgeHashMap = phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
 
 template<typename ActivityMapType>
 class EdgeStatsProcessor {

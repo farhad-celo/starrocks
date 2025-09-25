@@ -1,5 +1,4 @@
-#include "column/array_column.h"
-#include "exprs/celonis/agg/variant_util.h"
+#include "exprs/celonis/agg/variant_stats_utils.h"
 
 namespace starrocks {
 

@@ -6,12 +6,11 @@
 #include "column/type_traits.h"
 #include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate.h"
-#include "exprs/celonis/agg/variant_util.h"
+#include "exprs/celonis/agg/variant_stats_utils.h"
 #include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "runtime/mem_pool.h"
 #include "variant.h"
-#include <set>
 #include <boost/algorithm/string/join.hpp>
 
 namespace starrocks {

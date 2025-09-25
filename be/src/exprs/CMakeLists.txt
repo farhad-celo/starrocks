@@ -131,10 +131,10 @@ set(CELONIS_FILES
   celonis/agg/mode.cpp
   celonis/agg/product.cpp
   celonis/agg/top_k_utils.cpp
-  celonis/agg/variant_util.cpp
   celonis/agg/util.cpp
   celonis/agg/variant_agg.cpp
   celonis/agg/variant_stats.cpp
+  celonis/agg/variant_stats_utils.cpp
   celonis/agg/variant_stats_v2.cpp
   celonis/agg/variant_stats_edge_utils.cpp
   celonis/agg/graph.cpp

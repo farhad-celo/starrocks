@@ -1,12 +1,9 @@
 #pragma once
 #include "exprs/agg/aggregate.h"
 #include "variant.h"
-#include "variant_util.h"
+#include "variant_stats_utils.h"
 
 namespace starrocks {
-
-//TODO(xingyuan): move it to a common header to be shared with variant_stats v1 & v2
-constexpr size_t MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES = std::numeric_limits<int16_t>::max();
 
 class CelonisGraphAggregateState {
 public:

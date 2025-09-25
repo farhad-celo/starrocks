@@ -342,12 +342,12 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
     LOG(INFO) << log_prefix << ": distinct activity count = " << state_impl.num_distinct_activities() << std::endl;
     LOG(INFO) << log_prefix << ": distinct variant count = " << state_impl.num_distinct_variants() << std::endl;
 
-    if (state_impl.activity_array().size() > static_cast<size_t>(std::numeric_limits<int16_t>::max())) {
+    if (state_impl.activity_array().size() > MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES) {
         ctx->set_error(std::string(
                                "CELONIS_VARIANT_STATS_V2: the number of unique activities is " +
                                std::to_string(state_impl.activity_array().size()) +
                                " which is greater than the limit " +
-                               std::to_string(std::numeric_limits<int16_t>::max()))
+                               std::to_string(MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES))
                                .c_str(),
                        false);
         return;

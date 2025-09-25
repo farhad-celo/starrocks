@@ -261,11 +261,11 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     LOG(INFO) << log_prefix << ": merging_seconds = " << merging_microseconds_ / 1000000.0 << " seconds." << std::endl;
     LOG(INFO) << log_prefix << ": merging_bytes = " << merging_bytes_ << " bytes." << std::endl;
     LOG(INFO) << log_prefix << ": number of states merged = " << merging_states_ << std::endl;
-    if (activity_map_.size() > std::numeric_limits<int16_t>::max()) {
+    if (activity_map_.size() > MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES) {
         ctx->set_error(std::string(
                                "CELONIS_VARIANT_STATS: the size of activity_map is " + std::to_string(activity_map_.size()) +
                                " which is greater than the limit " +
-                               std::to_string(std::numeric_limits<int16_t>::max()))
+                               std::to_string(MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES))
                                .c_str(),
                        false);
         return std::nullopt;

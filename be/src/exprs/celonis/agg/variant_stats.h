@@ -2,13 +2,12 @@
 
 #include "column/column_helper.h"
 #include "column/hash_set.h"
-#include "exprs/celonis/agg/variant_util.h"
+#include "exprs/celonis/agg/variant_stats_utils.h"
 #include "exprs/function_context.h"
 #include "rapidjson/document.h"
 #include "variant.h"
 #include "variant_agg.h"
 #include "util/uuid_generator.h"
-#include <boost/functional/hash.hpp>
 #include <chrono>
 
 namespace starrocks {
