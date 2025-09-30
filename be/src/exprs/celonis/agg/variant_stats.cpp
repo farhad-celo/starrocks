@@ -14,98 +14,8 @@
 
 namespace starrocks {
 
-int VariantStatsFinalizer::compute_happy_variant(const std::vector<VRef>& sorted) const {
-    // Happy path
-    // find top start activity
-    // find top end activity which is not top start
-    // find top variant with start and end from above
-    // if not found use top variant
-    int top_start = 0;
-    size_t count_start = 0;
-    for (int i = 0; i < activity_stats_.size(); i++) {
-        if (activity_stats_[i].count_start > count_start) {
-            count_start = activity_stats_[i].count_start;
-            top_start = i;
-        }
-    }
-    // top_end activity has to be different from top start.
-    uint32_t top_end = 0;
-    size_t count_end = 0;
-    for (int i = 0; i < activity_stats_.size(); i++) {
-        if (activity_stats_[i].count_end > count_end && i != top_start) {
-            count_end = activity_stats_[i].count_end;
-            top_end = i;
-        }
-    }
-    // Note: if there is a single activity in the data we will get start = 0, end = 0 and will return the top variant.
-    int happy = 0; // default happy is top freq variant.
-    for (int i = 0; i < sorted.size(); i++) {
-        const auto& v = sorted[i]->first.data;
-        if (v.empty()) {
-            continue;
-        }
-        if (v[0] == top_start && v[v.size() - 1] == top_end) {
-            happy = i;
-            break;
-        }
-    }
-    return happy;
-}
-
-VariantStatsFinalizer::VariantAnalysisResult
-VariantStatsFinalizer::analyze_variants(const std::string& query_id) const {
-    DCHECK(!variant_map_.empty() && !activity_map_.empty());
-    VariantAnalysisResult result;
-    auto& activity_top_variants = result.activity_top_variants;
-    // 1. Sort variants by count
-    std::vector<VRef> v_count(variant_map_.size());
-    int index = 0;
-    for (auto it = variant_map_.cbegin(); it != variant_map_.cend(); it++) {
-        v_count[index++] = it;
-    }
-    LOG(INFO) << get_log_prefix(query_id) << ": started variants sorting\n";
-    std::sort(v_count.begin(), v_count.end(),
-              [](const VRef& lhs, const VRef& rhs) { return lhs->second > rhs->second; });
-    LOG(INFO) << get_log_prefix(query_id) << ": done variants sorting (variant_map_ size = " << variant_map_.size()
-              << ")\n";
-    // 2. Find a happy variant
-    int happy_v = compute_happy_variant(v_count);
-    result.happy = v_count[happy_v];
-    // 3. Find top-10 variants for each activity
-    // Make sure we get enough variants so that each activity has 10 entries
-    activity_top_variants.resize(activity_map_.size());
-    for (int i = 0; i < activity_top_variants.size(); i++) {
-        activity_top_variants[i].reserve(10);
-    }
-    std::vector<int8_t> a_done(activity_map_.size(), 0);
-    int done_count = 0;
-    for (int i = 0; i < v_count.size(); i++) {
-        // Check activities matched by this variant.
-        const auto& variant = v_count[i]->first;
-        std::vector<int8_t> a_seen(activity_map_.size(), 0);
-        for (int j = 0; j < variant.data.size(); j++) {
-            uint32_t idx = variant.data[j];
-            if (a_done[idx] == 0 && a_seen[idx] == 0) {
-                a_seen[idx] = 1;
-                activity_top_variants[idx].push_back(v_count[i]);
-                if (activity_top_variants[idx].size() >= 10) {
-                    a_done[idx] = 1;
-                    done_count++;
-                }
-            }
-        }
-        // Stop early if we have already collected 10 variants for every activity.
-        if (done_count == activity_map_.size()) {
-            break;
-        }
-    }
-    return result;
-}
-
 std::optional<std::string>
-VariantStatsFinalizer::json_string(const VariantAnalysisResult& analysis_result) const {
-    const std::vector<VList>& activity_top_variants = analysis_result.activity_top_variants;
-    const VRef& happy = analysis_result.happy;
+VariantStatsFinalizer::json_string(const std::optional<VariantAnalysisResult>& variant_analysis) const {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
@@ -142,7 +52,9 @@ VariantStatsFinalizer::json_string(const VariantAnalysisResult& analysis_result)
     }
     d.AddMember("e_stats", e_stats, allocator);
     // Top variants and happy path
-    if (!skip_variant_analysis_) {
+    if (variant_analysis.has_value()) {
+        const std::vector<VList>& activity_top_variants = variant_analysis.value().activity_top_variants;
+        const VRef& happy = variant_analysis.value().happy;
         rapidjson::Value topv(rapidjson::kArrayType);
         for (int i = 0; i < activity_top_variants.size(); i++) {
             rapidjson::Value obj(rapidjson::kObjectType);
@@ -177,10 +89,8 @@ VariantStatsFinalizer::json_string(const VariantAnalysisResult& analysis_result)
 }
 
 std::optional<std::string>
-VariantStatsFinalizer::base64_encoded_string(const VariantAnalysisResult& analysis_result,
+VariantStatsFinalizer::base64_encoded_string(const std::optional<VariantAnalysisResult>& variant_analysis,
                                              const std::string& query_id) const {
-    const std::vector<VList>& activity_top_variants = analysis_result.activity_top_variants;
-    const VRef& happy = analysis_result.happy;
     celonis::accelerator::Statistics statistics_proto;
     // Dictionary
     for (auto it = activity_map_.begin(); it != activity_map_.end(); it++) {
@@ -213,7 +123,9 @@ VariantStatsFinalizer::base64_encoded_string(const VariantAnalysisResult& analys
                 sorted_edges, statistics_proto);
     }
     // Top variants and happy path
-    if (!skip_variant_analysis_) {
+    if (variant_analysis.has_value()) {
+        const std::vector<VList>& activity_top_variants = variant_analysis.value().activity_top_variants;
+        const VRef& happy = variant_analysis.value().happy;
         uint32_t total_variants = 0;
         for (int i = 0; i < activity_top_variants.size(); i++) {
             celonis::accelerator::VariantEntry entry;
@@ -247,7 +159,7 @@ VariantStatsFinalizer::base64_encoded_string(const VariantAnalysisResult& analys
 }
 
 std::optional<std::string>
-VariantStatsFinalizer::to_string(const VariantAnalysisResult& analysis_result, const std::string& query_id) const {
+VariantStatsFinalizer::to_string(const std::optional<VariantAnalysisResult>& analysis_result, const std::string& query_id) const {
     return enable_proto_encoding_ ? base64_encoded_string(analysis_result, query_id) : json_string(analysis_result);
 }
 
@@ -309,12 +221,12 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     LOG(INFO) << log_prefix << ": done traversing variant_map\n";
     LOG(INFO) << log_prefix << ": size of activity_stats_ = " << activity_stats_.size() << "\n";
     LOG(INFO) << log_prefix << ": size of edge_map_ = " << edge_map_.size() << "\n";
-    VariantAnalysisResult variant_analysis;
+    std::optional<VariantAnalysisResult> variant_analysis = std::nullopt;
     if (!skip_variant_analysis_) {
         LOG(INFO) << log_prefix << ": started analyzing variants\n";
-        variant_analysis = analyze_variants(query_id);
+        variant_analysis = analyze_variants_for_explore_process(variant_map_, activity_map_, activity_stats_, log_prefix);
         LOG(INFO) << log_prefix << ": done analyzing variants (activity_top_variants size = "
-                  << variant_analysis.activity_top_variants.size()
+                  << variant_analysis.value().activity_top_variants.size()
                   << ")\n";
     }
     LOG(INFO) << log_prefix << ": started to_string\n";

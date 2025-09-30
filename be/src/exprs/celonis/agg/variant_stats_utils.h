@@ -41,6 +41,32 @@ struct ActivityStats {
 
 using EdgeHashMap = phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
 
+// Holds a reference (iterator) to a variant in the VariantHashMap.
+using VRef = VariantHashMap::const_iterator;
+// List of variant references, used to hold top-k variants per activity.
+using VList = std::vector<VRef>;
+
+struct VariantAnalysisResult {
+    VRef happy;
+    std::vector<VList> activity_top_variants;
+};
+
+// TODO(xingyuan): Move analyze_variants in variant_stats_v2 to this utils file as well
+/**
+ * Analyzes variants to compute happy path and top-10 variants per activity. Used to support EXPLORE_PROCESS PQL function.
+ * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11245719/EXPLORE_PROCESS
+ *
+ * @param variant_counts A map from each variant to its frequency.
+ * @param activity_map   A lookup table that maps an activity's string name to its unique integer index.
+ * @param activity_stats A vector containing statistics for each activity, indexed by the activity's ID from `activity_map`.
+ * @param log_prefix     A string prepended to any log messages.
+ *
+ * @return An `VariantAnalysisResult` object containing a happy path and top-10 variants per activity. Variants are
+ *         represented as const references (iterators) to elements in the original VariantHashMap.
+ */
+VariantAnalysisResult analyze_variants_for_explore_process(const VariantHashMap& variant_counts,
+    const SliceHashMap& activity_map, const std::vector<ActivityStats>& activity_stats,
+    const std::string& log_prefix);
 
 } // namespace starrocks
 

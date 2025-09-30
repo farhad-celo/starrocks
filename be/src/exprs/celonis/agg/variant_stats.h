@@ -108,32 +108,15 @@ public:
     std::optional<std::string> finalize(FunctionContext* ctx) override;
 
 private:
-    // Holds a reference (iterator) to a variant in the VariantHashMap.
-    using VRef = VariantHashMap::const_iterator;
-    // List of variant references, used to hold top-k variants per activity.
-    using VList = std::vector<VRef>;
-
-    struct VariantAnalysisResult {
-        std::vector<VList> activity_top_variants;
-        VRef happy;
-    };
-
-    std::optional<std::string> json_string(const VariantAnalysisResult& analysis_result) const;
+    std::optional<std::string> json_string(const std::optional<VariantAnalysisResult>& variant_analysis) const;
 
     std::optional<std::string>
-    base64_encoded_string(const VariantAnalysisResult& analysis_result, const std::string& query_id) const;
+    base64_encoded_string(const std::optional<VariantAnalysisResult>& variant_analysis, const std::string& query_id) const;
 
     std::optional<std::string>
-    to_string(const VariantAnalysisResult& analysis_result, const std::string& query_id) const;
+    to_string(const std::optional<VariantAnalysisResult>& analysis_result, const std::string& query_id) const;
 
     std::string get_log_prefix(const std::string& query_id) const;
-
-    // Computes the variant that starts and ends with the most common start/end activities,
-    // otherwise returns the top most frequent activity.
-    int compute_happy_variant(const std::vector<VRef>& sorted) const;
-
-    // Computes top-10 variants per activity and the happy path variant.
-    VariantAnalysisResult analyze_variants(const std::string& query_id) const;
 
     std::vector<ActivityStats> activity_stats_;
     EdgeHashMap edge_map_;
