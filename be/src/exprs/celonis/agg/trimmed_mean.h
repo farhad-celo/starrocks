@@ -18,6 +18,11 @@ template <LogicalType LT, typename = guard::Guard>
 struct TrimmedMeanState {
     using CppType = RunTimeCppType<LT>;
     void update(CppType item) { items.emplace_back(item); }
+    void update_batch(const std::vector<CppType>& vec) {
+        size_t old_size = items.size();
+        items.resize(old_size + vec.size());
+        memcpy(items.data() + old_size, vec.data(), vec.size() * sizeof(CppType));
+    }
     std::vector<CppType> items;
 };
 
@@ -125,6 +130,41 @@ public:
         size_t old_size = items.size();
         items.resize(old_size + data.size());
         memcpy(items.data() + old_size, data.data(), data.size() * sizeof(InputCppType));
+    }
+
+    void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
+        DCHECK(column->is_binary());
+
+        const Slice slice = column->get(row_num).get_slice();
+        size_t items_size = *reinterpret_cast<const size_t*>(slice.data);
+        auto data_ptr = slice.data + sizeof(size_t);
+
+        auto& items = this->data(state).items;
+        size_t old_size = items.size();
+        items.resize(old_size + items_size);
+        memcpy(items.data() + old_size, data_ptr, items_size * sizeof(InputCppType));
+    }
+
+    void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
+        auto* column = down_cast<BinaryColumn*>(to);
+        Bytes& bytes = column->get_bytes();
+        size_t old_size = bytes.size();
+        size_t items_size = this->data(state).items.size();
+
+        // Serialization Format:
+        // [items_size: 8 bytes][item1][item2][item3]...[itemN]
+        size_t new_size = old_size + sizeof(size_t) + items_size * sizeof(InputCppType);
+        bytes.resize(new_size);
+        memcpy(bytes.data() + old_size, &items_size, sizeof(size_t));
+        memcpy(bytes.data() + old_size + sizeof(size_t), this->data(state).items.data(),
+               items_size * sizeof(InputCppType));
+        column->get_offset().emplace_back(new_size);
+    }
+
+    void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
+                                     ColumnPtr* dst) const override {
+        // Used for streaming aggregation passthrough. Not implemented.
+        throw std::runtime_error("celonis_trimmed_mean: convert_to_serialize_format not supported");
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
