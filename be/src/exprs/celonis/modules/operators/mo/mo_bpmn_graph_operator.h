@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include <cpml/model/bpmn_graph_with_block_structure.h>
+
 #include "modules/common/execution_context.h"
 #ifndef CELOSTAR
 #include "modules/cube/query_scope_fwd.h"
@@ -13,7 +15,6 @@
 #include "modules/operators/mo/mo_bpmn_graph_types.h"
 #endif
 #include "modules/operators/process/bpmn/bpmn_graph_to_tables.h"
-#include "modules/operators/process/bpmn/bpmn_graph_with_block_structure.h"
 #include "modules/operators/process/inductive_miner/inductive_miner_statistics.h"
 #ifdef CELOSTAR
 #include "modules/operators/process/inductive_miner/process_tree.h"
@@ -44,7 +45,7 @@ class mo_bpmn_graph_operator {
 
  protected:
   struct compute_graph_result {
-    process::bpmn::bpmn_graph_with_block_structure graph;
+    cpml::model::bpmn_graph_with_block_structure graph;
     memory::dictionary_t dictionary;
     std::vector<process::inductive_miner_statistics> statistics;
   };
@@ -71,7 +72,7 @@ class mo_bpmn_graph_operator {
 
 namespace details {
 
-using bpmn_graph_with_dict = std::pair<process::bpmn::bpmn_graph_with_block_structure, memory::dictionary_t>;
+using bpmn_graph_with_dict = std::pair<cpml::model::bpmn_graph_with_block_structure, memory::dictionary_t>;
 
 /**
  * Merge a set of bpmn graphs for different objects (given their dictionaries).
@@ -87,7 +88,7 @@ using bpmn_graph_with_dict = std::pair<process::bpmn::bpmn_graph_with_block_stru
  * @param context Execution context.
  * @return A pair of the merge bpmn graph and the merged activity dictionary.
  */
-bpmn_graph_with_dict merge_bpmn_graphs(std::vector<process::bpmn::bpmn_graph_with_block_structure> graphs,
+bpmn_graph_with_dict merge_bpmn_graphs(std::vector<cpml::model::bpmn_graph_with_block_structure> graphs,
                                        const std::vector<std::pair<memory::dictionary_t, std::string>>& dictionaries,
                                        const common::execution_context& context);
 

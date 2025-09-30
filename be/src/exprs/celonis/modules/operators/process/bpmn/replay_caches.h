@@ -4,10 +4,11 @@
 
 #include <boost/container_hash/hash.hpp>
 
-#include "legacy_embedded_ctl/named_type_hash.h"
+#include <cpml/model/bpmn_graph_fwd.h>
+#include <ctl/named_type_hash.h>
+
 #include "modules/memory/management/memory_checked_containers.h"
 #include "modules/operators/process/bpmn/a_star/replay.h"
-#include "modules/operators/process/bpmn/bpmn_graph_fwd.h"
 #include "modules/operators/process/bpmn/prefix_trie.h"
 #include "modules/operators/process/bpmn/replay_types.h"
 
@@ -37,11 +38,12 @@ class replay_caches {
      * For a given BPMN model and markings, returns all the transitions that can fire. Can be used to see if a set of
      * markings has any enabled transitions defined.
      */
-    [[nodiscard]] transitions_map_t get_enabled_transitions(const bpmn_graph& model, const markings_t& markings);
+    [[nodiscard]] transitions_map_t get_enabled_transitions(const cpml::model::bpmn_graph& model,
+                                                            const markings_t& markings);
 
    private:
     // TODO(bluppes): thread safety
-    [[nodiscard]] const transitions_t& get_cached_or_compute_enabled_transitions(const bpmn_graph& model,
+    [[nodiscard]] const transitions_t& get_cached_or_compute_enabled_transitions(const cpml::model::bpmn_graph& model,
                                                                                  const marking_t& marking);
 
     using cache_t = memory::management::checked_ska_hash_map_t<marking_t, transitions_t, marking_hash>;

@@ -50,16 +50,9 @@ list(APPEND SOURCES
         modules/operators/process/alignment/log_aligner.cpp
         modules/operators/process/alignment/sequence_aligner.cpp
         modules/operators/process/alignment/trace_alignment.cpp
-        modules/operators/process/bpmn/bpmn_graph.cpp
-        modules/operators/process/bpmn/bpmn_graph_builder.cpp
+        modules/operators/process/bpmn/bpmn_from_proto.cpp
         modules/operators/process/bpmn/bpmn_graph_to_tables.cpp
-        modules/operators/process/bpmn/bpmn_graph_with_block_structure.cpp
-        modules/operators/process/bpmn/bpmn_graph_with_block_structure_utils.cpp
-        modules/operators/process/bpmn/bpmn_overlay_graphs.cpp
-        modules/operators/process/bpmn/bpmn_remap_task_ids.cpp
         modules/operators/process/bpmn/bpmn_to_pn.cpp
-        modules/operators/process/bpmn/bpmn_validation.cpp
-        modules/operators/process/bpmn/process_tree_to_bpmn.cpp
         modules/operators/process/bpmn/replay_types.cpp
         modules/operators/process/bpmn/replay_utils.cpp
 )
@@ -122,4 +115,7 @@ target_link_libraries(Celonis
         Boost::iostreams
         Boost::container
         onetbb
+        celonis_formatting_library # Custom to Celonis (CTL dependency)
+        celonis_template_library # Custom to Celonis (CPML dependency)
+        celonis_process_mining_library # Custom to Celonis (Process Mining algorithms)
 )

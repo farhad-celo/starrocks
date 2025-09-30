@@ -5,7 +5,8 @@
 
 namespace celonis::accelerator::operators::process::bpmn {
 
-replay_result_source_target_t create_replay_result(const bpmn_graph& model, const memory::column_t& input_column,
+replay_result_source_target_t create_replay_result(const cpml::model::bpmn_graph& model,
+                                                   const memory::column_t& input_column,
                                                    const memory::column_t& activity_column,
                                                    const memory::column_t& case_id_column,
                                                    const memory::join_projection_vector_t& activity_case_join_index,

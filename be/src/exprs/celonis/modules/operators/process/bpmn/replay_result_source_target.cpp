@@ -20,8 +20,8 @@ void check_size_invariant(const size_t expected_size, const size_t actual_size, 
 
 }  // anonymous namespace
 
-replay_result_source_target::replay_result_source_target(std::vector<vertex_id_type> source_ids,
-                                                         std::vector<vertex_id_type> target_ids,
+replay_result_source_target::replay_result_source_target(std::vector<cpml::model::bpmn::vertex_id_type> source_ids,
+                                                         std::vector<cpml::model::bpmn::vertex_id_type> target_ids,
                                                          std::vector<row_id> source_ptrs,
                                                          std::vector<row_id> target_ptrs,
                                                          std::vector<row_id> join_index)

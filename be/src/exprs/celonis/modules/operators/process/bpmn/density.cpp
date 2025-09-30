@@ -1,11 +1,17 @@
 #include "density.h"
 
+#include <cpml/model/bpmn_graph.h>
+
 #include "modules/common/exceptions.h"
-#include "modules/operators/process/bpmn/bpmn_graph.h"
 
 namespace celonis::accelerator::operators::process::bpmn {
 
-cel_float_t calculate_density(const bpmn_graph& bpmn_graph) {
+// TODO(n.weber): Temporary using decls until code is migrated to CPML
+using cpml::model::bpmn::exclusive_choice;
+using cpml::model::bpmn::parallel;
+using cpml::model::bpmn::task;
+
+cel_float_t calculate_density(const cpml::model::bpmn_graph& bpmn_graph) {
   if (!bpmn_graph.is_single_object()) {
     throw common::cpm_exception{"Single object BPMN required for density calculation"};
   }
@@ -17,7 +23,7 @@ cel_float_t calculate_density(const bpmn_graph& bpmn_graph) {
 
   for (const auto& [_, v] : bpmn_graph.get_vertices()) {
     std::visit(
-        legacy_embedded_ctl::overloaded{[](const auto& /*vertex_type*/) {}, [&num_tasks](const task& /*unused*/) { num_tasks++; },
+        ctl::overloaded{[](const auto& /*vertex_type*/) {}, [&num_tasks](const task& /*unused*/) { num_tasks++; },
                         [&num_gateways](const parallel& /*unused*/) { num_gateways++; },
                         [&num_gateways](const exclusive_choice& /*unused*/) { num_gateways++; }},
         v.get_vertex_type());

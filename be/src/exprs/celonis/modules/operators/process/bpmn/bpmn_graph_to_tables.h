@@ -3,12 +3,13 @@
 #include <variant>
 #include <vector>
 
+#include <cpml/model/bpmn_graph_fwd.h>
+#include <cpml/model/bpmn_graph_with_block_structure.h>
+
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/dictionary_fwd.h"
 #include "modules/memory/row_id.h"
 #include "modules/memory/table_fwd.h"
-#include "modules/operators/process/bpmn/bpmn_graph_fwd.h"
-#include "modules/operators/process/bpmn/bpmn_graph_with_block_structure.h"
 
 namespace celonis::accelerator::operators::process::bpmn {
 
@@ -39,7 +40,7 @@ struct bpmn_tables {
  * names.
  * @return Three tables describing the given graph.
  */
-bpmn_tables create_bpmn_tables_from_bpmn_graph(const bpmn_graph_with_block_structure& graph,
+bpmn_tables create_bpmn_tables_from_bpmn_graph(const cpml::model::bpmn_graph_with_block_structure& graph,
                                                const memory::dictionary_t& activity_dict,
                                                memory::table_row_limit_t table_row_limit,
                                                const common::execution_context& context);

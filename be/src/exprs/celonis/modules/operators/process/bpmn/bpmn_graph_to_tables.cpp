@@ -1,25 +1,32 @@
 #include "bpmn_graph_to_tables.h"
 
+#include <numeric>
 #include <vector>
 
+#include <cpml/model/bpmn_graph.h>
+#include <ctl/conversion.h>
+
+#include "modules/memory/column_pointers.h"
+#include "modules/memory/column_processing_state.h"
 #include "modules/memory/dictionary.h"
+#include "modules/memory/null_flags.h"
 #include "modules/memory/table.h"
-#include "modules/operators/process/bpmn/bpmn_graph.h"
 
 namespace celonis::accelerator::operators::process::bpmn {
 
 namespace {
 
-memory::table_t build_bpmn_edges_table(const bpmn::bpmn_graph& graph, memory::table_row_limit_t table_row_limit,
+memory::table_t build_bpmn_edges_table(const cpml::model::bpmn_graph& graph, memory::table_row_limit_t table_row_limit,
                                        const common::execution_context& operator_context) {
   const auto& bpmn_edges{graph.get_edges()};
   const row_id size{static_cast<row_id>(bpmn_edges.size())};
 
-  memory::table_t bpmn_edges_table{memory::table::create_query_scope_table(size, "bpmn_edges")};
+  memory::table_t bpmn_edges_table{memory::table::create_query_scope_table(size, "bpmn_edges", table_row_limit)};
 
   auto source_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   auto target_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   auto object_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  // TODO(n.weber): Deprecated for removal - counts column can be removed in a follow-up
   auto object_count_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   row_id i{0};
@@ -27,6 +34,7 @@ memory::table_t build_bpmn_edges_table(const bpmn::bpmn_graph& graph, memory::ta
     source_id_data[i] = static_cast<cel_int_t>(edge.get_source_id());
     target_id_data[i] = static_cast<cel_int_t>(edge.get_target_id());
     object_id_data[i] = static_cast<cel_int_t>(edge.get_object_id());
+    // TODO(n.weber): Deprecated for removal - counts column can be removed in a follow-up
     object_count_data[i] = static_cast<cel_int_t>(edge.get_count());
     ++i;
   }
@@ -40,6 +48,7 @@ memory::table_t build_bpmn_edges_table(const bpmn::bpmn_graph& graph, memory::ta
   bpmn_edges_table->add_column<cel_int_t>(memory::col_name{"OBJECT_ID"}, memory::col_id{"OBJECT_ID"},
                                           std::move(object_id_data), memory::create_null_flags(size, operator_context),
                                           memory::column_processing_state{}, table_row_limit);
+  // TODO(n.weber): Deprecated for removal - counts column can be removed in a follow-up
   bpmn_edges_table->add_column<cel_int_t>(
       memory::col_name{"OBJECT_COUNT"}, memory::col_id{"OBJECT_COUNT"}, std::move(object_count_data),
       memory::create_null_flags(size, operator_context), memory::column_processing_state{}, table_row_limit);
@@ -47,19 +56,19 @@ memory::table_t build_bpmn_edges_table(const bpmn::bpmn_graph& graph, memory::ta
   return bpmn_edges_table;
 }
 
-memory::table_t build_bpmn_nodes_table(const bpmn::bpmn_graph& graph, memory::table_row_limit_t table_row_limit,
+memory::table_t build_bpmn_nodes_table(const cpml::model::bpmn_graph& graph, memory::table_row_limit_t table_row_limit,
                                        const common::execution_context& operator_context) {
   const auto& bpmn_nodes{graph.get_vertices()};
   const row_id size{static_cast<row_id>(bpmn_nodes.size())};
 
-  memory::table_t bpmn_nodes_table{memory::table::create_query_scope_table(size, "bpmn_nodes")};
+  memory::table_t bpmn_nodes_table{memory::table::create_query_scope_table(size, "bpmn_nodes", table_row_limit)};
 
   auto node_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   auto node_type_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   for (int i{0}; const auto& [_, vertex] : bpmn_nodes) {
     node_id_data[i] = static_cast<cel_int_t>(vertex.get_vertex_id());
-    node_type_data[i] = bpmn::convert_vertex_type_to_int(vertex.get_vertex_type());
+    node_type_data[i] = cpml::model::convert_vertex_type_to_int(vertex.get_vertex_type());
     i++;
   }
 
@@ -77,7 +86,7 @@ memory::table_t build_bpmn_nodes_table(const bpmn::bpmn_graph& graph, memory::ta
  * Returns function that gets a mapping of indices to dict row ids and sets the given column pointers to the dict rid
  * for each index.
  */
-auto exec_dict_mapper(const legacy_embedded_ctl::static_array<row_id>& dict_rid_mapping) {
+auto exec_dict_mapper(const ctl::static_array<row_id>& dict_rid_mapping) {
   return [&dict_rid_mapping](const auto& t) {
     auto output_col_ptrs_ac{std::get<0>(t).get_data()};
 
@@ -85,25 +94,28 @@ auto exec_dict_mapper(const legacy_embedded_ctl::static_array<row_id>& dict_rid_
   };
 }
 
-memory::table_t build_bpmn_activities(const bpmn_graph& graph, const memory::dictionary_t& activity_dict,
+memory::table_t build_bpmn_activities(const cpml::model::bpmn_graph& graph, const memory::dictionary_t& activity_dict,
                                       memory::table_row_limit_t table_row_limit,
                                       const common::execution_context& context) {
-  std::vector<bpmn::vertex> bpmn_nodes{};
+  std::vector<cpml::model::bpmn::vertex> bpmn_nodes{};
   std::transform(graph.get_vertices().begin(), graph.get_vertices().end(), std::back_inserter(bpmn_nodes),
                  [](const auto& pair) { return pair.second; });
-  std::vector<bpmn::vertex> bpmn_activity_nodes{};
+  std::vector<cpml::model::bpmn::vertex> bpmn_activity_nodes{};
   std::copy_if(bpmn_nodes.begin(), bpmn_nodes.end(), std::back_inserter(bpmn_activity_nodes),
-               [](const bpmn::vertex& vertex) { return std::holds_alternative<bpmn::task>(vertex.get_vertex_type()); });
+               [](const cpml::model::bpmn::vertex& vertex) {
+                 return std::holds_alternative<cpml::model::bpmn::task>(vertex.get_vertex_type());
+               });
   const row_id size{static_cast<row_id>(bpmn_activity_nodes.size())};
 
   auto node_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   auto activity_name_dict_mapping{
-      legacy_embedded_ctl::make_static_array_for_overwrite<row_id>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
+      ctl::make_static_array_for_overwrite<row_id>(size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
   for (row_id i{0}; i < size; i++) {
     node_id_data[i] = static_cast<cel_int_t>(bpmn_activity_nodes[i].get_vertex_id());
-    activity_name_dict_mapping[i] = std::get<bpmn::task>(bpmn_activity_nodes[i].get_vertex_type()).activity_id;
+    activity_name_dict_mapping[i] =
+        std::get<cpml::model::bpmn::task>(bpmn_activity_nodes[i].get_vertex_type()).activity_id;
   }
 
   // create column pointers and map them to dictionary entries
@@ -113,7 +125,8 @@ memory::table_t build_bpmn_activities(const bpmn_graph& graph, const memory::dic
   memory::cast_execute_column_pointers(exec_dict_mapper(activity_name_dict_mapping),
                                        *activity_name_output_column_pointer);
 
-  memory::table_t bpmn_activities_table{memory::table::create_query_scope_table(size, "bpmn_activities")};
+  memory::table_t bpmn_activities_table{
+      memory::table::create_query_scope_table(size, "bpmn_activities", table_row_limit)};
 
   bpmn_activities_table->add_column<cel_int_t>(memory::col_name{"NODE_ID"}, memory::col_id{"NODE_ID"},
                                                std::move(node_id_data), memory::create_null_flags(size, context),
@@ -128,13 +141,14 @@ memory::table_t build_bpmn_activities(const bpmn_graph& graph, const memory::dic
 struct edges_and_unique_vertices {
   // We use sorted sets here such that the order in which vertices and edges appear in the model description is
   // consistent.
-  std::set<edge> edges{};
-  std::set<vertex> vertices{};
+  std::set<cpml::model::bpmn::edge> edges{};
+  std::set<cpml::model::bpmn::vertex> vertices{};
 };
 
-using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_unique_vertices>;
+using edges_and_vertices_per_object_t = std::unordered_map<cpml::model::bpmn::object_id, edges_and_unique_vertices>;
 
-[[nodiscard]] edges_and_vertices_per_object_t split_global_model_per_object(const bpmn_graph& global_model) {
+[[nodiscard]] edges_and_vertices_per_object_t split_global_model_per_object(
+    const cpml::model::bpmn_graph& global_model) {
   edges_and_vertices_per_object_t edges_and_vertices_per_object{};
 
   // Add all edges and vertices to their respective object ids in the maps
@@ -145,29 +159,34 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
     edges.insert(edge);
 
     // This does not insert if the vertex was already present in the set
-    vertices.insert(vertex{edge.get_source_id(), global_model.get_vertex(edge.get_source_id()).get_vertex_type()});
-    vertices.insert(vertex{edge.get_target_id(), global_model.get_vertex(edge.get_target_id()).get_vertex_type()});
+    vertices.insert(cpml::model::bpmn::vertex{edge.get_source_id(),
+                                              global_model.get_vertex(edge.get_source_id()).get_vertex_type()});
+    vertices.insert(cpml::model::bpmn::vertex{edge.get_target_id(),
+                                              global_model.get_vertex(edge.get_target_id()).get_vertex_type()});
   }
 
   return edges_and_vertices_per_object;
 }
 
 [[nodiscard]] std::string construct_model_description(const edges_and_unique_vertices& edges_and_vertices,
-                                                      const memory::dictionary_t& activity_dict) {
+                                                      const memory::dictionary_t& activity_dict,
+                                                      const common::execution_context& context) {
   std::ostringstream model_description_strm{};
 
-  const auto vertex_formatter{[&](const vertex& vertex) {
+  const auto vertex_formatter{[&](const cpml::model::bpmn::vertex& vertex) {
     const auto& vertex_type{vertex.get_vertex_type()};
     const auto optional_activity_name{
-        bpmn::is_task(vertex_type)
-            ? fmt::format(" '{}'", activity_dict->get_string_value(std::get<bpmn::task>(vertex_type).activity_id))
+        cpml::model::bpmn::is_task(vertex_type)
+            ? fmt::format(" '{}'", activity_dict->get_string_value(std::get<cpml::model::bpmn::task>(vertex_type).activity_id))
             : ""};
 
-    return fmt::format("[{} {}{}]", vertex.get_vertex_id(), bpmn::to_string(vertex_type), optional_activity_name);
+    return fmt::format("[{} {}{}]", vertex.get_vertex_id(), cpml::model::bpmn::to_string(vertex_type),
+                       optional_activity_name);
   }};
 
-  const auto edge_formatter{
-      [&](const edge& edge) { return fmt::format("[{} {}]", edge.get_source_id(), edge.get_target_id()); }};
+  const auto edge_formatter{[&](const cpml::model::bpmn::edge& edge) {
+    return fmt::format("[{} {}]", edge.get_source_id(), edge.get_target_id());
+  }};
 
   model_description_strm << "[";
   for (const auto& vertex : edges_and_vertices.vertices) {
@@ -182,7 +201,7 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
   return model_description_strm.str();
 }
 
-[[nodiscard]] memory::table_t build_bpmn_model_descriptions(const bpmn_graph& graph,
+[[nodiscard]] memory::table_t build_bpmn_model_descriptions(const cpml::model::bpmn_graph& graph,
                                                             const memory::dictionary_t& activity_dict,
                                                             memory::table_row_limit_t table_row_limit,
                                                             const common::execution_context& operator_context) {
@@ -191,11 +210,11 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
 
   // We cannot write the model_descriptions to to a string buffer directly as we do not know the total size
   // We use a sorted map such that the object ids appear in consecutive order in the result column
-  std::map<object_id, std::string> model_descriptions_per_object{};
+  std::map<cpml::model::bpmn::object_id, std::string> model_descriptions_per_object{};
   size_t total_model_descriptions_size{0};
 
   for (const auto& [object_id, edges_and_vertices] : edges_and_vertices_per_object) {
-    auto model_description{construct_model_description(edges_and_vertices, activity_dict)};
+    auto model_description{construct_model_description(edges_and_vertices, activity_dict, operator_context)};
 
     total_model_descriptions_size += model_description.size() + 1;  // for string null-termination
     model_descriptions_per_object.emplace(object_id, std::move(model_description));
@@ -223,7 +242,8 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
     ++index;
   }
 
-  memory::table_t descriptions_table{memory::table::create_query_scope_table(num_objects, "bpmn_model_descriptions")};
+  memory::table_t descriptions_table{
+      memory::table::create_query_scope_table(num_objects, "bpmn_model_descriptions", table_row_limit)};
   descriptions_table->add_column<cel_int_t>(
       memory::col_name{"OBJECT_ID"}, memory::col_id{"OBJECT_ID"}, std::move(object_id_data),
       memory::create_null_flags(num_objects, operator_context), memory::column_processing_state{}, table_row_limit);
@@ -236,19 +256,20 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
 }
 
 [[nodiscard]] consteval auto MAKE_BLOCK_TYPE_STR_BUFFER_AND_OFFSETS() {
-  constexpr size_t BUFFER_SIZE{
-      std::accumulate(std::cbegin(BPMN_BLOCK_TYPE_STRINGS), std::cend(BPMN_BLOCK_TYPE_STRINGS), size_t{0},
-                      [](const size_t current_size, const std::string_view block_type_as_string) {
-                        return current_size + block_type_as_string.size() + 1;  // +1 for \0 terminator
-                      })};
+  constexpr size_t BUFFER_SIZE{std::accumulate(
+      std::cbegin(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS), std::cend(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS),
+      size_t{0}, [](const size_t current_size, const std::string_view block_type_as_string) {
+        return current_size + block_type_as_string.size() + 1;  // +1 for \0 terminator
+      })};
   std::array<char, BUFFER_SIZE> BUFFER{};  // raw buffer containing the (null terminated) string data
-  std::array<size_t, BPMN_BLOCK_TYPE_STRINGS.size()> OFFSETS{};  // offsets to the respective string data beginning
+  std::array<size_t, cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.size()>
+      OFFSETS{};  // offsets to the respective string data beginning
   OFFSETS.at(0) = 0;
-  for (size_t idx{0}; const std::string_view BPMN_BLOCK_TYPE_AS_STRING : BPMN_BLOCK_TYPE_STRINGS) {
-    char* BUFFER_OUT_PTR{std::next(BUFFER.data(), legacy_embedded_ctl::cast_signed(OFFSETS.at(idx)))};
+  for (size_t idx{0}; const std::string_view BPMN_BLOCK_TYPE_AS_STRING : cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS) {
+    char* BUFFER_OUT_PTR{std::next(BUFFER.data(), ctl::cast_signed(OFFSETS.at(idx)))};
     // copy the string to the buffer and add a null terminator at the end
     *std::ranges::copy(BPMN_BLOCK_TYPE_AS_STRING, BUFFER_OUT_PTR).out = '\0';
-    if (++idx < BPMN_BLOCK_TYPE_STRINGS.size()) {
+    if (++idx < cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.size()) {
       OFFSETS.at(idx) = OFFSETS.at(idx - 1) + BPMN_BLOCK_TYPE_AS_STRING.size() + 1;
     }
   }
@@ -256,14 +277,20 @@ using edges_and_vertices_per_object_t = std::unordered_map<object_id, edges_and_
 }
 
 constexpr auto BUFFER_AND_OFFSETS{MAKE_BLOCK_TYPE_STR_BUFFER_AND_OFFSETS()};
-static_assert(BPMN_BLOCK_TYPE_STRINGS.at(0) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(0)));
-static_assert(BPMN_BLOCK_TYPE_STRINGS.at(1) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(1)));
-static_assert(BPMN_BLOCK_TYPE_STRINGS.at(2) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(2)));
-static_assert(BPMN_BLOCK_TYPE_STRINGS.at(3) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(3)));
-static_assert(BPMN_BLOCK_TYPE_STRINGS.at(4) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(4)));
-static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(5)));
+static_assert(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.at(0) ==
+              &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(0)));
+static_assert(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.at(1) ==
+              &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(1)));
+static_assert(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.at(2) ==
+              &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(2)));
+static_assert(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.at(3) ==
+              &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(3)));
+static_assert(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.at(4) ==
+              &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(4)));
+static_assert(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.at(5) ==
+              &BUFFER_AND_OFFSETS.first.at(BUFFER_AND_OFFSETS.second.at(5)));
 
-[[nodiscard]] memory::table_t build_bpmn_blocks(const bpmn_graph_with_block_structure& graph,
+[[nodiscard]] memory::table_t build_bpmn_blocks(const cpml::model::bpmn_graph_with_block_structure& graph,
                                                 const memory::table_row_limit_t table_row_limit,
                                                 const common::execution_context& operator_context) {
   const auto& blocks{graph.blocks()};
@@ -294,7 +321,8 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
     ++idx;
   }
 
-  auto bpmn_blocks_table{memory::table::create_query_scope_table(legacy_embedded_ctl::cast_signed(number_of_blocks), "bpmn_blocks")};
+  auto bpmn_blocks_table{
+      memory::table::create_query_scope_table(ctl::cast_signed(number_of_blocks), "bpmn_blocks", table_row_limit)};
   bpmn_blocks_table->add_column<cel_int_t>(memory::col_name{"BLOCK_ID"}, memory::col_id{"BLOCK_ID"},
                                            std::move(block_ids_column_data),
                                            memory::create_null_flags(number_of_blocks, operator_context),
@@ -315,16 +343,16 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
   return bpmn_blocks_table;
 }
 
-[[nodiscard]] memory::table_t build_bpmn_nodes_to_blocks(const bpmn_graph_with_block_structure& graph,
+[[nodiscard]] memory::table_t build_bpmn_nodes_to_blocks(const cpml::model::bpmn_graph_with_block_structure& graph,
                                                          const memory::table_row_limit_t table_row_limit,
                                                          const common::execution_context& operator_context) {
   const auto& vertex_id_to_block_ids_mapping{graph.vertex_id_to_block_id_mapping()};
-  const auto number_of_nodes_with_a_related_block{
-      std::accumulate(vertex_id_to_block_ids_mapping.begin(), vertex_id_to_block_ids_mapping.end(), size_t{},
-                      [](const size_t current_size, const auto& vertex_id_to_block_ids) {
-                        const bpmn_block_ids_t& block_ids_for_vertex_id{vertex_id_to_block_ids.second};
-                        return current_size + block_ids_for_vertex_id.size();
-                      })};
+  const auto number_of_nodes_with_a_related_block{std::accumulate(
+      vertex_id_to_block_ids_mapping.begin(), vertex_id_to_block_ids_mapping.end(), size_t{},
+      [](const size_t current_size, const auto& vertex_id_to_block_ids) {
+        const cpml::model::bpmn::bpmn_block_ids_t& block_ids_for_vertex_id{vertex_id_to_block_ids.second};
+        return current_size + block_ids_for_vertex_id.size();
+      })};
 
   // column data containers
   auto vertex_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
@@ -334,7 +362,7 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
   // fill column data
   for (size_t idx{0}; const auto& [vertex_id, block_ids] : vertex_id_to_block_ids_mapping) {
     for (const auto& block_id : block_ids) {
-      vertex_ids_column_data.at(idx) = legacy_embedded_ctl::cast<cel_int_t>(vertex_id);
+      vertex_ids_column_data.at(idx) = ctl::cast<cel_int_t>(vertex_id);
       block_ids_column_data.at(idx) = block_id;
       ++idx;
     }
@@ -342,7 +370,7 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
 
   // Create tables and add the corresponding columns to them
   auto bpmn_nodes_to_blocks_table{memory::table::create_query_scope_table(
-      legacy_embedded_ctl::cast_signed(number_of_nodes_with_a_related_block), "bpmn_nodes_to_blocks")};
+      ctl::cast_signed(number_of_nodes_with_a_related_block), "bpmn_nodes_to_blocks", table_row_limit)};
 
   bpmn_nodes_to_blocks_table->add_column<cel_int_t>(
       memory::col_name{"NODE_ID"}, memory::col_id{"NODE_ID"}, std::move(vertex_ids_column_data),
@@ -358,7 +386,7 @@ static_assert(BPMN_BLOCK_TYPE_STRINGS.at(5) == &BUFFER_AND_OFFSETS.first.at(BUFF
 
 }  // namespace
 
-bpmn_tables create_bpmn_tables_from_bpmn_graph(const bpmn_graph_with_block_structure& graph,
+bpmn_tables create_bpmn_tables_from_bpmn_graph(const cpml::model::bpmn_graph_with_block_structure& graph,
                                                const memory::dictionary_t& activity_dict,
                                                const memory::table_row_limit_t table_row_limit,
                                                const common::execution_context& parent_context) {

@@ -25,8 +25,9 @@ NAMED_TYPE_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES="${NAMED_TYPE_DIR_NAME_FOR_CELONIS
 NAMED_TYPE_DOWNLOAD_FOR_CELONIS_LIBRARIES="https://github.com/joboccara/NamedType/archive/${NAMED_TYPE_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES}"
 
 # Reference to the Saola release of the Celonis libraries (currently all packaged in the CPML)
-CPML_RELEASE="release-2.225.4"
-CPML_RESOURCE="CPML-2.225.4.tar.gz"
+CPML_VERSION="2.231.2"
+CPML_RELEASE="release-${CPML_VERSION}"
+CPML_RESOURCE="CPML-${CPML_VERSION}.tar.gz"
 
 # The temporary build directory where all thirdparty dependencies are placed at and where we build the Celonis libraries
 # before copying them to their final install directory

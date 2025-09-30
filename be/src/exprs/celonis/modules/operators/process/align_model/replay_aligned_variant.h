@@ -4,11 +4,10 @@
 #include <numeric>
 #include <vector>
 
-#include <boost/graph/depth_first_search.hpp>
+#include <cpml/model/bpmn_graph_fwd.h>
 
 #include "align_model.h"
 #include "legacy_embedded_ctl/hash.h"
-#include "modules/operators/process/bpmn/bpmn_graph_fwd.h"
 #include "partial_order_graph.h"
 
 namespace celonis::accelerator::operators::process::align_model {
@@ -118,7 +117,7 @@ class replay_result_type {
  * the produced result components refer to offsets into the provided 'aligned_variant' and do not refer to the indices
  * of the bpmn_graph.
  */
-[[nodiscard]] replay_result_type replay_aligned_variant(const bpmn::bpmn_graph& input_bpmn_graph,
+[[nodiscard]] replay_result_type replay_aligned_variant(const cpml::model::bpmn_graph& input_bpmn_graph,
                                                         const alignment_t& aligned_variant,
                                                         const parallel_vertex_pairs<>& parallel_vertices);
 

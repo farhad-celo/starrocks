@@ -1,8 +1,9 @@
 #include "replay_caches.h"
 
-#include "legacy_embedded_ctl/algorithm.h"
-#include "legacy_embedded_ctl/utils/allocation_messages.h"
-#include "log/log.h"
+#include <ctl/algorithm.h>
+#include <ctl/utils/allocation_messages.h>
+#include <log/log.h>
+
 #include "modules/operators/process/bpmn/replay_types.h"
 #include "modules/operators/process/bpmn/replay_utils.h"
 
@@ -13,10 +14,10 @@ replay_caches::replay_caches(const common::execution_context& context)
 
 replay_caches::enabled_transitions_cache::enabled_transitions_cache(const common::execution_context& context)
     : enabled_transitions_cache_{
-          memory::management::checked_allocator<cache_t>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))} {}
+          memory::management::checked_allocator<cache_t>(context, ALLOC_MSG(ctl::MEMBER_INIT_MSG))} {}
 
-transitions_map_t replay_caches::enabled_transitions_cache::get_enabled_transitions(const bpmn_graph& model,
-                                                                                    const markings_t& markings) {
+transitions_map_t replay_caches::enabled_transitions_cache::get_enabled_transitions(
+    const cpml::model::bpmn_graph& model, const markings_t& markings) {
   transitions_map_t result{};
 
   for (const auto& marking : markings) {
@@ -27,14 +28,14 @@ transitions_map_t replay_caches::enabled_transitions_cache::get_enabled_transiti
 }
 
 const transitions_t& replay_caches::enabled_transitions_cache::get_cached_or_compute_enabled_transitions(
-    const bpmn_graph& model, const marking_t& marking) {
-  if (legacy_embedded_ctl::contains(enabled_transitions_cache_, marking)) {
+    const cpml::model::bpmn_graph& model, const marking_t& marking) {
+  if (ctl::contains(enabled_transitions_cache_, marking)) {
     return enabled_transitions_cache_[marking];
   }
 
   const auto [inserted_element_iter, insert_successful]{
       enabled_transitions_cache_.emplace(marking, bpmn::get_enabled_transitions(model, marking))};
-  legacy_embedded_debug_assert(insert_successful);
+  debug_assert(insert_successful);
   return inserted_element_iter->second;
 }
 
@@ -59,11 +60,11 @@ void replay_caches::non_conforming_prefix_cache::add(a_star::non_conforming_subt
 
 replay_caches::linearized_transitions_cache::linearized_transitions_cache(const common::execution_context& context)
     : linearized_transitions_cache_{
-          memory::management::checked_allocator<cache_t>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))} {}
+          memory::management::checked_allocator<cache_t>(context, ALLOC_MSG(ctl::MEMBER_INIT_MSG))} {}
 
 replay_caches::linearized_transitions_cache::maybe_get_result_t replay_caches::linearized_transitions_cache::maybe_get(
     const activity_trace_t& variant) const {
-  return legacy_embedded_ctl::contains(linearized_transitions_cache_, variant)
+  return ctl::contains(linearized_transitions_cache_, variant)
              ? maybe_get_result_t{linearized_transitions_cache_.at(variant)}
              : std::nullopt;
 }

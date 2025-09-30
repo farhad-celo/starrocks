@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 #include <tbb/enumerable_thread_specific.h>
+#include <cpml/model/bpmn_graph.h>
 
 #include "align_model_statistics.h"
 #ifdef CELOSTAR
@@ -35,7 +36,6 @@
 #endif
 #include "modules/operators/process/alignment/log_aligner.h"
 #include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
-#include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/bpmn_to_pn.h"
 #ifdef CELOSTAR
 #include "utils/nullable_pql_value.h"
@@ -86,8 +86,8 @@ prune_variants_result prune_variants(const memory::cache::variant_trace_cache_t&
 };
 
 std::optional<alignment_move> remap_move_type(const alignment::alignment_move& move,
-                                              const petri_net_id_to_bpmn_mapping& mappings,
-                                              const label_to_bpmn_mapping& label_to_bpmn) {
+                                              const bpmn::petri_net_id_to_bpmn_mapping& mappings,
+                                              const bpmn::label_to_bpmn_mapping& label_to_bpmn) {
   switch (move.type()) {
     case alignment::alignment_move_type::SYNC: {
       const auto vertex_id{mappings.at(move.move_on_model().value())};
@@ -132,7 +132,7 @@ void write_alignment_statistics(align_model_statistics& stats, const alignment::
 }
 
 std::tuple<alignments_t, alignment::alignment_statistics, parallel_vertex_pairs<>> compute_pruned_alignments(
-    const memory::cache::variant_trace_cache_t& pruned_variants, const bpmn_to_petri_net_result_t& result,
+    const memory::cache::variant_trace_cache_t& pruned_variants, const bpmn::bpmn_to_petri_net_result_t& result,
     const align_model_config& config, const common::execution_context& context) {
   auto compute_pruned_alignments_context{context.create_sub_context("compute_pruned_alignments", {})};
   // NB assume that the variants are already "pruned", i.e., devoid of activities that are not in the Petri net
@@ -153,7 +153,7 @@ std::tuple<alignments_t, alignment::alignment_statistics, parallel_vertex_pairs<
   auto [alignments,
         event_to_transition_mapping]{aligner(pruned_variants, compute_pruned_alignments_context, operator_name)};
 
-  petri_net_id_to_bpmn_mapping new_mapping{};
+  bpmn::petri_net_id_to_bpmn_mapping new_mapping{};
 
   // The transitions in the unfolding are called events. Want to know for each event id the corresponding BPMN vertex
   for (const auto& [event_id, transition_str_id] : event_to_transition_mapping) {
@@ -1034,7 +1034,7 @@ align_model_config align_model_config::make(std::string pruned_variant_cache_key
 }
 
 std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache::variant_trace_cache_t& variants,
-                                                             const bpmn_to_petri_net_result_t& result,
+                                                             const bpmn::bpmn_to_petri_net_result_t& result,
                                                              const align_model_config& config,
                                                              align_model_statistics& stats,
                                                              const std::string& activity_table_name,
@@ -1056,48 +1056,7 @@ std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache
   return {full_alignments, parallel_vertices};
 }
 
-bpmn_to_petri_net_result_t bpmn_to_petri_net(const bpmn::bpmn_graph& graph) {
-  // NB we assume here that there is a one-to-one mapping from petri net transitions to BPMN vertices
-  bpmn_to_petri_net_result_t result{get_pn(graph), {}, {}};
-  // get_pn(graph) returns a Petri net where the labeled transitions' label ids are the BPMN vertex ids.
-  // However, the alignment expects the Petri net transitions' label ids to refer to the corresponding activity column
-  // id if they refer to a task (that is present in the activity column), and tau label if not.
-  // That means that we need to remap ids from task nodes to their activity ids and from other nodes to tau.
-  // TODO (a.swoboda) fix the case where we have activities that are only in the model (and not in the activity column).
-  //  NB This is not critical at the moment as we only used mined models, where such activities can't show up.
-  for (auto& [transition_str_id, vertex_ref] : result.petri_net.transitions) {
-    if (vertex_ref == alignment::string_to_int_mapper::get_tau_transition_id()) {
-      continue;
-    }
-
-    const auto& corresponding_vertex{graph.get_vertex(vertex_ref)};
-    const auto label_to_be{std::visit(
-        legacy_embedded_ctl::overloaded{[](const bpmn::task& t) { return t.activity_id; },
-                        [](const auto& /**/) { return alignment::string_to_int_mapper::get_tau_transition_id(); }},
-        corresponding_vertex.get_vertex_type())};
-    result.pn_str_id_to_bpmn.try_emplace(transition_str_id, vertex_ref);
-    vertex_ref = label_to_be;
-  }
-
-  // This can also be extracted somewhere else, but we don't bother for now
-  for (const auto& [vertex_id, vertex] : graph.get_vertices()) {
-    if (is_task(vertex)) {
-      const auto activity_id{std::get<process::bpmn::task>(vertex.get_vertex_type()).activity_id};
-      if (activity_id != VALUE_NOT_FOUND) {
-        if (result.log_label_to_bpmn.contains(activity_id)) {
-          throw common::internal_exception(
-              "Input BPMN model has duplicate tasks. "
-              "This messes up with the vertex id assignment for log moves.");
-        }
-        result.log_label_to_bpmn.emplace(activity_id, vertex_id);
-      }
-    }
-  }
-
-  return result;
-}
-
-replay_results_t replay_aligned_variants(const bpmn::bpmn_graph& bpmn_graph, const alignments_t& alignments,
+replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_graph, const alignments_t& alignments,
                                          const parallel_vertex_pairs<>& parallel_vertices,
                                          const common::execution_context& context) {
   const auto replay_context{context.create_sub_context("replay_aligned_variants", {})};

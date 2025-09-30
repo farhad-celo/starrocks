@@ -5,6 +5,8 @@
 #include <utility>
 #include <vector>
 
+#include <cpml/model/bpmn_graph.h>
+
 #include "align_model_statistics.h"
 #ifndef CELOSTAR
 #include "modules/cube/query_scope_fwd.h"
@@ -21,11 +23,9 @@
 #include "modules/operators/framework/cached_operator_fwd.h"
 #endif
 #include "modules/operators/process/alignment/log_aligner.h"
-#include "modules/operators/process/alignment/petri_net/petri_net.h"
+#include "modules/operators/process/bpmn/bpmn_to_pn.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
-#include "modules/operators/process/bpmn/bpmn_graph.h"
-#include "modules/operators/process/bpmn/bpmn_graph_fwd.h"
-#include "modules/operators/process/bpmn/vertex_types.h"
+#include "modules/operators/process/bpmn/bpmn_from_proto.h"
 
 namespace celonis::accelerator::operators::process::align_model {
 // avoid circular includes
@@ -64,23 +64,6 @@ struct align_model_config {
   alignment::log_aligner_config log_aligner_cfg;
 };
 
-// For now we reuse conformance petri net definition
-using petri_net_t = alignment::petri_net::petri_net_representation;
-// Mapping from transition_ids in petri net representation to corresponding bpmn vertices
-//  All transitions related to vertices should be here and no transitions related to edges should be here
-using petri_net_str_id_to_bpmn_mapping = std::unordered_map<std::string, bpmn::vertex_id_type>;
-using petri_net_id_to_bpmn_mapping = std::unordered_map<alignment::petri_net::petri_net_transition_id,
-                                                        bpmn::vertex_id_type, alignment::petri_net::hash_transition>;
-// We need this because we want log moves to point to tasks in the BPMN graph
-//  this only contains labels which are part of the log
-using label_to_bpmn_mapping = std::unordered_map<petri_net_t::label_type, bpmn::vertex_id_type>;
-
-struct bpmn_to_petri_net_result_t {
-  petri_net_t petri_net;
-  petri_net_str_id_to_bpmn_mapping pn_str_id_to_bpmn;
-  label_to_bpmn_mapping log_label_to_bpmn;
-};
-
 using variants = memory::cache::variant_trace_cache_t;
 
 enum class alignment_move_type { UNMAPPED_MOVE, LOG_MOVE, MODEL_MOVE, SYNC_MOVE, GATEWAY_MOVE };
@@ -88,7 +71,7 @@ enum class alignment_move_type { UNMAPPED_MOVE, LOG_MOVE, MODEL_MOVE, SYNC_MOVE,
 struct alignment_move {
   alignment_move_type move_type{alignment_move_type::UNMAPPED_MOVE};
   std::optional<row_id> move_on_log{std::nullopt};
-  std::optional<bpmn::vertex_id_type> move_on_model{std::nullopt};
+  std::optional<cpml::model::bpmn::vertex_id_type> move_on_model{std::nullopt};
   auto operator<=>(const alignment_move&) const noexcept = default;  // NOLINT(modernize-use-nullptr)
 };
 
@@ -154,19 +137,10 @@ struct edge_type_strings {
 using replay_results_t = std::vector<std::optional<replay_result_type>>;
 
 /**
- * @brief Converts a BPMN graph into a semantically equivalent Petri net.
- *
- * @param graph The BPMN graph
- * @return bpmn_to_petri_net_result_t A pair consisting of the petri net and the mapping from its transitions back to
- * the BPMN model
- */
-bpmn_to_petri_net_result_t bpmn_to_petri_net(const bpmn::bpmn_graph& graph);
-
-/**
  * @brief Encapsulates if two BPMN vertices are "parallel" (concurrent)
  * @tparam ALLOCATOR
  */
-template <typename ALLOCATOR = std::allocator<std::array<bpmn::vertex_id_type, 2>>>
+template <typename ALLOCATOR = std::allocator<std::array<cpml::model::bpmn::vertex_id_type, 2>>>
 class parallel_vertex_pairs {
  public:
   parallel_vertex_pairs() = default;
@@ -179,7 +153,7 @@ class parallel_vertex_pairs {
    *
    * Note that the order of the two arguments does not matter, as the "parallel" relation is symmetric
    */
-  void add(bpmn::vertex_id_type i, bpmn::vertex_id_type j) {
+  void add(cpml::model::bpmn::vertex_id_type i, cpml::model::bpmn::vertex_id_type j) {
     data_.emplace(std::array{std::min(i, j), std::max(i, j)});
   }
 
@@ -192,15 +166,15 @@ class parallel_vertex_pairs {
    *
    * Note that the order of the two arguments does not matter, as the "parallel" relation is symmetric
    */
-  [[nodiscard]] bool test(bpmn::vertex_id_type i, bpmn::vertex_id_type j) const {
+  [[nodiscard]] bool test(cpml::model::bpmn::vertex_id_type i, cpml::model::bpmn::vertex_id_type j) const {
     return data_.contains(std::array{std::min(i, j), std::max(i, j)});
   }
 
  private:
   struct hash {
-    size_t operator()(const std::array<bpmn::vertex_id_type, 2>& v) const { return legacy_embedded_ctl::hash_range(v); }
+    size_t operator()(const std::array<cpml::model::bpmn::vertex_id_type, 2>& v) const { return legacy_embedded_ctl::hash_range(v); }
   };
-  std::unordered_set<std::array<bpmn::vertex_id_type, 2>, hash, std::ranges::equal_to, ALLOCATOR> data_{};
+  std::unordered_set<std::array<cpml::model::bpmn::vertex_id_type, 2>, hash, std::ranges::equal_to, ALLOCATOR> data_{};
 };
 
 /**
@@ -216,7 +190,7 @@ class parallel_vertex_pairs {
  * Note: We compute the behavioral profile for the relaxation-labeling, and extract the parallel relation from there.
  */
 std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache::variant_trace_cache_t& variants,
-                                                             const bpmn_to_petri_net_result_t& result,
+                                                             const bpmn::bpmn_to_petri_net_result_t& result,
                                                              const align_model_config& config,
                                                              align_model_statistics& stats,
                                                              const std::string& activity_table_name,
@@ -230,7 +204,7 @@ std::pair<alignments_t, parallel_vertex_pairs<>> align_model(const memory::cache
  * @param config Configuration parameters of the align model algorithm
  * @return replay_results_t The partial order executions of all variants as well as groupers and edge types
  */
-replay_results_t replay_aligned_variants(const bpmn::bpmn_graph& bpmn_graph, const alignments_t& alignments,
+replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_graph, const alignments_t& alignments,
                                          const parallel_vertex_pairs<>& parallel_vertices,
                                          const common::execution_context& context);
 /**

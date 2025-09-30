@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cpml/constants.h>
+
 #include <limits>
 #ifdef CELOSTAR
 #include <span>
@@ -18,10 +20,10 @@ class string_to_int_mapper {
  public:
   using label_id_t = row_id;
 
-  [[nodiscard]] static constexpr label_id_t get_tau_transition_id() noexcept { return tau_transition_label_id_; }
+  [[nodiscard]] static constexpr label_id_t get_tau_transition_id() noexcept { return cpml::TAU_ID; }
 
   [[nodiscard]] static constexpr bool is_tau_transition(label_id_t label_id) noexcept {
-    return label_id == tau_transition_label_id_;
+    return label_id == get_tau_transition_id();
   }
 
   string_to_int_mapper() = default;
@@ -45,7 +47,6 @@ class string_to_int_mapper {
   [[nodiscard]] bool was_added_after_construction(label_id_t label) const noexcept { return label > cur_int_id_; }
 
  private:
-  static constexpr label_id_t tau_transition_label_id_{ROW_ID_MAX};
   label_id_t cur_int_id_{ROW_ID_MAX - 1};
 
   std::unordered_map<label_id_t, std::string> int_to_string_{};

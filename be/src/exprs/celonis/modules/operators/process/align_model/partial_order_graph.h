@@ -11,7 +11,7 @@ namespace celonis::accelerator::operators::process::align_model {
 struct partial_order_vertex_properties {
   // Multiple vertices in this graph may refer to the same bpmn vertex. Optional is empty if it's an unmapped move.
   // This means that for unmapped moves we "lose" the information of the label corresponding to that
-  std::optional<bpmn::vertex_id_type> bpmn_vertex_id{std::nullopt};
+  std::optional<cpml::model::bpmn::vertex_id_type> bpmn_vertex_id{std::nullopt};
   alignment_move_type move_type{alignment_move_type::UNMAPPED_MOVE};  // do we need to know the move type?
   bool operator==(const partial_order_vertex_properties& rhs) const = default;
 };

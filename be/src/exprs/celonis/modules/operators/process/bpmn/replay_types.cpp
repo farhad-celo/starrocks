@@ -2,7 +2,8 @@
 
 #include <algorithm>
 
-#include "legacy_embedded_ctl/hash.h"
+#include <ctl/hash.h>
+
 #include "modules/common/exceptions.h"
 
 namespace celonis::accelerator::operators::process::bpmn {
@@ -20,19 +21,19 @@ namespace {
 struct token_hash final {
   [[nodiscard]] size_t operator()(const token_t& key) const noexcept {
     size_t hash_value{0};
-    legacy_embedded_ctl::hash_combine(hash_value, key.get_source_id());
-    legacy_embedded_ctl::hash_combine(hash_value, key.get_target_id());
+    ctl::hash_combine(hash_value, key.get_source_id());
+    ctl::hash_combine(hash_value, key.get_target_id());
     return hash_value;
   }
 };
 
 }  // anonymous namespace
 
-size_t marking_hash::operator()(const marking_t& key) const { return legacy_embedded_ctl::hash_range<marking_t, token_hash>(key); }
+size_t marking_hash::operator()(const marking_t& key) const { return ctl::hash_range<marking_t, token_hash>(key); }
 
 size_t marking_hash::operator()(const marking_with_num_fired_tasks& key) const {
-  size_t hash_value{legacy_embedded_ctl::hash_range<marking_t, token_hash>(key.marking())};
-  legacy_embedded_ctl::hash_combine(hash_value, key.num_fired_tasks());
+  size_t hash_value{ctl::hash_range<marking_t, token_hash>(key.marking())};
+  ctl::hash_combine(hash_value, key.num_fired_tasks());
   return hash_value;
 }
 
@@ -41,7 +42,7 @@ transition transition::swap_transition_direction(transition transition_to_swap) 
   return transition_to_swap;
 }
 
-transition::transition(const vertex_id_type vertex_id, tokens_t consumed, tokens_t produced,
+transition::transition(const cpml::model::bpmn::vertex_id_type vertex_id, tokens_t consumed, tokens_t produced,
                        const allocator_type& alloc)
     : vertex_id_{vertex_id}, consumed_(std::move(consumed), alloc), produced_(std::move(produced), alloc) {
   // Every consumed token must have 'vertex_id_' as target vertex
@@ -66,14 +67,15 @@ transition::transition(const vertex_id_type vertex_id, tokens_t consumed, tokens
   }
 }
 
-vertex_id_type transition::vertex_id() const noexcept { return vertex_id_; }
+cpml::model::bpmn::vertex_id_type transition::vertex_id() const noexcept { return vertex_id_; }
 
-const tokens_t& transition::consumed() const noexcept { return consumed_; }
+tokens_view_t transition::consumed() const noexcept { return consumed_; }
 
-const tokens_t& transition::produced() const noexcept { return produced_; }
+tokens_view_t transition::produced() const noexcept { return produced_; }
 
 bool transition::operator==(const transition& rhs) const noexcept {
-  return vertex_id() == rhs.vertex_id() && consumed() == rhs.consumed() && produced() == rhs.produced();
+  return vertex_id() == rhs.vertex_id() && cmp_equal_deep(consumed(), rhs.consumed()) &&
+         cmp_equal_deep(produced(), rhs.produced());
 }
 
 }  // namespace celonis::accelerator::operators::process::bpmn

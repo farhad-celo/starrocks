@@ -2,8 +2,9 @@
 
 #include <optional>
 
-#include "legacy_embedded_ctl/assert.h"
-#include "modules/operators/process/bpmn/bpmn_graph.h"
+#include <cpml/model/bpmn_graph.h>
+#include <ctl/assert.h>
+
 #include "modules/operators/process/bpmn/replay_types.h"
 #include "modules/operators/process/bpmn/replay_utils.h"
 
@@ -19,10 +20,11 @@ class adjacency_graph_heuristic {
   using marking_type = bpmn::marking_with_num_fired_tasks;
   using cost_type = int32_t;
 
-  adjacency_graph_heuristic(const bpmn::bpmn_graph& model, bpmn::vertex_id_type target_vertex) noexcept
+  adjacency_graph_heuristic(const cpml::model::bpmn_graph& model,
+                            cpml::model::bpmn::vertex_id_type target_vertex) noexcept
       : model_{model}, target_vertex_{target_vertex} {
     const auto target_type{model_.get_vertex(target_vertex).get_vertex_type()};
-    legacy_embedded_debug_assert(is_task(target_type) || is_end(target_type));
+    debug_assert(is_task(target_type) || is_end(target_type));
   };
 
   [[nodiscard]] static cost_type get_weight(const transition_type& /*transition*/) noexcept { return 1; }
@@ -41,8 +43,8 @@ class adjacency_graph_heuristic {
   }
 
  private:
-  const bpmn::bpmn_graph& model_;
-  const bpmn::vertex_id_type target_vertex_;
+  const cpml::model::bpmn_graph& model_;
+  const cpml::model::bpmn::vertex_id_type target_vertex_;
 };
 
 }  // namespace celonis::accelerator::operators::process::bpmn::a_star

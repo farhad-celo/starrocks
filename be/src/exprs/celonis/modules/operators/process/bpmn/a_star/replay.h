@@ -1,7 +1,8 @@
 #pragma once
 
+#include <cpml/model/bpmn_graph_fwd.h>
+
 #include "modules/common/execution_context_fwd.h"
-#include "modules/operators/process/bpmn/bpmn_graph_fwd.h"
 #include "modules/operators/process/bpmn/replay_types.h"
 
 /**
@@ -35,7 +36,7 @@ using replay_return_t = std::variant<transitions_t, non_conforming_subtrace_t, n
  * @return a variant containing either the linearized transitions (if a path was found) or the subtrace that was
  * non-conforming
  */
-[[nodiscard]] replay_return_t replay_trace(const bpmn_graph& model, const marking_t& initial_marking,
+[[nodiscard]] replay_return_t replay_trace(const cpml::model::bpmn_graph& model, const marking_t& initial_marking,
                                            const activity_trace_t& trace, const common::execution_context& context);
 
 }  // namespace celonis::accelerator::operators::process::bpmn::a_star

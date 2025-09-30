@@ -3,6 +3,14 @@
 #include <cmath>
 #include <mutex>
 
+#include <cpml/model/process_tree_to_bpmn.h>
+#include <cpml/model/bpmn/merge.h>
+#include <cpml/model/process_tree.h>
+#include <cpml/model/pt/node_to_counts_mapping.h>
+#include <ctl/algorithm.h>
+
+#include "exprs/celonis/cpml_utils/sr_context.h"
+
 #include "legacy_embedded_ctl/assert.h"
 #include "legacy_embedded_format/json/json.h"
 #include "log/log.h"
@@ -22,10 +30,7 @@
 #include "modules/operators/mo/incremental_eventlog.h"
 #endif
 #include "modules/operators/process/bpmn/bpmn_graph_to_tables.h"
-#include "modules/operators/process/bpmn/bpmn_overlay_graphs.h"
-#include "modules/operators/process/bpmn/bpmn_remap_task_ids.h"
 #include "modules/operators/process/bpmn/density.h"
-#include "modules/operators/process/bpmn/process_tree_to_bpmn.h"
 #ifndef CELOSTAR
 // TODO(j.kim)
 #include "modules/operators/process/dot_format_helper.h"
@@ -44,6 +49,109 @@
 namespace celonis::accelerator::operators::mo {
 
 namespace {
+
+/// The below transformation code can be removed once we adopt the new PT data structures in Celostar-SR
+using process_tree_with_counts_t = process::process_tree;
+using process_tree_ptr_t = ctl::checked_raw_ptr<const process_tree_with_counts_t>;
+
+void generate_node_id_mapping_recurse(
+    const process::process_tree& current_node, cpml::model::node_id_t& current_node_id,
+    const std::function<void(process_tree_ptr_t, cpml::model::node_id_t)>& callback);
+
+class id_mapping {
+public:
+  /** Generates the ID mapping for the given process tree */
+  [[nodiscard]] static id_mapping generate(const process::process_tree& tree) {
+    id_mapping mapping{};
+    auto& internal_boost_bimap{mapping.mapping_};
+
+    const auto callback{[&internal_boost_bimap](const process_tree_ptr_t node_ptr, const cpml::model::node_id_t node_id) {
+      using bimap_value_t = bimap_t::value_type;
+      internal_boost_bimap.insert(bimap_value_t{node_ptr, node_id});
+    }};
+
+    cpml::model::node_id_t initial_node_id{0};
+    generate_node_id_mapping_recurse(tree, initial_node_id, callback);
+
+    return mapping;
+  }
+
+  [[nodiscard]] cpml::model::node_id_t node_id(const process::process_tree& node) const {
+    const process_tree_ptr_t node_ptr{std::addressof(node)};
+    return mapping_.left.at(node_ptr);
+  }
+
+private:
+  using bimap_t = boost::bimap<process_tree_ptr_t, cpml::model::node_id_t>;
+  bimap_t mapping_;
+};
+
+void generate_node_id_mapping_recurse(
+    const process::process_tree& current_node, cpml::model::node_id_t& current_node_id,
+    const std::function<void(process_tree_ptr_t, cpml::model::node_id_t)>& callback) {
+  callback(std::addressof(current_node), current_node_id++);
+  for (const auto& child_node : current_node.get_children()) {
+    generate_node_id_mapping_recurse(child_node, current_node_id, callback);
+  }
+}
+
+[[nodiscard]] cpml::model::process_tree do_transform_to_tree_without_counts(
+    const id_mapping& node_id_mapping, cpml::model::pt::node_to_counts_mapping::builder& node_counts_bldr,
+    const process::process_tree& tree_with_counts) {
+  using node_without_counts_t = cpml::model::process_tree;
+  using nodes_without_counts_t = std::vector<node_without_counts_t>;
+
+  const auto node_id{node_id_mapping.node_id(tree_with_counts)};
+  const auto node_count{tree_with_counts.get_object_count()};
+  node_counts_bldr.add_count(node_id, node_count);
+
+  const auto do_transform{
+      std::bind_front(do_transform_to_tree_without_counts, std::cref(node_id_mapping), std::ref(node_counts_bldr))};
+
+  return std::visit(
+      ctl::overloaded{
+          []([[maybe_unused]] const process_tree_with_counts_t::tau& tau_node_with_counts) {
+            return node_without_counts_t{node_without_counts_t::tau{}};
+          },
+          [](const process_tree_with_counts_t::activity& activity_node_with_counts) {
+            return node_without_counts_t{node_without_counts_t::activity{activity_node_with_counts.activity_id}};
+          },
+          [&do_transform](const process_tree_with_counts_t::exclusive& exclusive_node_with_counts) {
+            auto child_nodes_without_count{
+                ctl::transform_to<nodes_without_counts_t>(exclusive_node_with_counts.children, do_transform)};
+            return node_without_counts_t{node_without_counts_t::exclusive{{std::move(child_nodes_without_count)}}};
+          },
+          [&do_transform](const process_tree_with_counts_t::sequence& sequence_node_with_counts) {
+            auto child_nodes_without_count{
+                ctl::transform_to<nodes_without_counts_t>(sequence_node_with_counts.children, do_transform)};
+            return node_without_counts_t{node_without_counts_t::sequence{{std::move(child_nodes_without_count)}}};
+          },
+          [&do_transform](const process_tree_with_counts_t::parallel& parallel_node_with_counts) {
+            auto child_nodes_without_count{
+                ctl::transform_to<nodes_without_counts_t>(parallel_node_with_counts.children, do_transform)};
+            return node_without_counts_t{node_without_counts_t::parallel{{std::move(child_nodes_without_count)}}};
+          },
+          [&do_transform](const process_tree_with_counts_t::redo& redo_node_with_counts) {
+            auto child_nodes_without_count{
+                ctl::transform_to<nodes_without_counts_t>(redo_node_with_counts.children, do_transform)};
+            return node_without_counts_t{node_without_counts_t::redo{{std::move(child_nodes_without_count)}}};
+          }},
+      tree_with_counts.node);
+}
+
+[[nodiscard]] cpml::model::pt::tree_and_counts_mapping transform(const process_tree_with_counts_t& pt) {
+  const auto node_id_mapping{id_mapping::generate(pt)};
+  cpml::model::pt::node_to_counts_mapping::builder node_counts_bldr{};
+  auto tree_without_counts_ptr{ctl::make_checked_unique<cpml::model::process_tree>(
+      do_transform_to_tree_without_counts(node_id_mapping, node_counts_bldr, pt))};
+  const auto ctx{starrocks::celonis::cpml_utils::make_sr_function_context()};
+  auto node_without_counts_ptr_to_node_id_mapping{cpml::model::pt::id_mapping::generate(*tree_without_counts_ptr, ctx)};
+  auto node_id_to_counts{std::move(node_counts_bldr).build()};
+  cpml::model::pt::tree_and_counts_mapping tree_and_counts{std::move(tree_without_counts_ptr),
+                                                     std::move(node_without_counts_ptr_to_node_id_mapping),
+                                                     std::move(node_id_to_counts)};
+  return tree_and_counts;
+}
 
 #ifndef CELOSTAR
 constexpr std::chrono::milliseconds INDUCTIVE_MINER_TIME_LIMIT_MS{10_minutes};
@@ -371,7 +479,7 @@ mo_bpmn_graph_operator::result_type mo_bpmn_graph_operator::compute() const {
   const auto [graph, dictionary, statistics] = compute_graph();
 #ifdef CELOSTAR
   // TODO(j.kim): Review 32bit row_id and its limit.
-  return {create_bpmn_tables_from_bpmn_graph(graph, dictionary, memory::MAX_TABLE_ROW_LIMIT, operator_context_),
+  return {process::bpmn::create_bpmn_tables_from_bpmn_graph(graph, dictionary, memory::MAX_TABLE_ROW_LIMIT, operator_context_),
           statistics};
 #else
   return {create_bpmn_tables_from_bpmn_graph(graph, dictionary, scope_.get_table_row_limit(), operator_context_),
@@ -381,11 +489,12 @@ mo_bpmn_graph_operator::result_type mo_bpmn_graph_operator::compute() const {
 
 mo_bpmn_graph_operator::compute_graph_result mo_bpmn_graph_operator::compute_graph() const {
 #ifdef CELOSTAR
-  std::vector<process::bpmn::bpmn_graph_with_block_structure> graphs(process_trees_.size());
-  std::transform(begin(process_trees_), end(process_trees_), begin(graphs),
-                 [](const auto& process_tree) {
-                     return process::bpmn::convert_to_bpmn_graph_with_block_structure(process_tree);
-                 });
+  const auto transform_func{[oid = 0](const process::process_tree& process_tree) mutable {
+    const auto pt_and_counts{transform(process_tree)};
+    return cpml::model::convert_to_bpmn_graph_with_block_structure(pt_and_counts, oid++);
+  }};
+  const auto graphs{ctl::transform_to<std::vector<cpml::model::bpmn_graph_with_block_structure>>(process_trees_, transform_func)};
+
   std::vector<process::inductive_miner_statistics> statistics{statistics_};
   std::vector<std::pair<memory::dictionary_t, std::string>> dictionaries(activity_columns_.size());
   std::transform(begin(activity_columns_), end(activity_columns_), begin(dictionaries),
@@ -451,7 +560,7 @@ mo_bpmn_graph_operator::compute_single_object_graphs_return_type mo_bpmn_graph_o
 namespace details {
 
 details::bpmn_graph_with_dict merge_bpmn_graphs(
-    std::vector<process::bpmn::bpmn_graph_with_block_structure> graphs,
+    std::vector<cpml::model::bpmn_graph_with_block_structure> graphs,
     const std::vector<std::pair<memory::dictionary_t, std::string>>& dictionaries,
     const common::execution_context& parent_context) {
   legacy_embedded_debug_assert(graphs.size() == dictionaries.size());
@@ -472,12 +581,17 @@ details::bpmn_graph_with_dict merge_bpmn_graphs(
                                        [](memory::dictionary_t&& dict) { return std::move(dict); }},
                        std::move(merge_result.dictionary_variant))};
 
-  std::transform(std::begin(graphs), std::end(graphs), std::begin(merge_result.mappings), std::begin(graphs),
-                 [](const process::bpmn::bpmn_graph_with_block_structure& graph, const auto& mapping) {
-                   return process::bpmn::remap_task_ids(graph, mapping);
-                 });
+  std::vector<cpml::model::bpmn::graph_and_activity_remapping> merge_input{};
+  merge_input.reserve(graphs.size());
+  for (size_t idx{0}; idx < graphs.size(); ++idx) {
+    const auto& mapping{merge_result.mappings.at(idx)};
+    const auto remapping_func{[&mapping](const cpml::activity_id_t activity_id) { return mapping.at(activity_id); }};
+    merge_input.emplace_back(std::move(graphs.at(idx)), remapping_func);
+  }
 
-  auto overlaid_graph{process::bpmn::overlay(graphs)};
+  const auto function_ctx{starrocks::celonis::cpml_utils::make_sr_function_context()};
+
+  auto overlaid_graph{cpml::model::bpmn::merge(merge_input, function_ctx)};
 
   return std::make_pair(std::move(overlaid_graph), std::move(dict));
 }

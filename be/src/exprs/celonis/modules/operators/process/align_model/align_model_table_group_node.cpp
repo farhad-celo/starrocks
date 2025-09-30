@@ -6,9 +6,12 @@
 
 #include <fmt/core.h>
 
+#include <cpml/model/bpmn_graph.h>
+
 #include "align_model.h"
 #include "align_model_statistics.h"
 #include "modules/common/execution_context.h"
+#include "modules/operators/process/bpmn/bpmn_to_pn.h"
 #ifndef CELOSTAR
 #include "modules/common/hash_cache_key.h"
 #include "modules/common/shared_types.h"
@@ -26,7 +29,6 @@
 #include "modules/operators/framework/cached_operator_fwd.h"
 #endif
 #include "modules/operators/process/alignment/rl_align/rl_align_configs.h"
-#include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/query/operators.pb.h"
 #include "replay_aligned_variant.h"
 
@@ -123,7 +125,7 @@ memory::table_group_t create_align_model_tables::operator()([[maybe_unused]] cub
 
   const auto [bpmn_graph, bpmn_to_string]{
       bpmn::convert_from_proto_and_create_string_map(model_description_, activity_column_, align_model_op_context)};
-  const auto model_with_mapping{bpmn_to_petri_net(bpmn_graph)};
+  const auto model_with_mapping{bpmn::bpmn_to_petri_net_with_mapping<bpmn::filter_out_bpmn_edge_transitions::YES>(bpmn_graph)};
 
 #ifdef CELOSTAR
   const auto variants{aggregation::compute_variant_row_ids(

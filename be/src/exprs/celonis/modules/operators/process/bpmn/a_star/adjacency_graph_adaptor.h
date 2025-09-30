@@ -1,7 +1,8 @@
 #pragma once
 
-#include "legacy_embedded_ctl/assert.h"
-#include "modules/operators/process/bpmn/bpmn_graph.h"
+#include <cpml/model/bpmn_graph.h>
+#include <ctl/assert.h>
+
 #include "modules/operators/process/bpmn/replay_types.h"
 #include "modules/operators/process/bpmn/replay_utils.h"
 
@@ -18,10 +19,11 @@ class adjacency_graph_adaptor {
   using transition_type = bpmn::transition;
   using transition_list_type = std::vector<transition_type>;
 
-  explicit adjacency_graph_adaptor(const bpmn_graph& model, vertex_id_type target) noexcept
+  explicit adjacency_graph_adaptor(const cpml::model::bpmn_graph& model,
+                                   cpml::model::bpmn::vertex_id_type target) noexcept
       : model_{model}, target_vertex_{target} {
     const auto target_type{model_.get_vertex(target_vertex_).get_vertex_type()};
-    legacy_embedded_debug_assert(is_task(target_type) || is_end(target_type));
+    debug_assert(is_task(target_type) || is_end(target_type));
   }
 
   [[nodiscard]] transition_list_type get_enabled_transitions(const marking_type& marking_with_num_fired_tasks) const {
@@ -32,7 +34,8 @@ class adjacency_graph_adaptor {
     all_enabled_transitions.erase(std::remove_if(all_enabled_transitions.begin(), all_enabled_transitions.end(),
                                                  [this](const auto& transition) {
                                                    const auto id{transition.vertex_id()};
-                                                   return bpmn::is_task(model_.get_vertex(id)) && id != target_vertex_;
+                                                   return cpml::model::bpmn::is_task(model_.get_vertex(id)) &&
+                                                          id != target_vertex_;
                                                  }),
                                   all_enabled_transitions.end());
 
@@ -42,9 +45,9 @@ class adjacency_graph_adaptor {
   [[nodiscard]] marking_type fire(const marking_type& marking_with_num_fired_tasks,
                                   const transition_type& transition) const {
     auto number_of_fired_tasks{marking_with_num_fired_tasks.num_fired_tasks()};
-    if (bpmn::is_task(model_.get_vertex(transition.vertex_id()))) {
+    if (cpml::model::bpmn::is_task(model_.get_vertex(transition.vertex_id()))) {
       number_of_fired_tasks++;
-      legacy_embedded_debug_assert(number_of_fired_tasks == 1,
+      debug_assert(number_of_fired_tasks == 1,
                    "Multiple tasks ([{}]) were fired during a single iteration of the search.", number_of_fired_tasks);
     }
     return {bpmn::fire(marking_with_num_fired_tasks.marking(), transition), number_of_fired_tasks};
@@ -53,17 +56,17 @@ class adjacency_graph_adaptor {
   [[nodiscard]] marking_type fire_inverse(const marking_type& marking_with_num_fired_tasks,
                                           const transition_type& transition) const {
     auto number_of_fired_tasks{marking_with_num_fired_tasks.num_fired_tasks()};
-    if (bpmn::is_task(model_.get_vertex(transition.vertex_id()))) {
+    if (cpml::model::bpmn::is_task(model_.get_vertex(transition.vertex_id()))) {
       number_of_fired_tasks--;
-      legacy_embedded_debug_assert(number_of_fired_tasks == 0,
+      debug_assert(number_of_fired_tasks == 0,
                    "Multiple tasks ([{}]) were fired during a single iteration of the search.", number_of_fired_tasks);
     }
     return {bpmn::fire_inverse(marking_with_num_fired_tasks.marking(), transition), number_of_fired_tasks};
   }
 
  private:
-  const bpmn_graph& model_;
-  const vertex_id_type target_vertex_;
+  const cpml::model::bpmn_graph& model_;
+  const cpml::model::bpmn::vertex_id_type target_vertex_;
 };
 
 }  // namespace celonis::accelerator::operators::process::bpmn::a_star
