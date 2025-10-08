@@ -39,6 +39,7 @@
 // #include "modules/memory/table_utils.h"
 #include "modules/operators/aggregation/string_aggregation.h"
 #include "modules/operators/process/align_model/replay_aligned_variant.h"
+#include "modules/sr_glue_code/tbb_parallel_for.h"
 #include "exprs/celonis/cpml_utils/sr_context.h"
 #include "legacy_embedded_ctl/static_array.h"
 
@@ -396,41 +397,6 @@ std::pair<alignments_t, cpml::conformance::behavioral_relations> align_model(
   return {full_alignments, parallel_vertices};
 }
 
-class tbb_error_propagation_helper {
-  public:
-    tbb_error_propagation_helper() = default;
-
-    [[nodiscard]] bool has_error() const {
-      std::shared_lock lock{mtx_};
-      return optional_error_msg_.has_value();
-    }
-
-    void set_error(const std::string_view error_msg) {
-      std::unique_lock lock{mtx_};
-      // N.B.: For now we only keep track of the first error message
-      if (!optional_error_msg_.has_value()) {
-        optional_error_msg_ = error_msg;
-      }
-      ++number_of_errors_;
-    }
-
-    [[nodiscard]] const std::string& error_message() const {
-      std::shared_lock lock{mtx_};
-      debug_assert(has_error());
-      return optional_error_msg_.value();
-    }
-
-    [[nodiscard]] int number_of_errors() const {
-      std::shared_lock lock{mtx_};
-      return number_of_errors_;
-    }
-
-  private:
-    mutable std::shared_mutex mtx_{};
-    std::optional<std::string> optional_error_msg_{std::nullopt};
-    int number_of_errors_{0};
-};
-
 replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_graph, const alignments_view_t alignments,
                                          const cpml::conformance::behavioral_relations& parallel_vertices,
                                          const common::execution_context& context) {
@@ -449,27 +415,19 @@ replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_gra
         return std::nullopt;
       }};
 
-  tbb_error_propagation_helper error_propagation_helper{};
-
-  tbb::parallel_for(tbb::blocked_range<size_t>{0, alignments.size()},
-                    [&replay_results, &bpmn_graphs, &error_propagation_helper, &alignments = std::as_const(alignments),
+  const auto optional_error_state{sr_glue_code::non_throwing_tbb_parallel_for(tbb::blocked_range<size_t>{0, alignments.size()},
+                    [&replay_results, &bpmn_graphs, &alignments = std::as_const(alignments),
                      &replay_result_fn = std::as_const(replay_result_fn)](const auto& range) {
                       const auto& bpmn_graph{bpmn_graphs.local()};
-                      try {
-                        for (size_t index{range.begin()}; index < range.end(); ++index) {
-                          const auto& aligned_variant{alignments.at(index)};
-                          replay_results.at(index) = replay_result_fn(bpmn_graph, aligned_variant);
-                        }
-                      } catch (const std::exception& ex) {
-                        error_propagation_helper.set_error(ex.what());
-                      } catch (...) {
-                        error_propagation_helper.set_error("Unknown error");
+                      for (size_t index{range.begin()}; index < range.end(); ++index) {
+                        const auto& aligned_variant{alignments.at(index)};
+                        replay_results.at(index) = replay_result_fn(bpmn_graph, aligned_variant);
                       }
-                    });
+                    })};
 
-  if (error_propagation_helper.has_error()) {
+  if (optional_error_state.has_value()) {
     throw common::internal_exception{"ALIGN_MODEL - Error within parallel replay: {} (a total of {} errors within loop).",
-      error_propagation_helper.error_message(), error_propagation_helper.number_of_errors()};
+      optional_error_state->error_msg, optional_error_state->number_of_errors};
   }
 
   return replay_results;
