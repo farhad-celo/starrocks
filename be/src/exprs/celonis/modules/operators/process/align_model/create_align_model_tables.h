@@ -2,12 +2,12 @@
 
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/column_fwd.h"
-#include "modules/memory/table_group.h"
 #include "modules/memory/join_projection_vector.h"
+#include "modules/memory/table_group.h"
 #include "modules/operators/process/align_model/align_model.h"
 #include "modules/operators/process/align_model/align_model_table_group_node_settings.h"
-#include "modules/operators/process/bpmn/bpmn_from_proto.h"
 #include "modules/operators/process/align_model/deviation_category.h"
+#include "modules/operators/process/bpmn/bpmn_from_proto.h"
 
 namespace celonis::accelerator {
 
@@ -18,12 +18,12 @@ namespace operators::process::align_model {
 
 class create_align_model_tables {
  public:
-  create_align_model_tables(
-  memory::column_t activity_column, memory::column_t case_column, memory::table_t case_table, memory::join_projection_vector_t activity_to_case_join, cube::variant_trace_cache_manager& variant_trace_cache_manager,
-      const BpmnModelDescription& model_description,
-      align_model_table_group_node_settings settings = align_model_table_group_node_settings::make_default())
-      :
-        activity_column_{std::move(activity_column)},
+  create_align_model_tables(memory::column_t activity_column, memory::column_t case_column, memory::table_t case_table,
+                            memory::join_projection_vector_t activity_to_case_join,
+                            cube::variant_trace_cache_manager& variant_trace_cache_manager,
+                            const BpmnModelDescription& model_description,
+                            align_model_table_group_node_settings settings)
+      : activity_column_{std::move(activity_column)},
         case_column_{std::move(case_column)},
         case_table_{std::move(case_table)},
         activity_to_case_join_{std::move(activity_to_case_join)},

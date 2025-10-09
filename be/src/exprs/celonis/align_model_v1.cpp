@@ -141,7 +141,8 @@ StatusOr<ColumnPtr> CelonisAlignModel::align_model(FunctionContext* context, con
     DCHECK_EQ(row_to_case_index.size(), chunk_size);
 
     AlignModelHelper helper;
-    RETURN_IF_ERROR(helper.execute(deduped_cases, json_bpmn_model_description));
+    RETURN_IF_ERROR(helper.execute(deduped_cases, json_bpmn_model_description,
+                                   AlignModelHelper::celostar_align_model_version::V1));
     const auto& result_table = helper.result_table();
 
     const auto& alignment_model_vertex_id =

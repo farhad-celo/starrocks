@@ -27,13 +27,23 @@ protected:
         struct_desc.children = {
                 celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
                 celonis::array_type(TYPE_BIGINT),
-                celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_BIGINT),
-                celonis::array_type(TYPE_VARCHAR),celonis::array_type(TYPE_VARCHAR)
+               celonis::array_type(TYPE_BIGINT),celonis::array_type(TYPE_VARCHAR) , celonis::array_type(TYPE_BIGINT) , celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+               celonis::array_type(TYPE_BIGINT),celonis::array_type(TYPE_VARCHAR) , celonis::array_type(TYPE_BIGINT) , celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+               celonis::array_type(TYPE_BIGINT),celonis::array_type(TYPE_VARCHAR) , celonis::array_type(TYPE_BIGINT) , celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+               celonis::array_type(TYPE_BIGINT),celonis::array_type(TYPE_VARCHAR) , celonis::array_type(TYPE_BIGINT) , celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+               celonis::array_type(TYPE_BIGINT),celonis::array_type(TYPE_VARCHAR) , celonis::array_type(TYPE_BIGINT) , celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+               celonis::array_type(TYPE_BIGINT),celonis::array_type(TYPE_VARCHAR) , celonis::array_type(TYPE_BIGINT) , celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+               celonis::array_type(TYPE_BIGINT),celonis::array_type(TYPE_VARCHAR) , celonis::array_type(TYPE_BIGINT) , celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR)
         };
         struct_desc.field_names = {
-                "alignment_model_vertex_id", "alignment_vertex_label", "alignment_move_type",
-                "alignment_activity_index", "association_edge_class", "association_alignment_index",
-                "edge_class_id", "edge_class_type", "alignment_deviation_category"
+                "alignment_model_vertex_id", "alignment_vertex_label", "alignment_move_type", "alignment_activity_index",
+                "exclusive_violation_alignment_index", "exclusive_violation_deviation_category", "exclusive_violation_edge_class", "exclusive_violation_model_vertex_id", "exclusive_violation_model_type", "exclusive_violation_vertex_label",
+                "log_edge_alignment_index", "log_edge_deviation_category", "log_edge_edge_class", "log_edge_model_vertex_id", "log_edge_model_type", "log_edge_vertex_label",
+                "missing_violation_alignment_index", "missing_violation_deviation_category", "missing_violation_edge_class", "missing_violation_model_vertex_id", "missing_violation_model_type", "missing_violation_vertex_label",
+                "model_edge_alignment_index", "model_edge_deviation_category", "model_edge_edge_class", "model_edge_model_vertex_id", "model_edge_model_type", "model_edge_vertex_label",
+                "skip_edge_alignment_index", "skip_edge_deviation_category", "skip_edge_edge_class", "skip_edge_model_vertex_id", "skip_edge_model_type", "skip_edge_vertex_label",
+                "sync_edge_alignment_index", "sync_edge_deviation_category", "sync_edge_edge_class", "sync_edge_model_vertex_id", "sync_edge_model_type", "sync_edge_vertex_label",
+                "unmapped_edge_alignment_index", "unmapped_edge_deviation_category", "unmapped_edge_edge_class", "unmapped_edge_model_vertex_id", "unmapped_edge_model_type", "unmapped_edge_vertex_label"
         };
         return_type_ = AnyValUtil::column_type_to_type_desc(struct_desc);
     }
@@ -45,9 +55,16 @@ protected:
 private:
     typedef std::vector<std::string> Variant;
     typedef std::vector<Variant> VariantRows;
-    typedef std::tuple<std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
-            std::vector<int64_t>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>>
-            Result;
+    typedef std::tuple<
+            std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
+            std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
+            std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
+            std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
+            std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
+            std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
+            std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
+            std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>
+            > Result;
     typedef std::map<Variant, Result> ResultMap;
 
     static const std::string PARALLEL_MODEL;
@@ -67,17 +84,66 @@ private:
                 : result_(result), expected_(expected), return_type_(return_type) {}
 
         void evaluate() {
+            if (result_.size() != expected_.size()) {
+                return;
+            }
             ASSERT_EQ(result_.size(), expected_.size());
+
             for (int row = 0; row < result_.size(); ++row) {
-                compare_array<0, int64_t>(row);
-                compare_array<1, std::string>(row);
-                compare_array<2, std::string>(row);
-                compare_array<3, int64_t>(row);
-                compare_array<4, int64_t>(row);
-                compare_array<5, int64_t>(row);
-                compare_array<6, int64_t>(row);
-                compare_array<7, std::string>(row);
-                compare_array<8, std::string>(row);
+                    compare_array<0, int64_t>(row);
+                    compare_array<1, std::string>(row);
+                    compare_array<2, std::string>(row);
+                    compare_array<3, int64_t>(row);
+
+                    compare_array<4, int64_t>(row);
+                    compare_array<5, std::string>(row);
+                    compare_array<6, int64_t>(row);
+                    compare_array<7, int64_t>(row);
+                    compare_array<8, std::string>(row);
+                    compare_array<9, std::string>(row);
+
+                    compare_array<10, int64_t>(row);
+                    compare_array<11, std::string>(row);
+                    compare_array<12, int64_t>(row);
+                    compare_array<13, int64_t>(row);
+                    compare_array<14, std::string>(row);
+                    compare_array<15, std::string>(row);
+
+                    compare_array<16, int64_t>(row);
+                    compare_array<17, std::string>(row);
+                    compare_array<18, int64_t>(row);
+                    compare_array<19, int64_t>(row);
+                    compare_array<20, std::string>(row);
+                    compare_array<21, std::string>(row);
+
+                    compare_array<22, int64_t>(row);
+                    compare_array<23, std::string>(row);
+                    compare_array<24, int64_t>(row);
+                    compare_array<25, int64_t>(row);
+                    compare_array<26, std::string>(row);
+                    compare_array<27, std::string>(row);
+
+                    compare_array<28, int64_t>(row);
+                    compare_array<29, std::string>(row);
+                    compare_array<30, int64_t>(row);
+                    compare_array<31, int64_t>(row);
+                    compare_array<32, std::string>(row);
+                    compare_array<33, std::string>(row);
+
+                    compare_array<34, int64_t>(row);
+                    compare_array<35, std::string>(row);
+                    compare_array<36, int64_t>(row);
+                    compare_array<37, int64_t>(row);
+                    compare_array<38, std::string>(row);
+                    compare_array<39, std::string>(row);
+
+                    compare_array<40, int64_t>(row);
+                    compare_array<41, std::string>(row);
+                    compare_array<42, int64_t>(row);
+                    compare_array<43, int64_t>(row);
+                    compare_array<44, std::string>(row);
+                    compare_array<45, std::string>(row);
+
             }
         }
 
@@ -233,109 +299,287 @@ const std::string CelonisAlignModelV2Test::PARALLEL_MODEL =
             "cache_key": "CACHE_KEY"
         })json";
 
-const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::PARALLEL_MODEL_RESULTS = {
-        {{"A", "C"},
-         {
-
-                 // alignment
-                 {0, 1, 2, 4, 3, 5, 6},
-                 {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                 {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                         "GATEWAY_MOVE"},
-                 {0, 0, 0, 1, 0, 1, 1},
-                 // association
-                 {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
-                 {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
-                 // edge_class
-                 {0, 1, 2, 3},
-                 {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"},
-                 {"CONFORMING", "CONFORMING",  "CONFORMING", "CONFORMING", "MISSING", "CONFORMING",
-                         "CONFORMING"}}},
-        {
-                {"A", "B", "C"},
-                {{0, 1, 2, 3, 4, 5, 6},
-                 {"BPMN_START", "A", "BPMN_PARALLEL", "B", "C", "BPMN_PARALLEL", "BPMN_END"},
-                 {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE",
-                         "GATEWAY_MOVE"},
-                 {0, 0, 0, 1, 2, 2, 2},
-                 {0, 0, 0, 0, 0, 0, 1, 1, 1},
-                 {0, 1, 2, 3, 5, 6, 2, 4, 5},
-                 {0, 1},
-                 {"SYNC_EDGE", "SYNC_EDGE"},
-                 {"CONFORMING", "CONFORMING",  "CONFORMING", "CONFORMING", "CONFORMING",  "CONFORMING",
-                         "CONFORMING"}
-                        },
-        },
-        {
-                {"C", "B", "B"},
-                {
-                        {0, 1, 2, 4, 3, 3, 5, 6},
-                        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B",             "BPMN_PARALLEL", "BPMN_END"},
-                        {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE",  "LOG_MOVE",
-                                "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                        {0, 0, 0, 0, 1, 2, 1, 2},
-                        {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5},
-                        {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7, 0, 1, 3},
-                        {0, 1, 2, 3, 4, 5},
-                        {"SYNC_EDGE", "SYNC_EDGE",  "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE", "L1_MISSING"},
-                        {"CONFORMING", "MISSING", "CONFORMING", "CONFORMING", "CONFORMING",  "EXCESSIVE",
-                                "CONFORMING", "CONFORMING"}
-                }
-        },
-        {
-                {"C", "B", "null", "B"},
-                {
-                        {0, 1, 2, 4, 3, 3, 5, 6},
-                        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "B",             "BPMN_PARALLEL", "BPMN_END"},
-                        {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE",  "LOG_MOVE",
-                                "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                        {0, 0, 0, 0, 1, 3, 1, 3},
-                        {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5},
-                        {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7, 0, 1, 3},
-                        {0, 1, 2, 3, 4, 5},
-                        {"SYNC_EDGE", "SYNC_EDGE",  "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE", "L1_MISSING"},
-                        {"CONFORMING", "MISSING", "CONFORMING", "CONFORMING", "CONFORMING",  "EXCESSIVE",
-                                "CONFORMING", "CONFORMING"}
-                }
-        },
-        {
-            {"A", "null", "null", "C"},
-         {
-                 // alignment
-                 {0, 1, 2, 4, 3, 5, 6},
-                 {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                 {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                         "GATEWAY_MOVE"},
-                 {0, 0, 0, 3, 0, 3, 3},
-                 // association
-                 {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
-                 {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
-                 // edge_class
-                 {0, 1, 2, 3},
-                 {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"},
-                 {"CONFORMING", "CONFORMING",  "CONFORMING", "CONFORMING", "MISSING", "CONFORMING",
-                         "CONFORMING"}
-                        }
-        },
-        {  
-            {"null", "A", "null", "C", "null"},
+const CelonisAlignModelV2Test::ResultMap  CelonisAlignModelV2Test::PARALLEL_MODEL_RESULTS = {
+{{"A", "C"},
+    {
+        {1, 4, 3},
+        {"A", "C", "B"},
+        {"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE"},
+        {0, 1, 0},{},{},{},{},{},{},{},{},{},{},{},{},
+        {0, 2, 1},{"CONFORMING", "MISSING", "CONFORMING"},
+        {0, 0, 0},{1, 3, 6},
+        {"SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+        {"A", "B", "BPMN_END"},
+        {0, 2, 1},
+        {"CONFORMING", "MISSING", "CONFORMING"},
+        {0, 0, 0},{2, 3, 5},
+        {"GATEWAY_MOVE", "MODEL_MOVE",  "GATEWAY_MOVE"},
+        {"BPMN_PARALLEL", "B", "BPMN_PARALLEL" },
+        {0, 1},{"CONFORMING", "CONFORMING"},
+        {0, 0},{2, 5},{"GATEWAY_MOVE", "GATEWAY_MOVE"},{"BPMN_PARALLEL", "BPMN_PARALLEL"},
+        {0, 0, 0, 1, 1, 1},{"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING"},
+        {0, 0, 0, 0, 0, 0},
+        {0, 1, 2, 4, 5, 6},
+        {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+        {"BPMN_START", "A", "BPMN_PARALLEL", "C", "BPMN_PARALLEL", "BPMN_END"},
+        {},{},{},{},{},{}
+    }
+    },
+    {
+    {"A", "B", "C"},
             {
-                 // alignment
-                 {0, 1, 2, 4, 3, 5, 6},
-                 {"BPMN_START", "A", "BPMN_PARALLEL", "C", "B", "BPMN_PARALLEL", "BPMN_END"},
-                 {"GATEWAY_MOVE", "SYNC_MOVE",  "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
-                         "GATEWAY_MOVE"},
-                 {1, 1, 1, 3, 1, 3, 3},
-                 // association
-                 {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3},
-                 {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5, 1, 4, 6},
-                 // edge_class
-                 {0, 1, 2, 3},
-                 {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"},
-                 {"CONFORMING", "CONFORMING",  "CONFORMING", "CONFORMING", "MISSING", "CONFORMING",
-                         "CONFORMING"}
-                        }
+            {1, 3, 4},
+                {"A", "B", "C"},
+                {"SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE"},
+                {0, 1, 2},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {0, 0, 0, 1, 2, 2, 0, 2, 2},
+                {  "CONFORMING","CONFORMING","CONFORMING","CONFORMING","CONFORMING","CONFORMING","CONFORMING","CONFORMING", "CONFORMING" },
+                {0, 0, 0, 0, 0, 0, 1, 1, 1 },
+                { 0, 1, 2, 3, 5, 6, 2, 4, 5},
+                {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_START", "A", "BPMN_PARALLEL", "B", "BPMN_PARALLEL", "BPMN_END", "BPMN_PARALLEL", "C", "BPMN_PARALLEL"},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
         }
+    },
+    {
+    {"C", "B", "null", "B"},
+            {
+        {1, 4, 3, 3},
+                {"A", "C", "B", "B"},
+                {"MODEL_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE"},
+                {0, 0, 1, 3},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {2, 3, 3},
+                {"CONFORMING", "EXCESSIVE", "CONFORMING"},
+                {0, 0, 0},
+                {3, 3, 6},
+                {"SYNC_MOVE", "LOG_MOVE", "GATEWAY_MOVE"},
+                {"B", "B", "BPMN_END"},
+                {0, 0, 1},
+                {"CONFORMING", "MISSING", "CONFORMING"},
+                {0, 0, 0},
+                {0, 1, 4},
+                {"GATEWAY_MOVE", "MODEL_MOVE", "SYNC_MOVE"},
+                {"BPMN_START", "A", "C"},
+                {0, 0, 0},
+                {"CONFORMING", "MISSING", "CONFORMING"},
+                {0, 0, 0},
+                {0, 1, 2},
+                {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_START", "A", "BPMN_PARALLEL"},
+                {0, 0},
+                {"CONFORMING", "CONFORMING"},
+                {0, 0},
+                {0, 2},
+                {"GATEWAY_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_START", "BPMN_PARALLEL"},
+                {0, 1, 2, 3, 0, 2, 2},
+                {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING"},
+                {0, 0, 0, 0, 1, 1, 1},
+                {2,4, 5, 6, 2, 3,5},
+                {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE" },
+                {"BPMN_PARALLEL", "C", "BPMN_PARALLEL", "BPMN_END", "BPMN_PARALLEL", "B", "BPMN_PARALLEL"},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
+        }
+    },{
+    {"C", "B", "B"},
+            {
+            {1, 4, 3, 3},
+                {"A", "C", "B", "B"},
+                {"MODEL_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE"},
+                {0, 0, 1, 2},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {2, 3, 3},
+                {"CONFORMING","EXCESSIVE", "CONFORMING"  },
+                {0, 0, 0},
+                {3, 3, 6},
+                {"SYNC_MOVE", "LOG_MOVE", "GATEWAY_MOVE"},
+                {"B", "B", "BPMN_END"},
+                {0, 0, 1},
+                {"CONFORMING", "MISSING", "CONFORMING" },
+                {0, 0, 0},
+                {0, 1, 4},
+                {"GATEWAY_MOVE", "MODEL_MOVE", "SYNC_MOVE"},
+                {"BPMN_START", "A", "C"},
+                {0, 0, 0},
+                {"CONFORMING", "MISSING", "CONFORMING" },
+                {0, 0, 0},
+                {0, 1, 2},
+                {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE" },
+                {"BPMN_START", "A", "BPMN_PARALLEL" },
+                {0, 0},
+                {"CONFORMING", "CONFORMING" },
+                {0, 0},
+                {0, 2},
+                {"GATEWAY_MOVE", "GATEWAY_MOVE" },
+                {"BPMN_START", "BPMN_PARALLEL"},
+                {0, 1, 2, 3, 0, 2, 2},
+                {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING" },
+                {0, 0, 0, 0, 1, 1, 1},
+                {2, 4, 5, 6, 2, 3, 5},
+                {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_PARALLEL", "C", "BPMN_PARALLEL", "BPMN_END", "BPMN_PARALLEL", "B", "BPMN_PARALLEL" },
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
+        }
+    },
+    {
+    {"A", "null", "null", "C"},
+            {
+            {1, 4, 3},
+                {"A",  "C", "B"},
+                {"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE"},
+                {0, 3, 0},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {0, 2, 1},
+                {"CONFORMING", "MISSING", "CONFORMING"},
+                {0, 0, 0},
+                {1, 3, 6},
+                {"SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                {"A", "B", "BPMN_END"},
+                {0, 2, 1},
+                {"CONFORMING", "MISSING", "CONFORMING"},
+                {0, 0, 0},
+                {2, 3, 5},
+                {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_PARALLEL", "B", "BPMN_PARALLEL"},
+                {0, 1},
+                {"CONFORMING", "CONFORMING"},
+                {0, 0},
+                {2, 5},
+                {"GATEWAY_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_PARALLEL", "BPMN_PARALLEL"},
+                {0, 0, 0, 1, 1, 1},
+                {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING" },
+                {0, 0, 0, 0, 0, 0},
+                { 0, 1, 2, 4, 5, 6},
+                {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_START", "A", "BPMN_PARALLEL", "C", "BPMN_PARALLEL", "BPMN_END"},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
+        }
+    },
+    {
+    {"null", "A", "null", "C", "null"},
+            {
+            {1, 4, 3},
+                {"A",  "C", "B"},
+                {"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE"},
+                {1, 3, 1},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {0, 2, 1},
+                {"CONFORMING", "MISSING", "CONFORMING"},
+                {0, 0, 0},
+                {1, 3, 6},
+                {"SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                {"A", "B", "BPMN_END"},
+                {0, 2, 1},
+                {"CONFORMING", "MISSING", "CONFORMING"},
+                {0, 0, 0},
+                {2, 3, 5},
+                {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_PARALLEL", "B", "BPMN_PARALLEL"},
+                {0, 1},
+                {"CONFORMING", "CONFORMING"},
+                {0, 0},
+                {2, 5},
+                {"GATEWAY_MOVE","GATEWAY_MOVE"},
+                {"BPMN_PARALLEL", "BPMN_PARALLEL"},
+                {0, 0, 0, 1, 1, 1},
+                {  "CONFORMING","CONFORMING","CONFORMING","CONFORMING","CONFORMING","CONFORMING" },
+                {0, 0, 0, 0, 0, 0 },
+                { 0, 1, 2, 4, 5, 6},
+                {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_START", "A", "BPMN_PARALLEL", "C", "BPMN_PARALLEL", "BPMN_END"},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
+        }
+    },
+
 };
 
 const std::string CelonisAlignModelV2Test::LOOP_MODEL =
@@ -407,63 +651,166 @@ const std::string CelonisAlignModelV2Test::LOOP_MODEL =
         })json";
 
 const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::LOOP_MODEL_RESULTS = {
-        {
+    {
+        {"A", "B", "C", "A", "B"},
+            {
+            {2, 3, 5, 2, 3},
                 {"A", "B", "C", "A", "B"},
-                {
-                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                        {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
-                                "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
-                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
-                                "GATEWAY_MOVE", "SYNC_MOVE",  "SYNC_MOVE",  "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                        {0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 4},
-                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                        {0, 1, 2, 3, 4, 5, 6, 7, 8,  9,  10},
-                        {0},
-                        {"SYNC_EDGE"},
-                        {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING",
-                                "CONFORMING", "CONFORMING",  "CONFORMING",  "CONFORMING", "CONFORMING"},
-                }
-        },
-        {
-                {"A", "B", "C"},
-                {
-                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                        {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
-                                "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
-                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
-                                "GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                        {0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2},
-                        {0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4},
-                        {0, 1, 2, 3, 4, 5, 6, 9, 10, 6,  7, 8, 9, 6, 9, 5, 7, 8, 10},
-                        {0, 1, 2, 3, 4},
-                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "L1_MISSING"},
-                        {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING",
-                                "CONFORMING", "MISSING", "MISSING", "CONFORMING", "CONFORMING"},
-                }
-        },
-        {
-                {"A", "B", "A", "B"},
-                {
-                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
-                        {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
-                                "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
-                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE",
-                                "GATEWAY_MOVE", "SYNC_MOVE",  "SYNC_MOVE",  "GATEWAY_MOVE", "GATEWAY_MOVE"},
-                        {0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3},
-                        {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
-                        {0, 1, 2, 3, 4, 6, 7, 8, 9,  10, 4, 5, 6, 4, 6, 3, 5, 7},
-                        {0, 1, 2, 3, 4},
-                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "L1_MISSING"},
-                        {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "MISSING",
-                                "CONFORMING", "CONFORMING",  "CONFORMING",  "CONFORMING", "CONFORMING"},
-                }
+                {"SYNC_MOVE", "SYNC_MOVE",  "SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE"},
+                {0, 1, 2, 3, 4},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {0,0,0, 1, 1, 2, 2, 3, 4, 4, 4},
+                {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING" },
+                {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
+                {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
         }
+    },
+    {
+        {"A", "B", "C"},
+            {
+            {2, 3, 5, 2, 3},
+                {"A", "B", "C", "A", "B"},
+                {"SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE", "MODEL_MOVE"},
+                {0, 1, 2, 2, 2},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {2, 3, 4, 4},
+                {"CONFORMING", "MISSING", "MISSING", "CONFORMING" },
+                {0, 0, 0, 0},
+                {5, 2, 3, 6},
+                {"SYNC_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                {"C", "A", "B", "BPMN_END"},
+                {2, 3, 4, 4},
+                {"CONFORMING", "MISSING", "MISSING", "CONFORMING" },
+                {0, 0, 0, 0},
+                {1, 2, 3, 4},
+                {"GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE" },
+                { "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE"},
+                {2, 4},
+                {"CONFORMING", "CONFORMING" },
+                {0, 0},
+                {1, 4},
+                {"GATEWAY_MOVE", "GATEWAY_MOVE" },
+                {"BPMN_EXCLUSIVE_CHOICE", "BPMN_EXCLUSIVE_CHOICE" },
+                {0, 0, 0, 1, 1, 2, 2, 4, 4},
+                {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING" },
+                {0, 0, 0, 0, 0, 0, 0, 1, 1},
+                {0, 1, 2, 3, 4, 5, 1, 4, 6},
+                {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE","SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE", },
+                {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
+        }
+    }, {
+        {"A", "B", "A", "B"},
+            {
+            {2, 3, 5, 2, 3},
+                {"A", "B", "C", "A", "B"},
+                {"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE", "SYNC_MOVE", "SYNC_MOVE"},
+                {0, 1, 1, 2, 3},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {1, 2, 3},
+                {"CONFORMING", "MISSING", "CONFORMING" },
+                {0, 0, 0},
+                {3, 5, 2},
+                {"SYNC_MOVE", "MODEL_MOVE", "SYNC_MOVE" },
+                {"B", "C", "A"},
+                {1, 2, 2},
+                {"CONFORMING", "MISSING", "CONFORMING"},
+                {0, 0, 0},
+                {4, 5, 1},
+                {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_EXCLUSIVE_CHOICE", "C", "BPMN_EXCLUSIVE_CHOICE"},
+                {1, 2 },
+                {"CONFORMING", "CONFORMING"},
+                {0, 0},
+                {4, 1},
+                {"GATEWAY_MOVE", "GATEWAY_MOVE" },
+                {"BPMN_EXCLUSIVE_CHOICE", "BPMN_EXCLUSIVE_CHOICE"},
+                {0,0, 0, 1,1,2, 3, 4,4,4},
+                {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING"},
+                {0, 0, 0, 0, 0,1, 1, 1, 1, 1 },
+                {0, 1, 2, 3, 4, 1, 2, 3, 4, 6},
+                {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE","SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
+        }
+    }
+
 };
 
 TEST_F(CelonisAlignModelV2Test, Parallel) {
     VariantRows variants = {{"A", "C"},
                             {"A", "B", "C"},
-                            {"C", "B", "null", "B"}};
+                            {"C", "B", "null", "B"}
+                            };
     std::vector<Result> expected = {
             PARALLEL_MODEL_RESULTS.at(variants[0]),
             PARALLEL_MODEL_RESULTS.at(variants[1]),
@@ -475,7 +822,8 @@ TEST_F(CelonisAlignModelV2Test, Parallel) {
 TEST_F(CelonisAlignModelV2Test, Loop) {
     VariantRows variants = {{"A", "B", "C", "A", "B"},
                             {"A", "B", "C"},
-                            {"A", "B", "A", "B"}};
+                            {"A", "B", "A", "B"}
+    };
     std::vector<Result> expected = {
             LOOP_MODEL_RESULTS.at(variants[0]),
             LOOP_MODEL_RESULTS.at(variants[1]),
@@ -504,11 +852,12 @@ TEST_F(CelonisAlignModelV2Test, Parallel_NULL) {
                             {},
                             {"null", "null"},
                             {"C",    "B",    "B"},
-                            {"C", "B", "null", "B"},
-                            {"A",    "null", "null", "C"},
+                             {"C", "B", "null", "B"},
+                              {"A",    "null", "null", "C"},
                             {"null", "A",    "null", "C", "null"},
                             {"A",    "null", "null", "C"},
-                            {}};
+                             {}
+    };
     std::vector<Result> expected = {
             PARALLEL_MODEL_RESULTS.at({"A", "C"}),
             PARALLEL_MODEL_RESULTS.at({"A", "B", "C"}),

@@ -20,12 +20,14 @@
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types.h"
 #include "modules/memory/cache/variant_trace_cache.h"
+#include "modules/memory/table_group.h"
 #include "modules/operators/aggregation/string_aggregation.h"
 #include "modules/operators/process/align_model/align_model_table_group_node_settings.h"
 #include "modules/operators/process/align_model/align_model_types.h"
 #include "modules/operators/process/align_model/deviation_category.h"
 #include "modules/operators/process/align_model/replay_aligned_variant.h"
-#include "modules/operators/process/align_model/sr_specific_inflation_glue_code.h"
+#include "modules/operators/process/align_model/v1/sr_specific_inflation_glue_code.h"
+#include "modules/operators/process/align_model/v2/create_alignment_inflation.h"
 #include "modules/operators/process/bpmn/bpmn_from_proto.h"
 #include "modules/query/operators.pb.h"
 
@@ -108,18 +110,35 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   const auto deviation_categories{compute_categories(alignments, context)};
   stats.time_deviation_categories = deviation_category_timer.elapsed_wall_time_so_far();
 
-  auto tables{create_tables(   //
-      alignments,              //
-      replay_results,          //
-      deviation_categories,    //
-      bpmn_to_string,          //
-      variants,                //
-      activity_column_,        //
-      case_column_,            //
-      activity_to_case_join_,  //
-      align_model_op_context,  //
-      CREATE_TABLE_GRAIN_SIZE  //
-      )};
+  memory::table_group_t tables{};
+  if (settings_.get_version() == align_model_version::V1) {
+    tables = v1::create_tables(                  //
+        alignments,                              //
+        replay_results,                          //
+        deviation_categories,                    //
+        bpmn_to_string,                          //
+        variants,                                //
+        activity_column_,                        //
+        case_column_,                            //
+        activity_to_case_join_,                  //
+        align_model_op_context,                  //
+        settings_.get_create_table_grain_size()  //
+    );
+  } else {
+    debug_assert(settings_.get_version() == align_model_version::V2);
+    tables = v2::create_tables(                  //
+        alignments,                              //
+        replay_results,                          //
+        deviation_categories,                    //
+        bpmn_to_string,                          //
+        variants,                                //
+        activity_column_,                        //
+        case_column_,                            //
+        activity_to_case_join_,                  //
+        align_model_op_context,                  //
+        settings_.get_create_table_grain_size()  //
+    );
+  }
 
   // TODO(j.kruska) Implement statistics for celostar
 #ifndef CELOSTAR

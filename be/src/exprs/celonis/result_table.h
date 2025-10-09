@@ -1,7 +1,10 @@
 #pragma once
 
+#include <fmt/format.h>
+
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 namespace starrocks {
@@ -30,6 +33,20 @@ public:
     TYPE& operator[](int index) { return buffer_[index]; }
 
     const TYPE& operator[](int index) const { return buffer_[index]; }
+
+    [[nodiscard]] const TYPE& at(int index) const {
+        if (index >= size()) {
+            throw std::out_of_range(
+                    fmt::format("Attempting to access ResultColumn of size [{}] at index [{}].", size(), index));
+        }
+        return operator[](index);
+    };
+
+    [[nodiscard]] TYPE& at(int index) {
+        // We implement the non const at in terms of the const at to avoid duplication
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        return const_cast<TYPE&>(static_cast<const ResultColumn&>(*this).at(index));
+    };
 
 private:
     std::unique_ptr<TYPE[]> buffer_;
@@ -67,12 +84,12 @@ public:
         return *column;
     }
 
-    template<typename TYPE>
+    template <typename TYPE>
     ResultColumn<TYPE>& column(std::string_view column_name) const {
         return *dynamic_cast<ResultColumn<TYPE>*>(column(std::string(column_name)));
     };
 
-    template<typename TYPE>
+    template <typename TYPE>
     NullableResultColumn<TYPE>& nullable_column(std::string_view column_name) const {
         return *dynamic_cast<NullableResultColumn<TYPE>*>(column(std::string(column_name)));
     };

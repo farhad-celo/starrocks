@@ -1,6 +1,7 @@
 #include "align_model_helper.h"
 
 #include <google/protobuf/util/json_util.h>
+#include <ctl/assert.h>
 
 #include <algorithm>
 
@@ -12,6 +13,7 @@
 #include "modules/cube/variant_trace_cache_manager.h"
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table.h"
+#include "modules/operators/process/align_model/align_model_table_group_node_settings.h"
 #include "modules/operators/process/align_model/create_align_model_tables.h"
 #include "modules/query/operators.pb.h"
 #include "rapidjson/document.h"
@@ -29,7 +31,19 @@ struct eventlog_params {
     bool is_default_eventlog{true};
 };
 
-Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::string& json_bpmn_model_description) {
+align_model_version to_saola_version(AlignModelHelper::celostar_align_model_version v) {
+  switch (v) {
+    case AlignModelHelper::celostar_align_model_version::V1:
+      return align_model_version::V1;
+    case AlignModelHelper::celostar_align_model_version::V2:
+      return align_model_version::V2;
+    default:
+      ctl::assert_unreachable();
+  }
+}
+
+Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::string& json_bpmn_model_description, celostar_align_model_version version) {
+    auto settings{align_model_table_group_node_settings::builder{}.set_version(to_saola_version(version)).build()};
     // Convert json bpmn model description to BpmnModelDescription protobuf.
     BpmnModelDescription bpmn_model_description;
     auto status = google::protobuf::util::JsonStringToMessage(json_bpmn_model_description, &bpmn_model_description);
@@ -103,7 +117,7 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
 
     auto align_model = align_model::create_align_model_tables{
             activity_column,       case_id_column, case_table, activity_to_case_join, variant_trace_cache_manager,
-            bpmn_model_description};
+            bpmn_model_description, settings};
 
     common::execution_context context;
     auto tables = align_model(context);

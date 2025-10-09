@@ -9,7 +9,9 @@
 
 #include <cpml/model/bpmn/bpmn_graph_builder.h>
 #include <cpml/model/bpmn_graph.h>
+#include <ctl/assert.h>
 #include <ctl/conversion.h>
+#include <log/log.h>
 
 #include "modules/common/exceptions.h"
 #include "modules/operators/process/bpmn/replay_types.h"
@@ -525,7 +527,8 @@ class partial_order_graph_dfs_visitor : public boost::default_dfs_visitor {
  */
 partial_vertex_t compute_max_input_vertex(
     partial_vertex_t target_vertex, const partial_order_graph& run_graph,
-    const alignment_to_preceding_move_join_map_t& alignment_to_preceding_move_join_map) {
+    const alignment_to_preceding_move_join_map_t& alignment_to_preceding_move_join_map,
+    const alignment_idx_to_log_idx_t& alignment_idx_to_log_idx) {
   debug_assert(boost::in_degree(target_vertex, run_graph) > 0);
   const auto [begin_iter, end_iter]{boost::in_edges(target_vertex, run_graph)};
 
@@ -533,13 +536,14 @@ partial_vertex_t compute_max_input_vertex(
   const partial_in_edge_iter max_edge_iter{
       std::max_element(begin_iter, end_iter,
                        [&run_graph = std::as_const(run_graph),
-                        &alignment_to_preceding_move_join_map = std::as_const(alignment_to_preceding_move_join_map)](
+                        &alignment_to_preceding_move_join_map = std::as_const(alignment_to_preceding_move_join_map),
+                        &alignment_idx_to_log_idx = std::as_const(alignment_idx_to_log_idx)](
                            const partial_edge_t& edge1, const partial_edge_t& edge2) {
                          const partial_vertex_t edge1_source{boost::source(edge1, run_graph)};
                          const partial_vertex_t edge2_source{boost::source(edge2, run_graph)};
 
-                         return alignment_to_preceding_move_join_map.at(edge1_source) <
-                                alignment_to_preceding_move_join_map.at(edge2_source);
+                         return alignment_idx_to_log_idx.at(alignment_to_preceding_move_join_map.at(edge1_source)) <
+                                alignment_idx_to_log_idx.at(alignment_to_preceding_move_join_map.at(edge2_source));
                        })};
 
   return alignment_to_preceding_move_join_map.at(boost::source(*max_edge_iter, run_graph));
@@ -593,8 +597,10 @@ alignment_idx_to_log_idx_t map_alignment_activities_to_eventlog_idx(const alignm
  * @param run_graph a run graph containing at least the SYNC, MODEL LOG and UNMAPPED edges. SKIP edges do not
  * contribute to the joins since they skip over model-move components.
  */
-alignment_to_preceding_move_join_map_t generate_alignment_to_preceding_move_join_map(
-    const partial_order_graph& run_graph, const cpml::model::bpmn_graph& bpmn_graph, const alignment_view_t alignment) {
+std::pair<alignment_to_preceding_move_join_map_t, alignment_idx_to_log_idx_t>
+generate_alignment_to_preceding_move_join_map(const partial_order_graph& run_graph,
+                                              const cpml::model::bpmn_graph& bpmn_graph,
+                                              const alignment_view_t alignment) {
   debug_assert(!alignment.empty());
   // By construction of the partial order graph, vertex id / descriptor (boost::vecS) IS the index in the vector
   debug_assert(std::all_of(boost::vertices(run_graph).first, boost::vertices(run_graph).second,
@@ -607,11 +613,23 @@ alignment_to_preceding_move_join_map_t generate_alignment_to_preceding_move_join
   if (!is_ordered(run_graph)) {
     throw common::internal_exception{"ALIGN_MODEL: Cannot compute timestamp joins with unordered partial graph."};
   }
+  // Initialize the mapping from alignment index to eventlog index for SYNC, LOG and UNMAPPED moves
+  auto alignment_idx_to_log_idx{map_alignment_activities_to_eventlog_idx(alignment)};
 
-  // start gets joined to first activity in the log i.e. the first move that has `move_on_log` set
-  const size_t start_vertex_move_join{ctl::cast_unsigned(
-      std::distance(alignment.begin(),
-                    std::ranges::find_if(alignment, [](const auto& move) { return move.move_on_log().has_value(); })))};
+  const auto* first_non_gateway{
+      std::ranges::find_if(alignment, [](const auto& move) { return !move.is_gateway_move(); })};
+  if (first_non_gateway == alignment.end()) {
+    // The alignment consists only of gateway moves, therefore the variant has to be empty - no joins to be made
+    return {{}, {}};
+  }
+  if (first_non_gateway->is_model_move()) {
+    // If the first non-gateway move is a model move, we need to manually initialize it's join to the first activity in
+    // the log. Succeeding gateway and model moves will then join to this move. and take the activity join from it.
+    alignment_idx_to_log_idx.emplace(std::distance(alignment.begin(), first_non_gateway), 0);
+  }
+
+  // start gets joined to first non gateway move in the alignment
+  const size_t start_vertex_move_join{ctl::cast_unsigned(std::distance(alignment.begin(), first_non_gateway))};
   alignment_to_preceding_move_join_map_t alignment_to_preceding_move_join_map(alignment.size(), start_vertex_move_join);
 
   // skip start
@@ -620,42 +638,43 @@ alignment_to_preceding_move_join_map_t generate_alignment_to_preceding_move_join
     // the join at the vertex depends on the joins of all the incoming edges into the vertex
     const auto bpmn_vertex_id{run_graph[target_vertex].bpmn_vertex_id};
     if (run_graph[target_vertex].move_type == alignment_move_type::LOG_MOVE ||
-        run_graph[target_vertex].move_type == alignment_move_type::UNMAPPED_MOVE) {
+        run_graph[target_vertex].move_type == alignment_move_type::UNMAPPED_MOVE ||
+        run_graph[target_vertex].move_type == alignment_move_type::SYNC_MOVE
+
+    ) {
       alignment_to_preceding_move_join_map.at(target_vertex) = target_vertex;
       continue;
     }
     const auto& bpmn_vertex{bpmn_graph.get_vertex(bpmn_vertex_id.value())};
-    const auto move_type{run_graph[target_vertex].move_type};
 
     // we go over all vertices and compute the correct move to join to by looking at the input edges - by construction
     // of the partial order graph, we should have already processed all the input vertices of a vertex 't' when
     // processing 't' itself.
     const auto target_move_idx{std::visit(
-        ctl::overloaded{
-            [&](const cpml::model::bpmn::task& /*task*/) {
-              // if non-model-move task, it is a sync move and the join is identity
-              if (move_type != alignment_move_type::MODEL_MOVE) {
-                debug_assert(move_type == alignment_move_type::SYNC_MOVE);
-                return target_vertex;
-              }
-              // otherwise, this is a model move activity - without SKIP edges this should only
-              // have a single incoming edge
-              debug_assert(std::distance(boost::in_edges(target_vertex, run_graph).first,
-                                         boost::in_edges(target_vertex, run_graph).second) == 1);
-              return compute_max_input_vertex(target_vertex, run_graph, alignment_to_preceding_move_join_map);
-            },
-            [&](const auto& /*parallel_exclusive_or_end*/) {
-              return compute_max_input_vertex(target_vertex, run_graph, alignment_to_preceding_move_join_map);
-            },
-            [&](const cpml::model::bpmn::start& /*start*/) {
-              ctl::assert_unreachable();
-              return size_t{0};
-            }},
+        ctl::overloaded{[&](const cpml::model::bpmn::task& /*task*/) {
+                          debug_assert(run_graph[target_vertex].move_type == alignment_move_type::MODEL_MOVE);
+                          // The model move joins to the last preceding activity that was a SYNC, LOG or UNMAPPED move
+                          // in the alignment
+                          auto max_in{compute_max_input_vertex(target_vertex, run_graph,
+                                                               alignment_to_preceding_move_join_map,
+                                                               alignment_idx_to_log_idx)};
+                          alignment_idx_to_log_idx.emplace(target_vertex, alignment_idx_to_log_idx.at(max_in));
+                          // The model move joins to itself in the edge to alignment join
+                          return target_vertex;
+                        },
+                        [&](const auto& /*parallel_exclusive_or_end*/) {
+                          return compute_max_input_vertex(
+                              target_vertex, run_graph, alignment_to_preceding_move_join_map, alignment_idx_to_log_idx);
+                        },
+                        [&](const cpml::model::bpmn::start& /*start*/) {
+                          ctl::assert_unreachable();
+                          return size_t{0};
+                        }},
         bpmn_vertex.get_vertex_type())};
 
     alignment_to_preceding_move_join_map.at(target_vertex) = target_move_idx;
   }
-  return alignment_to_preceding_move_join_map;
+  return {std::move(alignment_to_preceding_move_join_map), std::move(alignment_idx_to_log_idx)};
 }
 
 struct sync_and_model_components {
@@ -893,9 +912,11 @@ replay_result_type replay_aligned_variant(const cpml::model::bpmn_graph& bpmn_gr
   // ensure that results are always generated in a certain order to ensure output stability
   std::ranges::sort(result_components);
 
-  return {std::move(result_components),
-          generate_alignment_to_preceding_move_join_map(run_graph, bpmn_graph, aligned_variant),
-          map_alignment_activities_to_eventlog_idx(aligned_variant)};
+  auto [alignment_to_preceding_move_join_map,
+        alignment_to_log_map]{generate_alignment_to_preceding_move_join_map(run_graph, bpmn_graph, aligned_variant)};
+
+  return {std::move(result_components), std::move(alignment_to_preceding_move_join_map),
+          std::move(alignment_to_log_map)};
 }
 
 }  // namespace celonis::accelerator::operators::process::align_model

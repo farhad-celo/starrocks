@@ -926,6 +926,31 @@ public class FunctionAnalyzer {
             sf.add(new StructField("edge_class_type", Type.ARRAY_VARCHAR));
             sf.add(new StructField("alignment_deviation_category", Type.ARRAY_VARCHAR));
             fn.setRetType(new StructType(sf));
+        } else if (FunctionSet.CELONIS_CREATE_ALIGNMENT.equals(fnName)) {
+            // Set struct type
+            fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_CREATE_ALIGNMENT, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            fn = fn.copy();
+            ArrayList<StructField> sf = Lists.newArrayList();
+            // Alignment columns
+            sf.add(new StructField("alignment_model_vertex_id", Type.ARRAY_BIGINT));
+            sf.add(new StructField("alignment_vertex_label", Type.ARRAY_VARCHAR));
+            sf.add(new StructField("alignment_move_type", Type.ARRAY_VARCHAR));
+            sf.add(new StructField("alignment_activity_index", Type.ARRAY_BIGINT));
+            sf.add(new StructField("alignment_deviation_category", Type.ARRAY_VARCHAR));
+
+            List<String> edgeTypes = Arrays.asList("SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE",
+                    "UNMAPPED_EDGE", "MISSING_VIOLATION", "EXCLUSIVE_VIOLATION");
+
+            for (String edgeType : edgeTypes) {
+                sf.add(new StructField(edgeType + "_model_vertex_id", Type.ARRAY_BIGINT));
+                sf.add(new StructField(edgeType + "_vertex_label", Type.ARRAY_VARCHAR));
+                sf.add(new StructField(edgeType + "_move_type", Type.ARRAY_VARCHAR));
+                sf.add(new StructField(edgeType + "_deviation_category", Type.ARRAY_VARCHAR));
+                sf.add(new StructField(edgeType + "_edge_class", Type.ARRAY_BIGINT));
+                sf.add(new StructField(edgeType + "_alignment_index", Type.ARRAY_BIGINT));
+            }
+            fn.setRetType(new StructType(sf));
         } else if (FunctionSet.CELONIS_PERCENTILE_DISC.equals(fnName)) {
             argumentTypes[1] = Type.DOUBLE;
             fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_IDENTICAL);

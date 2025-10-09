@@ -43,6 +43,8 @@ add_main_source(memory/tracking)
 add_main_source(memory/transform)
 add_main_source(operators/aggregation)
 add_main_source(operators/process/align_model)
+add_main_source(operators/process/align_model/v1)
+add_main_source(operators/process/align_model/v2)
 list(APPEND SOURCES
         modules/operators/mo/mo_bpmn_graph_helper.cpp
         modules/operators/mo/mo_bpmn_graph_operator.cpp

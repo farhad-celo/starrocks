@@ -23,7 +23,7 @@
 using starrocks::celonis::ResultColumn;
 using starrocks::celonis::ResultTable;
 
-namespace celonis::accelerator::operators::process::align_model {
+namespace celonis::accelerator::operators::process::align_model::v1 {
 
 namespace {
 

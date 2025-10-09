@@ -182,6 +182,7 @@ set(EXEC_FILES
         ./exprs/celonis/calc_throughput_test.cpp
         ./exprs/celonis/calculate_range_end_test.cpp
         ./exprs/celonis/conformance_test.cpp
+        ./exprs/celonis/create_alignment_test.cpp
         ./exprs/celonis/date_match_test.cpp
         ./exprs/celonis/eventlog_utils.cpp
         ./exprs/celonis/get_calendar_entry_start_test.cpp

@@ -13,7 +13,7 @@
 #include "util.h"
 #include "util/defer_op.h"
 #include "util/slice.h"
-
+#include "bpmn_models.h"
 namespace starrocks {
 
 class CelonisAlignModelTest : public testing::Test {
@@ -50,8 +50,6 @@ private:
             Result;
     typedef std::map<Variant, Result> ResultMap;
 
-    static const std::string PARALLEL_MODEL;
-    static const std::string LOOP_MODEL;
     static const ResultMap PARALLEL_MODEL_RESULTS;
     static const ResultMap LOOP_MODEL_RESULTS;
 
@@ -164,74 +162,6 @@ private:
     FunctionContext::TypeDesc return_type_;
 };
 
-const std::string CelonisAlignModelTest::PARALLEL_MODEL =
-        R"json({
-            "nodes": [
-                {
-                    "node_id": "0",
-                    "node_type": 4
-                },
-                {
-                    "node_id": "1",
-                    "node_type": 1,
-                    "task_name": "A"
-                },
-                {
-                    "node_id": "2",
-                    "node_type": 3
-                },
-                {
-                    "node_id": "3",
-                    "node_type": 1,
-                    "task_name": "B"
-                },
-                {
-                    "node_id": "4",
-                    "node_type": 1,
-                    "task_name": "C"
-                },
-                {
-                    "node_id": "5",
-                    "node_type": 3
-                },
-                {
-                    "node_id": "6",
-                    "node_type": 5
-                }
-            ],
-            "edges": [
-                {
-                    "from": "0",
-                    "to": "1"
-                },
-                {
-                    "from": "1",
-                    "to": "2"
-                },
-                {
-                    "from": "2",
-                    "to": "3"
-                },
-                {
-                    "from": "2",
-                    "to": "4"
-                },
-                {
-                    "from": "3",
-                    "to": "5"
-                },
-                {
-                    "from": "4",
-                    "to": "5"
-                },
-                {
-                    "from": "5",
-                    "to": "6"
-                }
-            ],
-            "cache_key": "CACHE_KEY"
-        })json";
-
 const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RESULTS = {
         {{"A", "C"},
          {
@@ -321,74 +251,6 @@ const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::PARALLEL_MODEL_RES
                  {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE",  "L1_MISSING"}}
         }
 };
-
-const std::string CelonisAlignModelTest::LOOP_MODEL =
-        R"json({
-            "nodes": [
-                {
-                    "node_id": "0",
-                    "node_type": 4
-                },
-                {
-                    "node_id": "1",
-                    "node_type": 2
-                },
-                {
-                    "node_id": "2",
-                    "node_type": 1,
-                    "task_name": "A"
-                },
-                {
-                    "node_id": "3",
-                    "node_type": 1,
-                    "task_name": "B"
-                },
-                {
-                    "node_id": "4",
-                    "node_type": 2
-                },
-                {
-                    "node_id": "5",
-                    "node_type": 1,
-                    "task_name": "C"
-                },
-                {
-                    "node_id": "6",
-                    "node_type": 5
-                }
-            ],
-            "edges": [
-                {
-                    "from": "0",
-                    "to": "1"
-                },
-                {
-                    "from": "1",
-                    "to": "2"
-                },
-                {
-                    "from": "2",
-                    "to": "3"
-                },
-                {
-                    "from": "3",
-                    "to": "4"
-                },
-                {
-                    "from": "4",
-                    "to": "5"
-                },
-                {
-                    "from": "4",
-                    "to": "6"
-                },
-                {
-                    "from": "5",
-                    "to": "1"
-                }
-            ],
-            "cache_key": "CACHE_KEY"
-        })json";
 
 const CelonisAlignModelTest::ResultMap CelonisAlignModelTest::LOOP_MODEL_RESULTS = {
         {
@@ -574,7 +436,7 @@ TEST_F(CelonisAlignModelTest, Concurrency) {
     int num_inputs = 100;
     int num_threads = 1000;
 
-    const std::string* models[2] = {&PARALLEL_MODEL, &LOOP_MODEL};
+    const std::vector<std::string> models{PARALLEL_MODEL, LOOP_MODEL};
     std::vector<ResultMap::const_iterator> results[2];
     for (auto it = PARALLEL_MODEL_RESULTS.cbegin(); it != PARALLEL_MODEL_RESULTS.cend(); it++) {
         results[0].push_back(it);
@@ -610,7 +472,7 @@ TEST_F(CelonisAlignModelTest, Concurrency) {
             variants.push_back(results[model][variant]->first);
             expected.push_back(results[model][variant]->second);
         }
-        inputs.emplace_back(*models[model], std::move(variants), std::move(expected));
+        inputs.emplace_back(models[model], std::move(variants), std::move(expected));
     }
 
     std::uniform_int_distribution<size_t> input_d(0, num_inputs - 1);

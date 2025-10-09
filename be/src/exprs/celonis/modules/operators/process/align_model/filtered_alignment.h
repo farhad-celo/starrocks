@@ -7,6 +7,8 @@
 #include <boost/bimap.hpp>
 #include <boost/bimap/unordered_set_of.hpp>
 
+#include <ctl/algorithm.h>
+
 #include "modules/operators/process/align_model/align_model_types.h"
 
 namespace celonis::accelerator::operators::process::align_model {

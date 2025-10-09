@@ -8,7 +8,7 @@
 #include "modules/operators/process/align_model/shared_types.h"
 #include "modules/operators/process/bpmn/bpmn_from_proto.h"
 
-namespace celonis::accelerator::operators::process::align_model {
+namespace celonis::accelerator::operators::process::align_model::v1 {
 
 /**
  * @brief Maps variants back to original traces and creates the table group both with internal joins between and
@@ -45,4 +45,4 @@ memory::table_group_t create_tables(const alignments_t& alignments, const replay
                                     const memory::join_projection_vector_t& activity_to_case_join,
                                     const common::execution_context& context, size_t grain_size);
 
-}  // namespace celonis::accelerator::operators::process::align_model
+}  // namespace celonis::accelerator::operators::process::align_model::v1
