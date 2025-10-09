@@ -9,8 +9,8 @@
 #include <string_view>
 
 #include "legacy_embedded_ctl/bitset_view.h"
-#include "legacy_embedded_ctl/hash.h"
-#include "legacy_embedded_ctl/hyperloglog.h"
+#include <ctl/hash.h>
+#include <ctl/hyperloglog.h>
 #include "modules/common/shared_types_fwd.h"
 
 namespace celonis::accelerator::memory {
@@ -21,7 +21,7 @@ template <typename T>
 struct hyperloglog_hash {
   explicit hyperloglog_hash(uint64_t seed) : seed_{seed} {}
   size_t operator()(const T& data) const {
-    return legacy_embedded_ctl::hash_murmur_64a(std::string_view{reinterpret_cast<const char*>(&data), sizeof(data)}, seed_);
+    return ctl::hash_murmur_64a(std::string_view{reinterpret_cast<const char*>(&data), sizeof(data)}, seed_);
   }
 
  private:
@@ -31,7 +31,7 @@ struct hyperloglog_hash {
 template <>
 struct hyperloglog_hash<cel_string_t> {
   explicit hyperloglog_hash(uint64_t seed) : seed_{seed} {}
-  size_t operator()(const cel_string_t& data) const { return legacy_embedded_ctl::hash_murmur_64a(data, seed_); }
+  size_t operator()(const cel_string_t& data) const { return ctl::hash_murmur_64a(data, seed_); }
 
  private:
   const uint64_t seed_;
@@ -45,7 +45,7 @@ struct hyperloglog_hash<cel_int_t> {
   size_t operator()(const cel_int_t& data) const { return hash_impl(data); }
 
  private:
-  legacy_embedded_ctl::hash_crc32<cel_int_t> hash_impl;
+  ctl::hash_crc32<cel_int_t> hash_impl;
 };
 
 }  // namespace details
@@ -59,7 +59,7 @@ size_t estimate_unique_value_count(std::span<const T> data, const legacy_embedde
   const uint64_t seed{dist(mt)};
   const details::hyperloglog_hash<T> hasher{seed};
 
-  tbb::enumerable_thread_specific<legacy_embedded_ctl::hyperloglog> thread_local_hyperloglogs{};
+  tbb::enumerable_thread_specific<ctl::hyperloglog> thread_local_hyperloglogs{};
   tbb::blocked_range<size_t> range{0, data.size(), block_size};
 
   tbb::parallel_for(range, [&hasher, &data, &null_flags, &thread_local_hyperloglogs](const auto& range) {
@@ -73,7 +73,7 @@ size_t estimate_unique_value_count(std::span<const T> data, const legacy_embedde
         range.begin(), range.end());
   });
 
-  legacy_embedded_ctl::hyperloglog global_hll{};
+  ctl::hyperloglog global_hll{};
   for (const auto& thread_local_hyperloglog : thread_local_hyperloglogs) {
     global_hll += thread_local_hyperloglog;
   }
