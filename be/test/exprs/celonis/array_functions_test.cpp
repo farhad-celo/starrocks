@@ -2048,6 +2048,90 @@ TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_secondary_order_nulls_last
     EXPECT_EQ(11, result->get(0).get_array()[2].get_int32());
 }
 
+TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_secondary_order_with_secondary_nulls_first) {
+    // Test that when secondary_order_array is NULL, the secondary_nulls_first parameter
+    // is accepted but has no effect since there's no secondary sorting to apply
+    auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), false);
+    input_array->append_datum(DatumArray{10, 20, 30, 40});
+    input_array->append_datum(DatumArray{5, 15, 25});
+
+    auto timestamp_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)),
+                                                       false);
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 10),
+            TimestampValue::create(2023, 1, 1, 0, 0, 30),
+            TimestampValue::create(2023, 1, 1, 0, 0, 20),
+            TimestampValue::create(2023, 1, 1, 0, 0, 40),
+    });
+    timestamp_array->append_datum(DatumArray{
+            TimestampValue::create(2023, 1, 1, 0, 0, 5),
+            TimestampValue::create(2023, 1, 1, 0, 0, 15),
+            TimestampValue::create(2023, 1, 1, 0, 0, 25),
+    });
+
+    auto size_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                  false);
+    size_array->append_datum(DatumArray{2, 2});
+    size_array->append_datum(DatumArray{2, 1});
+
+    auto priority_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+                                                      false);
+    priority_array->append_datum(DatumArray{1, 2});
+    priority_array->append_datum(DatumArray{1, 2});
+
+    // secondary_order_array is NULL (literal)
+    auto secondary_order_array = ColumnHelper::create_const_null_column(2);
+
+    // Test with secondary_nulls_first = false
+    auto secondary_nulls_first_false = ColumnHelper::create_column(TypeDescriptor(TYPE_BOOLEAN), false);
+    secondary_nulls_first_false->append_datum(false);
+    secondary_nulls_first_false->append_datum(false);
+
+    const auto rs1 = CelonisArrayFunctions::merge_sorted_arrays(nullptr, {input_array, timestamp_array, size_array,
+                                                                          priority_array, secondary_order_array,
+                                                                          secondary_nulls_first_false});
+    ASSERT_TRUE(rs1.ok()) << rs1.status().message();
+    const auto& result1 = rs1.value();
+    ASSERT_EQ(2, result1->size());
+
+    // First row: timestamps should be sorted [10, 20, 30, 40]
+    ASSERT_EQ(4, result1->get(0).get_array().size());
+    EXPECT_EQ(10, result1->get(0).get_array()[0].get_int32());
+    EXPECT_EQ(30, result1->get(0).get_array()[1].get_int32());
+    EXPECT_EQ(20, result1->get(0).get_array()[2].get_int32());
+    EXPECT_EQ(40, result1->get(0).get_array()[3].get_int32());
+
+    // Second row: timestamps should be sorted [5, 15, 25]
+    ASSERT_EQ(3, result1->get(1).get_array().size());
+    EXPECT_EQ(5, result1->get(1).get_array()[0].get_int32());
+    EXPECT_EQ(15, result1->get(1).get_array()[1].get_int32());
+    EXPECT_EQ(25, result1->get(1).get_array()[2].get_int32());
+
+    // Test with secondary_nulls_first = true (should produce same result as with false)
+    auto secondary_nulls_first_true = ColumnHelper::create_column(TypeDescriptor(TYPE_BOOLEAN), false);
+    secondary_nulls_first_true->append_datum(true);
+    secondary_nulls_first_true->append_datum(true);
+
+    const auto rs2 = CelonisArrayFunctions::merge_sorted_arrays(nullptr, {input_array, timestamp_array, size_array,
+                                                                          priority_array, secondary_order_array,
+                                                                          secondary_nulls_first_true});
+    ASSERT_TRUE(rs2.ok()) << rs2.status().message();
+    const auto& result2 = rs2.value();
+    ASSERT_EQ(2, result2->size());
+
+    // Results should be identical to the false case since secondary_order_array is NULL
+    ASSERT_EQ(4, result2->get(0).get_array().size());
+    EXPECT_EQ(10, result2->get(0).get_array()[0].get_int32());
+    EXPECT_EQ(30, result2->get(0).get_array()[1].get_int32());
+    EXPECT_EQ(20, result2->get(0).get_array()[2].get_int32());
+    EXPECT_EQ(40, result2->get(0).get_array()[3].get_int32());
+
+    ASSERT_EQ(3, result2->get(1).get_array().size());
+    EXPECT_EQ(5, result2->get(1).get_array()[0].get_int32());
+    EXPECT_EQ(15, result2->get(1).get_array()[1].get_int32());
+    EXPECT_EQ(25, result2->get(1).get_array()[2].get_int32());
+}
+
 TEST_F(CelonisArrayFunctionsTest, merge_sorted_arrays_null_varchar_sortings) {
     auto input_array = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
                                                    false);

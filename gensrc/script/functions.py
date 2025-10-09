@@ -1480,19 +1480,24 @@ celostar_functions = [
     [1001504, 'celonis_in_json_array', False, False, 'BOOLEAN', ['VARCHAR', 'ARRAY_VARCHAR'], 'CelonisInJson<TYPE_VARCHAR>::in_json_array', 'CelonisInJson<TYPE_VARCHAR>::prepare', 'CelonisInJson<TYPE_VARCHAR>::close'],
     # Array functions
     #2000100 removed, see https://github.com/celonis/celostar-starrocks/pull/1478
-    [2000110, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000111, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000112, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000113, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_DOUBLE'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000114, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000115, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_BIGINT', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000116, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000117, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_DOUBLE', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000118, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_INT', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000119, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_BIGINT', 'BOOLEAN', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000120, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR', 'BOOLEAN', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000121, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_DOUBLE', 'BOOLEAN', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
-    [2000122, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_INT', 'BOOLEAN', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    # celonis_merge_sorted_arrays
+    # 7-parameter versions (most specific - with secondary_nulls_first and limit)
+    [2000101, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_BIGINT', 'BOOLEAN', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000102, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR', 'BOOLEAN', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000103, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_DOUBLE', 'BOOLEAN', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000104, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_INT', 'BOOLEAN', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    # 6-parameter versions (with limit but no secondary_nulls_first)
+    [2000105, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_BIGINT', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000106, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000107, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_DOUBLE', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000108, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_INT', 'BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    # 5-parameter versions (with secondary_order_array but no limit)
+    [2000109, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_BIGINT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000110, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_VARCHAR'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000111, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_DOUBLE'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    [2000112, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
+    # 4-parameter version (base case - no secondary_order_array or limit)
+    [2000113, 'celonis_merge_sorted_arrays', True, True, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_DATETIME', 'ARRAY_INT', 'ARRAY_INT'], 'CelonisArrayFunctions::merge_sorted_arrays'],
     [2000125, 'celonis_dedup_sorted_by',     True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'ARRAY_VARCHAR'], 'CelonisArrayFunctions::dedup_sorted_by'],
     [2000130, 'celonis_array_lag',           True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'BIGINT'], 'CelonisArrayFunctions::array_lag'],
     [2000140, 'celonis_array_lead',          True, False, 'ANY_ARRAY', ['ANY_ARRAY', 'BIGINT'], 'CelonisArrayFunctions::array_lead'],

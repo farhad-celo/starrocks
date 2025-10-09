@@ -72,7 +72,9 @@ public:
 
         const uint8_t* secondary_nulls_first_values = nullptr;
         bool has_secondary_nulls_first_column = false;
-        if (has_secondary_order && columns.size() > next_idx) {
+        // Check for secondary_nulls_first parameter if we have extra arguments
+        // Note: this can be present even when secondary_order_array is NULL
+        if (columns.size() > next_idx) {
             ColumnPtr candidate = ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[next_idx]);
             if (const auto* values = get_boolean_data(candidate); values != nullptr) {
                 if (candidate->has_null()) {
