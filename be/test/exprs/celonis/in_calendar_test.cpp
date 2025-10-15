@@ -224,7 +224,7 @@ TEST_F(CelonisInCalendarTest, null_input) {
                 DatumArray{
                         R"({"workday_calendar": )",
                         R"({ "entries": { "year": 1970, )",
-                        celonis::get_is_workdays_str(365, {0}).c_str(),
+                        celonis::get_workday_mask_str(365, {0}).c_str(),
                         R"( } }})"});
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run().value();
@@ -259,7 +259,7 @@ TEST_F(CelonisInCalendarTest, const_workday_calendar_without_id) {
     calendar_id_column_->append_datum(kNullDatum);
     const auto result = RunConstantCalendar({R"({"workday_calendar": )",
                                              R"({ "entries": { "year": 1970, )",
-                                             celonis::get_is_workdays_str(365, {0}),
+                                             celonis::get_workday_mask_str(365, {0}),
                                              R"( } }})"}).value();
     ASSERT_EQ(2, result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
@@ -338,14 +338,14 @@ TEST_F(CelonisInCalendarTest, const_invalid_calendar) {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
-                                                        R"({"workday_calendar": )",
-                                                        R"({ "entries": { "year": 1989, )",
-                                                        celonis::get_is_workdays_str(366, {0}).c_str(),
-                                                        R"( } }})"});
+        // Create an invalid workday_mask with wrong length (not 46 bytes)
+        const auto result = RunConstantCalendar({R"({"workday_calendar": )",
+                                                 R"({ "entries": { "year": 1989, )",
+                                                 R"("workday_mask": "dGVzdA==")",  // base64 "test" = 4 bytes, not 46
+                                                 R"( } }})"});
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
-                  "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
+                  "The length of workday_mask of workday calendar should be 46 however it is 4");
     }
 }
 
@@ -425,16 +425,17 @@ TEST_F(CelonisInCalendarTest, non_const_invalid_calendar) {
     {
         Prepare();
         timestamp_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
+        // Create an invalid workday_mask with wrong length (not 46 bytes)
         calendar_column_->append_datum(DatumArray{
                 R"({"workday_calendar": )",
                 R"({ "entries": { "year": 1989, )",
-                celonis::get_is_workdays_str(366, {0}).c_str(),
+                R"("workday_mask": "dGVzdA==")",  // base64 "test" = 4 bytes, not 46
                 R"( } }})"});
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
-                  "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
+                  "The length of workday_mask of workday calendar should be 46 however it is 4");
     }
 }
 

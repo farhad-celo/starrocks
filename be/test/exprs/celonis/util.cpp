@@ -14,19 +14,6 @@ TypeDescriptor array_type(const LogicalType& element_type) {
     return t;
 }
 
-std::string get_is_workdays_str(int n_days, const std::unordered_set<int>& one_indexes) {
-    std::string sep = "";
-    std::string rv;
-    for (int i = 0; i < n_days; ++i) {
-        // is_workday: {index}
-        std::string item = "\"is_workday\": " + std::string(one_indexes.count(i) ? "true" : "false");
-        rv += sep;
-        sep = ", ";
-        rv += item;
-    }
-    return rv;
-}
-
 std::string get_workday_mask_str(int n_days, const std::unordered_set<int>& one_indexes) {
     size_t num_bytes = (n_days + 7) / 8;
     std::string mask_data(num_bytes, '\0');

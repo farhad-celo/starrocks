@@ -693,7 +693,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0}).c_str(),
                                                  R"( } }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(24L, result->get(0).get_int64());
@@ -704,7 +704,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {1}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {1}).c_str(),
                                                  R"( } }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(0L, result->get(0).get_int64());
@@ -715,7 +715,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {1}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {1}).c_str(),
                                                  R"( } }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(10L, result->get(0).get_int64());
@@ -726,13 +726,13 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  "},",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 364}).c_str(),
                                                  "},",
                                                  R"("entries": { "year": 1971, )",
-                                                 celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {5, 7}).c_str(),
                                                  "},",
                                                  R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
@@ -744,11 +744,11 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1969, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 360, 361, 362,
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 360, 361, 362,
                                                                                     364}).c_str(),
                                                  "},",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 1, 2}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 1, 2}).c_str(),
                                                  "},",
                                                  R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
@@ -760,13 +760,13 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_without_id) {
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  "},",
                                                  R"("entries": { "year": 1969, )",
-                                                 celonis::get_is_workdays_str(365, {0, 1, 10, 100, 150, 364}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 1, 10, 100, 150, 364}).c_str(),
                                                  "},",
                                                  R"("entries": { "year": 1968, )",
-                                                 celonis::get_is_workdays_str(366, {5, 7, 364, 365}).c_str(),
+                                                 celonis::get_workday_mask_str(366, {5, 7, 364, 365}).c_str(),
                                                  "},",
                                                  R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
@@ -799,13 +799,13 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_with_id) {
         calendar_id_column_->append_datum("id3");
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 364}).c_str(),
                                                  R"(, calendar_id: "id2"},)",
                                                  R"("entries": { "year": 1971, )",
-                                                 celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {5, 7}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
                                                  R"( }})"}, "DAYS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
@@ -821,13 +821,13 @@ TEST_F(CelonisRemapTimestampsCalendarTest, workday_calendar_with_id) {
         calendar_id_column_->append_datum("id2");
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 150}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
                                                  R"("entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 4, 10, 100, 364}).c_str(),
                                                  R"(, calendar_id: "id2"},)",
                                                  R"("entries": { "year": 1971, )",
-                                                 celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {5, 7}).c_str(),
                                                  R"(, calendar_id: "id1"},)",
                                                  R"( }})"}, "SECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
@@ -844,11 +844,11 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
         calendar_id_column_->append_datum("id");
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": {"year": 1989,)",
-                                                 celonis::get_is_workdays_str(366, {0, 2, 3}).c_str(),
+                                                 R"("workday_mask": "dGVzdA==")",  // base64 "test" = 4 bytes, not 46
                                                  R"( } }})"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
-                  "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
+                  "The length of workday_mask of workday calendar should be 46 however it is 4");
     }
     {
         Prepare();
@@ -857,12 +857,12 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
         calendar_id_column_->append_datum("id");
         calendar_column_->append_datum(DatumArray{R"({"workday_calendar": )",
                                                   R"({ "entries": {"year": 1989,)",
-                                                  celonis::get_is_workdays_str(366, {0, 2, 3}).c_str(),
+                                                  R"("workday_mask": "dGVzdA==")",  // base64 "test" = 4 bytes, not 46
                                                   R"( } }})"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(),
-                  "1989 should have 365 days, however the workday calendar contains 366 is_workday.");
+                  "The length of workday_mask of workday calendar should be 46 however it is 4");
     }
     {
         Prepare();
@@ -870,7 +870,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
         calendar_id_column_->append_datum("id");
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": {)",
-                                                 celonis::get_is_workdays_str(365, {0, 2, 3}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0, 2, 3}).c_str(),
                                                  R"( } }})"}, "HOURS");
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "year is not set in a workday calendar entry.");
@@ -883,7 +883,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_workday_calendar) {
 
         calendar_column_->append_datum(DatumArray{R"({"workday_calendar": )",
                                                   R"({ "entries": {)",
-                                                  celonis::get_is_workdays_str(365, {0, 2, 3}).c_str(),
+                                                  celonis::get_workday_mask_str(365, {0, 2, 3}).c_str(),
                                                   R"( } }})"});
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
@@ -996,26 +996,26 @@ TEST_F(CelonisRemapTimestampsCalendarTest, non_const_calendar) {
             DatumArray{
                     R"({"workday_calendar": {)",
                     R"("entries": { "year": 1970, )",
-                    celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                    celonis::get_workday_mask_str(365, {0, 4, 10, 100, 150}).c_str(),
                     R"(, calendar_id: "id1"},)",
                     R"("entries": { "year": 1970, )",
-                    celonis::get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                    celonis::get_workday_mask_str(365, {0, 4, 10, 100, 364}).c_str(),
                     R"(, calendar_id: "id2"},)",
                     R"("entries": { "year": 1971, )",
-                    celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                    celonis::get_workday_mask_str(365, {5, 7}).c_str(),
                     R"(, calendar_id: "id1"},)",
                     R"( }})"});
     calendar_column_->append_datum(
             DatumArray{
                     R"({"workday_calendar": {)",
                     R"("entries": { "year": 1970, )",
-                    celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                    celonis::get_workday_mask_str(365, {0, 4, 10, 100, 150}).c_str(),
                     R"(, calendar_id: "id1"},)",
                     R"("entries": { "year": 1970, )",
-                    celonis::get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                    celonis::get_workday_mask_str(365, {0, 4, 10, 100, 364}).c_str(),
                     R"(, calendar_id: "id3"},)",
                     R"("entries": { "year": 1971, )",
-                    celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                    celonis::get_workday_mask_str(365, {5, 7}).c_str(),
                     R"(, calendar_id: "id1"},)",
                     R"( }})"});
     calendar_column_->append_datum(DatumArray{
@@ -1116,7 +1116,7 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_is_ignored) {
         calendar_id_column_->append_datum("id1");
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": )",
                                                  R"({ "entries": { "year": 1970, )",
-                                                 celonis::get_is_workdays_str(365, {0}).c_str(),
+                                                 celonis::get_workday_mask_str(365, {0}).c_str(),
                                                  R"( } }})"}, "HOURS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());
         EXPECT_EQ(24L, result->get(0).get_int64());
@@ -1209,13 +1209,13 @@ TEST_F(CelonisRemapTimestampsCalendarTest, malformed_calendar) {
         calendar_column_->append_datum(DatumArray{
                 R"({"workday_calendar": {)",
                 R"("entries": { "year": 1970, )",
-                celonis::get_is_workdays_str(365, {0, 4, 10, 100, 150}).c_str(),
+                celonis::get_workday_mask_str(365, {0, 4, 10, 100, 150}).c_str(),
                 R"(, calendar_id: "id1"},)",
                 R"("entries": { "year": 1970, )",
-                celonis::get_is_workdays_str(365, {0, 4, 10, 100, 364}).c_str(),
+                celonis::get_workday_mask_str(365, {0, 4, 10, 100, 364}).c_str(),
                 R"(, calendar_id: "id2"},)",
                 R"("entries": { "year": 1971, )",
-                celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                celonis::get_workday_mask_str(365, {5, 7}).c_str(),
                 R"(},)",
                 R"( }})"});
         const auto result = Run();
@@ -1271,15 +1271,15 @@ TEST_F(CelonisRemapTimestampsCalendarTest, calendar_id_not_provided_when_needed)
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = RunConstantCalendarAndTimeUnit({R"({"workday_calendar": {)",
                                                             R"("entries": { "year": 1970, )",
-                                                            celonis::get_is_workdays_str(365,
+                                                            celonis::get_workday_mask_str(365,
                                                                                          {0, 4, 10, 100, 150}).c_str(),
                                                             R"(, calendar_id: "id1"},)",
                                                             R"("entries": { "year": 1970, )",
-                                                            celonis::get_is_workdays_str(365,
+                                                            celonis::get_workday_mask_str(365,
                                                                                          {0, 4, 10, 100, 364}).c_str(),
                                                             R"(, calendar_id: "id2"},)",
                                                             R"("entries": { "year": 1971, )",
-                                                            celonis::get_is_workdays_str(365, {5, 7}).c_str(),
+                                                            celonis::get_workday_mask_str(365, {5, 7}).c_str(),
                                                             R"(, calendar_id: "id1"},)",
                                                             R"( }})"}, "MILLISECONDS").value();
         ASSERT_EQ(timestamp_column_->size(), result->size());

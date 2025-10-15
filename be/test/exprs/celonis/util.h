@@ -15,10 +15,6 @@ namespace starrocks::celonis {
 // Creates an array type from the given 'element_type'
 TypeDescriptor array_type(const LogicalType& element_type);
 
-// TODO(y.zhang): Remove this method when WorkdayCalendarEntry is migrated to use `workday_mask`
-// Gets the str representation of is_workday part in WorkdayCalendarEntry
-std::string get_is_workdays_str(int n_days, const std::unordered_set<int>& one_indexes);
-
 // Gets the str representation of workday_mask part in WorkdayCalendarEntry
 std::string get_workday_mask_str(int n_days, const std::unordered_set<int>& one_indexes);
 
