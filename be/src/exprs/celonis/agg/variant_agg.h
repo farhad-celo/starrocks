@@ -36,7 +36,6 @@ private:
     // Adds an activity to the dictionary if it does not exist.
     // Updates memory with the number of bytes allocated in mem_pool.
     // Returns the index of the activity and the hash.
-    std::pair<int32_t, size_t> maybe_add_activity(MemPool* mem_pool, const Slice& slice, size_t* memory);
 
     std::string debug_string() const;
 

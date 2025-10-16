@@ -74,7 +74,9 @@ void CelonisGraphAggregateState::update(FunctionContext* ctx, const Column** col
             // we will consider that a,b form an edge.
             continue;
         }
-        int32_t activity_id = maybe_add_activity(ctx->mem_pool(), b_elements->get_slice(offset), &mem);
+        int32_t activity_id = maybe_add_activity(activity_map_, b_elements->get_slice(offset),
+            ctx->mem_pool(), &mem).first;
+        activity_stats_.resize(activity_map_.size());
         activity_updated_count_cases.resize(activity_map_.size(), 0);
         ActivityStats& a_stats = activity_stats_[activity_id];
         a_stats.count += count;
@@ -143,21 +145,12 @@ void CelonisGraphAggregateState::serialize(uint8_t* dst) const {
     DCHECK_EQ(activity_map_.size(), activity_stats_.size());
 
     // Activity Dictionary
-    uint32_t num_activities = activity_map_.size();
-    memcpy(dst, &num_activities, sizeof(uint32_t));
-    dst += sizeof(uint32_t);
-    for (auto it = activity_map_.begin(); it != activity_map_.end(); it++) {
-        uint32_t size = it->first.size;
-        uint32_t idx = it->second;
-        memcpy(dst, &idx, sizeof(uint32_t));
-        dst += sizeof(uint32_t);
-        memcpy(dst, &size, sizeof(uint32_t));
-        dst += sizeof(uint32_t);
-        memcpy(dst, it->first.data, it->first.size);
-        dst += it->first.size;
-    }
+    dst = serialize_activity_map(dst, activity_map_);
 
     // Activity Statistics
+    size_t num_activities = activity_map_.size();
+    memcpy(dst, &num_activities, sizeof(size_t));
+    dst += sizeof(size_t);
     for (const auto& stats: activity_stats_) {
         memcpy(dst, &stats.count, sizeof(size_t));
         dst += sizeof(size_t);
@@ -193,16 +186,10 @@ void CelonisGraphAggregateState::serialize(uint8_t* dst) const {
 }
 
 size_t CelonisGraphAggregateState::serialized_size() const {
-    size_t result = 0;
-    result += sizeof(uint32_t); // num_activities
-
-    // activities dictionary
-    for (auto it = activity_map_.begin(); it != activity_map_.end(); it++) {
-        result += sizeof(uint32_t) * 2; // idx + size
-        result += it->first.size;       // data
-    }
+    size_t result = get_serialized_size(activity_map_);
 
     // activity_stats
+    result += sizeof(size_t); // num_activities
     result += 4 * sizeof(size_t) * activity_stats_.size();
 
     // edge_stats
@@ -224,28 +211,16 @@ size_t CelonisGraphAggregateState::deserialize_and_merge(MemPool* mem_pool, cons
     size_t mem = 0;
     const uint8_t* end = src + len;
 
-    // Activities Dictionary
-    uint32_t num_activities;
-    memcpy(&num_activities, src, sizeof(uint32_t));
-    src += sizeof(uint32_t);
-    // Maps input activity dictionary to the current activity dictionary.
-    // src_index -> local_idx
-    std::vector<uint32_t> index_vector;
-    index_vector.resize(num_activities);
-    for (size_t i = 0; i < num_activities; ++i) {
-        uint32_t size;
-        uint32_t idx;
-        memcpy(&idx, src, sizeof(uint32_t));
-        src += sizeof(uint32_t);
-        memcpy(&size, src, sizeof(uint32_t));
-        src += sizeof(uint32_t);
-        Slice s(src, size);
-        src += size;
-        index_vector[idx] = maybe_add_activity(mem_pool, s, &mem);
-    }
+    std::vector<std::pair<int32_t, size_t>> index_vector;
+    src = deserialize_activity_map_and_merge(src, index_vector, activity_map_, mem_pool, &mem);
+    activity_stats_.resize(activity_map_.size());
+
     // read activity_stats and merge it with existing stats
+    size_t num_activities;
+    memcpy(&num_activities, src, sizeof(size_t));
+    src += sizeof(size_t);
     for (size_t i = 0; i < num_activities; ++i) {
-        uint32_t local_idx = index_vector[i];
+        int32_t local_idx = index_vector[i].first;
         auto& stats = activity_stats_[local_idx];
         // [activity_stats] count, count_case, count_start, count_end
         size_t count = 0;
@@ -278,8 +253,8 @@ size_t CelonisGraphAggregateState::deserialize_and_merge(MemPool* mem_pool, cons
         memcpy(&edge_dst, src, sizeof(int32_t));
         src += sizeof(int32_t);
 
-        uint32_t local_src = index_vector[edge_src];
-        uint32_t local_dst = index_vector[edge_dst];
+        int32_t local_src = index_vector[edge_src].first;
+        int32_t local_dst = index_vector[edge_dst].first;
         Edge e(local_src, local_dst);
         auto& stats = edge_stats_[e];
 
@@ -346,29 +321,6 @@ void CelonisGraphAggregateState::finalize_to_column(FunctionContext* ctx, Column
     }
     LOG(INFO) << log_prefix << ": done to_string (length = " << rv->size() << ")\n";
     down_cast<BinaryColumn*>(to)->append(rv.value());
-}
-
-int32_t CelonisGraphAggregateState::maybe_add_activity(MemPool* mem_pool, const Slice& slice, size_t* memory) {
-    // TODO(j.kim): Reserve activity id 0 for null to be consistent with Saola.
-    int32_t index = 0;
-    SliceWithHash key(slice);
-
-    auto it = activity_map_.find(key, key.hash);
-    if (it == activity_map_.end()) {
-        // New activity - allocate memory
-        char* pos = (char*)mem_pool->allocate(key.size);
-        DCHECK(pos != nullptr);
-        memcpy(pos, key.data, key.size);
-        *memory += phmap::item_serialize_size<SliceHashMap>::value;
-        key.data = pos;
-        index = activity_map_.size();
-        activity_map_.insert(std::pair<SliceWithHash, int32_t>(key, index));
-        activity_stats_.emplace_back();
-    } else {
-        key.data = it->first.data;
-        index = it->second;
-    }
-    return index;
 }
 
 //TODO(xingyuan): extract code to an utils class

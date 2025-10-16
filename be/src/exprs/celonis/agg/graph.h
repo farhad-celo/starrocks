@@ -16,7 +16,6 @@ public:
 private:
     using EdgeHashMap = phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
 
-    int32_t maybe_add_activity(MemPool* mem_pool, const Slice& slice, size_t* memory);
     std::optional<std::string> base64_encoded_string() const;
     std::optional<std::string> json_string() const;
     std::string get_log_prefix(const std::string& query_id) const;
