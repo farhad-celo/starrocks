@@ -36,6 +36,10 @@ struct FloatExtractor {
 };
 
 bool equal(const DatumKey& var1, const DatumKey& var2) {
+    if (var1.index() == var2.index()) {
+        return var1 == var2;
+    }
+    // Cross-type comparison
     auto int1 = std::visit(IntExtractor{}, var1);
     auto int2 = std::visit(IntExtractor{}, var2);
 
