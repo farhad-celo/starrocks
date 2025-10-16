@@ -32,7 +32,7 @@ ARG BUILD_ROOT
 ARG BUILD_TYPE
 COPY . ${BUILD_ROOT}
 WORKDIR ${BUILD_ROOT}
-RUN --mount=type=cache,target=/root/.m2/ STARROCKS_VERSION=${RELEASE_VERSION} BUILD_TYPE=${BUILD_TYPE} MAVEN_OPTS=${MAVEN_OPTS} ./build.sh --be --enable-shared-data --clean -j `nproc`
+RUN --mount=type=cache,target=/root/.m2/ STARROCKS_VERSION=${RELEASE_VERSION} BUILD_TYPE=${BUILD_TYPE} MAVEN_OPTS=${MAVEN_OPTS} ./build.sh --be --enable-shared-data --clean
 
 FROM ubuntu:22.04 as downloader
 
