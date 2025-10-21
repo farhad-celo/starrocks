@@ -75,7 +75,7 @@ void CelonisGraphAggregateState::update(FunctionContext* ctx, const Column** col
             continue;
         }
         int32_t activity_id =
-                maybe_add_activity(activity_map_, b_elements->get_slice(offset), ctx->mem_pool(), &mem).first;
+                maybe_add_activity(b_elements->get_slice(offset), ctx->mem_pool(), activity_map_, &mem).first;
         activity_stats_.resize(activity_map_.size());
         activity_updated_count_cases.resize(activity_map_.size(), 0);
         ActivityStats& a_stats = activity_stats_[activity_id];
@@ -211,7 +211,7 @@ size_t CelonisGraphAggregateState::deserialize_and_merge(MemPool* mem_pool, cons
     const uint8_t* end = src + len;
 
     std::vector<std::pair<int32_t, size_t>> index_vector;
-    src = deserialize_activity_map_and_merge(src, index_vector, activity_map_, mem_pool, &mem);
+    src = deserialize_activity_map_and_merge(src, mem_pool, activity_map_, index_vector, &mem);
     activity_stats_.resize(activity_map_.size());
 
     // read activity_stats and merge it with existing stats

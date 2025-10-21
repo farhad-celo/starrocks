@@ -26,7 +26,7 @@ rapidjson::Value ActivityStats::to_json(rapidjson::Document::AllocatorType& allo
     return obj;
 }
 
-std::pair<int32_t, size_t> maybe_add_activity(SliceHashMap& activity_map, const Slice& activity, MemPool* mem_pool,
+std::pair<int32_t, size_t> maybe_add_activity(const Slice& activity, MemPool* mem_pool, SliceHashMap& activity_map,
                                               size_t* memory) {
     // TODO(j.kim): Reserve activity id 0 for null to be consistent with Saola.
     int32_t index = 0;
@@ -77,8 +77,8 @@ size_t get_serialized_size(const SliceHashMap& activity_map) {
     return result;
 }
 const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src,
-                                                  std::vector<std::pair<int32_t, size_t>>& index_vector,
-                                                  SliceHashMap& activity_map, MemPool* mem_pool, size_t* memory) {
+                                                  MemPool* mem_pool,
+                                                  SliceHashMap& activity_map, std::vector<std::pair<int32_t, size_t>>& index_vector, size_t* memory) {
     uint32_t num_activities;
     memcpy(&num_activities, src, sizeof(uint32_t));
     src += sizeof(uint32_t);
@@ -92,7 +92,7 @@ const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src,
         src += sizeof(uint32_t);
         Slice s(src, len);
         src += len;
-        index_vector[idx] = maybe_add_activity(activity_map, s, mem_pool, memory);
+        index_vector[idx] = maybe_add_activity(s, mem_pool, activity_map, memory);
     }
     return src;
 }

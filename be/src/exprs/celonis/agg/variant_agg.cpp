@@ -50,7 +50,7 @@ size_t VariantAggregateState::update(FunctionContext* ctx, const Column** column
             // we will consider that a,b form an edge.
             continue;
         }
-        auto idx_hash = maybe_add_activity(activity_map_, b_elements->get_slice(offset), ctx->mem_pool(), &memory);
+        auto idx_hash = maybe_add_activity(b_elements->get_slice(offset), ctx->mem_pool(), activity_map_, &memory);
         variant.add(idx_hash.first, idx_hash.second);
     }
     // Add the variant into the variant_map.
@@ -77,7 +77,7 @@ size_t VariantAggregateState::deserialize_and_merge(MemPool* mem_pool, const uin
     // src can contain multiple serialized states. We merge each of them.
     while (src < end) {
         std::vector<std::pair<int32_t, size_t>> index_vector;
-        src = deserialize_activity_map_and_merge(src, index_vector, activity_map_, mem_pool, &mem);
+        src = deserialize_activity_map_and_merge(src, mem_pool, activity_map_, index_vector, &mem);
         src = deserialize_variant_map_and_merge(src, index_vector, variant_map_);
     }
     DCHECK_EQ(src, end);

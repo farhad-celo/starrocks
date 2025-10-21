@@ -76,14 +76,14 @@ struct VariantAnalysisResult {
  *
  * Note that activity indices are assigned sequentially starting from 0 based on insertion order.
  *
- * @param[in,out] activity_map The hash map that stores unique activities and maps them to integer indices. This map is
- *                             modified if a new activity is added.
  * @param activity A non-owning view of the activity data to look up or add.
  * @param mem_pool A pointer to a memory pool used for allocating storage for new activity data.
+ * @param[in,out] activity_map The hash map that stores unique activities and maps them to integer indices. This map is
+ *                             modified if a new activity is added.
  * @param[out] memory A pointer to a memory usage counter, which is incremented when a new activity is added to the map.
  * @return A std::pair containing the activity's unique integer index and its hash value.
  */
-std::pair<int32_t, size_t> maybe_add_activity(SliceHashMap& activity_map, const Slice& activity, MemPool* mem_pool,
+std::pair<int32_t, size_t> maybe_add_activity(const Slice& activity, MemPool* mem_pool, SliceHashMap& activity_map,
                                               size_t* memory);
 
 /**
@@ -112,15 +112,15 @@ size_t get_serialized_size(const SliceHashMap& activity_map);
  * its corresponding index and hash in the local map.
  *
  * @param src A pointer to the buffer containing the serialized activity map.
- * @param[out] index_vector An output vector that will be populated with a mapping from source indices to local {index, hash} pairs.
- * @param[in,out] activity_map The local activity map into which deserialized activities are merged.
  * @param mem_pool A pointer to a memory pool used for allocating storage for new activity data.
+ * @param[in,out] activity_map The local activity map into which deserialized activities are merged.
+ * @param[out] index_vector An output vector that will be populated with a mapping from source indices to local {index, hash} pairs.
  * @param[out] memory A pointer to a memory usage counter, which is incremented when a new activity is added to the map.
  * @return A pointer to the position in the source buffer immediately after the consumed data.
  */
 const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src,
-                                                  std::vector<std::pair<int32_t, size_t>>& index_vector,
-                                                  SliceHashMap& activity_map, MemPool* mem_pool, size_t* memory);
+                                                  MemPool* mem_pool,
+                                                  SliceHashMap& activity_map, std::vector<std::pair<int32_t, size_t>>& index_vector, size_t* memory);
 
 /**
  * Serializes a variant map into a byte buffer. It's a map from variants to their counts.
