@@ -1,0 +1,68 @@
+{
+    "name": "sr-dev-homcc",
+    "build": {
+        "dockerfile": "../../docker/dockerfiles/dev-env-arm-homcc/Dockerfile"
+    },
+    "postCreateCommand": "cp .devcontainer/arm/CMakePresets.json be/CMakePresets.json",
+    "containerEnv": {
+        // This is covered by the CMake presets already but still useful to have in case you want to execute build.sh
+        "STARROCKS_GCC_HOME": "/usr/",
+        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/lib",
+        "STARROCKS_LINKER": "lld",
+        "CMAKE_GENERATOR": "ninja"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools-extension-pack",
+                "matepek.vscode-catch2-test-adapter",
+                "eamodio.gitlens",
+                "vadimcn.vscode-lldb",
+                "xaver.clang-format",
+                "IBM.output-colorizer"
+            ],
+            "settings": {
+                "testMate.cpp.test.advancedExecutables": [
+                    {
+                        "pattern": "be/{**/test,out/build/**/test}/starrocks_test",
+                        "env": {
+                            "LD_LIBRARY_PATH": "${workspaceFolder}/output/be/lib/:/var/local/thirdparty/installed/lib",
+                            "STARROCKS_HOME": "${workspaceFolder}",
+                            "UDF_RUNTIME_DIR": "${workspaceFolder}"
+                        }
+                    }
+                ],
+                "testMate.cpp.log.logpanel": true,
+                "C_Cpp.default.includePath": [
+                    "${workspaceFolder}/**",
+                    "/var/local/thirdparty/installed/include/**",
+                    "/var/local/thirdparty/installed/**"
+                ],
+                "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+                "C_Cpp.default.compilerArgs": [
+                    "-fuse-ld=lld"
+                ],
+                "C_Cpp.default.cppStandard": "c++20",
+                "C_Cpp.default.intelliSenseMode": "linux-gcc-arm64",
+                "C_Cpp.default.compileCommands": [
+                    "${workspaceFolder}/be/build_Release/compile_commands.json",
+                    "${workspaceFolder}/be/build_Debug/compile_commands.json",
+                    "${workspaceFolder}/be/ut_build_ASAN/compile_commands.json"
+                ],
+                "cmake.sourceDirectory": "${workspaceFolder}/be",
+                "cmake.useCMakePresets": "always",
+                "cmake.options.statusBarVisibility": "hidden",
+                "cmake.options.advanced": {
+                    "configurePreset": {
+                        "statusBarVisibility": "visible",
+                        "inheritDefault": "visible"
+                    },
+                    "buildPreset": {
+                        "statusBarVisibility": "visible",
+                        "inheritDefault": "visible"
+                    }
+                }
+            }
+        }
+    }
+}
