@@ -22,7 +22,12 @@ build_onetbb() {
     check_if_source_exist $ONETBB_SOURCE
     cd $TP_SOURCE_DIR/$ONETBB_SOURCE
 
-    $CMAKE_CMD -G "${CMAKE_GENERATOR}" -DCMAKE_BUILD_TYPE=Release \
+    # CELOSTAR-1006 Unset the LDFLAGS explicitly as they are set by build-thirdparty.sh and would
+    # cause -static-libstdc++ and -static-libgcc flags to be used for TBB, which causes an abort
+    # if an exception is thrown inside a TBB context (e.g. a parallel_for) which normally should
+    # be propagated & re-thrown in the calling code.
+    LDFLAGS="" \
+        $CMAKE_CMD -G "${CMAKE_GENERATOR}" -DCMAKE_BUILD_TYPE=Release \
 	    -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=$TP_INSTALL_DIR -DCMAKE_INSTALL_LIBDIR=lib \
 	    -DTBB_ENABLE_IPO=OFF -DTBB_TEST=OFF -DTBBMALLOC_BUILD=OFF
     ${BUILD_SYSTEM} -j$PARALLEL install
