@@ -165,6 +165,24 @@ TEST_F(CelonisMultiInTest, multiple_fields) {
     EXPECT_EQ(true, result->get(2).get_uint8());
 }
 
+TEST_F(CelonisMultiInTest, integer_width_mismatch) {
+    auto ints = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+    ints->append_datum(100);
+    ints->append_datum(300);
+    auto strings = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+    strings->append_datum("A");
+    strings->append_datum("C");
+    auto big_int_arrays = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+    auto string_arrays = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+    big_int_arrays->append_datum(DatumArray{Datum(static_cast<int64_t>(100)), Datum(static_cast<int64_t>(200)),
+                                            Datum(static_cast<int64_t>(300))});
+    string_arrays->append_datum(DatumArray{"A", "B", "C"});
+    auto result = RunConstMatchLists({ints, strings}, {big_int_arrays, string_arrays}).value();
+    EXPECT_EQ(2, result->size());
+    EXPECT_EQ(true, result->get(0).get_uint8());
+    EXPECT_EQ(true, result->get(1).get_uint8());
+}
+
 TEST_F(CelonisMultiInTest, multiple_fields_with_different_types) {
     auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
     timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));

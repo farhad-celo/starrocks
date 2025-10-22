@@ -43,6 +43,10 @@ bool equal(const DatumKey& var1, const DatumKey& var2) {
     auto int1 = std::visit(IntExtractor{}, var1);
     auto int2 = std::visit(IntExtractor{}, var2);
 
+    if (int1 && int2) {
+        return *int1 == *int2;
+    }
+
     auto float1 = std::visit(FloatExtractor{}, var1);
     auto float2 = std::visit(FloatExtractor{}, var2);
 
