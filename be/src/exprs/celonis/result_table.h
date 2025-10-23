@@ -86,12 +86,26 @@ public:
 
     template <typename TYPE>
     ResultColumn<TYPE>& column(std::string_view column_name) const {
-        return *dynamic_cast<ResultColumn<TYPE>*>(column(std::string(column_name)));
+        auto* requested_column{column(std::string(column_name))};
+        if (requested_column == nullptr) {
+            throw std::out_of_range(
+                    fmt::format(R"(The column "{}" does not exist on the table "{}".)", column_name, name_));
+        }
+        return *dynamic_cast<ResultColumn<TYPE>*>(requested_column);
     };
 
     template <typename TYPE>
     NullableResultColumn<TYPE>& nullable_column(std::string_view column_name) const {
-        return *dynamic_cast<NullableResultColumn<TYPE>*>(column(std::string(column_name)));
+        auto* requested_column{column(std::string(column_name))};
+        if (requested_column == nullptr) {
+            throw std::out_of_range(
+                    fmt::format(R"(The column "{}" does not exist on the table "{}".)", column_name, name_));
+        }
+        if (NullableResultColumn<TYPE> * nullable_column{dynamic_cast<NullableResultColumn<TYPE>*>(requested_column)};
+            nullable_column != nullptr) {
+            return *nullable_column;
+        }
+        throw std::bad_cast();
     };
 
     const std::map<std::string, std::unique_ptr<ResultColumnBase>>& columns() const { return columns_; };

@@ -211,6 +211,7 @@ set(EXEC_FILES
         ./exprs/celonis/remap_values_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/remap_timestamps_calendar_test.cpp
+        ./exprs/celonis/result_table_test.cpp
         ./exprs/celonis/row_buffer_test.cpp
         ./exprs/celonis/serialization_utils_test.cpp
         ./exprs/celonis/shortened_variant_test.cpp
