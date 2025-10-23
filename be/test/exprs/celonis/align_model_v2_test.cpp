@@ -26,27 +26,36 @@ protected:
               return_type_(AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))) {
         // Initialize the struct type descriptor properly
         auto struct_desc = TypeDescriptor::from_logical_type(TYPE_STRUCT);
-        struct_desc.children = {
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
-                celonis::array_type(TYPE_VARCHAR)};
-        struct_desc.field_names = {"alignment_model_vertex_id",
+        struct_desc.children = {celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),
+                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),
+                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),
+                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),
+                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),
+                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),
+                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),
+                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
+                                celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_BIGINT),
+                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR)};
+        struct_desc.field_names = {"variant",
+                                   "alignment_model_vertex_id",
                                    "alignment_vertex_label",
                                    "alignment_move_type",
                                    "alignment_activity_index",
+                                   "alignment_deviation_category",
                                    "exclusive_violation_alignment_index",
                                    "exclusive_violation_deviation_category",
                                    "exclusive_violation_edge_class",
@@ -99,9 +108,8 @@ protected:
 private:
     typedef std::vector<std::string> Variant;
     typedef std::vector<Variant> VariantRows;
-    typedef std::tuple<std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>,
-                       std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
+    typedef std::tuple<std::vector<std::string>, std::vector<int64_t>, std::vector<std::string>,
+                       std::vector<std::string>, std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>,
                        std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>,
                        std::vector<std::string>, std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>,
                        std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
@@ -110,7 +118,9 @@ private:
                        std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
                        std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>,
                        std::vector<std::string>, std::vector<int64_t>, std::vector<std::string>, std::vector<int64_t>,
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>>
+                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
+                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<std::string>,
+                       std::vector<std::string>>
             Result;
     typedef std::map<Variant, Result> ResultMap;
 
@@ -137,59 +147,61 @@ private:
             ASSERT_EQ(result_.size(), expected_.size());
 
             for (int row = 0; row < result_.size(); ++row) {
-                compare_array<0, int64_t>(row);
-                compare_array<1, std::string>(row);
+                compare_array<0, std::string>(row);
+                compare_array<1, int64_t>(row);
                 compare_array<2, std::string>(row);
-                compare_array<3, int64_t>(row);
-
+                compare_array<3, std::string>(row);
                 compare_array<4, int64_t>(row);
                 compare_array<5, std::string>(row);
+
                 compare_array<6, int64_t>(row);
-                compare_array<7, int64_t>(row);
-                compare_array<8, std::string>(row);
-                compare_array<9, std::string>(row);
-
-                compare_array<10, int64_t>(row);
+                compare_array<7, std::string>(row);
+                compare_array<8, int64_t>(row);
+                compare_array<9, int64_t>(row);
+                compare_array<10, std::string>(row);
                 compare_array<11, std::string>(row);
+
                 compare_array<12, int64_t>(row);
-                compare_array<13, int64_t>(row);
-                compare_array<14, std::string>(row);
-                compare_array<15, std::string>(row);
-
-                compare_array<16, int64_t>(row);
+                compare_array<13, std::string>(row);
+                compare_array<14, int64_t>(row);
+                compare_array<15, int64_t>(row);
+                compare_array<16, std::string>(row);
                 compare_array<17, std::string>(row);
+
                 compare_array<18, int64_t>(row);
-                compare_array<19, int64_t>(row);
-                compare_array<20, std::string>(row);
-                compare_array<21, std::string>(row);
-
-                compare_array<22, int64_t>(row);
+                compare_array<19, std::string>(row);
+                compare_array<20, int64_t>(row);
+                compare_array<21, int64_t>(row);
+                compare_array<22, std::string>(row);
                 compare_array<23, std::string>(row);
+
                 compare_array<24, int64_t>(row);
-                compare_array<25, int64_t>(row);
-                compare_array<26, std::string>(row);
-                compare_array<27, std::string>(row);
-
-                compare_array<28, int64_t>(row);
+                compare_array<25, std::string>(row);
+                compare_array<26, int64_t>(row);
+                compare_array<27, int64_t>(row);
+                compare_array<28, std::string>(row);
                 compare_array<29, std::string>(row);
+
                 compare_array<30, int64_t>(row);
-                compare_array<31, int64_t>(row);
-                compare_array<32, std::string>(row);
-                compare_array<33, std::string>(row);
-
-                compare_array<34, int64_t>(row);
+                compare_array<31, std::string>(row);
+                compare_array<32, int64_t>(row);
+                compare_array<33, int64_t>(row);
+                compare_array<34, std::string>(row);
                 compare_array<35, std::string>(row);
-                compare_array<36, int64_t>(row);
-                compare_array<37, int64_t>(row);
-                compare_array<38, std::string>(row);
-                compare_array<39, std::string>(row);
 
-                compare_array<40, int64_t>(row);
+                compare_array<36, int64_t>(row);
+                compare_array<37, std::string>(row);
+                compare_array<38, int64_t>(row);
+                compare_array<39, int64_t>(row);
+                compare_array<40, std::string>(row);
                 compare_array<41, std::string>(row);
+
                 compare_array<42, int64_t>(row);
-                compare_array<43, int64_t>(row);
-                compare_array<44, std::string>(row);
-                compare_array<45, std::string>(row);
+                compare_array<43, std::string>(row);
+                compare_array<44, int64_t>(row);
+                compare_array<45, int64_t>(row);
+                compare_array<46, std::string>(row);
+                compare_array<47, std::string>(row);
             }
         }
 
@@ -344,10 +356,16 @@ const std::string CelonisAlignModelV2Test::PARALLEL_MODEL =
 
 const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::PARALLEL_MODEL_RESULTS = {
         {{"A", "C"},
-         {{1, 4, 3},
+         {{"A", "C"},
+          {1, 4, 3},
           {"A", "C", "B"},
           {"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE"},
           {0, 1, 0},
+          {
+                  "CONFORMING",
+                  "CONFORMING",
+                  "MISSING",
+          },
           {},
           {},
           {},
@@ -391,10 +409,12 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::PARALLEL_MODEL
           {},
           {}}},
         {{"A", "B", "C"},
-         {{1, 3, 4},
+         {{"A", "B", "C"},
+          {1, 3, 4},
           {"A", "B", "C"},
           {"SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE"},
           {0, 1, 2},
+          {"CONFORMING", "CONFORMING", "CONFORMING"},
           {},
           {},
           {},
@@ -440,10 +460,12 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::PARALLEL_MODEL
           {},
           {}}},
         {{"C", "B", "null", "B"},
-         {{1, 4, 3, 3},
+         {{"C", "B", "NULL", "B"},
+          {1, 4, 3, 3},
           {"A", "C", "B", "B"},
           {"MODEL_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE"},
           {0, 0, 1, 3},
+          {"MISSING", "CONFORMING", "CONFORMING", "EXCESSIVE"},
           {},
           {},
           {},
@@ -487,10 +509,12 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::PARALLEL_MODEL
           {},
           {}}},
         {{"C", "B", "B"},
-         {{1, 4, 3, 3},
+         {{"C", "B", "B"},
+          {1, 4, 3, 3},
           {"A", "C", "B", "B"},
           {"MODEL_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE"},
           {0, 0, 1, 2},
+          {"MISSING", "CONFORMING", "CONFORMING", "EXCESSIVE"},
           {},
           {},
           {},
@@ -534,10 +558,12 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::PARALLEL_MODEL
           {},
           {}}},
         {{"A", "null", "null", "C"},
-         {{1, 4, 3},
+         {{"A", "NULL", "NULL", "C"},
+          {1, 4, 3},
           {"A", "C", "B"},
           {"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE"},
           {0, 3, 0},
+          {"CONFORMING", "CONFORMING", "MISSING"},
           {},
           {},
           {},
@@ -581,10 +607,12 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::PARALLEL_MODEL
           {},
           {}}},
         {{"null", "A", "null", "C", "null"},
-         {{1, 4, 3},
+         {{"NULL", "A", "NULL", "C", "NULL"},
+          {1, 4, 3},
           {"A", "C", "B"},
           {"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE"},
           {1, 3, 1},
+          {"CONFORMING", "CONFORMING", "MISSING"},
           {},
           {},
           {},
@@ -627,7 +655,6 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::PARALLEL_MODEL
           {},
           {},
           {}}},
-
 };
 
 const std::string CelonisAlignModelV2Test::LOOP_MODEL =
@@ -699,11 +726,14 @@ const std::string CelonisAlignModelV2Test::LOOP_MODEL =
         })json";
 
 const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::LOOP_MODEL_RESULTS = {
+
         {{"A", "B", "C", "A", "B"},
-         {{2, 3, 5, 2, 3},
+         {{"A", "B", "C", "A", "B"},
+          {2, 3, 5, 2, 3},
           {"A", "B", "C", "A", "B"},
           {"SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE"},
           {0, 1, 2, 3, 4},
+          {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING"},
           {},
           {},
           {},
@@ -750,10 +780,12 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::LOOP_MODEL_RES
           {},
           {}}},
         {{"A", "B", "C"},
-         {{2, 3, 5, 2, 3},
+         {{"A", "B", "C"},
+          {2, 3, 5, 2, 3},
           {"A", "B", "C", "A", "B"},
           {"SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE", "MODEL_MOVE"},
           {0, 1, 2, 2, 2},
+          {"CONFORMING", "CONFORMING", "CONFORMING", "MISSING", "MISSING"},
           {},
           {},
           {},
@@ -789,17 +821,8 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::LOOP_MODEL_RES
            "CONFORMING", "CONFORMING"},
           {0, 0, 0, 0, 0, 0, 0, 1, 1},
           {0, 1, 2, 3, 4, 5, 1, 4, 6},
-          {
-                  "GATEWAY_MOVE",
-                  "GATEWAY_MOVE",
-                  "SYNC_MOVE",
-                  "SYNC_MOVE",
-                  "GATEWAY_MOVE",
-                  "SYNC_MOVE",
-                  "GATEWAY_MOVE",
-                  "GATEWAY_MOVE",
-                  "GATEWAY_MOVE",
-          },
+          {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
+           "GATEWAY_MOVE", "GATEWAY_MOVE"},
           {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C", "BPMN_EXCLUSIVE_CHOICE",
            "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
           {},
@@ -809,10 +832,12 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::LOOP_MODEL_RES
           {},
           {}}},
         {{"A", "B", "A", "B"},
-         {{2, 3, 5, 2, 3},
+         {{"A", "B", "A", "B"},
+          {2, 3, 5, 2, 3},
           {"A", "B", "C", "A", "B"},
           {"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE", "SYNC_MOVE", "SYNC_MOVE"},
           {0, 1, 1, 2, 3},
+          {"CONFORMING", "CONFORMING", "MISSING", "CONFORMING", "CONFORMING"},
           {},
           {},
           {},
@@ -857,9 +882,7 @@ const CelonisAlignModelV2Test::ResultMap CelonisAlignModelV2Test::LOOP_MODEL_RES
           {},
           {},
           {},
-          {}}}
-
-};
+          {}}}};
 
 TEST_F(CelonisAlignModelV2Test, Parallel) {
     VariantRows variants = {{"A", "C"}, {"A", "B", "C"}, {"C", "B", "null", "B"}};

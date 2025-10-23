@@ -29,6 +29,11 @@ namespace celonis::accelerator::operators::process::align_model::v2 {
 
 namespace {
 
+struct variant_col {
+  using value_type = std::vector<std::string>;
+  constexpr static std::string_view name{"variant"};
+};
+
 struct alignment_model_vertex_id_col {
   using value_type = std::vector<std::optional<size_t>>;
   constexpr static std::string_view name{"model_vertex_id"};
@@ -66,7 +71,8 @@ struct association_alignment_index_col {
 
 struct alignment_columns {
   static alignment_columns make(ResultTable& table, std::string_view prefix) {
-    return alignment_columns{table.AddColumn<alignment_model_vertex_id_col::value_type>(
+    return alignment_columns{table.AddColumn<variant_col::value_type>(variant_col::name),
+                             table.AddColumn<alignment_model_vertex_id_col::value_type>(
                                  fmt::format("{}_{}", prefix, alignment_model_vertex_id_col::name)),
                              table.AddColumn<alignment_vertex_label_col::value_type>(
                                  fmt::format("{}_{}", prefix, alignment_vertex_label_col::name)),
@@ -77,6 +83,7 @@ struct alignment_columns {
                              table.AddColumn<alignment_deviation_category_col::value_type>(
                                  fmt::format("{}_{}", prefix, alignment_deviation_category_col::name))};
   }
+  ResultColumn<variant_col::value_type>& variant;
   ResultColumn<alignment_model_vertex_id_col::value_type>& model_vertex_id;
   ResultColumn<alignment_vertex_label_col::value_type>& vertex_label;
   ResultColumn<alignment_move_type_col::value_type>& move_type;
@@ -84,12 +91,14 @@ struct alignment_columns {
   ResultColumn<alignment_deviation_category_col::value_type>& deviation_category;
 
  private:
-  alignment_columns(ResultColumn<alignment_model_vertex_id_col::value_type>& model_vertex_id,
+  alignment_columns(ResultColumn<variant_col::value_type>& variant,
+                    ResultColumn<alignment_model_vertex_id_col::value_type>& model_vertex_id,
                     ResultColumn<alignment_vertex_label_col::value_type>& vertex_label,
                     ResultColumn<alignment_move_type_col::value_type>& move_type,
                     ResultColumn<alignment_activity_index_col::value_type>& activity_index,
                     ResultColumn<alignment_deviation_category_col::value_type>& deviation_category)
-      : model_vertex_id(model_vertex_id),
+      : variant(variant),
+        model_vertex_id(model_vertex_id),
         vertex_label(vertex_label),
         move_type(move_type),
         activity_index(activity_index),
@@ -364,7 +373,7 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
               const auto& activity_to_case_join_vec{std::get<3>(tup)};
 
               auto current_variant_row{block.offset_variant};
-
+              const auto activity_dict{activity_column->get_string_dict(context)};
               common::for_each_group(
                   block.offset_in, block.offset_in + block.size_in, case_accessor, [&](auto interval) {
                     const auto activity_table_case_id_col_row{interval.begin()};
@@ -450,6 +459,12 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                     // 3. Fill ALIGNMENT table column data and join to Activity table
                     // copy the alignment (ids/move types) for each case into the arrays
                     auto alignment_size = condensed_alignment_for_case.get_alignment().size();
+                    alignment_cols.variant.at(current_variant_row).reserve(interval.end() - interval.begin());
+                    for (auto i{interval.begin()}; i < interval.end(); ++i) {
+                      const auto activity_dict_id{activity_accessor.at(i)};
+                      alignment_cols.variant.at(current_variant_row)
+                          .emplace_back(activity_dict->get_string_value(activity_dict_id));
+                    }
                     alignment_cols.model_vertex_id.at(current_variant_row).reserve(alignment_size);
                     alignment_cols.vertex_label.at(current_variant_row).reserve(alignment_size);
                     alignment_cols.move_type.at(current_variant_row).reserve(alignment_size);

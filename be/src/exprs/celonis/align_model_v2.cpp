@@ -195,6 +195,7 @@ StatusOr<ColumnPtr> CelonisAlignModelV2::align_model_v2(FunctionContext* context
                                    AlignModelHelper::celostar_align_model_version::V2));
     const auto& result_table = helper.result_table();
 
+    const auto& variant_column = result_table.column<std::vector<std::string>>("variant");
     const auto& alignment_model_vertex_id =
             result_table.column<std::vector<std::optional<size_t>>>("alignment_model_vertex_id");
     const auto& alignment_vertex_label = result_table.column<std::vector<std::string>>("alignment_vertex_label");
@@ -228,10 +229,12 @@ StatusOr<ColumnPtr> CelonisAlignModelV2::align_model_v2(FunctionContext* context
         }
         int fields_index{0};
 
+        AddArray(fields[fields_index++], variant_column[index]);
         AddArray(fields[fields_index++], alignment_model_vertex_id[index]);
         AddArray(fields[fields_index++], alignment_vertex_label[index]);
         AddArray(fields[fields_index++], alignment_move_type[index]);
         AddArray(fields[fields_index++], alignment_activity_index[index]);
+        AddArray(fields[fields_index++], alignment_deviation_category[index]);
         checked_add_array_to_field(fields_index, exclusive_violation_columns, index);
         checked_add_array_to_field(fields_index, log_edge_columns, index);
         checked_add_array_to_field(fields_index, missing_violation_columns, index);
