@@ -1,8 +1,9 @@
 #include "cluster_variants.h"
 
-#include <queue>
-#include <chrono>
 #include <tbb/parallel_for.h>
+
+#include <chrono>
+#include <queue>
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
@@ -56,12 +57,13 @@ struct Clusterer {
         // prefix_bitmask represents the first min(64, n) edges.
         // second_prefix_bitmask represents the next min(64, n - 64) edges.
         // compute the top (most) 2 * 64 frequent edges
-        std::vector<std::pair<Edge, int64_t>> temp_edges(std::min(2 * sizeof(uint64_t) * CHAR_BIT, edge_counter.size()));
+        std::vector<std::pair<Edge, int64_t>> temp_edges(
+                std::min(2 * sizeof(uint64_t) * CHAR_BIT, edge_counter.size()));
         std::vector<std::pair<Edge, int64_t>> edge_cnts(edge_counter.begin(), edge_counter.end());
         std::partial_sort_copy(edge_cnts.begin(), edge_cnts.end(), temp_edges.begin(), temp_edges.end(),
                                [](const auto& a, const auto& b) { return a.second > b.second; });
         std::vector<Edge> freq_edges;
-        for (const auto& entry: temp_edges) {
+        for (const auto& entry : temp_edges) {
             freq_edges.push_back(entry.first);
         }
         // compute the bitmasks
@@ -84,16 +86,17 @@ struct Clusterer {
             second_prefix_bitmasks[i] = second_bitmask;
             // If all the edges in the edge set are covered by prefix_bitmask and second_prefix_bitmask,
             // is_bitmask_exact = true.
-            is_bitmask_exacts[i] = ((__builtin_popcountll(bitmask) + __builtin_popcountll(second_bitmask)) ==
-                                    cur_edges.size());
+            is_bitmask_exacts[i] =
+                    ((__builtin_popcountll(bitmask) + __builtin_popcountll(second_bitmask)) == cur_edges.size());
         }
     }
 
     // Executes DBSCAN and returns cluster labels.
     // points (i.e., edge_sets) are sorted based on length (from high to low).
     // Each point (i.e., edge_set) is sorted based on edge frequency (from low frequency to high frequency).
-    std::optional<std::vector<int64_t>> dbscan(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
-                                               const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
+    std::optional<std::vector<int64_t>> dbscan(
+            const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
+            const phmap::flat_hash_map<Edge, int64_t, HashOnEdge, EqualOnEdge>& edge_counter) {
         auto timeout_time = std::chrono::steady_clock::now() + std::chrono::seconds(MAX_DBSCAN_SECONDS);
         LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique edges is " << edge_counter.size() << std::endl;
         DCHECK_EQ(points.size(), counts.size());
@@ -121,9 +124,8 @@ struct Clusterer {
                         }
                     }
                 },
-                tbb::auto_partitioner()  // Let TBB decide the best partitioning
+                tbb::auto_partitioner() // Let TBB decide the best partitioning
         );
-
 
         int64_t cluster_id = 0;
         // Traverse the points
@@ -171,7 +173,7 @@ struct Clusterer {
 
     int64_t compute_density(const std::vector<int64_t>& counts, const std::vector<size_t>& neighbors) const {
         int64_t rv = 0;
-        for (auto index: neighbors) {
+        for (auto index : neighbors) {
             rv += counts[index];
         }
         return rv;
@@ -193,7 +195,7 @@ struct Clusterer {
         const auto& b = points[j];
         phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> unique_edges(a.edges.begin(), a.edges.end());
         int64_t distance = 0;
-        for (const auto& edge: b.edges) {
+        for (const auto& edge : b.edges) {
             if (unique_edges.contains(edge)) {
                 unique_edges.erase(edge);
             } else {
@@ -247,9 +249,8 @@ struct Clusterer {
         return lo;
     }
 
-    std::vector<size_t>
-    get_neighbors(const std::vector<EdgeSet>& points, size_t index, const std::vector<bool>& is_cores,
-                  const std::vector<bool>& is_isolated) {
+    std::vector<size_t> get_neighbors(const std::vector<EdgeSet>& points, size_t index,
+                                      const std::vector<bool>& is_cores, const std::vector<bool>& is_isolated) {
         const auto& point = points[index];
         const auto length = point.size();
         // Given two sets s1 and s2, if symmetric_difference(s1, s2) >= abs(len(s1) - len(s2)).
@@ -287,7 +288,7 @@ struct Clusterer {
             }
         }
         std::vector<size_t> rv = {index};
-        for (auto candidate: candidates) {
+        for (auto candidate : candidates) {
             if (is_neighbor(points, index, candidate)) {
                 rv.push_back(candidate);
             }
@@ -295,9 +296,9 @@ struct Clusterer {
         return rv;
     }
 
-    void expand_cluster(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts,
-                        size_t start_index, const std::vector<size_t>& neighbors, int64_t cluster_id,
-                        std::vector<int64_t>& labels, std::vector<bool>& is_cores, std::vector<bool>& is_isolated) {
+    void expand_cluster(const std::vector<EdgeSet>& points, const std::vector<int64_t>& counts, size_t start_index,
+                        const std::vector<size_t>& neighbors, int64_t cluster_id, std::vector<int64_t>& labels,
+                        std::vector<bool>& is_cores, std::vector<bool>& is_isolated) {
         std::vector<size_t> core_indexes = {start_index};
         labels[start_index] = cluster_id;
         std::deque<size_t> unvisited(neighbors.begin(), neighbors.end());
@@ -315,20 +316,18 @@ struct Clusterer {
             }
             if (compute_density(counts, cur_neighbors) >= min_pts) {
                 core_indexes.push_back(neighbor_index);
-                for (auto cur_neighbor: cur_neighbors) {
+                for (auto cur_neighbor : cur_neighbors) {
                     unvisited.push_back(cur_neighbor);
                 }
             }
         }
-        for (auto index: core_indexes) {
+        for (auto index : core_indexes) {
             is_cores[index] = true;
         }
     }
-
 };
 
 } // namespace
-
 
 std::pair<int32_t, size_t> ClusterVariantsState::maybe_add_activity(MemPool* mem_pool, const Slice& slice,
                                                                     size_t* memory) {
@@ -340,7 +339,7 @@ std::pair<int32_t, size_t> ClusterVariantsState::maybe_add_activity(MemPool* mem
     auto it = activity_map_.find(key, key.hash);
     if (it == activity_map_.end()) {
         // New activity - allocate memory
-        char* pos = (char*) mem_pool->allocate(key.size);
+        char* pos = (char*)mem_pool->allocate(key.size);
         DCHECK(pos != nullptr);
         memcpy(pos, key.data, key.size);
         *memory += phmap::item_serialize_size<SliceHashMap>::value;
@@ -369,7 +368,7 @@ void ClusterVariantsAggregateFunction::merge(FunctionContext* ctx, const Column*
     const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
     Slice slice = input_column->get_slice(row_num);
     size_t mem_usage = 0;
-    mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*) slice.data, slice.size);
+    mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size);
     ctx->add_mem_usage(mem_usage);
 }
 
@@ -388,8 +387,7 @@ void ClusterVariantsAggregateFunction::serialize_to_column(FunctionContext* ctx,
 }
 
 void ClusterVariantsAggregateFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
-                                                                   size_t chunk_size,
-                                                                   ColumnPtr* dst) const {
+                                                                   size_t chunk_size, ColumnPtr* dst) const {
     // Used for streaming aggregation. Not implemented.
     throw std::runtime_error("celonis_cluster_variants: convert_to_serialize_format not supported");
 }
@@ -413,16 +411,18 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     const auto& activity_map = state_impl.activity_map();
     const auto& edge_set_map = state_impl.edge_set_map();
     if (edge_set_map.size() > MAX_DISTINCT_VARIANTS) {
-        ctx->set_error(std::string(
-                "CELONIS_CLUSTER_VARIANTS is currently limited to 10,000,000 distinct variants, however there are " +
-                std::to_string(edge_set_map.size()) + " unique variants").c_str(), false);
+        ctx->set_error(std::string("CELONIS_CLUSTER_VARIANTS is currently limited to 10,000,000 distinct variants, "
+                                   "however there are " +
+                                   std::to_string(edge_set_map.size()) + " unique variants")
+                               .c_str(),
+                       false);
         return;
     }
     LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique activities is " << activity_map.size() << std::endl;
     const auto& null_variant_hashes = state_impl.null_variant_hashes();
     // We need to create a map from EdgeSet to (count, vector of variant hashes), then cluster based on it.
     phmap::flat_hash_map<EdgeSet, VariantHashesWithCount, HashOnEdgeSet, EqualOnEdgeSet> edges_map;
-    for (const auto& [hash128, edge_set_count]: edge_set_map) {
+    for (const auto& [hash128, edge_set_count] : edge_set_map) {
         auto& hashes_with_count = edges_map[edge_set_count.first];
         hashes_with_count.count += edge_set_count.second;
         hashes_with_count.hashes.emplace_back(hash128);
@@ -434,22 +434,20 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     std::vector<std::pair<EdgeSet, VariantHashesWithCount>> pairs;
     int64_t total_set_size = 0;
     size_t max_set_size = 0;
-    for (auto& entry: edges_map) {
+    for (auto& entry : edges_map) {
         const EdgeSet& edge_set = entry.first;
         total_set_size += edge_set.size();
         max_set_size = std::max(max_set_size, edge_set.size());
-        for (const auto& edge: edge_set.edges) {
+        for (const auto& edge : edge_set.edges) {
             edge_counter[edge] += 1;
         }
         pairs.emplace_back(std::move(entry.first), std::move(entry.second));
     }
     LOG(INFO) << "CELONIS_CLUSTER_VARIANTS: number of unique set representation is " << edges_map.size()
               << ", average size is " << (edges_map.empty() ? 0 : (total_set_size / edges_map.size()))
-              << ", maximum size is " << max_set_size
-              << std::endl;
+              << ", maximum size is " << max_set_size << std::endl;
     // Sort the points based on their length (from high to low)
-    std::sort(pairs.begin(), pairs.end(),
-              [](const auto& a, const auto& b) { return a.first.size() > b.first.size(); });
+    std::sort(pairs.begin(), pairs.end(), [](const auto& a, const auto& b) { return a.first.size() > b.first.size(); });
 
     std::vector<EdgeSet> points;
     std::vector<int64_t> counts;
@@ -457,13 +455,13 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     points.reserve(n_points);
     counts.reserve(n_points);
     hashes_vec.reserve(n_points);
-    for (auto& entry: pairs) {
+    for (auto& entry : pairs) {
         points.emplace_back(std::move(entry.first));
         counts.push_back(entry.second.count);
         hashes_vec.emplace_back(std::move(entry.second.hashes));
     }
     // Reorder the edges based on their frequency in each EdgeSet. Edge with low frequency comes first.
-    for (auto& point: points) {
+    for (auto& point : points) {
         std::sort(point.edges.begin(), point.edges.end(),
                   [&edge_counter](const auto& a, const auto& b) { return edge_counter[a] < edge_counter[b]; });
     }
@@ -492,7 +490,7 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     phmap::flat_hash_set<int128_t> null_variant_hashes_seen;
     for (auto i = 0; i < n_points; ++i) {
         const auto label = labels->at(i);
-        for (const int128_t hash128: hashes_vec[i]) {
+        for (const int128_t hash128 : hashes_vec[i]) {
             hash_col->elements_column()->append_datum(hash128);
             label_col->elements_column()->append_datum(label);
             ++n_elements;
@@ -501,7 +499,7 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
             }
         }
     }
-    for (int128_t hash128: null_variant_hashes) {
+    for (int128_t hash128 : null_variant_hashes) {
         if (!null_variant_hashes_seen.contains(hash128)) {
             hash_col->elements_column()->append_datum(hash128);
             label_col->elements_column()->append_datum(NULL_VARIANT_LABEL);
@@ -514,6 +512,8 @@ void ClusterVariantsAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     hash_offsets.push_back(hash_offsets.back() + n_elements);
 }
 
-std::string ClusterVariantsAggregateFunction::get_name() const { return "celonis_cluster_variants"; }
+std::string ClusterVariantsAggregateFunction::get_name() const {
+    return "celonis_cluster_variants";
+}
 
 } // namespace starrocks

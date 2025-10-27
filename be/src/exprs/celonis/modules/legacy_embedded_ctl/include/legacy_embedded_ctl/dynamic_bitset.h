@@ -104,7 +104,9 @@ class dynamic_bitset final : public bitset_crtp_base<PARALLELISM_SETTING, dynami
   /**
    * @brief get a mutable view of the underlying block array
    */
-  [[nodiscard]] legacy_embedded_ctl::array_view<block_type> to_mutable_block_span() noexcept { return legacy_embedded_ctl::array_view{bitset_data_}; }
+  [[nodiscard]] legacy_embedded_ctl::array_view<block_type> to_mutable_block_span() noexcept {
+    return legacy_embedded_ctl::array_view{bitset_data_};
+  }
 
   /* bitset size */
   [[nodiscard]] size_type size() const noexcept { return size_; }

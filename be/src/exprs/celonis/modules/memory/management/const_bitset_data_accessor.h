@@ -11,7 +11,8 @@ namespace celonis::accelerator::memory::management {
 
 class const_bitset_data_accessor final {
  public:
-  const_bitset_data_accessor(legacy_embedded_ctl::bitset_view_t bitset_view, legacy_embedded_ctl::shared_static_array<const uint64_t> data)
+  const_bitset_data_accessor(legacy_embedded_ctl::bitset_view_t bitset_view,
+                             legacy_embedded_ctl::shared_static_array<const uint64_t> data)
       : bitset_view_{bitset_view}, bitset_data_{std::move(data)} {}
 
   [[nodiscard]] bool operator[](const null_flags_bitset_t::bit_index_type idx) const noexcept {

@@ -1,10 +1,10 @@
 #include "exprs/celonis/remap_timestamp_weekday.h"
 
-#include "column/column_helper.h"
-#include "exprs/function_context.h"
-
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+
+#include "column/column_helper.h"
+#include "exprs/function_context.h"
 
 namespace starrocks {
 

@@ -1,12 +1,12 @@
 #include "exprs/celonis/abc_model.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util/defer_op.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -17,12 +17,11 @@ protected:
     void TearDown() override {}
 
 private:
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(LT),
-                TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(LT),
+                                                            TypeDescriptor::from_logical_type(TYPE_BIGINT),
+                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_BIGINT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -31,31 +30,26 @@ private:
         model_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     }
 
-    void
-    AddRow(const Datum& value, const Datum& pk_hash, const Datum& model) {
+    void AddRow(const Datum& value, const Datum& pk_hash, const Datum& model) {
         value_column_->append_datum(value);
         pk_hash_column_->append_datum(pk_hash);
         model_column_->append_datum(model);
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     StatusOr<ColumnPtr> Run() {
-        DeferOp close_fragment_local([this] {
-            CelonisAbcModel<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [this] { CelonisAbcModel<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisAbcModel<LT>::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisAbcModel<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local([this] { CelonisAbcModel<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisAbcModel<LT>::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
         result = CelonisAbcModel<LT>::apply_abc_model(ctx_.get(), {value_column_, pk_hash_column_, model_column_});
         return result;
     }
 
-    template<LogicalType LT>
-    StatusOr<ColumnPtr>
-    RunConstantModel(const Datum& model) {
+    template <LogicalType LT>
+    StatusOr<ColumnPtr> RunConstantModel(const Datum& model) {
         model_column_->append_datum(model);
         const auto nrows = value_column_->size();
         model_column_ = ConstColumn::create(model_column_, nrows);

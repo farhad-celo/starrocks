@@ -12,7 +12,7 @@
 
 namespace starrocks {
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct CelonisCalcBucketWidthBoundariesState {
 public:
     using CppType = RunTimeCppType<LT>;
@@ -45,7 +45,7 @@ public:
         memcpy(&src_true_max, src, sizeof(CppType));
         src += sizeof(CppType);
         PercentileValue src_percentile;
-        src_percentile.deserialize((const char*) src);
+        src_percentile.deserialize((const char*)src);
 
         width = src_width;
         true_min = std::min<CppType>(true_min, src_true_min);
@@ -93,10 +93,10 @@ public:
  *
  * Note: PercentileValue uses float so it may lose some precision especially with DATETIME with narrow ranges.
  */
-template<LogicalType LT>
+template <LogicalType LT>
 class CelonisCalcBucketWidthBoundariesAggregateFunction final
         : public AggregateFunctionBatchHelper<CelonisCalcBucketWidthBoundariesState<LT>,
-                CelonisCalcBucketWidthBoundariesAggregateFunction<LT>> {
+                                              CelonisCalcBucketWidthBoundariesAggregateFunction<LT>> {
 public:
     using CppType = RunTimeCppType<LT>;
     using ColumnType = RunTimeColumnType<LT>;
@@ -125,7 +125,6 @@ public:
         }
 
         this->data(state).update(column_value);
-
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
@@ -141,7 +140,7 @@ public:
             src = binary_column->get_slice(row_num);
         }
 
-        this->data(state).deserialize_and_merge((const uint8_t*) src.data);
+        this->data(state).deserialize_and_merge((const uint8_t*)src.data);
     }
 
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
@@ -221,9 +220,9 @@ public:
                 uint8_t* dst = bytes.data() + old_size;
                 memcpy(dst, &width, sizeof(WidthType)); // width
                 dst += sizeof(WidthType);
-                memcpy(dst, &value, sizeof(CppType));   // true_min
+                memcpy(dst, &value, sizeof(CppType)); // true_min
                 dst += sizeof(CppType);
-                memcpy(dst, &value, sizeof(CppType));   // true_max
+                memcpy(dst, &value, sizeof(CppType)); // true_max
                 dst += sizeof(CppType);
                 percentile.serialize(dst);
 
@@ -259,18 +258,15 @@ public:
     std::string get_name() const override { return "celonis_calc_bucket_width_boundaries"; }
 
 private:
-    void
-    generate_boundaries(FunctionContext* ctx, double min_value, double max_value, CppType true_min, CppType true_max,
-                        WidthType width,
-                        ArrayColumn* to, NullData* null_data) const {
+    void generate_boundaries(FunctionContext* ctx, double min_value, double max_value, CppType true_min,
+                             CppType true_max, WidthType width, ArrayColumn* to, NullData* null_data) const {
         double true_min_value = to_histogram_value<LT>(true_min);
         double true_max_value = to_histogram_value<LT>(true_max);
 
         WidthType count = static_cast<WidthType>(std::ceil((true_max_value - true_min_value + 1) / width));
         if (count > MAX_NUM_BUCKETS) {
-            ctx->set_error(
-                    std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
-                    false);
+            ctx->set_error(std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
+                           false);
             return;
         }
         // The output column is nullable, populate null_data.

@@ -142,41 +142,41 @@ static void do_bench(benchmark::State& state, PatternType pattern_type) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
         ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         for (int i = 0; i < num_rows; i++) {
             input_column->append_datum(gen_rand_str(1, max_str_length, false));
         }
-        auto patterns_column = ColumnHelper::create_column(
-                TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), false);
+        auto patterns_column =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), false);
         switch (pattern_type) {
-            case CONSTANT_WILDCARD: {
+        case CONSTANT_WILDCARD: {
+            DatumArray array = {};
+            for (int i = 0; i < num_patterns; ++i) {
+                array.push_back(gen_rand_str(pattern_length, pattern_length, true));
+            }
+            patterns_column->append_datum(array);
+            break;
+        }
+        case CONSTANT_NO_WILDCARD: {
+            DatumArray array = {};
+            for (int i = 0; i < num_patterns; ++i) {
+                array.push_back(gen_rand_str(pattern_length, pattern_length, false));
+            }
+            patterns_column->append_datum(array);
+            break;
+        }
+        case NON_CONSTANT: {
+            for (int i = 0; i < num_rows; i++) {
                 DatumArray array = {};
-                for (int i = 0; i < num_patterns; ++i) {
-                    array.push_back(gen_rand_str(pattern_length, pattern_length, true));
+                for (int j = 0; j < num_patterns; ++j) {
+                    array.push_back(gen_rand_str(pattern_length, pattern_length, uniform_int(rng) % 2));
                 }
                 patterns_column->append_datum(array);
-                break;
             }
-            case CONSTANT_NO_WILDCARD: {
-                DatumArray array = {};
-                for (int i = 0; i < num_patterns; ++i) {
-                    array.push_back(gen_rand_str(pattern_length, pattern_length, false));
-                }
-                patterns_column->append_datum(array);
-                break;
-            }
-            case NON_CONSTANT: {
-                for (int i = 0; i < num_rows; i++) {
-                    DatumArray array = {};
-                    for (int j = 0; j < num_patterns; ++j) {
-                        array.push_back(gen_rand_str(pattern_length, pattern_length, uniform_int(rng) % 2));
-                    }
-                    patterns_column->append_datum(array);
-                }
-            }
+        }
         }
         if (pattern_type == CONSTANT_NO_WILDCARD || pattern_type == CONSTANT_WILDCARD) {
             ctx->set_constant_columns({nullptr, patterns_column});
@@ -214,18 +214,9 @@ static void BM_InLikeNonConstant(benchmark::State& state) {
 }
 
 // Args: Number of rows / maximum input string length / pattern string length / number of patterns
-BENCHMARK(BM_InLikeConstantWildcard)->ArgsProduct({{1000, 10000, 100000},
-                                                   {20,   60},
-                                                   {5,    15},
-                                                   {1,    3}});
-BENCHMARK(BM_InLikeConstantNoWildcard)->ArgsProduct({{1000, 10000, 100000},
-                                                     {20,   60},
-                                                     {5,    15},
-                                                     {1,    3}});
-BENCHMARK(BM_InLikeNonConstant)->ArgsProduct({{1000, 10000, 100000},
-                                              {20,   60},
-                                              {5,    15},
-                                              {1,    3}});
+BENCHMARK(BM_InLikeConstantWildcard)->ArgsProduct({{1000, 10000, 100000}, {20, 60}, {5, 15}, {1, 3}});
+BENCHMARK(BM_InLikeConstantNoWildcard)->ArgsProduct({{1000, 10000, 100000}, {20, 60}, {5, 15}, {1, 3}});
+BENCHMARK(BM_InLikeNonConstant)->ArgsProduct({{1000, 10000, 100000}, {20, 60}, {5, 15}, {1, 3}});
 
 } // namespace starrocks
 

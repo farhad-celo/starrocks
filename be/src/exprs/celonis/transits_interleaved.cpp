@@ -1,9 +1,9 @@
 #include "exprs/celonis/transits_interleaved.h"
 
 #include "column/array_column.h"
+#include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "column/struct_column.h"
-#include "column/column_helper.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
 #include "util.h"
@@ -37,11 +37,10 @@ std::vector<Edge> keep_first_and_last(const std::vector<Edge>& edges) {
     return rv;
 }
 
-}
+} // namespace
 
-StatusOr<ColumnPtr>
-CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::FunctionContext* context,
-                                                 const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisTransitsInterleaved::transits_interleaved(
+        [[maybe_unused]] starrocks::FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK_EQ(7, columns.size());
     const size_t n_rows = columns[0]->size();
     auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
@@ -63,7 +62,6 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
     const auto& right_timestamps_offsets = right_timestamps_data.offsets->get_data().data();
     const auto* right_timestamp_null_elements = right_timestamps_data.null_elements;
 
-
     // Use sorting columns when both left_sortings and right_sortings are not NULL literal.
     const bool has_sorting_columns = (!columns[2]->has_null()) && (!columns[5]->has_null());
     ColumnPtr left_sortings_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[2]);
@@ -82,7 +80,8 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
             const auto end = left_timestamps_offsets[row + 1];
             if (left_sortings_offsets[row] != start || left_sortings_offsets[row + 1] != end) {
                 return Status::InvalidArgument(
-                        "If provided, the size of left_sortings_array and left_timestamps_array should not be different.");
+                        "If provided, the size of left_sortings_array and left_timestamps_array should not be "
+                        "different.");
             }
         }
         UnnestedArrayData right_sortings_array_data = prepare_array_input(right_sortings_column.get());
@@ -94,7 +93,8 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
             const auto end = right_timestamps_offsets[row + 1];
             if (right_sortings_offsets[row] != start || right_sortings_offsets[row + 1] != end) {
                 return Status::InvalidArgument(
-                        "If provided, the size of right_sortings_array and right_timestamps_array should not be different.");
+                        "If provided, the size of right_sortings_array and right_timestamps_array should not be "
+                        "different.");
             }
         }
     }
@@ -133,18 +133,22 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
     std::vector<UInt32Column::Ptr> left_key_offsets;
     std::vector<UInt32Column::Ptr> right_key_offsets;
     for (auto i = 0; i < left_key_fields.size(); ++i) {
-        left_key_elements.push_back(down_cast<const ArrayColumn*>(
-                ColumnHelper::get_data_column(left_key_fields[i].get()))->elements_column().get());
+        left_key_elements.push_back(
+                down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(left_key_fields[i].get()))
+                        ->elements_column()
+                        .get());
         left_key_offsets.push_back(
-                down_cast<const ArrayColumn*>(
-                        ColumnHelper::get_data_column(left_key_fields[i].get()))->offsets_column());
+                down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(left_key_fields[i].get()))
+                        ->offsets_column());
     }
     for (auto i = 0; i < right_key_fields.size(); ++i) {
-        right_key_elements.push_back(down_cast<const ArrayColumn*>(
-                ColumnHelper::get_data_column(right_key_fields[i].get()))->elements_column().get());
+        right_key_elements.push_back(
+                down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(right_key_fields[i].get()))
+                        ->elements_column()
+                        .get());
         right_key_offsets.push_back(
-                down_cast<const ArrayColumn*>(
-                        ColumnHelper::get_data_column(right_key_fields[i].get()))->offsets_column());
+                down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(right_key_fields[i].get()))
+                        ->offsets_column());
     }
     std::vector<uint32_t> left_indexes;
     std::vector<uint32_t> right_indexes;
@@ -268,13 +272,11 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
                 }
             }
             if (left_i < left_end && right_i < right_end) {
-                if ((!has_sorting_columns &&
-                     left_timestamps[left_i] <= right_timestamps[right_i]) ||
-                    (has_sorting_columns &&
-                     ((left_timestamps[left_i] < right_timestamps[right_i]) ||
-                      (left_timestamps[left_i] == right_timestamps[right_i] &&
-                       !(left_sorting_elements->get(left_i).convert2DatumKey() >
-                         right_sorting_elements->get(right_i).convert2DatumKey()))))) {
+                if ((!has_sorting_columns && left_timestamps[left_i] <= right_timestamps[right_i]) ||
+                    (has_sorting_columns && ((left_timestamps[left_i] < right_timestamps[right_i]) ||
+                                             (left_timestamps[left_i] == right_timestamps[right_i] &&
+                                              !(left_sorting_elements->get(left_i).convert2DatumKey() >
+                                                right_sorting_elements->get(right_i).convert2DatumKey()))))) {
                     node.from_left = true;
                     node.index = left_i++;
                 } else {
@@ -297,7 +299,7 @@ CelonisTransitsInterleaved::transits_interleaved([[maybe_unused]] starrocks::Fun
         if (first_last_only) {
             edges = keep_first_and_last(edges);
         }
-        for (const auto& edge: edges) {
+        for (const auto& edge : edges) {
             if (edge.start.from_left) {
                 left_indexes.push_back(edge.start.index);
                 right_indexes.push_back(edge.end.index);

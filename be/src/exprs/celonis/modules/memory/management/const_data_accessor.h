@@ -40,7 +40,9 @@ class const_data_accessor<
   /**
    * @deprecated use the const_data_accessor instance instead
    */
-  [[nodiscard]] legacy_embedded_ctl::shared_static_array<const value_type_t> shared() const noexcept { return ptr_data_; }
+  [[nodiscard]] legacy_embedded_ctl::shared_static_array<const value_type_t> shared() const noexcept {
+    return ptr_data_;
+  }
 
  private:
   legacy_embedded_ctl::shared_static_array<const value_type_t> ptr_data_;
@@ -103,7 +105,9 @@ class const_data_accessor<
 
   [[nodiscard]] const storage_type_t* buffer_get() const noexcept { return buffer_begin(); }
 
-  [[nodiscard]] legacy_embedded_ctl::shared_static_array<const value_type_t> data_shared() const noexcept { return ptr_data_; }
+  [[nodiscard]] legacy_embedded_ctl::shared_static_array<const value_type_t> data_shared() const noexcept {
+    return ptr_data_;
+  }
 
   [[nodiscard]] legacy_embedded_ctl::shared_static_array<const storage_type_t> buffer_shared() const noexcept {
     return pointer_buffer_data_;

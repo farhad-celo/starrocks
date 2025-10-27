@@ -11,15 +11,15 @@
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
 #include "exprs/arithmetic_operation.h"
-#include "exprs/celonis/base64.h"
-#include "exprs/celonis/agg/variant_stats.h"
 #include "exprs/celonis/agg/graph.h"
+#include "exprs/celonis/agg/variant_stats.h"
+#include "exprs/celonis/base64.h"
 #include "exprs/function_context.h"
-#include "runtime/runtime_state.h"
 #include "google/protobuf/util/json_util.h"
 #include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
 #include "runtime/mem_pool.h"
+#include "runtime/runtime_state.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
 
@@ -49,7 +49,7 @@ private:
     AggDataPtr _state;
 };
 
-}
+} // namespace
 
 struct GraphResult {
     std::vector<std::string> act_map; // idx -> activity_name
@@ -148,9 +148,7 @@ struct GraphResult {
         return true;
     }
 
-    bool equal_e_count(const GraphResult& other) {
-        return e_count == other.e_count;
-    }
+    bool equal_e_count(const GraphResult& other) { return e_count == other.e_count; }
 
     std::string debug_string() const {
         std::stringstream ss;
@@ -206,13 +204,18 @@ struct GraphResult {
             if (id < 0 || id >= a.Size()) {
                 return false;
             }
-            a_stats[id].count = obj["count"].IsString() ? std::stoll(obj["count"].GetString()) : obj["count"].GetInt64();
-            a_stats[id].count_case = obj["count_case"].IsString() ? std::stoll(obj["count_case"].GetString()) : obj["count_case"].GetInt64();
-            a_stats[id].count_start = obj["count_start"].IsString() ? std::stoll(obj["count_start"].GetString()) : obj["count_start"].GetInt64();
-            a_stats[id].count_end = obj["count_end"].IsString() ? std::stoll(obj["count_end"].GetString()) : obj["count_end"].GetInt64();
+            a_stats[id].count =
+                    obj["count"].IsString() ? std::stoll(obj["count"].GetString()) : obj["count"].GetInt64();
+            a_stats[id].count_case = obj["count_case"].IsString() ? std::stoll(obj["count_case"].GetString())
+                                                                  : obj["count_case"].GetInt64();
+            a_stats[id].count_start = obj["count_start"].IsString() ? std::stoll(obj["count_start"].GetString())
+                                                                    : obj["count_start"].GetInt64();
+            a_stats[id].count_end = obj["count_end"].IsString() ? std::stoll(obj["count_end"].GetString())
+                                                                : obj["count_end"].GetInt64();
             if (obj.HasMember("self_loop_count_case")) {
-                a_stats_self_loop[id] = obj["self_loop_count_case"].IsString() ?
-                    std::stoll(obj["self_loop_count_case"].GetString()) : obj["self_loop_count_case"].GetInt64();
+                a_stats_self_loop[id] = obj["self_loop_count_case"].IsString()
+                                                ? std::stoll(obj["self_loop_count_case"].GetString())
+                                                : obj["self_loop_count_case"].GetInt64();
             }
         }
         return true;
@@ -227,7 +230,8 @@ struct GraphResult {
             EdgeStats es;
             const auto& obj = a[i];
             es.count = obj["count"].IsString() ? std::stoll(obj["count"].GetString()) : obj["count"].GetInt64();
-            es.count_case = obj["count_case"].IsString() ? std::stoll(obj["count_case"].GetString()) : obj["count_case"].GetInt64();
+            es.count_case = obj["count_case"].IsString() ? std::stoll(obj["count_case"].GetString())
+                                                         : obj["count_case"].GetInt64();
             int src = obj["src"].IsString() ? std::stoll(obj["src"].GetString()) : obj["src"].GetInt64();
             int dst = obj["dst"].IsString() ? std::stoll(obj["dst"].GetString()) : obj["dst"].GetInt64();
             Edge e(src, dst);
@@ -239,7 +243,8 @@ struct GraphResult {
 
     bool e_count_from_json(const rapidjson::Document& document) {
         if (document.HasMember("e_count")) {
-            e_count = document["e_count"].IsString() ? std::stoll(document["e_count"].GetString()) : document["e_count"].GetInt64();
+            e_count = document["e_count"].IsString() ? std::stoll(document["e_count"].GetString())
+                                                     : document["e_count"].GetInt64();
         }
         return true;
     }
@@ -248,6 +253,7 @@ struct GraphResult {
 class CelonisGraphVariantStatsValidationTest : public testing::Test {
 public:
     CelonisGraphVariantStatsValidationTest() = default;
+
 protected:
     void SetUp() override {
         runtime_state_vs = new RuntimeState();
@@ -309,7 +315,7 @@ protected:
         std::uniform_int_distribution<size_t> length_g(0, 2 * avg_length);
         std::uniform_int_distribution<size_t> g(0, alphabet.size() - 1);
 
-        std::vector<std::vector<std::string> > seed_data;
+        std::vector<std::vector<std::string>> seed_data;
         for (int i = 0; i < seed_rows; i++) {
             std::vector<std::string> v;
             int len = length_g(gen);
@@ -363,8 +369,8 @@ protected:
     }
 
     static std::string compute_result(const std::vector<std::pair<ArrayColumn::Ptr, Column::Ptr>>& data,
-        std::optional<int> edge_count, const AggregateFunction* func, FunctionContext* ctx){
-
+                                      std::optional<int> edge_count, const AggregateFunction* func,
+                                      FunctionContext* ctx) {
         std::vector<ColumnPtr> serde_columns;
         for (const auto& vw_pair : data) {
             auto variant_column = vw_pair.first;
@@ -374,7 +380,8 @@ protected:
             raw_columns[0] = variant_column.get();
             raw_columns[1] = weight_column.get();
             if (edge_count.has_value()) {
-                auto edge_count_column = ColumnHelper::create_const_column<TYPE_BIGINT>(edge_count.value(), variant_column->size());
+                auto edge_count_column =
+                        ColumnHelper::create_const_column<TYPE_BIGINT>(edge_count.value(), variant_column->size());
                 raw_columns.resize(3);
                 raw_columns[2] = edge_count_column.get();
                 ctx->set_constant_columns({nullptr, nullptr, edge_count_column});
@@ -403,6 +410,7 @@ protected:
 
         return rs;
     }
+
 private:
     FunctionUtils* utils_vs{};
     FunctionUtils* utils_graph{};
@@ -414,19 +422,12 @@ private:
 
 TEST_F(CelonisGraphVariantStatsValidationTest, test_basic) {
     auto data = {
-        std::make_pair(build_variant_column({
-            {"a1", "a2"},
-            {"a10, a1", "a2", "a3"},
-            {"a3", "a4"},
-            {"a5", "a6", "a7, a1, a2"}}),
-            build_weight_column({10, 1, 1, 10})),
-        std::make_pair(build_variant_column({
-            {"a3", "a4", "a11"},
-            {"a9", "a6", "a7", "a8"}}),
-            build_weight_column({1, 15})),
-        std::make_pair(build_variant_column({
-            {"a9", "a10", "a3"}}),
-            build_weight_column({1})),
+            std::make_pair(build_variant_column(
+                                   {{"a1", "a2"}, {"a10, a1", "a2", "a3"}, {"a3", "a4"}, {"a5", "a6", "a7, a1, a2"}}),
+                           build_weight_column({10, 1, 1, 10})),
+            std::make_pair(build_variant_column({{"a3", "a4", "a11"}, {"a9", "a6", "a7", "a8"}}),
+                           build_weight_column({1, 15})),
+            std::make_pair(build_variant_column({{"a9", "a10", "a3"}}), build_weight_column({1})),
     };
     const AggregateFunction* func_vs = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
     std::string rs_vs = compute_result(data, std::nullopt, func_vs, ctx_vs);
@@ -436,13 +437,11 @@ TEST_F(CelonisGraphVariantStatsValidationTest, test_basic) {
 }
 
 TEST_F(CelonisGraphVariantStatsValidationTest, test_random_small) {
-    auto data = {
-        std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2)),
-        std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2)),
-        std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2)),
-        std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2)),
-        std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2))
-    };
+    auto data = {std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2)),
+                 std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2)),
+                 std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2)),
+                 std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2)),
+                 std::make_pair(build_random_variant_column(2, 2, 2), build_random_weight_column(2, 2))};
     const AggregateFunction* func_vs = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
     std::string rs_vs = compute_result(data, std::nullopt, func_vs, ctx_vs);
     const AggregateFunction* func_graph = get_aggregate_function("celonis_graph", TYPE_ARRAY, TYPE_VARCHAR, false);
@@ -452,11 +451,11 @@ TEST_F(CelonisGraphVariantStatsValidationTest, test_random_small) {
 
 TEST_F(CelonisGraphVariantStatsValidationTest, test_random_large) {
     auto data = {
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
     };
     const AggregateFunction* func_vs = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
     std::string rs_vs = compute_result(data, std::nullopt, func_vs, ctx_vs);
@@ -467,11 +466,11 @@ TEST_F(CelonisGraphVariantStatsValidationTest, test_random_large) {
 
 TEST_F(CelonisGraphVariantStatsValidationTest, test_edge_count) {
     auto data = {
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
-        std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
+            std::make_pair(build_random_variant_column(100, 10000, 10), build_random_weight_column(10000, 100)),
     };
     const AggregateFunction* func_vs = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
     std::string rs_vs = compute_result(data, std::make_optional(5), func_vs, ctx_vs);
@@ -480,4 +479,4 @@ TEST_F(CelonisGraphVariantStatsValidationTest, test_edge_count) {
     match(rs_vs, rs_gragh);
 }
 
-}
+} // namespace starrocks

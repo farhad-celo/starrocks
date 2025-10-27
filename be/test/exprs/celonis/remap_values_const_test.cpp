@@ -1,13 +1,12 @@
-#include "exprs/celonis/remap_values.h"
+#include <gtest/gtest.h>
 
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
+#include "exprs/celonis/remap_values.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -18,13 +17,11 @@ protected:
     void TearDown() override {}
 
 private:
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(LT),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(LT)};
+                TypeDescriptor::from_logical_type(LT), TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY), TypeDescriptor::from_logical_type(LT)};
         auto return_type = TypeDescriptor::from_logical_type(LT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -38,29 +35,26 @@ private:
         new_array_column_ = ColumnHelper::create_column(celonis::array_type(LT), false);
     }
 
-    void
-    AddRow(const Datum& value, const DatumArray& old_array, const DatumArray& new_array, const Datum& default_value) {
+    void AddRow(const Datum& value, const DatumArray& old_array, const DatumArray& new_array,
+                const Datum& default_value) {
         value_column_->append_datum(value);
         old_array_column_->append_datum(old_array);
         new_array_column_->append_datum(new_array);
         default_column_->append_datum(default_value);
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     StatusOr<ColumnPtr> Run(bool has_default) {
-        DeferOp close_fragment_local([this] {
-            CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [this] { CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisRemapValues<LT>::prepare_const(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local(
+                [this] { CelonisRemapValues<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisRemapValues<LT>::prepare_const(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
         if (has_default) {
-            result = CelonisRemapValues<LT>::remap_values_const(ctx_.get(),
-                                                                {value_column_, old_array_column_, new_array_column_,
-                                                                 default_column_});
+            result = CelonisRemapValues<LT>::remap_values_const(
+                    ctx_.get(), {value_column_, old_array_column_, new_array_column_, default_column_});
         } else {
             result = CelonisRemapValues<LT>::remap_values_const(ctx_.get(),
                                                                 {value_column_, old_array_column_, new_array_column_});
@@ -68,9 +62,9 @@ private:
         return result;
     }
 
-    template<LogicalType LT>
-    StatusOr<ColumnPtr>
-    RunConstantValueMap(const DatumArray& old_array, const DatumArray& new_array, bool has_default) {
+    template <LogicalType LT>
+    StatusOr<ColumnPtr> RunConstantValueMap(const DatumArray& old_array, const DatumArray& new_array,
+                                            bool has_default) {
         old_array_column_->append_datum(old_array);
         new_array_column_->append_datum(new_array);
         const auto nrows = value_column_->size();
@@ -99,8 +93,7 @@ TEST_F(CelonisRemapValuesConstTest, const_inconsist_value_map) {
 
     const auto result = RunConstantValueMap<LT>(old_array, new_array, true);
     EXPECT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ("[prepare] old value array must have the same length as new value array.",
-              result.status().message());
+    EXPECT_EQ("[prepare] old value array must have the same length as new value array.", result.status().message());
 }
 
 TEST_F(CelonisRemapValuesConstTest, non_const_inconsist_value_map) {
@@ -111,8 +104,7 @@ TEST_F(CelonisRemapValuesConstTest, non_const_inconsist_value_map) {
 
     const auto result = Run<LT>(true);
     EXPECT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ("old value array must have the same length as new value array.",
-              result.status().message());
+    EXPECT_EQ("old value array must have the same length as new value array.", result.status().message());
 }
 
 TEST_F(CelonisRemapValuesConstTest, empty_value_column) {
@@ -288,7 +280,6 @@ TEST_F(CelonisRemapValuesConstTest, string_without_default) {
     EXPECT_EQ("string3", result->get(2).get_slice());
     EXPECT_EQ("string4", result->get(3).get_slice());
     EXPECT_TRUE(result->get(4).is_null());
-
 }
 
 TEST_F(CelonisRemapValuesConstTest, string_empty_value_map_without_default) {
@@ -550,10 +541,10 @@ TEST_F(CelonisRemapValuesConstTest, const_datetime) {
     default_column_->append_datum(kNullDatum);
     default_column_->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0));
 
-    auto old_array = DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0),
-                                TimestampValue::create(1970, 1, 2, 0, 0, 0)};
-    auto new_array = DatumArray{TimestampValue::create(1970, 1, 10, 0, 0, 0),
-                                TimestampValue::create(1970, 1, 20, 0, 0, 0)};
+    auto old_array =
+            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 2, 0, 0, 0)};
+    auto new_array =
+            DatumArray{TimestampValue::create(1970, 1, 10, 0, 0, 0), TimestampValue::create(1970, 1, 20, 0, 0, 0)};
 
     const auto result = RunConstantValueMap<LT>(old_array, new_array, true).value();
     ASSERT_EQ(5, result->size());

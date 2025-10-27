@@ -5,8 +5,8 @@
 
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
-#include "exprs/time_functions.h"
 #include "exprs/function_context.h"
+#include "exprs/time_functions.h"
 #include "runtime/types.h"
 #include "testutil/assert.h"
 

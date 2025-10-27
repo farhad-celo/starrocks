@@ -67,12 +67,12 @@ std::string gen_random_str(int min_length, int max_length, int invalid_percentag
 
     // These are invalid UTF-8 sequences
     static std::vector<char> invalid_utf8 = {
-            static_cast<char>(0xC0),  // Invalid start byte
-            static_cast<char>(0xA0),  // Invalid continuation byte
-            static_cast<char>(0xFF),  // Invalid in UTF-8
-            static_cast<char>(0xFE),  // Invalid in UTF-8
-            static_cast<char>(0xC0),  // Overlong encoding start
-            static_cast<char>(0x80)   // Continuation byte without start
+            static_cast<char>(0xC0), // Invalid start byte
+            static_cast<char>(0xA0), // Invalid continuation byte
+            static_cast<char>(0xFF), // Invalid in UTF-8
+            static_cast<char>(0xFE), // Invalid in UTF-8
+            static_cast<char>(0xC0), // Overlong encoding start
+            static_cast<char>(0x80)  // Continuation byte without start
     };
 
     static std::random_device rd;
@@ -108,7 +108,7 @@ static void do_bench(benchmark::State& state) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
         ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);

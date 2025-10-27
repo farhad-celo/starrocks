@@ -1,14 +1,16 @@
+#include "exprs/celonis/util.h"
+
+#include <cmath>
+
 #include "column/array_column.h"
 #include "column/column_helper.h"
-#include "exprs/celonis/util.h"
 #include "exprs/celonis/agg/util.h"
 #include "exprs/celonis/base64.h"
-#include <cmath>
 
 namespace starrocks {
 
-std::optional<std::string>
-to_base64_encoded_string(const google::protobuf::Message& message, size_t size_limit, bool compress) {
+std::optional<std::string> to_base64_encoded_string(const google::protobuf::Message& message, size_t size_limit,
+                                                    bool compress) {
     if (message.ByteSizeLong() > size_limit) {
         return std::nullopt;
     }
@@ -17,10 +19,10 @@ to_base64_encoded_string(const google::protobuf::Message& message, size_t size_l
     if (compress && !binary_string.empty()) {
         binary_string = std::move(compress_string(binary_string, true));
     }
-    int cipher_len = (size_t) (4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
+    int cipher_len = (size_t)(4.0 * ceil((double)binary_string.length() / 3.0)) + 1;
     std::string p(cipher_len, '\0');
 
-    int len = base64_encode3((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*) p.data());
+    int len = base64_encode3((unsigned char*)binary_string.data(), binary_string.length(), (unsigned char*)p.data());
     std::string encoded_string(p.data(), len);
     return encoded_string;
 }
@@ -44,4 +46,3 @@ void serialize_to_column(const std::unique_ptr<Column>& src, ColumnPtr& dst) {
 }
 
 } // namespace starrocks
-

@@ -13,29 +13,29 @@ namespace starrocks {
 namespace {
 
 // To use SliceHashSet for TYPE_VARCHAR. Copied from ../in_const_predicate.hpp.
-template<LogicalType LT, typename Enable = void>
+template <LogicalType LT, typename Enable = void>
 struct LHashSet {
     using LType = HashSet<RunTimeCppType<LT>>;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct LHashSet<LT, std::enable_if_t<isSliceLT<LT>>> {
     using LType = SliceHashSet;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 using LHashSetType = typename LHashSet<LT>::LType;
 
 } // namespace
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct InStateFragmentLocal {
     LHashSetType<LT> match_set;
     bool match_has_null = false;
     ScalarFunction function;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisIn<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
@@ -62,7 +62,7 @@ Status CelonisIn<LT>::prepare(FunctionContext* context, FunctionContext::Functio
     }
 
     auto match_array = match_column->get(0).get_array();
-    for (const auto& element: match_array) {
+    for (const auto& element : match_array) {
         if (element.is_null()) {
             state->match_has_null = true;
         } else {
@@ -73,7 +73,7 @@ Status CelonisIn<LT>::prepare(FunctionContext* context, FunctionContext::Functio
     return Status::OK();
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisIn<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         const auto* state = reinterpret_cast<const InStateFragmentLocal<LT>*>(
@@ -83,8 +83,8 @@ Status CelonisIn<LT>::close(FunctionContext* context, FunctionContext::FunctionS
     return Status::OK();
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr> CelonisIn<LT>::in_non_constant_match([[maybe_unused]]FunctionContext* context,
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisIn<LT>::in_non_constant_match([[maybe_unused]] FunctionContext* context,
                                                          const Columns& columns) {
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const auto& value_column = columns[0];
@@ -101,7 +101,7 @@ StatusOr<ColumnPtr> CelonisIn<LT>::in_non_constant_match([[maybe_unused]]Functio
         }
         bool match = false;
         if (value_viewer.is_null(row)) {
-            for (const auto& element: match_datum.get_array()) {
+            for (const auto& element : match_datum.get_array()) {
                 if (element.is_null()) {
                     match = true;
                     break;
@@ -109,7 +109,7 @@ StatusOr<ColumnPtr> CelonisIn<LT>::in_non_constant_match([[maybe_unused]]Functio
             }
         } else {
             const auto& value = value_viewer.value(row);
-            for (const auto& element: match_datum.get_array()) {
+            for (const auto& element : match_datum.get_array()) {
                 if (!element.is_null() && element.is_equal(value)) {
                     match = true;
                     break;
@@ -121,8 +121,9 @@ StatusOr<ColumnPtr> CelonisIn<LT>::in_non_constant_match([[maybe_unused]]Functio
     return result.build(all_const);
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr> CelonisIn<LT>::in_constant_match([[maybe_unused]]FunctionContext* context, const Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisIn<LT>::in_constant_match([[maybe_unused]] FunctionContext* context,
+                                                     const Columns& columns) {
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer<LT> value_viewer(columns[0]);
     ColumnBuilder<TYPE_BOOLEAN> result(num_rows);
@@ -139,26 +140,21 @@ StatusOr<ColumnPtr> CelonisIn<LT>::in_constant_match([[maybe_unused]]FunctionCon
     return result.build(all_const);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisIn<LT>::in(FunctionContext* context, const Columns& columns) {
     const auto* state = reinterpret_cast<const InStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
 
-template
-class CelonisIn<TYPE_INT>;
+template class CelonisIn<TYPE_INT>;
 
-template
-class CelonisIn<TYPE_BIGINT>;
+template class CelonisIn<TYPE_BIGINT>;
 
-template
-class CelonisIn<TYPE_DOUBLE>;
+template class CelonisIn<TYPE_DOUBLE>;
 
-template
-class CelonisIn<TYPE_DATETIME>;
+template class CelonisIn<TYPE_DATETIME>;
 
-template
-class CelonisIn<TYPE_VARCHAR>;
+template class CelonisIn<TYPE_VARCHAR>;
 
 } // namespace starrocks

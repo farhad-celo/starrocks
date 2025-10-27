@@ -1,13 +1,12 @@
-#include "exprs/celonis/time_functions.h"
+#include <gtest/gtest.h>
 
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
+#include "exprs/celonis/time_functions.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -18,15 +17,13 @@ protected:
     void TearDown() override {}
 
     TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
+
 private:
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_DATETIME),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+                TypeDescriptor::from_logical_type(TYPE_DATETIME), TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY),    TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY),    TypeDescriptor::from_logical_type(TYPE_ARRAY)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_BIGINT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -38,9 +35,8 @@ private:
         days_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_ARRAY_BIGINT), true);
     }
 
-    void
-    AddRow(const Datum& timestamp, const DatumArray& years_array, const DatumArray& quarters_array,
-           const DatumArray& months_array, const DatumArray& weeks_array, const DatumArray& days_array) {
+    void AddRow(const Datum& timestamp, const DatumArray& years_array, const DatumArray& quarters_array,
+                const DatumArray& months_array, const DatumArray& weeks_array, const DatumArray& days_array) {
         timestamp_column_->append_datum(timestamp);
         years_column_->append_datum(years_array);
         quarters_column_->append_datum(quarters_array);
@@ -50,24 +46,21 @@ private:
     }
 
     StatusOr<ColumnPtr> Run() {
-        DeferOp close_fragment_local([this] {
-            CelonisTimeFunctions::date_match_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [this] { CelonisTimeFunctions::date_match_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisTimeFunctions::date_match_prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisTimeFunctions::date_match_close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local(
+                [this] { CelonisTimeFunctions::date_match_close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisTimeFunctions::date_match_prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
-        result = CelonisTimeFunctions::date_match(ctx_.get(),
-                                                  {timestamp_column_, years_column_, quarters_column_, months_column_,
-                                                   weeks_column_, days_column_});
+        result = CelonisTimeFunctions::date_match(ctx_.get(), {timestamp_column_, years_column_, quarters_column_,
+                                                               months_column_, weeks_column_, days_column_});
         return result;
     }
 
-    StatusOr<ColumnPtr>
-    RunConstantConfig(const DatumArray& years_array, const DatumArray& quarters_array,
-                      const DatumArray& months_array, const DatumArray& weeks_array, const DatumArray& days_array) {
+    StatusOr<ColumnPtr> RunConstantConfig(const DatumArray& years_array, const DatumArray& quarters_array,
+                                          const DatumArray& months_array, const DatumArray& weeks_array,
+                                          const DatumArray& days_array) {
         years_column_->append_datum(years_array);
         quarters_column_->append_datum(quarters_array);
         months_column_->append_datum(months_array);
@@ -119,7 +112,8 @@ TEST_F(CelonisDateMatchTest, const_config) {
     timestamp_column_->append_datum(TimestampValue::create(2008, 3, 16, 0, 0, 0));
     timestamp_column_->append_datum(TimestampValue::create(2009, 6, 22, 0, 0, 0));
     const auto result = RunConstantConfig(DatumArray{2008L}, DatumArray{1L, 2L}, DatumArray{1L, 2L, 3L, 5L},
-                                          DatumArray{1L, 6L, 11L, 21L}, DatumArray{1L, 8L, 15L, 22L}).value();
+                                          DatumArray{1L, 6L, 11L, 21L}, DatumArray{1L, 8L, 15L, 22L})
+                                .value();
     ASSERT_EQ(timestamp_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());

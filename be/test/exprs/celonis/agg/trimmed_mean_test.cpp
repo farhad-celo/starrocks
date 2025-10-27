@@ -20,14 +20,12 @@ public:
     }
     void TearDown() override { delete utils; }
 
-    std::unique_ptr<FunctionContext> create_function_context(
-            std::vector<FunctionContext::TypeDesc> arg_types,
-            FunctionContext::TypeDesc return_type) {
+    std::unique_ptr<FunctionContext> create_function_context(std::vector<FunctionContext::TypeDesc> arg_types,
+                                                             FunctionContext::TypeDesc return_type) {
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
-        return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(),
-                                                return_type, std::move(arg_types)));
+        return std::unique_ptr<FunctionContext>(FunctionContext::create_context(
+                runtime_states_.back().get(), mem_pools_.back().get(), return_type, std::move(arg_types)));
     }
 
 private:
@@ -57,10 +55,9 @@ private:
 };
 
 TEST_F(CelonisTrimmedMeanTest, pql_example_1_bigint) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_BIGINT),
-            TypeDescriptor::from_logical_type(TYPE_INT),
-            TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
@@ -122,14 +119,13 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_1_bigint) {
     func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
     ASSERT_FALSE(local_ctx->has_error());
 
-    ASSERT_EQ(2.5, result_column->get_data()[0]);  // (-102, -101, -100), 1, 2, 3, 4, (100, 101, 102)
+    ASSERT_EQ(2.5, result_column->get_data()[0]); // (-102, -101, -100), 1, 2, 3, 4, (100, 101, 102)
 }
 
 TEST_F(CelonisTrimmedMeanTest, pql_example_2_bigint) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_BIGINT),
-            TypeDescriptor::from_logical_type(TYPE_INT),
-            TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
@@ -186,14 +182,13 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_2_bigint) {
     func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
     ASSERT_FALSE(local_ctx->has_error());
 
-    ASSERT_EQ(5.0, result_column->get_data()[0]);  // (3, 4), 5, (10, 22)
+    ASSERT_EQ(5.0, result_column->get_data()[0]); // (3, 4), 5, (10, 22)
 }
 
 TEST_F(CelonisTrimmedMeanTest, type_double) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_DOUBLE),
-            TypeDescriptor::from_logical_type(TYPE_INT),
-            TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_DOUBLE),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
@@ -256,14 +251,13 @@ TEST_F(CelonisTrimmedMeanTest, type_double) {
     func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
     ASSERT_FALSE(local_ctx->has_error());
 
-    ASSERT_EQ(5.5, result_column->get_data()[0]);  // (1, 2), 3, 4, 5, 6, 7, 8, (9, 10, 11)
+    ASSERT_EQ(5.5, result_column->get_data()[0]); // (1, 2), 3, 4, 5, 6, 7, 8, (9, 10, 11)
 }
 
 TEST_F(CelonisTrimmedMeanTest, type_double_large_input) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_DOUBLE),
-            TypeDescriptor::from_logical_type(TYPE_INT),
-            TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_DOUBLE),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
@@ -306,7 +300,6 @@ TEST_F(CelonisTrimmedMeanTest, type_double_large_input) {
         odd_data_column->append(static_cast<double>(i));
     }
 
-
     std::vector<const Column*> raw_columns2;
     raw_columns2.resize(3);
     raw_columns2[0] = odd_data_column.get();
@@ -327,10 +320,9 @@ TEST_F(CelonisTrimmedMeanTest, type_double_large_input) {
 }
 
 TEST_F(CelonisTrimmedMeanTest, null_handling) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_BIGINT),
-            TypeDescriptor::from_logical_type(TYPE_INT),
-            TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
@@ -387,14 +379,13 @@ TEST_F(CelonisTrimmedMeanTest, null_handling) {
     func->merge(local_ctx.get(), serde_column.get(), state2->state(), 0);
     func->finalize_to_column(local_ctx.get(), state2->state(), result_column.get());
 
-    ASSERT_EQ(2.5, result_column->get(0).get_double());  // 1, 2, 3, 4
+    ASSERT_EQ(2.5, result_column->get(0).get_double()); // 1, 2, 3, 4
 }
 
 TEST_F(CelonisTrimmedMeanTest, invalid_lower_and_upper) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_BIGINT),
-            TypeDescriptor::from_logical_type(TYPE_INT),
-            TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT),
+                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
@@ -456,4 +447,3 @@ TEST_F(CelonisTrimmedMeanTest, invalid_lower_and_upper) {
 }
 
 } // namespace starrocks
-

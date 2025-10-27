@@ -5,11 +5,11 @@
 
 #include "column/column_helper.h"
 #include "column/datum_tuple.h"
-#include "exprs/table_function/table_function.h"
 #include "exprs/celonis/table_function/count_edges.h"
+#include "exprs/table_function/table_function.h"
 #include "runtime/types.h"
-#include "types/logical_type.h"
 #include "testutil/assert.h"
+#include "types/logical_type.h"
 
 namespace starrocks {
 
@@ -72,7 +72,7 @@ static void do_bench(benchmark::State& state) {
         int array_len = 1 + uniform_int(rng) % max_length;
         DatumArray result;
         for (int i = 0; i < array_len; ++i) {
-            result.emplace_back((Slice) activities[uniform_int(rng) % activities.size()]);
+            result.emplace_back((Slice)activities[uniform_int(rng) % activities.size()]);
         }
         return result;
     };
@@ -105,6 +105,6 @@ static void BM_CountEdges(benchmark::State& state) {
 
 BENCHMARK(BM_CountEdges)->ArgsProduct({{1000, 10000, 100000}, {8, 16, 32, 64, 128}});
 
-}  // namespace starrocks
+} // namespace starrocks
 
 BENCHMARK_MAIN();

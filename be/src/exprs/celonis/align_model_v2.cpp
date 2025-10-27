@@ -54,26 +54,31 @@ void AddNulls(Columns& fields) {
 }
 
 enum class move_type {
-   EXCLUSIVE_VIOLATION,
-LOG_EDGE, MISSING_VIOLATION, MODEL_EDGE, SKIP_EDGE, SYNC_EDGE, UNMAPPED_EDGE
+    EXCLUSIVE_VIOLATION,
+    LOG_EDGE,
+    MISSING_VIOLATION,
+    MODEL_EDGE,
+    SKIP_EDGE,
+    SYNC_EDGE,
+    UNMAPPED_EDGE
 };
 std::string get_move_type(const move_type t) {
-   switch (t) {
-       case move_type::EXCLUSIVE_VIOLATION:
-       return "EXCLUSIVE_VIOLATION";
-       case move_type::LOG_EDGE:
-       return "LOG_EDGE";
-       case move_type::MISSING_VIOLATION:
-       return "MISSING_VIOLATION";
-       case move_type::MODEL_EDGE:
-       return "MODEL_EDGE";
-       case move_type::SKIP_EDGE:
-       return "SKIP_EDGE";
-       case move_type::SYNC_EDGE:
-       return "SYNC_EDGE";
-       case move_type::UNMAPPED_EDGE:
-       return "UNMAPPED_EDGE";
-   }
+    switch (t) {
+    case move_type::EXCLUSIVE_VIOLATION:
+        return "EXCLUSIVE_VIOLATION";
+    case move_type::LOG_EDGE:
+        return "LOG_EDGE";
+    case move_type::MISSING_VIOLATION:
+        return "MISSING_VIOLATION";
+    case move_type::MODEL_EDGE:
+        return "MODEL_EDGE";
+    case move_type::SKIP_EDGE:
+        return "SKIP_EDGE";
+    case move_type::SYNC_EDGE:
+        return "SYNC_EDGE";
+    case move_type::UNMAPPED_EDGE:
+        return "UNMAPPED_EDGE";
+    }
     // std::unreachable();
     return "";
 }
@@ -90,13 +95,11 @@ alignment_move_columns get_alignment_move_columns(const ResultTable& result_tabl
     const auto move_type_string{get_move_type(type)};
 
     return {result_table.column<std::vector<row_id>>(move_type_string + "_alignment_index"),
-result_table.column<std::vector<std::string>>(move_type_string + "_deviation_category"),
-    result_table.column<std::vector<row_id>>(move_type_string + "_edge_class"),
-    result_table.column<std::vector<std::optional<size_t>>>(move_type_string + "_model_vertex_id"),
-    result_table.column<std::vector<std::string>>(move_type_string + "_move_type"),
-    result_table.column<std::vector<std::string>>(move_type_string + "_vertex_label")
-    };
-
+            result_table.column<std::vector<std::string>>(move_type_string + "_deviation_category"),
+            result_table.column<std::vector<row_id>>(move_type_string + "_edge_class"),
+            result_table.column<std::vector<std::optional<size_t>>>(move_type_string + "_model_vertex_id"),
+            result_table.column<std::vector<std::string>>(move_type_string + "_move_type"),
+            result_table.column<std::vector<std::string>>(move_type_string + "_vertex_label")};
 }
 
 } // namespace
@@ -209,14 +212,15 @@ StatusOr<ColumnPtr> CelonisAlignModelV2::align_model_v2(FunctionContext* context
     const auto sync_edge_columns{get_alignment_move_columns(result_table, move_type::SYNC_EDGE)};
     const auto unmapped_edge_columns{get_alignment_move_columns(result_table, move_type::UNMAPPED_EDGE)};
 
-    const auto  checked_add_array_to_field{[&fields](int& fields_index, const alignment_move_columns& columns, int index) {
-        AddArray(fields[fields_index++], columns.alignment_index[index]);
-        AddArray(fields[fields_index++], columns.deviation_category[index]);
-        AddArray(fields[fields_index++], columns.edge_class[index]);
-        AddArray(fields[fields_index++], columns.model_vertex_id[index]);
-        AddArray(fields[fields_index++], columns.move_type[index]);
-        AddArray(fields[fields_index++], columns.vertex_label[index]);
-    }};
+    const auto checked_add_array_to_field{
+            [&fields](int& fields_index, const alignment_move_columns& columns, int index) {
+                AddArray(fields[fields_index++], columns.alignment_index[index]);
+                AddArray(fields[fields_index++], columns.deviation_category[index]);
+                AddArray(fields[fields_index++], columns.edge_class[index]);
+                AddArray(fields[fields_index++], columns.model_vertex_id[index]);
+                AddArray(fields[fields_index++], columns.move_type[index]);
+                AddArray(fields[fields_index++], columns.vertex_label[index]);
+            }};
     for (auto index : row_to_case_index) {
         if (index < 0) {
             AddNulls(fields);

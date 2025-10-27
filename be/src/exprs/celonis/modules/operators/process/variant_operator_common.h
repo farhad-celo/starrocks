@@ -123,7 +123,8 @@ void merge_collected_traces_build_maps(
         auto& thread_local_to_global_map = thread_slot_local_to_slot_local_maps[slot][thread_id];
         // Initiate map for thread/slot temporary variant_id to slot temporary variant ids
         thread_local_to_global_map.resize(my_thread_local_it->next_id[slot]);
-        legacy_embedded_debug_assert(thread_local_to_global_map.size() == static_cast<size_t>(my_thread_local_it->next_id[slot]));
+        legacy_embedded_debug_assert(thread_local_to_global_map.size() ==
+                                     static_cast<size_t>(my_thread_local_it->next_id[slot]));
         // Do the merge
         for (const auto& [variant, local_id] : thread_local_hashmap) {
           const auto [variant_base_map_iter, not_in_base_map]{base_hashmap.emplace(variant, base_nextid)};
@@ -148,8 +149,10 @@ struct sort_mappers_result {
   const legacy_embedded_ctl::dynamic_bitset<> tainted;
   const legacy_embedded_ctl::static_array<int64_t> string_sizes;
 
-  sort_mappers_result(legacy_embedded_ctl::static_array<row_id> end_map, legacy_embedded_ctl::static_array<row_id> no_end_map,
-                      legacy_embedded_ctl::dynamic_bitset<> tainted, legacy_embedded_ctl::static_array<int64_t> string_sizes)
+  sort_mappers_result(legacy_embedded_ctl::static_array<row_id> end_map,
+                      legacy_embedded_ctl::static_array<row_id> no_end_map,
+                      legacy_embedded_ctl::dynamic_bitset<> tainted,
+                      legacy_embedded_ctl::static_array<int64_t> string_sizes)
       : end_map(std::move(end_map)),
         no_end_map(std::move(no_end_map)),
         tainted(std::move(tainted)),

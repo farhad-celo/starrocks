@@ -3,9 +3,9 @@
 #include <vector>
 
 #include "column/array_column.h"
-#include "exprs/celonis/util.h"
 #include "column/column_builder.h"
 #include "column/column_viewer.h"
+#include "exprs/celonis/util.h"
 #include "gutil/strings/strcat.h"
 #include "util/faststring.h"
 
@@ -32,8 +32,8 @@ public:
         UnnestedArrayData timestamp_array_data = prepare_array_input(timestamp_column.get());
         DCHECK(timestamp_array_data.elements->is_timestamp());
         const auto& timestamp_offsets = timestamp_array_data.offsets->get_data().data();
-        const auto& timestamp_elements = down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(
-                *timestamp_array_data.elements).get_data().data();
+        const auto& timestamp_elements =
+                down_cast<const RunTimeColumnType<TYPE_DATETIME>&>(*timestamp_array_data.elements).get_data().data();
         const auto& timestamp_null_elements = timestamp_array_data.null_elements;
 
         size_t next_idx = 4;
@@ -48,7 +48,8 @@ public:
                 secondary_order_array_data = prepare_array_input(secondary_order_column.get());
                 if (timestamp_array_data.offsets->get_data() != secondary_order_array_data.offsets->get_data()) {
                     return Status::InvalidArgument(
-                            "If provided, the size of secondary_order_array and timestamp_array should not be different.");
+                            "If provided, the size of secondary_order_array and timestamp_array should not be "
+                            "different.");
                 }
                 sorting_keys = secondary_order_array_data.elements;
                 null_sorting_keys = secondary_order_array_data.null_elements;
@@ -60,7 +61,7 @@ public:
         const auto get_boolean_data = [](const ColumnPtr& col) -> const uint8_t* {
             const Column* data_column = ColumnHelper::get_data_column(col.get());
             if (const auto* bool_column = dynamic_cast<const RunTimeColumnType<TYPE_BOOLEAN>*>(data_column);
-                    bool_column != nullptr) {
+                bool_column != nullptr) {
                 return bool_column->get_data().data();
             }
             return nullptr;
@@ -114,9 +115,8 @@ public:
         const auto& size_offsets = size_array_data.offsets->get_data().data();
 
         const bool has_priority = !has_limit || !columns[3]->has_null();
-        ColumnPtr priority_column = (has_priority ? ColumnHelper::unpack_and_duplicate_const_column(chunk_size,
-                                                                                                    columns[3])
-                                                  : nullptr);
+        ColumnPtr priority_column =
+                (has_priority ? ColumnHelper::unpack_and_duplicate_const_column(chunk_size, columns[3]) : nullptr);
         const int32_t* priorities = nullptr;
         const bool similar_to_size = !has_limit;
         if (has_priority) {
@@ -138,13 +138,15 @@ public:
                     if (similar_to_size) {
                         return Status::InvalidArgument(
                                 StrCat("If provided, priority_array (length = ", priority_length,
-                                       ") should have the same length as size_array (length = ", expected_length,
-                                       ").").c_str());
+                                       ") should have the same length as size_array (length = ", expected_length, ").")
+                                        .c_str());
                     } else {
                         return Status::InvalidArgument(
-                                StrCat("When limit is set and priority_array is not NULL literal, priority_array (length = ",
+                                StrCat("When limit is set and priority_array is not NULL literal, priority_array "
+                                       "(length = ",
                                        priority_length, ") should have the same length as timestamp_array (length = ",
-                                       expected_length, ").").c_str());
+                                       expected_length, ").")
+                                        .c_str());
                     }
                 }
             }
@@ -227,7 +229,10 @@ public:
             struct Array {
                 Array(size_t start, size_t end, const int64_t* timestamp, size_t secondary_order_index,
                       const int32_t* priority)
-                        : index(start), end(end), timestamp(timestamp), secondary_order_index(secondary_order_index),
+                        : index(start),
+                          end(end),
+                          timestamp(timestamp),
+                          secondary_order_index(secondary_order_index),
                           priority(priority) {}
 
                 size_t index;
@@ -276,9 +281,7 @@ public:
                     return null_sorting_keys != nullptr && (*null_sorting_keys)[index] != 0;
                 }
 
-                DatumKey get_sorting_key(size_t index) const {
-                    return sorting_keys->get(index).convert2DatumKey();
-                }
+                DatumKey get_sorting_key(size_t index) const { return sorting_keys->get(index).convert2DatumKey(); }
             };
             const bool row_secondary_nulls_first =
                     has_secondary_nulls_first_column ? (secondary_nulls_first_values[row] != 0) : true;
@@ -431,8 +434,8 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr activities_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData activities_data = prepare_array_input(activities_column.get());
-    const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *activities_data.elements).get_data().data();
+    const auto& activities =
+            down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*activities_data.elements).get_data().data();
     const auto& offsets = activities_data.offsets->get_data().data();
 
     ColumnBuilder<TYPE_VARCHAR> result(num_rows);
@@ -472,27 +475,25 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
             first = false;
         }
         result.append(Slice(variant.data(), variant.size()));
-
     }
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr> CelonisArrayFunctions::string_array_join([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisArrayFunctions::string_array_join([[maybe_unused]] FunctionContext* context,
+                                                             const Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
-    const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *array_data.elements).get_data().data();
+    const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*array_data.elements).get_data().data();
     const auto& offsets = array_data.offsets->get_data().data();
 
     ColumnBuilder<TYPE_VARCHAR> result(num_rows);
     ColumnViewer sep_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     faststring joined_string;
     for (auto row = 0; row < num_rows; ++row) {
-        if ((array_data.null_arrays != nullptr && (*array_data.null_arrays)[row] != 0) ||
-            sep_viewer.is_null(row)) {
+        if ((array_data.null_arrays != nullptr && (*array_data.null_arrays)[row] != 0) || sep_viewer.is_null(row)) {
             result.append_nulls(1);
             continue;
         }
@@ -526,7 +527,6 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::string_array_join([[maybe_unused]] Fu
             first = false;
         }
         result.append(Slice(joined_string.data(), joined_string.size()));
-
     }
     return result.build(all_const);
 }
@@ -614,7 +614,6 @@ private:
         return Status::OK();
     }
 };
-
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::array_lag([[maybe_unused]] FunctionContext* context,
                                                      const Columns& columns) {
@@ -710,7 +709,6 @@ private:
     }
 };
 
-
 StatusOr<ColumnPtr> CelonisArrayFunctions::array_lead([[maybe_unused]] FunctionContext* context,
                                                       const Columns& columns) {
     return CelonisArrayLead::process(columns);
@@ -756,8 +754,8 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
     DCHECK(activity_array_data.elements->is_binary());
-    const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *activity_array_data.elements).get_data().data();
+    const auto& activities =
+            down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
 
     ColumnViewer begin_activity_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
@@ -877,7 +875,7 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionContext* context,
                                                      const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     TypeDescriptor type_array_bigint;
     type_array_bigint.type = TYPE_ARRAY;
     type_array_bigint.children.resize(1);
@@ -891,7 +889,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionCo
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] FunctionContext* context,
                                                              const Columns& columns) {
     DCHECK(columns.size() == 5);
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
     RETURN_IF_ERROR(calc_crop_impl(columns, false, result.get()));
     return result;

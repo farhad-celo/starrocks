@@ -1,10 +1,11 @@
 #pragma once
 
+#include <boost/functional/hash.hpp>
+
 #include "column/hash_set.h"
 #include "rapidjson/document.h"
 #include "util/phmap/phmap.h"
 #include "util/slice.h"
-#include <boost/functional/hash.hpp>
 
 namespace starrocks {
 

@@ -77,9 +77,8 @@ static void do_multi_in_bench(benchmark::State& state) {
     // 1. Input struct: contains the fields to match against
     // 2. Match struct: contains arrays of potential matches (must be constant)
     std::vector<FunctionContext::TypeDesc> arg_types = {
-        AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT)),
-        AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))
-    };
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT)),
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))};
     auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -105,8 +104,8 @@ static void do_multi_in_bench(benchmark::State& state) {
         match_fields.reserve(num_fields);
         for (int field = 0; field < num_fields; field++) {
             auto field_array_column = ColumnHelper::create_column(
-                TypeDescriptor::create_array_type(TypeDescriptor::create_varchar_type(20)), false);
-            
+                    TypeDescriptor::create_array_type(TypeDescriptor::create_varchar_type(20)), false);
+
             // Generate match array for this field
             DatumArray match_array;
             match_array.reserve(match_size);
@@ -117,10 +116,10 @@ static void do_multi_in_bench(benchmark::State& state) {
             match_fields.push_back(field_array_column);
         }
         auto match_struct_col = StructColumn(match_fields).create(match_fields);
-        
+
         ctx->set_constant_columns({nullptr, match_struct_col});
         state.ResumeTiming();
-        
+
         // Execute benchmark
         ASSERT_TRUE(CelonisMultiIn::prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
         ASSERT_TRUE(CelonisMultiIn::prepare(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
@@ -129,9 +128,9 @@ static void do_multi_in_bench(benchmark::State& state) {
         ASSERT_TRUE(CelonisMultiIn::close(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
         ASSERT_TRUE(CelonisMultiIn::close(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
     }
-    
+
     state.counters["RowInvRate"] =
-        benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
+            benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
 
 static void BM_MultiInVARCHAR(benchmark::State& state) {
@@ -139,12 +138,13 @@ static void BM_MultiInVARCHAR(benchmark::State& state) {
 }
 
 // Args: Number of rows / Number of fields / Number of possible values / Match list size
-BENCHMARK(BM_MultiInVARCHAR)->ArgsProduct({
-    {4096, 10000, 100000},     // Number of rows
-    {2, 4},                    // Number of fields in struct
-    {20, 80},                  // Number of possible string values
-    {5, 10}                    // Size of match list per field
-});
+BENCHMARK(BM_MultiInVARCHAR)
+        ->ArgsProduct({
+                {4096, 10000, 100000}, // Number of rows
+                {2, 4},                // Number of fields in struct
+                {20, 80},              // Number of possible string values
+                {5, 10}                // Size of match list per field
+        });
 
 } // namespace starrocks
 

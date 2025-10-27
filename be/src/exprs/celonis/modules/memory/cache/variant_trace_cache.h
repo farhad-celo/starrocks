@@ -29,10 +29,12 @@ class variant_trace_cache {
   friend class cube::variant_trace_cache_manager;
 
  public:
-  using group_id_t = legacy_embedded_ctl::named_type<row_id, struct group_id_tag, legacy_embedded_ctl::comparable, legacy_embedded_ctl::hashable,
-                                     legacy_embedded_ctl::implicitly_convertible_to<row_id>::templ, legacy_embedded_ctl::printable>;
-  using variant_id_t = legacy_embedded_ctl::named_type<row_id, struct variant_id_tag, legacy_embedded_ctl::comparable, legacy_embedded_ctl::hashable,
-                                       legacy_embedded_ctl::implicitly_convertible_to<row_id>::templ, legacy_embedded_ctl::printable>;
+  using group_id_t = legacy_embedded_ctl::named_type<
+      row_id, struct group_id_tag, legacy_embedded_ctl::comparable, legacy_embedded_ctl::hashable,
+      legacy_embedded_ctl::implicitly_convertible_to<row_id>::templ, legacy_embedded_ctl::printable>;
+  using variant_id_t = legacy_embedded_ctl::named_type<
+      row_id, struct variant_id_tag, legacy_embedded_ctl::comparable, legacy_embedded_ctl::hashable,
+      legacy_embedded_ctl::implicitly_convertible_to<row_id>::templ, legacy_embedded_ctl::printable>;
   using variant_view_t = legacy_embedded_ctl::array_view<const trace_element_type>;
   static constexpr variant_id_t INVALID_VARIANT_ID{0};  // ID/Index of the empty/null variant
 

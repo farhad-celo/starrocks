@@ -15,8 +15,8 @@ namespace {
 // specialization for pointer_data_handler<trace_type> to sort by itself. Thus, we sort the trace pointer
 // data handlers explicitly here.
 [[nodiscard]] legacy_embedded_ctl::static_array<trace_buffer_type> sort_trace_buffer(
-    legacy_embedded_ctl::static_array<trace_type>& traces, const legacy_embedded_ctl::static_array<trace_length_type>& trace_lengths,
-    const size_t trace_buffer_size) {
+    legacy_embedded_ctl::static_array<trace_type>& traces,
+    const legacy_embedded_ctl::static_array<trace_length_type>& trace_lengths, const size_t trace_buffer_size) {
   auto sorted_trace_buffer{legacy_embedded_ctl::make_static_array_for_overwrite<trace_buffer_type>(
       trace_buffer_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
 

@@ -6,7 +6,6 @@ namespace starrocks {
 
 class CelonisMatchActivitiesFunctions {
 public:
-
     /**
      * @param: [activity_list, STARTING, NODE, ENDING, EXCLUDING, EXCLUDING_ALL, NODES_ANY]
      * @paramType: [ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR, ARRAY_VARCHAR]

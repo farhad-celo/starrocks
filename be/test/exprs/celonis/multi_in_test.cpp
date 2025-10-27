@@ -1,13 +1,13 @@
 #include "exprs/celonis/multi_in.h"
 
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/struct_column.h"
 #include "exprs/anyval_util.h"
 #include "testutil/function_utils.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -49,13 +49,11 @@ protected:
         constant_columns.push_back(nullptr);
         constant_columns.push_back(nullptr);
         utils->get_fn_ctx()->set_constant_columns(std::move(constant_columns));
-        DeferOp close_fragment_local([&utils] {
-            CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [&utils] { CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisMultiIn::prepare(utils->get_fn_ctx(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([&utils] {
-            CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local(
+                [&utils] { CelonisMultiIn::close(utils->get_fn_ctx(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisMultiIn::prepare(utils->get_fn_ctx(), FunctionContext::THREAD_LOCAL));
         Columns columns;
         columns.push_back(input_struct_col);
@@ -63,7 +61,6 @@ protected:
         StatusOr<ColumnPtr> result = CelonisMultiIn::multi_in(utils->get_fn_ctx(), columns);
         return result;
     }
-
 };
 
 TEST_F(CelonisMultiInTest, empty_input) {
@@ -179,9 +176,9 @@ TEST_F(CelonisMultiInTest, multiple_fields_with_different_types) {
     strings->append_datum("CC");
     auto timestamp_arrays = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, false);
     auto string_arrays = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
-    timestamp_arrays->append_datum(
-            DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0), TimestampValue::create(1970, 1, 2, 0, 0, 0),
-                       TimestampValue::create(1970, 1, 3, 0, 0, 0)});
+    timestamp_arrays->append_datum(DatumArray{TimestampValue::create(1970, 1, 1, 0, 0, 0),
+                                              TimestampValue::create(1970, 1, 2, 0, 0, 0),
+                                              TimestampValue::create(1970, 1, 3, 0, 0, 0)});
     string_arrays->append_datum(DatumArray{"AA", "AA", "AA"});
     auto result = RunConstMatchLists({timestamps, strings}, {timestamp_arrays, string_arrays}).value();
     EXPECT_EQ(3, result->size());

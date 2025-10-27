@@ -13,12 +13,12 @@ std::pair<dictionary_t, std::vector<legacy_embedded_ctl::shared_static_array<row
     common::execution_context& context) {
   auto result = merge_n_dictionaries_raw(dictionaries, op_name, context);
 
-  const raw_dictionary_t new_raw_dictionary{
-      std::visit(legacy_embedded_ctl::overloaded{[&context](const dictionary_t& existing_dictionary) {
-                                   return existing_dictionary->copy_to_raw_dictionary(context);
-                                 },
-                                 [](raw_dictionary_t&& new_dictionary) { return std::move(new_dictionary); }},
-                 std::move(result.dictionary_variant))};
+  const raw_dictionary_t new_raw_dictionary{std::visit(
+      legacy_embedded_ctl::overloaded{[&context](const dictionary_t& existing_dictionary) {
+                                        return existing_dictionary->copy_to_raw_dictionary(context);
+                                      },
+                                      [](raw_dictionary_t&& new_dictionary) { return std::move(new_dictionary); }},
+      std::move(result.dictionary_variant))};
 
   std::vector<legacy_embedded_ctl::shared_static_array<row_id>> ptr_mappings;
   std::transform(result.mappings.begin(), result.mappings.end(), std::back_inserter(ptr_mappings),
@@ -121,8 +121,8 @@ merge_result merge_n_dictionaries_raw(const std::vector<std::pair<dictionary_t, 
   auto* mapping_it{result.mappings.begin()};
   for (std::size_t i{0}; i < new_size; ++i) {
     if (null_index_it != null_indexes.end() && i == *null_index_it) {
-      auto mapping{
-          memory::tracking::make_static_array_for_overwrite<row_id>(1, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
+      auto mapping{memory::tracking::make_static_array_for_overwrite<row_id>(
+          1, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
       mapping[0] = 0;
       mappings[i] = std::move(mapping);
       ++null_index_it;

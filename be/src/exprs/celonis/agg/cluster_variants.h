@@ -1,15 +1,16 @@
 #pragma once
 
+#include <boost/functional/hash.hpp>
+
 #include "column/array_column.h"
 #include "column/binary_column.h"
-#include "column/const_column.h"
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "column/hash_set.h"
 #include "exprs/function_context.h"
 #include "rapidjson/document.h"
 #include "variant.h"
 #include "variant_agg.h"
-#include <boost/functional/hash.hpp>
 
 namespace starrocks {
 
@@ -37,7 +38,7 @@ struct EdgeSet {
             is_empty_variant = true;
         }
         int32_t pre_node = DUMMY_NODE;
-        for (auto node: variant.data) {
+        for (auto node : variant.data) {
             edge_set.insert({pre_node, node});
             pre_node = node;
         }
@@ -47,9 +48,7 @@ struct EdgeSet {
         compute_and_set_hash();
     }
 
-    size_t size() const {
-        return edges.size();
-    }
+    size_t size() const { return edges.size(); }
 
     std::string debug_string() const {
         std::stringstream ss;
@@ -72,7 +71,7 @@ private:
                 return a.dst < b.dst;
             }
         });
-        for (const auto& edge: edges) {
+        for (const auto& edge : edges) {
             boost::hash_combine(hash, edge.hash);
         }
     }
@@ -146,8 +145,8 @@ public:
             null_variant_hashes_.insert(hash128);
             return 0;
         }
-        const ArrayColumn& activity_column = *(down_cast<const ArrayColumn*>(
-                ColumnHelper::get_data_column(variant_column)));
+        const ArrayColumn& activity_column =
+                *(down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(variant_column)));
         const UInt32Column::Container& c_offset = activity_column.offsets().get_data();
         const Column* activity_elements = &activity_column.elements();
         const NullableColumn* nc = dynamic_cast<const NullableColumn*>(activity_elements);
@@ -187,7 +186,7 @@ public:
 
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(uint32_t);// num_null_variant_hashes
+        result += sizeof(uint32_t); // num_null_variant_hashes
         result += sizeof(int128_t) * null_variant_hashes_.size();
         result += sizeof(int64_t); // min_pts_
         result += sizeof(int64_t); // epsilon_
@@ -225,7 +224,7 @@ public:
         const uint32_t num_null_variant_hashes = null_variant_hashes_.size();
         memcpy(dst, &num_null_variant_hashes, sizeof(uint32_t));
         dst += sizeof(uint32_t);
-        for (int128_t hash128: null_variant_hashes_) {
+        for (int128_t hash128 : null_variant_hashes_) {
             memcpy(dst, &hash128, sizeof(int128_t));
             dst += sizeof(int128_t);
         }
@@ -263,7 +262,7 @@ public:
             memcpy(dst, &num_edges, sizeof(uint32_t));
             dst += sizeof(uint32_t);
 
-            for (const auto& edge: edge_set.edges) {
+            for (const auto& edge : edge_set.edges) {
                 memcpy(dst, &edge.src, sizeof(int32_t));
                 dst += sizeof(int32_t);
                 memcpy(dst, &edge.dst, sizeof(int32_t));
@@ -274,7 +273,6 @@ public:
             memcpy(dst, &count, sizeof(int64_t));
             dst += sizeof(int64_t);
         }
-
     }
 
     size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len) {
@@ -362,8 +360,9 @@ public:
 
     const SliceHashMap& activity_map() const { return activity_map_; }
 
-    const phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>, StdHash<int128_t>>&
-    edge_set_map() const { return edge_set_map_; }
+    const phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>, StdHash<int128_t>>& edge_set_map() const {
+        return edge_set_map_;
+    }
 
     const HashSet<int128_t>& null_variant_hashes() const { return null_variant_hashes_; }
 
@@ -375,8 +374,9 @@ private:
 
     int64_t min_pts_ = 0;
     int64_t epsilon_ = 0;
-    phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>, StdHash<int128_t>> edge_set_map_; // variant_hash128 -> (edge_set, count)
-    SliceHashMap activity_map_;  // activity -> index
+    phmap::flat_hash_map<int128_t, std::pair<EdgeSet, int64_t>, StdHash<int128_t>>
+            edge_set_map_;      // variant_hash128 -> (edge_set, count)
+    SliceHashMap activity_map_; // activity -> index
     // We need to keep track of hash values of variant = NULL. This is because variant = [] or [NULL, ...] may have
     // the different hash value as variant = NULL.
     HashSet<int128_t> null_variant_hashes_;
@@ -422,7 +422,6 @@ private:
 class ClusterVariantsAggregateFunction
         : public AggregateFunctionBatchHelper<ClusterVariantsState, ClusterVariantsAggregateFunction> {
 public:
-
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr state, size_t row_num) const override;
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override;

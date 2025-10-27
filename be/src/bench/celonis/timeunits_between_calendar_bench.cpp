@@ -4,6 +4,7 @@
 #include <functional>
 #include <random>
 
+#include "calendar_util.h"
 #include "column/column_helper.h"
 #include "column/datum_tuple.h"
 #include "exprs/anyval_util.h"
@@ -13,8 +14,6 @@
 #include "modules/query/calendars.pb.h"
 #include "runtime/types.h"
 #include "testutil/assert.h"
-
-#include "calendar_util.h"
 
 /*
 Running ./be/build_Release/src/bench/celonis/output/timeunits_between_calendar_bench
@@ -169,14 +168,14 @@ static void BM_TimeunitsBetweenWeekdayCalendar(benchmark::State& state) {
 BENCHMARK(BM_TimeunitsBetweenFactoryCalendar)
         ->ArgsProduct({
                 {1000, 10000, 100000}, // Number of rows
-                {2, 4, 8}, // Number of calendar IDs
-                {10, 100, 1000}, // Number of calendar entries per ID
+                {2, 4, 8},             // Number of calendar IDs
+                {10, 100, 1000},       // Number of calendar entries per ID
         });
 
 BENCHMARK(BM_TimeunitsBetweenWeekdayCalendar)
         ->ArgsProduct({
                 {1000, 10000, 100000}, // Number of rows
-                {2, 4, 8}, // Number of calendar IDs
+                {2, 4, 8},             // Number of calendar IDs
         });
 
 } // namespace starrocks

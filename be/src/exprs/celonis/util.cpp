@@ -1,14 +1,14 @@
 #include "exprs/celonis/util.h"
 
+#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <sstream>
+#include <string>
+
 #include "column/array_column.h"
 #include "column/column_helper.h"
 #include "util/xxh3.h"
-#include <string>
-#include <sstream>
-
-#include <boost/iostreams/filtering_streambuf.hpp>
-#include <boost/iostreams/copy.hpp>
-#include <boost/iostreams/filter/zlib.hpp>
 
 namespace starrocks {
 

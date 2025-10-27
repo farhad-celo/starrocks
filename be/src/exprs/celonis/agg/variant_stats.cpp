@@ -14,8 +14,8 @@
 
 namespace starrocks {
 
-std::optional<std::string>
-VariantStatsFinalizer::json_string(const std::optional<VariantAnalysisResult>& variant_analysis) const {
+std::optional<std::string> VariantStatsFinalizer::json_string(
+        const std::optional<VariantAnalysisResult>& variant_analysis) const {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
@@ -45,10 +45,8 @@ VariantStatsFinalizer::json_string(const std::optional<VariantAnalysisResult>& v
     rapidjson::Value e_stats(rapidjson::kArrayType);
     if (edge_count_ >= 0) {
         d.AddMember("e_count", edge_map_.size(), allocator);
-        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(
-                edge_map_, activity_map_, edge_count_);
-        e_stats = EdgeStatsProcessor<SliceHashMap>::build_edge_stats_json(
-                sorted_edges, allocator);
+        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(edge_map_, activity_map_, edge_count_);
+        e_stats = EdgeStatsProcessor<SliceHashMap>::build_edge_stats_json(sorted_edges, allocator);
     }
     d.AddMember("e_stats", e_stats, allocator);
     // Top variants and happy path
@@ -63,9 +61,8 @@ VariantStatsFinalizer::json_string(const std::optional<VariantAnalysisResult>& v
     return buf.GetString();
 }
 
-std::optional<std::string>
-VariantStatsFinalizer::base64_encoded_string(const std::optional<VariantAnalysisResult>& variant_analysis,
-                                             const std::string& query_id) const {
+std::optional<std::string> VariantStatsFinalizer::base64_encoded_string(
+        const std::optional<VariantAnalysisResult>& variant_analysis, const std::string& query_id) const {
     celonis::accelerator::Statistics statistics_proto;
     // Dictionary
     for (auto it = activity_map_.begin(); it != activity_map_.end(); it++) {
@@ -92,10 +89,8 @@ VariantStatsFinalizer::base64_encoded_string(const std::optional<VariantAnalysis
     // Edge stats
     if (edge_count_ >= 0) {
         statistics_proto.set_e_count(edge_map_.size());
-        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(
-                edge_map_, activity_map_, edge_count_);
-        EdgeStatsProcessor<SliceHashMap>::build_edge_stats_proto(
-                sorted_edges, statistics_proto);
+        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(edge_map_, activity_map_, edge_count_);
+        EdgeStatsProcessor<SliceHashMap>::build_edge_stats_proto(sorted_edges, statistics_proto);
     }
     // Top variants and happy path
     if (variant_analysis.has_value()) {
@@ -109,8 +104,8 @@ VariantStatsFinalizer::base64_encoded_string(const std::optional<VariantAnalysis
     return encoded_string;
 }
 
-std::optional<std::string>
-VariantStatsFinalizer::to_string(const std::optional<VariantAnalysisResult>& analysis_result, const std::string& query_id) const {
+std::optional<std::string> VariantStatsFinalizer::to_string(const std::optional<VariantAnalysisResult>& analysis_result,
+                                                            const std::string& query_id) const {
     return enable_proto_encoding_ ? base64_encoded_string(analysis_result, query_id) : json_string(analysis_result);
 }
 
@@ -125,10 +120,9 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     LOG(INFO) << log_prefix << ": merging_bytes = " << merging_bytes_ << " bytes." << std::endl;
     LOG(INFO) << log_prefix << ": number of states merged = " << merging_states_ << std::endl;
     if (activity_map_.size() > MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES) {
-        ctx->set_error(std::string(
-                               "CELONIS_VARIANT_STATS: the size of activity_map is " + std::to_string(activity_map_.size()) +
-                               " which is greater than the limit " +
-                               std::to_string(MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES))
+        ctx->set_error(std::string("CELONIS_VARIANT_STATS: the size of activity_map is " +
+                                   std::to_string(activity_map_.size()) + " which is greater than the limit " +
+                                   std::to_string(MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES))
                                .c_str(),
                        false);
         return std::nullopt;
@@ -139,7 +133,7 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
 
     std::vector<size_t> a_lastseen(activity_map_.size());
     LOG(INFO) << log_prefix << ": started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
-    for (const auto& [variant, count]: variant_map_) {
+    for (const auto& [variant, count] : variant_map_) {
         for (int i = 0; i < variant.data.size(); i++) {
             auto activity_id = variant.data[i];
             ActivityStats& a_stats = activity_stats_[activity_id];
@@ -175,10 +169,10 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     std::optional<VariantAnalysisResult> variant_analysis = std::nullopt;
     if (!skip_variant_analysis_) {
         LOG(INFO) << log_prefix << ": started analyzing variants\n";
-        variant_analysis = analyze_variants_for_explore_process(variant_map_, activity_map_, activity_stats_, log_prefix);
+        variant_analysis =
+                analyze_variants_for_explore_process(variant_map_, activity_map_, activity_stats_, log_prefix);
         LOG(INFO) << log_prefix << ": done analyzing variants (activity_top_variants size = "
-                  << variant_analysis.value().activity_top_variants.size()
-                  << ")\n";
+                  << variant_analysis.value().activity_top_variants.size() << ")\n";
     }
     LOG(INFO) << log_prefix << ": started to_string\n";
     auto rv = to_string(variant_analysis, query_id);

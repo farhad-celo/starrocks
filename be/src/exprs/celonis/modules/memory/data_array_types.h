@@ -11,8 +11,9 @@
 namespace celonis::accelerator::memory {
 
 using data_array_types_t =
-    std::variant<legacy_embedded_ctl::static_array<cel_string_t>, legacy_embedded_ctl::static_array<cel_int_t>, legacy_embedded_ctl::static_array<cel_float_t>,
-                 legacy_embedded_ctl::static_array<cel_date_t>, legacy_embedded_ctl::static_array<cel_boolean_t>, legacy_embedded_ctl::static_array<cel_null_t>,
+    std::variant<legacy_embedded_ctl::static_array<cel_string_t>, legacy_embedded_ctl::static_array<cel_int_t>,
+                 legacy_embedded_ctl::static_array<cel_float_t>, legacy_embedded_ctl::static_array<cel_date_t>,
+                 legacy_embedded_ctl::static_array<cel_boolean_t>, legacy_embedded_ctl::static_array<cel_null_t>,
                  legacy_embedded_ctl::static_array<cel_uuid_t>>;
 
 using const_data_array_types_t = std::variant<

@@ -101,7 +101,7 @@ int64_t base64_decode3(const char* data, size_t length, char* decoded_data) {
     while (i + 4 <= length) {
         // Check for padding in this block
         if (src[i + 2] == base64_pad || src[i + 3] == base64_pad) {
-            break;  // Handle padding in slow path
+            break; // Handle padding in slow path
         }
 
         // Get all 4 values
@@ -141,8 +141,8 @@ int64_t base64_decode3(const char* data, size_t length, char* decoded_data) {
                 // After padding, only whitespace is allowed
                 while (i < length) {
                     short val = s_decoding_table[src[i]];
-                    if (val != -1) {  // Not whitespace
-                        return -1;    // Invalid character after padding
+                    if (val != -1) { // Not whitespace
+                        return -1;   // Invalid character after padding
                     }
                     i++;
                 }

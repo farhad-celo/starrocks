@@ -411,7 +411,7 @@ std::optional<row_id> table::get_rows_optional() const {
 
 bool table::is_query_scope() const noexcept {
   legacy_embedded_debug_assert(!get_meta_data().is_query_scope_table() ||
-               get_swap_info().is_no_swap());  // query scope table => no swap
+                               get_swap_info().is_no_swap());  // query scope table => no swap
   return get_meta_data().is_query_scope_table() || get_meta_data().is_query_scope_result_table() ||
          get_meta_data().is_query_scope_aggregation_table();
 }
@@ -504,8 +504,9 @@ column_t table::add_column_by_blueprint(const col_name& column_name, const col_c
 }
 
 column_t table::add_string_column(const col_name& column_name, const col_id& column_id,
-                                  legacy_embedded_ctl::static_array<cel_string_t> ptrs, legacy_embedded_ctl::static_array<char> string_bfr,
-                                  const null_flags_t& null_flags, const table_row_limit_t table_row_limit) {
+                                  legacy_embedded_ctl::static_array<cel_string_t> ptrs,
+                                  legacy_embedded_ctl::static_array<char> string_bfr, const null_flags_t& null_flags,
+                                  const table_row_limit_t table_row_limit) {
   const auto row_count{ptrs.ssize()};
   const std::string description = create_column_description(column_name);
   std::shared_ptr<management::swappable_bitset> bitset(

@@ -1,4 +1,5 @@
 #include "exprs/celonis/agg/variant_stats_utils.h"
+
 #include "modules/query/variantstats.pb.h"
 
 namespace starrocks {
@@ -26,7 +27,7 @@ rapidjson::Value ActivityStats::to_json(rapidjson::Document::AllocatorType& allo
 }
 
 std::pair<int32_t, size_t> maybe_add_activity(SliceHashMap& activity_map, const Slice& activity, MemPool* mem_pool,
-    size_t* memory){
+                                              size_t* memory) {
     // TODO(j.kim): Reserve activity id 0 for null to be consistent with Saola.
     int32_t index = 0;
     SliceWithHash key(activity);
@@ -70,13 +71,14 @@ size_t get_serialized_size(const SliceHashMap& activity_map) {
     size_t result = 0;
     result += sizeof(uint32_t); // num_activities
     for (auto it = activity_map.begin(); it != activity_map.end(); ++it) {
-        result += sizeof(uint32_t) * 2;  // idx, size
-        result += it->first.size;        // data
+        result += sizeof(uint32_t) * 2; // idx, size
+        result += it->first.size;       // data
     }
     return result;
 }
-const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src, std::vector<std::pair<int32_t, size_t>>& index_vector,
-    SliceHashMap& activity_map, MemPool* mem_pool, size_t* memory) {
+const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src,
+                                                  std::vector<std::pair<int32_t, size_t>>& index_vector,
+                                                  SliceHashMap& activity_map, MemPool* mem_pool, size_t* memory) {
     uint32_t num_activities;
     memcpy(&num_activities, src, sizeof(uint32_t));
     src += sizeof(uint32_t);
@@ -122,12 +124,13 @@ size_t get_serialized_size(const VariantHashMap& variant_map) {
     for (auto it = variant_map.begin(); it != variant_map.end(); ++it) {
         result += sizeof(size_t);                           // count
         result += sizeof(uint32_t);                         // num_activities
-        result += sizeof(uint32_t) * it->first.data.size();  // activity indices
+        result += sizeof(uint32_t) * it->first.data.size(); // activity indices
     }
     return result;
 }
-const uint8_t* deserialize_variant_map_and_merge(const uint8_t* src, const std::vector<std::pair<int32_t, size_t>>& index_vector,
-    VariantHashMap& variant_map) {
+const uint8_t* deserialize_variant_map_and_merge(const uint8_t* src,
+                                                 const std::vector<std::pair<int32_t, size_t>>& index_vector,
+                                                 VariantHashMap& variant_map) {
     size_t num_variants;
     memcpy(&num_variants, src, sizeof(size_t));
     src += sizeof(size_t);
@@ -198,10 +201,10 @@ VRef compute_happy_variant(const std::vector<VRef>& sorted, const std::vector<Ac
     return sorted[happy];
 }
 
-
 VariantAnalysisResult analyze_variants_for_explore_process(const VariantHashMap& variant_counts,
-    const SliceHashMap& activity_map, const std::vector<ActivityStats>& activity_stats,
-    const std::string& log_prefix) {
+                                                           const SliceHashMap& activity_map,
+                                                           const std::vector<ActivityStats>& activity_stats,
+                                                           const std::string& log_prefix) {
     DCHECK(!variant_counts.empty() && !activity_map.empty());
     VariantAnalysisResult result;
 
@@ -214,8 +217,7 @@ VariantAnalysisResult analyze_variants_for_explore_process(const VariantHashMap&
     LOG(INFO) << log_prefix << ": started variants sorting\n";
     std::sort(v_count.begin(), v_count.end(),
               [](const VRef& lhs, const VRef& rhs) { return lhs->second > rhs->second; });
-    LOG(INFO) << log_prefix << ": done variants sorting (variant_map_ size = " << variant_counts.size()
-              << ")\n";
+    LOG(INFO) << log_prefix << ": done variants sorting (variant_map_ size = " << variant_counts.size() << ")\n";
 
     // 2. Find a happy variant
     result.happy = compute_happy_variant(v_count, activity_stats);
@@ -254,7 +256,7 @@ VariantAnalysisResult analyze_variants_for_explore_process(const VariantHashMap&
 }
 
 void build_variant_analysis_proto(const VariantAnalysisResult& variant_analysis_result,
-    celonis::accelerator::Statistics& statistics_proto, const std::string& log_prefix) {
+                                  celonis::accelerator::Statistics& statistics_proto, const std::string& log_prefix) {
     const std::vector<VList>& activity_top_variants = variant_analysis_result.activity_top_variants;
     const VRef& happy = variant_analysis_result.happy;
     uint32_t total_variants = 0;
@@ -282,8 +284,8 @@ void build_variant_analysis_proto(const VariantAnalysisResult& variant_analysis_
     }
 }
 
-void build_variant_analysis_json(const VariantAnalysisResult& variant_analysis_result,
-    rapidjson::Document& d, rapidjson::Document::AllocatorType& allocator) {
+void build_variant_analysis_json(const VariantAnalysisResult& variant_analysis_result, rapidjson::Document& d,
+                                 rapidjson::Document::AllocatorType& allocator) {
     const std::vector<VList>& activity_top_variants = variant_analysis_result.activity_top_variants;
     const VRef& happy = variant_analysis_result.happy;
     rapidjson::Value topv(rapidjson::kArrayType);
@@ -313,4 +315,3 @@ void build_variant_analysis_json(const VariantAnalysisResult& variant_analysis_r
 }
 
 } // namespace starrocks
-

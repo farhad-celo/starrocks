@@ -116,7 +116,7 @@ static void BM_ArrayJoin(benchmark::State& state) {
 }
 
 // Number of rows / Number of distinct activities / Variant length / NULL activity percentage
-BENCHMARK(BM_ArrayJoin) ->ArgsProduct({{10000, 100000}, {20, 100, 1000}, {20, 40}, {0, 5}});
+BENCHMARK(BM_ArrayJoin)->ArgsProduct({{10000, 100000}, {20, 100, 1000}, {20, 40}, {0, 5}});
 
 } // namespace starrocks
 

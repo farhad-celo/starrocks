@@ -4,14 +4,13 @@
 
 #include <execution>
 
-#include "column/column_builder.h"
 #include "column/array_column.h"
+#include "column/column_builder.h"
 #include "util.h"
-
 
 namespace starrocks {
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct ParallelExecutionThreshold {
     static constexpr int64_t value = 1000;
 };
@@ -35,7 +34,7 @@ Running 10 iterations for each size
     10000000         1725.10          651.40            2.65x
 */
 
-template<>
+template <>
 struct ParallelExecutionThreshold<TYPE_INT> {
     static constexpr int64_t value = 10'000'000;
 };
@@ -57,7 +56,7 @@ struct ParallelExecutionThreshold<TYPE_INT> {
     10000000         3901.20         1132.10            3.45x
 */
 
-template<>
+template <>
 struct ParallelExecutionThreshold<TYPE_BIGINT> {
     static constexpr int64_t value = 400'000;
 };
@@ -78,17 +77,17 @@ struct ParallelExecutionThreshold<TYPE_BIGINT> {
      1000000          938.00          199.40            4.70x
     10000000         9427.80         1156.60            8.15x
 */
-template<>
+template <>
 struct ParallelExecutionThreshold<TYPE_DOUBLE> {
     static constexpr int64_t value = 100'000;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisArrayTrimmedMean<LT>::celonis_array_trimmed_mean(FunctionContext* ctx,
                                                                             const Columns& columns) {
     using CppType = RunTimeCppType<LT>;
     DCHECK_EQ(3, columns.size());
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData array_data = prepare_array_input(array_column.get());
@@ -161,26 +160,19 @@ StatusOr<ColumnPtr> CelonisArrayTrimmedMean<LT>::celonis_array_trimmed_mean(Func
         CppType sum;
         // Use parallel execution only for large arrays (> parallel_threshold)
         if (count > parallel_threshold) {
-            sum = std::reduce(std::execution::par_unseq,
-                              buffer.begin() + first,
-                              buffer.begin() + last);
+            sum = std::reduce(std::execution::par_unseq, buffer.begin() + first, buffer.begin() + last);
         } else {
             // Sequential sum for small arrays to avoid parallel overhead
-            sum = std::accumulate(buffer.begin() + first,
-                                  buffer.begin() + last,
-                                  static_cast<CppType>(0));
+            sum = std::accumulate(buffer.begin() + first, buffer.begin() + last, static_cast<CppType>(0));
         }
         result_column.append(static_cast<double>(sum) / count);
     }
     return result_column.build(all_const);
 }
 
-template
-class CelonisArrayTrimmedMean<TYPE_INT>;
+template class CelonisArrayTrimmedMean<TYPE_INT>;
 
-template
-class CelonisArrayTrimmedMean<TYPE_BIGINT>;
+template class CelonisArrayTrimmedMean<TYPE_BIGINT>;
 
-template
-class CelonisArrayTrimmedMean<TYPE_DOUBLE>;
-}
+template class CelonisArrayTrimmedMean<TYPE_DOUBLE>;
+} // namespace starrocks

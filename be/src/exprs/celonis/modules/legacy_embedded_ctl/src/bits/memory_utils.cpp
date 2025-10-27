@@ -218,7 +218,8 @@ void throw_if_not_enough_memory_for_allocation(const std::size_t bytes_to_alloca
       // an endless amount of logs, if the memory estimation ends up and remains in a bad state
       if (last_estimated_check_successful) {
         log_memory_tracking_state(
-            mem_available_kib, mem_estimated_available_kib, mem_status.in_use_by_process<legacy_embedded_ctl::byte_unit::B>(),
+            mem_available_kib, mem_estimated_available_kib,
+            mem_status.in_use_by_process<legacy_embedded_ctl::byte_unit::B>(),
             fmt::format("Rejecting allocation of size {} based on memory estimation.", bytes_to_allocate));
       }
       throw short_of_memory{true};

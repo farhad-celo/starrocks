@@ -1,8 +1,8 @@
 #include "exprs/celonis/transits_match.h"
 
 #include "column/array_column.h"
-#include "column/struct_column.h"
 #include "column/column_helper.h"
+#include "column/struct_column.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
 #include "util/phmap/btree.h"
@@ -31,9 +31,8 @@ void AppendFields(const Columns& source_fields, std::vector<DatumArray>& arrays,
     }
 }
 
-void
-AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const Columns& right_key_fields,
-         Columns& res_left_fields, Columns& res_right_fields, NullableColumn* null_column, size_t row) {
+void AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const Columns& right_key_fields,
+              Columns& res_left_fields, Columns& res_right_fields, NullableColumn* null_column, size_t row) {
     const auto n_left_fields = left_key_fields.size();
     const auto n_right_fields = right_key_fields.size();
     std::vector<DatumArray> left_arrays;
@@ -48,7 +47,7 @@ AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const C
         array.reserve(edges.size());
         right_arrays.push_back(array);
     }
-    for (const auto& edge: edges) {
+    for (const auto& edge : edges) {
         AppendFields(left_key_fields, left_arrays, row, edge.left_index);
         AppendFields(right_key_fields, right_arrays, row, edge.right_index);
     }
@@ -61,8 +60,8 @@ AddEdges(const std::vector<Edge>& edges, const Columns& left_key_fields, const C
     }
 }
 
-std::optional<phmap::btree_map<DatumKey, std::set<DatumKey>>>
-build_map(const std::optional<DatumArray>& left_manual_array, const std::optional<DatumArray>& right_manual_array) {
+std::optional<phmap::btree_map<DatumKey, std::set<DatumKey>>> build_map(
+        const std::optional<DatumArray>& left_manual_array, const std::optional<DatumArray>& right_manual_array) {
     if (!left_manual_array.has_value() || !right_manual_array.has_value()) {
         return std::nullopt;
     }
@@ -96,10 +95,10 @@ std::vector<Edge> compute_edges(const DatumArray& left_match_array, const DatumA
                 matched_keys = {};
             }
         }
-        for (auto matched_key: matched_keys) {
+        for (auto matched_key : matched_keys) {
             auto it = right_key_to_indexes.find(matched_key);
             if (it != right_key_to_indexes.end()) {
-                for (auto j: it->second) {
+                for (auto j : it->second) {
                     edges.push_back({i, j});
                 }
             }
@@ -110,8 +109,7 @@ std::vector<Edge> compute_edges(const DatumArray& left_match_array, const DatumA
 
 } // namespace
 
-Status CelonisTransitsMatch::prepare(starrocks::FunctionContext* context,
-                                     FunctionContext::FunctionStateScope scope) {
+Status CelonisTransitsMatch::prepare(starrocks::FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
     }
@@ -153,8 +151,7 @@ Status CelonisTransitsMatch::prepare(starrocks::FunctionContext* context,
     return Status::OK();
 }
 
-Status CelonisTransitsMatch::close(starrocks::FunctionContext* context,
-                                   FunctionContext::FunctionStateScope scope) {
+Status CelonisTransitsMatch::close(starrocks::FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         const auto* state = reinterpret_cast<const TransitsMatchStateFragmentLocal*>(
                 context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
@@ -163,9 +160,8 @@ Status CelonisTransitsMatch::close(starrocks::FunctionContext* context,
     return Status::OK();
 }
 
-StatusOr<ColumnPtr>
-CelonisTransitsMatch::transits_match_non_constant_manual([[maybe_unused]] starrocks::FunctionContext* context,
-                                                         const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisTransitsMatch::transits_match_non_constant_manual(
+        [[maybe_unused]] starrocks::FunctionContext* context, const starrocks::Columns& columns) {
     const size_t n_rows = columns[0]->size();
     auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();
@@ -279,16 +275,15 @@ CelonisTransitsMatch::transits_match_non_constant_manual([[maybe_unused]] starro
             auto null_column_2 = down_cast<NullableColumn*>(fields[1].get());
             null_column_2->null_column_data().emplace_back(0);
         }
-        std::vector<Edge> edges = compute_edges(left_match_array, right_match_array,
-                                                build_map(left_manual_array, right_manual_array));
+        std::vector<Edge> edges =
+                compute_edges(left_match_array, right_match_array, build_map(left_manual_array, right_manual_array));
         AddEdges(edges, left_key_fields, right_key_fields, res_left_fields, res_right_fields, null_column, row);
     }
     return res;
 }
 
-StatusOr<ColumnPtr>
-CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks::FunctionContext* context,
-                                                     const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisTransitsMatch::transits_match_constant_manual(
+        [[maybe_unused]] starrocks::FunctionContext* context, const starrocks::Columns& columns) {
     const size_t n_rows = columns[0]->size();
     auto& left_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto& right_key_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[2].get()))->fields();
@@ -332,18 +327,22 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
     std::vector<UInt32Column::Ptr> left_key_offsets;
     std::vector<UInt32Column::Ptr> right_key_offsets;
     for (auto i = 0; i < left_key_fields.size(); ++i) {
-        left_key_elements.push_back(down_cast<const ArrayColumn*>(
-                ColumnHelper::get_data_column(left_key_fields[i].get()))->elements_column().get());
+        left_key_elements.push_back(
+                down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(left_key_fields[i].get()))
+                        ->elements_column()
+                        .get());
         left_key_offsets.push_back(
-                down_cast<const ArrayColumn*>(
-                        ColumnHelper::get_data_column(left_key_fields[i].get()))->offsets_column());
+                down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(left_key_fields[i].get()))
+                        ->offsets_column());
     }
     for (auto i = 0; i < right_key_fields.size(); ++i) {
-        right_key_elements.push_back(down_cast<const ArrayColumn*>(
-                ColumnHelper::get_data_column(right_key_fields[i].get()))->elements_column().get());
+        right_key_elements.push_back(
+                down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(right_key_fields[i].get()))
+                        ->elements_column()
+                        .get());
         right_key_offsets.push_back(
-                down_cast<const ArrayColumn*>(
-                        ColumnHelper::get_data_column(right_key_fields[i].get()))->offsets_column());
+                down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(right_key_fields[i].get()))
+                        ->offsets_column());
     }
     std::vector<uint32_t> left_indexes;
     std::vector<uint32_t> right_indexes;
@@ -411,7 +410,7 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
         null_column_1->null_column_data().emplace_back(0);
         null_column_2->null_column_data().emplace_back(0);
         std::vector<Edge> edges = compute_edges(left_match_array, right_match_array, state->manual_map);
-        for (const auto& edge: edges) {
+        for (const auto& edge : edges) {
             left_indexes.push_back(left_start + edge.left_index);
             right_indexes.push_back(right_start + edge.right_index);
         }
@@ -435,9 +434,8 @@ CelonisTransitsMatch::transits_match_constant_manual([[maybe_unused]] starrocks:
     return res;
 }
 
-StatusOr<ColumnPtr>
-CelonisTransitsMatch::transits_match([[maybe_unused]] starrocks::FunctionContext* context,
-                                     const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisTransitsMatch::transits_match([[maybe_unused]] starrocks::FunctionContext* context,
+                                                         const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 6);
     const auto* state = reinterpret_cast<const TransitsMatchStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));

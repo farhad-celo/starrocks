@@ -1,16 +1,17 @@
-#include <algorithm>
 #include <gtest/gtest.h>
+
+#include <algorithm>
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "../util.h"
 #include "column/struct_column.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
+#include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
-#include "exprs/celonis/util.h"
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 namespace starrocks {
 
@@ -58,20 +59,19 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                celonis::array_type(TYPE_DOUBLE),                 // point_column
-                TypeDescriptor::from_logical_type(TYPE_BIGINT),   // NUM_CLUSTERS
-                TypeDescriptor::from_logical_type(TYPE_INT),      // RANDOM_SEED
+                celonis::array_type(TYPE_DOUBLE),               // point_column
+                TypeDescriptor::from_logical_type(TYPE_BIGINT), // NUM_CLUSTERS
+                TypeDescriptor::from_logical_type(TYPE_INT),    // RANDOM_SEED
         };
         auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
-        return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(), return_type,
-                                                std::move(arg_types)));
+        return std::unique_ptr<FunctionContext>(FunctionContext::create_context(
+                runtime_states_.back().get(), mem_pools_.back().get(), return_type, std::move(arg_types)));
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(const DatumArray& points, int64_t num_clusters, int random_seed) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            const DatumArray& points, int64_t num_clusters, int random_seed) {
         auto local_ctx = get_ctx();
 
         const AggregateFunction* func =
@@ -80,7 +80,7 @@ protected:
         DCHECK(func != nullptr);
 
         auto point_col = ColumnHelper::create_column(celonis::array_type(TYPE_DOUBLE), true);
-        for (const auto& point: points) {
+        for (const auto& point : points) {
             point_col->append_datum(point);
         }
         auto num_clusters_col = ColumnHelper::create_const_column<TYPE_BIGINT>(num_clusters, points.size());
@@ -322,8 +322,7 @@ TEST_F(CelonisBuildKMeansModelTest, two_features_small_k) {
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
     std::vector<std::vector<double>> expected_centroids = {{0.5, 0.5}};
-    std::vector<std::pair<double, double>> expected_limits = {{0.0, 1.0},
-                                                              {0.0, 1.0}};
+    std::vector<std::pair<double, double>> expected_limits = {{0.0, 1.0}, {0.0, 1.0}};
     match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
 }
 
@@ -347,8 +346,7 @@ TEST_F(CelonisBuildKMeansModelTest, two_features_null_rows_ignored) {
     auto result = ColumnHelper::create_column(get_return_type(), true);
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
 
-    std::vector<std::vector<double>> expected_centroids = {{0.666667, 0.333333},
-                                                           {0,        1}};
+    std::vector<std::vector<double>> expected_centroids = {{0.666667, 0.333333}, {0, 1}};
     std::vector<std::pair<double, double>> expected_limits = {{0, 1}, {0, 1}};
     match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
 }
@@ -421,5 +419,3 @@ TEST_F(CelonisBuildKMeansModelTest, inconsistent_point_dimension) {
 }
 
 } // namespace starrocks
-
-

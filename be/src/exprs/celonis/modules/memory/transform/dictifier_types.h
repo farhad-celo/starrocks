@@ -25,7 +25,9 @@ struct dictify_work_item final {
 struct cel_string_key {
  public:
   struct hash {
-    size_t operator()(const cel_string_key& key) const { return legacy_embedded_ctl::hash_murmur_64a(key.str_without_null_byte()); }
+    size_t operator()(const cel_string_key& key) const {
+      return legacy_embedded_ctl::hash_murmur_64a(key.str_without_null_byte());
+    }
   };
 
   cel_string_key() = default;

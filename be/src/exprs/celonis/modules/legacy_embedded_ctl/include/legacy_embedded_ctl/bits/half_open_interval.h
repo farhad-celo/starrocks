@@ -124,8 +124,8 @@ template <typename T>
 constexpr half_open_interval<T>::half_open_interval(half_open_interval<T>::no_bounds_check /*no_check*/,
                                                     const_reference begin, const_reference end) noexcept
     : begin_{begin}, end_{end} {
-  legacy_embedded_debug_assert(begin <= end, "Invalid interval {}: The begin of any interval must not be larger than its end.",
-               to_string());
+  legacy_embedded_debug_assert(
+      begin <= end, "Invalid interval {}: The begin of any interval must not be larger than its end.", to_string());
 }
 
 }  // namespace celonis::accelerator::legacy_embedded_ctl

@@ -188,7 +188,8 @@ struct event_subset {
   static auto create_factory(const cube::filter_bitset_t& filter,
                              typename memory::column_ptrs_impl<COLUMN_PTR_TYPE>::const_data_accessor_t activities) {
     const auto size{filter.size() - filter.count()};
-    auto buffer{legacy_embedded_ctl::make_static_array_for_overwrite<COLUMN_PTR_TYPE>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
+    auto buffer{legacy_embedded_ctl::make_static_array_for_overwrite<COLUMN_PTR_TYPE>(
+        size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
     auto* it{buffer.begin()};
     return [&filter, activities, buffer = std::move(buffer), it](process::variant_view v) mutable {
       auto* const old_it{it};
@@ -318,8 +319,8 @@ struct exec_compute_counter {
     auto boa_factory{event_subset<column_pointer_type>::create_factory(filter, activity_accessor)};
     using set_cover_data = std::tuple<process::variant_view, row_id, event_subset<column_pointer_type>>;
     memory::management::checked_vector_t<set_cover_data> boas{
-        counter.size(),
-        memory::management::checked_allocator<decltype(boas)>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
+        counter.size(), memory::management::checked_allocator<decltype(boas)>(
+                            context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
 
     std::vector<column_pointer_type> activity_set(begin(activities), end(activities));
     std::sort(begin(activity_set), end(activity_set));
@@ -357,10 +358,11 @@ struct exec_compute_counter {
 
     const auto sort_vector{get_sort_vector(activity_accessor, covering, counter)};
 
-    ranking_result result{
-        legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(case_domain_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG)),
-        legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(counter.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG)),
-        covering.size()};
+    ranking_result result{legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
+                              case_domain_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG)),
+                          legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
+                              counter.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG)),
+                          covering.size()};
     std::transform(begin(sort_vector), end(sort_vector), begin(result.accumulated_counts),
                    [&counter](const auto& p) { return counter[p]; });
     std::partial_sum(begin(result.accumulated_counts), end(result.accumulated_counts),
@@ -481,13 +483,13 @@ struct exec_compute_ranking {
     std::sort(begin(variant_ranking), end(variant_ranking), count_greater);
     const counter_ranking_of ranking_of{counter, variant_ranking, count_greater};
     // create ranking of cases
-    auto ranking{
-        legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(case_domain_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))};
+    auto ranking{legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
+        case_domain_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))};
     common::for_each_group<size_t>(case_accessor, grain_size,
                                    [&](auto group) { ranking[case_accessor[group.begin()]] = ranking_of(group); });
     // create the accumulated counts
-    auto accumulated_variant_counts{
-        legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(variant_ranking.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))};
+    auto accumulated_variant_counts{legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
+        variant_ranking.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))};
     std::transform(begin(variant_ranking), end(variant_ranking), begin(accumulated_variant_counts),
                    [](const auto& p) { return p.second; });
     std::partial_sum(begin(accumulated_variant_counts), end(accumulated_variant_counts),

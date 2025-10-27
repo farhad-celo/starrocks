@@ -1,12 +1,12 @@
 #include "exprs/celonis/array_count_distinct.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "util.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -21,23 +21,22 @@ protected:
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
     TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
     TypeDescriptor TYPE_ARRAY_DATETIME = celonis::array_type(TYPE_DATETIME);
-
 };
 
 TEST_F(CelonisArrayCountDistinctTest, const_null_column) {
     {
         auto arrays = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
         arrays->append_datum(kNullDatum);
-        const auto result = CelonisArrayCountDistinct<TYPE_INT>::array_count_distinct(nullptr,
-                                                                                      {ConstColumn::create(arrays,
-                                                                                                           2)}).value();
+        const auto result =
+                CelonisArrayCountDistinct<TYPE_INT>::array_count_distinct(nullptr, {ConstColumn::create(arrays, 2)})
+                        .value();
         ASSERT_EQ(2, result->size());
         EXPECT_TRUE(result->get(0).is_null());
         EXPECT_TRUE(result->get(1).is_null());
     }
     {
         auto arrays = ColumnHelper::create_const_null_column(2);
-        const auto result = CelonisArrayCountDistinct<TYPE_INT>::array_count_distinct(nullptr,{arrays}).value();
+        const auto result = CelonisArrayCountDistinct<TYPE_INT>::array_count_distinct(nullptr, {arrays}).value();
         EXPECT_EQ(2, result->size());
         EXPECT_TRUE(result->only_null());
         EXPECT_TRUE(result->is_constant());

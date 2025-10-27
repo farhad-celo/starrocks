@@ -99,8 +99,8 @@ static void do_bench(benchmark::State& state) {
         ctx->set_constant_columns({nullptr, cycle_length_column});
 
         state.ResumeTiming();
-        ASSERT_TRUE(CelonisShortenedVariant::celonis_shortened_variant(ctx.get(),
-                                                                       {variant_column, cycle_length_column}).ok());
+        ASSERT_TRUE(CelonisShortenedVariant::celonis_shortened_variant(ctx.get(), {variant_column, cycle_length_column})
+                            .ok());
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
@@ -111,7 +111,7 @@ static void BM_ShortenedVariant(benchmark::State& state) {
 }
 
 // Number of rows / Number of distinct activities / Variant length / Cycle length
-BENCHMARK(BM_ShortenedVariant) ->ArgsProduct({{10000, 100000}, {20, 100, 1000}, {20, 40}, {1, 2}});
+BENCHMARK(BM_ShortenedVariant)->ArgsProduct({{10000, 100000}, {20, 100, 1000}, {20, 40}, {1, 2}});
 
 } // namespace starrocks
 

@@ -10,25 +10,24 @@ namespace starrocks {
 
 namespace {
 
-template<LogicalType LT, typename = guard::Guard>
-struct ValueMap {
-};
+template <LogicalType LT, typename = guard::Guard>
+struct ValueMap {};
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct ValueMap<LT, FixedLengthLTGuard<LT>> {
     using CppType = RunTimeCppValueType<LT>;
     using KeyType = CppType;
     using HashMap = phmap::flat_hash_map<KeyType, Datum, StdHash<CppType>>;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct ValueMap<LT, StringLTGuard<LT>> {
     using CppType = RunTimeCppValueType<LT>;
     using KeyType = CppType;
     using HashMap = phmap::flat_hash_map<Slice, Datum, SliceHashWithSeed<PhmapSeed1>, SliceEqual>;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct ValueHashMap {
     using CppType = RunTimeCppType<LT>;
     using HashMap = typename ValueMap<LT, guard::Guard>::HashMap;
@@ -67,16 +66,16 @@ struct ValueHashMap {
     }
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct RemapValuesStateFragmentLocal {
     ValueHashMap<LT> value_map;
     ScalarFunction function;
 };
 
-template<LogicalType LT>
-Status prepare_helper(FunctionContext* context, FunctionContext::FunctionStateScope
-scope, StatusOr<ColumnPtr> (* func_const)(FunctionContext*, const starrocks::Columns&),
-                      StatusOr<ColumnPtr>(* func_general)(FunctionContext*, const starrocks::Columns&)) {
+template <LogicalType LT>
+Status prepare_helper(FunctionContext* context, FunctionContext::FunctionStateScope scope,
+                      StatusOr<ColumnPtr> (*func_const)(FunctionContext*, const starrocks::Columns&),
+                      StatusOr<ColumnPtr> (*func_general)(FunctionContext*, const starrocks::Columns&)) {
     using CppType = RunTimeCppValueType<LT>;
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
@@ -110,18 +109,18 @@ scope, StatusOr<ColumnPtr> (* func_const)(FunctionContext*, const starrocks::Col
 }
 } // namespace
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisRemapValues<LT>::prepare_const(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     return prepare_helper<LT>(context, scope, remap_values_constant_value_map,
                               remap_values_const_non_constant_value_map);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisRemapValues<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     return prepare_helper<LT>(context, scope, remap_values_constant_value_map, remap_values_non_constant_value_map);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisRemapValues<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
@@ -131,10 +130,9 @@ Status CelonisRemapValues<LT>::close(FunctionContext* context, FunctionContext::
     return Status::OK();
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr>
-CelonisRemapValues<LT>::remap_values_const_non_constant_value_map([[maybe_unused]]FunctionContext* context,
-                                                                  const Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_const_non_constant_value_map(
+        [[maybe_unused]] FunctionContext* context, const Columns& columns) {
     const auto& value_column = columns[0];
     const auto& old_value_column = columns[1];
     const auto& new_value_column = columns[2];
@@ -170,10 +168,9 @@ CelonisRemapValues<LT>::remap_values_const_non_constant_value_map([[maybe_unused
     return result;
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr>
-CelonisRemapValues<LT>::remap_values_non_constant_value_map([[maybe_unused]]FunctionContext* context,
-                                                            const Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_non_constant_value_map(
+        [[maybe_unused]] FunctionContext* context, const Columns& columns) {
     const auto& value_column = columns[0];
     const auto& old_value_column = columns[1];
     const auto& new_value_column = columns[2];
@@ -220,8 +217,8 @@ CelonisRemapValues<LT>::remap_values_non_constant_value_map([[maybe_unused]]Func
     return result;
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[maybe_unused]]FunctionContext* context,
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[maybe_unused]] FunctionContext* context,
                                                                             const Columns& columns) {
     const auto& value_column = columns[0];
     const bool has_default = columns.size() == 4;
@@ -240,7 +237,7 @@ StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_constant_value_map([[ma
     return result;
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values(FunctionContext* context, const Columns& columns) {
     DCHECK(columns.size() == 3 || columns.size() == 4);
     const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
@@ -248,7 +245,7 @@ StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values(FunctionContext* contex
     return state->function(context, columns);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_const(FunctionContext* context, const Columns& columns) {
     DCHECK(columns.size() == 3 || columns.size() == 4);
     const auto* state = reinterpret_cast<const RemapValuesStateFragmentLocal<LT>*>(
@@ -256,17 +253,12 @@ StatusOr<ColumnPtr> CelonisRemapValues<LT>::remap_values_const(FunctionContext* 
     return state->function(context, columns);
 }
 
-template
-class CelonisRemapValues<TYPE_BIGINT>;
+template class CelonisRemapValues<TYPE_BIGINT>;
 
-template
-class CelonisRemapValues<TYPE_DOUBLE>;
+template class CelonisRemapValues<TYPE_DOUBLE>;
 
-template
-class CelonisRemapValues<TYPE_DATETIME>;
+template class CelonisRemapValues<TYPE_DATETIME>;
 
-template
-class CelonisRemapValues<TYPE_VARCHAR>;
-
+template class CelonisRemapValues<TYPE_VARCHAR>;
 
 } // namespace starrocks

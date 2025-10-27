@@ -35,8 +35,7 @@ BM_StringToInt/100000    3574000 ns      3573999 ns          196 RowInvRate=35.7
 static void BM_StringToInt(benchmark::State& state) {
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<long> dist(std::numeric_limits<long>::min(),
-                                             std::numeric_limits<long>::max());
+    std::uniform_int_distribution<long> dist(std::numeric_limits<long>::min(), std::numeric_limits<long>::max());
 
     int num_rows = state.range(0);
 

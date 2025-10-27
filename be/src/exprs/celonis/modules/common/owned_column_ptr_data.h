@@ -8,17 +8,19 @@
 
 namespace celonis::accelerator::common {
 
-// simple wrapper around legacy_embedded_ctl::static_array to avoid copies since copying a non-shared static_array would make a copy of
-// the underlying buffer
+// simple wrapper around legacy_embedded_ctl::static_array to avoid copies since copying a non-shared static_array would
+// make a copy of the underlying buffer
 template <
-    legacy_embedded_ctl::one_of<memory::col_ptr_8_t, memory::col_ptr_16_t, memory::col_ptr_32_t, memory::col_ptr_64_t> COL_PTR_TYPE>
+    legacy_embedded_ctl::one_of<memory::col_ptr_8_t, memory::col_ptr_16_t, memory::col_ptr_32_t, memory::col_ptr_64_t>
+        COL_PTR_TYPE>
 class owned_column_ptr_data {
  public:
   using value_type = COL_PTR_TYPE;
   using reference = value_type&;
 
   owned_column_ptr_data() noexcept = default;
-  explicit owned_column_ptr_data(legacy_embedded_ctl::static_array<COL_PTR_TYPE>&& ptrs) noexcept : ptrs_{std::move(ptrs)} {}
+  explicit owned_column_ptr_data(legacy_embedded_ctl::static_array<COL_PTR_TYPE>&& ptrs) noexcept
+      : ptrs_{std::move(ptrs)} {}
 
   owned_column_ptr_data(const owned_column_ptr_data& other) = delete;
   owned_column_ptr_data& operator=(const owned_column_ptr_data& other) = delete;

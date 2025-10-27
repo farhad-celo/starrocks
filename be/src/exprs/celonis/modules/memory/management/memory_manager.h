@@ -66,7 +66,7 @@ class memory_manager {
   void force_swap_out(common::execution_context& context) const;
 
   void force_compress() const;
-  #endif
+#endif
 
   void force_clean_up();
 
@@ -92,12 +92,12 @@ class memory_manager {
 
   void set_cache_compression_time(int64_t t) { cache_compression_time_in_min_ = t; }
 
-  #ifndef CELOSTAR
+#ifndef CELOSTAR
   /**
    * Tries to swap out all groups that are associated with the given transaction.
    */
   void end_transaction(const cube::query_transaction& transaction) const;
-  #endif
+#endif
 
   /**
    * Used in testing scenarios to override the real memory status with a mocked one to be able to more easily test
@@ -119,7 +119,8 @@ class memory_manager {
    * case where the lock could not be acquired in time)
    */
   std::pair<std::vector<volatile_group_t>, std::vector<managed_group_t>> get_groups(
-      std::chrono::seconds wait_time, legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{}) const;
+      std::chrono::seconds wait_time,
+      legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{}) const;
 
   void add_invocation_to_operator_statistics(const std::string& key, std::chrono::milliseconds runtime) const;
 

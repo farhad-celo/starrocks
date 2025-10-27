@@ -1,15 +1,17 @@
-#include <algorithm>
+#include "exprs/celonis/agg/multi_linear_regression.h"
+
 #include <gtest/gtest.h>
+
+#include <algorithm>
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "../util.h"
 #include "column/struct_column.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/agg/multi_linear_regression.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 namespace starrocks {
 
@@ -57,8 +59,8 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(LogicalType logical_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                celonis::array_type(logical_type),               // x
-                TypeDescriptor::from_logical_type(logical_type)  // y
+                celonis::array_type(logical_type),              // x
+                TypeDescriptor::from_logical_type(logical_type) // y
         };
         auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
         mem_pools_.emplace_back(std::make_unique<MemPool>());
@@ -66,8 +68,8 @@ protected:
                 FunctionContext::create_context(nullptr, mem_pools_.back().get(), return_type, std::move(arg_types)));
     }
 
-    std::optional<std::vector<double>>
-    ComputeExpectedBeta(const std::vector<DatumArray>& xs, const std::vector<DatumArray>& ys, bool is_bigint) {
+    std::optional<std::vector<double>> ComputeExpectedBeta(const std::vector<DatumArray>& xs,
+                                                           const std::vector<DatumArray>& ys, bool is_bigint) {
         DCHECK_EQ(xs.size(), ys.size());
         DatumArray x;
         DatumArray y;
@@ -135,20 +137,19 @@ protected:
         }
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(LogicalType logical_type, const DatumArray& x, const DatumArray& y) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            LogicalType logical_type, const DatumArray& x, const DatumArray& y) {
         auto local_ctx = get_ctx(logical_type);
 
         const AggregateFunction* func =
-                get_aggregate_function("celonis_build_multi_linear_regression_model", TYPE_ARRAY, TYPE_VARCHAR,
-                                       false);
+                get_aggregate_function("celonis_build_multi_linear_regression_model", TYPE_ARRAY, TYPE_VARCHAR, false);
 
         auto x_col = ColumnHelper::create_column(celonis::array_type(logical_type), true);
-        for (const auto& datum: x) {
+        for (const auto& datum : x) {
             x_col->append_datum(datum);
         }
         auto y_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(logical_type), true);
-        for (const auto& datum: y) {
+        for (const auto& datum : y) {
             y_col->append_datum(datum);
         }
         std::vector<const Column*> raw_columns;
@@ -193,7 +194,7 @@ protected:
         return true;
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Run(const DatumArray& x, const DatumArray& y, const std::vector<double>& expected_beta, bool is_null = false) {
         auto [local_ctx, state, func] = RunUpdate(LT, x, y);
 
@@ -205,7 +206,8 @@ protected:
             const char* error = local_ctx->error_msg();
             ASSERT_NE(error, nullptr);
             EXPECT_EQ(std::string_view(error),
-                      "CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL: Unable to fit regression model. The system is singular or ill-conditioned.");
+                      "CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL: Unable to fit regression model. The system is "
+                      "singular or ill-conditioned.");
             EXPECT_TRUE(result->get(0).is_null());
         } else {
             const std::string model = result->get(0).get_slice().to_string();
@@ -244,12 +246,12 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, bigint_single_dimension_merge
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, double_multi_dimensions_merge) {
     auto logical_type = TYPE_DOUBLE;
-    std::vector<double> x1s = {2.75, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.25, 2.25, 2.25, 2, 2, 2, 1.75, 1.75, 1.75,
-                               1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75};
-    std::vector<double> x2s = {5.3, 5.3, 5.3, 5.3, 5.4, 5.6, 5.5, 5.5, 5.5, 5.6, 5.7, 5.9, 6, 5.9, 5.8, 6.1, 6.2,
-                               6.1, 6.1, 6.1, 5.9, 6.2, 6.2, 6.1};
-    std::vector<double> ys = {1464, 1394, 1357, 1293, 1256, 1254, 1234, 1195, 1159, 1167, 1130, 1075, 1047, 965,
-                              943, 958, 971, 949, 884, 866, 876, 822, 704, 719};
+    std::vector<double> x1s = {2.75, 2.5,  2.5,  2.5,  2.5,  2.5,  2.5,  2.25, 2.25, 2.25, 2,    2,
+                               2,    1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75};
+    std::vector<double> x2s = {5.3, 5.3, 5.3, 5.3, 5.4, 5.6, 5.5, 5.5, 5.5, 5.6, 5.7, 5.9,
+                               6,   5.9, 5.8, 6.1, 6.2, 6.1, 6.1, 6.1, 5.9, 6.2, 6.2, 6.1};
+    std::vector<double> ys = {1464, 1394, 1357, 1293, 1256, 1254, 1234, 1195, 1159, 1167, 1130, 1075,
+                              1047, 965,  943,  958,  971,  949,  884,  866,  876,  822,  704,  719};
     auto n = ys.size();
     auto x1 = DatumArray{};
     auto x2 = DatumArray{};
@@ -284,8 +286,8 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, double_multi_dimensions_merge
 }
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, 3_features) {
-    auto x = DatumArray{DatumArray{1.0, 2.0, 3.0}, DatumArray{1.0, 2.0, 3.0}, DatumArray{2.0, 3.0, 4.0}, DatumArray{3.0, 4.0, 5.0},
-                        DatumArray{4.0, 5.0, 6.0}};
+    auto x = DatumArray{DatumArray{1.0, 2.0, 3.0}, DatumArray{1.0, 2.0, 3.0}, DatumArray{2.0, 3.0, 4.0},
+                        DatumArray{3.0, 4.0, 5.0}, DatumArray{4.0, 5.0, 6.0}};
     auto y = DatumArray{100.0, 300.0, 400.0, 300.0, 500.0};
     auto expected_beta = ComputeExpectedBeta({x}, {y}, false);
     ASSERT_TRUE(expected_beta.has_value());
@@ -293,12 +295,12 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, 3_features) {
 }
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, double_run) {
-    std::vector<double> x1s = {2.75, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.25, 2.25, 2.25, 2, 2, 2, 1.75, 1.75, 1.75,
-                               1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75};
-    std::vector<double> x2s = {5.3, 5.3, 5.3, 5.3, 5.4, 5.6, 5.5, 5.5, 5.5, 5.6, 5.7, 5.9, 6, 5.9, 5.8, 6.1, 6.2,
-                               6.1, 6.1, 6.1, 5.9, 6.2, 6.2, 6.1};
-    std::vector<double> ys = {1464, 1394, 1357, 1293, 1256, 1254, 1234, 1195, 1159, 1167, 1130, 1075, 1047, 965,
-                              943, 958, 971, 949, 884, 866, 876, 822, 704, 719};
+    std::vector<double> x1s = {2.75, 2.5,  2.5,  2.5,  2.5,  2.5,  2.5,  2.25, 2.25, 2.25, 2,    2,
+                               2,    1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75};
+    std::vector<double> x2s = {5.3, 5.3, 5.3, 5.3, 5.4, 5.6, 5.5, 5.5, 5.5, 5.6, 5.7, 5.9,
+                               6,   5.9, 5.8, 6.1, 6.2, 6.1, 6.1, 6.1, 5.9, 6.2, 6.2, 6.1};
+    std::vector<double> ys = {1464, 1394, 1357, 1293, 1256, 1254, 1234, 1195, 1159, 1167, 1130, 1075,
+                              1047, 965,  943,  958,  971,  949,  884,  866,  876,  822,  704,  719};
     auto x = DatumArray{};
     auto y = DatumArray{};
     for (auto i = 0; i < ys.size(); ++i) {
@@ -311,8 +313,8 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, double_run) {
 }
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, null_x_or_y) {
-    auto x = DatumArray{kNullDatum, DatumArray{1.0}, DatumArray{1.0}, kNullDatum, DatumArray{2.0}, DatumArray{3.0},
-                        DatumArray{4.0}, DatumArray{5.0}};
+    auto x = DatumArray{kNullDatum,      DatumArray{1.0}, DatumArray{1.0}, kNullDatum,
+                        DatumArray{2.0}, DatumArray{3.0}, DatumArray{4.0}, DatumArray{5.0}};
     auto y = DatumArray{10.0, 100.0, 300.0, kNullDatum, 400.0, 300.0, 500.0, kNullDatum};
     auto expected_beta = ComputeExpectedBeta({x}, {y}, false);
     ASSERT_TRUE(expected_beta.has_value());
@@ -320,8 +322,8 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, null_x_or_y) {
 }
 
 TEST_F(CelonisBuildMultiLinearRegressionModelTest, null_in_x_array) {
-    auto x = DatumArray{DatumArray{1.0}, DatumArray{1.0}, DatumArray{3.0, kNullDatum}, DatumArray{2.0}, DatumArray{3.0},
-                        DatumArray{4.0}};
+    auto x = DatumArray{DatumArray{1.0}, DatumArray{1.0}, DatumArray{3.0, kNullDatum},
+                        DatumArray{2.0}, DatumArray{3.0}, DatumArray{4.0}};
     auto y = DatumArray{100.0, 300.0, 200.0, 400.0, 300.0, 500.0};
     auto expected_beta = ComputeExpectedBeta({x}, {y}, false);
     ASSERT_TRUE(expected_beta.has_value());
@@ -335,4 +337,3 @@ TEST_F(CelonisBuildMultiLinearRegressionModelTest, not_enough_data_points) {
 }
 
 } // namespace starrocks
-

@@ -105,8 +105,7 @@ static void run_benchmark(benchmark::State& state, const CreateCalendar& create_
                 ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
         state.PauseTiming();
     }
-    state.counters["PrepareCyclesPerSecond"] =
-            benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
+    state.counters["PrepareCyclesPerSecond"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
 
 } // namespace
@@ -121,10 +120,11 @@ static void BM_RemapTimestampsFactoryCalendarPrepare(benchmark::State& state) {
 
 BENCHMARK(BM_RemapTimestampsFactoryCalendarPrepare)
         ->ArgsProduct({
-                {4096, 40960, 409600},       // Number of rows
-                {256, 512, 1024},            // Number of calendar ids
-                {8096},                      // Number of calendar entries per id
-        })->Iterations(10);
+                {4096, 40960, 409600}, // Number of rows
+                {256, 512, 1024},      // Number of calendar ids
+                {8096},                // Number of calendar entries per id
+        })
+        ->Iterations(10);
 
 } // namespace starrocks
 

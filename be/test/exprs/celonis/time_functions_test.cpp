@@ -1,13 +1,14 @@
 #include "exprs/celonis/time_functions.h"
 
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
-#include "types/timestamp_value.h"
-#include "util.h"
-#include <gtest/gtest.h>
-#include "testutil/function_utils.h"
 #include "exprs/anyval_util.h"
 #include "google/protobuf/text_format.h"
+#include "testutil/function_utils.h"
+#include "types/timestamp_value.h"
+#include "util.h"
 
 namespace starrocks {
 
@@ -81,8 +82,8 @@ TEST(TimeRangeTest, weekly_compute_overlap) {
         EXPECT_EQ(range.compute_overlap(0, WEEK_MS + 8), 18);
         EXPECT_EQ(range.compute_overlap(2, WEEK_MS + 10), 18);
         EXPECT_EQ(range.compute_overlap(2, WEEK_MS + 8), 16);
-        EXPECT_EQ(range.compute_overlap(3, 17 * WEEK_MS + 5), 7+160+5);
-        EXPECT_EQ(range.compute_overlap(2 * WEEK_MS + 3, 17 * WEEK_MS + 5), 7+140+5);
+        EXPECT_EQ(range.compute_overlap(3, 17 * WEEK_MS + 5), 7 + 160 + 5);
+        EXPECT_EQ(range.compute_overlap(2 * WEEK_MS + 3, 17 * WEEK_MS + 5), 7 + 140 + 5);
         EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS + 3, 17 * WEEK_MS + 5), 7 + 160 + 170 + 5);
         EXPECT_EQ(range.compute_overlap(-17 * WEEK_MS + 3, -3 * WEEK_MS + 5), 7 + 130 + 5);
     }
@@ -96,7 +97,6 @@ protected:
 
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
     TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
-
 };
 
 TEST_F(CelonisTimeFunctionsTest, millis_timestamp) {
@@ -123,13 +123,13 @@ TEST_F(CelonisTimeFunctionsTest, millis_timestamp_empty_input) {
 
 TEST_F(CelonisTimeFunctionsTest, timestamp_millis) {
     auto col = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
-    col->append_datum(0L);  // 1970-01-01 00:00:00.000 UTC
-    col->append_datum(123L);   // 1970-01-01 00:00:00.123 UTC
-    col->append_datum(Datum());  // NULL
-    col->append_datum(-11676096000000L);  // 1600-01-01 00:00:00
-    col->append_datum(61123L);    // 1970-01-01 00:01:01.123 UTC
-    col->append_datum(172800000L);  // 1970-01-03 00:00:00
-    col->append_datum(-11676182400000L);  // 1599-12-31 00:00:00
+    col->append_datum(0L);               // 1970-01-01 00:00:00.000 UTC
+    col->append_datum(123L);             // 1970-01-01 00:00:00.123 UTC
+    col->append_datum(Datum());          // NULL
+    col->append_datum(-11676096000000L); // 1600-01-01 00:00:00
+    col->append_datum(61123L);           // 1970-01-01 00:01:01.123 UTC
+    col->append_datum(172800000L);       // 1970-01-03 00:00:00
+    col->append_datum(-11676182400000L); // 1599-12-31 00:00:00
 
     const auto result = CelonisTimeFunctions::timestamp_millis(nullptr, {col}).value();
     ASSERT_EQ(result->size(), col->size());
@@ -155,8 +155,8 @@ TEST_F(CelonisTimeFunctionsTest, date_between) {
         begin_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         end_timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
     }
-    const auto result = CelonisTimeFunctions::date_between(nullptr,
-                                                           {timestamps, begin_timestamps, end_timestamps}).value();
+    const auto result =
+            CelonisTimeFunctions::date_between(nullptr, {timestamps, begin_timestamps, end_timestamps}).value();
     ASSERT_EQ(timestamps->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
@@ -173,8 +173,8 @@ TEST_F(CelonisTimeFunctionsTest, date_between_null_input) {
         timestamps->append_datum(kNullDatum);
         begin_timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         end_timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
-        const auto result = CelonisTimeFunctions::date_between(nullptr,
-                                                               {timestamps, begin_timestamps, end_timestamps}).value();
+        const auto result =
+                CelonisTimeFunctions::date_between(nullptr, {timestamps, begin_timestamps, end_timestamps}).value();
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -185,8 +185,8 @@ TEST_F(CelonisTimeFunctionsTest, date_between_null_input) {
         timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         begin_timestamps->append_datum(kNullDatum);
         end_timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
-        const auto result = CelonisTimeFunctions::date_between(nullptr,
-                                                               {timestamps, begin_timestamps, end_timestamps}).value();
+        const auto result =
+                CelonisTimeFunctions::date_between(nullptr, {timestamps, begin_timestamps, end_timestamps}).value();
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -197,8 +197,8 @@ TEST_F(CelonisTimeFunctionsTest, date_between_null_input) {
         timestamps->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
         begin_timestamps->append_datum(TimestampValue::create(1970, 1, 3, 0, 0, 0));
         end_timestamps->append_datum(kNullDatum);
-        const auto result = CelonisTimeFunctions::date_between(nullptr,
-                                                               {timestamps, begin_timestamps, end_timestamps}).value();
+        const auto result =
+                CelonisTimeFunctions::date_between(nullptr, {timestamps, begin_timestamps, end_timestamps}).value();
         ASSERT_EQ(timestamps->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -208,8 +208,8 @@ TEST_F(CelonisTimeFunctionsTest, date_between_empty_input) {
     auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
     auto begin_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
     auto end_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
-    const auto result = CelonisTimeFunctions::date_between(nullptr,
-                                                           {timestamps, begin_timestamps, end_timestamps}).value();
+    const auto result =
+            CelonisTimeFunctions::date_between(nullptr, {timestamps, begin_timestamps, end_timestamps}).value();
     EXPECT_EQ(0, result->size());
 }
 

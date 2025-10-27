@@ -4,8 +4,8 @@
 #include "column/column_builder.h"
 #include "column/column_viewer.h"
 #include "exprs/builtin_functions.h"
-#include "exprs/function_context.h"
 #include "exprs/celonis/match_pattern_util.h"
+#include "exprs/function_context.h"
 
 // The implementation is copied from Saola: cpm-query-engine/blob/01a65c8ebe07c10cd7fda76eb3be95c070aada79/query-engine/src/main/native/cpm-accelerator/modules/common/stringhasher.cpp
 extern "C" {
@@ -37,11 +37,11 @@ void base64_encode(const unsigned char* const src, const size_t len, char* const
     if ((end - in) != 0) {
         *pos++ = BASE64_TABLE[in[0] >> 2];
         if (end - in == 1) {
-            *pos++ = BASE64_TABLE[(in[0] & 0x03) << 4];  // NOLINT(bugprone-misplaced-widening-cast)
+            *pos++ = BASE64_TABLE[(in[0] & 0x03) << 4]; // NOLINT(bugprone-misplaced-widening-cast)
             *pos++ = '=';
         } else {
             *pos++ = BASE64_TABLE[((in[0] & 0x03) << 4) | (in[1] >> 4)];
-            *pos++ = BASE64_TABLE[(in[1] & 0x0f) << 2];  // NOLINT(bugprone-misplaced-widening-cast)
+            *pos++ = BASE64_TABLE[(in[1] & 0x0f) << 2]; // NOLINT(bugprone-misplaced-widening-cast)
         }
         *pos++ = '=';
     }
@@ -51,7 +51,7 @@ void base64_encode(const unsigned char* const src, const size_t len, char* const
  * A wrapper around std::array, representing a NULL-terminated string.
  * @tparam N The number of characters in the string (excluding the NULL-terminator)
  */
-template<size_t N>
+template <size_t N>
 class static_string {
 public:
     static constexpr size_t LENGTH{N};
@@ -115,7 +115,7 @@ using base64_hash_t = static_string<(TRUNCATED_DIGEST_SIZE / 3) * 4 - 1>;
     return base64_hash_t{readable_digest};
 }
 
-}
+} // namespace
 
 StatusOr<ColumnPtr> CelonisStringhash::stringhash([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());

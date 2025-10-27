@@ -3,15 +3,14 @@
 #include "column/array_column.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
-#include "exprs/function_context.h"
 #include "exprs/celonis/util.h"
+#include "exprs/function_context.h"
 
 namespace starrocks {
 
-template<LogicalType LT>
-StatusOr<ColumnPtr>
-CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]starrocks::FunctionContext* context,
-                                                             const starrocks::Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays(
+        [[maybe_unused]] starrocks::FunctionContext* context, const starrocks::Columns& columns) {
     if (columns[0]->only_null()) {
         return Status::InvalidArgument("input_array column should not be NULL literal.");
     }
@@ -47,7 +46,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
         }
         for (auto row = 0; row < num_rows; ++row) {
             auto array = secondary_order_column->get(row).get_array();
-            for (const auto& item: array) {
+            for (const auto& item : array) {
                 secondary_orders.push_back(item.convert2DatumKey());
             }
         }
@@ -103,7 +102,7 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
         std::vector<DatumKey> timestamp_keys;
         timestamp_keys.reserve(timestamp_offsets[row + 1] - timestamp_offsets[row]);
         auto array = timestamp_column->get(row).get_array();
-        for (const auto& item: array) {
+        for (const auto& item : array) {
             timestamp_keys.push_back(item.convert2DatumKey());
         }
         size_t start = src_timestamp_start;
@@ -166,19 +165,14 @@ CelonisPeekMergedSortedArrays<LT>::peek_merged_sorted_arrays([[maybe_unused]]sta
     return result.build(all_const);
 }
 
-template
-class CelonisPeekMergedSortedArrays<TYPE_INT>;
+template class CelonisPeekMergedSortedArrays<TYPE_INT>;
 
-template
-class CelonisPeekMergedSortedArrays<TYPE_BIGINT>;
+template class CelonisPeekMergedSortedArrays<TYPE_BIGINT>;
 
-template
-class CelonisPeekMergedSortedArrays<TYPE_DOUBLE>;
+template class CelonisPeekMergedSortedArrays<TYPE_DOUBLE>;
 
-template
-class CelonisPeekMergedSortedArrays<TYPE_DATETIME>;
+template class CelonisPeekMergedSortedArrays<TYPE_DATETIME>;
 
-template
-class CelonisPeekMergedSortedArrays<TYPE_VARCHAR>;
+template class CelonisPeekMergedSortedArrays<TYPE_VARCHAR>;
 
 } // namespace starrocks

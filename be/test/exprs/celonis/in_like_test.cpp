@@ -1,13 +1,12 @@
-#include "exprs/celonis/string_functions.h"
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
+#include "exprs/celonis/string_functions.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -19,9 +18,8 @@ protected:
 
 private:
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_BIGINT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -29,28 +27,24 @@ private:
         patterns_column_ = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
     }
 
-    void
-    AddRow(const Datum& string, const DatumArray& patterns) {
+    void AddRow(const Datum& string, const DatumArray& patterns) {
         string_column_->append_datum(string);
         patterns_column_->append_datum(patterns);
     }
 
     StatusOr<ColumnPtr> Run() {
-        DeferOp close_fragment_local([this] {
-            CelonisStringFunctions::in_like_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [this] { CelonisStringFunctions::in_like_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisStringFunctions::in_like_prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisStringFunctions::in_like_close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local(
+                [this] { CelonisStringFunctions::in_like_close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisStringFunctions::in_like_prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
         result = CelonisStringFunctions::in_like(ctx_.get(), {string_column_, patterns_column_});
         return result;
     }
 
-    StatusOr<ColumnPtr>
-    RunConstantPatterns(const DatumArray& patterns) {
+    StatusOr<ColumnPtr> RunConstantPatterns(const DatumArray& patterns) {
         patterns_column_->append_datum(patterns);
         const auto nrows = string_column_->size();
         patterns_column_ = ConstColumn::create(patterns_column_, nrows);

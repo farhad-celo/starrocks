@@ -1,11 +1,11 @@
 #include "inductive_miner.h"
 
+#include <cpml/context/function_context.h>
+#include <cpml/discovery/inductive_miner.h>
+#include <cpml/discovery/inductive_miner_settings.h>
+
 #include <algorithm>
 #include <execution>
-
-#include <cpml/context/function_context.h>
-#include <cpml/discovery/inductive_miner_settings.h>
-#include <cpml/discovery/inductive_miner.h>
 
 #include "exprs/celonis/cpml_utils/process_tree_to_table.h"
 #include "exprs/celonis/cpml_utils/sr_context.h"
@@ -24,11 +24,11 @@ namespace {
     using im_settings_builder_t = cpml::discovery::inductive_miner_exec_settings::builder;
     using infrequent_im_settings_builder_t = cpml::discovery::infrequent_im_settings::builder;
     return im_settings_builder_t{}                     //
-    .im_policy_settings(                       //
-            infrequent_im_settings_builder_t{} //
-                    .edges_filter_frequency_threshold(imfd_frequency_threshold)
-                    .build()) // throws if the threshold was not in the valid range
-    .build();
+            .im_policy_settings(                       //
+                    infrequent_im_settings_builder_t{} //
+                            .edges_filter_frequency_threshold(imfd_frequency_threshold)
+                            .build()) // throws if the threshold was not in the valid range
+            .build();
 }
 
 struct inductive_miner_result {
@@ -62,7 +62,7 @@ std::pair<std::vector<Slice>, Variants> sort_activities_and_variants(const Slice
     activities.reserve(ordered_activity_map.size() + 1);
     activities.push_back({});
     int index = 1;
-    for (auto it = ordered_activity_map.begin() ; it != ordered_activity_map.end(); ++it, ++index) {
+    for (auto it = ordered_activity_map.begin(); it != ordered_activity_map.end(); ++it, ++index) {
         if (it->second >= activity_remap.size()) {
             activity_remap.resize(it->second + 1);
         }

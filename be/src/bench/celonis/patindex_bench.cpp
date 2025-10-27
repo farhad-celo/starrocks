@@ -76,7 +76,7 @@ static void do_bench(benchmark::State& state, const std::string& pattern) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
         ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);

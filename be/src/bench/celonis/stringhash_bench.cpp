@@ -51,17 +51,15 @@ private:
     std::uniform_int_distribution<int> char_distribution;
 
 public:
-    RandomStringGenerator() :
-        generator(std::random_device()()), // Seed the generator once
-        char_set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"),
-        char_distribution(0, char_set.size() - 1) {
-    }
+    RandomStringGenerator()
+            : generator(std::random_device()()), // Seed the generator once
+              char_set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"),
+              char_distribution(0, char_set.size() - 1) {}
 
-    RandomStringGenerator(const std::string& custom_char_set) :
-        generator(std::random_device()()),
-        char_set(custom_char_set),
-        char_distribution(0, custom_char_set.size() - 1) {
-    }
+    RandomStringGenerator(const std::string& custom_char_set)
+            : generator(std::random_device()()),
+              char_set(custom_char_set),
+              char_distribution(0, custom_char_set.size() - 1) {}
 
     std::string generate(int average_length) {
         // Use normal distribution to determine the actual length

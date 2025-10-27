@@ -1,5 +1,8 @@
 #pragma once
 
+#include <boost/algorithm/string/join.hpp>
+#include <set>
+
 #include "column/column_helper.h"
 #include "column/object_column.h"
 #include "column/type_traits.h"
@@ -8,13 +11,10 @@
 #include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "runtime/mem_pool.h"
-#include <set>
-#include <boost/algorithm/string/join.hpp>
 
 namespace starrocks {
 
 struct CelonisKMeansModelAggregateState {
-
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
         if (inconsistent_dimension_) {
             return;
@@ -63,13 +63,13 @@ struct CelonisKMeansModelAggregateState {
     // Returns the total size in bytes required to encode this object.
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(uint8_t);                    // inconsistent_dimension_
-        result += sizeof(int64_t);                    // num_clusters_
-        result += sizeof(int);                        // seed_
-        result += sizeof(size_t);                     // num_features_
-        result += sizeof(size_t);                     // num_points_
+        result += sizeof(uint8_t); // inconsistent_dimension_
+        result += sizeof(int64_t); // num_clusters_
+        result += sizeof(int);     // seed_
+        result += sizeof(size_t);  // num_features_
+        result += sizeof(size_t);  // num_points_
         size_t num_values = num_points_ * num_features_;
-        result += sizeof(double) * num_values;        // items in points_
+        result += sizeof(double) * num_values; // items in points_
         return result;
     }
 
@@ -85,8 +85,8 @@ struct CelonisKMeansModelAggregateState {
         dst += sizeof(size_t);
         memcpy(dst, &num_points_, sizeof(size_t));
         dst += sizeof(size_t);
-        for (const auto& point: points_) {
-            for (auto num: point) {
+        for (const auto& point : points_) {
+            for (auto num : point) {
                 memcpy(dst, &num, sizeof(double));
                 dst += sizeof(double);
             }
@@ -136,29 +136,17 @@ struct CelonisKMeansModelAggregateState {
         DCHECK_EQ(src, end);
     }
 
-    bool is_initialized() const {
-        return num_clusters_ != -1;
-    }
+    bool is_initialized() const { return num_clusters_ != -1; }
 
-    int64_t num_clusters() const {
-        return num_clusters_;
-    }
+    int64_t num_clusters() const { return num_clusters_; }
 
-    size_t num_features() const {
-        return num_features_;
-    }
+    size_t num_features() const { return num_features_; }
 
-    bool inconsistent_dimension() const {
-        return inconsistent_dimension_;
-    }
+    bool inconsistent_dimension() const { return inconsistent_dimension_; }
 
-    int random_seed() const {
-        return seed_;
-    }
+    int random_seed() const { return seed_; }
 
-    const std::vector<std::vector<double>>& points() const {
-        return points_;
-    }
+    const std::vector<std::vector<double>>& points() const { return points_; }
 
 private:
     bool inconsistent_dimension_ = false;
@@ -183,12 +171,10 @@ private:
  * If NUM_CLUSTERS > # of valid points, we set the num of clusters to min(NUM_CLUSTERS, # of valid points).
  */
 class CelonisKMeansAggregationFunction final
-        : public AggregateFunctionBatchHelper<CelonisKMeansModelAggregateState,
-                CelonisKMeansAggregationFunction> {
+        : public AggregateFunctionBatchHelper<CelonisKMeansModelAggregateState, CelonisKMeansAggregationFunction> {
 public:
-
-    void
-    update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state, size_t row_num) const override;
+    void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
+                size_t row_num) const override;
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override;
 

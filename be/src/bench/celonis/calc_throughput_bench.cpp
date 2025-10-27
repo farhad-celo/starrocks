@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
-#include <cassert>
 #include <gtest/gtest.h>
+
+#include <cassert>
 #include <random>
 
 #include "column/column_helper.h"
@@ -9,8 +10,8 @@
 #include "exprs/celonis/calc_throughput.h"
 #include "exprs/function_context.h"
 #include "runtime/types.h"
-#include "types/logical_type.h"
 #include "testutil/assert.h"
+#include "types/logical_type.h"
 
 namespace starrocks {
 
@@ -61,7 +62,6 @@ TypeDescriptor array_type(const LogicalType& element_type) {
     return t;
 }
 
-
 template <LogicalType ActivityLT>
 static void do_bench(benchmark::State& state, const std::string& start_label, const std::string& end_label) {
     int num_rows = state.range(0);
@@ -108,9 +108,7 @@ static void do_bench(benchmark::State& state, const std::string& start_label, co
         DatumArray timestamps;
         timestamps.resize(event_array_size);
         std::generate(timestamps.begin(), timestamps.end(), [&]() { return uniform_int(rng); });
-        auto timestamp_cmp = [](const Datum& d1, const Datum& d2) {
-            return d1.get_int64() < d2.get_int64();
-        };
+        auto timestamp_cmp = [](const Datum& d1, const Datum& d2) { return d1.get_int64() < d2.get_int64(); };
         std::sort(timestamps.begin(), timestamps.end(), timestamp_cmp);
 
         DatumArray activities;
@@ -134,12 +132,10 @@ static void do_bench(benchmark::State& state, const std::string& start_label, co
             end_label_col->append_datum(Slice(end_label));
         }
         state.ResumeTiming();
-        EXPECT_TRUE(CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_throughput(ctx.get(), {activity_array_col,
-                                                                                                    timestamp_array_col,
-                                                                                                    start_activity_col,
-                                                                                                    end_activity_col,
-                                                                                                    start_label_col,
-                                                                                                    end_label_col}).ok());
+        EXPECT_TRUE(CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_throughput(
+                            ctx.get(), {activity_array_col, timestamp_array_col, start_activity_col, end_activity_col,
+                                        start_label_col, end_label_col})
+                            .ok());
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
@@ -165,6 +161,6 @@ BENCHMARK(BM_CalcThroughputStrFirstLast)->ArgsProduct({{1000, 10000}, {10, 20}, 
 // Args: Number of rows / Event array size / Max string length (for string type)
 BENCHMARK(BM_CalcThroughputStrCaseStartEnd)->ArgsProduct({{1000, 10000}, {10, 20}, {8, 16}});
 
-}  // namespace starrocks
+} // namespace starrocks
 
 BENCHMARK_MAIN();

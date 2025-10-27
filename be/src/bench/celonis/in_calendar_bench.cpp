@@ -9,9 +9,9 @@
 #include "exprs/celonis/agg/util.h"
 #include "exprs/celonis/time_functions.h"
 #include "exprs/function_context.h"
+#include "modules/query/calendars.pb.h"
 #include "runtime/types.h"
 #include "testutil/assert.h"
-#include "modules/query/calendars.pb.h"
 
 namespace starrocks {
 
@@ -153,7 +153,8 @@ static void BM_InCalendar(benchmark::State& state) {
         state.PauseTiming();
         total_rows += num_rows;
         auto timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
-        auto calendar_column = ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
+        auto calendar_column =
+                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
         auto calendar_id_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
 
         calendar_column->append_datum(calendar_array);
@@ -174,12 +175,13 @@ static void BM_InCalendar(benchmark::State& state) {
                                                             FunctionContext::FunctionStateScope::THREAD_LOCAL));
         state.ResumeTiming();
 
-        EXPECT_TRUE(CelonisTimeFunctions::in_calendar(ctx.get(),
-                                                      {timestamp_column, calendar_column, calendar_id_column}).ok());
+        EXPECT_TRUE(
+                CelonisTimeFunctions::in_calendar(ctx.get(), {timestamp_column, calendar_column, calendar_id_column})
+                        .ok());
 
         state.PauseTiming();
-        ASSERT_OK(CelonisTimeFunctions::in_calendar_close(ctx.get(),
-                                                          FunctionContext::FunctionStateScope::THREAD_LOCAL));
+        ASSERT_OK(
+                CelonisTimeFunctions::in_calendar_close(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
         ASSERT_OK(CelonisTimeFunctions::in_calendar_close(ctx.get(),
                                                           FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
         state.ResumeTiming();

@@ -42,7 +42,8 @@ struct fmt::formatter<celonis::accelerator::legacy_embedded_ctl::utils::allocati
 
   /** Custom {fmt} formatter for an allocation priority. */
   template <typename FormatContext>
-  auto format(const celonis::accelerator::legacy_embedded_ctl::utils::allocation_priority& priority, FormatContext& ctx) {
+  auto format(const celonis::accelerator::legacy_embedded_ctl::utils::allocation_priority& priority,
+              FormatContext& ctx) {
     return fmt::format_to(ctx.out(), "{0}", celonis::accelerator::legacy_embedded_ctl::utils::to_string(priority));
   }
 };

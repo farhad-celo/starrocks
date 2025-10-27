@@ -23,10 +23,13 @@ namespace celonis::accelerator::legacy_embedded_ctl::utils {
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 class allocation_reason {
  public:
-  constexpr allocation_reason(legacy_embedded_ctl::source_location source_location, const std::string_view allocation_message) noexcept
+  constexpr allocation_reason(legacy_embedded_ctl::source_location source_location,
+                              const std::string_view allocation_message) noexcept
       : source_location_{source_location}, allocation_message_{allocation_message} {}
 
-  [[nodiscard]] constexpr const legacy_embedded_ctl::source_location& source_location() const& noexcept { return source_location_; }
+  [[nodiscard]] constexpr const legacy_embedded_ctl::source_location& source_location() const& noexcept {
+    return source_location_;
+  }
 
   /**
    * @brief Returns a formatted string of the allocation reason.
@@ -53,8 +56,8 @@ template <typename... ENRICHING_MESSAGES>
 class allocation_reason_enriched final : public allocation_reason {
  public:
   template <typename... ARGS>
-  constexpr allocation_reason_enriched(legacy_embedded_ctl::source_location source_location, std::string_view allocation_message,
-                                       ARGS&&... messages)
+  constexpr allocation_reason_enriched(legacy_embedded_ctl::source_location source_location,
+                                       std::string_view allocation_message, ARGS&&... messages)
       : allocation_reason{source_location, allocation_message}, enriching_messages_{std::forward<ARGS>(messages)...} {}
 
   /**
@@ -95,5 +98,6 @@ template <typename... ARGS>
  * more convenient to use (i.e., automatically injects the source location at the callers side)
  */
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define LEGACY_EMBEDDED_ALLOC_MSG(...) \
-  (celonis::accelerator::legacy_embedded_ctl::utils::make_allocation_reason(celonis::accelerator::legacy_embedded_ctl::source_location{}, __VA_ARGS__))
+#define LEGACY_EMBEDDED_ALLOC_MSG(...)                                       \
+  (celonis::accelerator::legacy_embedded_ctl::utils::make_allocation_reason( \
+      celonis::accelerator::legacy_embedded_ctl::source_location{}, __VA_ARGS__))

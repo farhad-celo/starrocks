@@ -482,7 +482,8 @@ inline bool celonis_date_storage::is_invalid_date() const noexcept {
   static constexpr uint32_t MIN_DAY_NUMBER = 2232400;  // boost::gregorian::date{1400, 1, 1}.day_number();
   legacy_embedded_debug_assert(MIN_DAY_NUMBER == (boost::gregorian::date{date::MIN_POSSIBLE_YEAR, 1, 1}.day_number()));
   static constexpr uint32_t MAX_DAY_NUMBER = 5373484;  // boost::gregorian::date{9999, 12, 31}.day_number();
-  legacy_embedded_debug_assert(MAX_DAY_NUMBER == (boost::gregorian::date{date::MAX_POSSIBLE_YEAR, 12, 31}.day_number()));
+  legacy_embedded_debug_assert(MAX_DAY_NUMBER ==
+                               (boost::gregorian::date{date::MAX_POSSIBLE_YEAR, 12, 31}.day_number()));
   return date.is_infinity() || date.is_not_a_date() || date.day_number() < MIN_DAY_NUMBER ||
          date.day_number() > MAX_DAY_NUMBER;
 }

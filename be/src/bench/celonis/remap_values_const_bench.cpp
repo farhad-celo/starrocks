@@ -128,26 +128,28 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
         auto new_map_column = ColumnHelper::create_column(
                 TypeDescriptor::create_array_type(TypeDescriptor::create_varchar_type(20)), false);
         switch (match_type) {
-            case CONSTANT:
-                old_map_column->append_datum(gen_rand_array(map_size));
-                old_map_column = ConstColumn::create(old_map_column, num_rows);
-                new_map_column->append_datum(gen_rand_array(map_size));
-                new_map_column = ConstColumn::create(new_map_column, num_rows);
-                ctx->set_constant_columns({nullptr, old_map_column, new_map_column, nullptr});
-                break;
-            case NON_CONSTANT:
-                old_map_column->append_datum(gen_rand_array(map_size));
-                old_map_column = ConstColumn::create(old_map_column, num_rows);
-                new_map_column->append_datum(gen_rand_array(map_size));
-                new_map_column = ConstColumn::create(new_map_column, num_rows);
-                ctx->set_constant_columns({nullptr, nullptr, nullptr, nullptr});
-                break;
+        case CONSTANT:
+            old_map_column->append_datum(gen_rand_array(map_size));
+            old_map_column = ConstColumn::create(old_map_column, num_rows);
+            new_map_column->append_datum(gen_rand_array(map_size));
+            new_map_column = ConstColumn::create(new_map_column, num_rows);
+            ctx->set_constant_columns({nullptr, old_map_column, new_map_column, nullptr});
+            break;
+        case NON_CONSTANT:
+            old_map_column->append_datum(gen_rand_array(map_size));
+            old_map_column = ConstColumn::create(old_map_column, num_rows);
+            new_map_column->append_datum(gen_rand_array(map_size));
+            new_map_column = ConstColumn::create(new_map_column, num_rows);
+            ctx->set_constant_columns({nullptr, nullptr, nullptr, nullptr});
+            break;
         }
 
         state.ResumeTiming();
         ASSERT_TRUE(CelonisRemapValues<TYPE_VARCHAR>::prepare_const(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
         ASSERT_TRUE(CelonisRemapValues<TYPE_VARCHAR>::prepare_const(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
-        ASSERT_TRUE(CelonisRemapValues<TYPE_VARCHAR>::remap_values_const(ctx.get(), {input_column, old_map_column, new_map_column, default_column}).ok());
+        ASSERT_TRUE(CelonisRemapValues<TYPE_VARCHAR>::remap_values_const(
+                            ctx.get(), {input_column, old_map_column, new_map_column, default_column})
+                            .ok());
         ASSERT_TRUE(CelonisRemapValues<TYPE_VARCHAR>::close(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
         ASSERT_TRUE(CelonisRemapValues<TYPE_VARCHAR>::close(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
     }

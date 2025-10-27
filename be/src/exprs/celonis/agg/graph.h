@@ -24,7 +24,7 @@ private:
     std::vector<ActivityStats> activity_stats_; // activity stats
     EdgeHashMap edge_stats_;                    // edge stats
 
-    int64_t edge_count_ = std::numeric_limits<int64_t>::max();          // very large number to output all edges.
+    int64_t edge_count_ = std::numeric_limits<int64_t>::max(); // very large number to output all edges.
     bool enable_proto_encoding_ = false;
 
     // merging statistics for logging purpose
@@ -49,11 +49,10 @@ private:
  * https://celonis-confluence.atlassian.net/wiki/spaces/PQLdevelopment/pages/11248519/GRAPH+Query
  */
 class CelonisGraphAggregationFunction final
-    : public AggregateFunctionBatchHelper<CelonisGraphAggregateState, CelonisGraphAggregationFunction> {
-
+        : public AggregateFunctionBatchHelper<CelonisGraphAggregateState, CelonisGraphAggregationFunction> {
 public:
-    void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state, size_t row_num) const
-    override;
+    void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
+                size_t row_num) const override;
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override;
 
@@ -63,10 +62,9 @@ public:
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const override;
 
-    void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
-                            Column* to) const override;
+    void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override;
 
     std::string get_name() const override;
 };
 
-}
+} // namespace starrocks

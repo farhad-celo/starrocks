@@ -1,8 +1,9 @@
+#include "exprs/celonis/agg/sorted_first_last.h"
+
 #include <gtest/gtest.h>
 
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/agg/sorted_first_last.h"
 #include "runtime/mem_pool.h"
 
 namespace starrocks {
@@ -48,8 +49,8 @@ protected:
     void TearDown() override {}
 
     template <LogicalType LT>
-    std::tuple<std::unique_ptr<FunctionContext>, Columns, const AggregateFunction*>
-    Prepare(const std::string& func_name, const std::vector<SortColumnType>& sort_column_types,
+    std::tuple<std::unique_ptr<FunctionContext>, Columns, const AggregateFunction*> Prepare(
+            const std::string& func_name, const std::vector<SortColumnType>& sort_column_types,
             const std::vector<DatumStruct>& input) {
         auto num_columns = sort_column_types.size() + 1;
 
@@ -70,7 +71,8 @@ protected:
         }
         auto return_type = TypeDescriptor::from_logical_type(LT);
 
-        std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+        std::unique_ptr<FunctionContext> local_ctx(
+                FunctionContext::create_test_context(std::move(arg_types), return_type));
         local_ctx->set_is_asc_order(is_asc_order);
         local_ctx->set_nulls_first(nulls_first);
 
@@ -91,9 +93,9 @@ protected:
     }
 
     template <LogicalType LT>
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(const std::string& func_name, const std::vector<SortColumnType>& sort_column_types,
-              const std::vector<DatumStruct>& input) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            const std::string& func_name, const std::vector<SortColumnType>& sort_column_types,
+            const std::vector<DatumStruct>& input) {
         auto [local_ctx, columns, func] = Prepare<LT>(func_name, sort_column_types, input);
         auto state = ManagedAggrState::create(local_ctx.get(), func);
 
@@ -166,8 +168,7 @@ TEST_F(CelonisSortedFirstLastTest, no_sort) {
 }
 
 TEST_F(CelonisSortedFirstLastTest, multiple_sort) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
-                                                     {TYPE_INT, true, true}};
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}, {TYPE_INT, true, true}};
 
     std::vector<DatumStruct> input;
     input.emplace_back(DatumStruct{"A", 2, 2});
@@ -179,8 +180,7 @@ TEST_F(CelonisSortedFirstLastTest, multiple_sort) {
 }
 
 TEST_F(CelonisSortedFirstLastTest, varchar_int_desc_sort) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_VARCHAR, true, true},
-                                                     {TYPE_INT, false, true}};
+    std::vector<SortColumnType> sort_column_types = {{TYPE_VARCHAR, true, true}, {TYPE_INT, false, true}};
 
     std::vector<DatumStruct> input;
     input.emplace_back(DatumStruct{1, "A", 1});
@@ -241,8 +241,7 @@ TEST_F(CelonisSortedFirstLastTest, int128_t) {
 }
 
 TEST_F(CelonisSortedFirstLastTest, serialize_and_merge) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
-                                                     {TYPE_VARCHAR, true, true}};
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}, {TYPE_VARCHAR, true, true}};
 
     std::vector<DatumStruct> input1;
     input1.emplace_back(DatumStruct{"A", 2, "2"});
@@ -338,8 +337,7 @@ TEST_F(CelonisSortedFirstLastTest, serialize_and_merge_no_row_nullable) {
 }
 
 TEST_F(CelonisSortedFirstLastTest, serialize_and_merge_null_sort) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
-                                                     {TYPE_VARCHAR, true, true}};
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}, {TYPE_VARCHAR, true, true}};
 
     std::vector<DatumStruct> input1;
     input1.emplace_back(DatumStruct{"A", 2, "2"});
@@ -371,8 +369,7 @@ TEST_F(CelonisSortedFirstLastTest, serialize_and_merge_null_sort) {
 }
 
 TEST_F(CelonisSortedFirstLastTest, serialize_and_merge_to_new_state) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
-                                                     {TYPE_VARCHAR, true, true}};
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}, {TYPE_VARCHAR, true, true}};
 
     std::vector<DatumStruct> input1;
 
@@ -404,8 +401,7 @@ TEST_F(CelonisSortedFirstLastTest, serialize_and_merge_to_new_state) {
 }
 
 TEST_F(CelonisSortedFirstLastTest, convert_to_serialize_format) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
-                                                     {TYPE_VARCHAR, true, true}};
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}, {TYPE_VARCHAR, true, true}};
 
     std::vector<DatumStruct> input1;
     input1.emplace_back(DatumStruct{"A", 2, "2"});
@@ -444,8 +440,7 @@ TEST_F(CelonisSortedFirstLastTest, convert_to_serialize_format) {
 }
 
 TEST_F(CelonisSortedFirstLastTest, convert_to_serialize_format_nullable) {
-    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true},
-                                                     {TYPE_VARCHAR, true, true}};
+    std::vector<SortColumnType> sort_column_types = {{TYPE_INT, true, true}, {TYPE_VARCHAR, true, true}};
 
     std::vector<DatumStruct> input1;
     input1.emplace_back(DatumStruct{"A", 1, "2"});
@@ -484,4 +479,3 @@ TEST_F(CelonisSortedFirstLastTest, convert_to_serialize_format_nullable) {
 }
 
 } // namespace starrocks
-

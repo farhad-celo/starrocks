@@ -320,7 +320,8 @@ template <typename T, typename SHARED_T, typename ALLOCATOR_TYPE>
 inline typename static_array_base<T, SHARED_T, ALLOCATOR_TYPE>::const_reference
 static_array_base<T, SHARED_T, ALLOCATOR_TYPE>::at(const index_type index) const {
   if (index >= size()) [[unlikely]] {
-    throw legacy_embedded_ctl::out_of_range{"Index [{}] is out of bounds for static array of size [{}].", index, size()};
+    throw legacy_embedded_ctl::out_of_range{"Index [{}] is out of bounds for static array of size [{}].", index,
+                                            size()};
   }
   return data_[index];
 }
@@ -329,7 +330,8 @@ template <typename T, typename SHARED_T, typename ALLOCATOR_TYPE>
 inline typename static_array_base<T, SHARED_T, ALLOCATOR_TYPE>::reference
 static_array_base<T, SHARED_T, ALLOCATOR_TYPE>::at(const index_type index) {
   if (index >= size()) [[unlikely]] {
-    throw legacy_embedded_ctl::out_of_range{"Index [{}] is out of bounds for static array of size [{}].", index, size()};
+    throw legacy_embedded_ctl::out_of_range{"Index [{}] is out of bounds for static array of size [{}].", index,
+                                            size()};
   }
   return data_[index];
 }
@@ -508,8 +510,8 @@ inline void static_array_base<T, SHARED_T, ALLOCATOR_TYPE>::shrink(const size_t 
   }
 
   if (new_size < size()) {
-    auto new_data{
-        make_array_internal(false, new_size, LEGACY_EMBEDDED_ALLOC_MSG("Allocation to shrink a static array"), get_allocator())};
+    auto new_data{make_array_internal(false, new_size, LEGACY_EMBEDDED_ALLOC_MSG("Allocation to shrink a static array"),
+                                      get_allocator())};
     std::copy_n(data_.get(), new_size, new_data.get());
     data_ = std::move(new_data);
     size_ = new_size;

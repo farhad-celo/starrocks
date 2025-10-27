@@ -1,13 +1,14 @@
 #include "kmeans.h"
 
-#include <vector>
-#include <chrono>
-#include <random>
-#include <algorithm>
-#include <limits>
+#include <tbb/concurrent_vector.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
-#include <tbb/concurrent_vector.h>
+
+#include <algorithm>
+#include <chrono>
+#include <limits>
+#include <random>
+#include <vector>
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
@@ -45,8 +46,8 @@ std::vector<std::pair<double, double>> get_limits(const std::vector<std::vector<
 
 // Applies min-max scaling normalization. It returns {limits, normalized_points}.
 // when min == max, set all values of the feature to 0.
-std::pair<std::vector<std::pair<double, double>>, std::vector<std::vector<double>>>
-normalize_points(const std::vector<std::vector<double>>& points) {
+std::pair<std::vector<std::pair<double, double>>, std::vector<std::vector<double>>> normalize_points(
+        const std::vector<std::vector<double>>& points) {
     if (points.empty()) {
         return {};
     }
@@ -91,12 +92,12 @@ std::string to_string(double value) {
     return decimal_str.substr(0, last_non_zero + 1);
 }
 
-std::optional<std::string>
-to_model(const std::vector<std::pair<double, double>>& limits, const std::vector<std::vector<double>>& centroids) {
+std::optional<std::string> to_model(const std::vector<std::pair<double, double>>& limits,
+                                    const std::vector<std::vector<double>>& centroids) {
     uint64_t size = 0;
     std::vector<std::string> limit_strs;
     limit_strs.reserve(limits.size());
-    for (const auto& [min_value, max_value]: limits) {
+    for (const auto& [min_value, max_value] : limits) {
         std::string limit_str = to_string(min_value) + "," + to_string(max_value);
         size += limit_str.size() + 1;
         if (size > MAX_KMEANS_MODEL_SIZE) {
@@ -106,10 +107,10 @@ to_model(const std::vector<std::pair<double, double>>& limits, const std::vector
     }
     std::vector<std::string> row_strs;
     row_strs.reserve(centroids.size());
-    for (const auto& centroid: centroids) {
+    for (const auto& centroid : centroids) {
         std::vector<std::string> value_strs;
         value_strs.reserve(centroid.size());
-        for (double value: centroid) {
+        for (double value : centroid) {
             value_strs.push_back(to_string(value));
         }
         const auto row_str = boost::algorithm::join(value_strs, ",");
@@ -162,34 +163,29 @@ private:
         // For remaining k-1 centroids
         for (int iter = 1; iter < k; ++iter) {
             // Parallel computation of distances to nearest centroid
-            std::vector<double> min_distances(points.size(),
-                                              std::numeric_limits<double>::max());
+            std::vector<double> min_distances(points.size(), std::numeric_limits<double>::max());
 
             // Use TBB parallel_for to compute distances
-            tbb::parallel_for(
-                    tbb::blocked_range<size_t>(0, points.size()),
-                    [&](const tbb::blocked_range<size_t>& range) {
-                        for (size_t i = range.begin(); i != range.end(); ++i) {
-                            if (!is_available[i]) {
-                                min_distances[i] = 0.0;
-                                continue;
-                            }
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, points.size()),
+                              [&](const tbb::blocked_range<size_t>& range) {
+                                  for (size_t i = range.begin(); i != range.end(); ++i) {
+                                      if (!is_available[i]) {
+                                          min_distances[i] = 0.0;
+                                          continue;
+                                      }
 
-                            double min_dist_sq = std::numeric_limits<double>::max();
-                            for (const auto& centroid: centroids) {
-                                double dist_sq = euclidean_distance_squared(
-                                        points[i], centroid);
-                                min_dist_sq = std::min(min_dist_sq, dist_sq);
-                            }
-                            min_distances[i] = min_dist_sq;
-                        }
-                    }
-            );
+                                      double min_dist_sq = std::numeric_limits<double>::max();
+                                      for (const auto& centroid : centroids) {
+                                          double dist_sq = euclidean_distance_squared(points[i], centroid);
+                                          min_dist_sq = std::min(min_dist_sq, dist_sq);
+                                      }
+                                      min_distances[i] = min_dist_sq;
+                                  }
+                              });
 
             // Parallel reduction to compute total distance
             double total_distance_squared = tbb::parallel_reduce(
-                    tbb::blocked_range<size_t>(0, points.size()),
-                    0.0,
+                    tbb::blocked_range<size_t>(0, points.size()), 0.0,
                     [&](const tbb::blocked_range<size_t>& range, double init) {
                         double sum = init;
                         for (size_t i = range.begin(); i != range.end(); ++i) {
@@ -197,8 +193,7 @@ private:
                         }
                         return sum;
                     },
-                    std::plus<double>()
-            );
+                    std::plus<double>());
 
             // Sequential selection (cannot be parallelized due to dependencies)
             std::uniform_real_distribution<> dis_real(0.0, total_distance_squared);
@@ -232,25 +227,21 @@ private:
     void assign_points_to_clusters() {
         assignments.resize(points.size());
         // Parallel assignment using TBB
-        tbb::parallel_for(
-                tbb::blocked_range<size_t>(0, points.size()),
-                [&](const tbb::blocked_range<size_t>& range) {
-                    for (size_t i = range.begin(); i != range.end(); ++i) {
-                        double min_dist_squared = std::numeric_limits<double>::max();
-                        int closest_centroid = 0;
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, points.size()), [&](const tbb::blocked_range<size_t>& range) {
+            for (size_t i = range.begin(); i != range.end(); ++i) {
+                double min_dist_squared = std::numeric_limits<double>::max();
+                int closest_centroid = 0;
 
-                        for (int j = 0; j < k; ++j) {
-                            double dist_squared = euclidean_distance_squared(
-                                    points[i], centroids[j]);
-                            if (dist_squared < min_dist_squared) {
-                                min_dist_squared = dist_squared;
-                                closest_centroid = j;
-                            }
-                        }
-                        assignments[i] = closest_centroid;
+                for (int j = 0; j < k; ++j) {
+                    double dist_squared = euclidean_distance_squared(points[i], centroids[j]);
+                    if (dist_squared < min_dist_squared) {
+                        min_dist_squared = dist_squared;
+                        closest_centroid = j;
                     }
                 }
-        );
+                assignments[i] = closest_centroid;
+            }
+        });
     }
 
     void update_centroids() {
@@ -296,10 +287,7 @@ public:
         }
     }
 
-    const std::vector<std::vector<double>>& get_centroids() const {
-        return centroids;
-    }
-
+    const std::vector<std::vector<double>>& get_centroids() const { return centroids; }
 };
 
 } // namespace
@@ -319,7 +307,7 @@ void CelonisKMeansAggregationFunction::merge(FunctionContext* ctx, const Column*
         return;
     }
     Slice slice = input_column->get_slice(row_num);
-    this->data(state).deserialize_and_merge((const uint8_t*) slice.data, slice.size);
+    this->data(state).deserialize_and_merge((const uint8_t*)slice.data, slice.size);
 }
 
 void CelonisKMeansAggregationFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
@@ -337,8 +325,7 @@ void CelonisKMeansAggregationFunction::serialize_to_column(FunctionContext* ctx,
 }
 
 void CelonisKMeansAggregationFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
-                                                                   size_t chunk_size,
-                                                                   ColumnPtr* dst) const {
+                                                                   size_t chunk_size, ColumnPtr* dst) const {
     // Used for streaming aggregation passthrough. Not implemented.
     throw std::runtime_error("celonis_build_kmeans_model: convert_to_serialize_format not supported");
 }
@@ -366,7 +353,9 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
     }
     if (num_clusters > points.size()) {
         ctx->set_error(fmt::format("CELONIS_BUILD_KMEANS_MODEL: not enough rows {} provided for training of size k {}",
-                                   points.size(), num_clusters).c_str(), false);
+                                   points.size(), num_clusters)
+                               .c_str(),
+                       false);
         to->append_default();
         return;
     }
@@ -396,6 +385,8 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
     }
 }
 
-std::string CelonisKMeansAggregationFunction::get_name() const { return "celonis_build_kmeans_model"; }
+std::string CelonisKMeansAggregationFunction::get_name() const {
+    return "celonis_build_kmeans_model";
+}
 
 } // namespace starrocks

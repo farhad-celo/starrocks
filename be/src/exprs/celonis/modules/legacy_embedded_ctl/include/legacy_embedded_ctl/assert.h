@@ -120,11 +120,11 @@ void abort_assert(const bool condition, fmt::format_string<ARGS...> fmt, ARGS&&.
  * legacy_embedded_debug_assert(value == 1, "Value should be 1, but got {}", value);
  */
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define legacy_embedded_debug_assert(...)                                                                                              \
-  if constexpr (celonis::accelerator::legacy_embedded_ctl::IS_DEBUG_BUILD) {                                                           \
-    celonis::accelerator::legacy_embedded_ctl::details::debug_assert_impl([] { return celonis::accelerator::legacy_embedded_ctl::source_location{}; }, \
-                                                          __VA_ARGS__);                                                \
-  }                                                                                                                    \
+#define legacy_embedded_debug_assert(...)                                                          \
+  if constexpr (celonis::accelerator::legacy_embedded_ctl::IS_DEBUG_BUILD) {                       \
+    celonis::accelerator::legacy_embedded_ctl::details::debug_assert_impl(                         \
+        [] { return celonis::accelerator::legacy_embedded_ctl::source_location{}; }, __VA_ARGS__); \
+  }                                                                                                \
   static_assert(true, "Place a semicolon after warning_assert")
 
 /**
@@ -132,6 +132,7 @@ void abort_assert(const bool condition, fmt::format_string<ARGS...> fmt, ARGS&&.
  * On debug mode it behaves just like a normal assert. On release mode it will log a warning to datadog.
  */
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define legacy_embedded_warning_assert(...)                                                                                           \
-  celonis::accelerator::legacy_embedded_ctl::details::warning_assert_impl(celonis::accelerator::legacy_embedded_ctl::source_location{}, __VA_ARGS__); \
+#define legacy_embedded_warning_assert(...)                                       \
+  celonis::accelerator::legacy_embedded_ctl::details::warning_assert_impl(        \
+      celonis::accelerator::legacy_embedded_ctl::source_location{}, __VA_ARGS__); \
   static_assert(true, "Place a semicolon after warning_assert")

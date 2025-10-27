@@ -1,16 +1,15 @@
-#include "exprs/celonis/in_json.h"
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
 #include "exprs/celonis/base64.h"
+#include "exprs/celonis/in_json.h"
 #include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
+#include "nlohmann/json.hpp"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
-#include "nlohmann/json.hpp"
 
 using json = nlohmann::json;
 
@@ -20,18 +19,17 @@ struct CelonisInJsonArrayTestParam {
     bool compress_json_str = false;
 };
 
-class CelonisInJsonArrayTest :public testing::TestWithParam<CelonisInJsonArrayTestParam> {
+class CelonisInJsonArrayTest : public testing::TestWithParam<CelonisInJsonArrayTestParam> {
 protected:
     void SetUp() override {}
 
     void TearDown() override {}
 
 private:
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(LT),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(LT),
+                                                            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -39,7 +37,7 @@ private:
         match_array_json_column_ = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void AddRow(const Datum& value, const DatumArray& match_array) {
         value_column_->append_datum(value);
         json match_array_json = ToJsonArray<LT>(match_array);
@@ -49,25 +47,21 @@ private:
         match_array_json_column_->append_datum(array);
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     StatusOr<ColumnPtr> Run() {
-        DeferOp close_fragment_local([this] {
-            CelonisInJson<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local([this] { CelonisInJson<LT>::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisInJson<LT>::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisInJson<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local([this] { CelonisInJson<LT>::close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisInJson<LT>::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         auto result = CelonisInJson<LT>::in_json_array(ctx_.get(), {value_column_, match_array_json_column_});
         return result;
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     json ToJsonArray(const DatumArray& match_array) {
         json match_array_json = json::array();
         if constexpr (lt_is_string<LT>) {
-            for (const auto& item: match_array) {
+            for (const auto& item : match_array) {
                 if (item.is_null()) {
                     match_array_json.push_back(nullptr);
                 } else {
@@ -75,7 +69,7 @@ private:
                 }
             }
         } else {
-            for (const auto& item: match_array) {
+            for (const auto& item : match_array) {
                 if (item.is_null()) {
                     match_array_json.push_back(nullptr);
                 } else {
@@ -86,7 +80,7 @@ private:
         return match_array_json;
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     StatusOr<ColumnPtr> RunConstantMatch(const DatumArray& match_array, bool compress_json_str) {
         json match_array_json = ToJsonArray<LT>(match_array);
         std::string match_array_json_str = match_array_json.dump();
@@ -94,7 +88,7 @@ private:
         return RunConstantMatch<LT>(match_array_json_str, compress_json_str);
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     StatusOr<ColumnPtr> RunConstantMatch(const std::string& json_str, bool compress_json_str) {
         std::string str = compress_json_str ? compressAndBase64Encode(json_str) : json_str;
         // Split the string into 2 parts
@@ -114,10 +108,10 @@ private:
 
     std::string compressAndBase64Encode(const std::string& str) {
         std::string compressed_str = compress_string(str, false);
-        int cipher_len = (size_t) (4.0 * ceil((double) compressed_str.length() / 3.0)) + 1;
+        int cipher_len = (size_t)(4.0 * ceil((double)compressed_str.length() / 3.0)) + 1;
         std::string p(cipher_len, '\0');
-        int len = base64_encode3((unsigned char*) compressed_str.data(), compressed_str.length(),
-                                 (unsigned char*) p.data());
+        int len = base64_encode3((unsigned char*)compressed_str.data(), compressed_str.length(),
+                                 (unsigned char*)p.data());
         std::string encoded_string(p.data(), len);
         return encoded_string;
     }
@@ -270,6 +264,5 @@ TEST_F(CelonisInJsonArrayTest, non_const_match_fail) {
 
 INSTANTIATE_TEST_SUITE_P(CelonisInJsonArrayTest, CelonisInJsonArrayTest,
                          ::testing::Values(CelonisInJsonArrayTestParam{true}, CelonisInJsonArrayTestParam{false}));
-
 
 } // namespace starrocks

@@ -21,7 +21,8 @@ class identity_join_projection {
   }
   [[nodiscard]] row_id at(row_id index) const {
     if (static_cast<size_t>(index) >= size()) [[unlikely]] {
-      throw legacy_embedded_ctl::out_of_range{"Index [{}] is out of bounds for join projection vector of size [{}].", index, size()};
+      throw legacy_embedded_ctl::out_of_range{"Index [{}] is out of bounds for join projection vector of size [{}].",
+                                              index, size()};
     }
     return operator[](index);
   }
@@ -40,7 +41,9 @@ using pull_up_vector_t = std::variant<identity_join_projection, join_projection3
 
 template <typename FUNCTION, typename... PROJECTION_VECTOR>
 [[nodiscard]] decltype(auto) cast_execute_projection_vector(FUNCTION&& f, PROJECTION_VECTOR&&... projections) {
-  return std::visit(legacy_embedded_ctl::overloaded{[&f](auto&&... projs) { return std::invoke(std::forward<FUNCTION>(f), projs...); }},
+  return std::visit(legacy_embedded_ctl::overloaded{[&f](auto&&... projs) {
+                      return std::invoke(std::forward<FUNCTION>(f), projs...);
+                    }},
                     projections...);
 }
 

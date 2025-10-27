@@ -4,12 +4,12 @@
 #include <cmath>
 #include <cstddef>
 #include <functional>
-#include <oneapi/tbb/enumerable_thread_specific.h>
-#include <oneapi/tbb/parallel_for_each.h>
 #include <type_traits>
 #include <utility>
 
 #include <bytell_hash_map.hpp>
+#include <oneapi/tbb/enumerable_thread_specific.h>
+#include <oneapi/tbb/parallel_for_each.h>
 #include <tbb/parallel_for_each.h>
 #include <tbb/parallel_sort.h>
 
@@ -131,7 +131,8 @@ class parallel_hash_table {
     // Makes the last entry available in the buffer again
     void reclaim_last_entry(hash_entry* entry) {
       legacy_embedded_debug_assert(next_free_entry_ > 0);
-      legacy_embedded_debug_assert(entry == &entries_buffer_[next_free_entry_ - 1], "only the last entry can be reclaimed");
+      legacy_embedded_debug_assert(entry == &entries_buffer_[next_free_entry_ - 1],
+                                   "only the last entry can be reclaimed");
       next_free_entry_--;
     }
 
@@ -159,8 +160,9 @@ class parallel_hash_table {
    * @brief inserts all input elements and returns an array that maps every element of the input to a unique hash_entry.
    * Elements with the same key point to the same hash_entry.
    */
-  legacy_embedded_ctl::static_array<hash_entry*> batch_insert_or_get(std::span<const KEY_T> keys, const legacy_embedded_ctl::bitset_view_t null_flags,
-                                                     const uint64_t max_num_hash_collisions_per_bucket = 100) {
+  legacy_embedded_ctl::static_array<hash_entry*> batch_insert_or_get(
+      std::span<const KEY_T> keys, const legacy_embedded_ctl::bitset_view_t null_flags,
+      const uint64_t max_num_hash_collisions_per_bucket = 100) {
     auto associated_entries{memory::tracking::make_static_array_for_overwrite<hash_entry*>(
         keys.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context_)};
 

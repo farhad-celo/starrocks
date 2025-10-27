@@ -4,8 +4,8 @@
 #include "column/column_builder.h"
 #include "column/column_viewer.h"
 #include "exprs/builtin_functions.h"
-#include "exprs/function_context.h"
 #include "exprs/celonis/match_pattern_util.h"
+#include "exprs/function_context.h"
 
 namespace starrocks {
 
@@ -51,9 +51,8 @@ Status CelonisPatindex::close(FunctionContext* context, FunctionContext::Functio
     return Status::OK();
 }
 
-StatusOr<ColumnPtr>
-CelonisPatindex::patindex_non_constant_pattern([[maybe_unused]]FunctionContext* context,
-                                               const Columns& columns) {
+StatusOr<ColumnPtr> CelonisPatindex::patindex_non_constant_pattern([[maybe_unused]] FunctionContext* context,
+                                                                   const Columns& columns) {
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     ColumnViewer pattern_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     const bool has_occurrence = columns.size() == 3;
@@ -72,7 +71,7 @@ CelonisPatindex::patindex_non_constant_pattern([[maybe_unused]]FunctionContext* 
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr> CelonisPatindex::patindex_constant_pattern([[maybe_unused]]FunctionContext* context,
+StatusOr<ColumnPtr> CelonisPatindex::patindex_constant_pattern([[maybe_unused]] FunctionContext* context,
                                                                const Columns& columns) {
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     const bool has_occurrence = columns.size() == 3;

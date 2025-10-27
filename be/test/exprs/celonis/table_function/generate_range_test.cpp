@@ -1,10 +1,10 @@
 #include "exprs/celonis/table_function/generate_range.h"
 
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "common/config.h"
 #include "testutil/assert.h"
-
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -24,9 +24,8 @@ protected:
 
     void TearDown() override {}
 
-    template<LogicalType LT, LogicalType STEP_LT>
-    std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>>
-    Prepare(const std::vector<TestCase>& test_cases) {
+    template <LogicalType LT, LogicalType STEP_LT>
+    std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> Prepare(const std::vector<TestCase>& test_cases) {
         auto step = ColumnHelper::create_column(TypeDescriptor::from_logical_type(STEP_LT), true);
         auto range_start = ColumnHelper::create_column(TypeDescriptor::from_logical_type(LT), true);
         auto range_end = ColumnHelper::create_column(TypeDescriptor::from_logical_type(LT), true);
@@ -49,7 +48,7 @@ protected:
         return {table_state, std::move(function)};
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Evaluate(const ColumnPtr& result_column, const std::vector<TestCase>& test_cases) {
         auto result = ColumnViewer<LT>(result_column);
 
@@ -64,12 +63,12 @@ protected:
             for (int j = 0; j < test_cases[i].expected.size(); ++j) {
                 ASSERT_FALSE(result.is_null(row));
                 EXPECT_EQ(result.value(row++), test_cases[i].expected[j].get<RunTimeCppType<LT>>())
-                                    << "input_row: " << i << ", element_index : " << j;
+                        << "input_row: " << i << ", element_index : " << j;
             }
         }
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Evaluate(const ColumnPtr& result_column, const DatumArray& expected) {
         auto result = ColumnViewer<LT>(result_column);
 
@@ -81,7 +80,7 @@ protected:
         }
     }
 
-    template<LogicalType LT, LogicalType STEP_LT>
+    template <LogicalType LT, LogicalType STEP_LT>
     void Run(const std::vector<TestCase>& test_cases) {
         auto [table_state, function] = Prepare<LT, STEP_LT>(test_cases);
 
@@ -115,9 +114,7 @@ TEST_F(CelonisGenerateRangeTest, bigint_null_row) {
 TEST_F(CelonisGenerateRangeTest, bigint_chunks) {
     rt_state_->set_chunk_size(4);
     const auto LT = TYPE_BIGINT;
-    std::vector<TestCase> test_cases{{3L, 3L, 14L, {}},
-                                     {1L, 1L, 9L, {}},
-                                     {2L, 0L, 2L, {}}};
+    std::vector<TestCase> test_cases{{3L, 3L, 14L, {}}, {1L, 1L, 9L, {}}, {2L, 0L, 2L, {}}};
 
     auto [table_state, function] = Prepare<LT, LT>(test_cases);
 
@@ -182,132 +179,106 @@ TEST_F(CelonisGenerateRangeTest, bigint_start_greater_than_end) {
 
 TEST_F(CelonisGenerateRangeTest, datetime) {
     std::vector<TestCase> test_cases{
-            {
-                    "1M",
-                    TimestampValue::create(2019, 1, 1, 0, 0, 0),
-                    TimestampValue::create(2019, 6, 1, 0, 0, 0),
-                    {
-                            TimestampValue::create(2019, 1, 1, 0, 0, 0),
-                            TimestampValue::create(2019, 2, 1, 0, 0, 0),
-                            TimestampValue::create(2019, 3, 1, 0, 0, 0),
-                            TimestampValue::create(2019, 4, 1, 0, 0, 0),
-                            TimestampValue::create(2019, 5, 1, 0, 0, 0),
-                            TimestampValue::create(2019, 6, 1, 0, 0, 0)
-                    }
-            }
-    };
+            {"1M",
+             TimestampValue::create(2019, 1, 1, 0, 0, 0),
+             TimestampValue::create(2019, 6, 1, 0, 0, 0),
+             {TimestampValue::create(2019, 1, 1, 0, 0, 0), TimestampValue::create(2019, 2, 1, 0, 0, 0),
+              TimestampValue::create(2019, 3, 1, 0, 0, 0), TimestampValue::create(2019, 4, 1, 0, 0, 0),
+              TimestampValue::create(2019, 5, 1, 0, 0, 0), TimestampValue::create(2019, 6, 1, 0, 0, 0)}}};
     Run<TYPE_DATETIME, TYPE_VARCHAR>(test_cases);
 }
 
 TEST_F(CelonisGenerateRangeTest, datetime_max_day) {
-    std::vector<TestCase> test_cases{
-            {
-                    "1M",
-                    TimestampValue::create(2019, 12, 31, 1, 2, 3),
-                    TimestampValue::create(2020,  7,  1, 0, 0, 0),
-                    {
-                            TimestampValue::create(2019, 12, 31, 1, 2, 3),
-                            TimestampValue::create(2020,  1, 31, 1, 2, 3),
-                            TimestampValue::create(2020,  2, 29, 1, 2, 3),
-                            TimestampValue::create(2020,  3, 31, 1, 2, 3),
-                            TimestampValue::create(2020,  4, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  5, 31, 1, 2, 3),
-                            TimestampValue::create(2020,  6, 30, 1, 2, 3),
-                    }
-            },
-            {
-                    "1Q",
-                    TimestampValue::create(2019,  2, 28, 1, 2, 3),
-                    TimestampValue::create(2020,  7,  1, 0, 0, 0),
-                    {
-                            TimestampValue::create(2019,  2, 28, 1, 2, 3),
-                            TimestampValue::create(2019,  5, 31, 1, 2, 3),
-                            TimestampValue::create(2019,  8, 31, 1, 2, 3),
-                            TimestampValue::create(2019, 11, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  2, 29, 1, 2, 3),
-                            TimestampValue::create(2020,  5, 31, 1, 2, 3),
-                    }
-            },
-            {
-                    "3M", // Same test case as 1Q
-                    TimestampValue::create(2019,  2, 28, 1, 2, 3),
-                    TimestampValue::create(2020,  7,  1, 0, 0, 0),
-                    {
-                            TimestampValue::create(2019,  2, 28, 1, 2, 3),
-                            TimestampValue::create(2019,  5, 31, 1, 2, 3),
-                            TimestampValue::create(2019,  8, 31, 1, 2, 3),
-                            TimestampValue::create(2019, 11, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  2, 29, 1, 2, 3),
-                            TimestampValue::create(2020,  5, 31, 1, 2, 3),
-                    }
-            },
-            {
-                "2Y",
-                        TimestampValue::create(2018,  2, 28, 1, 2, 3),
-                        TimestampValue::create(2027,  7,  1, 0, 0, 0),
-                        {
-                                TimestampValue::create(2018,  2, 28, 1, 2, 3),
-                                TimestampValue::create(2020,  2, 29, 1, 2, 3),
-                                TimestampValue::create(2022,  2, 28, 1, 2, 3),
-                                TimestampValue::create(2024,  2, 29, 1, 2, 3),
-                                TimestampValue::create(2026,  2, 28, 1, 2, 3),
-                        }
-            }
-    };
+    std::vector<TestCase> test_cases{{"1M",
+                                      TimestampValue::create(2019, 12, 31, 1, 2, 3),
+                                      TimestampValue::create(2020, 7, 1, 0, 0, 0),
+                                      {
+                                              TimestampValue::create(2019, 12, 31, 1, 2, 3),
+                                              TimestampValue::create(2020, 1, 31, 1, 2, 3),
+                                              TimestampValue::create(2020, 2, 29, 1, 2, 3),
+                                              TimestampValue::create(2020, 3, 31, 1, 2, 3),
+                                              TimestampValue::create(2020, 4, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 5, 31, 1, 2, 3),
+                                              TimestampValue::create(2020, 6, 30, 1, 2, 3),
+                                      }},
+                                     {"1Q",
+                                      TimestampValue::create(2019, 2, 28, 1, 2, 3),
+                                      TimestampValue::create(2020, 7, 1, 0, 0, 0),
+                                      {
+                                              TimestampValue::create(2019, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2019, 5, 31, 1, 2, 3),
+                                              TimestampValue::create(2019, 8, 31, 1, 2, 3),
+                                              TimestampValue::create(2019, 11, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 2, 29, 1, 2, 3),
+                                              TimestampValue::create(2020, 5, 31, 1, 2, 3),
+                                      }},
+                                     {"3M", // Same test case as 1Q
+                                      TimestampValue::create(2019, 2, 28, 1, 2, 3),
+                                      TimestampValue::create(2020, 7, 1, 0, 0, 0),
+                                      {
+                                              TimestampValue::create(2019, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2019, 5, 31, 1, 2, 3),
+                                              TimestampValue::create(2019, 8, 31, 1, 2, 3),
+                                              TimestampValue::create(2019, 11, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 2, 29, 1, 2, 3),
+                                              TimestampValue::create(2020, 5, 31, 1, 2, 3),
+                                      }},
+                                     {"2Y",
+                                      TimestampValue::create(2018, 2, 28, 1, 2, 3),
+                                      TimestampValue::create(2027, 7, 1, 0, 0, 0),
+                                      {
+                                              TimestampValue::create(2018, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2020, 2, 29, 1, 2, 3),
+                                              TimestampValue::create(2022, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2024, 2, 29, 1, 2, 3),
+                                              TimestampValue::create(2026, 2, 28, 1, 2, 3),
+                                      }}};
     Run<TYPE_DATETIME, TYPE_VARCHAR>(test_cases);
 }
 
 TEST_F(CelonisGenerateRangeTest, datetime_non_max_day) {
-    std::vector<TestCase> test_cases{
-            {
-                    "1M",
-                    TimestampValue::create(2019, 12, 30, 1, 2, 3),
-                    TimestampValue::create(2021,  4,  1, 0, 0, 0),
-                    {
-                            TimestampValue::create(2019, 12, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  1, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  2, 29, 1, 2, 3),
-                            TimestampValue::create(2020,  3, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  4, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  5, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  6, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  7, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  8, 30, 1, 2, 3),
-                            TimestampValue::create(2020,  9, 30, 1, 2, 3),
-                            TimestampValue::create(2020, 10, 30, 1, 2, 3),
-                            TimestampValue::create(2020, 11, 30, 1, 2, 3),
-                            TimestampValue::create(2020, 12, 30, 1, 2, 3),
-                            TimestampValue::create(2021,  1, 30, 1, 2, 3),
-                            TimestampValue::create(2021,  2, 28, 1, 2, 3),
-                            TimestampValue::create(2021,  3, 30, 1, 2, 3),
-                    }
-            },
-            {
-                "1Q",
-                        TimestampValue::create(2018, 11, 29, 1, 2, 3),
-                        TimestampValue::create(2020,  7,  1, 0, 0, 0),
-                        {
-                                TimestampValue::create(2018, 11, 29, 1, 2, 3),
-                                TimestampValue::create(2019,  2, 28, 1, 2, 3),
-                                TimestampValue::create(2019,  5, 29, 1, 2, 3),
-                                TimestampValue::create(2019,  8, 29, 1, 2, 3),
-                                TimestampValue::create(2019, 11, 29, 1, 2, 3),
-                                TimestampValue::create(2020,  2, 29, 1, 2, 3),
-                                TimestampValue::create(2020,  5, 29, 1, 2, 3),
-                        }
-            },
-            {
-                    "2Y",
-                    TimestampValue::create(2020,  2, 28, 1, 2, 3),
-                    TimestampValue::create(2027,  7,  1, 0, 0, 0),
-                    {
-                            TimestampValue::create(2020,  2, 28, 1, 2, 3),
-                            TimestampValue::create(2022,  2, 28, 1, 2, 3),
-                            TimestampValue::create(2024,  2, 28, 1, 2, 3),
-                            TimestampValue::create(2026,  2, 28, 1, 2, 3),
-                    }
-            }
-    };
+    std::vector<TestCase> test_cases{{"1M",
+                                      TimestampValue::create(2019, 12, 30, 1, 2, 3),
+                                      TimestampValue::create(2021, 4, 1, 0, 0, 0),
+                                      {
+                                              TimestampValue::create(2019, 12, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 1, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 2, 29, 1, 2, 3),
+                                              TimestampValue::create(2020, 3, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 4, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 5, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 6, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 7, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 8, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 9, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 10, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 11, 30, 1, 2, 3),
+                                              TimestampValue::create(2020, 12, 30, 1, 2, 3),
+                                              TimestampValue::create(2021, 1, 30, 1, 2, 3),
+                                              TimestampValue::create(2021, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2021, 3, 30, 1, 2, 3),
+                                      }},
+                                     {"1Q",
+                                      TimestampValue::create(2018, 11, 29, 1, 2, 3),
+                                      TimestampValue::create(2020, 7, 1, 0, 0, 0),
+                                      {
+                                              TimestampValue::create(2018, 11, 29, 1, 2, 3),
+                                              TimestampValue::create(2019, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2019, 5, 29, 1, 2, 3),
+                                              TimestampValue::create(2019, 8, 29, 1, 2, 3),
+                                              TimestampValue::create(2019, 11, 29, 1, 2, 3),
+                                              TimestampValue::create(2020, 2, 29, 1, 2, 3),
+                                              TimestampValue::create(2020, 5, 29, 1, 2, 3),
+                                      }},
+                                     {"2Y",
+                                      TimestampValue::create(2020, 2, 28, 1, 2, 3),
+                                      TimestampValue::create(2027, 7, 1, 0, 0, 0),
+                                      {
+                                              TimestampValue::create(2020, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2022, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2024, 2, 28, 1, 2, 3),
+                                              TimestampValue::create(2026, 2, 28, 1, 2, 3),
+                                      }}};
     Run<TYPE_DATETIME, TYPE_VARCHAR>(test_cases);
 }
 
@@ -316,10 +287,9 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
     const auto LT = TYPE_DATETIME;
     const auto STEP_LT = TYPE_VARCHAR;
     std::vector<TestCase> test_cases{
-            { "1M", TimestampValue::create(2019, 12, 31, 1, 2, 3), TimestampValue::create(2020,  7,  1, 0, 0, 0), {}},
-            { "1Q", TimestampValue::create(2018, 11, 29, 1, 2, 3), TimestampValue::create(2019, 12,  1, 0, 0, 0), {}},
-            { "2Y", TimestampValue::create(2024,  1,  1, 0, 0, 0), TimestampValue::create(2028,  1,  1, 0, 0, 0), {}}
-    };
+            {"1M", TimestampValue::create(2019, 12, 31, 1, 2, 3), TimestampValue::create(2020, 7, 1, 0, 0, 0), {}},
+            {"1Q", TimestampValue::create(2018, 11, 29, 1, 2, 3), TimestampValue::create(2019, 12, 1, 0, 0, 0), {}},
+            {"2Y", TimestampValue::create(2024, 1, 1, 0, 0, 0), TimestampValue::create(2028, 1, 1, 0, 0, 0), {}}};
 
     auto [table_state, function] = Prepare<LT, STEP_LT>(test_cases);
 
@@ -331,9 +301,9 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
 
         DatumArray expected = {
                 TimestampValue::create(2019, 12, 31, 1, 2, 3),
-                TimestampValue::create(2020,  1, 31, 1, 2, 3),
-                TimestampValue::create(2020,  2, 29, 1, 2, 3),
-                TimestampValue::create(2020,  3, 31, 1, 2, 3),
+                TimestampValue::create(2020, 1, 31, 1, 2, 3),
+                TimestampValue::create(2020, 2, 29, 1, 2, 3),
+                TimestampValue::create(2020, 3, 31, 1, 2, 3),
         };
         Evaluate<LT>(results[0], expected);
     }
@@ -345,9 +315,9 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
         EXPECT_EQ(offset->get(2).get_uint32(), 4);
 
         DatumArray expected = {
-                TimestampValue::create(2020,  4, 30, 1, 2, 3),
-                TimestampValue::create(2020,  5, 31, 1, 2, 3),
-                TimestampValue::create(2020,  6, 30, 1, 2, 3),
+                TimestampValue::create(2020, 4, 30, 1, 2, 3),
+                TimestampValue::create(2020, 5, 31, 1, 2, 3),
+                TimestampValue::create(2020, 6, 30, 1, 2, 3),
                 TimestampValue::create(2018, 11, 29, 1, 2, 3),
         };
         Evaluate<LT>(results[0], expected);
@@ -358,9 +328,9 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 4);
         DatumArray expected = {
-                TimestampValue::create(2019,  2, 28, 1, 2, 3),
-                TimestampValue::create(2019,  5, 29, 1, 2, 3),
-                TimestampValue::create(2019,  8, 29, 1, 2, 3),
+                TimestampValue::create(2019, 2, 28, 1, 2, 3),
+                TimestampValue::create(2019, 5, 29, 1, 2, 3),
+                TimestampValue::create(2019, 8, 29, 1, 2, 3),
                 TimestampValue::create(2019, 11, 29, 1, 2, 3),
         };
         Evaluate<LT>(results[0], expected);
@@ -370,11 +340,8 @@ TEST_F(CelonisGenerateRangeTest, datetime_chunks) {
         EXPECT_EQ(table_state->processed_rows(), 3); // input2 is processed in this call.
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 3);
-        DatumArray expected = {
-                TimestampValue::create(2024,  1,  1, 0, 0, 0),
-                TimestampValue::create(2026,  1,  1, 0, 0, 0),
-                TimestampValue::create(2028,  1,  1, 0, 0, 0)
-        };
+        DatumArray expected = {TimestampValue::create(2024, 1, 1, 0, 0, 0), TimestampValue::create(2026, 1, 1, 0, 0, 0),
+                               TimestampValue::create(2028, 1, 1, 0, 0, 0)};
         Evaluate<LT>(results[0], expected);
     }
 

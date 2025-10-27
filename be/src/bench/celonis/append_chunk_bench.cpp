@@ -75,12 +75,10 @@ static void do_bench(benchmark::State& state, size_t chunk_size, size_t chunk_nu
         total_chunks += chunk_num;
         total_bytes += column->byte_size() * chunk_num;
     }
-    state.counters["ChunkRate"] =
-            benchmark::Counter(total_chunks, benchmark::Counter::kIsRate);
+    state.counters["ChunkRate"] = benchmark::Counter(total_chunks, benchmark::Counter::kIsRate);
     state.counters["ChunkInvRate"] =
             benchmark::Counter(total_chunks, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
-    state.counters["ByteRate"] =
-            benchmark::Counter(total_bytes, benchmark::Counter::kIsRate);
+    state.counters["ByteRate"] = benchmark::Counter(total_bytes, benchmark::Counter::kIsRate);
     state.counters["ByteInvRate"] =
             benchmark::Counter(total_bytes, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }

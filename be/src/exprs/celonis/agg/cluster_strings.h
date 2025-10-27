@@ -1,15 +1,16 @@
 #pragma once
 
+#include <boost/functional/hash.hpp>
+
 #include "column/array_column.h"
 #include "column/binary_column.h"
-#include "column/const_column.h"
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "column/hash_set.h"
 #include "exprs/function_context.h"
 #include "rapidjson/document.h"
 #include "variant.h"
 #include "variant_agg.h"
-#include <boost/functional/hash.hpp>
 
 namespace starrocks {
 
@@ -44,8 +45,8 @@ public:
         }
         std::optional<std::string> string_value = std::nullopt;
         if (!columns[0]->is_null(row_num)) {
-            const BinaryColumn& strings = *(down_cast<const BinaryColumn*>(
-                    ColumnHelper::get_data_column(string_column)));
+            const BinaryColumn& strings =
+                    *(down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(string_column)));
             string_value = strings.get(row_num).get_slice().to_string();
         }
 
@@ -71,17 +72,17 @@ public:
 
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(int64_t);                       // edit_threshold_
-        result += sizeof(int64_t);                       // token_weight_
-        result += weighted_tokens_.size() + 1;           // weighted_tokens_
-        result += sizeof(uint32_t);                      // num_null_hashes
+        result += sizeof(int64_t);             // edit_threshold_
+        result += sizeof(int64_t);             // token_weight_
+        result += weighted_tokens_.size() + 1; // weighted_tokens_
+        result += sizeof(uint32_t);            // num_null_hashes
         result += sizeof(int128_t) * null_hashes_.size();
 
         result += sizeof(uint32_t); // num_hash_to_string_with_count
-        for (const auto& [hash128, string_count]: hash_to_string_with_count_) {
-            result += sizeof(int128_t);                 // hash
-            result += string_count.first.size() + 1;    // string
-            result += sizeof(int64_t);                  // count
+        for (const auto& [hash128, string_count] : hash_to_string_with_count_) {
+            result += sizeof(int128_t);              // hash
+            result += string_count.first.size() + 1; // string
+            result += sizeof(int64_t);               // count
         }
         return result;
     };
@@ -104,14 +105,14 @@ public:
         const uint32_t num_null_hashes = null_hashes_.size();
         memcpy(dst, &num_null_hashes, sizeof(uint32_t));
         dst += sizeof(uint32_t);
-        for (int128_t hash128: null_hashes_) {
+        for (int128_t hash128 : null_hashes_) {
             memcpy(dst, &hash128, sizeof(int128_t));
             dst += sizeof(int128_t);
         }
         const uint32_t num_hash_to_strings = hash_to_string_with_count_.size();
         memcpy(dst, &num_hash_to_strings, sizeof(uint32_t));
         dst += sizeof(uint32_t);
-        for (const auto& [hash128, string_count]: hash_to_string_with_count_) {
+        for (const auto& [hash128, string_count] : hash_to_string_with_count_) {
             memcpy(dst, &hash128, sizeof(int128_t));
             dst += sizeof(int128_t);
             memcpy(dst, string_count.first.data(), string_count.first.size() + 1);
@@ -205,7 +206,6 @@ private:
 class ClusterStringsAggregateFunction
         : public AggregateFunctionBatchHelper<ClusterStringsState, ClusterStringsAggregateFunction> {
 public:
-
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr state, size_t row_num) const override;
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override;

@@ -91,80 +91,81 @@ template <typename T>
  */
 
 template <typename T>
-inline legacy_embedded_ctl::static_array<T> make_static_array_value_init(size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                                         const common::execution_context& context,
-                                                         const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_static_array_value_init<T>(size, reason, spawn_allocator<T>(context, reason, priority));
+inline legacy_embedded_ctl::static_array<T> make_static_array_value_init(
+    size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason, const common::execution_context& context,
+    const legacy_embedded_ctl::utils::allocation_priority priority) {
+  return legacy_embedded_ctl::make_static_array_value_init<T>(size, reason,
+                                                              spawn_allocator<T>(context, reason, priority));
 }
 
 template <typename T>
-inline legacy_embedded_ctl::static_array<T> make_static_array_for_overwrite(size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                                            const common::execution_context& context,
-                                                            const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_static_array_for_overwrite<T>(size, reason, spawn_allocator<T>(context, reason, priority, false));
+inline legacy_embedded_ctl::static_array<T> make_static_array_for_overwrite(
+    size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason, const common::execution_context& context,
+    const legacy_embedded_ctl::utils::allocation_priority priority) {
+  return legacy_embedded_ctl::make_static_array_for_overwrite<T>(size, reason,
+                                                                 spawn_allocator<T>(context, reason, priority, false));
 }
 
 template <typename T>
-inline legacy_embedded_ctl::static_array<T> make_static_array(const size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                              const common::execution_context& context,
-                                              const legacy_embedded_ctl::utils::allocation_priority priority) {
+inline legacy_embedded_ctl::static_array<T> make_static_array(
+    const size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason,
+    const common::execution_context& context, const legacy_embedded_ctl::utils::allocation_priority priority) {
   return legacy_embedded_ctl::make_static_array<T>(size, reason, spawn_allocator<T>(context, reason, priority));
 }
 
 template <typename T>
-inline legacy_embedded_ctl::static_array<T> make_static_array(const size_t size, const T& init_value,
-                                              const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                              const common::execution_context& context,
-                                              const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_static_array<T>(size, init_value, reason, spawn_allocator<T>(context, reason, priority));
+inline legacy_embedded_ctl::static_array<T> make_static_array(
+    const size_t size, const T& init_value, const legacy_embedded_ctl::utils::allocation_reason& reason,
+    const common::execution_context& context, const legacy_embedded_ctl::utils::allocation_priority priority) {
+  return legacy_embedded_ctl::make_static_array<T>(size, init_value, reason,
+                                                   spawn_allocator<T>(context, reason, priority));
 }
 
 template <typename T>
-inline legacy_embedded_ctl::static_array<T> make_static_array(std::initializer_list<T> init,
-                                              const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                              const common::execution_context& context,
-                                              const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_static_array<T>(std::move(init), reason, spawn_allocator<T>(context, reason, priority));
+inline legacy_embedded_ctl::static_array<T> make_static_array(
+    std::initializer_list<T> init, const legacy_embedded_ctl::utils::allocation_reason& reason,
+    const common::execution_context& context, const legacy_embedded_ctl::utils::allocation_priority priority) {
+  return legacy_embedded_ctl::make_static_array<T>(std::move(init), reason,
+                                                   spawn_allocator<T>(context, reason, priority));
 }
 
 template <typename T>
-inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array_value_init(size_t size,
-                                                                       const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                                                       const common::execution_context& context,
-                                                                       const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_shared_static_array_value_init<T>(size, reason, spawn_allocator<T>(context, reason, priority));
+inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array_value_init(
+    size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason, const common::execution_context& context,
+    const legacy_embedded_ctl::utils::allocation_priority priority) {
+  return legacy_embedded_ctl::make_shared_static_array_value_init<T>(size, reason,
+                                                                     spawn_allocator<T>(context, reason, priority));
 }
 
 template <typename T>
 inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array_for_overwrite(
     size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason, const common::execution_context& context,
     const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(size, reason,
-                                                        spawn_allocator<T>(context, reason, priority, false));
+  return legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(
+      size, reason, spawn_allocator<T>(context, reason, priority, false));
 }
 
 template <typename T>
-inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(const size_t size,
-                                                            const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                                            const common::execution_context& context,
-                                                            const legacy_embedded_ctl::utils::allocation_priority priority) {
+inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(
+    const size_t size, const legacy_embedded_ctl::utils::allocation_reason& reason,
+    const common::execution_context& context, const legacy_embedded_ctl::utils::allocation_priority priority) {
   return legacy_embedded_ctl::make_shared_static_array<T>(size, reason, spawn_allocator<T>(context, reason, priority));
 }
 
 template <typename T>
-inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(const size_t size, const T& init_value,
-                                                            const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                                            const common::execution_context& context,
-                                                            const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_shared_static_array<T>(size, init_value, reason, spawn_allocator<T>(context, reason, priority));
+inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(
+    const size_t size, const T& init_value, const legacy_embedded_ctl::utils::allocation_reason& reason,
+    const common::execution_context& context, const legacy_embedded_ctl::utils::allocation_priority priority) {
+  return legacy_embedded_ctl::make_shared_static_array<T>(size, init_value, reason,
+                                                          spawn_allocator<T>(context, reason, priority));
 }
 
 template <typename T>
-inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(std::initializer_list<T> init,
-                                                            const legacy_embedded_ctl::utils::allocation_reason& reason,
-                                                            const common::execution_context& context,
-                                                            const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_shared_static_array<T>(std::move(init), reason, spawn_allocator<T>(context, reason, priority));
+inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(
+    std::initializer_list<T> init, const legacy_embedded_ctl::utils::allocation_reason& reason,
+    const common::execution_context& context, const legacy_embedded_ctl::utils::allocation_priority priority) {
+  return legacy_embedded_ctl::make_shared_static_array<T>(std::move(init), reason,
+                                                          spawn_allocator<T>(context, reason, priority));
 }
 
 }  // namespace celonis::accelerator::memory::tracking

@@ -1,20 +1,20 @@
 #include "exprs/celonis/kmeans.h"
 
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+
 #include "column/column_builder.h"
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 namespace starrocks {
 
 namespace {
 
 class KmeansModel {
-
 public:
     KmeansModel(const std::vector<std::pair<double, double>>& limits, const std::vector<std::vector<double>>& centroids)
             : limits_(limits), centroids_(centroids) {}
@@ -171,9 +171,8 @@ Status CelonisKmeans::close(FunctionContext* context, FunctionContext::FunctionS
     return Status::OK();
 }
 
-StatusOr<ColumnPtr>
-CelonisKmeans::apply_kmeans_non_constant_model([[maybe_unused]]FunctionContext* context,
-                                               const Columns& columns) {
+StatusOr<ColumnPtr> CelonisKmeans::apply_kmeans_non_constant_model([[maybe_unused]] FunctionContext* context,
+                                                                   const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto& model_column = columns[1];
@@ -225,10 +224,8 @@ CelonisKmeans::apply_kmeans_non_constant_model([[maybe_unused]]FunctionContext* 
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisKmeans::apply_kmeans_constant_model([[maybe_unused]]FunctionContext* context,
-                                           const Columns& columns) {
-
+StatusOr<ColumnPtr> CelonisKmeans::apply_kmeans_constant_model([[maybe_unused]] FunctionContext* context,
+                                                               const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
@@ -275,8 +272,7 @@ CelonisKmeans::apply_kmeans_constant_model([[maybe_unused]]FunctionContext* cont
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisKmeans::apply_kmeans_model(FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisKmeans::apply_kmeans_model(FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     const auto* state = reinterpret_cast<const KmeansStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));

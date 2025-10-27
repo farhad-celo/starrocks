@@ -1,3 +1,5 @@
+#include "exprs/celonis/agg/variant_stats.h"
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -12,15 +14,14 @@
 #include "exprs/anyval_util.h"
 #include "exprs/arithmetic_operation.h"
 #include "exprs/celonis/base64.h"
-#include "exprs/celonis/agg/variant_stats.h"
 #include "exprs/function_context.h"
-#include "runtime/runtime_state.h"
 #include "google/protobuf/util/json_util.h"
 #include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "runtime/mem_pool.h"
+#include "runtime/runtime_state.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
 
@@ -184,9 +185,7 @@ struct VariantStatsResult {
         return true;
     }
 
-    bool equal_e_count(const VariantStatsResult& other) {
-        return e_count == other.e_count;
-    }
+    bool equal_e_count(const VariantStatsResult& other) { return e_count == other.e_count; }
 
     bool equal_top(const VariantStatsResult& other, const std::vector<int>& remap_idx) {
         // Top variants per activity are sorted by frequency.
@@ -402,7 +401,7 @@ public:
         std::uniform_int_distribution<size_t> length_g(0, 2 * avg_length);
         std::uniform_int_distribution<size_t> g(0, alphabet.size() - 1);
 
-        std::vector<std::vector<std::string> > seed_data;
+        std::vector<std::vector<std::string>> seed_data;
         for (int i = 0; i < seed_rows; i++) {
             std::vector<std::string> v;
             int len = length_g(rd);
@@ -470,14 +469,36 @@ private:
 };
 
 TEST_F(CelonisVariantStatsTest, test_equality) {
-    std::string s = "{ 'dict':[ {'id':3,'name':'a4'}, {'id':2,'name':'a3'}, {'id':0,'name':'a1'}, {'id':1,'name':'a2'} ], 'a_stats':[ {'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0}, {'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1}, {'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2}, {'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3} ], 'e_stats':[ {'count':3,'count_case':3,'src':0,'dst':1}, {'count':1,'count_case':1,'src':1,'dst':2}, {'count':1,'count_case':1,'src':2,'dst':3} ], 'top':[ {'id':0,'top':[ {'variant':[0,1],'count':2}, {'variant':[0,1,2],'count':1}]}, {'id':1,'top':[ {'variant':[0,1],'count':2}, {'variant':[0,1,2],'count':1}]}, {'id':2,'top':[ {'variant':[0,1,2],'count':1}, {'variant':[2,3],'count':1}]}, {'id':3,'top':[ {'variant':[2,3],'count':1}]} ], 'happy': {'variant':[0,1],'count':2} }";
+    std::string s =
+            "{ 'dict':[ {'id':3,'name':'a4'}, {'id':2,'name':'a3'}, {'id':0,'name':'a1'}, {'id':1,'name':'a2'} ], "
+            "'a_stats':[ {'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0}, "
+            "{'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1}, "
+            "{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2}, "
+            "{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3} ], 'e_stats':[ "
+            "{'count':3,'count_case':3,'src':0,'dst':1}, {'count':1,'count_case':1,'src':1,'dst':2}, "
+            "{'count':1,'count_case':1,'src':2,'dst':3} ], 'top':[ {'id':0,'top':[ {'variant':[0,1],'count':2}, "
+            "{'variant':[0,1,2],'count':1}]}, {'id':1,'top':[ {'variant':[0,1],'count':2}, "
+            "{'variant':[0,1,2],'count':1}]}, {'id':2,'top':[ {'variant':[0,1,2],'count':1}, "
+            "{'variant':[2,3],'count':1}]}, {'id':3,'top':[ {'variant':[2,3],'count':1}]} ], 'happy': "
+            "{'variant':[0,1],'count':2} }";
     std::replace(s.begin(), s.end(), '\'', '\"');
     VariantStatsResult vs;
     ASSERT_TRUE(vs.from_json(s));
     std::cout << "\n==== vs\n" << vs.debug_string() << "\n===\n";
 
     // remap 0 to 1 and 1 to 0
-    std::string s1 = "{ 'dict':[ {'id':3,'name':'a4'}, {'id':2,'name':'a3'}, {'id':1,'name':'a1'}, {'id':0,'name':'a2'} ], 'a_stats':[ {'count':3,'count_case':3,'count_start':3,'count_end':0,'id':1}, {'count':3,'count_case':3,'count_start':0,'count_end':2,'id':0}, {'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2}, {'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3} ], 'e_stats':[ {'count':3,'count_case':3,'src':1,'dst':0}, {'count':1,'count_case':1,'src':0,'dst':2}, {'count':1,'count_case':1,'src':2,'dst':3} ], 'top':[ {'id':0,'top':[{ 'variant':[1,0],'count':2},{ 'variant':[1,0,2],'count':1}]}, {'id':1,'top':[{ 'variant':[1,0],'count':2},{ 'variant':[1,0,2],'count':1}]}, {'id':2,'top':[{ 'variant':[1,0,2],'count':1},{ 'variant':[2,3],'count':1}]}, {'id':3,'top':[{ 'variant':[2,3],'count':1}]} ], 'happy':{'variant':[1,0],'count':2} }";
+    std::string s1 =
+            "{ 'dict':[ {'id':3,'name':'a4'}, {'id':2,'name':'a3'}, {'id':1,'name':'a1'}, {'id':0,'name':'a2'} ], "
+            "'a_stats':[ {'count':3,'count_case':3,'count_start':3,'count_end':0,'id':1}, "
+            "{'count':3,'count_case':3,'count_start':0,'count_end':2,'id':0}, "
+            "{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2}, "
+            "{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3} ], 'e_stats':[ "
+            "{'count':3,'count_case':3,'src':1,'dst':0}, {'count':1,'count_case':1,'src':0,'dst':2}, "
+            "{'count':1,'count_case':1,'src':2,'dst':3} ], 'top':[ {'id':0,'top':[{ 'variant':[1,0],'count':2},{ "
+            "'variant':[1,0,2],'count':1}]}, {'id':1,'top':[{ 'variant':[1,0],'count':2},{ "
+            "'variant':[1,0,2],'count':1}]}, {'id':2,'top':[{ 'variant':[1,0,2],'count':1},{ "
+            "'variant':[2,3],'count':1}]}, {'id':3,'top':[{ 'variant':[2,3],'count':1}]} ], "
+            "'happy':{'variant':[1,0],'count':2} }";
     std::replace(s1.begin(), s1.end(), '\'', '\"');
     VariantStatsResult vs1;
     ASSERT_TRUE(vs1.from_json(s1));
@@ -492,10 +513,7 @@ TEST_F(CelonisVariantStatsTest, test_equality) {
 TEST_F(CelonisVariantStatsTest, test_no_merge) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2"},
-                                      {"a1", "a2", "a3"},
-                                      {"a3", "a4"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2"}, {"a1", "a2", "a3"}, {"a3", "a4"}});
 
     auto weights = build_weight_column({1, 1, 1, 1});
     std::vector<const Column*> raw_columns;
@@ -513,16 +531,22 @@ TEST_F(CelonisVariantStatsTest, test_no_merge) {
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
 
-    std::string e_s = "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0},{'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3}],'e_stats':[{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[2,3],'count':1}]}],'happy':{'variant':[0,1],'count':2},'e_count':3}";
+    std::string e_s =
+            "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{"
+            "'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0},{'count':3,'count_case':3,'count_start':0,'"
+            "count_end':2,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':1,'count_"
+            "case':1,'count_start':0,'count_end':1,'id':3}],'e_stats':[{'count':3,'count_case':3,'src':0,'dst':1},{'"
+            "count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3}],'top':[{'id':0,'top':"
+            "[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':2},{'"
+            "variant':[0,1,2],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{"
+            "'id':3,'top':[{'variant':[2,3],'count':1}]}],'happy':{'variant':[0,1],'count':2},'e_count':3}";
     match(e_s, rs);
 }
 
 TEST_F(CelonisVariantStatsTest, test_merge_with_itself) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col = build_variant_column({{},
-                                     {"key1", "key2"},
-                                     {"sr-1", "sr-2", "sr-2"}});
+    auto col = build_variant_column({{}, {"key1", "key2"}, {"sr-1", "sr-2", "sr-2"}});
 
     auto weights = build_weight_column({1, 1, 1});
 
@@ -549,16 +573,22 @@ TEST_F(CelonisVariantStatsTest, test_merge_with_itself) {
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
 
-    std::string e_s = "{'dict':[{'id':3,'name':'sr-2'},{'id':2,'name':'sr-1'},{'id':0,'name':'key1'},{'id':1,'name':'key2'}],'a_stats':[{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':0},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':4,'count_case':2,'count_start':0,'count_end':2,'self_loop_count_case':2,'id':3}],'e_stats':[{'count':2,'count_case':2,'src':0,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3},{'count':2,'count_case':2,'src':3,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3,3],'count':2}]},{'id':3,'top':[{'variant':[2,3,3],'count':2}]}],'happy':{'variant':[0,1],'count':2},'e_count':3}";
+    std::string e_s =
+            "{'dict':[{'id':3,'name':'sr-2'},{'id':2,'name':'sr-1'},{'id':0,'name':'key1'},{'id':1,'name':'key2'}],'a_"
+            "stats':[{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':0},{'count':2,'count_case':2,'count_"
+            "start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':4,"
+            "'count_case':2,'count_start':0,'count_end':2,'self_loop_count_case':2,'id':3}],'e_stats':[{'count':2,'"
+            "count_case':2,'src':0,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3},{'count':2,'count_case':2,'src':"
+            "3,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1],'count':2}"
+            "]},{'id':2,'top':[{'variant':[2,3,3],'count':2}]},{'id':3,'top':[{'variant':[2,3,3],'count':2}]}],'happy':"
+            "{'variant':[0,1],'count':2},'e_count':3}";
     match(e_s, rs);
 }
 
 TEST_F(CelonisVariantStatsTest, test_merge_distinct_dict) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2", "a3"},
-                                      {"a3", "a4"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2", "a3"}, {"a3", "a4"}});
     auto weights = build_weight_column({1, 1, 1});
     std::vector<const Column*> raw_columns;
     raw_columns.resize(2);
@@ -570,8 +600,7 @@ TEST_F(CelonisVariantStatsTest, test_merge_distinct_dict) {
     auto part1 = BinaryColumn::create();
     func->serialize_to_column(ctx, state1->state(), part1.get());
 
-    auto col2 = build_variant_column({{"a1", "a4", "a0"},
-                                      {"a1", "a2", "a2", "a2", "a5"}});
+    auto col2 = build_variant_column({{"a1", "a4", "a0"}, {"a1", "a2", "a2", "a2", "a5"}});
     auto weights2 = build_weight_column({1, 1});
 
     std::vector<const Column*> raw_columns2;
@@ -593,17 +622,28 @@ TEST_F(CelonisVariantStatsTest, test_merge_distinct_dict) {
 
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
-    std::string e_s = "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':4,'name':'a0'},{'id':0,'name':'a1'},{'id':5,'name':'a5'},{'id':1,'name':'a2'}],'a_stats':[{'count':4,'count_case':4,'count_start':4,'count_end':0,'id':0},{'count':5,'count_case':3,'count_start':0,'count_end':1,'self_loop_count_case':1,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':1,'id':3},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':4},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':5}],'e_stats':[{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3},{'count':1,'count_case':1,'src':0,'dst':3},{'count':3,'count_case':3,'src':0,'dst':1},{'count':1,'count_case':1,'src':3,'dst':4},{'count':2,'count_case':1,'src':1,'dst':1},{'count':1,'count_case':1,'src':1,'dst':5}],'top':[{'id':0,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,3,4],'count':1},{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,1],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[0,3,4],'count':1},{'variant':[2,3],'count':1}]},{'id':4,'top':[{'variant':[0,3,4],'count':1}]},{'id':5,'top':[{'variant':[0,1,1,1,5],'count':1}]}],'happy':{'variant':[0,1],'count':1},'e_count':7}";
+    std::string e_s =
+            "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':4,'name':'a0'},{'id':0,'name':'a1'},{'id':5,'"
+            "name':'a5'},{'id':1,'name':'a2'}],'a_stats':[{'count':4,'count_case':4,'count_start':4,'count_end':0,'id':"
+            "0},{'count':5,'count_case':3,'count_start':0,'count_end':1,'self_loop_count_case':1,'id':1},{'count':2,'"
+            "count_case':2,'count_start':1,'count_end':1,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':"
+            "1,'id':3},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':4},{'count':1,'count_case':1,'"
+            "count_start':0,'count_end':1,'id':5}],'e_stats':[{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'"
+            "count_case':1,'src':2,'dst':3},{'count':1,'count_case':1,'src':0,'dst':3},{'count':3,'count_case':3,'src':"
+            "0,'dst':1},{'count':1,'count_case':1,'src':3,'dst':4},{'count':2,'count_case':1,'src':1,'dst':1},{'count':"
+            "1,'count_case':1,'src':1,'dst':5}],'top':[{'id':0,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,"
+            "1,5],'count':1},{'variant':[0,3,4],'count':1},{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,"
+            "1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,1],'count':1}]},{'id':2,'top':[{'variant':"
+            "[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[0,3,4],'count':1},{'variant':["
+            "2,3],'count':1}]},{'id':4,'top':[{'variant':[0,3,4],'count':1}]},{'id':5,'top':[{'variant':[0,1,1,1,5],'"
+            "count':1}]}],'happy':{'variant':[0,1],'count':1},'e_count':7}";
     match(e_s, rs);
 }
 
 TEST_F(CelonisVariantStatsTest, test_weights) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2"},
-                                      {"a1", "a2", "a2"},
-                                      {"a3", "a4"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2"}, {"a1", "a2", "a2"}, {"a3", "a4"}});
 
     auto weights = build_weight_column({1, 1, 3, 2});
     std::vector<const Column*> raw_columns;
@@ -620,15 +660,23 @@ TEST_F(CelonisVariantStatsTest, test_weights) {
 
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
-    std::string e_s = "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{'count':5,'count_case':5,'count_start':5,'count_end':0,'id':0},{'count':8,'count_case':5,'count_start':0,'count_end':5,'self_loop_count_case':3,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id':2},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':5,'count_case':5,'src':0,'dst':1},{'count':3,'count_case':3,'src':1,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3}],'top':[{'id':0,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3],'count':2}]},{'id':3,'top':[{'variant':[2,3],'count':2}]}],'happy':{'variant':[0,1,1],'count':3},'e_count':3}";
+    std::string e_s =
+            "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{"
+            "'count':5,'count_case':5,'count_start':5,'count_end':0,'id':0},{'count':8,'count_case':5,'count_start':0,'"
+            "count_end':5,'self_loop_count_case':3,'id':1},{'count':2,'count_case':2,'count_start':2,'count_end':0,'id'"
+            ":2},{'count':2,'count_case':2,'count_start':0,'count_end':2,'id':3}],'e_stats':[{'count':5,'count_case':5,"
+            "'src':0,'dst':1},{'count':3,'count_case':3,'src':1,'dst':1},{'count':2,'count_case':2,'src':2,'dst':3}],'"
+            "top':[{'id':0,'top':[{'variant':[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':1,'top':[{'variant'"
+            ":[0,1,1],'count':3},{'variant':[0,1],'count':2}]},{'id':2,'top':[{'variant':[2,3],'count':2}]},{'id':3,'"
+            "top':[{'variant':[2,3],'count':2}]}],'happy':{'variant':[0,1,1],'count':3},'e_count':3}";
     match(e_s, rs);
 }
 
 TEST_F(CelonisVariantStatsTest, test_empty) {
     {
         // No data.
-        const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto col1 = build_variant_column({});
         auto weights = build_weight_column({});
         std::vector<const Column*> raw_columns;
@@ -648,8 +696,8 @@ TEST_F(CelonisVariantStatsTest, test_empty) {
 
     {
         // Only empty variant.
-        const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto col1 = build_variant_column({{}});
         auto weights = build_weight_column({1});
         std::vector<const Column*> raw_columns;
@@ -668,8 +716,8 @@ TEST_F(CelonisVariantStatsTest, test_empty) {
 
     {
         // Single activity.
-        const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto col1 = build_variant_column({{"a1"}});
         auto weights = build_weight_column({1});
         std::vector<const Column*> raw_columns;
@@ -684,14 +732,16 @@ TEST_F(CelonisVariantStatsTest, test_empty) {
         Slice slice = result->get_slice(0);
         std::string rs = slice.to_string();
         std::string e_s =
-                "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':1,'id':0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1},'e_count':0}";
+                "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':1,'id'"
+                ":0}],'e_stats':[],'top':[{'id':0,'top':[{'variant':[0],'count':1}]}],'happy':{'variant':[0],'count':1}"
+                ",'e_count':0}";
         match(e_s, rs);
     }
 
     {
         // Single activity with self loop.
-        const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto col1 = build_variant_column({{"a1", "a1"}});
         auto weights = build_weight_column({1, 1});
         std::vector<const Column*> raw_columns;
@@ -706,15 +756,16 @@ TEST_F(CelonisVariantStatsTest, test_empty) {
         Slice slice = result->get_slice(0);
         std::string rs = slice.to_string();
         std::string e_s =
-                "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':2,'count_case':1,'count_start':1,'count_end':1,'self_loop_count_case':1,'id':0}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':0}],'top':[{'id':0,'top':[{'variant':[0,0],'count':1}]}],'happy':{'variant':[0,0],'count':1},'e_count':1}";
+                "{'dict':[{'id':0,'name':'a1'}],'a_stats':[{'count':2,'count_case':1,'count_start':1,'count_end':1,'"
+                "self_loop_count_case':1,'id':0}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':0}],'top':[{'id':"
+                "0,'top':[{'variant':[0,0],'count':1}]}],'happy':{'variant':[0,0],'count':1},'e_count':1}";
         match(e_s, rs);
     }
 }
 
 TEST_F(CelonisVariantStatsTest, test_null_activity) {
     // null activity.
-    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
-                                                           false);
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
     auto col1 = build_variant_column({{"a", "null", "b"}});
     auto weights = build_weight_column({1});
     std::vector<const Column*> raw_columns;
@@ -728,7 +779,11 @@ TEST_F(CelonisVariantStatsTest, test_null_activity) {
     EXPECT_EQ(result->size(), 1);
     Slice slice = result->get_slice(0);
     std::string rs = slice.to_string();
-    std::string e_s = "{'dict':[{'id':1,'name':'b'},{'id':0,'name':'a'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'count_end':0,'id':0},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':1}],'e_stats':[{'count':1,'count_case':1,'src':0,'dst':1}],'top':[{'id':0,'top':[{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':1}]}],'happy':{'variant':[0,1],'count':1},'e_count':1}";
+    std::string e_s =
+            "{'dict':[{'id':1,'name':'b'},{'id':0,'name':'a'}],'a_stats':[{'count':1,'count_case':1,'count_start':1,'"
+            "count_end':0,'id':0},{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':1}],'e_stats':[{'count':"
+            "1,'count_case':1,'src':0,'dst':1}],'top':[{'id':0,'top':[{'variant':[0,1],'count':1}]},{'id':1,'top':[{'"
+            "variant':[0,1],'count':1}]}],'happy':{'variant':[0,1],'count':1},'e_count':1}";
     match(e_s, rs);
 }
 
@@ -777,8 +832,7 @@ TEST_F(CelonisVariantStatsTest, test_large) {
 TEST_F(CelonisVariantStatsTest, test_top_with_repeated_activities) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2", "a1", "a2"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2", "a1", "a2"}});
 
     auto weights = build_weight_column({1, 10});
     std::vector<const Column*> raw_columns;
@@ -878,11 +932,11 @@ TEST_F(CelonisVariantStatsTest, test_top_with_repeated_activities) {
 TEST_F(CelonisVariantStatsTest, test_edge_count) {
     // edge_count = 0, populate e_count, do not populate e_stats
     {
-        const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-        auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
-                                          {"a1", "a2", "a1", "a2"}});
+        auto col1 = build_variant_column(
+                {{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"}, {"a1", "a2", "a1", "a2"}});
 
         auto weights = build_weight_column({1, 10});
         auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(0, col1->size());
@@ -1129,11 +1183,11 @@ TEST_F(CelonisVariantStatsTest, test_edge_count) {
         match(e_s, rs);
     }
     {
-        const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-        auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
-                                          {"a1", "a2", "a1", "a2"}});
+        auto col1 = build_variant_column(
+                {{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"}, {"a1", "a2", "a1", "a2"}});
 
         auto weights = build_weight_column({1, 10});
         auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(-1, col1->size());
@@ -1379,11 +1433,11 @@ TEST_F(CelonisVariantStatsTest, test_edge_count) {
         match(e_s, rs);
     }
     {
-        const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-        auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
-                                          {"a1", "a2", "a1", "a2"}});
+        auto col1 = build_variant_column(
+                {{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"}, {"a1", "a2", "a1", "a2"}});
 
         auto weights = build_weight_column({1, 10});
         auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());
@@ -1666,8 +1720,7 @@ TEST_F(CelonisVariantStatsTest, test_self_loop_with_negative_edge_count) {
     // with edge_count == -1, the stats is populated correctly.
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2", "a2", "a1"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2", "a2", "a1"}});
 
     auto weights = build_weight_column({1, 10});
     auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(-1, col1->size());
@@ -1757,8 +1810,7 @@ TEST_F(CelonisVariantStatsTest, test_self_loop_with_negative_edge_count) {
 TEST_F(CelonisVariantStatsTest, test_self_loop) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2", "a2", "a1"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2", "a2", "a1"}});
 
     auto weights = build_weight_column({1, 10});
     std::vector<const Column*> raw_columns;
@@ -1865,8 +1917,8 @@ TEST_F(CelonisVariantStatsTest, test_self_loop) {
 TEST_F(CelonisVariantStatsTest, test_disable_top_variant_stats) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
-                                      {"a1", "a2", "a1", "a2"}});
+    auto col1 = build_variant_column(
+            {{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"}, {"a1", "a2", "a1", "a2"}});
 
     auto weights = build_weight_column({1, 10});
     auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());
@@ -2045,8 +2097,8 @@ TEST_F(CelonisVariantStatsTest, test_disable_top_variant_stats) {
 TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
-                                      {"a1", "a2", "a1", "a2"}});
+    auto col1 = build_variant_column(
+            {{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"}, {"a1", "a2", "a1", "a2"}});
 
     auto weights = build_weight_column({1, 10});
     auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());
@@ -2073,7 +2125,21 @@ TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding) {
     auto json_string = to_statistics_json_string(encoded_string);
     ASSERT_TRUE(json_string.has_value());
     EXPECT_EQ(
-            "{\"dict\":[{\"id\":3,\"name\":\"a4\"},{\"id\":5,\"name\":\"a6\"},{\"id\":4,\"name\":\"a5\"},{\"id\":6,\"name\":\"a7\"},{\"id\":9,\"name\":\"a02\"},{\"id\":2,\"name\":\"a3\"},{\"id\":7,\"name\":\"a00\"},{\"id\":0,\"name\":\"a1\"},{\"id\":1,\"name\":\"a2\"},{\"id\":8,\"name\":\"a01\"}],\"aStats\":[{\"count\":\"21\",\"countCase\":\"11\",\"countStart\":\"11\",\"countEnd\":\"0\",\"id\":0},{\"count\":\"21\",\"countCase\":\"11\",\"countStart\":\"0\",\"countEnd\":\"10\",\"id\":1},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":2},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":3},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":4},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":5},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":6},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":7},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":8},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"1\",\"id\":9}],\"eCount\":\"10\",\"eStats\":[{\"count\":\"1\",\"countCase\":\"1\",\"src\":7,\"dst\":8},{\"count\":\"1\",\"countCase\":\"1\",\"src\":8,\"dst\":9},{\"count\":\"21\",\"countCase\":\"11\",\"src\":0,\"dst\":1},{\"count\":\"10\",\"countCase\":\"10\",\"src\":1,\"dst\":0},{\"count\":\"1\",\"countCase\":\"1\",\"src\":1,\"dst\":2}]}",
+            "{\"dict\":[{\"id\":3,\"name\":\"a4\"},{\"id\":5,\"name\":\"a6\"},{\"id\":4,\"name\":\"a5\"},{\"id\":6,"
+            "\"name\":\"a7\"},{\"id\":9,\"name\":\"a02\"},{\"id\":2,\"name\":\"a3\"},{\"id\":7,\"name\":\"a00\"},{"
+            "\"id\":0,\"name\":\"a1\"},{\"id\":1,\"name\":\"a2\"},{\"id\":8,\"name\":\"a01\"}],\"aStats\":[{\"count\":"
+            "\"21\",\"countCase\":\"11\",\"countStart\":\"11\",\"countEnd\":\"0\",\"id\":0},{\"count\":\"21\","
+            "\"countCase\":\"11\",\"countStart\":\"0\",\"countEnd\":\"10\",\"id\":1},{\"count\":\"1\",\"countCase\":"
+            "\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":2},{\"count\":\"1\",\"countCase\":\"1\","
+            "\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":3},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":"
+            "\"0\",\"countEnd\":\"0\",\"id\":4},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":"
+            "\"0\",\"id\":5},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":6},{"
+            "\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":7},{\"count\":\"1\","
+            "\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":8},{\"count\":\"1\",\"countCase\":"
+            "\"1\",\"countStart\":\"0\",\"countEnd\":\"1\",\"id\":9}],\"eCount\":\"10\",\"eStats\":[{\"count\":\"1\","
+            "\"countCase\":\"1\",\"src\":7,\"dst\":8},{\"count\":\"1\",\"countCase\":\"1\",\"src\":8,\"dst\":9},{"
+            "\"count\":\"21\",\"countCase\":\"11\",\"src\":0,\"dst\":1},{\"count\":\"10\",\"countCase\":\"10\",\"src\":"
+            "1,\"dst\":0},{\"count\":\"1\",\"countCase\":\"1\",\"src\":1,\"dst\":2}]}",
             json_string.value());
 }
 
@@ -2110,8 +2176,8 @@ TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding_empty) {
 TEST_F(CelonisVariantStatsTest, test_cancellation_work) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"},
-                                      {"a1", "a2", "a1", "a2"}});
+    auto col1 = build_variant_column(
+            {{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"}, {"a1", "a2", "a1", "a2"}});
 
     auto weights = build_weight_column({1, 10});
     auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());

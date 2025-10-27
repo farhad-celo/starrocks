@@ -1,13 +1,13 @@
 #include "exprs/celonis/array_end_finder.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -22,14 +22,12 @@ protected:
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
     TypeDescriptor TYPE_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
     TypeDescriptor TYPE_ARRAY_DATETIME = celonis::array_type(TYPE_DATETIME);
-
 };
 
 TEST_F(CelonisArrayEndFinderTest, celonis_array_first_const_null) {
     auto arrays = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
     arrays->append_datum(kNullDatum);
-    const auto result = CelonisArrayEndFinder<TYPE_INT>::array_first(nullptr, {ConstColumn::create(arrays,
-                                                                                                   2)}).value();
+    const auto result = CelonisArrayEndFinder<TYPE_INT>::array_first(nullptr, {ConstColumn::create(arrays, 2)}).value();
     ASSERT_EQ(2, result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_TRUE(result->get(1).is_null());
@@ -140,8 +138,7 @@ TEST_F(CelonisArrayEndFinderTest, celonis_array_first_datetime) {
 TEST_F(CelonisArrayEndFinderTest, celonis_array_last_const_null) {
     auto arrays = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
     arrays->append_datum(kNullDatum);
-    const auto result = CelonisArrayEndFinder<TYPE_INT>::array_last(nullptr, {ConstColumn::create(arrays,
-                                                                                                   2)}).value();
+    const auto result = CelonisArrayEndFinder<TYPE_INT>::array_last(nullptr, {ConstColumn::create(arrays, 2)}).value();
     ASSERT_EQ(2, result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_TRUE(result->get(1).is_null());

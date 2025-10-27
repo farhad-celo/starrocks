@@ -23,9 +23,11 @@ namespace celonis::accelerator::memory::transform::details {
 template <typename TYPE>
 class exec_dictify_step2 final {
  public:
-  exec_dictify_step2(const std::vector<dictify_work_item>& work_items, legacy_embedded_ctl::static_array<TYPE>& distinct_values,
-                     const legacy_embedded_ctl::bitset_view_t null_flags, const row_id size, const row_id non_null_value_count,
-                     std::pair<TYPE, row_id>* index_prepared, const common::execution_context& context)
+  exec_dictify_step2(const std::vector<dictify_work_item>& work_items,
+                     legacy_embedded_ctl::static_array<TYPE>& distinct_values,
+                     const legacy_embedded_ctl::bitset_view_t null_flags, const row_id size,
+                     const row_id non_null_value_count, std::pair<TYPE, row_id>* index_prepared,
+                     const common::execution_context& context)
       : work_items(work_items),
         distinct_values(distinct_values),
         null_flags(null_flags),
@@ -44,7 +46,8 @@ class exec_dictify_step2 final {
 
       // The cast avoids the calls to the pair default constructor
       auto actual_dict{memory::tracking::make_static_array<std::pair<TYPE, row_id>>(
-          static_cast<size_t>(item.value_count), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
+          static_cast<size_t>(item.value_count), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG),
+          context)};
 
       // this maps values to RIDs - actual_dict_ptr points to the current value.
       std::pair<TYPE, row_id>* actual_dict_ptr = actual_dict.data();
@@ -150,11 +153,10 @@ class dictionary_id_resolver final {
 
 class exec_dictify_sort_based_str_step2 final {
  public:
-  exec_dictify_sort_based_str_step2(const row_id rows,
-                                    const legacy_embedded_ctl::static_array<std::pair<cel_string_t, row_id>>& sorted_strings,
-                                    const legacy_embedded_ctl::bitset_view_t null_flags,
-                                    const std::vector<distinct_element_data::block_data>& blocks,
-                                    const row_id block_size, const common::execution_context& context)
+  exec_dictify_sort_based_str_step2(
+      const row_id rows, const legacy_embedded_ctl::static_array<std::pair<cel_string_t, row_id>>& sorted_strings,
+      const legacy_embedded_ctl::bitset_view_t null_flags, const std::vector<distinct_element_data::block_data>& blocks,
+      const row_id block_size, const common::execution_context& context)
       : rows(rows),
         sorted_strings(sorted_strings),
         null_flags(null_flags),

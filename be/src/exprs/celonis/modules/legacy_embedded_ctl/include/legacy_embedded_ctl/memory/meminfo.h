@@ -26,9 +26,9 @@ namespace celonis::accelerator::legacy_embedded_ctl {
  * is only intended to generate logging output!
  */
 [[nodiscard]] legacy_embedded_format::json::json_object_t meminfo_change_json(const full_meminfo& old_meminfo,
-                                                              const full_meminfo& new_meminfo,
-                                                              std::optional<size_t> not_swapped_bytes,
-                                                              const std::string& status);
+                                                                              const full_meminfo& new_meminfo,
+                                                                              std::optional<size_t> not_swapped_bytes,
+                                                                              const std::string& status);
 
 /**
  * @brief Factory function which returns a meminfo instance with the current memory sizes set

@@ -23,11 +23,15 @@ memory::table_t build_bpmn_edges_table(const cpml::model::bpmn_graph& graph, mem
 
   memory::table_t bpmn_edges_table{memory::table::create_query_scope_table(size, "bpmn_edges", table_row_limit)};
 
-  auto source_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto target_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto object_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto source_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto target_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto object_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   // TODO(n.weber): Deprecated for removal - counts column can be removed in a follow-up
-  auto object_count_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto object_count_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   row_id i{0};
   for (const auto& edge : bpmn_edges) {
@@ -63,8 +67,10 @@ memory::table_t build_bpmn_nodes_table(const cpml::model::bpmn_graph& graph, mem
 
   memory::table_t bpmn_nodes_table{memory::table::create_query_scope_table(size, "bpmn_nodes", table_row_limit)};
 
-  auto node_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto node_type_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto node_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto node_type_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   for (int i{0}; const auto& [_, vertex] : bpmn_nodes) {
     node_id_data[i] = static_cast<cel_int_t>(vertex.get_vertex_id());
@@ -107,7 +113,8 @@ memory::table_t build_bpmn_activities(const cpml::model::bpmn_graph& graph, cons
                });
   const row_id size{static_cast<row_id>(bpmn_activity_nodes.size())};
 
-  auto node_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto node_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   auto activity_name_dict_mapping{
       ctl::make_static_array_for_overwrite<row_id>(size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
@@ -177,7 +184,8 @@ using edges_and_vertices_per_object_t = std::unordered_map<cpml::model::bpmn::ob
     const auto& vertex_type{vertex.get_vertex_type()};
     const auto optional_activity_name{
         cpml::model::bpmn::is_task(vertex_type)
-            ? fmt::format(" '{}'", activity_dict->get_string_value(std::get<cpml::model::bpmn::task>(vertex_type).activity_id))
+            ? fmt::format(" '{}'",
+                          activity_dict->get_string_value(std::get<cpml::model::bpmn::task>(vertex_type).activity_id))
             : ""};
 
     return fmt::format("[{} {}{}]", vertex.get_vertex_id(), cpml::model::bpmn::to_string(vertex_type),
@@ -221,11 +229,12 @@ using edges_and_vertices_per_object_t = std::unordered_map<cpml::model::bpmn::ob
   }
 
   // Now that we know the total size of the model descriptions, we can allocate the arrays
-  auto object_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(num_objects, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto model_description_ptrs{
-      legacy_embedded_ctl::make_static_array_for_overwrite<cel_string_t>(num_objects, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto column_str_bfr{
-      legacy_embedded_ctl::make_static_array_for_overwrite<char>(total_model_descriptions_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto object_id_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      num_objects, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto model_description_ptrs{legacy_embedded_ctl::make_static_array_for_overwrite<cel_string_t>(
+      num_objects, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto column_str_bfr{legacy_embedded_ctl::make_static_array_for_overwrite<char>(
+      total_model_descriptions_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   // Write the object ids and descriptions to the buffers
   row_id index{0};
@@ -297,18 +306,19 @@ static_assert(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.at(5) ==
   const auto number_of_blocks{blocks.size()};
 
   // column data containers
-  auto block_ids_column_data{
-      legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto parent_block_ids_column_data{
-      legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto object_ids_column_data{
-      legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto block_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto parent_block_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto object_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   static constexpr const auto& BUFFER{BUFFER_AND_OFFSETS.first};
   static constexpr const auto& OFFSETS{BUFFER_AND_OFFSETS.second};
-  auto block_type_column_data_pointers{
-      legacy_embedded_ctl::make_static_array_for_overwrite<cel_string_t>(number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto block_type_column_data_buffer{legacy_embedded_ctl::make_static_array<char>(BUFFER, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto block_type_column_data_pointers{legacy_embedded_ctl::make_static_array_for_overwrite<cel_string_t>(
+      number_of_blocks, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto block_type_column_data_buffer{legacy_embedded_ctl::make_static_array<char>(
+      BUFFER, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
 
   // fill column data
   for (size_t idx{0}; const auto& block : blocks) {
@@ -355,10 +365,10 @@ static_assert(cpml::model::bpmn::BPMN_BLOCK_TYPE_STRINGS.at(5) ==
       })};
 
   // column data containers
-  auto vertex_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
-                                                                              LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
-  auto block_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(number_of_nodes_with_a_related_block,
-                                                                             LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto vertex_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      number_of_nodes_with_a_related_block, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto block_ids_column_data{legacy_embedded_ctl::make_static_array_for_overwrite<cel_int_t>(
+      number_of_nodes_with_a_related_block, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
   // fill column data
   for (size_t idx{0}; const auto& [vertex_id, block_ids] : vertex_id_to_block_ids_mapping) {
     for (const auto& block_id : block_ids) {

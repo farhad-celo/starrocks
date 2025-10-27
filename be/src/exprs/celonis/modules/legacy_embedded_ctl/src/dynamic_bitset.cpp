@@ -2,8 +2,9 @@
 
 #include <algorithm>
 #include <bit>
-#include <oneapi/tbb/parallel_for.h>
 #include <type_traits>
+
+#include <oneapi/tbb/parallel_for.h>
 
 #include "legacy_embedded_ctl/conversion.h"
 #include "legacy_embedded_ctl/static_array.h"
@@ -50,7 +51,8 @@ template <parallelism_settings_t PARALLELISM_SETTING>
 dynamic_bitset<PARALLELISM_SETTING>::dynamic_bitset(const size_type size, allocator_type allocator)
     : size_{size},
       bitset_data_{make_static_array_for_overwrite<block_type>(details::calc_number_of_bitset_blocks(size_),
-                                                               LEGACY_EMBEDDED_ALLOC_MSG(MEMBER_INIT_MSG), std::move(allocator))} {}
+                                                               LEGACY_EMBEDDED_ALLOC_MSG(MEMBER_INIT_MSG),
+                                                               std::move(allocator))} {}
 
 template <parallelism_settings_t PARALLELISM_SETTING>
 dynamic_bitset<PARALLELISM_SETTING>& dynamic_bitset<PARALLELISM_SETTING>::operator=(const dynamic_bitset& other) {

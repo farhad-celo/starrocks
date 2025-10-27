@@ -1,14 +1,14 @@
 #include "exprs/celonis/linear_regression.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -22,37 +22,32 @@ private:
     TypeDescriptor TYPE_ARRAY_DOUBLE = celonis::array_type(TYPE_DOUBLE);
 
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                FunctionContext::TypeDesc{TYPE_ARRAY},
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {FunctionContext::TypeDesc{TYPE_ARRAY},
+                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
         x_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_ARRAY_DOUBLE), true);
         model_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
     }
 
-    void
-    AddRow(const DatumArray& xs, const Datum& model) {
+    void AddRow(const DatumArray& xs, const Datum& model) {
         x_column_->append_datum(xs);
         model_column_->append_datum(model);
     }
 
     StatusOr<ColumnPtr> Run() {
-        DeferOp close_fragment_local([this] {
-            CelonisLinearRegression::predict_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [this] { CelonisLinearRegression::predict_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisLinearRegression::predict_prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisLinearRegression::predict_close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local(
+                [this] { CelonisLinearRegression::predict_close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisLinearRegression::predict_prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
-        StatusOr<ColumnPtr> result = CelonisLinearRegression::predict_linear_regression(ctx_.get(),
-                                                                                        {x_column_, model_column_});
+        StatusOr<ColumnPtr> result =
+                CelonisLinearRegression::predict_linear_regression(ctx_.get(), {x_column_, model_column_});
         return result;
     }
 
-    StatusOr<ColumnPtr>
-    RunConstantModel(const Datum& model) {
+    StatusOr<ColumnPtr> RunConstantModel(const Datum& model) {
         model_column_->append_datum(model);
         const auto nrows = x_column_->size();
         model_column_ = ConstColumn::create(model_column_, nrows);

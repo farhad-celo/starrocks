@@ -132,7 +132,7 @@ public:
 
                     auto old_size = res->size();
                     resize_column_uninitialized(res.get(), old_size + count);
-                    auto *data = res->get_data().data();
+                    auto* data = res->get_data().data();
                     for (decltype(count) i = 0; i < count; i++) {
                         if (state->total_rows_generated_count >= MAX_GENERATED_ROWS_LIMIT) {
                             state->set_status(Status::InvalidArgument(
@@ -149,7 +149,7 @@ public:
                     }
                 }
                 // Max generated rows limit reached
-                if (!state->status().ok()){
+                if (!state->status().ok()) {
                     break;
                 }
 
@@ -216,8 +216,9 @@ private:
     }
 
     // Returns a function increasing timestamp by a step. Returns nullptr and sets status of state if there is an error.
-    std::function<TimestampValue(const TimestampValue&)> get_increase_timestamp_func(
-            const TimestampValue& range_start, Slice step_slice, MyState* state) const {
+    std::function<TimestampValue(const TimestampValue&)> get_increase_timestamp_func(const TimestampValue& range_start,
+                                                                                     Slice step_slice,
+                                                                                     MyState* state) const {
         char* endptr;
         int64_t step = strtol(step_slice.get_data(), &endptr, 10);
         if (step <= 0) {
@@ -225,31 +226,31 @@ private:
             return nullptr;
         }
         switch (*endptr) {
-            case 'm':
-                return [step](TimestampValue tv) {
-                    return TimestampValue{timestamp::add<TimeUnit::MINUTE>(tv.timestamp(), step)};
-                };
-            case 'h':
-                return [step](TimestampValue tv) {
-                    return TimestampValue{timestamp::add<TimeUnit::HOUR>(tv.timestamp(), step)};
-                };
-            case 'D':
-                return [step](TimestampValue tv) {
-                    return TimestampValue{timestamp::add<TimeUnit::DAY>(tv.timestamp(), step)};
-                };
-            case 'W':
-                return [step](TimestampValue tv) {
-                    return TimestampValue{timestamp::add<TimeUnit::WEEK>(tv.timestamp(), step)};
-                };
-            case 'M':
-                return get_increase_timestamp_months_func(range_start, step);
-            case 'Q':
-                return get_increase_timestamp_months_func(range_start, step * 3);
-            case 'Y':
-                return get_increase_timestamp_months_func(range_start, step * 12);
-            default:
-                state->set_status(Status::InternalError("Invalid step unit. It must be [mhDMYWQ]"));
-                return nullptr;
+        case 'm':
+            return [step](TimestampValue tv) {
+                return TimestampValue{timestamp::add<TimeUnit::MINUTE>(tv.timestamp(), step)};
+            };
+        case 'h':
+            return [step](TimestampValue tv) {
+                return TimestampValue{timestamp::add<TimeUnit::HOUR>(tv.timestamp(), step)};
+            };
+        case 'D':
+            return [step](TimestampValue tv) {
+                return TimestampValue{timestamp::add<TimeUnit::DAY>(tv.timestamp(), step)};
+            };
+        case 'W':
+            return [step](TimestampValue tv) {
+                return TimestampValue{timestamp::add<TimeUnit::WEEK>(tv.timestamp(), step)};
+            };
+        case 'M':
+            return get_increase_timestamp_months_func(range_start, step);
+        case 'Q':
+            return get_increase_timestamp_months_func(range_start, step * 3);
+        case 'Y':
+            return get_increase_timestamp_months_func(range_start, step * 12);
+        default:
+            state->set_status(Status::InternalError("Invalid step unit. It must be [mhDMYWQ]"));
+            return nullptr;
         }
     }
 };

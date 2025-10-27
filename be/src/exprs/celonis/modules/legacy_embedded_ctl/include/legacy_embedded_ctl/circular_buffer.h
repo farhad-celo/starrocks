@@ -24,7 +24,7 @@ class circular_buffer final {
   [[nodiscard]] size_type size() const noexcept;
 
   template <typename F>
-  requires std::invocable<F, std::span<value_type>>
+    requires std::invocable<F, std::span<value_type>>
   [[nodiscard]] auto apply(F&& f) const noexcept {
     std::shared_lock lock{buffer_mutex_};
     return f(std::span<value_type>{buffer_.get(), actual_size_});

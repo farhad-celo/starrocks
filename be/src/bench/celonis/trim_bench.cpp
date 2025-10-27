@@ -1,5 +1,6 @@
 #include <benchmark/benchmark.h>
 #include <gtest/gtest.h>
+
 #include <random>
 
 #include "column/column_helper.h"
@@ -318,7 +319,9 @@ enum TrimCharsType {
     NON_CONSTANT,
 };
 
-static std::string generate_random_word(std::mt19937& random_generator, const std::string& trim_chars, const bool add_trim_chars, std::normal_distribution<double>& length_dist, std::uniform_int_distribution<int>& trim_char_count_dist) {
+static std::string generate_random_word(std::mt19937& random_generator, const std::string& trim_chars,
+                                        const bool add_trim_chars, std::normal_distribution<double>& length_dist,
+                                        std::uniform_int_distribution<int>& trim_char_count_dist) {
     const std::string chars{"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"};
 
     int word_length{static_cast<int>(std::round(length_dist(random_generator)))};
@@ -344,7 +347,8 @@ static std::string generate_random_word(std::mt19937& random_generator, const st
     return word;
 }
 
-static ColumnPtr generate_input_column(const int num_rows, const int avg_word_length, const std::string& trim_chars, const int percentage_trimmed_words) {
+static ColumnPtr generate_input_column(const int num_rows, const int avg_word_length, const std::string& trim_chars,
+                                       const int percentage_trimmed_words) {
     // Control the spread of the word length of all words
     const double variance{2.0};
     const auto input_column{ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true)};
@@ -356,7 +360,8 @@ static ColumnPtr generate_input_column(const int num_rows, const int avg_word_le
     const int trim_cut{static_cast<int>(std::round(percentage_trimmed_words / num_rows))};
     for (size_t i{0}; i < num_rows; i++) {
         const auto add_trim_chars{i < trim_cut ? true : false};
-        const auto word{generate_random_word(random_generator, trim_chars, add_trim_chars, word_length_dist, trim_char_count_dist)};
+        const auto word{generate_random_word(random_generator, trim_chars, add_trim_chars, word_length_dist,
+                                             trim_char_count_dist)};
         input_column->append_datum(Slice(word));
     }
 
@@ -364,7 +369,7 @@ static ColumnPtr generate_input_column(const int num_rows, const int avg_word_le
 }
 
 static void do_bench(benchmark::State& state, TrimCharsType trim_chars_type) {
-	const std::string unique_trim_chars{"%_^&!"};
+    const std::string unique_trim_chars{"%_^&!"};
     const int num_rows = state.range(0);
     const int avg_word_length = state.range(1);
     const int trim_char_length = state.range(2);
@@ -372,7 +377,8 @@ static void do_bench(benchmark::State& state, TrimCharsType trim_chars_type) {
 
     auto arg_types = {AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
     auto return_type{AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), std::move(return_type)));
+    std::unique_ptr<FunctionContext> ctx(
+            FunctionContext::create_test_context(std::move(arg_types), std::move(return_type)));
 
     std::string trim_chars{};
     for (size_t i{0}; i < trim_char_length; ++i) {
@@ -382,18 +388,18 @@ static void do_bench(benchmark::State& state, TrimCharsType trim_chars_type) {
     auto trim_char_column{ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true)};
 
     switch (trim_chars_type) {
-        case CONSTANT: {
-            trim_char_column = ColumnHelper::create_const_column<TYPE_VARCHAR>(Slice(trim_chars), 1);
-            ctx->set_constant_columns({nullptr, trim_char_column});
-            break;
+    case CONSTANT: {
+        trim_char_column = ColumnHelper::create_const_column<TYPE_VARCHAR>(Slice(trim_chars), 1);
+        ctx->set_constant_columns({nullptr, trim_char_column});
+        break;
+    }
+    case NON_CONSTANT: {
+        for (size_t i{0}; i < num_rows; i++) {
+            trim_char_column->append_datum(Slice(trim_chars));
         }
-        case NON_CONSTANT: {
-            for (size_t i{0}; i < num_rows; i++) {
-                trim_char_column->append_datum(Slice(trim_chars));
-            }
-            ctx->set_constant_columns({nullptr, nullptr});
-            break;
-        }
+        ctx->set_constant_columns({nullptr, nullptr});
+        break;
+    }
     }
 
     int total_rows{0};
@@ -421,7 +427,8 @@ static void BM_TrimNonConstant(benchmark::State& state) {
 
 // Args: Number of rows / Avg length of words / Length of chars to trim / % of input rows that start with trim_chars
 BENCHMARK(BM_TrimConstant)->ArgsProduct({{1'000, 10'000, 100'000}, {25, 50, 100}, {1, 5, 10, 25}, {25, 50, 75, 100}});
-BENCHMARK(BM_TrimNonConstant)->ArgsProduct({{1'000, 10'000, 100'000}, {25, 50, 100}, {1, 5, 10, 25}, {25, 50, 75, 100}});
+BENCHMARK(BM_TrimNonConstant)
+        ->ArgsProduct({{1'000, 10'000, 100'000}, {25, 50, 100}, {1, 5, 10, 25}, {25, 50, 75, 100}});
 
 } // namespace starrocks
 

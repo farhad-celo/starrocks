@@ -11,25 +11,24 @@
 
 namespace starrocks {
 
-template<LogicalType LT, typename = guard::Guard>
-struct DetailValueMap {
-};
+template <LogicalType LT, typename = guard::Guard>
+struct DetailValueMap {};
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct DetailValueMap<LT, FixedLengthLTGuard<LT>> {
     using CppType = RunTimeCppValueType<LT>;
     using KeyType = CppType;
     using HashMap = phmap::flat_hash_map<KeyType, int64_t, StdHash<CppType>>;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct DetailValueMap<LT, StringLTGuard<LT>> {
     using CppType = RunTimeCppValueType<LT>;
     using KeyType = std::string;
     using HashMap = phmap::flat_hash_map<KeyType, int64_t, SliceHash>;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct CelonisMovingCountDistinctAggregateState {
     using CppType = RunTimeCppType<LT>;
     using ColumnType = RunTimeColumnType<LT>;
@@ -95,7 +94,7 @@ private:
     }
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 class CelonisMovingCountDistinctAggregateFunction final
         : public WindowFunction<CelonisMovingCountDistinctAggregateState<LT>> {
 public:
@@ -143,12 +142,10 @@ public:
         const int64_t previous_frame_first_position = current_row_position - 1 + rows_start_offset;
         const int64_t current_frame_last_position = current_row_position + rows_end_offset;
         if (this->data(state).is_frame_init) {
-            if (previous_frame_first_position >= partition_start &&
-                previous_frame_first_position < partition_end) {
+            if (previous_frame_first_position >= partition_start && previous_frame_first_position < partition_end) {
                 this->data(state).retract(ctx, columns, previous_frame_first_position);
             }
-            if (current_frame_last_position >= partition_start &&
-                current_frame_last_position < partition_end) {
+            if (current_frame_last_position >= partition_start && current_frame_last_position < partition_end) {
                 this->data(state).update(ctx, columns, current_frame_last_position);
             }
         } else {

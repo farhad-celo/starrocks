@@ -83,7 +83,7 @@ private:
         SliceWithHash input_symbol;
 
         TransitionKey(int current_state, const Slice& input_symbol)
-                : current_dfa_state(current_state), input_symbol(input_symbol){};
+                : current_dfa_state(current_state), input_symbol(input_symbol) {};
 
         bool operator==(const TransitionKey& other) const {
             return (current_dfa_state == other.current_dfa_state && input_symbol == other.input_symbol);

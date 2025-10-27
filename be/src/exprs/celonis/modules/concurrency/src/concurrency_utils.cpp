@@ -46,9 +46,9 @@ std::unique_lock<std::timed_mutex> lock_validated(std::timed_mutex& mutex, const
   return lock_validated_internal(mutex, duration, source_location);
 }
 
-std::unique_lock<concurrency::shared_counting_mutex> lock_validated(concurrency::shared_counting_mutex& mutex,
-                                                                    const std::chrono::seconds& duration,
-                                                                    legacy_embedded_ctl::source_location source_location) {
+std::unique_lock<concurrency::shared_counting_mutex> lock_validated(
+    concurrency::shared_counting_mutex& mutex, const std::chrono::seconds& duration,
+    legacy_embedded_ctl::source_location source_location) {
   return lock_validated_internal(mutex, duration, source_location);
 }
 
@@ -58,9 +58,9 @@ std::shared_lock<std::shared_timed_mutex> lock_shared_validated(std::shared_time
   return lock_shared_validated_internal(mutex, duration, source_location);
 }
 
-std::shared_lock<concurrency::shared_counting_mutex> lock_shared_validated(concurrency::shared_counting_mutex& mutex,
-                                                                           const std::chrono::seconds& duration,
-                                                                           legacy_embedded_ctl::source_location source_location) {
+std::shared_lock<concurrency::shared_counting_mutex> lock_shared_validated(
+    concurrency::shared_counting_mutex& mutex, const std::chrono::seconds& duration,
+    legacy_embedded_ctl::source_location source_location) {
   return lock_shared_validated_internal(mutex, duration, source_location);
 }
 

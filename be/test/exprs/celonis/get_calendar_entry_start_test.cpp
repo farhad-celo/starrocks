@@ -1,14 +1,12 @@
-#include "exprs/celonis/time_functions.h"
-
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
+#include "exprs/celonis/time_functions.h"
 #include "exprs/function_context.h"
-#include "util.h"
-#include "util/defer_op.h"
-
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
+#include "util.h"
+#include "util/defer_op.h"
 
 namespace starrocks {
 
@@ -22,10 +20,9 @@ protected:
 
 private:
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_INT),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_INT),
+                                                            TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_BIGINT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -51,10 +48,9 @@ private:
         return result;
     }
 
-    StatusOr<ColumnPtr>
-    RunConstantCalendar(const std::vector<std::string>& calendar_strs) {
+    StatusOr<ColumnPtr> RunConstantCalendar(const std::vector<std::string>& calendar_strs) {
         DatumArray calendar_array;
-        for (const auto& calendar_str: calendar_strs) {
+        for (const auto& calendar_str : calendar_strs) {
             calendar_array.emplace_back(calendar_str.c_str());
         }
         calendar_column_->append_datum(calendar_array);
@@ -80,8 +76,10 @@ TEST_F(CelonisGetCalendarEntryStartTest, normal_cases_without_calendar_id) {
         Prepare();
         index_column_->append_datum(0);
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
+        const auto result =
+                RunConstantCalendar(
+                        {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"})
+                        .value();
         ASSERT_EQ(1, result->size());
         EXPECT_EQ(28800000, result->get(0).get_int64());
     }
@@ -89,8 +87,10 @@ TEST_F(CelonisGetCalendarEntryStartTest, normal_cases_without_calendar_id) {
         Prepare();
         index_column_->append_datum(-1);
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"}).value();
+        const auto result =
+                RunConstantCalendar(
+                        {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000} }})"})
+                        .value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -103,12 +103,11 @@ TEST_F(CelonisGetCalendarEntryStartTest, normal_cases_without_calendar_id) {
         calendar_id_column_->append_datum(kNullDatum);
         calendar_id_column_->append_datum(kNullDatum);
         // the first two entries are merged, so there are two entries
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": {)",
-                 R"("entries": {"start_date": 1, "end_date": 11}, )",
-                 R"("entries": {"start_date": 7, "end_date": 21}, )",
-                 R"("entries": {"start_date": 500, "end_date": 600}, )",
-                 R"( }})"}).value();
+        const auto result =
+                RunConstantCalendar({R"({"factory_calendar": {)", R"("entries": {"start_date": 1, "end_date": 11}, )",
+                                     R"("entries": {"start_date": 7, "end_date": 21}, )",
+                                     R"("entries": {"start_date": 500, "end_date": 600}, )", R"( }})"})
+                        .value();
         ASSERT_EQ(3, result->size());
         EXPECT_EQ(1, result->get(0).get_int64());
         EXPECT_EQ(500, result->get(1).get_int64());
@@ -121,11 +120,10 @@ TEST_F(CelonisGetCalendarEntryStartTest, normal_cases_without_calendar_id) {
         calendar_id_column_->append_datum(kNullDatum);
         calendar_id_column_->append_datum(kNullDatum);
         // The entries are sorted
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": {)",
-                 R"("entries": {"start_date": 700, "end_date": 800}, )",
-                 R"("entries": {"start_date": 500, "end_date": 600}, )",
-                 R"( }})"}).value();
+        const auto result = RunConstantCalendar({R"({"factory_calendar": {)",
+                                                 R"("entries": {"start_date": 700, "end_date": 800}, )",
+                                                 R"("entries": {"start_date": 500, "end_date": 600}, )", R"( }})"})
+                                    .value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ(500, result->get(0).get_int64());
         EXPECT_EQ(700, result->get(1).get_int64());
@@ -137,8 +135,10 @@ TEST_F(CelonisGetCalendarEntryStartTest, normal_cases_with_calendar_id) {
         Prepare();
         index_column_->append_datum(0);
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "US"} }})"}).value();
+        const auto result =
+                RunConstantCalendar(
+                        {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "US"} }})"})
+                        .value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -146,8 +146,10 @@ TEST_F(CelonisGetCalendarEntryStartTest, normal_cases_with_calendar_id) {
         Prepare();
         index_column_->append_datum(0);
         calendar_id_column_->append_datum("US");
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "US"} }})"}).value();
+        const auto result =
+                RunConstantCalendar(
+                        {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "US"} }})"})
+                        .value();
         ASSERT_EQ(1, result->size());
         EXPECT_EQ(28800000, result->get(0).get_int64());
     }
@@ -155,8 +157,10 @@ TEST_F(CelonisGetCalendarEntryStartTest, normal_cases_with_calendar_id) {
         Prepare();
         index_column_->append_datum(-1);
         calendar_id_column_->append_datum("US");
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "US"} }})"}).value();
+        const auto result =
+                RunConstantCalendar(
+                        {R"({"factory_calendar": { "entries": {"start_date": 28800000, "end_date": 61200000, "calendar_id": "US"} }})"})
+                        .value();
         ASSERT_EQ(1, result->size());
         EXPECT_TRUE(result->get(0).is_null());
     }
@@ -169,12 +173,13 @@ TEST_F(CelonisGetCalendarEntryStartTest, normal_cases_with_calendar_id) {
         calendar_id_column_->append_datum("UK");
         calendar_id_column_->append_datum("US");
         // the first two entries are merged
-        const auto result = RunConstantCalendar(
-                {R"({"factory_calendar": {)",
-                 R"("entries": {"start_date": 1, "end_date": 11, "calendar_id": "US"}, )",
-                 R"("entries": {"start_date": 7, "end_date": 21, "calendar_id": "UK"}, )",
-                 R"("entries": {"start_date": 500, "end_date": 600, "calendar_id": "US"}, )",
-                 R"( }})"}).value();
+        const auto result =
+                RunConstantCalendar({R"({"factory_calendar": {)",
+                                     R"("entries": {"start_date": 1, "end_date": 11, "calendar_id": "US"}, )",
+                                     R"("entries": {"start_date": 7, "end_date": 21, "calendar_id": "UK"}, )",
+                                     R"("entries": {"start_date": 500, "end_date": 600, "calendar_id": "US"}, )",
+                                     R"( }})"})
+                        .value();
         ASSERT_EQ(3, result->size());
         EXPECT_EQ(1, result->get(0).get_int64());
         EXPECT_EQ(7, result->get(1).get_int64());

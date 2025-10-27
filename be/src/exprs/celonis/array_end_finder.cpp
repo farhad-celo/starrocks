@@ -3,16 +3,15 @@
 #include "column/array_column.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
-#include "exprs/function_context.h"
 #include "exprs/celonis/util.h"
+#include "exprs/function_context.h"
 
 namespace starrocks {
 
 enum class Direction { FORWARD, BACKWARD };
 
-template<LogicalType LT, Direction DIR>
-StatusOr<ColumnPtr> find_element(FunctionContext* context,
-                                 const Columns& columns) {
+template <LogicalType LT, Direction DIR>
+StatusOr<ColumnPtr> find_element(FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
@@ -59,29 +58,24 @@ StatusOr<ColumnPtr> find_element(FunctionContext* context,
     return result.build(all_const);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisArrayEndFinder<LT>::array_first(FunctionContext* context, const Columns& columns) {
     return find_element<LT, Direction::FORWARD>(context, columns);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisArrayEndFinder<LT>::array_last(FunctionContext* context, const Columns& columns) {
     return find_element<LT, Direction::BACKWARD>(context, columns);
 }
 
-template
-class CelonisArrayEndFinder<TYPE_INT>;
+template class CelonisArrayEndFinder<TYPE_INT>;
 
-template
-class CelonisArrayEndFinder<TYPE_BIGINT>;
+template class CelonisArrayEndFinder<TYPE_BIGINT>;
 
-template
-class CelonisArrayEndFinder<TYPE_DOUBLE>;
+template class CelonisArrayEndFinder<TYPE_DOUBLE>;
 
-template
-class CelonisArrayEndFinder<TYPE_DATETIME>;
+template class CelonisArrayEndFinder<TYPE_DATETIME>;
 
-template
-class CelonisArrayEndFinder<TYPE_VARCHAR>;
+template class CelonisArrayEndFinder<TYPE_VARCHAR>;
 
 } // namespace starrocks

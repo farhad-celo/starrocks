@@ -15,7 +15,7 @@ StatusOr<ColumnPtr> CelonisMoBpmnGraph::mo_bpmn_graph(FunctionContext* context, 
     for (int row = 0; row < num_rows; row++) {
         std::vector<std::string> process_trees;
         bool has_null = false;
-        for (auto column: columns) {
+        for (auto column : columns) {
             if (column->is_null(row)) {
                 has_null = true;
                 break;

@@ -58,7 +58,8 @@ template <typename T>
 inline void convert_to_relative_addresses(
     legacy_embedded_ctl::shared_static_array<T>& pointers,
     const legacy_embedded_ctl::shared_static_array<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) noexcept
-    requires(std::is_pointer_v<T>) {
+  requires(std::is_pointer_v<T>)
+{
   const uintptr_t buffer_offset = reinterpret_cast<uintptr_t>(buffer.get());
   for (size_t i = 0; i < pointers.size(); i++) {
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -71,7 +72,8 @@ template <typename T>
 inline void convert_to_absolute_addresses(
     legacy_embedded_ctl::shared_static_array<T>& pointers,
     const legacy_embedded_ctl::shared_static_array<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) noexcept
-    requires(std::is_pointer_v<T>) {
+  requires(std::is_pointer_v<T>)
+{
   const uintptr_t buffer_offset = reinterpret_cast<uintptr_t>(buffer.get());
   for (size_t i = 0; i < pointers.size(); i++) {
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -82,7 +84,9 @@ inline void convert_to_absolute_addresses(
 template <typename T>
 io::compressed_data compress_pointers(const loaded_data<T>& pointers,
                                       const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer,
-                                      bool write_with_sorting) requires(std::is_pointer_v<T>) {
+                                      bool write_with_sorting)
+  requires(std::is_pointer_v<T>)
+{
   if constexpr (std::is_same_v<T, cel_string_t>) {
     if (write_with_sorting) {
       io::unsorted_string_pointer_byte_iterator pointer_it{std::span{pointers.data},
@@ -98,7 +102,9 @@ io::compressed_data compress_pointers(const loaded_data<T>& pointers,
 template <typename T>
 io::compressed_data compress_buffer(const loaded_data<T>& pointers,
                                     const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer,
-                                    bool write_with_sorting) requires(std::is_pointer_v<T>) {
+                                    bool write_with_sorting)
+  requires(std::is_pointer_v<T>)
+{
   if constexpr (std::is_same_v<T, cel_string_t>) {
     if (write_with_sorting) {
       io::unsorted_string_buffer_byte_iterator iter{std::span{pointers.data}, std::span{buffer.data}};
@@ -111,11 +117,12 @@ io::compressed_data compress_buffer(const loaded_data<T>& pointers,
 }
 
 template <typename T>
-loaded_data<T> decompress_pointers(
-    const io::compressed_data& compressed_pointers, const size_t uncompressed_size,
-    const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) requires(std::is_pointer_v<T>) {
-  auto pointers{
-      legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(uncompressed_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
+loaded_data<T> decompress_pointers(const io::compressed_data& compressed_pointers, const size_t uncompressed_size,
+                                   const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer)
+  requires(std::is_pointer_v<T>)
+{
+  auto pointers{legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(
+      uncompressed_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
   io::decompress_from_memory_mt(compressed_pointers, io::as_byte_span(std::span{pointers}));
   convert_to_absolute_addresses(pointers, buffer.data);
 
@@ -124,8 +131,8 @@ loaded_data<T> decompress_pointers(
 
 template <typename T>
 loaded_data<T> decompress_buffer(const io::compressed_data& compressed_buffer, const size_t uncompressed_size) {
-  auto buffer{
-      legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(uncompressed_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
+  auto buffer{legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(
+      uncompressed_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
   io::decompress_from_memory_mt(compressed_buffer, io::as_byte_span(std::span{buffer}));
 
   return loaded_data<T>{std::move(buffer)};
@@ -164,13 +171,15 @@ namespace details {
 template <typename T>
 size_t get_size_in_memory(const data_handler_data<T>& data) {
 #ifdef CELOSTAR
-  return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); }),
+  return std::visit(
+      legacy_embedded_ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); }),
 #else
-  return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); },
-                                    [](const io::compressed_data& compressed) { return compressed.size(); },
-                                    [](const swapped_data&) { return size_t{0}; }),
+  return std::visit(
+      legacy_embedded_ctl::overloaded([](const loaded_data<T>& loaded) { return loaded.data.byte_size(); },
+                                      [](const io::compressed_data& compressed) { return compressed.size(); },
+                                      [](const swapped_data&) { return size_t{0}; }),
 #endif
-                    data);
+      data);
 }
 
 #ifndef CELOSTAR
@@ -178,7 +187,9 @@ template <typename T>
 std::optional<size_t> write_out_pointers(const loaded_data<T>& pointers,
                                          const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer,
                                          const std::string& swap_file, const swap_info& sinfo, bool write_with_sorting,
-                                         common::execution_context& context) requires(std::is_pointer_v<T>) {
+                                         common::execution_context& context)
+  requires(std::is_pointer_v<T>)
+{
   if (!sinfo.is_swappable()) {
     // no swap is still kind of success, but without returning size on disk
     return std::nullopt;
@@ -226,9 +237,9 @@ std::optional<size_t> write_out_buffer(const loaded_data<T>& pointers,
 
 template <typename T>
 std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_data_handler(
-    const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr, const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer,
-    const std::string& swap_file, pointer_data_handler_swap_type type, swap_info sinfo,
-    const std::string& description) {
+    const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr,
+    const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer, const std::string& swap_file,
+    pointer_data_handler_swap_type type, swap_info sinfo, const std::string& description) {
   sinfo.memory_manager().reset();
 
   std::shared_ptr<pointer_data_handler> pointer_data(
@@ -238,8 +249,9 @@ std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_data_ha
 
 template <typename T>
 std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_data_handler(
-    legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& buffer, const std::string& swap_file,
-    pointer_data_handler_swap_type type, swap_info sinfo, const std::string& description) {
+    legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& buffer,
+    const std::string& swap_file, pointer_data_handler_swap_type type, swap_info sinfo,
+    const std::string& description) {
   legacy_embedded_ctl::shared_static_array<POINTER_T> shared_ptr(std::move(ptr));
   legacy_embedded_ctl::shared_static_array<STORAGE_T> shared_buffer(std::move(buffer));
   return create_data_handler(std::move(shared_ptr), std::move(shared_buffer), swap_file, type, sinfo, description);
@@ -247,7 +259,8 @@ std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_data_ha
 
 template <typename T>
 std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_temp_data_handler(
-    const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr, const legacy_embedded_ctl::shared_static_array<STORAGE_T>& str_buffer) {
+    const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr,
+    const legacy_embedded_ctl::shared_static_array<STORAGE_T>& str_buffer) {
   return create_data_handler(ptr, str_buffer, "", pointer_data_handler_swap_type::NO_SWAP, no_swap(), "");
 }
 
@@ -293,13 +306,15 @@ template <typename T>
 load_status pointer_data_handler<T>::get_load_status() const {
   return data_.lock_shared([](const auto& data_wrapper) {
 #ifdef CELOSTAR
-    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; }),
+    return std::visit(
+        legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; }),
 #else
-    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; },
-                                      [](const io::compressed_data&) { return load_status::COMPRESSED; },
-                                      [](const swapped_data&) { return load_status::SWAPPED; }),
+    return std::visit(
+        legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>&) { return load_status::LOADED; },
+                                        [](const io::compressed_data&) { return load_status::COMPRESSED; },
+                                        [](const swapped_data&) { return load_status::SWAPPED; }),
 #endif
-                      data_wrapper.pointer);
+        data_wrapper.pointer);
   });
 }
 
@@ -570,9 +585,9 @@ void pointer_data_handler<T>::register_files() {
 
 template <typename T>
 pointer_data_handler<T>::pointer_data_handler(const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr_data,
-                                              const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer_data, swap_info sinfo,
-                                              const std::string& base_swap_file, pointer_data_handler_swap_type type,
-                                              std::string description)
+                                              const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer_data,
+                                              swap_info sinfo, const std::string& base_swap_file,
+                                              pointer_data_handler_swap_type type, std::string description)
     : pointer_swap_file_{base_swap_file + get_dict_file_ending(type).data()},
       buffer_swap_file_{base_swap_file + get_pointer_buffer_file_ending(type).data()},
       pointer_size_{ptr_data.size()},
@@ -788,9 +803,11 @@ void pointer_data_handler<T>::swap_in_buffer(data_handler_data<STORAGE_T>& buffe
 #ifndef CELOSTAR
 template <typename T>
 template <typename TYPE>
-loaded_data<TYPE> pointer_data_handler<T>::swap_in_impl(
-    const std::string& swap_file, std::atomic<size_t>& size, std::atomic<size_t>& size_on_disk,
-    std::atomic<bool>& broken_swap_file) requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>) {
+loaded_data<TYPE> pointer_data_handler<T>::swap_in_impl(const std::string& swap_file, std::atomic<size_t>& size,
+                                                        std::atomic<size_t>& size_on_disk,
+                                                        std::atomic<bool>& broken_swap_file)
+  requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>)
+{
   try {
     if (!data_handler::swap_file_exists(swap_file, sinfo_)) {
       log::jerror("Could not find swap file.", {{"swap_file", swap_file}, {"description", desc_}});
@@ -827,22 +844,24 @@ template <typename T>
 auto pointer_data_handler<T>::get_buffer_start() const -> const STORAGE_T* {
 #ifdef CELOSTAR
   return data_.lock_shared([](const auto& data_wrapper) {
-    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); }),
-                      data_wrapper.buffer);
+    return std::visit(
+        legacy_embedded_ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); }),
+        data_wrapper.buffer);
   });
 #else
   static const STORAGE_T never_used{};
   return data_.lock_shared([](const auto& data_wrapper) {
-    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); },
-                                      [](const io::compressed_data&) {
-                                        legacy_embedded_ctl::assert_unreachable();
-                                        return &never_used;
-                                      },
-                                      [](const swapped_data&) {
-                                        legacy_embedded_ctl::assert_unreachable();
-                                        return &never_used;
-                                      }),
-                      data_wrapper.buffer);
+    return std::visit(
+        legacy_embedded_ctl::overloaded([](const loaded_data<STORAGE_T>& loaded) { return loaded.data.get(); },
+                                        [](const io::compressed_data&) {
+                                          legacy_embedded_ctl::assert_unreachable();
+                                          return &never_used;
+                                        },
+                                        [](const swapped_data&) {
+                                          legacy_embedded_ctl::assert_unreachable();
+                                          return &never_used;
+                                        }),
+        data_wrapper.buffer);
   });
 #endif
 }
@@ -856,22 +875,24 @@ template <typename T>
 auto pointer_data_handler<T>::get_pointer_start() const -> const POINTER_T* {
 #ifdef CELOSTAR
   return data_.lock_shared([](const auto& data_wrapper) {
-    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); }),
-                      data_wrapper.pointer);
+    return std::visit(
+        legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); }),
+        data_wrapper.pointer);
   });
 #else
   static const POINTER_T never_used{};
   return data_.lock_shared([](const auto& data_wrapper) {
-    return std::visit(legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); },
-                                      [](const io::compressed_data&) {
-                                        legacy_embedded_ctl::assert_unreachable();
-                                        return &never_used;
-                                      },
-                                      [](const swapped_data&) {
-                                        legacy_embedded_ctl::assert_unreachable();
-                                        return &never_used;
-                                      }),
-                      data_wrapper.pointer);
+    return std::visit(
+        legacy_embedded_ctl::overloaded([](const loaded_data<POINTER_T>& loaded) { return loaded.data.get(); },
+                                        [](const io::compressed_data&) {
+                                          legacy_embedded_ctl::assert_unreachable();
+                                          return &never_used;
+                                        },
+                                        [](const swapped_data&) {
+                                          legacy_embedded_ctl::assert_unreachable();
+                                          return &never_used;
+                                        }),
+        data_wrapper.pointer);
   });
 #endif
 }

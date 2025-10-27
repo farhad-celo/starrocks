@@ -53,8 +53,8 @@ public:
     std::optional<std::string> finalize(FunctionContext* ctx) override;
 
 private:
-    std::string json_string(const std::vector<Slice>& activities,
-                            const celonis::ResultTable& vertex_table, const celonis::ResultTable& edge_table,
+    std::string json_string(const std::vector<Slice>& activities, const celonis::ResultTable& vertex_table,
+                            const celonis::ResultTable& edge_table,
                             const std::unordered_map<std::string, size_t>& statistics_map);
 
     const double imfd_frequency_threshold_;

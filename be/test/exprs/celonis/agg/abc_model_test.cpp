@@ -1,15 +1,17 @@
-#include <algorithm>
+#include "exprs/celonis/agg/abc_model.h"
+
 #include <gtest/gtest.h>
+
+#include <algorithm>
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "column/struct_column.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/agg/abc_model.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 namespace starrocks {
 
@@ -66,25 +68,24 @@ protected:
         auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
-        return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(), return_type,
-                                                std::move(arg_types)));
+        return std::unique_ptr<FunctionContext>(FunctionContext::create_context(
+                runtime_states_.back().get(), mem_pools_.back().get(), return_type, std::move(arg_types)));
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(LogicalType logical_type, const DatumArray& input, const DatumArray& pk_hash, double sample_ratio,
-              double ratio_a, double ratio_b) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            LogicalType logical_type, const DatumArray& input, const DatumArray& pk_hash, double sample_ratio,
+            double ratio_a, double ratio_b) {
         auto local_ctx = get_ctx(logical_type);
 
         const AggregateFunction* func =
                 get_aggregate_function("celonis_build_abc_model", logical_type, TYPE_VARCHAR, false);
 
         auto input_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(logical_type), true);
-        for (const auto& datum: input) {
+        for (const auto& datum : input) {
             input_col->append_datum(datum);
         }
         auto pk_hash_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_BIGINT), true);
-        for (const auto& datum: pk_hash) {
+        for (const auto& datum : pk_hash) {
             pk_hash_col->append_datum(datum);
         }
         auto sample_ratio_col = ColumnHelper::create_const_column<TYPE_DOUBLE>(sample_ratio, input.size());
@@ -119,7 +120,7 @@ protected:
             return false;
         }
         std::vector<double> boundaries;
-        for (const auto& boundary_str: boundary_strs) {
+        for (const auto& boundary_str : boundary_strs) {
             try {
                 auto boundary = boost::lexical_cast<double>(boundary_str);
                 boundaries.push_back(boundary);
@@ -134,7 +135,7 @@ protected:
         if (!parts[1].empty()) {
             std::vector<std::string> num_section_strs;
             boost::split(num_section_strs, parts[1], boost::is_any_of(";"));
-            for (const auto& num_section_str: num_section_strs) {
+            for (const auto& num_section_str : num_section_strs) {
                 std::vector<std::string> value_strs;
                 boost::split(value_strs, num_section_str, boost::is_any_of(","));
                 if (value_strs.size() != 4) {
@@ -167,11 +168,10 @@ protected:
         return true;
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Run(const DatumArray& input, const DatumArray& pk_hash, double sample_ratio, double ratio_a, double ratio_b,
              const std::vector<std::pair<double, double>>& expected_ranges,
-             const std::map<double, std::vector<double>>& expected_num_to_probs,
-             bool is_null = false) {
+             const std::map<double, std::vector<double>>& expected_num_to_probs, bool is_null = false) {
         auto [local_ctx, state, func] = RunUpdate(LT, input, pk_hash, sample_ratio, ratio_a, ratio_b);
 
         auto result = ColumnHelper::create_column(get_return_type(), true);
@@ -189,7 +189,7 @@ protected:
                 EXPECT_EQ(expected_ranges[i].first, ranges[i].first);
                 EXPECT_EQ(expected_ranges[i].second, ranges[i].second);
             }
-            for (const auto& [num, expected_probs]: expected_num_to_probs) {
+            for (const auto& [num, expected_probs] : expected_num_to_probs) {
                 auto it = num_to_probs.find(num);
                 ASSERT_TRUE(it != num_to_probs.end());
                 const auto probs = it->second;
@@ -380,10 +380,7 @@ TEST_F(CelonisBuildAbcModelTest, bigint_single_value) {
         double sample_ratio = 1.0;
         double ratio_a = 0.8;
         double ratio_b = 0.15;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0},
-                                                                  {0,   -1},
-                                                                  {0,   -1},
-                                                                  {50,  50}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {0, -1}, {0, -1}, {50, 50}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_BIGINT>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -393,10 +390,7 @@ TEST_F(CelonisBuildAbcModelTest, bigint_single_value) {
         double sample_ratio = 1.0;
         double ratio_a = 1.0;
         double ratio_b = 0.0;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0},
-                                                                  {50,  50},
-                                                                  {0,   -1},
-                                                                  {0,   -1}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {50, 50}, {0, -1}, {0, -1}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_BIGINT>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -409,10 +403,7 @@ TEST_F(CelonisBuildAbcModelTest, double_single_value) {
         double sample_ratio = 1.0;
         double ratio_a = 0.8;
         double ratio_b = 0.15;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0,  0.0},
-                                                                  {0,    -1},
-                                                                  {0,    -1},
-                                                                  {50.5, 50.5}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {0, -1}, {0, -1}, {50.5, 50.5}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_DOUBLE>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -422,10 +413,7 @@ TEST_F(CelonisBuildAbcModelTest, double_single_value) {
         double sample_ratio = 1.0;
         double ratio_a = 1.0;
         double ratio_b = 0.0;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0,  0.0},
-                                                                  {50.5, 50.5},
-                                                                  {0,    -1},
-                                                                  {0,    -1}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {50.5, 50.5}, {0, -1}, {0, -1}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_DOUBLE>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -438,10 +426,7 @@ TEST_F(CelonisBuildAbcModelTest, null_values) {
         double sample_ratio = 1.0;
         double ratio_a = 0.8;
         double ratio_b = 0.15;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0},
-                                                                  {30,  50},
-                                                                  {7,   8},
-                                                                  {5,   5}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {30, 50}, {7, 8}, {5, 5}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_BIGINT>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -451,10 +436,7 @@ TEST_F(CelonisBuildAbcModelTest, null_values) {
         double sample_ratio = 1.0;
         double ratio_a = 0.8;
         double ratio_b = 0.15;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0,  0.0},
-                                                                  {30.5, 50.5},
-                                                                  {7.5,  8.5},
-                                                                  {5.5,  5.5}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {30.5, 50.5}, {7.5, 8.5}, {5.5, 5.5}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_DOUBLE>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -467,10 +449,7 @@ TEST_F(CelonisBuildAbcModelTest, bigint_unique_values) {
         double sample_ratio = 1.0;
         double ratio_a = 0.8;
         double ratio_b = 0.15;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0},
-                                                                  {30,  50},
-                                                                  {7,   8},
-                                                                  {5,   5}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {30, 50}, {7, 8}, {5, 5}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_BIGINT>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -480,10 +459,7 @@ TEST_F(CelonisBuildAbcModelTest, bigint_unique_values) {
         double sample_ratio = 1.0;
         double ratio_a = 0.5;
         double ratio_b = 0.3;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0},
-                                                                  {50,  50},
-                                                                  {30,  30},
-                                                                  {5,   8}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {50, 50}, {30, 30}, {5, 8}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_BIGINT>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -497,10 +473,7 @@ TEST_F(CelonisBuildAbcModelTest, bigint_unique_values_sample_works) {
         double sample_ratio = 0.5;
         double ratio_a = 0.8;
         double ratio_b = 0.15;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0},
-                                                                  {30,  50},
-                                                                  {7,   8},
-                                                                  {5,   5}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {30, 50}, {7, 8}, {5, 5}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_BIGINT>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }
@@ -510,10 +483,7 @@ TEST_F(CelonisBuildAbcModelTest, bigint_unique_values_sample_works) {
         double sample_ratio = 0.5;
         double ratio_a = 0.8;
         double ratio_b = 0.15;
-        std::vector<std::pair<double, double>> expected_ranges = {{0.0,  0.0},
-                                                                  {30.5, 50.5},
-                                                                  {7.5,  8.5},
-                                                                  {5.5,  5.5}};
+        std::vector<std::pair<double, double>> expected_ranges = {{0.0, 0.0}, {30.5, 50.5}, {7.5, 8.5}, {5.5, 5.5}};
         std::map<double, std::vector<double>> expected_num_to_probs = {};
         Run<TYPE_DOUBLE>(input, pk_hash, sample_ratio, ratio_a, ratio_b, expected_ranges, expected_num_to_probs, false);
     }

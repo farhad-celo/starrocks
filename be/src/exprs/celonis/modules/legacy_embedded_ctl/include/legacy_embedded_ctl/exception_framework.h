@@ -73,7 +73,8 @@ class base_exception : public std::exception {
 
  public:
   /** The exception context is written into this key of the json_key_value_container_ **/
-  inline static const legacy_embedded_format::json::json_key_t EXCEPTION_CONTEXT_KEY{"saola_exception"};  // NOLINT(cert-err58-cpp)
+  inline static const legacy_embedded_format::json::json_key_t EXCEPTION_CONTEXT_KEY{
+      "saola_exception"};  // NOLINT(cert-err58-cpp)
 
   [[deprecated("Use the more explicit 'internal_message()' or 'external_message()' calls.")]] [[nodiscard]] const char*
   what() const noexcept final;  // final as internal-/external_message should be overloaded
@@ -84,7 +85,8 @@ class base_exception : public std::exception {
   /** Returns a JSON object with key #EXCEPTION_CONTEXT_KEY that contains additional data stored for the exception. */
   [[nodiscard]] const legacy_embedded_format::json::json_object_t& json_key_value_container() const noexcept;
   /** Allows to add further key-value pairs to the internal JSON map */
-  auto add_or_overwrite(const legacy_embedded_format::json::json_key_t& key, const legacy_embedded_format::json::json_value_t& value) {
+  auto add_or_overwrite(const legacy_embedded_format::json::json_key_t& key,
+                        const legacy_embedded_format::json::json_value_t& value) {
     return json_exception_context().insert_or_assign(key, value);
   }
   /** Same as above but supports batch input */
@@ -97,8 +99,9 @@ class base_exception : public std::exception {
   /** Returns the JSON object that contains additional data stored for the exception. **/
   [[nodiscard]] legacy_embedded_format::json::json_object_t& json_exception_context();
   /**Do not change the order of these members! 'gdb_data_table_cache_content_command.py' relies on this memory layout*/
-  std::string error_message_{};                             // NOLINT(misc-non-private-member-variables-in-classes)
-  legacy_embedded_format::json::json_object_t json_key_value_container_{};  // NOLINT(misc-non-private-member-variables-in-classes)
+  std::string error_message_{};  // NOLINT(misc-non-private-member-variables-in-classes)
+  legacy_embedded_format::json::json_object_t
+      json_key_value_container_{};  // NOLINT(misc-non-private-member-variables-in-classes)
 };
 
 }  // namespace celonis::accelerator::legacy_embedded_ctl

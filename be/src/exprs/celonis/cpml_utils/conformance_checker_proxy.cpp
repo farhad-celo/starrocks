@@ -157,9 +157,9 @@ template <conformance_or_readable_result_type T>
     using output_column_type =
             std::conditional_t<IS_CONFORMANCE_DATA, RunTimeColumnType<TYPE_BIGINT>, RunTimeColumnType<TYPE_VARCHAR>>;
     /* Transform the CPML output to a SR column output */
-    auto result_array_column = ArrayColumn::create(
-            NullableColumn::create(output_column_type::create(), NullColumn::create()),
-            ColumnHelper::as_column<UInt32Column>(original_input_array_column.offsets->clone()));
+    auto result_array_column =
+            ArrayColumn::create(NullableColumn::create(output_column_type::create(), NullColumn::create()),
+                                ColumnHelper::as_column<UInt32Column>(original_input_array_column.offsets->clone()));
 
     // Copy each conformance result value to the output column elements
     auto& result_elements = result_array_column->elements_column();
@@ -190,8 +190,8 @@ conformance_violation_result_column_t check_conformance(
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     /* Produce the conformance result output */
-    const auto conformance_result =
-            cpml::conformance::deprecated::check_conformance(trace_accessor, petri_net_description, stoken, function_ctx);
+    const auto conformance_result = cpml::conformance::deprecated::check_conformance(
+            trace_accessor, petri_net_description, stoken, function_ctx);
 #pragma GCC diagnostic pop
 
     return make_output_column(ctl::array_view(conformance_result), array_data);

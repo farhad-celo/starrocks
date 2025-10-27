@@ -227,23 +227,24 @@ void column::load_if_missing(const common::execution_context& context) {
       auto data{column_load_->load_missing_column(config_, load_context)};
       std::visit(
           legacy_embedded_ctl::overloaded{[this](std::shared_ptr<materialized_data>& mat_data) {
-                            if (belongs_to_augmentation_table()) {
-                              legacy_embedded_debug_assert(config_.row_count == 0);
-                              config_.row_count = mat_data->get_size();
-                            }
-                            plain_data_ = std::move(mat_data);
-                            legacy_embedded_debug_assert(plain_data_->get_size() == config_.row_count);
-                            status_ = column_loading::column_status::MATERIALIZED;
-                            column_pointers_ = nullptr;
-                            dict_ = nullptr;
-                          },
-                          [this](memory::column_loading::dictified_column_data& dic_data) {
-                            column_pointers_ = std::move(dic_data.col_ptrs);
-                            dict_ = std::move(dic_data.dict);
-                            legacy_embedded_debug_assert(column_pointers_->get_row_count() == static_cast<size_t>(config_.row_count));
-                            status_ = column_loading::column_status::DICTIFIED;
-                            plain_data_ = nullptr;
-                          }},
+                                            if (belongs_to_augmentation_table()) {
+                                              legacy_embedded_debug_assert(config_.row_count == 0);
+                                              config_.row_count = mat_data->get_size();
+                                            }
+                                            plain_data_ = std::move(mat_data);
+                                            legacy_embedded_debug_assert(plain_data_->get_size() == config_.row_count);
+                                            status_ = column_loading::column_status::MATERIALIZED;
+                                            column_pointers_ = nullptr;
+                                            dict_ = nullptr;
+                                          },
+                                          [this](memory::column_loading::dictified_column_data& dic_data) {
+                                            column_pointers_ = std::move(dic_data.col_ptrs);
+                                            dict_ = std::move(dic_data.dict);
+                                            legacy_embedded_debug_assert(column_pointers_->get_row_count() ==
+                                                                         static_cast<size_t>(config_.row_count));
+                                            status_ = column_loading::column_status::DICTIFIED;
+                                            plain_data_ = nullptr;
+                                          }},
           data);
     } else {
       throw common::internal_exception{"Load failed for column [{}].", get_user_visible_name(context)};
@@ -655,7 +656,8 @@ column_info column::dump_header() const {
   return col_dump;
 }
 
-legacy_embedded_ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column, const common::execution_context& context) {
+legacy_embedded_ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column,
+                                                          const common::execution_context& context) {
   auto null_flags{
       memory::tracking::make_tracked_dynamic_bitset_t(static_cast<size_t>(column->get_row_count(context)), context)};
   column->project_null_flags(null_flags, context);

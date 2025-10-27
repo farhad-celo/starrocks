@@ -1,16 +1,18 @@
 #pragma once
 
 #include <cstddef>
-#include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/enumerable_thread_specific.h>
-#include <oneapi/tbb/parallel_for.h>
 #include <random>
 #include <span>
 #include <string_view>
 
-#include "legacy_embedded_ctl/bitset_view.h"
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/enumerable_thread_specific.h>
+#include <oneapi/tbb/parallel_for.h>
+
 #include <ctl/hash.h>
 #include <ctl/hyperloglog.h>
+
+#include "legacy_embedded_ctl/bitset_view.h"
 #include "modules/common/shared_types_fwd.h"
 
 namespace celonis::accelerator::memory {
@@ -51,7 +53,8 @@ struct hyperloglog_hash<cel_int_t> {
 }  // namespace details
 
 template <typename T>
-size_t estimate_unique_value_count(std::span<const T> data, const legacy_embedded_ctl::bitset_view_t null_flags, size_t block_size) {
+size_t estimate_unique_value_count(std::span<const T> data, const legacy_embedded_ctl::bitset_view_t null_flags,
+                                   size_t block_size) {
   std::random_device rd{};
   std::mt19937 mt{rd()};
   std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());

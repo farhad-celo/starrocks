@@ -280,8 +280,8 @@ StatusOr<ColumnPtr> array_sources_targets_impl(FunctionContext* context, const C
         }
     }
 
-    auto result = array_sources_targets_impl< /*is_source=*/SOURCE_TARGET_TYPE == SourceTargetType::SOURCE,
-            EDGE_CONFIG>(array_data, group_array_data);
+    auto result = array_sources_targets_impl</*is_source=*/SOURCE_TARGET_TYPE == SourceTargetType::SOURCE, EDGE_CONFIG>(
+            array_data, group_array_data);
     if (array_data.null_arrays != nullptr) {
         return NullableColumn::create(std::move(result),
                                       down_cast<const NullableColumn*>(array_column.get())->null_column());

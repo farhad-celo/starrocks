@@ -1,11 +1,12 @@
 #include "exprs/celonis/qnorm.h"
 
-#include "column/column_helper.h"
-#include "exprs/anyval_util.h"
-
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+
 #include <boost/math/distributions/normal.hpp>
+
+#include "column/column_helper.h"
+#include "exprs/anyval_util.h"
 
 namespace starrocks {
 

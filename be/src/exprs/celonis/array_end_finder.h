@@ -4,10 +4,9 @@
 
 namespace starrocks {
 
-template<LogicalType LT>
+template <LogicalType LT>
 class CelonisArrayEndFinder {
 public:
-
     /**
      * @param: [input_array]
      * @paramType columns: [ARRAY_VARCHAR | ARRAY_INT | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_DATETIME]

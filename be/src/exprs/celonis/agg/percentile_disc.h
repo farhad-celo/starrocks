@@ -7,7 +7,6 @@
 
 namespace starrocks {
 
-
 // Customized implementation of PERCENTILE_DISC.
 // SR's PERCENTILE_DISC uses index = ceil((group_size - 1) * rate);
 // Saola's PERCENTILE uses index = floor(group_size * quantile_val); index = max(0, min(index, group_size - 1));

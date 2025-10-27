@@ -47,7 +47,8 @@ const legacy_embedded_format::json::json_object_t& base_exception::json_key_valu
 
 void base_exception::add_or_overwrite(const legacy_embedded_format::json::json_object_t& json_key_value_container) {
   std::for_each(json_key_value_container.cbegin(), json_key_value_container.cend(),
-                [this](const std::pair<const legacy_embedded_format::json::json_key_t&, const legacy_embedded_format::json::json_value_t&>& key_value) {
+                [this](const std::pair<const legacy_embedded_format::json::json_key_t&,
+                                       const legacy_embedded_format::json::json_value_t&>& key_value) {
                   const auto& [key, value]{key_value};
                   add_or_overwrite(key, value);
                 });
@@ -55,7 +56,8 @@ void base_exception::add_or_overwrite(const legacy_embedded_format::json::json_o
 
 legacy_embedded_format::json::json_object_t& base_exception::json_exception_context() {
   const auto exception_context_entry_it{
-      json_key_value_container_.try_emplace(EXCEPTION_CONTEXT_KEY, legacy_embedded_format::json::json_object_t{}).first};
+      json_key_value_container_.try_emplace(EXCEPTION_CONTEXT_KEY, legacy_embedded_format::json::json_object_t{})
+          .first};
   return std::get<legacy_embedded_format::json::json_object_t>(exception_context_entry_it->second);
 }
 

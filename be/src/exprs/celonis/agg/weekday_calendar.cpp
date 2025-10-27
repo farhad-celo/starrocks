@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "weekday_calendar.h"
+
 #include "exprs/celonis/agg/util.h"
 #include "gutil/strings/strcat.h"
 #include "modules/query/calendars.pb.h"
@@ -31,15 +32,14 @@ int64_t to_millis(const std::string& hhmm) {
     int hours, minutes;
     char delim;
     // note that we allow hours = 24 or minutes = 60
-    if (!(iss >> hours >> delim >> minutes) || delim != ':' || hours < 0 || hours > 24 || minutes < 0 ||
-        minutes > 60) {
+    if (!(iss >> hours >> delim >> minutes) || delim != ':' || hours < 0 || hours > 24 || minutes < 0 || minutes > 60) {
         return -1;
     }
     int64_t total_minutes = hours * 60 + minutes;
     return total_minutes * 60 * 1000;
 }
 
-}
+} // namespace
 
 WeekdayCalendarAggregateState::~WeekdayCalendarAggregateState() {
     if (weekday != nullptr) {
@@ -62,7 +62,7 @@ WeekdayCalendarAggregateState::~WeekdayCalendarAggregateState() {
 void WeekdayCalendarAggregateFunction::create(FunctionContext* ctx, AggDataPtr __restrict ptr) const {
     auto num = ctx->get_num_args();
     DCHECK(num == 4);
-    auto* state = new(ptr) WeekdayCalendarAggregateState;
+    auto* state = new (ptr) WeekdayCalendarAggregateState;
     state->weekday = std::make_unique<BinaryColumn>();
     state->shift_begin = std::make_unique<Int64Column>();
     state->shift_end = std::make_unique<Int64Column>();
@@ -70,8 +70,8 @@ void WeekdayCalendarAggregateFunction::create(FunctionContext* ctx, AggDataPtr _
     state->is_calendar_id_null = std::make_unique<BooleanColumn>();
 }
 
-void
-WeekdayCalendarAggregateFunction::reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const {
+void WeekdayCalendarAggregateFunction::reset(FunctionContext* ctx, const Columns& args,
+                                             AggDataPtr __restrict state) const {
     auto& state_impl = this->data(state);
     if (state_impl.weekday != nullptr) {
         state_impl.weekday.reset(nullptr);
@@ -136,7 +136,8 @@ void WeekdayCalendarAggregateFunction::merge(FunctionContext* ctx, const Column*
     auto shift_begin_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(1).get()));
     auto shift_end_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(2).get()));
     auto calendar_id_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(3).get()));
-    auto is_calendar_id_null_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(4).get()));
+    auto is_calendar_id_null_column =
+            down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(4).get()));
     auto& offsets = weekday_column->offsets().get_data();
     const auto start = offsets[row_num];
     const auto end = offsets[row_num + 1];
@@ -207,11 +208,11 @@ void WeekdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         id_to_entries[calendar_id][weekday].emplace_back(shift_begin, shift_end);
     }
 
-    for (auto& [id, entries]: id_to_entries) {
+    for (auto& [id, entries] : id_to_entries) {
         while (true) {
             celonis::accelerator::WeekdayCalendar weekday_calendar;
             bool is_empty = true;
-            for (auto& [day, pairs]: entries) {
+            for (auto& [day, pairs] : entries) {
                 if (pairs.empty()) {
                     continue;
                 }
@@ -251,11 +252,13 @@ void WeekdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
             }
         }
     }
-    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto,
-                                                                          DEFAULT_CELONIS_PROTO_SIZE_LIMIT, true);
+    std::optional<std::string> calendar_string =
+            to_base64_encoded_string(calendar_proto, DEFAULT_CELONIS_PROTO_SIZE_LIMIT, true);
     if (!calendar_string.has_value()) {
         ctx->set_error(StrCat("Calendar proto serialized size (", calendar_proto.ByteSizeLong(),
-                              " bytes) exceeds maximum supported length (1GB)").c_str(), false);
+                              " bytes) exceeds maximum supported length (1GB)")
+                               .c_str(),
+                       false);
         return;
     }
 
@@ -265,7 +268,7 @@ void WeekdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         calendar_pieces.emplace_back(calendar_string->substr(i, MAX_STRING_SIZE));
     }
     DatumArray array;
-    for (const auto& calendar_piece: calendar_pieces) {
+    for (const auto& calendar_piece : calendar_pieces) {
         array.emplace_back(calendar_piece.c_str());
     }
     to->append_datum(array);
@@ -273,8 +276,7 @@ void WeekdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
 
 // convert each cell of a row to a [nullable] array in a struct
 void WeekdayCalendarAggregateFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
-                                                                   size_t chunk_size,
-                                                                   ColumnPtr* dst) const {
+                                                                   size_t chunk_size, ColumnPtr* dst) const {
     DCHECK(src.size() == 4);
     std::vector<size_t> valid_indexes;
     for (size_t row = 0; row < chunk_size; ++row) {
@@ -311,20 +313,20 @@ void WeekdayCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
         }
 
         if (std::holds_alternative<Slice>(src[1]->get(valid_indexes.front()).convert2DatumKey())) {
-            for (auto i: valid_indexes) {
+            for (auto i : valid_indexes) {
                 shift_begin_array.push_back(Datum(to_millis(src[1]->get(i).get_slice().to_string())));
             }
         } else {
-            for (auto i: valid_indexes) {
+            for (auto i : valid_indexes) {
                 shift_begin_array.push_back(src[1]->get(i));
             }
         }
         if (std::holds_alternative<Slice>(src[2]->get(valid_indexes.front()).convert2DatumKey())) {
-            for (auto i: valid_indexes) {
+            for (auto i : valid_indexes) {
                 shift_end_array.push_back(Datum(to_millis(src[2]->get(i).get_slice().to_string())));
             }
         } else {
-            for (auto i: valid_indexes) {
+            for (auto i : valid_indexes) {
                 shift_end_array.push_back(src[2]->get(i));
             }
         }
@@ -336,6 +338,8 @@ void WeekdayCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
     }
 }
 
-std::string WeekdayCalendarAggregateFunction::get_name() const { return "celonis_make_weekday_calendar"; }
+std::string WeekdayCalendarAggregateFunction::get_name() const {
+    return "celonis_make_weekday_calendar";
+}
 
 } // namespace starrocks

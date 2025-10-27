@@ -1,5 +1,7 @@
 #include "exprs/celonis/transpose_array_of_struct.h"
 
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "column/struct_column.h"
@@ -7,8 +9,6 @@
 #include "gutil/strings/strcat.h"
 #include "testutil/function_utils.h"
 #include "util/defer_op.h"
-
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -19,7 +19,6 @@ protected:
     void TearDown() override {}
 
 private:
-
     TypeDescriptor to_array_of_struct_type(const std::vector<LogicalType>& logical_types) {
         TypeDescriptor struct_type;
         struct_type.type = LogicalType::TYPE_STRUCT;
@@ -46,25 +45,20 @@ private:
         return struct_type;
     }
 
-    std::unique_ptr<FunctionContext>
-    get_ctx(const std::vector<LogicalType>& field_logical_types) {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                to_array_of_struct_type(field_logical_types)};
+    std::unique_ptr<FunctionContext> get_ctx(const std::vector<LogicalType>& field_logical_types) {
+        std::vector<FunctionContext::TypeDesc> arg_types = {to_array_of_struct_type(field_logical_types)};
         auto return_type = get_return_type(field_logical_types);
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
 
-    void
-    Prepare(const std::vector<LogicalType>& field_logical_types) {
+    void Prepare(const std::vector<LogicalType>& field_logical_types) {
         auto array_of_struct_type = to_array_of_struct_type(field_logical_types);
         ctx_ = get_ctx(field_logical_types);
         array_of_struct_column_ = ColumnHelper::create_column(array_of_struct_type, true);
     }
 
-    void AddNullRow() {
-        array_of_struct_column_->append_nulls(1);
-    }
+    void AddNullRow() { array_of_struct_column_->append_nulls(1); }
 
     void AddRow(const std::vector<std::optional<DatumStruct>>& data) {
         DatumArray array;
@@ -185,14 +179,15 @@ TEST_F(CelonisTransposeArrayOfStructTest, three_fields) {
     DatumStruct ele3 = {kNullDatum, kNullDatum, kNullDatum};
     DatumStruct ele4 = {Datum{"world"}, Datum{20L}, Datum{20.5}};
     DatumStruct ele5 = {kNullDatum, Datum{30L}, Datum{30.5}};
-    std::vector<std::optional<DatumStruct>> row3 = std::vector<std::optional<DatumStruct>>(
-            {ele3, ele4, std::nullopt, ele5});
+    std::vector<std::optional<DatumStruct>> row3 =
+            std::vector<std::optional<DatumStruct>>({ele3, ele4, std::nullopt, ele5});
     AddRow(row3);
     auto result = Run().value();
     ASSERT_EQ(4, result->size());
     ASSERT_TRUE(result->is_null(0));
-    Validate(result, 1, {DatumArray{Datum{"apple"}, Datum{"pie"}}, DatumArray{Datum{1L}, Datum{-2L}},
-                         DatumArray{Datum{1.5}, Datum{-2.5}}});
+    Validate(result, 1,
+             {DatumArray{Datum{"apple"}, Datum{"pie"}}, DatumArray{Datum{1L}, Datum{-2L}},
+              DatumArray{Datum{1.5}, Datum{-2.5}}});
     ASSERT_TRUE(result->is_null(2));
     Validate(result, 3,
              {DatumArray{kNullDatum, Datum{"world"}, kNullDatum}, DatumArray{kNullDatum, Datum{20L}, Datum{30L}},

@@ -88,14 +88,10 @@ public:
 
 protected:
     CelonisAdjustDailyTimestampsTest()
-            : arg_types_{celonis::array_type(TYPE_DATETIME),
-                         celonis::array_type(TYPE_BOOLEAN)},
-              return_type_() {
+            : arg_types_{celonis::array_type(TYPE_DATETIME), celonis::array_type(TYPE_BOOLEAN)}, return_type_() {
         return_type_.type = TYPE_STRUCT;
-        return_type_.children.push_back(
-                                         TypeDescriptor::from_logical_type(TYPE_DATETIME));
-        return_type_.children.push_back(
-                                         TypeDescriptor::from_logical_type(TYPE_BIGINT));
+        return_type_.children.push_back(TypeDescriptor::from_logical_type(TYPE_DATETIME));
+        return_type_.children.push_back(TypeDescriptor::from_logical_type(TYPE_BIGINT));
         return_type_.field_names.push_back("adjusted_timestamps");
         return_type_.field_names.push_back("reordering");
     }
@@ -162,18 +158,18 @@ TEST_F(CelonisAdjustDailyTimestampsTest, const_null_column) {
 TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_day_based_activity_reordered_after_non_day_based) {
     auto activities = ActivitiesBuilder{}.add_non_day_based_activity("A", 1).add_day_based_activity("B", 2).build();
     auto case1 = CaseBuilder{activities}
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row("B", create_day_based_timestamp(2))
-                       .add_row("A", create_timestamp(2, 1))
-                       .build();
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row("B", create_day_based_timestamp(2))
+                         .add_row("A", create_timestamp(2, 1))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_case(std::move(case1)).build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}
-                                       .add_row(create_timestamp(1, 0), 0)
-                                       .add_row(create_timestamp(2, 1), 2)
-                                       .add_row(create_timestamp(2, 1), 1)
-                                       .build();
+                                         .add_row(create_timestamp(1, 0), 0)
+                                         .add_row(create_timestamp(2, 1), 2)
+                                         .add_row(create_timestamp(2, 1), 1)
+                                         .build();
     const auto expected_result = ExpectedResultBuilder{}.add_case(std::move(expected_result_case1)).build();
 
     run_scenario(scenario, expected_result);
@@ -183,18 +179,18 @@ TEST_F(CelonisAdjustDailyTimestampsTest,
        adjust_daily_timestamps_day_based_activity_not_reordered_before_non_day_based) {
     auto activities = ActivitiesBuilder{}.add_non_day_based_activity("A", 2).add_day_based_activity("B", 1).build();
     auto case1 = CaseBuilder{activities}
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row("B", create_day_based_timestamp(2))
-                       .add_row("A", create_timestamp(2, 1))
-                       .build();
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row("B", create_day_based_timestamp(2))
+                         .add_row("A", create_timestamp(2, 1))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_case(std::move(case1)).build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}
-                                       .add_row(create_timestamp(1, 0), 0)
-                                       .add_row(create_timestamp(2, 1), 1)
-                                       .add_row(create_timestamp(2, 1), 2)
-                                       .build();
+                                         .add_row(create_timestamp(1, 0), 0)
+                                         .add_row(create_timestamp(2, 1), 1)
+                                         .add_row(create_timestamp(2, 1), 2)
+                                         .build();
     const auto expected_result = ExpectedResultBuilder{}.add_case(std::move(expected_result_case1)).build();
 
     run_scenario(scenario, expected_result);
@@ -203,20 +199,20 @@ TEST_F(CelonisAdjustDailyTimestampsTest,
 TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_two_day_based_activities_reordered) {
     auto activities = ActivitiesBuilder{}.add_day_based_activity("A", 2).add_day_based_activity("B", 1).build();
     auto case1 = CaseBuilder{activities}
-                       .add_row("A", create_day_based_timestamp(1))
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row("B", create_day_based_timestamp(2))
-                       .add_row("A", create_day_based_timestamp(2))
-                       .build();
+                         .add_row("A", create_day_based_timestamp(1))
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row("B", create_day_based_timestamp(2))
+                         .add_row("A", create_day_based_timestamp(2))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_case(std::move(case1)).build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}
-                                       .add_row(create_day_based_timestamp(1), 1)
-                                       .add_row(create_day_based_timestamp(1), 0)
-                                       .add_row(create_day_based_timestamp(2), 2)
-                                       .add_row(create_day_based_timestamp(2), 3)
-                                       .build();
+                                         .add_row(create_day_based_timestamp(1), 1)
+                                         .add_row(create_day_based_timestamp(1), 0)
+                                         .add_row(create_day_based_timestamp(2), 2)
+                                         .add_row(create_day_based_timestamp(2), 3)
+                                         .build();
     const auto expected_result = ExpectedResultBuilder{}.add_case(std::move(expected_result_case1)).build();
 
     run_scenario(scenario, expected_result);
@@ -227,73 +223,73 @@ TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_simple_example_
     auto case1 = CaseBuilder{activities}.add_row("A", create_day_based_timestamp(1)).build();
     auto case2 = CaseBuilder{activities}.add_row("B", create_timestamp(1, 1)).build();
     auto case3 = CaseBuilder{activities}
-                       .add_row("A", create_day_based_timestamp(1))
-                       .add_row("B", create_timestamp(1, 1))
-                       .build();
+                         .add_row("A", create_day_based_timestamp(1))
+                         .add_row("B", create_timestamp(1, 1))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}
-                                .add_case(std::move(case1))
-                                .add_case(std::move(case2))
-                                .add_case(std::move(case3))
-                                .build();
+                                  .add_case(std::move(case1))
+                                  .add_case(std::move(case2))
+                                  .add_case(std::move(case3))
+                                  .build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}.add_row(create_day_based_timestamp(1), 0).build();
     auto expected_result_case2 = ExpectedResultCaseBuilder{}.add_row(create_timestamp(1, 1), 0).build();
     auto expected_result_case3 =
             ExpectedResultCaseBuilder{}.add_row(create_timestamp(1, 1), 1).add_row(create_timestamp(1, 1), 0).build();
     const auto expected_result = ExpectedResultBuilder{}
-                                       .add_case(std::move(expected_result_case1))
-                                       .add_case(std::move(expected_result_case2))
-                                       .add_case(std::move(expected_result_case3))
-                                       .build();
+                                         .add_case(std::move(expected_result_case1))
+                                         .add_case(std::move(expected_result_case2))
+                                         .add_case(std::move(expected_result_case3))
+                                         .build();
 
     run_scenario(scenario, expected_result);
 }
 
 TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_multiple_day_based_and_non_day_based) {
     auto activities = ActivitiesBuilder{}
-                            .add_non_day_based_activity("A", 1)
-                            .add_day_based_activity("B", 2)
-                            .add_non_day_based_activity("C", 3)
-                            .add_day_based_activity("D", 4)
-                            .build();
+                              .add_non_day_based_activity("A", 1)
+                              .add_day_based_activity("B", 2)
+                              .add_non_day_based_activity("C", 3)
+                              .add_day_based_activity("D", 4)
+                              .build();
     auto case1 = CaseBuilder{activities} // day 1
-                       .add_row("A", create_timestamp(1, 1))
-                       .add_row("C", create_timestamp(1, 2))
-                       .add_row("D", create_day_based_timestamp(1))
-                       // day 2
-                       .add_row("B", create_day_based_timestamp(2))
-                       .add_row("B", create_day_based_timestamp(2))
-                       .add_row("D", create_day_based_timestamp(2))
-                       .add_row("A", create_timestamp(2, 3))
-                       .add_row("C", create_timestamp(2, 4))
-                       .add_row("C", create_timestamp(2, 5))
-                       .add_row("A", create_timestamp(2, 6))
-                       // day 3
-                       .add_row("D", create_day_based_timestamp(3))
-                       .add_row("B", create_day_based_timestamp(3))
-                       .add_row("C", create_timestamp(3, 1))
-                       .build();
+                         .add_row("A", create_timestamp(1, 1))
+                         .add_row("C", create_timestamp(1, 2))
+                         .add_row("D", create_day_based_timestamp(1))
+                         // day 2
+                         .add_row("B", create_day_based_timestamp(2))
+                         .add_row("B", create_day_based_timestamp(2))
+                         .add_row("D", create_day_based_timestamp(2))
+                         .add_row("A", create_timestamp(2, 3))
+                         .add_row("C", create_timestamp(2, 4))
+                         .add_row("C", create_timestamp(2, 5))
+                         .add_row("A", create_timestamp(2, 6))
+                         // day 3
+                         .add_row("D", create_day_based_timestamp(3))
+                         .add_row("B", create_day_based_timestamp(3))
+                         .add_row("C", create_timestamp(3, 1))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_case(std::move(case1)).build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{} // day 1
-                                       .add_row(create_timestamp(1, 1), 0)
-                                       .add_row(create_timestamp(1, 2), 1)
-                                       .add_row(create_timestamp(1, 2), 2)
-                                       // day 2
-                                       .add_row(create_timestamp(2, 3), 4)
-                                       .add_row(create_timestamp(2, 3), 5)
-                                       .add_row(create_timestamp(2, 6), 9)
-                                       .add_row(create_timestamp(2, 3), 3)
-                                       .add_row(create_timestamp(2, 4), 6)
-                                       .add_row(create_timestamp(2, 5), 7)
-                                       .add_row(create_timestamp(2, 6), 8)
-                                       // day 3
-                                       .add_row(create_timestamp(3, 1), 12)
-                                       .add_row(create_timestamp(3, 1), 10)
-                                       .add_row(create_timestamp(3, 1), 11)
-                                       .build();
+                                         .add_row(create_timestamp(1, 1), 0)
+                                         .add_row(create_timestamp(1, 2), 1)
+                                         .add_row(create_timestamp(1, 2), 2)
+                                         // day 2
+                                         .add_row(create_timestamp(2, 3), 4)
+                                         .add_row(create_timestamp(2, 3), 5)
+                                         .add_row(create_timestamp(2, 6), 9)
+                                         .add_row(create_timestamp(2, 3), 3)
+                                         .add_row(create_timestamp(2, 4), 6)
+                                         .add_row(create_timestamp(2, 5), 7)
+                                         .add_row(create_timestamp(2, 6), 8)
+                                         // day 3
+                                         .add_row(create_timestamp(3, 1), 12)
+                                         .add_row(create_timestamp(3, 1), 10)
+                                         .add_row(create_timestamp(3, 1), 11)
+                                         .build();
     const auto expected_result = ExpectedResultBuilder{}.add_case(std::move(expected_result_case1)).build();
 
     run_scenario(scenario, expected_result);
@@ -301,44 +297,44 @@ TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_multiple_day_ba
 
 TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_multiple_identical_with_two_day_based) {
     auto activities = ActivitiesBuilder{}
-                            .add_non_day_based_activity("A", 1)
-                            .add_day_based_activity("B", 2)
-                            .add_non_day_based_activity("C", 3)
-                            .add_day_based_activity("D", 4)
-                            .build();
+                              .add_non_day_based_activity("A", 1)
+                              .add_day_based_activity("B", 2)
+                              .add_non_day_based_activity("C", 3)
+                              .add_day_based_activity("D", 4)
+                              .build();
     auto case1 = CaseBuilder{activities}
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row("D", create_day_based_timestamp(1))
-                       .add_row("A", create_timestamp(1, 1))
-                       .add_row("C", create_timestamp(1, 2))
-                       .add_row("C", create_timestamp(1, 3))
-                       .add_row("A", create_timestamp(1, 4))
-                       .build();
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row("D", create_day_based_timestamp(1))
+                         .add_row("A", create_timestamp(1, 1))
+                         .add_row("C", create_timestamp(1, 2))
+                         .add_row("C", create_timestamp(1, 3))
+                         .add_row("A", create_timestamp(1, 4))
+                         .build();
     auto case2 = case1;
     auto case3 = case1;
 
     const auto scenario = EventlogScenarioBuilder{}
-                                .add_case(std::move(case1))
-                                .add_case(std::move(case2))
-                                .add_case(std::move(case3))
-                                .build();
+                                  .add_case(std::move(case1))
+                                  .add_case(std::move(case2))
+                                  .add_case(std::move(case3))
+                                  .build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}
-                                       .add_row(create_timestamp(1, 1), 1)
-                                       .add_row(create_timestamp(1, 4), 5)
-                                       .add_row(create_timestamp(1, 1), 0)
-                                       .add_row(create_timestamp(1, 2), 2)
-                                       .add_row(create_timestamp(1, 3), 3)
-                                       .add_row(create_timestamp(1, 4), 4)
-                                       .build();
+                                         .add_row(create_timestamp(1, 1), 1)
+                                         .add_row(create_timestamp(1, 4), 5)
+                                         .add_row(create_timestamp(1, 1), 0)
+                                         .add_row(create_timestamp(1, 2), 2)
+                                         .add_row(create_timestamp(1, 3), 3)
+                                         .add_row(create_timestamp(1, 4), 4)
+                                         .build();
     auto expected_result_case2 = expected_result_case1;
     auto expected_result_case3 = expected_result_case1;
 
     const auto expected_result = ExpectedResultBuilder{}
-                                       .add_case(std::move(expected_result_case1))
-                                       .add_case(std::move(expected_result_case2))
-                                       .add_case(std::move(expected_result_case3))
-                                       .build();
+                                         .add_case(std::move(expected_result_case1))
+                                         .add_case(std::move(expected_result_case2))
+                                         .add_case(std::move(expected_result_case3))
+                                         .build();
 
     run_scenario(scenario, expected_result);
 }
@@ -346,29 +342,29 @@ TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_multiple_identi
 TEST_F(CelonisAdjustDailyTimestampsTest,
        adjust_daily_timestamps_day_based_not_written_to_null_if_other_timestamps_exist) {
     auto activities = ActivitiesBuilder{}
-                            .add_non_day_based_activity("A", 1)
-                            .add_day_based_activity("B", 2)
-                            .add_non_day_based_activity("C", 3)
-                            .build();
+                              .add_non_day_based_activity("A", 1)
+                              .add_day_based_activity("B", 2)
+                              .add_non_day_based_activity("C", 3)
+                              .build();
     auto case1 = CaseBuilder{activities}
-                       .add_null_timestamp("A")
-                       .add_null_timestamp("A")
-                       .add_null_timestamp("C")
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row("A", create_timestamp(1, 1))
-                       .add_row("C", create_timestamp(1, 2))
-                       .build();
+                         .add_null_timestamp("A")
+                         .add_null_timestamp("A")
+                         .add_null_timestamp("C")
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row("A", create_timestamp(1, 1))
+                         .add_row("C", create_timestamp(1, 2))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_case(std::move(case1)).build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}
-                                       .add_row({}, 0)
-                                       .add_row({}, 1)
-                                       .add_row({}, 2)
-                                       .add_row(create_timestamp(1, 1), 4)
-                                       .add_row(create_timestamp(1, 1), 3)
-                                       .add_row(create_timestamp(1, 2), 5)
-                                       .build();
+                                         .add_row({}, 0)
+                                         .add_row({}, 1)
+                                         .add_row({}, 2)
+                                         .add_row(create_timestamp(1, 1), 4)
+                                         .add_row(create_timestamp(1, 1), 3)
+                                         .add_row(create_timestamp(1, 2), 5)
+                                         .build();
 
     const auto expected_result = ExpectedResultBuilder{}.add_case(std::move(expected_result_case1)).build();
 
@@ -391,18 +387,18 @@ TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_null_day_based_
 TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_day_based_rows_with_missing_metadata_not_rewritten) {
     auto activities = ActivitiesBuilder{}.add_non_day_based_activity("A", 1).add_day_based_activity("B", 2).build();
     auto case1 = CaseBuilder{activities}
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row_with_missing_metadata("B", create_day_based_timestamp(1))
-                       .add_row("A", create_timestamp(1, 1))
-                       .build();
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row_with_missing_metadata("B", create_day_based_timestamp(1))
+                         .add_row("A", create_timestamp(1, 1))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_case(std::move(case1)).build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}
-                                       .add_row(create_timestamp(1, 1), 2)
-                                       .add_row(create_day_based_timestamp(1), 0)
-                                       .add_row(create_timestamp(1, 1), 1)
-                                       .build();
+                                         .add_row(create_timestamp(1, 1), 2)
+                                         .add_row(create_day_based_timestamp(1), 0)
+                                         .add_row(create_timestamp(1, 1), 1)
+                                         .build();
 
     const auto expected_result = ExpectedResultBuilder{}.add_case(std::move(expected_result_case1)).build();
 
@@ -413,18 +409,18 @@ TEST_F(CelonisAdjustDailyTimestampsTest,
        adjust_daily_timestamps_day_based_rows_rewritten_to_non_day_based_rows_with_missing_metadata) {
     auto activities = ActivitiesBuilder{}.add_non_day_based_activity("A", 2).add_day_based_activity("B", 2).build();
     auto case1 = CaseBuilder{activities}
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row_with_missing_metadata("A", create_timestamp(1, 2))
-                       .add_row("A", create_timestamp(1, 2))
-                       .build();
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row_with_missing_metadata("A", create_timestamp(1, 2))
+                         .add_row("A", create_timestamp(1, 2))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_case(std::move(case1)).build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}
-                                       .add_row(create_timestamp(1, 2), 1)
-                                       .add_row(create_timestamp(1, 2), 0)
-                                       .add_row(create_timestamp(1, 2), 2)
-                                       .build();
+                                         .add_row(create_timestamp(1, 2), 1)
+                                         .add_row(create_timestamp(1, 2), 0)
+                                         .add_row(create_timestamp(1, 2), 2)
+                                         .build();
 
     const auto expected_result = ExpectedResultBuilder{}.add_case(std::move(expected_result_case1)).build();
 
@@ -434,9 +430,9 @@ TEST_F(CelonisAdjustDailyTimestampsTest,
 TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_handle_null_case) {
     auto activities = ActivitiesBuilder{}.add_non_day_based_activity("A", 1).add_day_based_activity("B", 2).build();
     auto case1 = CaseBuilder{activities}
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row("A", create_timestamp(1, 1))
-                       .build();
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row("A", create_timestamp(1, 1))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_null_case().add_case(std::move(case1)).add_null_case().build();
 
@@ -452,16 +448,16 @@ TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_handle_null_cas
 TEST_F(CelonisAdjustDailyTimestampsTest, adjust_daily_timestamps_no_reordering_without_sorting_column) {
     auto activities = ActivitiesBuilder{}.add_non_day_based_activity("A", 1).add_day_based_activity("B", 2).build();
     auto case1 = CaseBuilder{activities}
-                       .add_row("B", create_day_based_timestamp(1))
-                       .add_row("A", create_timestamp(1, 1))
-                       .build();
+                         .add_row("B", create_day_based_timestamp(1))
+                         .add_row("A", create_timestamp(1, 1))
+                         .build();
 
     const auto scenario = EventlogScenarioBuilder{}.add_case(std::move(case1)).build();
 
     auto expected_result_case1 = ExpectedResultCaseBuilder{}
-                                       .add_row(create_day_based_timestamp(1), 0)
-                                       .add_row(create_timestamp(1, 1), 1)
-                                       .build();
+                                         .add_row(create_day_based_timestamp(1), 0)
+                                         .add_row(create_timestamp(1, 1), 1)
+                                         .build();
     const auto expected_result = ExpectedResultBuilder{}.add_case(std::move(expected_result_case1)).build();
 
     run_scenario(scenario, expected_result, PassSortingColumn::NO);

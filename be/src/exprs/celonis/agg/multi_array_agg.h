@@ -30,7 +30,7 @@
 namespace starrocks {
 
 namespace {
-template<typename T>
+template <typename T>
 bool is_capacity_limit_reached(const std::shared_ptr<T>& column) {
     auto result = column->capacity_limit_reached();
     if constexpr (std::is_same_v<decltype(result), bool>) {
@@ -39,7 +39,7 @@ bool is_capacity_limit_reached(const std::shared_ptr<T>& column) {
         return !result.ok();
     }
 }
-template<typename T>
+template <typename T>
 bool is_capacity_limit_reached(T&& column) {
     if constexpr (requires { column->capacity_limit_reached(); }) {
         // Has -> operator (pointers, smart pointers)
@@ -59,13 +59,13 @@ bool is_capacity_limit_reached(T&& column) {
         }
     }
 }
-}
+} // namespace
 
 // input columns result in intermediate result: struct{array[col0], array[col1], array[col2]... array[coln]}
 struct MultiArrayAggAggregateState {
-
-    MultiArrayAggAggregateState() : size_limit(config::array_agg_size_limit),
-                                    serialization_threshold(config::multi_array_agg_serialization_threshold) {}
+    MultiArrayAggAggregateState()
+            : size_limit(config::array_agg_size_limit),
+              serialization_threshold(config::multi_array_agg_serialization_threshold) {}
 
     void create_columns(FunctionContext* ctx) {
         auto num = ctx->get_num_args();
@@ -184,7 +184,6 @@ struct MultiArrayAggAggregateState {
     int32_t num_serialized_rows = 0;
 
 private:
-
     void serialize_data(const ColumnPtr& column, size_t index, size_t offset, size_t count) {
         // size_t index,
         // size_t count,
@@ -209,7 +208,6 @@ private:
         }
         DCHECK_EQ(pos, serialized_data.data() + serialized_data.size());
     }
-
 };
 
 class MultiArrayAggAggregateFunction
@@ -221,14 +219,14 @@ private:
 
 public:
     void create(FunctionContext* ctx, AggDataPtr __restrict ptr) const override {
-        auto* state = new(ptr) MultiArrayAggAggregateState;
+        auto* state = new (ptr) MultiArrayAggAggregateState;
         DCHECK(state->data_columns.empty());
     }
 
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const override {
         auto& state_impl = this->data(state);
         if (!state_impl.data_columns.empty()) {
-            for (auto& col: state_impl.data_columns) {
+            for (auto& col : state_impl.data_columns) {
                 col->resize(0);
             }
         }
@@ -238,8 +236,9 @@ public:
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
                 size_t row_num) const override {
         if (UNLIKELY(this->data(state).size_limit_reached())) {
-            ctx->set_error(("size limit (" + std::to_string(this->data(state).size_limit) +
-                            ") of multi_array_agg is reached").c_str());
+            ctx->set_error(
+                    ("size limit (" + std::to_string(this->data(state).size_limit) + ") of multi_array_agg is reached")
+                            .c_str());
             return;
         }
         for (auto i = 0; i < ctx->get_num_args(); ++i) {
@@ -332,8 +331,8 @@ public:
             state_impl.init_columns(ctx);
         }
         if (UNLIKELY(state_impl.size_limit_reached())) {
-            ctx->set_error(("size limit (" + std::to_string(state_impl.size_limit) +
-                            ") of multi_array_agg is reached").c_str());
+            ctx->set_error(("size limit (" + std::to_string(state_impl.size_limit) + ") of multi_array_agg is reached")
+                                   .c_str());
             return;
         }
         // should check overflow before append, otherwise will generate invalid result.
@@ -402,8 +401,8 @@ public:
             state_impl.release_data_column(i);
         }
         auto output_end_time = std::chrono::high_resolution_clock::now();
-        auto output_duration = std::chrono::duration_cast<std::chrono::microseconds>(
-                output_end_time - output_start_time);
+        auto output_duration =
+                std::chrono::duration_cast<std::chrono::microseconds>(output_end_time - output_start_time);
         if (elem_size > 1000000) {
             LOG(INFO) << "MULTI_ARRAY_AGG (finalize_to_column) output time = " << output_duration.count() << " us\n";
         }

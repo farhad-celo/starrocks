@@ -1,14 +1,14 @@
 #include "exprs/celonis/greatest_least.h"
 
-#include <vector>
-#include <memory>
+#include <gtest/gtest.h>
+
 #include <initializer_list>
+#include <memory>
+#include <vector>
 
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
-
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -23,7 +23,7 @@ private:
         assert(!types.empty());
         std::vector<FunctionContext::TypeDesc> arg_types{};
 
-        for (const LogicalType type: types) {
+        for (const LogicalType type : types) {
             arg_types.push_back(TypeDescriptor::from_logical_type(type));
             input_columns.push_back(ColumnHelper::create_column(TypeDescriptor(type), true));
         }
@@ -39,7 +39,7 @@ private:
     void AddRow(const DatumArray& values) {
         assert(values.size() == input_columns.size());
         std::size_t col_idx{0};
-        for (auto& column: input_columns) {
+        for (auto& column : input_columns) {
             column->append_datum(values.at(col_idx++));
         }
     }
@@ -52,23 +52,22 @@ private:
         return CelonisGreatestLeast::celonis_least(ctx_.get(), input_columns);
     }
 
-
     std::unique_ptr<FunctionContext> ctx_;
     Columns input_columns;
 };
 
-template<typename T>
+template <typename T>
 struct Expected {
     std::size_t size;
     std::vector<bool> nulls;
     std::vector<T> values;
 };
 
-template<typename T>
+template <typename T>
 [[nodiscard]] Expected<T> make_expected(std::initializer_list<Datum> values) {
     Expected<T> ret;
     ret.size = values.size();
-    for (const auto& datum: values) {
+    for (const auto& datum : values) {
         const bool is_null{datum.is_null()};
         ret.nulls.push_back(is_null);
         ret.values.push_back(is_null ? T{} : datum.get<T>());
@@ -77,7 +76,7 @@ template<typename T>
     return ret;
 }
 
-template<typename T>
+template <typename T>
 void validate(const ColumnPtr& result, const Expected<T>& expected) {
     const auto [expected_size, expected_nulls, expected_values] = expected;
 
@@ -178,7 +177,7 @@ TEST_F(CelonisGreatestLeastTest, celonis_greatest_double_data_mixed_nulls) {
     validate(result, expected);
 }
 
-[[nodiscard]] inline auto operator ""_ts(const unsigned long long seconds) -> TimestampValue {
+[[nodiscard]] inline auto operator""_ts(const unsigned long long seconds) -> TimestampValue {
     return TimestampValue::MIN_TIMESTAMP_VALUE.add<SECOND>(seconds);
 }
 

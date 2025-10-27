@@ -25,9 +25,9 @@ class memory_threshold final {
     set_lower(lower);
     set_higher(higher);
   }
-  #ifndef CELOSTAR
+#ifndef CELOSTAR
   void set(const MemoryThreshold& protobuf_memory_threshold);
-  #endif
+#endif
   constexpr void set_lower(double lower) noexcept {
     legacy_embedded_debug_assert(is_valid(lower, higher_threshold));
     lower_threshold = lower;

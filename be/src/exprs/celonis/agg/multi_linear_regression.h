@@ -1,5 +1,11 @@
 #pragma once
 
+#include <boost/algorithm/string/join.hpp>
+#include <boost/numeric/ublas/io.hpp>
+#include <boost/numeric/ublas/lu.hpp>
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/vector.hpp>
+
 #include "column/column_helper.h"
 #include "column/object_column.h"
 #include "column/type_traits.h"
@@ -8,11 +14,6 @@
 #include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "runtime/mem_pool.h"
-#include <boost/algorithm/string/join.hpp>
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/vector.hpp>
-#include <boost/numeric/ublas/io.hpp>
-#include <boost/numeric/ublas/lu.hpp>
 
 namespace starrocks {
 
@@ -27,7 +28,7 @@ static const int PRECISION = 17;
 bool lu_solve(const matrix<double>& A, const boost::numeric::ublas::vector<double>& B,
               boost::numeric::ublas::vector<double>& X) {
     matrix<double> A_lu(A);
-    permutation_matrix <std::size_t> perm(A.size1());
+    permutation_matrix<std::size_t> perm(A.size1());
     int res = lu_factorize(A_lu, perm);
     if (res != 0) return false;
     X.assign(B);
@@ -37,13 +38,13 @@ bool lu_solve(const matrix<double>& A, const boost::numeric::ublas::vector<doubl
 
 std::string to_model_str(const boost::numeric::ublas::vector<double>& beta) {
     std::vector<std::string> beta_strs;
-    for (double v: beta) {
+    for (double v : beta) {
         beta_strs.push_back(double_to_string(v, PRECISION));
     }
     return boost::algorithm::join(beta_strs, ":");
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct CelonisMultiLinearRegressionModelAggregateState {
     using CppType = RunTimeCppType<LT>;
 
@@ -85,17 +86,17 @@ struct CelonisMultiLinearRegressionModelAggregateState {
     // Returns the total size in bytes required to encode this object.
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(int64_t);                    // n_samples
-        result += sizeof(int64_t);                    // n_features;
-        result += sizeof(CppType) * sum_x.size();     // items in sum_x
-        result += sizeof(CppType) * sum_xx.size();    // items in sum_xx
-        result += sizeof(CppType) * sum_xy.size();    // items in sum_xy
-        result += sizeof(CppType);                    // sum_y
+        result += sizeof(int64_t);                 // n_samples
+        result += sizeof(int64_t);                 // n_features;
+        result += sizeof(CppType) * sum_x.size();  // items in sum_x
+        result += sizeof(CppType) * sum_xx.size(); // items in sum_xx
+        result += sizeof(CppType) * sum_xy.size(); // items in sum_xy
+        result += sizeof(CppType);                 // sum_y
         return result;
     }
 
     void serialize(const std::vector<CppType>& vec, uint8_t** dst) const {
-        for (CppType num: vec) {
+        for (CppType num : vec) {
             memcpy(*dst, &num, sizeof(CppType));
             *dst += sizeof(CppType);
         }
@@ -189,10 +190,10 @@ struct CelonisMultiLinearRegressionModelAggregateState {
  * @return: VARCHAR
  *
  */
-template<LogicalType LT, typename T = RunTimeCppType<LT>>
+template <LogicalType LT, typename T = RunTimeCppType<LT>>
 class CelonisMultiLinearRegressionModelAggregationFunction final
         : public AggregateFunctionBatchHelper<CelonisMultiLinearRegressionModelAggregateState<LT>,
-                CelonisMultiLinearRegressionModelAggregationFunction<LT, T>> {
+                                              CelonisMultiLinearRegressionModelAggregationFunction<LT, T>> {
 public:
     using ColumnType = RunTimeColumnType<LT>;
 
@@ -220,7 +221,7 @@ public:
             return;
         }
         Slice slice = input_column->get_slice(row_num);
-        this->data(state).deserialize_and_merge((const uint8_t*) slice.data, slice.size);
+        this->data(state).deserialize_and_merge((const uint8_t*)slice.data, slice.size);
     }
 
     void serialize_to_column(FunctionContext* ctx __attribute__((unused)), ConstAggDataPtr __restrict state,
@@ -275,7 +276,8 @@ public:
             to->append_datum(model.c_str());
         } else {
             ctx->set_error(
-                    "CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL: Unable to fit regression model. The system is singular or ill-conditioned.");
+                    "CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL: Unable to fit regression model. The system is "
+                    "singular or ill-conditioned.");
             to->append_datum(kNullDatum);
         }
     }

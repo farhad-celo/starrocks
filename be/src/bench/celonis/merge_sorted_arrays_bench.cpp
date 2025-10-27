@@ -90,8 +90,7 @@ static void BM_MergeSortedArraysVARCHAR(benchmark::State& state) {
                 ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), true);
         auto secondary_order_column =
                 ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)), true);
-        auto limit_column =
-                ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        auto limit_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
         limit_column->append_datum(1000000L); // Currently this is the value used in PQL2SQL
         limit_column = ConstColumn::create(limit_column, num_rows);
         for (int i = 0; i < num_rows; i++) {
@@ -121,13 +120,14 @@ static void BM_MergeSortedArraysVARCHAR(benchmark::State& state) {
         }
 
         state.ResumeTiming();
-        ASSERT_TRUE(CelonisArrayFunctions::merge_sorted_arrays(ctx.get(),
-                {input_column, timestamp_column, size_column, priority_column, secondary_order_column, limit_column}).ok());
+        ASSERT_TRUE(CelonisArrayFunctions::merge_sorted_arrays(
+                            ctx.get(), {input_column, timestamp_column, size_column, priority_column,
+                                        secondary_order_column, limit_column})
+                            .ok());
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
-
 
 // Args: Number of rows / Number of arrays / Minimum size of inner array / Maximum size of inner array
 BENCHMARK(BM_MergeSortedArraysVARCHAR)->ArgsProduct({{10000}, {5, 10, 20, 30}, {5, 10}, {15, 30}});

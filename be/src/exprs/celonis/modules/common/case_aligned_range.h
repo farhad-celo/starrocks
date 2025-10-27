@@ -76,8 +76,8 @@ struct set_bit_aligned_range {
   size_t begin;
   size_t end;
   size_t grain_size;
-  explicit set_bit_aligned_range(const legacy_embedded_ctl::dynamic_bitset<PARALLELISM_SETTING>& bitset, size_t begin, size_t end,
-                                 size_t grain_size = 1) noexcept
+  explicit set_bit_aligned_range(const legacy_embedded_ctl::dynamic_bitset<PARALLELISM_SETTING>& bitset, size_t begin,
+                                 size_t end, size_t grain_size = 1) noexcept
       : bitset{bitset}, begin{begin}, end{end}, grain_size{grain_size} {}
   set_bit_aligned_range(set_bit_aligned_range& other, tbb::split /**/) noexcept
       : bitset{other.bitset}, begin{other.midpoint()}, end{other.end}, grain_size{other.grain_size} {
@@ -138,9 +138,8 @@ struct group_aligned_range {
 };
 
 template <class CASE_PTR_ACCESSOR>
-std::vector<legacy_embedded_ctl::half_open_interval<row_id>> generate_case_aligned_blocks(const CASE_PTR_ACCESSOR& case_ptr_ac,
-                                                                          const row_id row_count,
-                                                                          const size_t grainsize) {
+std::vector<legacy_embedded_ctl::half_open_interval<row_id>> generate_case_aligned_blocks(
+    const CASE_PTR_ACCESSOR& case_ptr_ac, const row_id row_count, const size_t grainsize) {
   std::vector<legacy_embedded_ctl::half_open_interval<row_id>> ret;
   int64_t laststart = 0;
   int64_t nextsplit = 0;
@@ -159,8 +158,8 @@ std::vector<legacy_embedded_ctl::half_open_interval<row_id>> generate_case_align
     }
     ret.emplace_back(laststart, nextsplit);
     laststart = nextsplit;
-    legacy_embedded_debug_assert(nextsplit == row_count ||
-                 case_ptr_ac[static_cast<row_id>(nextsplit) - 1] != case_ptr_ac[static_cast<row_id>(nextsplit)]);
+    legacy_embedded_debug_assert(nextsplit == row_count || case_ptr_ac[static_cast<row_id>(nextsplit) - 1] !=
+                                                               case_ptr_ac[static_cast<row_id>(nextsplit)]);
   }
   return ret;
 }

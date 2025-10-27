@@ -13,15 +13,17 @@
 // limitations under the License.
 
 #include "linear_regression.h"
+
+#include <google/protobuf/util/json_util.h>
+
+#include <boost/numeric/ublas/io.hpp>
+#include <boost/numeric/ublas/lu.hpp>
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/vector.hpp>
+
 #include "exprs/celonis/agg/util.h"
 #include "exprs/celonis/util.h"
 #include "modules/query/calendars.pb.h"
-#include <google/protobuf/util/json_util.h>
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/vector.hpp>
-#include <boost/numeric/ublas/io.hpp>
-#include <boost/numeric/ublas/lu.hpp>
-
 
 namespace starrocks {
 
@@ -47,7 +49,7 @@ bool lu_solve(const matrix<double>& A, const boost::numeric::ublas::vector<doubl
 std::string to_model_str(const boost::numeric::ublas::vector<double>& beta) {
     std::string sep = "";
     std::string rv = "";
-    for (double v: beta) {
+    for (double v : beta) {
         rv += sep;
         rv += double_to_string(v, PRECISION);
         sep = ":";
@@ -55,7 +57,7 @@ std::string to_model_str(const boost::numeric::ublas::vector<double>& beta) {
     return rv;
 }
 
-}
+} // namespace
 
 LinearRegressionAggregateState::~LinearRegressionAggregateState() {
     if (x != nullptr) {
@@ -68,14 +70,14 @@ LinearRegressionAggregateState::~LinearRegressionAggregateState() {
 
 void LinearRegressionAggregateFunction::create(FunctionContext* ctx, AggDataPtr __restrict ptr) const {
     DCHECK(ctx->get_num_args() == 2);
-    auto* state = new(ptr) LinearRegressionAggregateState;
+    auto* state = new (ptr) LinearRegressionAggregateState;
     state->x = std::make_unique<ArrayColumn>(NullableColumn::create(DoubleColumn::create(), NullColumn::create()),
                                              UInt32Column::create());
     state->y = std::make_unique<DoubleColumn>();
 }
 
-void
-LinearRegressionAggregateFunction::reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const {
+void LinearRegressionAggregateFunction::reset(FunctionContext* ctx, const Columns& args,
+                                              AggDataPtr __restrict state) const {
     auto& state_impl = this->data(state);
     if (state_impl.x != nullptr) {
         state_impl.x.reset(nullptr);
@@ -85,9 +87,8 @@ LinearRegressionAggregateFunction::reset(FunctionContext* ctx, const Columns& ar
     }
 }
 
-void
-LinearRegressionAggregateFunction::update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
-                                          size_t row_num) const {
+void LinearRegressionAggregateFunction::update(FunctionContext* ctx, const Column** columns,
+                                               AggDataPtr __restrict state, size_t row_num) const {
     DCHECK(ctx->get_num_args() == 2);
     for (auto i = 0; i < 2; ++i) {
         if (UNLIKELY(columns[i]->size() <= row_num)) {
@@ -104,7 +105,7 @@ LinearRegressionAggregateFunction::update(FunctionContext* ctx, const Column** c
     // if x_array contains NULL, ignore
     bool has_null = false;
     auto array = columns[0]->get(row_num).get_array();
-    for (const auto& v: array) {
+    for (const auto& v : array) {
         if (v.is_null()) {
             has_null = true;
             break;
@@ -234,8 +235,7 @@ void LinearRegressionAggregateFunction::finalize_to_column(FunctionContext* ctx,
 
 // convert each cell of a row to a [nullable] array in a struct
 void LinearRegressionAggregateFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
-                                                                    size_t chunk_size,
-                                                                    ColumnPtr* dst) const {
+                                                                    size_t chunk_size, ColumnPtr* dst) const {
     DCHECK(src.size() == 2);
     std::vector<size_t> valid_indexes;
     for (size_t row = 0; row < chunk_size; ++row) {
@@ -247,7 +247,7 @@ void LinearRegressionAggregateFunction::convert_to_serialize_format(FunctionCont
         }
         bool has_null = false;
         auto array = src[0]->get(row).get_array();
-        for (const auto& v: array) {
+        for (const auto& v : array) {
             if (v.is_null()) {
                 has_null = true;
                 break;
@@ -265,7 +265,7 @@ void LinearRegressionAggregateFunction::convert_to_serialize_format(FunctionCont
         }
         DatumArray x_array;
         DatumArray y_array;
-        for (auto i: valid_indexes) {
+        for (auto i : valid_indexes) {
             auto array = src[0]->get(i).get_array();
             const auto length = array.size();
             for (auto j = 0; j < length; ++j) {
@@ -278,6 +278,8 @@ void LinearRegressionAggregateFunction::convert_to_serialize_format(FunctionCont
     }
 }
 
-std::string LinearRegressionAggregateFunction::get_name() const { return "celonis_build_linear_regression_model"; }
+std::string LinearRegressionAggregateFunction::get_name() const {
+    return "celonis_build_linear_regression_model";
+}
 
 } // namespace starrocks

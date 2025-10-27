@@ -2,8 +2,8 @@
 
 #include <tbb/parallel_for.h>
 
-#include <ctl/static_array.h>
 #include <cpml/variant/types_and_constants.h>
+#include <ctl/static_array.h>
 
 #include "modules/common/execution_context.h"
 #include "modules/common/trace_types.h"

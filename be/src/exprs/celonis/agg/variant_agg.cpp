@@ -50,8 +50,7 @@ size_t VariantAggregateState::update(FunctionContext* ctx, const Column** column
             // we will consider that a,b form an edge.
             continue;
         }
-        auto idx_hash = maybe_add_activity(activity_map_, b_elements->get_slice(offset),
-            ctx->mem_pool(), &memory);
+        auto idx_hash = maybe_add_activity(activity_map_, b_elements->get_slice(offset), ctx->mem_pool(), &memory);
         variant.add(idx_hash.first, idx_hash.second);
     }
     // Add the variant into the variant_map.

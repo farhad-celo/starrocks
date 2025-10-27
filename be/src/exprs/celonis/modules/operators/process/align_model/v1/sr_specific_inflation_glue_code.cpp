@@ -350,8 +350,9 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
       })};
 
   if (optional_error_state.has_value()) {
-    throw common::internal_exception{"ALIGN_MODEL - Error within parallel inflation: {} (a total of {} errors within loop).",
-      optional_error_state->error_msg, optional_error_state->number_of_errors};
+    throw common::internal_exception{
+        "ALIGN_MODEL - Error within parallel inflation: {} (a total of {} errors within loop).",
+        optional_error_state->error_msg, optional_error_state->number_of_errors};
   }
 
   // Make table group
@@ -375,4 +376,4 @@ memory::table_group_t create_tables(const alignments_t& alignments, const replay
                  case_id_column->get_column_pointers(context), grain_size, create_tables_context);
 }
 
-}  // namespace celonis::accelerator::operators::process::align_model
+}  // namespace celonis::accelerator::operators::process::align_model::v1

@@ -42,7 +42,7 @@ Status CelonisConformance::conformance_close(FunctionContext* context, FunctionC
 }
 
 StatusOr<ColumnPtr> CelonisConformance::conformance(FunctionContext* context, const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
 
     const auto* state =
             reinterpret_cast<const ConformanceState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
@@ -51,7 +51,7 @@ StatusOr<ColumnPtr> CelonisConformance::conformance(FunctionContext* context, co
 }
 
 StatusOr<ColumnPtr> CelonisConformance::readable_conformance(FunctionContext* context, const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
 
     const auto conformance_result{conformance(context, columns)};
     return celonis::cpml_utils::conformance_result_to_readable_diagnostics(conformance_result.value(), columns[0]);
@@ -59,7 +59,7 @@ StatusOr<ColumnPtr> CelonisConformance::readable_conformance(FunctionContext* co
 
 StatusOr<ColumnPtr> CelonisReadableConformance::readable_conformance([[maybe_unused]] FunctionContext* context,
                                                                      const Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
 
     return celonis::cpml_utils::conformance_result_to_readable_diagnostics(columns[0], columns[1]);
 }

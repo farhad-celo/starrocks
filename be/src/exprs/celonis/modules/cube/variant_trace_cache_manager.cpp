@@ -37,11 +37,10 @@ size_t variant_trace_cache_manager::size() const {
 }
 
 #ifndef CELOSTAR
-void variant_trace_cache_manager::create_and_store_variant_cache(const std::string& cache_key,
-                                                                 const std::string& table_name,
-                                                                 legacy_embedded_ctl::static_array<trace_type> traces,
-                                                                 legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer,
-                                                                 legacy_embedded_ctl::static_array<trace_length_type> trace_lengths) {
+void variant_trace_cache_manager::create_and_store_variant_cache(
+    const std::string& cache_key, const std::string& table_name, legacy_embedded_ctl::static_array<trace_type> traces,
+    legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer,
+    legacy_embedded_ctl::static_array<trace_length_type> trace_lengths) {
   const details::cached_variants::caching_meta_data caching_meta_data{
       .cache_key = cache_key, .cache_id = get_next_cache_id(), .swap_info = sinfo};
 
@@ -56,7 +55,8 @@ void variant_trace_cache_manager::create_and_store_variant_cache(const std::stri
 
 void variant_trace_cache_manager::create_and_store_variant_cache_col_ptrs(
     const std::string& cache_key, const std::string& table_name, legacy_embedded_ctl::static_array<trace_type> traces,
-    legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer, legacy_embedded_ctl::static_array<trace_length_type> trace_lengths,
+    legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer,
+    legacy_embedded_ctl::static_array<trace_length_type> trace_lengths,
     common::owned_column_ptr_data_t group_id_to_trace_id) {
   const details::cached_variants::caching_meta_data caching_meta_data{
       .cache_key = decorate_cache_key_col_ptrs(cache_key), .cache_id = get_next_cache_id(), .swap_info = sinfo};

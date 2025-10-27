@@ -254,9 +254,9 @@ class raw_column_ptrs_abstract : public details::column_ptrs_abstract_base {
 
   explicit raw_column_ptrs_abstract(col_pointer_type type) noexcept : column_ptrs_abstract_base{type} {}
 
-  #ifndef CELOSTAR
+#ifndef CELOSTAR
   [[nodiscard]] virtual column_ptrs_t create_cache_column_pointer(const cache::column_register& column_register) = 0;
-  #endif
+#endif
   [[nodiscard]] virtual column_ptrs_t create_temp_column_pointer() = 0;
 
   [[nodiscard]] virtual raw_immutable_column_ptrs_t as_immutable() const = 0;
@@ -272,10 +272,11 @@ class raw_column_ptrs_impl final : public raw_column_ptrs_abstract {
   raw_column_ptrs_impl(const row_id row_count, const zero_init_t initialize_to_0,
                        const common::execution_context& context)
       : raw_column_ptrs_abstract{details::col_ptr_type_to_enum<COL_PTRS_TYPE>()},
-        data_{initialize_to_0.get() ? memory::tracking::make_shared_static_array_value_init<COL_PTRS_TYPE>(
-                                          row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_COLUMN_MSG), context)
-                                    : memory::tracking::make_shared_static_array_for_overwrite<COL_PTRS_TYPE>(
-                                          row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_COLUMN_MSG), context)},
+        data_{initialize_to_0.get()
+                  ? memory::tracking::make_shared_static_array_value_init<COL_PTRS_TYPE>(
+                        row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_COLUMN_MSG), context)
+                  : memory::tracking::make_shared_static_array_for_overwrite<COL_PTRS_TYPE>(
+                        row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_COLUMN_MSG), context)},
         context{context} {}
 
   friend raw_column_ptrs_abstract;
@@ -382,7 +383,8 @@ using get_ptr_impl_type_of_decayed_t = typename get_ptr_impl_type_of_decayed<ABS
 
 template <typename ABSTRACT_PTR_TYPE, col_pointer_type PTR_SIZE>
 using get_ptr_impl_type =
-    legacy_embedded_ctl::adopt_cvr<ABSTRACT_PTR_TYPE, get_ptr_impl_type_of_decayed_t<std::decay_t<ABSTRACT_PTR_TYPE>, PTR_SIZE>>;
+    legacy_embedded_ctl::adopt_cvr<ABSTRACT_PTR_TYPE,
+                                   get_ptr_impl_type_of_decayed_t<std::decay_t<ABSTRACT_PTR_TYPE>, PTR_SIZE>>;
 
 template <class ABSTRACT_PTR_TYPE, col_pointer_type PTR_SIZE>
 using get_ptr_impl_type_t = typename get_ptr_impl_type<ABSTRACT_PTR_TYPE, PTR_SIZE>::type;
@@ -393,8 +395,9 @@ template <typename FUNCTION, class TUPLE>
 }
 
 template <typename FUNCTION, class TUPLE, class FIRST_ARG, class... ARGS>
-requires(std::is_base_of_v<column_ptrs_abstract_base, std::remove_cvref_t<FIRST_ARG>>) [[nodiscard]] decltype(auto)
-    cast_execute_column_pointers_impl(FUNCTION&& f, TUPLE&& args_tuple, FIRST_ARG&& first_arg, ARGS&&... args) {
+  requires(std::is_base_of_v<column_ptrs_abstract_base, std::remove_cvref_t<FIRST_ARG>>)
+[[nodiscard]] decltype(auto) cast_execute_column_pointers_impl(FUNCTION&& f, TUPLE&& args_tuple, FIRST_ARG&& first_arg,
+                                                               ARGS&&... args) {
   switch (first_arg.get_type()) {
     case col_pointer_type::PTR_64: {
       if constexpr (COL_PTR_64_NEEDED) {

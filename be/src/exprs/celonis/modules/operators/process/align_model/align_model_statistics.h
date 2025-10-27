@@ -3,8 +3,8 @@
 #include <cpml/model/bpmn_graph.h>
 #include <ctl/time.h>
 
-#include "modules/operators/process/align_model/align_model_types.h"
 #include "legacy_embedded_format/json/json_fwd.h"
+#include "modules/operators/process/align_model/align_model_types.h"
 
 namespace celonis::accelerator::operators::process::align_model {
 

@@ -11,13 +11,13 @@
 #include "column/column_hash.h"
 #include "column/column_viewer.h"
 #include "column/hash_set.h"
-#include "util/phmap/phmap.h"
-#include "util/xxh3.h"
-#include "util/utf8.h"
-#include "exprs/celonis/util.h"
 #include "exprs/builtin_functions.h"
+#include "exprs/celonis/util.h"
 #include "exprs/unary_function.h"
 #include "util/faststring.h"
+#include "util/phmap/phmap.h"
+#include "util/utf8.h"
+#include "util/xxh3.h"
 
 namespace starrocks {
 
@@ -40,7 +40,7 @@ Status xxh3_128bits_update(XXH3_state_t* state, const void* input, size_t len) {
 Status xxh3_128bits_update_v3(XXH3_state_t* state, const void* input, size_t len) {
     RETURN_IF_ERROR(xxh3_128bits_update(state, input, len));
     // Also hash the value "_" + std::string(len) + "_"
-    char len_buffer[32];  // enough for any size_t value
+    char len_buffer[32]; // enough for any size_t value
     len_buffer[0] = '_';
     char* p = len_buffer + 1;
     size_t temp_len = len;
@@ -70,24 +70,21 @@ Status xxh3_128bits_update_v4(XXH3_state_t* state, const void* input, size_t len
     return xxh3_128bits_update(state, input, len);
 }
 
-template<std::string_view const& reserved_str, std::string_view const& function_name>
+template <std::string_view const& reserved_str, std::string_view const& function_name>
 inline Status validate_slice_template(const Slice& slice) {
-    if (reserved_str.size() == slice.size &&
-        std::memcmp(reserved_str.data(), slice.data, slice.size) == 0) {
-        return Status::InvalidArgument(
-                std::string(function_name)
-                        .append(": string value conflicts with the reserved string '")
-                        .append(reserved_str)
-                        .append("'.")
-                        .c_str());
+    if (reserved_str.size() == slice.size && std::memcmp(reserved_str.data(), slice.data, slice.size) == 0) {
+        return Status::InvalidArgument(std::string(function_name)
+                                               .append(": string value conflicts with the reserved string '")
+                                               .append(reserved_str)
+                                               .append("'.")
+                                               .c_str());
     }
     return Status::OK();
 }
 
-
-template<bool hash96, bool enable_validation, std::string_view const& function_name>
+template <bool hash96, bool enable_validation, std::string_view const& function_name>
 StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const starrocks::Columns& columns,
-                                    Status (* hash_update_func)(XXH3_state_t*, const void*, size_t)) {
+                                    Status (*hash_update_func)(XXH3_state_t*, const void*, size_t)) {
     DCHECK(columns.size() >= 1);
     const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
@@ -112,7 +109,7 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
             RETURN_IF_ERROR(hash_update_func(&null_array_hash, XXHASH3_128_NULL_ARRAY_STRING.data(),
                                              XXHASH3_128_NULL_ARRAY_STRING.size()));
             XXH128_hash_t value = XXH3_128bits_digest(&null_array_hash);
-            int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
+            int128_t res = ((int128_t)value.high64 << 64) | (uint64_t)value.low64;
             auto result_column = context->create_column(context->get_return_type(), false);
             result_column->append_datum(res);
             // We need to return a const column here, otherwise function_call_expr will not resize it correctly.
@@ -120,8 +117,7 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
         }
         ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(columns[0]->size(), columns[0]);
         UnnestedArrayData string_data = prepare_array_input(array_column.get());
-        const auto& slices = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-                *string_data.elements).get_data().data();
+        const auto& slices = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
         for (size_t row = 0; row < n_rows; ++row) {
             if (columns[0]->is_null(row)) {
@@ -158,7 +154,7 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
         }
         std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
         column_viewers.reserve(columns.size());
-        for (const auto& column: columns) {
+        for (const auto& column : columns) {
             column_viewers.emplace_back(column);
         }
         // Handle the leading constant columns
@@ -198,7 +194,7 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
         ColumnBuilder<TYPE_LARGEINT> builder(n_rows);
         for (int row = 0; row < n_rows; ++row) {
             XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
-            int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
+            int128_t res = ((int128_t)value.high64 << 64) | (uint64_t)value.low64;
             builder.append(res, false);
         }
         return builder.build(all_const);
@@ -217,7 +213,7 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
     }
 }
 
-}
+} // namespace
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v2(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
@@ -250,17 +246,16 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
         // columns[0] is NULL literal
         if (columns[0]->only_null()) {
-            const auto null_array_hash = ::starrocks::xx_hash3_128(XXHASH3_128_NULL_ARRAY_STRING.data(),
-                                                                   XXHASH3_128_NULL_ARRAY_STRING.size(),
-                                                                   default_xxhash_seed);
+            const auto null_array_hash = ::starrocks::xx_hash3_128(
+                    XXHASH3_128_NULL_ARRAY_STRING.data(), XXHASH3_128_NULL_ARRAY_STRING.size(), default_xxhash_seed);
             auto result_column = context->create_column(context->get_return_type(), false);
             result_column->append_datum(null_array_hash);
             return ConstColumn::create(std::move(result_column), num_rows);
         }
         ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
         UnnestedArrayData string_data = prepare_array_input(array_column.get());
-        const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-                *string_data.elements).get_data().data();
+        const auto& strings =
+                down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
         for (size_t row = 0; row < num_rows; ++row) {
             if (columns[0]->is_null(row)) {
@@ -280,17 +275,19 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                     Slice slice = strings[i];
                     if (XXHASH3_128_NULL_STRING.size() == slice.size &&
                         XXHASH3_128_NULL_STRING.compare(0, XXHASH3_128_NULL_STRING.size(), slice.data, slice.size) ==
-                        0) {
+                                0) {
                         return Status::InvalidArgument(
                                 ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
-                                 std::string(XXHASH3_128_NULL_STRING) + "'.").c_str());
+                                 std::string(XXHASH3_128_NULL_STRING) + "'.")
+                                        .c_str());
                     }
                     if (XXHASH3_128_NULL_ARRAY_STRING.size() == slice.size &&
                         XXHASH3_128_NULL_ARRAY_STRING.compare(0, XXHASH3_128_NULL_ARRAY_STRING.size(), slice.data,
                                                               slice.size) == 0) {
                         return Status::InvalidArgument(
                                 ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL array string '" +
-                                 std::string(XXHASH3_128_NULL_ARRAY_STRING) + "'.").c_str());
+                                 std::string(XXHASH3_128_NULL_ARRAY_STRING) + "'.")
+                                        .c_str());
                     }
                     seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
                 }
@@ -299,10 +296,10 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
     } else {
         std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
         column_viewers.reserve(columns.size());
-        for (const auto& column: columns) {
+        for (const auto& column : columns) {
             column_viewers.emplace_back(column);
         }
-        for (const auto& viewer: column_viewers) {
+        for (const auto& viewer : column_viewers) {
             for (size_t row = 0; row < num_rows; ++row) {
                 uint128_t seed = seeds_vec[row];
                 if (viewer.is_null(row)) {
@@ -312,10 +309,11 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionCont
                     auto slice = viewer.value(row);
                     if (XXHASH3_128_NULL_STRING.size() == slice.size &&
                         XXHASH3_128_NULL_STRING.compare(0, XXHASH3_128_NULL_STRING.size(), slice.data, slice.size) ==
-                        0) {
+                                0) {
                         return Status::InvalidArgument(
                                 ("CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '" +
-                                 std::string(XXHASH3_128_NULL_STRING) + "'.").c_str());
+                                 std::string(XXHASH3_128_NULL_STRING) + "'.")
+                                        .c_str());
                     }
                     seeds_vec[row] = ::starrocks::xx_hash3_128(slice.data, slice.size, seed);
                 }
@@ -352,8 +350,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
         }
         ColumnPtr array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
         UnnestedArrayData string_data = prepare_array_input(array_column.get());
-        const auto& strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-                *string_data.elements).get_data().data();
+        const auto& strings =
+                down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
         for (size_t row = 0; row < num_rows; ++row) {
             if (columns[0]->is_null(row)) {
@@ -368,17 +366,16 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                     break;
                 }
                 Slice slice = strings[i];
-                RETURN_IF_ERROR(
-                        xxh3_128bits_update_v3(&states[row], slice.data, slice.size));
+                RETURN_IF_ERROR(xxh3_128bits_update_v3(&states[row], slice.data, slice.size));
             }
         }
     } else {
         std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
         column_viewers.reserve(columns.size());
-        for (const auto& column: columns) {
+        for (const auto& column : columns) {
             column_viewers.emplace_back(column);
         }
-        for (const auto& viewer: column_viewers) {
+        for (const auto& viewer : column_viewers) {
             for (size_t row = 0; row < num_rows; ++row) {
                 if (is_null_vec[row]) {
                     continue;
@@ -388,15 +385,14 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                     continue;
                 }
                 auto slice = viewer.value(row);
-                RETURN_IF_ERROR(
-                        xxh3_128bits_update_v3(&states[row], slice.data, slice.size));
+                RETURN_IF_ERROR(xxh3_128bits_update_v3(&states[row], slice.data, slice.size));
             }
         }
     }
     ColumnBuilder<TYPE_LARGEINT> builder(num_rows);
     for (int row = 0; row < num_rows; ++row) {
         XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
-        int128_t res = ((int128_t) value.high64 << 64) | (uint64_t) value.low64;
+        int128_t res = ((int128_t)value.high64 << 64) | (uint64_t)value.low64;
         builder.append(res, is_null_vec[row]);
     }
     return builder.build(all_const);
@@ -452,8 +448,8 @@ Status CelonisStringFunctions::translate_prepare(FunctionContext* context, Funct
     const char* pattern_p = pattern_chars.get_data();
     const char* pattern_end = pattern_p + pattern_chars.get_size();
 
-    for (int replace_char_size = 0, pattern_char_size = 0; replace_p < replace_end && pattern_p <
-                                                                                      pattern_end; replace_p += replace_char_size, pattern_p += pattern_char_size) {
+    for (int replace_char_size = 0, pattern_char_size = 0; replace_p < replace_end && pattern_p < pattern_end;
+         replace_p += replace_char_size, pattern_p += pattern_char_size) {
         replace_char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*replace_p)];
         pattern_char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*pattern_p)];
 
@@ -502,8 +498,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
         result_str.reserve(str_value.get_size());
 
         int char_size = 0;
-        for (const char* str_p = str_value.get_data(), * str_end = str_p + str_value.get_size();
-             str_p < str_end; str_p += char_size) {
+        for (const char *str_p = str_value.get_data(), *str_end = str_p + str_value.get_size(); str_p < str_end;
+             str_p += char_size) {
             char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
 
             const auto cit = translate_mapping.find(Slice(str_p, char_size));
@@ -521,7 +517,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
 
 struct StringCaseLowerFunction {
 public:
-    template<LogicalType Type, LogicalType ResultType>
+    template <LogicalType Type, LogicalType ResultType>
     static ColumnPtr evaluate(const ColumnPtr& column) {
         auto* src = down_cast<const BinaryColumn*>(column.get());
         const Bytes& src_bytes = src->get_bytes();
@@ -564,14 +560,14 @@ public:
     }
 };
 
-StatusOr<ColumnPtr> CelonisStringFunctions::lower([[maybe_unused]]FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::lower([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
     return VectorizedUnaryFunction<StringCaseLowerFunction>::evaluate<TYPE_VARCHAR>(columns[0]);
 }
 
 struct StringCaseUpperFunction {
 public:
-    template<LogicalType Type, LogicalType ResultType>
+    template <LogicalType Type, LogicalType ResultType>
     static ColumnPtr evaluate(const ColumnPtr& column) {
         auto* src = down_cast<const BinaryColumn*>(column.get());
         const Bytes& src_bytes = src->get_bytes();
@@ -614,7 +610,7 @@ public:
     }
 };
 
-StatusOr<ColumnPtr> CelonisStringFunctions::upper([[maybe_unused]]FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::upper([[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(1, columns.size());
     return VectorizedUnaryFunction<StringCaseUpperFunction>::evaluate<TYPE_VARCHAR>(columns[0]);
 }
@@ -719,7 +715,7 @@ static bool split_index(const Slice& haystack, const Slice& delimiter, int32_t p
         int32_t num = 1;
         auto substr = haystack_str;
         while (num <= part_number && offset >= 0) {
-            offset = (int) substr.rfind(delimiter, offset);
+            offset = (int)substr.rfind(delimiter, offset);
             if (offset != -1) {
                 if (num == part_number) {
                     break;
@@ -827,14 +823,13 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
 
 std::string_view trim_spaces(const std::string_view& str) {
     // Find the first non-space character from the beginning
-    auto start = std::find_if_not(str.begin(), str.end(), [](char c) {
-        return std::isspace(static_cast<unsigned char>(c));
-    });
+    auto start = std::find_if_not(str.begin(), str.end(),
+                                  [](char c) { return std::isspace(static_cast<unsigned char>(c)); });
 
     // Find the first non-space character from the end (reverse iteration)
     auto end = std::find_if_not(str.rbegin(), str.rend(), [](char c) {
-        return std::isspace(static_cast<unsigned char>(c));
-    }).base(); // .base() converts reverse_iterator back to iterator
+                   return std::isspace(static_cast<unsigned char>(c));
+               }).base(); // .base() converts reverse_iterator back to iterator
 
     if (start >= end) {
         return "";
@@ -858,13 +853,12 @@ static const std::locale& get_locale() {
     return *locale;
 }
 
-
 static std::optional<double> to_double(std::stringstream& ss, const std::string_view& input_string) {
     std::string_view trimmed_input_string = trim_spaces(input_string);
-    ss.clear();   // Clear any existing error flags
-    ss.str("");   // Clear the content of the internal buffer
-    ss.seekp(0);  // Reset the put pointer to the beginning of the stream
-    ss.seekg(0);  // Reset the get pointer to the beginning of the stream
+    ss.clear();  // Clear any existing error flags
+    ss.str("");  // Clear the content of the internal buffer
+    ss.seekp(0); // Reset the put pointer to the beginning of the stream
+    ss.seekg(0); // Reset the get pointer to the beginning of the stream
     // Leading whitespaces should already be trimmed.
     ss << std::noskipws << trimmed_input_string;
 
@@ -910,12 +904,12 @@ std::optional<int64_t> to_int64(const std::string_view& str) {
     // Parse digits
     while (index < str.size() && std::isdigit(static_cast<unsigned char>(str[index]))) {
         if (result < limit_before) {
-            return std::nullopt;  // Overflow check
+            return std::nullopt; // Overflow check
         }
         result *= 10;
         int digit = str[index] - '0';
         if (result < limit + digit) {
-            return std::nullopt;  // Overflow check
+            return std::nullopt; // Overflow check
         }
         result -= digit;
         index++;
@@ -936,8 +930,8 @@ std::optional<int64_t> to_int64(const std::string_view& str) {
     return negative ? result : -result;
 }
 
-StatusOr<ColumnPtr>
-CelonisStringFunctions::string_to_int([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::string_to_int([[maybe_unused]] FunctionContext* context,
+                                                          const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
@@ -959,8 +953,8 @@ CelonisStringFunctions::string_to_int([[maybe_unused]] FunctionContext* context,
     return res.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisStringFunctions::string_to_double(FunctionContext* context, const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::string_to_double(FunctionContext* context,
+                                                             const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
@@ -984,7 +978,6 @@ CelonisStringFunctions::string_to_double(FunctionContext* context, const starroc
         } else {
             res.append_null();
         }
-
     }
     return res.build(all_const);
 }
@@ -1010,7 +1003,7 @@ std::string to_lower_utf8(const std::string& input) {
 }
 
 static bool match_helper(const std::string& input, const std::string& pattern, int i, int j) {
-    if (j == pattern.length()) { // End of pattern
+    if (j == pattern.length()) {    // End of pattern
         return i == input.length(); // True if also end of input
     }
 
@@ -1043,7 +1036,7 @@ static bool match_helper(const std::string& input, const std::string& pattern, i
 
 bool contains_wildcard(const std::string& pattern) {
     int backslash_count = 0;
-    for (char ch: pattern) {
+    for (char ch : pattern) {
         if (ch == '%' || ch == '_') {
             // If the number of preceding backslashes is even (including 0), the wildcard is not escaped
             if (backslash_count % 2 == 0) {
@@ -1062,7 +1055,7 @@ bool contains_wildcard(const std::string& pattern) {
 std::string remove_escape(const std::string& str) {
     std::string rv;
     int backslash_count = 0;
-    for (char c: str) {
+    for (char c : str) {
         if (c == '\\') {
             ++backslash_count;
         } else {
@@ -1120,7 +1113,7 @@ Status CelonisStringFunctions::in_like_prepare(FunctionContext* context, Functio
     }
     auto pattern_array = pattern_column->get(0).get_array();
     HashSet<std::string> pattern_seen;
-    for (const auto& pattern_datum: pattern_array) {
+    for (const auto& pattern_datum : pattern_array) {
         if (pattern_datum.is_null()) {
             state->has_null = true;
             continue;
@@ -1147,11 +1140,10 @@ Status CelonisStringFunctions::in_like_close(FunctionContext* context, FunctionC
     return Status::OK();
 }
 
-StatusOr<ColumnPtr>
-CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext* context,
-                                                      const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext* context,
+                                                                          const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     // Handle constant patterns column here. SR may send a const patterns column chunk to this function.
     ColumnPtr patterns_column = ColumnHelper::unpack_and_duplicate_const_column(columns[1]->size(), columns[1]);
@@ -1201,13 +1193,12 @@ CelonisStringFunctions::in_like_non_constant_patterns(starrocks::FunctionContext
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisStringFunctions::in_like_constant_patterns([[maybe_unused]] FunctionContext* context,
-                                                  const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::in_like_constant_patterns([[maybe_unused]] FunctionContext* context,
+                                                                      const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
-    const auto* state = reinterpret_cast<const CelonisInLikeState*>(
-            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    const auto* state =
+            reinterpret_cast<const CelonisInLikeState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
@@ -1243,10 +1234,10 @@ CelonisStringFunctions::in_like_constant_patterns([[maybe_unused]] FunctionConte
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisStringFunctions::in_like([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
-    const auto* state = reinterpret_cast<const CelonisInLikeState*>(
-            context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+StatusOr<ColumnPtr> CelonisStringFunctions::in_like([[maybe_unused]] FunctionContext* context,
+                                                    const starrocks::Columns& columns) {
+    const auto* state =
+            reinterpret_cast<const CelonisInLikeState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
 
@@ -1258,11 +1249,11 @@ static int edit_distance(const std::string& str1, const std::string& str2) {
     // Initialize the previous row (first row in the dp table)
     std::iota(prev_row.begin(), prev_row.end(), 0);
     for (int i = 1; i <= len1; i++) {
-        curr_row[0] = i;  // Initialize the first element of the current row
+        curr_row[0] = i; // Initialize the first element of the current row
         for (int j = 1; j <= len2; j++) {
             int cost = (str1[i - 1] == str2[j - 1]) ? 0 : 1;
-            curr_row[j] = std::min({prev_row[j] + 1,    // Deletion
-                                    curr_row[j - 1] + 1, // Insertion
+            curr_row[j] = std::min({prev_row[j] + 1,          // Deletion
+                                    curr_row[j - 1] + 1,      // Insertion
                                     prev_row[j - 1] + cost}); // Substitution
         }
         std::swap(prev_row, curr_row);
@@ -1280,8 +1271,8 @@ struct CelonisMatchStringsState {
     ScalarFunction function;
 };
 
-Status
-CelonisStringFunctions::match_strings_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+Status CelonisStringFunctions::match_strings_prepare(FunctionContext* context,
+                                                     FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
     }
@@ -1314,7 +1305,7 @@ CelonisStringFunctions::match_strings_prepare(FunctionContext* context, Function
         return Status::OK();
     }
     auto match_string_array = match_strings_column->get(0).get_array();
-    for (const auto& match_string: match_string_array) {
+    for (const auto& match_string : match_string_array) {
         if (match_string.is_null()) {
             continue;
         }
@@ -1324,8 +1315,8 @@ CelonisStringFunctions::match_strings_prepare(FunctionContext* context, Function
     return Status::OK();
 }
 
-Status
-CelonisStringFunctions::match_strings_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+Status CelonisStringFunctions::match_strings_close(FunctionContext* context,
+                                                   FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         auto* state = reinterpret_cast<CelonisMatchStringsState*>(context->get_function_state(scope));
         delete state;
@@ -1333,13 +1324,12 @@ CelonisStringFunctions::match_strings_close(FunctionContext* context, FunctionCo
     return Status::OK();
 }
 
-std::string
-get_match_strings_result(const std::string& input_string, const HashSet<std::string>& match_strings, int64_t top_k,
-                         const std::string& separator) {
+std::string get_match_strings_result(const std::string& input_string, const HashSet<std::string>& match_strings,
+                                     int64_t top_k, const std::string& separator) {
     HashSet<char> char_set(input_string.begin(), input_string.end());
     const std::string chars(char_set.begin(), char_set.end());
     std::vector<std::pair<int, std::string>> pairs;
-    for (const auto& match_string: match_strings) {
+    for (const auto& match_string : match_strings) {
         if (match_string.find_first_of(chars) != std::string::npos) {
             pairs.emplace_back(edit_distance(input_string, match_string), match_string);
         }
@@ -1348,7 +1338,7 @@ get_match_strings_result(const std::string& input_string, const HashSet<std::str
     std::partial_sort(pairs.begin(), pairs.begin() + top_k, pairs.end());
     std::string sep = "";
     std::string joined = "";
-    for (const auto& p: pairs) {
+    for (const auto& p : pairs) {
         if (top_k-- > 0) {
             joined += sep;
             joined += p.second;
@@ -1360,17 +1350,16 @@ get_match_strings_result(const std::string& input_string, const HashSet<std::str
     return joined;
 }
 
-StatusOr<ColumnPtr>
-CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionContext* context,
-                                                   const starrocks::Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
+StatusOr<ColumnPtr> CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionContext* context,
+                                                                       const starrocks::Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
     DCHECK_EQ(columns.size(), 4);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     ColumnPtr match_string_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[1]);
     UnnestedArrayData match_string_data = prepare_array_input(match_string_column.get());
-    const auto& match_strings = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *match_string_data.elements).get_data().data();
+    const auto& match_strings =
+            down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*match_string_data.elements).get_data().data();
     const auto& offsets = match_string_data.offsets->get_data().data();
     ColumnViewer top_k_viewer = ColumnViewer<TYPE_BIGINT>(columns[2]);
     ColumnViewer separator_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
@@ -1401,10 +1390,9 @@ CelonisStringFunctions::match_strings_non_constant([[maybe_unused]] FunctionCont
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext* context,
-                                               const starrocks::Columns& columns) {
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
+StatusOr<ColumnPtr> CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext* context,
+                                                                   const starrocks::Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
     DCHECK_EQ(columns.size(), 4);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnViewer input_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
@@ -1422,8 +1410,8 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
         auto input_slice = input_string_viewer.value(row);
         auto it = cache.find(input_slice);
         if (it == cache.end()) {
-            const auto match_result = get_match_strings_result(input_slice.to_string(), state->match_strings, top_k,
-                                                               separator);
+            const auto match_result =
+                    get_match_strings_result(input_slice.to_string(), state->match_strings, top_k, separator);
             cache.insert({input_slice, match_result});
             result.append(match_result);
         } else {
@@ -1433,8 +1421,8 @@ CelonisStringFunctions::match_strings_constant([[maybe_unused]] FunctionContext*
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context, const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisStringFunctions::match_strings([[maybe_unused]] FunctionContext* context,
+                                                          const starrocks::Columns& columns) {
     const auto* state = reinterpret_cast<const CelonisMatchStringsState*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);

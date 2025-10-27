@@ -69,8 +69,8 @@ BM_CalcCropToNullFirstLast/100000/40  113311574 ns    113310947 ns            6 
 
 using ScalarFunction = StatusOr<ColumnPtr> (*)(FunctionContext* context, const Columns& columns);
 
-static void bench(benchmark::State& state, ScalarFunction scalar_function,
-        const std::string& begin_mode, const std::string& end_mode) {
+static void bench(benchmark::State& state, ScalarFunction scalar_function, const std::string& begin_mode,
+                  const std::string& end_mode) {
     int num_rows = state.range(0);
     int array_length = state.range(1);
 
@@ -128,7 +128,7 @@ static void bench(benchmark::State& state, ScalarFunction scalar_function,
 
         state.ResumeTiming();
         auto result = scalar_function(ctx.get(), {input_column, begin_activity_column, begin_mode_column,
-                end_activity_column, end_mode_column});
+                                                  end_activity_column, end_mode_column});
         ASSERT_TRUE(result.ok()) << result.status().message();
     }
     state.counters["RowInvRate"] =

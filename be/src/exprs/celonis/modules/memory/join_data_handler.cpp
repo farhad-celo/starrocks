@@ -18,10 +18,11 @@ join_raw_t create_raw_join_impl(row_id row_count, zero_init_t initialize_to_0,
     throw common::internal_exception{"No negative row count allowed but is [{}]", row_count};
   }
 
-  auto data{initialize_to_0.get() ? memory::tracking::make_shared_static_array_value_init<JOIN_TYPE>(
-                                        row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)
-                                  : memory::tracking::make_shared_static_array_for_overwrite<JOIN_TYPE>(
-                                        row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)};
+  auto data{initialize_to_0.get()
+                ? memory::tracking::make_shared_static_array_value_init<JOIN_TYPE>(
+                      row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)
+                : memory::tracking::make_shared_static_array_for_overwrite<JOIN_TYPE>(
+                      row_count, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)};
   return data;
 }
 

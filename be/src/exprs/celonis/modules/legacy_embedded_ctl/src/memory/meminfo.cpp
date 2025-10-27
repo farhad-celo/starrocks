@@ -88,9 +88,10 @@ struct total_and_available_memory {
 
 }  // namespace
 
-legacy_embedded_format::json::json_object_t meminfo_change_json(const full_meminfo& old_meminfo, const full_meminfo& new_meminfo,
-                                                const std::optional<size_t> not_swapped_bytes,
-                                                const std::string& status) {
+legacy_embedded_format::json::json_object_t meminfo_change_json(const full_meminfo& old_meminfo,
+                                                                const full_meminfo& new_meminfo,
+                                                                const std::optional<size_t> not_swapped_bytes,
+                                                                const std::string& status) {
   legacy_embedded_format::json::json_object_t json{};
   auto& json_title{json["memory_info"]};
   json_title["status"] = status;

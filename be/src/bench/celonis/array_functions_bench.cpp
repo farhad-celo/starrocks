@@ -122,8 +122,7 @@ static void BM_ArrayBoolOr(benchmark::State& state) {
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BOOLEAN)))};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BOOLEAN));
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BOOLEAN));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     std::random_device rd;
@@ -131,7 +130,7 @@ static void BM_ArrayBoolOr(benchmark::State& state) {
     std::bernoulli_distribution dist(probability);
 
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
         auto input_column =
@@ -160,8 +159,7 @@ static void BM_ArrayCountVarchar(benchmark::State& state) {
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)))};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BIGINT));
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BIGINT));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     std::random_device rd;
@@ -174,7 +172,7 @@ static void BM_ArrayCountVarchar(benchmark::State& state) {
         strings.emplace_back("value" + std::to_string(j));
     }
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
         auto input_column =

@@ -162,13 +162,13 @@ class column {
 
   /* Swapping */
   void swap_in(common::execution_context& context);
-  #ifndef CELOSTAR
+#ifndef CELOSTAR
   void swap_out(common::execution_context& context);
   bool write_out(common::execution_context& context);
 
   // Swap out if the column was swapped in or created for the current query
   void swap_out_transaction(common::execution_context& context, std::chrono::steady_clock::time_point query_start);
-  #endif
+#endif
   /**
    * A column is at least partially swapped out if it is materialized and swapped out or if it is dictified and
    * the column pointers and/or the dictionary is swapped out.
@@ -412,8 +412,8 @@ class column {
   void check_implicit_dictification(const no_dictify_request_t& no_dictify_request) const {
     // enable/disable implicit dictification checking
     if (constexpr bool enable_check{false}; enable_check && no_dictify_request) {
-      legacy_embedded_warning_assert(is_dictified(),
-                     fmt::format("Implicit dictification: {}", no_dictify_request->get_source_location()));
+      legacy_embedded_warning_assert(
+          is_dictified(), fmt::format("Implicit dictification: {}", no_dictify_request->get_source_location()));
     }
   }
 
@@ -481,6 +481,7 @@ class column {
   static constexpr auto LOCK_LOGGING_THRESHOLD = std::chrono::seconds{1200};
 };
 
-legacy_embedded_ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column, const common::execution_context& context);
+legacy_embedded_ctl::dynamic_bitset<> get_null_flags_copy(const column_t& column,
+                                                          const common::execution_context& context);
 
 }  // namespace celonis::accelerator::memory

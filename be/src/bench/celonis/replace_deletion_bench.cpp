@@ -5,8 +5,8 @@
 
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
-#include "exprs/string_functions.h"
 #include "exprs/function_context.h"
+#include "exprs/string_functions.h"
 #include "runtime/types.h"
 #include "testutil/assert.h"
 
@@ -95,7 +95,7 @@ static void do_bench(benchmark::State& state) {
     std::uniform_int_distribution<int> char_dist(0, pattern_chars.size() - 1);
 
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
 
@@ -123,7 +123,7 @@ static void do_bench(benchmark::State& state) {
         // Generate input strings with patterns to be deleted
         for (int i = 0; i < num_rows; i++) {
             std::string input_str = gen_random_str(base_length / 2, base_length);
-            
+
             // Insert patterns at random positions
             std::mt19937 pos_gen(std::random_device{}());
             for (int j = 0; j < pattern_count; j++) {
@@ -137,16 +137,16 @@ static void do_bench(benchmark::State& state) {
 
         StringFunctions::replace_prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL);
         ctx->set_constant_columns({nullptr, pattern_column, replacement_column});
-        
+
         Columns columns;
         columns.push_back(input_column);
         columns.push_back(pattern_column);
         columns.push_back(replacement_column);
-        
+
         state.ResumeTiming();
         EXPECT_TRUE(StringFunctions::replace(ctx.get(), columns).ok());
         state.PauseTiming();
-        
+
         StringFunctions::replace_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL);
         state.ResumeTiming();
     }
@@ -159,8 +159,7 @@ static void BM_ReplaceDeletion(benchmark::State& state) {
 }
 
 // Args: Number of rows / String length / Pattern length / Pattern count
-BENCHMARK(BM_ReplaceDeletion)
-    ->ArgsProduct({{4096, 10000, 100000}, {10, 20}, {3, 5}, {1, 3}});
+BENCHMARK(BM_ReplaceDeletion)->ArgsProduct({{4096, 10000, 100000}, {10, 20}, {3, 5}, {1, 3}});
 
 } // namespace starrocks
 

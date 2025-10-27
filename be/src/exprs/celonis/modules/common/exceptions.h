@@ -22,8 +22,8 @@ class external_error_message final {
   [[nodiscard]] external_error_message() noexcept = default;
   [[nodiscard]] explicit external_error_message(std::string message) noexcept : value_{std::move(message)} {}
   template <typename... ARGS>
-  requires(sizeof...(ARGS) != 0)
-      [[nodiscard]] explicit external_error_message(fmt::format_string<ARGS...> fmt, ARGS&&... args)
+    requires(sizeof...(ARGS) != 0)
+  [[nodiscard]] explicit external_error_message(fmt::format_string<ARGS...> fmt, ARGS&&... args)
       : external_error_message{fmt::format(fmt, std::forward<ARGS>(args)...)} {}
   [[nodiscard]] const std::string& value() const& noexcept { return value_; }
 

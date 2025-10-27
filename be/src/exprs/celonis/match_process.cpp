@@ -25,7 +25,7 @@ static StatusOr<NFA::TransitionType> type_from_string(const std::string& input) 
     return Status::JsonFormatError(Slice("Unsupported TransitionType in celonis_match_process"));
 }
 
-NFAEvaluator::NFAEvaluator(const NFA* nfa): nfa_(nfa) {
+NFAEvaluator::NFAEvaluator(const NFA* nfa) : nfa_(nfa) {
     std::vector<bool> state;
     state.resize(nfa->states.size());
     add_state_and_transitions(nfa->initial_state, &state);
@@ -71,8 +71,7 @@ int NFAEvaluator::get_or_compute_updated_state(const Slice& activity, int curren
     return rv;
 }
 
-std::vector<bool>
-NFAEvaluator::compute_updated_state(const Slice& activity, const std::vector<bool>& current_state) {
+std::vector<bool> NFAEvaluator::compute_updated_state(const Slice& activity, const std::vector<bool>& current_state) {
     std::vector<bool> new_state(current_state.size());
     for (int i = 0; i < nfa_->states.size(); ++i) {
         if (!current_state[i]) {
@@ -112,7 +111,7 @@ void NFAEvaluator::add_state_and_transitions(int new_state, std::vector<bool>* c
         to_visit.pop_back();
         for (const auto& transition : nfa_->states[back]->transitions) {
             if (transition->type == NFA::E_TRANSITION) {
-                for (int out :  transition->to_states) {
+                for (int out : transition->to_states) {
                     if (!(*current_state)[out]) {
                         (*current_state)[out] = true;
                         to_visit.push_back(out);
@@ -141,10 +140,9 @@ StatusOr<std::string> convert_like_pattern(const Slice& pattern) {
             // check for escape char before checking for regex special chars, they might overlap
         } else if (!is_escaped && pattern[i] == '\\') {
             is_escaped = true;
-        } else if (pattern[i] == '.' || pattern[i] == '[' || pattern[i] == ']' ||
-                   pattern[i] == '{' || pattern[i] == '}' || pattern[i] == '(' ||
-                   pattern[i] == ')' || pattern[i] == '\\' || pattern[i] == '*' ||
-                   pattern[i] == '+' || pattern[i] == '?' || pattern[i] == '|' ||
+        } else if (pattern[i] == '.' || pattern[i] == '[' || pattern[i] == ']' || pattern[i] == '{' ||
+                   pattern[i] == '}' || pattern[i] == '(' || pattern[i] == ')' || pattern[i] == '\\' ||
+                   pattern[i] == '*' || pattern[i] == '+' || pattern[i] == '?' || pattern[i] == '|' ||
                    pattern[i] == '^' || pattern[i] == '$') {
             re_pattern.append("\\");
             re_pattern.append(1, pattern[i]);
@@ -165,19 +163,19 @@ StatusOr<std::string> convert_like_pattern(const Slice& pattern) {
 
 bool NFAEvaluator::transition_matches_activity(const Slice& activity, const NFA::Transition& transition) {
     switch (transition.type) {
-        case NFA::E_TRANSITION:
-            return false;
-        case NFA::UNMATCHED:
-            return false;
-        case NFA::EXACT_MATCH:
-            return transition.activity_names.count(activity);
-        case NFA::INVERSE_MATCH:
-            return !transition.activity_names.count(activity);
-        case NFA::LIKE:
-            if (transition.activity_names.count(Slice("%"))) {
-                return true;
-            }
-            return transition.regex_patterns->Match(re2::StringPiece(activity.data, activity.size), nullptr);
+    case NFA::E_TRANSITION:
+        return false;
+    case NFA::UNMATCHED:
+        return false;
+    case NFA::EXACT_MATCH:
+        return transition.activity_names.count(activity);
+    case NFA::INVERSE_MATCH:
+        return !transition.activity_names.count(activity);
+    case NFA::LIKE:
+        if (transition.activity_names.count(Slice("%"))) {
+            return true;
+        }
+        return transition.regex_patterns->Match(re2::StringPiece(activity.data, activity.size), nullptr);
     }
     std::stringstream error;
     error << "Unhandled case: " << transition.type << std::endl;
@@ -249,7 +247,7 @@ ColumnPtr celonis_match_process_internal(const NFA* nfa, const Columns& columns)
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
     result.reserve(num_rows);
     using ValueType = RunTimeCppType<TYPE_VARCHAR>;
-    auto elements_ptr = (const ValueType *) (elements.raw_data());
+    auto elements_ptr = (const ValueType*)(elements.raw_data());
     std::vector<Slice> current_array;
     NFAEvaluator nfa_eval(nfa);
     for (size_t i = 0; i < num_rows; i++) {
@@ -276,14 +274,13 @@ Status CelonisMatchProcess::match_process_prepare(FunctionContext* context, Func
         return Status::OK();
     }
     if (context->get_num_constant_columns() != 2) {
-        return Status::InvalidArgument(
-                "celonis_match_process needs 2 parameters: column, json spec");
+        return Status::InvalidArgument("celonis_match_process needs 2 parameters: column, json spec");
     }
     if (!context->is_notnull_constant_column(1)) {
         return Status::OK();
     }
     const auto json_input = context->get_constant_column(1);
-    auto *state = new MatchProcessState();
+    auto* state = new MatchProcessState();
     std::string json = ColumnHelper::get_const_value<TYPE_VARCHAR>(json_input).to_string();
     StatusOr<std::unique_ptr<NFA>> nfa_status = from_json(state, json);
     if (!nfa_status.ok()) {
@@ -303,8 +300,7 @@ Status CelonisMatchProcess::match_process_prepare_benchmark_only(FunctionContext
         return Status::OK();
     }
     if (context->get_num_constant_columns() != 1) {
-        return Status::InvalidArgument(
-                "celonis_match_process needs 1 parameter: column");
+        return Status::InvalidArgument("celonis_match_process needs 1 parameter: column");
     }
     auto* state = new MatchProcessState();
     state->nfa = std::move(nfa);
@@ -323,7 +319,8 @@ Status CelonisMatchProcess::match_process_close(FunctionContext* context, Functi
 StatusOr<ColumnPtr> CelonisMatchProcess::celonis_match_process(FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    const auto* state = reinterpret_cast<const MatchProcessState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    const auto* state =
+            reinterpret_cast<const MatchProcessState*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     DCHECK(state != nullptr);
     const auto& nfa = state->nfa;
     return celonis_match_process_internal(nfa.get(), columns);

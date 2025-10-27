@@ -1,7 +1,7 @@
 #include "variant_stats_v2.h"
 
-#include <stack>
 #include <chrono>
+#include <stack>
 
 #include "column/column_helper.h"
 #include "exprs/celonis/agg/util.h"
@@ -15,7 +15,6 @@
 #include "util/defer_op.h"
 
 namespace starrocks {
-
 
 size_t CelonisVariantStatsAggregateV2State::compute_happy_variant(const std::vector<size_t>& sorted) const {
     // Happy path
@@ -62,8 +61,8 @@ size_t CelonisVariantStatsAggregateV2State::compute_happy_variant(const std::vec
     return happy;
 }
 
-CelonisVariantStatsAggregateV2State::VariantAnalysisResult
-CelonisVariantStatsAggregateV2State::analyze_variants() const {
+CelonisVariantStatsAggregateV2State::VariantAnalysisResult CelonisVariantStatsAggregateV2State::analyze_variants()
+        const {
     DCHECK(!no_activities() && !no_variants());
     VariantAnalysisResult result;
     auto& activity_top_variants = result.activity_top_variants;
@@ -112,8 +111,8 @@ CelonisVariantStatsAggregateV2State::analyze_variants() const {
     return result;
 }
 
-std::optional<std::string>
-CelonisVariantStatsAggregateV2State::json_string(const VariantAnalysisResult& analysis_result) const {
+std::optional<std::string> CelonisVariantStatsAggregateV2State::json_string(
+        const VariantAnalysisResult& analysis_result) const {
     const std::vector<std::vector<size_t>>& activity_top_variants = analysis_result.activity_top_variants;
     size_t happy = analysis_result.happy;
     rapidjson::Document d;
@@ -149,10 +148,9 @@ CelonisVariantStatsAggregateV2State::json_string(const VariantAnalysisResult& an
     rapidjson::Value e_stats(rapidjson::kArrayType);
     if (edge_count_ >= 0) {
         d.AddMember("e_count", edge_stats_.size(), allocator);
-        auto sorted_edges = EdgeStatsProcessor<std::vector<std::string>>::get_sorted_edges(
-                edge_stats_, activity_array_, edge_count_);
-        e_stats = EdgeStatsProcessor<std::vector<std::string>>::build_edge_stats_json(
-                sorted_edges, allocator);
+        auto sorted_edges = EdgeStatsProcessor<std::vector<std::string>>::get_sorted_edges(edge_stats_, activity_array_,
+                                                                                           edge_count_);
+        e_stats = EdgeStatsProcessor<std::vector<std::string>>::build_edge_stats_json(sorted_edges, allocator);
     }
     d.AddMember("e_stats", e_stats, allocator);
     // Top variants and happy path
@@ -203,8 +201,8 @@ CelonisVariantStatsAggregateV2State::json_string(const VariantAnalysisResult& an
     return buf.GetString();
 }
 
-std::optional<std::string>
-CelonisVariantStatsAggregateV2State::base64_encoded_string(const VariantAnalysisResult& analysis_result) const {
+std::optional<std::string> CelonisVariantStatsAggregateV2State::base64_encoded_string(
+        const VariantAnalysisResult& analysis_result) const {
     const std::vector<std::vector<size_t>>& activity_top_variants = analysis_result.activity_top_variants;
     size_t happy = analysis_result.happy;
     celonis::accelerator::Statistics statistics_proto;
@@ -233,10 +231,9 @@ CelonisVariantStatsAggregateV2State::base64_encoded_string(const VariantAnalysis
     // Edge stats
     if (edge_count_ >= 0) {
         statistics_proto.set_e_count(edge_stats_.size());
-        auto sorted_edges = EdgeStatsProcessor<std::vector<std::string>>::get_sorted_edges(
-                edge_stats_, activity_array_, edge_count_);
-        EdgeStatsProcessor<std::vector<std::string>>::build_edge_stats_proto(
-                sorted_edges, statistics_proto);
+        auto sorted_edges = EdgeStatsProcessor<std::vector<std::string>>::get_sorted_edges(edge_stats_, activity_array_,
+                                                                                           edge_count_);
+        EdgeStatsProcessor<std::vector<std::string>>::build_edge_stats_proto(sorted_edges, statistics_proto);
     }
     // Top variants and happy path
     if (!skip_variant_analysis_) {
@@ -275,8 +272,8 @@ CelonisVariantStatsAggregateV2State::base64_encoded_string(const VariantAnalysis
     return encoded_string;
 }
 
-std::optional<std::string>
-CelonisVariantStatsAggregateV2State::to_string(const VariantAnalysisResult& analysis_result) const {
+std::optional<std::string> CelonisVariantStatsAggregateV2State::to_string(
+        const VariantAnalysisResult& analysis_result) const {
     return enable_proto_encoding_ ? base64_encoded_string(analysis_result) : json_string(analysis_result);
 }
 
@@ -289,9 +286,8 @@ void CelonisVariantStateV2AggregationFunction::update(FunctionContext* ctx, cons
     this->data(state).update(ctx, columns, row_num);
 }
 
-void
-CelonisVariantStateV2AggregationFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,
-                                                size_t row_num) const {
+void CelonisVariantStateV2AggregationFunction::merge(FunctionContext* ctx, const Column* column,
+                                                     AggDataPtr __restrict state, size_t row_num) const {
     // merge internal state with column[row_num]
     // the column type is binary
     if (column->is_null(row_num)) {
@@ -299,12 +295,11 @@ CelonisVariantStateV2AggregationFunction::merge(FunctionContext* ctx, const Colu
     }
     const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
     Slice slice = input_column->get_slice(row_num);
-    this->data(state).deserialize_and_merge((const uint8_t*) slice.data, slice.size);
+    this->data(state).deserialize_and_merge((const uint8_t*)slice.data, slice.size);
 }
 
-void
-CelonisVariantStateV2AggregationFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
-                                                              Column* to) const {
+void CelonisVariantStateV2AggregationFunction::serialize_to_column(FunctionContext* ctx,
+                                                                   ConstAggDataPtr __restrict state, Column* to) const {
     // append our serialized state to column "to"
     auto* column = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(to));
     if (to->is_nullable()) {
@@ -318,15 +313,13 @@ CelonisVariantStateV2AggregationFunction::serialize_to_column(FunctionContext* c
 }
 
 void CelonisVariantStateV2AggregationFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
-                                                                           size_t chunk_size,
-                                                                           ColumnPtr* dst) const {
+                                                                           size_t chunk_size, ColumnPtr* dst) const {
     // Used for streaming aggregation. Not implemented.
     throw std::runtime_error("celonis_variant_stats_v2: convert_to_serialize_format not supported");
 }
 
-void
-CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
-                                                             Column* to) const {
+void CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ctx,
+                                                                  ConstAggDataPtr __restrict state, Column* to) const {
     auto defer = DeferOp([&]() {
         if (ctx->has_error() && to != nullptr) {
             to->append_default();
@@ -335,21 +328,20 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
     auto& state_impl = this->data(state);
     const std::string query_id = print_id(ctx->state()->query_id());
     const std::string log_prefix = get_log_prefix(query_id);
-    LOG(INFO) << log_prefix << ": merging_seconds = " << state_impl.merging_microseconds() / 1000000.0
-              << " seconds." << std::endl;
+    LOG(INFO) << log_prefix << ": merging_seconds = " << state_impl.merging_microseconds() / 1000000.0 << " seconds."
+              << std::endl;
     LOG(INFO) << log_prefix << ": merging_bytes = " << state_impl.merging_bytes() << " bytes." << std::endl;
     LOG(INFO) << log_prefix << ": number of states merged = " << state_impl.merging_states() << std::endl;
     LOG(INFO) << log_prefix << ": distinct activity count = " << state_impl.num_distinct_activities() << std::endl;
     LOG(INFO) << log_prefix << ": distinct variant count = " << state_impl.num_distinct_variants() << std::endl;
 
     if (state_impl.activity_array().size() > MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES) {
-        ctx->set_error(std::string(
-                               "CELONIS_VARIANT_STATS_V2: the number of unique activities is " +
-                               std::to_string(state_impl.activity_array().size()) +
-                               " which is greater than the limit " +
-                               std::to_string(MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES))
-                               .c_str(),
-                       false);
+        ctx->set_error(
+                std::string("CELONIS_VARIANT_STATS_V2: the number of unique activities is " +
+                            std::to_string(state_impl.activity_array().size()) + " which is greater than the limit " +
+                            std::to_string(MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES))
+                        .c_str(),
+                false);
         return;
     }
     std::string output = "";
@@ -367,8 +359,7 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
         LOG(INFO) << log_prefix << ": started analyzing variants\n";
         variant_analysis = state_impl.analyze_variants();
         LOG(INFO) << log_prefix << ": done analyzing variants (activity_top_variants size = "
-                  << variant_analysis.activity_top_variants.size()
-                  << ")\n";
+                  << variant_analysis.activity_top_variants.size() << ")\n";
     }
     LOG(INFO) << log_prefix << ": started to_string\n";
     auto rv = state_impl.to_string(variant_analysis);
@@ -383,6 +374,8 @@ CelonisVariantStateV2AggregationFunction::finalize_to_column(FunctionContext* ct
     down_cast<BinaryColumn*>(to)->append(output);
 }
 
-std::string CelonisVariantStateV2AggregationFunction::get_name() const { return "celonis_variant_stats_v2"; }
+std::string CelonisVariantStateV2AggregationFunction::get_name() const {
+    return "celonis_variant_stats_v2";
+}
 
 } // namespace starrocks

@@ -1,5 +1,7 @@
 #include "span.h"
 
+#include <thread>
+
 #include <opentelemetry/common/key_value_iterable.h>
 #include <opentelemetry/context/propagation/global_propagator.h>
 #include <opentelemetry/context/runtime_context.h>
@@ -7,7 +9,6 @@
 #include <opentelemetry/trace/scope.h>
 #include <opentelemetry/trace/span.h>
 #include <opentelemetry/trace/span_metadata.h>
-#include <thread>
 #ifdef CELOSTAR
 #include <variant>
 #endif

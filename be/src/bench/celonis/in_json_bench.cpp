@@ -8,8 +8,8 @@
 #include "exprs/anyval_util.h"
 #include "exprs/celonis/in_json.h"
 #include "exprs/function_context.h"
-#include "runtime/types.h"
 #include "nlohmann/json.hpp"
+#include "runtime/types.h"
 
 using json = nlohmann::json;
 
@@ -48,11 +48,11 @@ BM_InJsonVARCHAR/10000/60/10      180171 ns       180182 ns         3886 RowInvR
 BM_InJsonVARCHAR/100000/60/10    1734872 ns      1734867 ns          405 RowInvRate=17.3487ns
 */
 
-template<LogicalType LT>
+template <LogicalType LT>
 json ToJsonArray(const DatumArray& match_array) {
     json match_array_json = json::array();
     if constexpr (lt_is_string<LT>) {
-        for (const auto& item: match_array) {
+        for (const auto& item : match_array) {
             if (item.is_null()) {
                 match_array_json.push_back(nullptr);
             } else {
@@ -60,7 +60,7 @@ json ToJsonArray(const DatumArray& match_array) {
             }
         }
     } else {
-        for (const auto& item: match_array) {
+        for (const auto& item : match_array) {
             if (item.is_null()) {
                 match_array_json.push_back(nullptr);
             } else {

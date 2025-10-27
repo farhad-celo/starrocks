@@ -25,10 +25,10 @@ static int64_t convert_timestamp_to_weekday(long timestamp_val) {
     days_from_unix_epoch = -days_from_unix_epoch;
     return -((days_from_unix_epoch / 7) * 5 + pre_epoch_weekday[days_from_unix_epoch % 7]);
 }
-}
+} // namespace
 
-StatusOr<ColumnPtr>
-CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday(FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday(FunctionContext* context,
+                                                                                  const Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     ColumnViewer<TYPE_DATETIME> viewer(columns[0]);

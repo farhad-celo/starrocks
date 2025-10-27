@@ -3,8 +3,8 @@
 #include <fmt/format.h>
 
 #include "column/datum.h"
-#include "column/type_traits.h"
 #include "column/hash_set.h"
+#include "column/type_traits.h"
 #include "exprs/agg/aggregate.h"
 #include "exprs/function_context.h"
 #include "gutil/casts.h"
@@ -45,19 +45,20 @@ struct ColumnsKey {
             }
             const auto type = info->types[i];
             switch (type) {
-                case TYPE_VARCHAR:
-                    HashUtil::hash_combine(hash, SliceHash()(info->columns[i]->get(offset).get_slice()));
-                    break;
-#define M(type) \
-                case type: \
-                    HashUtil::hash_combine(hash, StdHash<RunTimeCppType<type>>()(info->columns[i]->get(offset).get<RunTimeCppType<type>>())); \
-                    break;
+            case TYPE_VARCHAR:
+                HashUtil::hash_combine(hash, SliceHash()(info->columns[i]->get(offset).get_slice()));
+                break;
+#define M(type)                                                                                                    \
+    case type:                                                                                                     \
+        HashUtil::hash_combine(                                                                                    \
+                hash, StdHash<RunTimeCppType<type>>()(info->columns[i]->get(offset).get<RunTimeCppType<type>>())); \
+        break;
 
                 APPLY_FOR_ALL_NUMBER_TYPE(M)
                 M(TYPE_DATETIME)
 #undef M
-                default:
-                    throw std::runtime_error(fmt::format("Type {} not supported", type));
+            default:
+                throw std::runtime_error(fmt::format("Type {} not supported", type));
             }
         }
         if (any_null) {
@@ -76,9 +77,7 @@ struct ColumnsKey {
         return info->columns[idx]->get(offset);
     }
 
-    bool has_any_null() const {
-        return offset == -1;
-    }
+    bool has_any_null() const { return offset == -1; }
 };
 
 struct EqualOnColumnsKey {
@@ -129,19 +128,20 @@ struct DedupColumnsKey {
             all_nulls = false;
             const auto type = info->types[i];
             switch (type) {
-                case TYPE_VARCHAR:
-                    HashUtil::hash_combine(hash, SliceHash()(info->columns[i]->get(offset).get_slice()));
-                    break;
-#define M(type) \
-                case type: \
-                    HashUtil::hash_combine(hash, StdHash<RunTimeCppType<type>>()(info->columns[i]->get(offset).get<RunTimeCppType<type>>())); \
-                    break;
+            case TYPE_VARCHAR:
+                HashUtil::hash_combine(hash, SliceHash()(info->columns[i]->get(offset).get_slice()));
+                break;
+#define M(type)                                                                                                    \
+    case type:                                                                                                     \
+        HashUtil::hash_combine(                                                                                    \
+                hash, StdHash<RunTimeCppType<type>>()(info->columns[i]->get(offset).get<RunTimeCppType<type>>())); \
+        break;
 
                 APPLY_FOR_ALL_NUMBER_TYPE(M)
                 M(TYPE_DATETIME)
 #undef M
-                default:
-                    throw std::runtime_error(fmt::format("Type {} not supported", type));
+            default:
+                throw std::runtime_error(fmt::format("Type {} not supported", type));
             }
         }
         if (all_nulls) {
@@ -156,9 +156,7 @@ struct DedupColumnsKey {
         return info->columns[idx]->get(offset);
     }
 
-    bool is_all_nulls() const {
-        return offset == -1;
-    }
+    bool is_all_nulls() const { return offset == -1; }
 };
 
 struct EqualOnDedupColumnsKey {
@@ -252,17 +250,14 @@ struct CelonisEnumerateAggregateState {
 class CelonisEnumerateAggregateFunction
         : public AggregateFunctionBatchHelper<CelonisEnumerateAggregateState, CelonisEnumerateAggregateFunction> {
 public:
-    enum class Mode {
-        NODE_PATHS,
-        TRANSITIVE_EDGES
-    };
+    enum class Mode { NODE_PATHS, TRANSITIVE_EDGES };
 
     CelonisEnumerateAggregateFunction(Mode mode) : mode_(mode) {}
 
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const override;
 
-    void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state, size_t row_num) const
-    override;
+    void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
+                size_t row_num) const override;
 
     void update_batch_single_state(FunctionContext* ctx, size_t chunk_size, const Column** columns,
                                    AggDataPtr __restrict state) const override;
@@ -274,8 +269,9 @@ public:
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const override {
         // Used for streaming aggregation passthrough. Not implemented.
-        throw std::runtime_error("convert_to_serialize_format is not supported. "
-                                 "Not to trigger this, SET streaming_preaggregation_mode=\"force_preaggregation\"");
+        throw std::runtime_error(
+                "convert_to_serialize_format is not supported. "
+                "Not to trigger this, SET streaming_preaggregation_mode=\"force_preaggregation\"");
     }
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override;

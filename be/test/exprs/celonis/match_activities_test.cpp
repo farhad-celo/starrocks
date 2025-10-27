@@ -1,12 +1,13 @@
 #include "exprs/celonis/match_activities.h"
 
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -19,12 +20,9 @@ protected:
 private:
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY), TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY), TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY), TypeDescriptor::from_logical_type(TYPE_ARRAY),
                 TypeDescriptor::from_logical_type(TYPE_ARRAY)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_BIGINT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -52,29 +50,23 @@ private:
     }
 
     StatusOr<ColumnPtr> Run() {
-        DeferOp close_fragment_local([this] {
-            CelonisMatchActivitiesFunctions::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [this] { CelonisMatchActivitiesFunctions::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisMatchActivitiesFunctions::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisMatchActivitiesFunctions::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local(
+                [this] { CelonisMatchActivitiesFunctions::close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisMatchActivitiesFunctions::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
-        result = CelonisMatchActivitiesFunctions::celonis_match_activities(ctx_.get(),
-                                                                           {activity_column_, starting_nodes_column_,
-                                                                            nodes_column_, ending_nodes_column_,
-                                                                            excluding_nodes_column_,
-                                                                            excluding_all_nodes_column_,
-                                                                            any_nodes_column_
-                                                                           });
+        result = CelonisMatchActivitiesFunctions::celonis_match_activities(
+                ctx_.get(), {activity_column_, starting_nodes_column_, nodes_column_, ending_nodes_column_,
+                             excluding_nodes_column_, excluding_all_nodes_column_, any_nodes_column_});
         return result;
     }
 
-    StatusOr<ColumnPtr>
-    RunConstantConfig(const DatumArray& starting_nodes_array, const DatumArray& nodes_array,
-                      const DatumArray& ending_nodes_array, const DatumArray& excluding_nodes_array,
-                      const DatumArray& excluding_all_nodes_array, const DatumArray& any_nodes_array) {
+    StatusOr<ColumnPtr> RunConstantConfig(const DatumArray& starting_nodes_array, const DatumArray& nodes_array,
+                                          const DatumArray& ending_nodes_array, const DatumArray& excluding_nodes_array,
+                                          const DatumArray& excluding_all_nodes_array,
+                                          const DatumArray& any_nodes_array) {
         starting_nodes_column_->append_datum(starting_nodes_array);
         nodes_column_->append_datum(nodes_array);
         ending_nodes_column_->append_datum(ending_nodes_array);
@@ -88,9 +80,8 @@ private:
         excluding_nodes_column_ = ConstColumn::create(excluding_nodes_column_, nrows);
         excluding_all_nodes_column_ = ConstColumn::create(excluding_all_nodes_column_, nrows);
         any_nodes_column_ = ConstColumn::create(any_nodes_column_, nrows);
-        ctx_->set_constant_columns(
-                {nullptr, starting_nodes_column_, nodes_column_, ending_nodes_column_, excluding_nodes_column_,
-                 excluding_all_nodes_column_, any_nodes_column_});
+        ctx_->set_constant_columns({nullptr, starting_nodes_column_, nodes_column_, ending_nodes_column_,
+                                    excluding_nodes_column_, excluding_all_nodes_column_, any_nodes_column_});
         return Run();
     }
 
@@ -125,8 +116,8 @@ TEST_F(CelonisMatchActivitiesTest, const_null_activity_column) {
         activity_column_ = ConstColumn::create(activity_column_, 2);
         auto nodes_array = DatumArray{"string1", "string3"};
         auto empty_array = DatumArray{};
-        const auto result = RunConstantConfig(empty_array, nodes_array, empty_array, empty_array, empty_array,
-                                              empty_array).value();
+        const auto result =
+                RunConstantConfig(empty_array, nodes_array, empty_array, empty_array, empty_array, empty_array).value();
         ASSERT_EQ(activity_column_->size(), result->size());
         EXPECT_TRUE(result->get(0).is_null());
         EXPECT_TRUE(result->get(1).is_null());
@@ -141,8 +132,8 @@ TEST_F(CelonisMatchActivitiesTest, with_nodes) {
 
     auto nodes_array = DatumArray{"string1", "string3"};
     auto empty_array = DatumArray{};
-    const auto result = RunConstantConfig(empty_array, nodes_array, empty_array, empty_array, empty_array,
-                                          empty_array).value();
+    const auto result =
+            RunConstantConfig(empty_array, nodes_array, empty_array, empty_array, empty_array, empty_array).value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(0, result->get(0).get_int64());
     EXPECT_EQ(1, result->get(1).get_int64());
@@ -160,8 +151,9 @@ TEST_F(CelonisMatchActivitiesTest, with_excluding_nodes) {
     auto nodes_array = DatumArray{"string1", "string3"};
     auto excluding_nodes_array = DatumArray{"string2"};
     auto empty_array = DatumArray{};
-    const auto result = RunConstantConfig(empty_array, nodes_array, empty_array, excluding_nodes_array, empty_array,
-                                          empty_array).value();
+    const auto result =
+            RunConstantConfig(empty_array, nodes_array, empty_array, excluding_nodes_array, empty_array, empty_array)
+                    .value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(0, result->get(0).get_int64());
     EXPECT_EQ(0, result->get(1).get_int64());
@@ -179,8 +171,9 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_with_only_excluding_
 
     auto excluding_nodes_array = DatumArray{"string2"};
     auto empty_array = DatumArray{};
-    const auto result = RunConstantConfig(empty_array, empty_array, empty_array, excluding_nodes_array, empty_array,
-                                          empty_array).value();
+    const auto result =
+            RunConstantConfig(empty_array, empty_array, empty_array, excluding_nodes_array, empty_array, empty_array)
+                    .value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(0, result->get(0).get_int64());
     EXPECT_EQ(1, result->get(1).get_int64());
@@ -200,9 +193,8 @@ TEST_F(CelonisMatchActivitiesTest, with_only_end_nodes) {
     activity_column_->append_datum(DatumArray{});
     auto end_nodes_array = DatumArray{"end1", "end2"};
     auto empty_array = DatumArray{};
-    const auto result = RunConstantConfig(empty_array, empty_array, end_nodes_array, empty_array,
-                                          empty_array,
-                                          empty_array).value();
+    const auto result =
+            RunConstantConfig(empty_array, empty_array, end_nodes_array, empty_array, empty_array, empty_array).value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
@@ -224,9 +216,8 @@ TEST_F(CelonisMatchActivitiesTest, with_nodes_and_end_nodes) {
     auto nodes_array = DatumArray{"start1", "end2"};
     auto end_nodes_array = DatumArray{"end1", "end2"};
     auto empty_array = DatumArray{};
-    const auto result = RunConstantConfig(empty_array, nodes_array, end_nodes_array, empty_array,
-                                          empty_array,
-                                          empty_array).value();
+    const auto result =
+            RunConstantConfig(empty_array, nodes_array, end_nodes_array, empty_array, empty_array, empty_array).value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(0L, result->get(1).get_int64());
@@ -250,8 +241,8 @@ TEST_F(CelonisMatchActivitiesTest, with_start_and_end_nodes) {
     auto excluding_nodes_array = DatumArray{"excluding_activity"};
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(start_nodes_array, empty_array, end_nodes_array, excluding_nodes_array,
-                                          empty_array,
-                                          empty_array).value();
+                                          empty_array, empty_array)
+                                .value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
@@ -269,8 +260,9 @@ TEST_F(CelonisMatchActivitiesTest, no_non_null_activities_with_start_nodes) {
     activity_column_->append_datum(DatumArray{kNullDatum, "start1"});
     auto start_nodes_array = DatumArray{"start1", "start2"};
     auto empty_array = DatumArray{};
-    const auto result = RunConstantConfig(start_nodes_array, empty_array, empty_array, empty_array,
-                                          empty_array, empty_array).value();
+    const auto result =
+            RunConstantConfig(start_nodes_array, empty_array, empty_array, empty_array, empty_array, empty_array)
+                    .value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(0L, result->get(1).get_int64());
@@ -284,8 +276,8 @@ TEST_F(CelonisMatchActivitiesTest, short_variant_with_nodes) {
     activity_column_->append_datum(DatumArray{kNullDatum, kNullDatum, "node1", "node2", "node3", "node4"});
     auto nodes_array = DatumArray{"node1", "node2", "node3"};
     auto empty_array = DatumArray{};
-    const auto result = RunConstantConfig(empty_array, nodes_array, empty_array, empty_array,
-                                          empty_array, empty_array).value();
+    const auto result =
+            RunConstantConfig(empty_array, nodes_array, empty_array, empty_array, empty_array, empty_array).value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(0L, result->get(0).get_int64());
     EXPECT_EQ(0L, result->get(1).get_int64());
@@ -307,8 +299,8 @@ TEST_F(CelonisMatchActivitiesTest, null_in_const_filters) {
     auto excluding_nodes_array = DatumArray{"excluding_activity", kNullDatum};
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(start_nodes_array, empty_array, end_nodes_array, excluding_nodes_array,
-                                          empty_array,
-                                          empty_array).value();
+                                          empty_array, empty_array)
+                                .value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
@@ -334,7 +326,8 @@ TEST_F(CelonisMatchActivitiesTest, with_excluding_all_nodes) {
     auto excluding_all_nodes_array = DatumArray{"A", "C"};
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(empty_array, empty_array, empty_array, empty_array, excluding_all_nodes_array,
-                                          empty_array).value();
+                                          empty_array)
+                                .value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(1L, result->get(1).get_int64());
@@ -360,8 +353,8 @@ TEST_F(CelonisMatchActivitiesTest, with_nodes_any) {
 
     auto any_nodes_array = DatumArray{"A", "C"};
     auto empty_array = DatumArray{};
-    const auto result = RunConstantConfig(empty_array, empty_array, empty_array, empty_array, empty_array,
-                                          any_nodes_array).value();
+    const auto result =
+            RunConstantConfig(empty_array, empty_array, empty_array, empty_array, empty_array, any_nodes_array).value();
     ASSERT_EQ(activity_column_->size(), result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
     EXPECT_EQ(0L, result->get(1).get_int64());
@@ -380,8 +373,8 @@ TEST_F(CelonisMatchActivitiesTest, celonis_match_activities_empty_input) {
     auto excluding_nodes_array = DatumArray{"excluding_activity"};
     auto empty_array = DatumArray{};
     const auto result = RunConstantConfig(starting_nodes_array, empty_array, ending_nodes_array, excluding_nodes_array,
-                                          empty_array,
-                                          empty_array).value();
+                                          empty_array, empty_array)
+                                .value();
     EXPECT_EQ(0, result->size());
 }
 
@@ -407,16 +400,13 @@ TEST_F(CelonisMatchActivitiesTest, non_const_filters) {
 TEST_F(CelonisMatchActivitiesTest, null_in_non_const_filters) {
     Prepare();
     AddRow(DatumArray{"start1", "end2"}, DatumArray{kNullDatum, "start1", kNullDatum}, DatumArray{}, DatumArray{},
-           DatumArray{}, DatumArray{},
-           DatumArray{});
+           DatumArray{}, DatumArray{}, DatumArray{});
     AddRow(DatumArray{"start2", "end1"}, DatumArray{kNullDatum, "start2"}, DatumArray{}, DatumArray{"end1"},
-           DatumArray{},
-           DatumArray{}, DatumArray{});
+           DatumArray{}, DatumArray{}, DatumArray{});
     AddRow(DatumArray{kNullDatum, "start1", "end2", kNullDatum}, DatumArray{}, DatumArray{}, DatumArray{}, DatumArray{},
            DatumArray{}, DatumArray{});
     AddRow(DatumArray{"start2", "end1", kNullDatum}, DatumArray{"start2", kNullDatum}, DatumArray{},
-           DatumArray{"end2", kNullDatum},
-           DatumArray{}, DatumArray{}, DatumArray{});
+           DatumArray{"end2", kNullDatum}, DatumArray{}, DatumArray{}, DatumArray{});
 
     const auto result = Run().value();
     ASSERT_EQ(activity_column_->size(), result->size());
@@ -427,20 +417,18 @@ TEST_F(CelonisMatchActivitiesTest, null_in_non_const_filters) {
 }
 
 TEST_F(CelonisMatchActivitiesTest, ban_non_const_config_works) {
-    const bool fail_query_when_expensive_non_const_impl_is_called = config::fail_query_when_expensive_non_const_impl_is_called;
+    const bool fail_query_when_expensive_non_const_impl_is_called =
+            config::fail_query_when_expensive_non_const_impl_is_called;
     config::fail_query_when_expensive_non_const_impl_is_called = true;
     Prepare();
     AddRow(DatumArray{"start1", "end2"}, DatumArray{kNullDatum, "start1", kNullDatum}, DatumArray{}, DatumArray{},
-           DatumArray{}, DatumArray{},
-           DatumArray{});
+           DatumArray{}, DatumArray{}, DatumArray{});
     AddRow(DatumArray{"start2", "end1"}, DatumArray{kNullDatum, "start2"}, DatumArray{}, DatumArray{"end1"},
-           DatumArray{},
-           DatumArray{}, DatumArray{});
+           DatumArray{}, DatumArray{}, DatumArray{});
 
     const auto result = Run();
     EXPECT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ("The non-const version of CELONIS_MATCH_ACTIVITIES should not be called.",
-              result.status().message());
+    EXPECT_EQ("The non-const version of CELONIS_MATCH_ACTIVITIES should not be called.", result.status().message());
     config::fail_query_when_expensive_non_const_impl_is_called = fail_query_when_expensive_non_const_impl_is_called;
 }
 

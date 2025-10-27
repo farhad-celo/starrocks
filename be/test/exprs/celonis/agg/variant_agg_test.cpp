@@ -84,7 +84,7 @@ public:
         std::uniform_int_distribution<size_t> length_g(0, 2 * avg_length);
         std::uniform_int_distribution<size_t> g(0, alphabet.size() - 1);
 
-        std::vector<std::vector<std::string> > seed_data;
+        std::vector<std::vector<std::string>> seed_data;
         for (int i = 0; i < seed_rows; i++) {
             std::vector<std::string> v;
             int len = length_g(rd);
@@ -173,23 +173,16 @@ private:
 };
 
 TEST_F(CelonisVariantAggTest, test_no_merge) {
-    Rows rows = {{"a1", "a2"},
-                 {"a1", "a2"},
-                 {"a1", "a2", "a3"},
-                 {"a3", "a4"}};
+    Rows rows = {{"a1", "a2"}, {"a1", "a2"}, {"a1", "a2", "a3"}, {"a3", "a4"}};
     Weights weights = {1, 1, 1, 1};
-    DistinctVariantMap expected = {{{"a1", "a2"}, 2},
-                                   {{"a1", "a2", "a3"}, 1},
-                                   {{"a3", "a4"}, 1}};
+    DistinctVariantMap expected = {{{"a1", "a2"}, 2}, {{"a1", "a2", "a3"}, 1}, {{"a3", "a4"}, 1}};
     run_no_merge_test(rows, weights, expected);
 }
 
 TEST_F(CelonisVariantAggTest, test_merge_with_itself) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col = build_variant_column({{},
-                                     {"key1", "key2"},
-                                     {"sr-1", "sr-2", "sr-2"}});
+    auto col = build_variant_column({{}, {"key1", "key2"}, {"sr-1", "sr-2", "sr-2"}});
 
     auto weights = build_weight_column({1, 1, 1});
 
@@ -204,18 +197,14 @@ TEST_F(CelonisVariantAggTest, test_merge_with_itself) {
     // Merge with itself
     func->merge(ctx, part1.get(), state->state(), 0);
 
-    DistinctVariantMap expected = {{{}, 2},
-                                   {{"key1", "key2"}, 2},
-                                   {{"sr-1", "sr-2", "sr-2"}, 2}};
+    DistinctVariantMap expected = {{{}, 2}, {{"key1", "key2"}, 2}, {{"sr-1", "sr-2", "sr-2"}, 2}};
     match(*state, expected);
 }
 
 TEST_F(CelonisVariantAggTest, test_merge_distinct_dict) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2", "a3"},
-                                      {"a3", "a4"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2", "a3"}, {"a3", "a4"}});
     auto weights1 = build_weight_column({1, 1, 1});
     std::vector<const Column*> raw_columns{col1.get(), weights1.get()};
     auto state1 = ManagedAggrState::create(ctx, func);
@@ -224,8 +213,7 @@ TEST_F(CelonisVariantAggTest, test_merge_distinct_dict) {
     auto part1 = BinaryColumn::create();
     func->serialize_to_column(ctx, state1->state(), part1.get());
 
-    auto col2 = build_variant_column({{"a1", "a4", "a0"},
-                                      {"a1", "a2", "a2", "a2", "a5"}});
+    auto col2 = build_variant_column({{"a1", "a4", "a0"}, {"a1", "a2", "a2", "a2", "a5"}});
     auto weights2 = build_weight_column({1, 1});
 
     std::vector<const Column*> raw_columns2{col2.get(), weights2.get()};
@@ -246,23 +234,16 @@ TEST_F(CelonisVariantAggTest, test_merge_distinct_dict) {
 }
 
 TEST_F(CelonisVariantAggTest, test_weights) {
-    Rows rows = {{"a1", "a2"},
-                 {"a1", "a2"},
-                 {"a1", "a2", "a2"},
-                 {"a3", "a4"}};
+    Rows rows = {{"a1", "a2"}, {"a1", "a2"}, {"a1", "a2", "a2"}, {"a3", "a4"}};
     Weights weights = {1, 10, 3, 2};
-    DistinctVariantMap expected = {{{"a1", "a2"}, 11},
-                                   {{"a1", "a2", "a2"}, 3},
-                                   {{"a3", "a4"}, 2}};
+    DistinctVariantMap expected = {{{"a1", "a2"}, 11}, {{"a1", "a2", "a2"}, 3}, {{"a3", "a4"}, 2}};
     run_no_merge_test(rows, weights, expected);
 }
 
 TEST_F(CelonisVariantAggTest, test_merge_weights) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2", "a3"},
-                                      {"a3", "a4"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2", "a3"}, {"a3", "a4"}});
     auto weights1 = build_weight_column({10, 100, 20});
     std::vector<const Column*> raw_columns{col1.get(), weights1.get()};
     auto state1 = ManagedAggrState::create(ctx, func);
@@ -271,10 +252,8 @@ TEST_F(CelonisVariantAggTest, test_merge_weights) {
     auto part1 = BinaryColumn::create();
     func->serialize_to_column(ctx, state1->state(), part1.get());
 
-    auto col2 = build_variant_column({{"a1", "a4", "a0"},
-                                      {"a1", "a2", "a3"},
-                                      {"a3", "a4"},
-                                      {"a1", "a2", "a2", "a2", "a5"}});
+    auto col2 = build_variant_column(
+            {{"a1", "a4", "a0"}, {"a1", "a2", "a3"}, {"a3", "a4"}, {"a1", "a2", "a2", "a2", "a5"}});
     auto weights2 = build_weight_column({20, 50, 5, 1});
 
     std::vector<const Column*> raw_columns2{col2.get(), weights2.get()};
@@ -297,9 +276,7 @@ TEST_F(CelonisVariantAggTest, test_merge_weights) {
 TEST_F(CelonisVariantAggTest, test_merge_very_large_weights) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column({{"a1", "a2"},
-                                      {"a1", "a2", "a3"},
-                                      {"a3", "a4"}});
+    auto col1 = build_variant_column({{"a1", "a2"}, {"a1", "a2", "a3"}, {"a3", "a4"}});
     auto weights1 = build_weight_column({10'000'000'000L, 100'000'000'000L, 20'000'000'000L});
     std::vector<const Column*> raw_columns{col1.get(), weights1.get()};
     auto state1 = ManagedAggrState::create(ctx, func);
@@ -308,10 +285,8 @@ TEST_F(CelonisVariantAggTest, test_merge_very_large_weights) {
     auto part1 = BinaryColumn::create();
     func->serialize_to_column(ctx, state1->state(), part1.get());
 
-    auto col2 = build_variant_column({{"a1", "a4", "a0"},
-                                      {"a1", "a2", "a3"},
-                                      {"a3", "a4"},
-                                      {"a1", "a2", "a2", "a2", "a5"}});
+    auto col2 = build_variant_column(
+            {{"a1", "a4", "a0"}, {"a1", "a2", "a3"}, {"a3", "a4"}, {"a1", "a2", "a2", "a2", "a5"}});
     auto weights2 = build_weight_column({20'000'000'000L, 50'000'000'000L, 50L, 1L});
 
     std::vector<const Column*> raw_columns2{col2.get(), weights2.get()};
@@ -401,7 +376,7 @@ TEST_F(CelonisVariantAggTest, test_large) {
     for (const auto& [variant, count] : actual) {
         std::cout << "variant:";
         for (const auto& activity : variant) {
-           std::cout << " "  << activity;
+            std::cout << " " << activity;
         }
         std::cout << ", count: " << count << "\n";
     }

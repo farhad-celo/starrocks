@@ -2,31 +2,29 @@
 
 #include "column/column_builder.h"
 #include "exprs/function_context.h"
-#include "types/logical_type.h"
 #include "exprs/math_functions.h"
+#include "types/logical_type.h"
 
 namespace starrocks {
 
 namespace {
 
-enum class ComparisonType {
-    GREATEST, LEAST
-};
+enum class ComparisonType { GREATEST, LEAST };
 
 template <typename>
 inline constexpr bool always_false_v{false};
 
-template<ComparisonType CMP_TYPE, LogicalType LT>
-[[nodiscard]] ColumnPtr celonis_greatest_least_impl(FunctionContext* context, const Columns &columns) {
+template <ComparisonType CMP_TYPE, LogicalType LT>
+[[nodiscard]] ColumnPtr celonis_greatest_least_impl(FunctionContext* context, const Columns& columns) {
     if (columns.size() == 1) {
         return columns[0]->clone();
     }
 
     // If none of the columns contains a null value, we can simply defer the computation to the existing
     // Starrocks greatest/least implementation.
-    if (const bool all_columns_without_null{std::none_of(columns.begin(), columns.end(), [](const ColumnPtr& column_ptr) {
-        return column_ptr->has_null();
-    })}; all_columns_without_null) {
+    if (const bool all_columns_without_null{std::none_of(
+                columns.begin(), columns.end(), [](const ColumnPtr& column_ptr) { return column_ptr->has_null(); })};
+        all_columns_without_null) {
         // At the time of this implementation, Starrocks' greatest/least implementation never returns a non-OK
         // status. Thus, we access the value of the returned StatusOr without further checks.
         if constexpr (CMP_TYPE == ComparisonType::GREATEST) {
@@ -84,23 +82,23 @@ template<ComparisonType CMP_TYPE, LogicalType LT>
     return result.build(all_const);
 }
 
-template<ComparisonType CMP_TYPE>
-[[nodiscard]] ColumnPtr celonis_greatest_least_impl(FunctionContext* context, const Columns &columns) {
+template <ComparisonType CMP_TYPE>
+[[nodiscard]] ColumnPtr celonis_greatest_least_impl(FunctionContext* context, const Columns& columns) {
     switch (const auto type{context->get_return_type().type}; type) {
-        case TYPE_VARCHAR:
-            return celonis_greatest_least_impl<CMP_TYPE, TYPE_VARCHAR>(context, columns);
-        case TYPE_BIGINT:
-            return celonis_greatest_least_impl<CMP_TYPE, TYPE_BIGINT>(context, columns);
-        case TYPE_DOUBLE:
-            return celonis_greatest_least_impl<CMP_TYPE, TYPE_DOUBLE>(context, columns);
-        case TYPE_DATETIME:
-            return celonis_greatest_least_impl<CMP_TYPE, TYPE_DATETIME>(context, columns);
-        default: {
-            // Should be prevented by the grammar and thus never be reached
-            std::stringstream error_msg_strm{};
-            error_msg_strm << "Column type '" << logical_type_to_string(type) << "' not supported.";
-            throw std::runtime_error(error_msg_strm.str());
-        }
+    case TYPE_VARCHAR:
+        return celonis_greatest_least_impl<CMP_TYPE, TYPE_VARCHAR>(context, columns);
+    case TYPE_BIGINT:
+        return celonis_greatest_least_impl<CMP_TYPE, TYPE_BIGINT>(context, columns);
+    case TYPE_DOUBLE:
+        return celonis_greatest_least_impl<CMP_TYPE, TYPE_DOUBLE>(context, columns);
+    case TYPE_DATETIME:
+        return celonis_greatest_least_impl<CMP_TYPE, TYPE_DATETIME>(context, columns);
+    default: {
+        // Should be prevented by the grammar and thus never be reached
+        std::stringstream error_msg_strm{};
+        error_msg_strm << "Column type '" << logical_type_to_string(type) << "' not supported.";
+        throw std::runtime_error(error_msg_strm.str());
+    }
     }
 }
 

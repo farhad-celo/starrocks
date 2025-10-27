@@ -22,7 +22,8 @@ class ctl_exception : virtual public base_exception, public internal_error {
       : ctl_exception{"Internal error. It is not your fault. The issue will be investigated.", std::nullopt} {
     init(std::move(message), exception_type_as_text);
     // For server errors we add the backtrace of the exception to the JSON data
-    add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
+    add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY},
+                     to_string(boost::stacktrace::stacktrace()));
   }
   /** Delegating ctor for the initialization of the internal_error trait */
   [[nodiscard]] ctl_exception(const std::string_view external_message_prefix,
@@ -39,7 +40,8 @@ class retryable_ctl_exception : public ctl_exception, public retryable_error {
       : ctl_exception{EXTERNAL_MESSAGE_PREFIX, std::nullopt} {
     init(std::move(message), exception_type_as_text);
     // For server errors we add the backtrace of the exception to the JSON data
-    add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
+    add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY},
+                     to_string(boost::stacktrace::stacktrace()));
   }
 
   [[nodiscard]] retryable_ctl_exception(std::string message, const std::string_view exception_type_as_text,
@@ -48,7 +50,8 @@ class retryable_ctl_exception : public ctl_exception, public retryable_error {
       : ctl_exception{EXTERNAL_MESSAGE_PREFIX, external_message_reason} {
     init(std::move(message), exception_type_as_text);
     // For server errors we add the backtrace of the exception to the JSON data
-    add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY}, to_string(boost::stacktrace::stacktrace()));
+    add_or_overwrite(legacy_embedded_format::json::json_key_t{BACKTRACE_KEY},
+                     to_string(boost::stacktrace::stacktrace()));
   }
 
  private:

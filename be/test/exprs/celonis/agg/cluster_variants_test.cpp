@@ -1,13 +1,14 @@
-#include <algorithm>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <boost/algorithm/string/join.hpp>
+
+#include "../util.h"
 #include "column/column_builder.h"
 #include "column/fixed_length_column.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
-#include "../util.h"
 #include "gutil/strings/strcat.h"
 #include "runtime/runtime_state.h"
 #include "testutil/function_utils.h"
@@ -45,6 +46,7 @@ public:
     CelonisClusterVariantsTest() = default;
 
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
+
 protected:
     void SetUp() override {}
 
@@ -70,18 +72,17 @@ protected:
         auto return_type = get_return_type();
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
-        return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(), return_type,
-                                                std::move(arg_types)));
+        return std::unique_ptr<FunctionContext>(FunctionContext::create_context(
+                runtime_states_.back().get(), mem_pools_.back().get(), return_type, std::move(arg_types)));
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(const std::vector<std::optional<DatumArray>>& variants, const std::vector<int128_t>& hashes,
-              int64_t min_pts, int64_t epsilon) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            const std::vector<std::optional<DatumArray>>& variants, const std::vector<int128_t>& hashes,
+            int64_t min_pts, int64_t epsilon) {
         auto local_ctx = get_ctx();
 
-        const AggregateFunction* func = get_aggregate_function("celonis_cluster_variants", TYPE_ARRAY, TYPE_STRUCT,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_cluster_variants", TYPE_ARRAY, TYPE_STRUCT, false);
 
         const auto size = variants.size();
         Columns columns;
@@ -102,7 +103,7 @@ protected:
 
         std::vector<ColumnPtr> const_columns;
         std::vector<const Column*> raw_columns;
-        for (auto& column: columns) {
+        for (auto& column : columns) {
             if (column->is_constant()) {
                 const_columns.push_back(column);
             } else {
@@ -121,7 +122,7 @@ protected:
 
     std::vector<int128_t> ExtractCluster(const std::vector<std::pair<int128_t, int64_t>>& pairs, int64_t label) {
         std::vector<int128_t> hashes;
-        for (const auto& entry: pairs) {
+        for (const auto& entry : pairs) {
             if (entry.second == label) {
                 hashes.push_back(entry.first);
             }
@@ -131,10 +132,9 @@ protected:
     }
 
     // Extracts clusters which have label != -1 and label != -2.
-    std::vector<std::vector<int128_t>>
-    ExtractNormalClusters(const std::vector<std::pair<int128_t, int64_t>>& pairs) {
+    std::vector<std::vector<int128_t>> ExtractNormalClusters(const std::vector<std::pair<int128_t, int64_t>>& pairs) {
         phmap::flat_hash_map<int64_t, std::vector<int128_t>> label_to_cluster;
-        for (const auto& entry: pairs) {
+        for (const auto& entry : pairs) {
             const auto hash = entry.first;
             const auto label = entry.second;
             if (label == -1 || label == -2) {
@@ -143,7 +143,7 @@ protected:
             label_to_cluster[label].push_back(hash);
         }
         std::vector<std::vector<int128_t>> clusters;
-        for (auto& [label, cluster]: label_to_cluster) {
+        for (auto& [label, cluster] : label_to_cluster) {
             if (cluster.empty()) {
                 continue;
             }
@@ -252,8 +252,8 @@ protected:
     }
 
     void Run(const std::vector<std::pair<DatumArray, int>>& variant_cnt_pairs1,
-             const std::vector<std::pair<DatumArray, int>>& variant_cnt_pairs2,
-             int64_t min_pts, int64_t epsilon, const std::vector<std::pair<int128_t, int64_t>>& expected) {
+             const std::vector<std::pair<DatumArray, int>>& variant_cnt_pairs2, int64_t min_pts, int64_t epsilon,
+             const std::vector<std::pair<int128_t, int64_t>>& expected) {
         auto variants1 = CreateVariants(variant_cnt_pairs1);
         auto variants2 = CreateVariants(variant_cnt_pairs2);
         std::vector<std::vector<std::optional<DatumArray>>> variant_arrays;
@@ -267,7 +267,7 @@ protected:
 
     std::vector<std::optional<DatumArray>> CreateVariants(const std::vector<std::pair<DatumArray, int>>& pairs) {
         std::vector<std::optional<DatumArray>> variants;
-        for (const auto& [array, cnt]: pairs) {
+        for (const auto& [array, cnt] : pairs) {
             for (auto i = 0; i < cnt; ++i) {
                 variants.push_back(array);
             }
@@ -275,17 +275,17 @@ protected:
         return variants;
     }
 
-    std::vector<std::vector<int128_t>>
-    CreateHashArrays(const std::vector<std::vector<std::optional<DatumArray>>>& variant_arrays) {
+    std::vector<std::vector<int128_t>> CreateHashArrays(
+            const std::vector<std::vector<std::optional<DatumArray>>>& variant_arrays) {
         std::vector<std::vector<int128_t>> rv;
         phmap::flat_hash_map<std::string, size_t> seen;
         const auto n_arrays = variant_arrays.size();
         for (auto i = 0; i < n_arrays; ++i) {
             std::vector<int128_t> hashes;
-            for (const auto& variant: variant_arrays[i]) {
+            for (const auto& variant : variant_arrays[i]) {
                 std::vector<std::string> activities;
                 if (variant.has_value()) {
-                    for (const auto& activity: variant.value()) {
+                    for (const auto& activity : variant.value()) {
                         if (activity.is_null()) {
                             continue;
                         }
@@ -375,39 +375,35 @@ TEST_F(CelonisClusterVariantsTest, cancellation_work) {
 }
 
 TEST_F(CelonisClusterVariantsTest, null_variant_with_different_hash) {
-    std::vector<std::optional<DatumArray>> variants1 = {DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "C"},
-                                                        DatumArray{"A", "B", "B", "C"}, DatumArray{"X", "Y", "Z"},
-                                                        DatumArray{kNullDatum}, DatumArray{kNullDatum, kNullDatum}};
+    std::vector<std::optional<DatumArray>> variants1 = {
+            DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "B", "C"},
+            DatumArray{"X", "Y", "Z"}, DatumArray{kNullDatum},    DatumArray{kNullDatum, kNullDatum}};
     std::vector<int128_t> hashes1 = {1, 1, 3, 4, 5, 7};
-    std::vector<std::optional<DatumArray>> variants2 = {DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "C"},
-                                                        DatumArray{"A", "B", "D"}, DatumArray{"A", "B", "D"},
-                                                        std::nullopt, DatumArray{}};
+    std::vector<std::optional<DatumArray>> variants2 = {DatumArray{"A", "B", "C"},
+                                                        DatumArray{"A", "B", "C"},
+                                                        DatumArray{"A", "B", "D"},
+                                                        DatumArray{"A", "B", "D"},
+                                                        std::nullopt,
+                                                        DatumArray{}};
     std::vector<int128_t> hashes2 = {1, 1, 2, 2, 6, 6};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0},
-                                                          {2, 1},
-                                                          {3, 0},
-                                                          {4, -1},
-                                                          {5, -2},
-                                                          {6, -2},
-                                                          {7, -2}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0}, {2, 1}, {3, 0}, {4, -1}, {5, -2}, {6, -2}, {7, -2}};
 
     Run(variants1, hashes1, variants2, hashes2, 2, 2, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, null_variant_with_same_hash) {
-    std::vector<std::optional<DatumArray>> variants1 = {DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "C"},
-                                                        DatumArray{"A", "B", "B", "C"}, DatumArray{"X", "Y", "Z"},
-                                                        DatumArray{kNullDatum}, DatumArray{kNullDatum, kNullDatum}};
+    std::vector<std::optional<DatumArray>> variants1 = {
+            DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "B", "C"},
+            DatumArray{"X", "Y", "Z"}, DatumArray{kNullDatum},    DatumArray{kNullDatum, kNullDatum}};
     std::vector<int128_t> hashes1 = {1, 1, 3, 4, 5, 5};
-    std::vector<std::optional<DatumArray>> variants2 = {DatumArray{"A", "B", "C"}, DatumArray{"A", "B", "C"},
-                                                        DatumArray{"A", "B", "D"}, DatumArray{"A", "B", "D"},
-                                                        std::nullopt, DatumArray{}};
+    std::vector<std::optional<DatumArray>> variants2 = {DatumArray{"A", "B", "C"},
+                                                        DatumArray{"A", "B", "C"},
+                                                        DatumArray{"A", "B", "D"},
+                                                        DatumArray{"A", "B", "D"},
+                                                        std::nullopt,
+                                                        DatumArray{}};
     std::vector<int128_t> hashes2 = {1, 1, 2, 2, 5, 5};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0},
-                                                          {2, 1},
-                                                          {3, 0},
-                                                          {4, -1},
-                                                          {5, -2}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0}, {2, 1}, {3, 0}, {4, -1}, {5, -2}};
 
     Run(variants1, hashes1, variants2, hashes2, 2, 2, expected);
 }
@@ -421,11 +417,7 @@ TEST_F(CelonisClusterVariantsTest, two_clusters_and_one_noise_variant) {
                                                         DatumArray{"A", "B", "D"}, DatumArray{"A", "B", "D"},
                                                         DatumArray{}};
     std::vector<int128_t> hashes2 = {1, 1, 2, 2, 5};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0},
-                                                          {2, 1},
-                                                          {3, 0},
-                                                          {4, -1},
-                                                          {5, -2}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0}, {2, 1}, {3, 0}, {4, -1}, {5, -2}};
 
     Run(variants1, hashes1, variants2, hashes2, 2, 2, expected);
 }
@@ -439,11 +431,7 @@ TEST_F(CelonisClusterVariantsTest, two_clusters_and_two_noise_variants) {
                                                         DatumArray{"A", "B", "D"}, DatumArray{"A", "B", "D"},
                                                         DatumArray{}};
     std::vector<int128_t> hashes2 = {1, 1, 2, 2, 5};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0},
-                                                          {2, -1},
-                                                          {3, 0},
-                                                          {4, -1},
-                                                          {5, -2}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0}, {2, -1}, {3, 0}, {4, -1}, {5, -2}};
 
     Run(variants1, hashes1, variants2, hashes2, 3, 2, expected);
 }
@@ -457,11 +445,7 @@ TEST_F(CelonisClusterVariantsTest, two_clusters_and_one_noise_variant_lower_epsi
                                                         DatumArray{"A", "B", "D"}, DatumArray{"A", "B", "D"},
                                                         DatumArray{}};
     std::vector<int128_t> hashes2 = {1, 1, 2, 2, 5};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0},
-                                                          {2, 1},
-                                                          {3, 0},
-                                                          {4, -1},
-                                                          {5, -2}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0}, {2, 1}, {3, 0}, {4, -1}, {5, -2}};
 
     Run(variants1, hashes1, variants2, hashes2, 2, 1, expected);
 }
@@ -475,11 +459,7 @@ TEST_F(CelonisClusterVariantsTest, single_cluster_and_one_noise_variant) {
                                                         DatumArray{"A", "B", "D"}, DatumArray{"A", "B", "D"},
                                                         DatumArray{}};
     std::vector<int128_t> hashes2 = {1, 1, 2, 2, 5};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0},
-                                                          {2, 0},
-                                                          {3, 0},
-                                                          {4, -1},
-                                                          {5, -2}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{1, 0}, {2, 0}, {3, 0}, {4, -1}, {5, -2}};
 
     Run(variants1, hashes1, variants2, hashes2, 2, 4, expected);
 }
@@ -499,358 +479,221 @@ TEST_F(CelonisClusterVariantsTest, empty_input) {
 }
 
 TEST_F(CelonisClusterVariantsTest, big_data_set_zero_min_pts) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"},           12},
-                                                      {DatumArray{"A", "B", "C", "D", "E"},      8},
-                                                      {DatumArray{"A", "B", "C"},                10},
-                                                      {DatumArray{"A", "B", "B", "C"},           6},
-                                                      {DatumArray{"A", "B", "B", "C", "D"},      2},
-                                                      {DatumArray{"A", "B", "B", "A", "D"},      1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"}, 12},
+                                                      {DatumArray{"A", "B", "C", "D", "E"}, 8},
+                                                      {DatumArray{"A", "B", "C"}, 10},
+                                                      {DatumArray{"A", "B", "B", "C"}, 6},
+                                                      {DatumArray{"A", "B", "B", "C", "D"}, 2},
+                                                      {DatumArray{"A", "B", "B", "A", "D"}, 1},
                                                       {DatumArray{"A", "B", "B", "A", "C", "D"}, 2},
-                                                      {DatumArray{"B", "A", "C", "D"},           9}};
+                                                      {DatumArray{"B", "A", "C", "D"}, 9}};
     std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"B", "B", "D", "C", "A"}, 13},
-                                                      {DatumArray{"G", "F", "H", "I"},      5},
+                                                      {DatumArray{"G", "F", "H", "I"}, 5},
                                                       {DatumArray{"G", "G", "F", "H", "I"}, 2},
                                                       {DatumArray{"G", "F", "H", "H", "I"}, 3},
-                                                      {DatumArray{"G", "F", "H", "H"},      4},
-                                                      {DatumArray{"G", "F", "I", "H"},      2},
-                                                      {DatumArray{"X", "Y", "Z"},           4},
-                                                      {DatumArray{"S", "T", "R", "R"},      3},
-                                                      {DatumArray{"U", "O", "L", "M"},      5}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0,  0},
-                                                          {1,  0},
-                                                          {2,  0},
-                                                          {3,  0},
-                                                          {4,  0},
-                                                          {5,  0},
-                                                          {6,  0},
-                                                          {7,  0},
-                                                          {8,  1},
-                                                          {9,  2},
-                                                          {10, 2},
-                                                          {11, 2},
-                                                          {12, 2},
-                                                          {13, 2},
-                                                          {14, 5},
-                                                          {15, 3},
-                                                          {16, 4}};
+                                                      {DatumArray{"G", "F", "H", "H"}, 4},
+                                                      {DatumArray{"G", "F", "I", "H"}, 2},
+                                                      {DatumArray{"X", "Y", "Z"}, 4},
+                                                      {DatumArray{"S", "T", "R", "R"}, 3},
+                                                      {DatumArray{"U", "O", "L", "M"}, 5}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{0, 0},  {1, 0},  {2, 0},  {3, 0},  {4, 0},  {5, 0},
+                                                          {6, 0},  {7, 0},  {8, 1},  {9, 2},  {10, 2}, {11, 2},
+                                                          {12, 2}, {13, 2}, {14, 5}, {15, 3}, {16, 4}};
     Run(pairs1, pairs2, 0, 4, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, big_data_set_zero_epsilon) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"},           12},
-                                                      {DatumArray{"A", "B", "C", "D", "E"},      8},
-                                                      {DatumArray{"A", "B", "C"},                10},
-                                                      {DatumArray{"A", "B", "B", "C"},           6},
-                                                      {DatumArray{"A", "B", "B", "C", "D"},      2},
-                                                      {DatumArray{"A", "B", "B", "A", "D"},      1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"}, 12},
+                                                      {DatumArray{"A", "B", "C", "D", "E"}, 8},
+                                                      {DatumArray{"A", "B", "C"}, 10},
+                                                      {DatumArray{"A", "B", "B", "C"}, 6},
+                                                      {DatumArray{"A", "B", "B", "C", "D"}, 2},
+                                                      {DatumArray{"A", "B", "B", "A", "D"}, 1},
                                                       {DatumArray{"A", "B", "B", "A", "C", "D"}, 2},
-                                                      {DatumArray{"B", "A", "C", "D"},           9}};
+                                                      {DatumArray{"B", "A", "C", "D"}, 9}};
     std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"B", "B", "D", "C", "A"}, 13},
-                                                      {DatumArray{"G", "F", "H", "I"},      5},
+                                                      {DatumArray{"G", "F", "H", "I"}, 5},
                                                       {DatumArray{"G", "G", "F", "H", "I"}, 2},
                                                       {DatumArray{"G", "F", "H", "H", "I"}, 3},
-                                                      {DatumArray{"G", "F", "H", "H"},      4},
-                                                      {DatumArray{"G", "F", "I", "H"},      2},
-                                                      {DatumArray{"X", "Y", "Z"},           4},
-                                                      {DatumArray{"S", "T", "R", "R"},      3},
-                                                      {DatumArray{"U", "O", "L", "M"},      5}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0,  1},
-                                                          {1,  -1},
-                                                          {2,  2},
-                                                          {3,  -1},
-                                                          {4,  -1},
-                                                          {5,  -1},
-                                                          {6,  -1},
-                                                          {7,  -1},
-                                                          {8,  0},
-                                                          {9,  -1},
-                                                          {10, -1},
-                                                          {11, -1},
-                                                          {12, -1},
-                                                          {13, -1},
-                                                          {14, -1},
-                                                          {15, -1},
-                                                          {16, -1}};
+                                                      {DatumArray{"G", "F", "H", "H"}, 4},
+                                                      {DatumArray{"G", "F", "I", "H"}, 2},
+                                                      {DatumArray{"X", "Y", "Z"}, 4},
+                                                      {DatumArray{"S", "T", "R", "R"}, 3},
+                                                      {DatumArray{"U", "O", "L", "M"}, 5}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{0, 1},   {1, -1},  {2, 2},   {3, -1},  {4, -1},  {5, -1},
+                                                          {6, -1},  {7, -1},  {8, 0},   {9, -1},  {10, -1}, {11, -1},
+                                                          {12, -1}, {13, -1}, {14, -1}, {15, -1}, {16, -1}};
     Run(pairs1, pairs2, 10, 0, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, big_data_set_both_parameters_zero) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"},           12},
-                                                      {DatumArray{"A", "B", "C", "D", "E"},      8},
-                                                      {DatumArray{"A", "B", "C"},                10},
-                                                      {DatumArray{"A", "B", "B", "C"},           6},
-                                                      {DatumArray{"A", "B", "B", "C", "D"},      2},
-                                                      {DatumArray{"A", "B", "B", "A", "D"},      1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"}, 12},
+                                                      {DatumArray{"A", "B", "C", "D", "E"}, 8},
+                                                      {DatumArray{"A", "B", "C"}, 10},
+                                                      {DatumArray{"A", "B", "B", "C"}, 6},
+                                                      {DatumArray{"A", "B", "B", "C", "D"}, 2},
+                                                      {DatumArray{"A", "B", "B", "A", "D"}, 1},
                                                       {DatumArray{"A", "B", "B", "A", "C", "D"}, 2},
-                                                      {DatumArray{"B", "A", "C", "D"},           9}};
+                                                      {DatumArray{"B", "A", "C", "D"}, 9}};
     std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"B", "B", "D", "C", "A"}, 13},
-                                                      {DatumArray{"G", "F", "H", "I"},      5},
+                                                      {DatumArray{"G", "F", "H", "I"}, 5},
                                                       {DatumArray{"G", "G", "F", "H", "I"}, 2},
                                                       {DatumArray{"G", "F", "H", "H", "I"}, 3},
-                                                      {DatumArray{"G", "F", "H", "H"},      4},
-                                                      {DatumArray{"G", "F", "I", "H"},      2},
-                                                      {DatumArray{"X", "Y", "Z"},           4},
-                                                      {DatumArray{"S", "T", "R", "R"},      3},
-                                                      {DatumArray{"U", "O", "L", "M"},      5}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0,  7},
-                                                          {1,  1},
-                                                          {2,  15},
-                                                          {3,  8},
-                                                          {4,  2},
-                                                          {5,  3},
-                                                          {6,  0},
-                                                          {7,  9},
-                                                          {8,  4},
-                                                          {9,  10},
-                                                          {10, 5},
-                                                          {11, 6},
-                                                          {12, 11},
-                                                          {13, 12},
-                                                          {14, 16},
-                                                          {15, 13},
-                                                          {16, 14}};
+                                                      {DatumArray{"G", "F", "H", "H"}, 4},
+                                                      {DatumArray{"G", "F", "I", "H"}, 2},
+                                                      {DatumArray{"X", "Y", "Z"}, 4},
+                                                      {DatumArray{"S", "T", "R", "R"}, 3},
+                                                      {DatumArray{"U", "O", "L", "M"}, 5}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{0, 7},   {1, 1},   {2, 15},  {3, 8},   {4, 2},  {5, 3},
+                                                          {6, 0},   {7, 9},   {8, 4},   {9, 10},  {10, 5}, {11, 6},
+                                                          {12, 11}, {13, 12}, {14, 16}, {15, 13}, {16, 14}};
     Run(pairs1, pairs2, 0, 0, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, big_data_set_three_clusters_one_noise) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"},           12},
-                                                      {DatumArray{"A", "B", "C", "D", "E"},      8},
-                                                      {DatumArray{"A", "B", "C"},                10},
-                                                      {DatumArray{"A", "B", "B", "C"},           6},
-                                                      {DatumArray{"A", "B", "B", "C", "D"},      2},
-                                                      {DatumArray{"A", "B", "B", "A", "D"},      1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"}, 12},
+                                                      {DatumArray{"A", "B", "C", "D", "E"}, 8},
+                                                      {DatumArray{"A", "B", "C"}, 10},
+                                                      {DatumArray{"A", "B", "B", "C"}, 6},
+                                                      {DatumArray{"A", "B", "B", "C", "D"}, 2},
+                                                      {DatumArray{"A", "B", "B", "A", "D"}, 1},
                                                       {DatumArray{"A", "B", "B", "A", "C", "D"}, 2},
-                                                      {DatumArray{"B", "A", "C", "D"},           9}};
+                                                      {DatumArray{"B", "A", "C", "D"}, 9}};
     std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"B", "B", "D", "C", "A"}, 13},
-                                                      {DatumArray{"G", "F", "H", "I"},      5},
+                                                      {DatumArray{"G", "F", "H", "I"}, 5},
                                                       {DatumArray{"G", "G", "F", "H", "I"}, 2},
                                                       {DatumArray{"G", "F", "H", "H", "I"}, 3},
-                                                      {DatumArray{"G", "F", "H", "H"},      4},
-                                                      {DatumArray{"G", "F", "I", "H"},      2},
-                                                      {DatumArray{"X", "Y", "Z"},           4},
-                                                      {DatumArray{"S", "T", "R", "R"},      3},
-                                                      {DatumArray{"U", "O", "L", "M"},      5}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0,  0},
-                                                          {1,  0},
-                                                          {2,  0},
-                                                          {3,  0},
-                                                          {4,  0},
-                                                          {5,  0},
-                                                          {6,  0},
-                                                          {7,  0},
-                                                          {8,  1},
-                                                          {9,  2},
-                                                          {10, 2},
-                                                          {11, 2},
-                                                          {12, 2},
-                                                          {13, 2},
-                                                          {14, -1},
-                                                          {15, -1},
-                                                          {16, -1}};
+                                                      {DatumArray{"G", "F", "H", "H"}, 4},
+                                                      {DatumArray{"G", "F", "I", "H"}, 2},
+                                                      {DatumArray{"X", "Y", "Z"}, 4},
+                                                      {DatumArray{"S", "T", "R", "R"}, 3},
+                                                      {DatumArray{"U", "O", "L", "M"}, 5}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{0, 0},  {1, 0},  {2, 0},   {3, 0},   {4, 0},  {5, 0},
+                                                          {6, 0},  {7, 0},  {8, 1},   {9, 2},   {10, 2}, {11, 2},
+                                                          {12, 2}, {13, 2}, {14, -1}, {15, -1}, {16, -1}};
     Run(pairs1, pairs2, 10, 4, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, big_data_set_all_noise) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"},           12},
-                                                      {DatumArray{"A", "B", "C", "D", "E"},      8},
-                                                      {DatumArray{"A", "B", "C"},                10},
-                                                      {DatumArray{"A", "B", "B", "C"},           6},
-                                                      {DatumArray{"A", "B", "B", "C", "D"},      2},
-                                                      {DatumArray{"A", "B", "B", "A", "D"},      1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"}, 12},
+                                                      {DatumArray{"A", "B", "C", "D", "E"}, 8},
+                                                      {DatumArray{"A", "B", "C"}, 10},
+                                                      {DatumArray{"A", "B", "B", "C"}, 6},
+                                                      {DatumArray{"A", "B", "B", "C", "D"}, 2},
+                                                      {DatumArray{"A", "B", "B", "A", "D"}, 1},
                                                       {DatumArray{"A", "B", "B", "A", "C", "D"}, 2},
-                                                      {DatumArray{"B", "A", "C", "D"},           9}};
+                                                      {DatumArray{"B", "A", "C", "D"}, 9}};
     std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"B", "B", "D", "C", "A"}, 13},
-                                                      {DatumArray{"G", "F", "H", "I"},      5},
+                                                      {DatumArray{"G", "F", "H", "I"}, 5},
                                                       {DatumArray{"G", "G", "F", "H", "I"}, 2},
                                                       {DatumArray{"G", "F", "H", "H", "I"}, 3},
-                                                      {DatumArray{"G", "F", "H", "H"},      4},
-                                                      {DatumArray{"G", "F", "I", "H"},      2},
-                                                      {DatumArray{"X", "Y", "Z"},           4},
-                                                      {DatumArray{"S", "T", "R", "R"},      3},
-                                                      {DatumArray{"U", "O", "L", "M"},      5}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0,  -1},
-                                                          {1,  -1},
-                                                          {2,  -1},
-                                                          {3,  -1},
-                                                          {4,  -1},
-                                                          {5,  -1},
-                                                          {6,  -1},
-                                                          {7,  -1},
-                                                          {8,  -1},
-                                                          {9,  -1},
-                                                          {10, -1},
-                                                          {11, -1},
-                                                          {12, -1},
-                                                          {13, -1},
-                                                          {14, -1},
-                                                          {15, -1},
-                                                          {16, -1}};
+                                                      {DatumArray{"G", "F", "H", "H"}, 4},
+                                                      {DatumArray{"G", "F", "I", "H"}, 2},
+                                                      {DatumArray{"X", "Y", "Z"}, 4},
+                                                      {DatumArray{"S", "T", "R", "R"}, 3},
+                                                      {DatumArray{"U", "O", "L", "M"}, 5}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{0, -1},  {1, -1},  {2, -1},  {3, -1},  {4, -1},  {5, -1},
+                                                          {6, -1},  {7, -1},  {8, -1},  {9, -1},  {10, -1}, {11, -1},
+                                                          {12, -1}, {13, -1}, {14, -1}, {15, -1}, {16, -1}};
     Run(pairs1, pairs2, 250, 2, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, exact_min_pts) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"},           1},
-                                                      {DatumArray{"A", "B", "C"},                1},
-                                                      {DatumArray{"A", "B", "C", "D"},           1},
-                                                      {DatumArray{"B", "A", "B", "C"},           1},
-                                                      {DatumArray{"B", "C"},                     1},
-                                                      {DatumArray{"A", "B"},                     1},
-                                                      {DatumArray{"D", "E", "F"},                1},
-                                                      {DatumArray{"E", "F"},                     1},
-                                                      {DatumArray{"D", "D", "E", "F"},           1},
-                                                      {DatumArray{"F", "D", "E", "F"},           1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"}, 1},
+                                                      {DatumArray{"A", "B", "C"}, 1},
+                                                      {DatumArray{"A", "B", "C", "D"}, 1},
+                                                      {DatumArray{"B", "A", "B", "C"}, 1},
+                                                      {DatumArray{"B", "C"}, 1},
+                                                      {DatumArray{"A", "B"}, 1},
+                                                      {DatumArray{"D", "E", "F"}, 1},
+                                                      {DatumArray{"E", "F"}, 1},
+                                                      {DatumArray{"D", "D", "E", "F"}, 1},
+                                                      {DatumArray{"F", "D", "E", "F"}, 1},
                                                       {DatumArray{"D", "E", "E", "E", "E", "F"}, 1},
-                                                      {DatumArray{"D", "E"},                     1},
-                                                      {DatumArray{"X", "Y", "Z"},                1},
-                                                      {DatumArray{"X", "Y", "Y", "Z"},           1},
-                                                      {DatumArray{"Y", "Z"},                     1}};
-    std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"X", "Z", "X", "Y", "Z"},           1},
-                                                      {DatumArray{"X", "Y", "Z", "X"},                1},
-                                                      {DatumArray{"X", "Y"},                          1},
-                                                      {DatumArray{"G", "H", "I"},                     1},
-                                                      {DatumArray{"G", "H", "H", "I", "I"},           1},
-                                                      {DatumArray{"G", "G", "H"},                     1},
-                                                      {DatumArray{"G", "H"},                          1},
-                                                      {DatumArray{"H", "I"},                          1},
-                                                      {DatumArray{"C", "C", "A", "B"},                1},
-                                                      {DatumArray{"D", "F", "D", "F", "D", "D", "D", "E", "F", "D", "F",
-                                                                  "E"},                               1},
-                                                      {DatumArray{"S", "P", "R", "E", "A", "D"},      1},
-                                                      {DatumArray{"L", "O", "W", "Z"},                1},
-                                                      {DatumArray{"Z", "A", "B", "Z", "L", "O"},      1},
-                                                      {DatumArray{"C", "E", "L", "O", "N", "I", "S"}, 1},
-                                                      {DatumArray{"E", "A", "S", "T", "E", "R", "E", "G", "G",
-                                                                  "S"},                               1}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0,  0},
-                                                          {1,  0},
-                                                          {2,  0},
-                                                          {3,  0},
-                                                          {4,  0},
-                                                          {5,  1},
-                                                          {6,  1},
-                                                          {7,  1},
-                                                          {8,  1},
-                                                          {9,  1},
-                                                          {10, 1},
-                                                          {11, 2},
-                                                          {12, 2},
-                                                          {13, 2},
-                                                          {14, 2},
-                                                          {15, 2},
-                                                          {16, 2},
-                                                          {17, -1},
-                                                          {18, -1},
-                                                          {19, -1},
-                                                          {20, -1},
-                                                          {21, -1},
-                                                          {22, -1},
-                                                          {23, -1},
-                                                          {24, -1},
-                                                          {25, -1},
-                                                          {26, -1},
-                                                          {27, -1},
-                                                          {28, -1}};
+                                                      {DatumArray{"D", "E"}, 1},
+                                                      {DatumArray{"X", "Y", "Z"}, 1},
+                                                      {DatumArray{"X", "Y", "Y", "Z"}, 1},
+                                                      {DatumArray{"Y", "Z"}, 1}};
+    std::vector<std::pair<DatumArray, int>> pairs2 = {
+            {DatumArray{"X", "Z", "X", "Y", "Z"}, 1},
+            {DatumArray{"X", "Y", "Z", "X"}, 1},
+            {DatumArray{"X", "Y"}, 1},
+            {DatumArray{"G", "H", "I"}, 1},
+            {DatumArray{"G", "H", "H", "I", "I"}, 1},
+            {DatumArray{"G", "G", "H"}, 1},
+            {DatumArray{"G", "H"}, 1},
+            {DatumArray{"H", "I"}, 1},
+            {DatumArray{"C", "C", "A", "B"}, 1},
+            {DatumArray{"D", "F", "D", "F", "D", "D", "D", "E", "F", "D", "F", "E"}, 1},
+            {DatumArray{"S", "P", "R", "E", "A", "D"}, 1},
+            {DatumArray{"L", "O", "W", "Z"}, 1},
+            {DatumArray{"Z", "A", "B", "Z", "L", "O"}, 1},
+            {DatumArray{"C", "E", "L", "O", "N", "I", "S"}, 1},
+            {DatumArray{"E", "A", "S", "T", "E", "R", "E", "G", "G", "S"}, 1}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {
+            {0, 0},   {1, 0},   {2, 0},   {3, 0},   {4, 0},   {5, 1},   {6, 1},   {7, 1},   {8, 1},   {9, 1},
+            {10, 1},  {11, 2},  {12, 2},  {13, 2},  {14, 2},  {15, 2},  {16, 2},  {17, -1}, {18, -1}, {19, -1},
+            {20, -1}, {21, -1}, {22, -1}, {23, -1}, {24, -1}, {25, -1}, {26, -1}, {27, -1}, {28, -1}};
     Run(pairs1, pairs2, 6, 3, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, several_failed_clusters) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"},      1},
-                                                      {DatumArray{"A", "B", "C"},           1},
-                                                      {DatumArray{"A", "B", "C", "D"},      1},
-                                                      {DatumArray{"B", "A", "B", "C"},      1},
-                                                      {DatumArray{"B", "C"},                1},
-                                                      {DatumArray{"A", "B"},                1},
-                                                      {DatumArray{"D", "E", "F"},           1},
-                                                      {DatumArray{"E", "F"},                1},
-                                                      {DatumArray{"X", "Y", "Z"},           1},
-                                                      {DatumArray{"G", "H", "I"},           1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "C", "D"}, 1},
+                                                      {DatumArray{"A", "B", "C"}, 1},
+                                                      {DatumArray{"A", "B", "C", "D"}, 1},
+                                                      {DatumArray{"B", "A", "B", "C"}, 1},
+                                                      {DatumArray{"B", "C"}, 1},
+                                                      {DatumArray{"A", "B"}, 1},
+                                                      {DatumArray{"D", "E", "F"}, 1},
+                                                      {DatumArray{"E", "F"}, 1},
+                                                      {DatumArray{"X", "Y", "Z"}, 1},
+                                                      {DatumArray{"G", "H", "I"}, 1},
                                                       {DatumArray{"G", "H", "H", "I", "I"}, 1}};
-    std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"C", "C", "A", "B"},                1},
-                                                      {DatumArray{"D", "F", "D", "F", "D", "D", "D", "E", "F", "D", "F",
-                                                                  "E"},                               1},
-                                                      {DatumArray{"S", "P", "R", "E", "A", "D"},      1},
-                                                      {DatumArray{"L", "O", "W", "Z"},                1},
-                                                      {DatumArray{"Z", "A", "B", "Z", "L", "O"},      1},
-                                                      {DatumArray{"C", "E", "L", "O", "N", "I", "S"}, 1},
-                                                      {DatumArray{"E", "A", "S", "T", "E", "R", "E", "G", "G",
-                                                                  "S"},                               1}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0,  0},
-                                                          {1,  0},
-                                                          {2,  0},
-                                                          {3,  0},
-                                                          {4,  0},
-                                                          {5,  -1},
-                                                          {6,  -1},
-                                                          {7,  -1},
-                                                          {8,  -1},
-                                                          {9,  -1},
-                                                          {10, -1},
-                                                          {11, -1},
-                                                          {12, -1},
-                                                          {13, -1},
-                                                          {14, -1},
-                                                          {15, -1},
-                                                          {16, -1}};
+    std::vector<std::pair<DatumArray, int>> pairs2 = {
+            {DatumArray{"C", "C", "A", "B"}, 1},
+            {DatumArray{"D", "F", "D", "F", "D", "D", "D", "E", "F", "D", "F", "E"}, 1},
+            {DatumArray{"S", "P", "R", "E", "A", "D"}, 1},
+            {DatumArray{"L", "O", "W", "Z"}, 1},
+            {DatumArray{"Z", "A", "B", "Z", "L", "O"}, 1},
+            {DatumArray{"C", "E", "L", "O", "N", "I", "S"}, 1},
+            {DatumArray{"E", "A", "S", "T", "E", "R", "E", "G", "G", "S"}, 1}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{0, 0},   {1, 0},   {2, 0},   {3, 0},   {4, 0},   {5, -1},
+                                                          {6, -1},  {7, -1},  {8, -1},  {9, -1},  {10, -1}, {11, -1},
+                                                          {12, -1}, {13, -1}, {14, -1}, {15, -1}, {16, -1}};
     Run(pairs1, pairs2, 3, 3, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, smaller_set) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "C"}, 1},
-                                                      {DatumArray{"B"},      1},
-                                                      {DatumArray{"D", "E"}, 1},
-                                                      {DatumArray{"F"},      1},
-                                                      {DatumArray{"G", "H"}, 1},
-                                                      {DatumArray{"I"},      1},
-                                                      {DatumArray{"I"},      1},
-                                                      {DatumArray{"I"},      1}};
-    std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"J", "K"},                1},
-                                                      {DatumArray{"J", "K"},                1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {
+            {DatumArray{"A", "C"}, 1}, {DatumArray{"B"}, 1}, {DatumArray{"D", "E"}, 1}, {DatumArray{"F"}, 1},
+            {DatumArray{"G", "H"}, 1}, {DatumArray{"I"}, 1}, {DatumArray{"I"}, 1},      {DatumArray{"I"}, 1}};
+    std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"J", "K"}, 1},
+                                                      {DatumArray{"J", "K"}, 1},
                                                       {DatumArray{"X", "Y", "Z", "U", "P"}, 1},
-                                                      {DatumArray{"U", "V", "W", "X"},      1}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0, 0},
-                                                          {1, 0},
-                                                          {2, 0},
-                                                          {3, 0},
-                                                          {4, 0},
-                                                          {5, 0},
-                                                          {6, 0},
-                                                          {7, -1},
-                                                          {8, -1}};
+                                                      {DatumArray{"U", "V", "W", "X"}, 1}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{0, 0}, {1, 0}, {2, 0},  {3, 0}, {4, 0},
+                                                          {5, 0}, {6, 0}, {7, -1}, {8, -1}};
     Run(pairs1, pairs2, 10, 5, expected);
 }
 
 TEST_F(CelonisClusterVariantsTest, significantly_smaller_working_set_than_original_sets) {
-    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "B", "B", "C"},                     1},
-                                                      {DatumArray{"A", "B", "B", "C"},                          1},
-                                                      {DatumArray{"A", "B", "B", "B", "B", "C"},                1},
-                                                      {DatumArray{"A", "B", "B", "B", "B", "B", "B", "C"},      1},
+    std::vector<std::pair<DatumArray, int>> pairs1 = {{DatumArray{"A", "B", "B", "B", "C"}, 1},
+                                                      {DatumArray{"A", "B", "B", "C"}, 1},
+                                                      {DatumArray{"A", "B", "B", "B", "B", "C"}, 1},
+                                                      {DatumArray{"A", "B", "B", "B", "B", "B", "B", "C"}, 1},
                                                       {DatumArray{"A", "B", "B", "B", "B", "B", "B", "B", "C"}, 1},
-                                                      {DatumArray{"A", "B", "C"},                               1},
-                                                      {DatumArray{"A", "A", "B", "C"},                          1},
-                                                      {DatumArray{"A", "B", "C", "C"},                          1}};
-    std::vector<std::pair<DatumArray, int>> pairs2 = {{DatumArray{"A", "C"},                                         1},
-                                                      {DatumArray{"D", "E", "E", "F", "E", "E", "G"},                1},
-                                                      {DatumArray{"D", "E", "E", "E", "F", "E", "E", "G"},           1},
-                                                      {DatumArray{"D", "E", "E", "E", "F", "E", "E", "E", "E", "G"}, 1},
-                                                      {DatumArray{"D", "E", "E", "E", "E", "F", "E", "E", "E", "F", "E",
-                                                                  "E", "E", "G"},                                    1},
-                                                      {DatumArray{"D", "E", "E", "F", "E", "E", "F", "E", "E", "F", "E",
-                                                                  "E",
-                                                                  "G"},                                              1}};
-    std::vector<std::pair<int128_t, int64_t>> expected = {{0,  1},
-                                                          {1,  1},
-                                                          {2,  1},
-                                                          {3,  1},
-                                                          {4,  1},
-                                                          {5,  1},
-                                                          {6,  1},
-                                                          {7,  1},
-                                                          {8,  1},
-                                                          {9,  0},
-                                                          {10, 0},
-                                                          {11, 0},
-                                                          {12, 0},
-                                                          {13, 0}};
+                                                      {DatumArray{"A", "B", "C"}, 1},
+                                                      {DatumArray{"A", "A", "B", "C"}, 1},
+                                                      {DatumArray{"A", "B", "C", "C"}, 1}};
+    std::vector<std::pair<DatumArray, int>> pairs2 = {
+            {DatumArray{"A", "C"}, 1},
+            {DatumArray{"D", "E", "E", "F", "E", "E", "G"}, 1},
+            {DatumArray{"D", "E", "E", "E", "F", "E", "E", "G"}, 1},
+            {DatumArray{"D", "E", "E", "E", "F", "E", "E", "E", "E", "G"}, 1},
+            {DatumArray{"D", "E", "E", "E", "E", "F", "E", "E", "E", "F", "E", "E", "E", "G"}, 1},
+            {DatumArray{"D", "E", "E", "F", "E", "E", "F", "E", "E", "F", "E", "E", "G"}, 1}};
+    std::vector<std::pair<int128_t, int64_t>> expected = {{0, 1}, {1, 1}, {2, 1}, {3, 1},  {4, 1},  {5, 1},  {6, 1},
+                                                          {7, 1}, {8, 1}, {9, 0}, {10, 0}, {11, 0}, {12, 0}, {13, 0}};
     Run(pairs1, pairs2, 3, 3, expected);
 }
 

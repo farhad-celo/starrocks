@@ -38,14 +38,18 @@ class result_partition {
  public:
   result_partition() = default;
 
-  explicit result_partition(legacy_embedded_ctl::array_view<const T> dictionary_view) : dictionary_view_{dictionary_view} {};
+  explicit result_partition(legacy_embedded_ctl::array_view<const T> dictionary_view)
+      : dictionary_view_{dictionary_view} {};
 
-  result_partition(legacy_embedded_ctl::array_view<const T> dictionary_view, std::vector<legacy_embedded_ctl::array_view<const row_id>>&& mapping_views)
+  result_partition(legacy_embedded_ctl::array_view<const T> dictionary_view,
+                   std::vector<legacy_embedded_ctl::array_view<const row_id>>&& mapping_views)
       : dictionary_view_{dictionary_view}, mapping_views_{std::move(mapping_views)} {};
 
   [[nodiscard]] const legacy_embedded_ctl::array_view<const T>& dictionary_view() const { return dictionary_view_; }
 
-  [[nodiscard]] const std::vector<legacy_embedded_ctl::array_view<const row_id>>& mapping_views() const { return mapping_views_; }
+  [[nodiscard]] const std::vector<legacy_embedded_ctl::array_view<const row_id>>& mapping_views() const {
+    return mapping_views_;
+  }
 
   [[nodiscard]] bool has_mappings() const { return !mapping_views_.empty(); }
 
@@ -140,9 +144,9 @@ template <typename T>
  * of the fact that only two dictionaries are merged.
  */
 template <typename T>
-[[nodiscard]] merged_partition_data<T> merge_2_dictionary_partitions(const legacy_embedded_ctl::array_view<const T>& lhs,
-                                                                     const legacy_embedded_ctl::array_view<const T>& rhs,
-                                                                     const common::execution_context& context);
+[[nodiscard]] merged_partition_data<T> merge_2_dictionary_partitions(
+    const legacy_embedded_ctl::array_view<const T>& lhs, const legacy_embedded_ctl::array_view<const T>& rhs,
+    const common::execution_context& context);
 
 /**
  * Sequential merge of n dictionaries. This merge uses a heap.
@@ -181,8 +185,8 @@ template <typename T>
  */
 template <typename T>
 [[nodiscard]] dictionary_data<T> copy_dictionary_partitions(
-    const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions, const sizes_and_offsets<T>& sizes_and_offsets,
-    common::execution_context& context);
+    const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions,
+    const sizes_and_offsets<T>& sizes_and_offsets, common::execution_context& context);
 
 /**
  * Copies the mapping partitions into the output mappings using the sizes and offsets. For partitions that were not
@@ -192,8 +196,10 @@ template <typename T>
 [[nodiscard]] legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>> copy_mapping_partitions(
     const std::vector<typed_dictionary<T>*>& typed_dictionaries,
     const std::vector<disjunct_partition<T>>& disjunct_partitions,
-    const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions, const legacy_embedded_ctl::static_array<size_t>& partition_offsets,
-    const legacy_embedded_ctl::static_array<flattened_partition>& flattened_partitions, common::execution_context& context);
+    const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions,
+    const legacy_embedded_ctl::static_array<size_t>& partition_offsets,
+    const legacy_embedded_ctl::static_array<flattened_partition>& flattened_partitions,
+    common::execution_context& context);
 
 template <typename T>
 [[nodiscard]] std::pair<raw_dictionary_t, legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>>>

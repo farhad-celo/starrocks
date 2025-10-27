@@ -60,9 +60,11 @@
 namespace celonis::accelerator::memory::management {
 
 template <typename T>
-raw_data_handler_t<T> raw_data_handler<T>::create_data_handler(legacy_embedded_ctl::static_array<T> data, const std::string& swap_file,
-                                                               const swap_info& sinfo, const std::string& description) {
-  return create_data_handler(legacy_embedded_ctl::shared_static_array<T>{std::move(data)}, swap_file, sinfo, description);
+raw_data_handler_t<T> raw_data_handler<T>::create_data_handler(legacy_embedded_ctl::static_array<T> data,
+                                                               const std::string& swap_file, const swap_info& sinfo,
+                                                               const std::string& description) {
+  return create_data_handler(legacy_embedded_ctl::shared_static_array<T>{std::move(data)}, swap_file, sinfo,
+                             description);
 }
 
 template <typename T>
@@ -83,7 +85,8 @@ raw_data_handler_t<T> raw_data_handler<T>::create_data_handler(const legacy_embe
 }
 
 template <typename T>
-raw_data_handler_t<T> raw_data_handler<T>::create_temp_data_handler(const legacy_embedded_ctl::shared_static_array<T>& data) {
+raw_data_handler_t<T> raw_data_handler<T>::create_temp_data_handler(
+    const legacy_embedded_ctl::shared_static_array<T>& data) {
   raw_data_handler_t<T> raw_data(
       new raw_data_handler(load_status::LOADED, data, data.size(), "", no_swap(), false, 0, ""));
   return raw_data;
@@ -282,7 +285,8 @@ io::storage_manager::read_return_data<T> read_from_swap(swap_info& swap_info, co
 #endif
 
 template <typename T>
-legacy_embedded_ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(const common::execution_context& context) {
+legacy_embedded_ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(
+    const common::execution_context& context) {
   auto wait_context = context.create_sub_context("swap_in_wait_for_lock", {});
   common::timer timer_with_lock;
 
@@ -350,7 +354,8 @@ legacy_embedded_ctl::shared_static_array<T> raw_data_handler<T>::swap_in_data(co
       throw;
     }
   } else {
-    throw common::internal_exception{"Unknown load status: [{}] at {}.", legacy_embedded_ctl::enum_to_underlying_type(status.load()),
+    throw common::internal_exception{"Unknown load status: [{}] at {}.",
+                                     legacy_embedded_ctl::enum_to_underlying_type(status.load()),
                                      legacy_embedded_ctl::source_location{}};
   }
 
@@ -394,7 +399,8 @@ void raw_data_handler<T>::write_to_disk(const common::execution_context& context
     size_on_disk = sm.encrypt_and_write_mt(swap_file, compressed_data(), sizeof(T) * size, swap_information,
                                            io::get_type_id<T>(), context);
   } else {
-    throw common::internal_exception{"Unknown load status: [{}] at {}.", legacy_embedded_ctl::enum_to_underlying_type(status.load()),
+    throw common::internal_exception{"Unknown load status: [{}] at {}.",
+                                     legacy_embedded_ctl::enum_to_underlying_type(status.load()),
                                      legacy_embedded_ctl::source_location{}};
   }
   persisted = true;
@@ -423,8 +429,9 @@ template <typename T>
 #endif
 
 template <typename T>
-const_data_accessor<T> raw_data_handler<T>::get_const_data(const common::execution_context& context) requires(
-    requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; }) {
+const_data_accessor<T> raw_data_handler<T>::get_const_data(const common::execution_context& context)
+  requires(requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; })
+{
   last_usage = mem_clock_t::now();
   usage_count++;
 

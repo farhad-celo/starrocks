@@ -1,10 +1,11 @@
+#include "exprs/celonis/string_functions.h"
+
 #include <gtest/gtest.h>
 
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "column/vectorized_fwd.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/string_functions.h"
 #include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
 #include "util.h"
@@ -32,7 +33,6 @@ std::string int128_to_string(int128_t num) {
 }
 
 class CelonisStringFunctionsTest : public testing::Test {
-
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
 
 protected:
@@ -42,8 +42,8 @@ protected:
         context->set_constant_columns(columns);
 
         ASSERT_TRUE(
-                CelonisStringFunctions::translate_prepare(context,
-                                                          FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+                CelonisStringFunctions::translate_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                        .ok());
 
         const auto result = CelonisStringFunctions::translate(context, columns).value();
         const auto v = ColumnHelper::as_column<BinaryColumn>(result);
@@ -52,17 +52,15 @@ protected:
             EXPECT_EQ(res[i], v->get_data()[i].to_string());
         }
 
-        ASSERT_TRUE(
-                CelonisStringFunctions::translate_close(context,
-                                                        FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
-                        .ok());
+        ASSERT_TRUE(CelonisStringFunctions::translate_close(
+                            context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
     }
 };
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v4_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -84,9 +82,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v4_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v4_concat_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -113,9 +110,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v4_concat_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -137,9 +133,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_concat_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -166,8 +161,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_concat_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_ARRAY)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -253,21 +247,22 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_array_input) {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
         column->append_datum(DatumArray{std::string(XXHASH3_128_NULL_STRING).c_str()});
         const auto result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column});
-        EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+        EXPECT_EQ(
+                result.status().message(),
+                "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
         column->append_datum(DatumArray{std::string(XXHASH3_128_NULL_ARRAY_STRING).c_str()});
         const auto result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {column});
         EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
+                  "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string "
+                  "'_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
     }
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_with_leading_const_columns) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -312,8 +307,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_with_leading_const_colum
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -387,14 +381,14 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3) {
         strings->append_datum(std::string(XXHASH3_128_NULL_STRING).c_str());
         strings->append_datum(kNullDatum);
         const auto result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {strings});
-        EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+        EXPECT_EQ(
+                result.status().message(),
+                "CELONIS_XX_HASH3_128_V3: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
     }
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -413,7 +407,11 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96) {
         ColumnPtr result = CelonisStringFunctions::xx_hash3_96(ctx.get(), columns).value();
         ASSERT_EQ(2, result->size());
         EXPECT_EQ("\xCC\x82\xEC>&T\x2\x1D+L\xDD\xC2", result->get(0).get_slice().to_string());
-        EXPECT_EQ("\xBF\xCB" "Cp\xB4" "0\x3\xE2\r\xF3\x9A\xA6", result->get(1).get_slice().to_string());
+        EXPECT_EQ(
+                "\xBF\xCB"
+                "Cp\xB4"
+                "0\x3\xE2\r\xF3\x9A\xA6",
+                result->get(1).get_slice().to_string());
     }
     {
         Columns columns;
@@ -429,7 +427,10 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96) {
 
         ASSERT_EQ(2, result->size());
         EXPECT_EQ("\xACifm\xA8,Yl\xB5\xA0I\v", result->get(0).get_slice().to_string());
-        EXPECT_EQ("\x16" "4\xC3zYek\x9B\x1Eh\x91\x9E", result->get(1).get_slice().to_string());
+        EXPECT_EQ(
+                "\x16"
+                "4\xC3zYek\x9B\x1Eh\x91\x9E",
+                result->get(1).get_slice().to_string());
     }
     {
         Columns columns;
@@ -474,9 +475,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -498,9 +498,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_concat_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -527,9 +526,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_96_concat_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -552,8 +550,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_ARRAY)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -640,20 +637,21 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_array_input) {
         column->append_datum(DatumArray{std::string(XXHASH3_128_NULL_STRING).c_str()});
         const auto result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {column});
         EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+                  "CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string "
+                  "'_$CeL0nIs_ReSeRvEd_NuLl_'.");
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
         column->append_datum(DatumArray{std::string(XXHASH3_128_NULL_ARRAY_STRING).c_str()});
         const auto result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {column});
         EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL array string '_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
+                  "CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL array string "
+                  "'_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
     }
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -728,13 +726,13 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128) {
         strings->append_datum(kNullDatum);
         const auto result = CelonisStringFunctions::xx_hash3_128(ctx.get(), {strings});
         EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+                  "CELONIS_XX_HASH3_128: string value conflicts with the reserved NULL string "
+                  "'_$CeL0nIs_ReSeRvEd_NuLl_'.");
     }
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_const_array_input) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_ARRAY)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -756,8 +754,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_const_array_input) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_array_input) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_ARRAY)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -844,21 +841,22 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_array_input) {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
         column->append_datum(DatumArray{std::string(XXHASH3_128_NULL_STRING).c_str()});
         const auto result = CelonisStringFunctions::xx_hash3_128_v2(ctx.get(), {column});
-        EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128_V2: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+        EXPECT_EQ(
+                result.status().message(),
+                "CELONIS_XX_HASH3_128_V2: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
     }
     {
         auto column = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
         column->append_datum(DatumArray{std::string(XXHASH3_128_NULL_ARRAY_STRING).c_str()});
         const auto result = CelonisStringFunctions::xx_hash3_128_v2(ctx.get(), {column});
         EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128_V2: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
+                  "CELONIS_XX_HASH3_128_V2: string value conflicts with the reserved string "
+                  "'_$CeL0nIs_ReSeRvEd_NuLl_aRrAy_'.");
     }
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -894,8 +892,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -974,15 +971,15 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v2) {
         strings->append_datum(std::string(XXHASH3_128_NULL_STRING).c_str());
         strings->append_datum(kNullDatum);
         const auto result = CelonisStringFunctions::xx_hash3_128_v2(ctx.get(), {strings});
-        EXPECT_EQ(result.status().message(),
-                  "CELONIS_XX_HASH3_128_V2: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
+        EXPECT_EQ(
+                result.status().message(),
+                "CELONIS_XX_HASH3_128_V2: string value conflicts with the reserved string '_$CeL0nIs_ReSeRvEd_NuLl_'.");
     }
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -1004,9 +1001,8 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_collision) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_concat_collision) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     Columns columns;
@@ -1033,8 +1029,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_concat_collision) 
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_const_array_input) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_ARRAY)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -1058,8 +1053,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_const_array_input)
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_ARRAY)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -1128,8 +1122,7 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_array_input) {
 }
 
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TypeDescriptor::from_logical_type(TYPE_LARGEINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     {
@@ -1223,9 +1216,8 @@ TEST_F(CelonisStringFunctionsTest, translate_null_input) {
     auto context = ctx.get();
     context->set_constant_columns(columns);
 
-    ASSERT_TRUE(
-            CelonisStringFunctions::translate_prepare(context,
-                                                      FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+    ASSERT_TRUE(CelonisStringFunctions::translate_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                        .ok());
 
     const auto result = CelonisStringFunctions::translate(context, columns).value();
     const auto v = ColumnHelper::as_column<NullableColumn>(result);
@@ -1236,10 +1228,9 @@ TEST_F(CelonisStringFunctionsTest, translate_null_input) {
     ASSERT_FALSE(v->is_null(1));
     EXPECT_EQ("aa7", v->get(1).get_slice());
 
-    ASSERT_TRUE(
-            CelonisStringFunctions::translate_close(context,
-                                                    FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
-                    .ok());
+    ASSERT_TRUE(CelonisStringFunctions::translate_close(
+                        context, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                        .ok());
 }
 
 TEST_F(CelonisStringFunctionsTest, translate_single_char) {
@@ -1385,7 +1376,7 @@ TEST(CelonisStringFunctionsSanitizeStringTest, Simple) {
     input->append_nulls(1);
     input->append_datum(VALID_STR);
     input->append_datum("\xFF");
-    input->append_datum("\xC1\xBF");  // 11000001 10111111 must be encoded as ASCII
+    input->append_datum("\xC1\xBF"); // 11000001 10111111 must be encoded as ASCII
     input->append_datum("This is \xC3\xE4 invalid");
     input->append_datum("");
     input->append_datum("\xFFHELLO\xFF");
@@ -1409,15 +1400,10 @@ TEST(CelonisStringFunctionsSanitizeStringTest, Simple) {
 TEST(CelonisStringFunctionsSanitizeStringTest, NullTerminated) {
     using namespace std::string_literals;
 
-    std::vector<std::string> input_strs{
-            "\0"s,
-            "abc\0def"s,
-            "\0abc\0def"s,
-            "Invalid \xFF and \0 valid str"s
-    };
+    std::vector<std::string> input_strs{"\0"s, "abc\0def"s, "\0abc\0def"s, "Invalid \xFF and \0 valid str"s};
 
     auto input = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
-    for (const auto& str: input_strs) {
+    for (const auto& str : input_strs) {
         input->append_datum(Slice(str));
     }
 
@@ -1440,70 +1426,69 @@ TEST(CelonisStringFunctionsStringSplitTest, All) {
 
     std::vector<DatumStruct> test_input = {
             // Return the first split after splitting on ','.
-            {"äö,ü,abc",                        ",",   0,  "äö"},
+            {"äö,ü,abc", ",", 0, "äö"},
             // Return the first split after splitting on the multi-character pattern ', '.
-            {"FirstName, MiddleName, LastName", ", ",  0,  "FirstName"},
-            {"Date, Notes",                     ", ",  0,  "Date"},
-            {"",                                ", ",  0,  ""},
-            {kNullDatum,                        ", ",  0,  kNullDatum},
-            {", ",                              ", ",  0,  ""},
-            {", abcd, ",                        ", ",  0,  ""},
-            {", , ",                            ", ",  0,  ""},
+            {"FirstName, MiddleName, LastName", ", ", 0, "FirstName"},
+            {"Date, Notes", ", ", 0, "Date"},
+            {"", ", ", 0, ""},
+            {kNullDatum, ", ", 0, kNullDatum},
+            {", ", ", ", 0, ""},
+            {", abcd, ", ", ", 0, ""},
+            {", , ", ", ", 0, ""},
             // Return the second split after splitting on the single-character pattern '-'.
-            {"Customer-X",                      "-",   1,  "X"},
-            {"Customer-Y",                      "-",   1,  "Y"},
+            {"Customer-X", "-", 1, "X"},
+            {"Customer-Y", "-", 1, "Y"},
             // Return the second split after splitting on the multi-character pattern ', '.
-            {"FirstName, MiddleName, LastName", ", ",  1,  "MiddleName"},
-            {"Date, Notes",                     ", ",  1,  "Notes"},
-            {"",                                ", ",  1,  kNullDatum},
-            {kNullDatum,                        ", ",  1,  kNullDatum},
-            {", ",                              ", ",  1,  ""},
-            {", abcd, ",                        ", ",  1,  "abcd"},
-            {", , ",                            ", ",  1,  ""},
+            {"FirstName, MiddleName, LastName", ", ", 1, "MiddleName"},
+            {"Date, Notes", ", ", 1, "Notes"},
+            {"", ", ", 1, kNullDatum},
+            {kNullDatum, ", ", 1, kNullDatum},
+            {", ", ", ", 1, ""},
+            {", abcd, ", ", ", 1, "abcd"},
+            {", , ", ", ", 1, ""},
             // Extract the second character from the input using an empty pattern string.
-            {"FirstName, LastName",             "",    1,  "i"},
-            {"äö,ü,",                           "",    1,  "ö"},
-            {"abcd",                            "",    1,  "b"},
-            {"",                                "",    1,  ""},
-            {kNullDatum,                        "",    1,  kNullDatum},
+            {"FirstName, LastName", "", 1, "i"},
+            {"äö,ü,", "", 1, "ö"},
+            {"abcd", "", 1, "b"},
+            {"", "", 1, ""},
+            {kNullDatum, "", 1, kNullDatum},
             // Return from the end of the input using a negative index.
             // Multi-character pattern
-            {"FirstName, LastName",             ", ",  -1, "LastName"},
-            {"FirstName, LastName",             ", ",  -2, "FirstName"},
-            {"FirstName, LastName",             ", ",  -3, kNullDatum},
-            {"Query",                           ", ",  -1, "Query"},
-            {"Query",                           ", ",  -2, kNullDatum},
-            {kNullDatum,                        ", ",  -1, kNullDatum},
-            {kNullDatum,                        ", ",  -2, kNullDatum},
+            {"FirstName, LastName", ", ", -1, "LastName"},
+            {"FirstName, LastName", ", ", -2, "FirstName"},
+            {"FirstName, LastName", ", ", -3, kNullDatum},
+            {"Query", ", ", -1, "Query"},
+            {"Query", ", ", -2, kNullDatum},
+            {kNullDatum, ", ", -1, kNullDatum},
+            {kNullDatum, ", ", -2, kNullDatum},
             // Single-character pattern
-            {"FirstName,LastName",              ",",   -1, "LastName"},
-            {"FirstName,LastName",              ",",   -2, "FirstName"},
-            {"FirstName,LastName",              ",",   -3, kNullDatum},
-            {"Query",                           ",",   -1, "Query"},
-            {"Query",                           ",",   -2, kNullDatum},
-            {kNullDatum,                        ",",   -1, kNullDatum},
-            {kNullDatum,                        ",",   -2, kNullDatum},
+            {"FirstName,LastName", ",", -1, "LastName"},
+            {"FirstName,LastName", ",", -2, "FirstName"},
+            {"FirstName,LastName", ",", -3, kNullDatum},
+            {"Query", ",", -1, "Query"},
+            {"Query", ",", -2, kNullDatum},
+            {kNullDatum, ",", -1, kNullDatum},
+            {kNullDatum, ",", -2, kNullDatum},
             // Empty pattern
-            {"äö",                              "",    -1, "ö"},
-            {"äö",                              "",    -2, "ä"},
-            {"äö",                              "",    -3, kNullDatum},
-            {kNullDatum,                        "",    -1, kNullDatum},
+            {"äö", "", -1, "ö"},
+            {"äö", "", -2, "ä"},
+            {"äö", "", -3, kNullDatum},
+            {kNullDatum, "", -1, kNullDatum},
             // Return the entire string if pattern does not exist in the string and split-index is zero.
-            {"",                                ", ",  0,  ""},
-            {"abc",                             ", ",  0,  "abc"},
-            {"abc",                             ",",   0,  "abc"},
+            {"", ", ", 0, ""},
+            {"abc", ", ", 0, "abc"},
+            {"abc", ",", 0, "abc"},
             // pattern is identical to input-string and split-index is either zero or one: An empty string is returned.
-            {"",                                "",    0,  ""},
-            {"",                                "",    1,  ""},
-            {"",                                "",    2,  kNullDatum},
-            {"a",                               "a",   0,  ""},
-            {"a",                               "a",   1,  ""},
-            {"a",                               "a",   2,  kNullDatum},
-            {"abc",                             "abc", 0,  ""},
-            {"abc",                             "abc", 1,  ""},
-            {"abc",                             "abc", 2,  kNullDatum}
-    };
-    for (const auto& st: test_input) {
+            {"", "", 0, ""},
+            {"", "", 1, ""},
+            {"", "", 2, kNullDatum},
+            {"a", "a", 0, ""},
+            {"a", "a", 1, ""},
+            {"a", "a", 2, kNullDatum},
+            {"abc", "abc", 0, ""},
+            {"abc", "abc", 1, ""},
+            {"abc", "abc", 2, kNullDatum}};
+    for (const auto& st : test_input) {
         if (st[0].is_null()) {
             string->append_nulls(1);
         } else {
@@ -1552,29 +1537,29 @@ TEST(CelonisStringFunctionsStringToIntTest, All) {
     auto expected_int = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
 
     std::vector<DatumStruct> test_input = {
-            {"123456",              123456L},
-            {"-123456.11",          -123456L},
-            {"123456.11",           123456L},
-            {"123456.99",           123456L},
-            {"12345699",            12345699L},
+            {"123456", 123456L},
+            {"-123456.11", -123456L},
+            {"123456.11", 123456L},
+            {"123456.99", 123456L},
+            {"12345699", 12345699L},
             {"9223372036854775807", 9223372036854775807L},
             {"-9223372036854775808", INT64_MIN},
             // Invalid string inputs
-            {kNullDatum,            kNullDatum},
-            {"  123456  ",          kNullDatum},
-            {"123 ",                kNullDatum},
-            {" 123",                kNullDatum},
-            {"4.70E+2",             kNullDatum},
-            {"-5.93E-2",            kNullDatum},
-            {"2*4",                 kNullDatum},
-            {"4F",                  kNullDatum},
-            {"-2*4",                kNullDatum},
-            {"-4F",                 kNullDatum},
-            {"4.70e+2",             kNullDatum},
-            {"-5.93e-2",            kNullDatum},
-            {"HELLO",               kNullDatum},
+            {kNullDatum, kNullDatum},
+            {"  123456  ", kNullDatum},
+            {"123 ", kNullDatum},
+            {" 123", kNullDatum},
+            {"4.70E+2", kNullDatum},
+            {"-5.93E-2", kNullDatum},
+            {"2*4", kNullDatum},
+            {"4F", kNullDatum},
+            {"-2*4", kNullDatum},
+            {"-4F", kNullDatum},
+            {"4.70e+2", kNullDatum},
+            {"-5.93e-2", kNullDatum},
+            {"HELLO", kNullDatum},
     };
-    for (const auto& st: test_input) {
+    for (const auto& st : test_input) {
         if (st[0].is_null()) {
             strings->append_nulls(1);
         } else {
@@ -1612,58 +1597,58 @@ TEST(CelonisStringFunctionsStringToDoubleTest, All) {
 
     std::vector<DatumStruct> test_input = {
             // Fixed point notation
-            {"123",           123.0},
-            {"  123   ",      123.0},
-            {" \t 123 \n  ",  123.0},
-            {"+123456",       123456.0},
-            {" +123456",      123456.0},
-            {" +123456 \n",   123456.0},
-            {"-123456",       -123456.0},
-            {"+00003",        3.0},
-            {"3.",            3.0},
-            {"1.11",          1.11},
-            {"-9.99",         -9.99},
-            {"2,500.10",      2500.1},
-            {"-2,500.10",     -2500.1},
-            {"1.02",          1.02},
-            {"-2.1",          -2.1},
-            {"45.2",          45.2},
-            {"   45.2",       45.2},
-            {"45.2   ",       45.2},
-            {"   45.2   ",    45.2},
-            {"\t\t45.2   ",   45.2},
-            {"\t\t45.2 \n ",  45.2},
+            {"123", 123.0},
+            {"  123   ", 123.0},
+            {" \t 123 \n  ", 123.0},
+            {"+123456", 123456.0},
+            {" +123456", 123456.0},
+            {" +123456 \n", 123456.0},
+            {"-123456", -123456.0},
+            {"+00003", 3.0},
+            {"3.", 3.0},
+            {"1.11", 1.11},
+            {"-9.99", -9.99},
+            {"2,500.10", 2500.1},
+            {"-2,500.10", -2500.1},
+            {"1.02", 1.02},
+            {"-2.1", -2.1},
+            {"45.2", 45.2},
+            {"   45.2", 45.2},
+            {"45.2   ", 45.2},
+            {"   45.2   ", 45.2},
+            {"\t\t45.2   ", 45.2},
+            {"\t\t45.2 \n ", 45.2},
             // Scientific E notation
-            {"4,000.0e2",     400000.0},
+            {"4,000.0e2", 400000.0},
             {"  4,000.0e2  ", 400000.0},
             {"\t4,000.0e2  ", 400000.0},
-            {"4000.0e2",      400000.0},
-            {"-5.93E-2",      -0.0593},
-            {"-5.93e-2",      -0.0593},
-            {"  -5.93e-2  ",  -0.0593},
-            {"2e0",           2.0},
-            {"2e+00",         2.0},
-            {"\n2e+00\n",     2.0},
+            {"4000.0e2", 400000.0},
+            {"-5.93E-2", -0.0593},
+            {"-5.93e-2", -0.0593},
+            {"  -5.93e-2  ", -0.0593},
+            {"2e0", 2.0},
+            {"2e+00", 2.0},
+            {"\n2e+00\n", 2.0},
             // Invalid string inputs
-            {kNullDatum,      kNullDatum},
-            {"",              kNullDatum},
-            {"F10.0",         kNullDatum},
-            {"10.F0",         kNullDatum},
-            {"10.0F",         kNullDatum},
-            {"3 21",          kNullDatum},
-            {"1E650",         kNullDatum},
-            {"++1",           kNullDatum},
-            {"--1",           kNullDatum},
-            {"1E",            kNullDatum},
-            {"1EA",           kNullDatum},
-            {"1.0.0",         kNullDatum},
-            {"10,00,000",     kNullDatum},
-            {"10,0000,000",   kNullDatum},
-            {"1.234,5",       kNullDatum},
-            {"INF",           kNullDatum},
-            {"NaN",           kNullDatum},
+            {kNullDatum, kNullDatum},
+            {"", kNullDatum},
+            {"F10.0", kNullDatum},
+            {"10.F0", kNullDatum},
+            {"10.0F", kNullDatum},
+            {"3 21", kNullDatum},
+            {"1E650", kNullDatum},
+            {"++1", kNullDatum},
+            {"--1", kNullDatum},
+            {"1E", kNullDatum},
+            {"1EA", kNullDatum},
+            {"1.0.0", kNullDatum},
+            {"10,00,000", kNullDatum},
+            {"10,0000,000", kNullDatum},
+            {"1.234,5", kNullDatum},
+            {"INF", kNullDatum},
+            {"NaN", kNullDatum},
     };
-    for (const auto& st: test_input) {
+    for (const auto& st : test_input) {
         if (st[0].is_null()) {
             string->append_nulls(1);
         } else {

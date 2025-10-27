@@ -47,19 +47,19 @@ public:
             Datum datum = get(); // This must be called once if not null.
             auto logical_type = ctx_->get_arg_type(i)->type;
             switch (logical_type) {
-                case TYPE_VARCHAR:
-                    result += sizeof(SliceSizeType) + datum.get_slice().size;
-                    break;
-#define M(type) \
-                case type: \
-                    result += sizeof(RunTimeCppType<type>); \
-                    break;
+            case TYPE_VARCHAR:
+                result += sizeof(SliceSizeType) + datum.get_slice().size;
+                break;
+#define M(type)                                 \
+    case type:                                  \
+        result += sizeof(RunTimeCppType<type>); \
+        break;
 
                 APPLY_FOR_ALL_NUMBER_TYPE(M)
                 M(TYPE_DATETIME)
 #undef M
-                default:
-                    break;
+            default:
+                break;
             }
         }
         return result;
@@ -79,28 +79,28 @@ public:
             Datum datum = get(); // This must be called once if not null.
             auto logical_type = ctx_->get_arg_type(i)->type;
             switch (logical_type) {
-                case TYPE_VARCHAR: {
-                    auto slice = datum.get_slice();
-                    SliceSizeType size = slice.size;
-                    memcpy(dst, &size, sizeof(SliceSizeType));
-                    dst += sizeof(SliceSizeType);
-                    memcpy(dst, slice.data, slice.size);
-                    dst += slice.size;
-                    break;
-                }
-#define M(type) \
-                case type: {\
-                    RunTimeCppType<type> value = datum.get<RunTimeCppType<type>>(); \
-                    memcpy(dst, &value, sizeof(RunTimeCppType<type>)); \
-                    dst += sizeof(RunTimeCppType<type>); \
-                    break; \
-                }
+            case TYPE_VARCHAR: {
+                auto slice = datum.get_slice();
+                SliceSizeType size = slice.size;
+                memcpy(dst, &size, sizeof(SliceSizeType));
+                dst += sizeof(SliceSizeType);
+                memcpy(dst, slice.data, slice.size);
+                dst += slice.size;
+                break;
+            }
+#define M(type)                                                         \
+    case type: {                                                        \
+        RunTimeCppType<type> value = datum.get<RunTimeCppType<type>>(); \
+        memcpy(dst, &value, sizeof(RunTimeCppType<type>));              \
+        dst += sizeof(RunTimeCppType<type>);                            \
+        break;                                                          \
+    }
 
                 APPLY_FOR_ALL_NUMBER_TYPE(M)
                 M(TYPE_DATETIME)
 #undef M
-                default:
-                    break;
+            default:
+                break;
             }
         }
     }
@@ -124,7 +124,7 @@ public:
     void rewind() override { index_ = -1; }
 
 private:
-    const Column **columns_;
+    const Column** columns_;
     size_t row_num_;
     int index_;
 };
@@ -165,27 +165,27 @@ public:
     Datum get() const override {
         auto logical_type = ctx_->get_arg_type(index_)->type;
         switch (logical_type) {
-            case TYPE_VARCHAR: {
-                SliceSizeType size;
-                memcpy(&size, current_, sizeof(SliceSizeType));
-                current_ += sizeof(SliceSizeType);
-                auto value = Slice(current_, size);
-                current_ += size;
-                return value;
-            }
-#define M(type) \
-            case type: { \
-                RunTimeCppType<type> value; \
-                memcpy(&value, current_, sizeof(RunTimeCppType<type>)); \
-                current_ += sizeof(RunTimeCppType<type>); \
-                return value; \
-            }
+        case TYPE_VARCHAR: {
+            SliceSizeType size;
+            memcpy(&size, current_, sizeof(SliceSizeType));
+            current_ += sizeof(SliceSizeType);
+            auto value = Slice(current_, size);
+            current_ += size;
+            return value;
+        }
+#define M(type)                                                 \
+    case type: {                                                \
+        RunTimeCppType<type> value;                             \
+        memcpy(&value, current_, sizeof(RunTimeCppType<type>)); \
+        current_ += sizeof(RunTimeCppType<type>);               \
+        return value;                                           \
+    }
 
             APPLY_FOR_ALL_NUMBER_TYPE(M)
             M(TYPE_DATETIME)
 #undef M
-            default:
-                throw std::runtime_error(fmt::format("Unsupported column type {}", logical_type));
+        default:
+            throw std::runtime_error(fmt::format("Unsupported column type {}", logical_type));
         }
     }
 
@@ -196,9 +196,7 @@ public:
 
     size_t serialized_size() override { return size_; }
 
-    virtual void serialize(uint8_t* dst) override {
-        memcpy(dst, row_, size_);
-    }
+    virtual void serialize(uint8_t* dst) override { memcpy(dst, row_, size_); }
 
 private:
     const uint8_t* row_;
@@ -245,19 +243,19 @@ struct CelonisSortedFirstLastAggregateState {
             int cmp = 0;
             auto logical_type = ctx->get_arg_type(i)->type;
             switch (logical_type) {
-#define M(type) \
-                case type: {\
-                    cmp = SorterComparator<RunTimeCppType<type>>::compare( \
-                            datum.get<RunTimeCppType<type>>(), new_datum.get<RunTimeCppType<type>>()); \
-                    break; \
-                }
+#define M(type)                                                                                       \
+    case type: {                                                                                      \
+        cmp = SorterComparator<RunTimeCppType<type>>::compare(datum.get<RunTimeCppType<type>>(),      \
+                                                              new_datum.get<RunTimeCppType<type>>()); \
+        break;                                                                                        \
+    }
 
                 APPLY_FOR_ALL_NUMBER_TYPE(M)
                 M(TYPE_DATETIME)
                 M(TYPE_VARCHAR)
 #undef M
-                default:
-                    throw std::runtime_error(fmt::format("Unsupported column type {}", logical_type));
+            default:
+                throw std::runtime_error(fmt::format("Unsupported column type {}", logical_type));
             }
             if (cmp == 0) {
                 continue;
@@ -396,7 +394,7 @@ public:
                 to->append_default();
                 return;
             }
-            row_accessor.get();  // This must be called once if not null to move the pointer.
+            row_accessor.get(); // This must be called once if not null to move the pointer.
         }
         row_accessor.rewind();
         row_accessor.seek_and_is_null();
@@ -409,7 +407,7 @@ public:
         } else {
             return "celonis_sorted_last";
         }
-     }
+    }
 };
 
 } // namespace starrocks

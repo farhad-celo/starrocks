@@ -79,8 +79,8 @@ TypeDescriptor logical_types_to_struct_type(const std::vector<LogicalType>& logi
     return struct_type;
 }
 
-TypeDescriptor
-get_return_type(const TypeDescriptor& left_key_struct_type, const TypeDescriptor& right_key_struct_type) {
+TypeDescriptor get_return_type(const TypeDescriptor& left_key_struct_type,
+                               const TypeDescriptor& right_key_struct_type) {
     TypeDescriptor struct_type;
     struct_type.type = LogicalType::TYPE_STRUCT;
 
@@ -100,29 +100,26 @@ get_return_type(const TypeDescriptor& left_key_struct_type, const TypeDescriptor
     return struct_type;
 }
 
-std::unique_ptr<FunctionContext>
-get_ctx(const TypeDescriptor& left_key_struct_type, const TypeDescriptor& right_key_struct_type) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(left_key_struct_type),
-            AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-            AnyValUtil::column_type_to_type_desc(right_key_struct_type),
-            AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-            AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-            AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR)};
-    auto return_type = AnyValUtil::column_type_to_type_desc(
-            get_return_type(left_key_struct_type, right_key_struct_type));
-    return std::unique_ptr<FunctionContext>(
-            FunctionContext::create_test_context(std::move(arg_types), return_type));
+std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& left_key_struct_type,
+                                         const TypeDescriptor& right_key_struct_type) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {AnyValUtil::column_type_to_type_desc(left_key_struct_type),
+                                                        AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
+                                                        AnyValUtil::column_type_to_type_desc(right_key_struct_type),
+                                                        AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
+                                                        AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
+                                                        AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR)};
+    auto return_type =
+            AnyValUtil::column_type_to_type_desc(get_return_type(left_key_struct_type, right_key_struct_type));
+    return std::unique_ptr<FunctionContext>(FunctionContext::create_test_context(std::move(arg_types), return_type));
 }
 
-void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays,
-            const std::optional<DatumArray>& left_match,
+void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays, const std::optional<DatumArray>& left_match,
             const std::optional<std::vector<DatumArray>>& right_keys_arrays,
             const std::optional<DatumArray>& right_match, const ColumnPtr& left_primary_keys_column,
             const ColumnPtr& left_match_column, const ColumnPtr& right_primary_keys_column,
             const ColumnPtr& right_match_column) {
-    auto& left_fields = down_cast<StructColumn*>(
-            ColumnHelper::get_data_column(left_primary_keys_column.get()))->fields_column();
+    auto& left_fields =
+            down_cast<StructColumn*>(ColumnHelper::get_data_column(left_primary_keys_column.get()))->fields_column();
     auto left_null_column = down_cast<NullableColumn*>(left_primary_keys_column.get());
     if (left_keys_arrays.has_value()) {
         left_null_column->null_column_data().emplace_back(0);
@@ -137,8 +134,8 @@ void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays,
     } else {
         left_match_column->append_datum(kNullDatum);
     }
-    auto& right_fields = down_cast<StructColumn*>(
-            ColumnHelper::get_data_column(right_primary_keys_column.get()))->fields_column();
+    auto& right_fields =
+            down_cast<StructColumn*>(ColumnHelper::get_data_column(right_primary_keys_column.get()))->fields_column();
     auto right_null_column = down_cast<NullableColumn*>(right_primary_keys_column.get());
     if (right_keys_arrays.has_value()) {
         right_null_column->null_column_data().emplace_back(0);
@@ -155,11 +152,9 @@ void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays,
     }
 }
 
-void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays,
-            const std::optional<DatumArray>& left_match,
+void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays, const std::optional<DatumArray>& left_match,
             const std::optional<std::vector<DatumArray>>& right_keys_arrays,
-            const std::optional<DatumArray>& right_match,
-            const std::optional<DatumArray>& left_manual,
+            const std::optional<DatumArray>& right_match, const std::optional<DatumArray>& left_manual,
             const std::optional<DatumArray>& right_manual, const ColumnPtr& left_primary_keys_column,
             const ColumnPtr& left_match_column, const ColumnPtr& right_primary_keys_column,
             const ColumnPtr& right_match_column, const ColumnPtr& left_manual_column,
@@ -231,7 +226,7 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
     auto array_type_desc = logical_type_to_array_type_desc(TYPE_VARCHAR);
 
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         left_primary_keys_column = ColumnHelper::create_column(left_key_struct_type, true);
         left_match_column = ColumnHelper::create_column(array_type_desc, true);
@@ -242,33 +237,25 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
         total_rows += num_rows;
         for (int i = 0; i < num_rows; i++) {
             AddRow(left_key_arrays, left_match_array, right_key_arrays, right_match_array, left_match_array,
-                   right_match_array, left_primary_keys_column,
-                   left_match_column,
-                   right_primary_keys_column,
-                   right_match_column,
-                   left_manual_column,
-                   right_manual_column);
+                   right_match_array, left_primary_keys_column, left_match_column, right_primary_keys_column,
+                   right_match_column, left_manual_column, right_manual_column);
         }
 
         switch (match_type) {
-            case CONSTANT:
-                ctx->set_constant_columns(
-                        {nullptr, nullptr, nullptr, nullptr, left_manual_column, right_manual_column});
-                break;
-            case NON_CONSTANT:
-                ctx->set_constant_columns({nullptr, nullptr, nullptr, nullptr, nullptr, nullptr});
-                break;
+        case CONSTANT:
+            ctx->set_constant_columns({nullptr, nullptr, nullptr, nullptr, left_manual_column, right_manual_column});
+            break;
+        case NON_CONSTANT:
+            ctx->set_constant_columns({nullptr, nullptr, nullptr, nullptr, nullptr, nullptr});
+            break;
         }
         state.ResumeTiming();
 
         ASSERT_TRUE(CelonisTransitsMatch::prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
         ASSERT_TRUE(CelonisTransitsMatch::prepare(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
-        auto result = CelonisTransitsMatch::transits_match(ctx.get(), {left_primary_keys_column,
-                                                                       left_match_column,
-                                                                       right_primary_keys_column,
-                                                                       right_match_column,
-                                                                       left_manual_column,
-                                                                       right_manual_column});
+        auto result = CelonisTransitsMatch::transits_match(
+                ctx.get(), {left_primary_keys_column, left_match_column, right_primary_keys_column, right_match_column,
+                            left_manual_column, right_manual_column});
         ASSERT_TRUE(result.ok()) << result.status().message();
         ASSERT_TRUE(CelonisTransitsMatch::close(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
         ASSERT_TRUE(CelonisTransitsMatch::close(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
@@ -286,13 +273,9 @@ static void BM_NonConstantTransitsMatch(benchmark::State& state) {
 }
 
 // Args: Number of rows / Number of primary key fields / Length of match or manual array
-BENCHMARK(BM_ConstantTransitsMatch)->ArgsProduct({{1000, 10000},
-                                                  {2,    4},
-                                                  {10,   20}});
+BENCHMARK(BM_ConstantTransitsMatch)->ArgsProduct({{1000, 10000}, {2, 4}, {10, 20}});
 
-BENCHMARK(BM_NonConstantTransitsMatch)->ArgsProduct({{1000, 10000},
-                                                     {2,    4},
-                                                     {10,   20}});
+BENCHMARK(BM_NonConstantTransitsMatch)->ArgsProduct({{1000, 10000}, {2, 4}, {10, 20}});
 } // namespace starrocks
 
 BENCHMARK_MAIN();

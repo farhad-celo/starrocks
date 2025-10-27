@@ -4,10 +4,9 @@
 
 namespace starrocks {
 
-template<LogicalType LT>
+template <LogicalType LT>
 class CelonisPeekMergedSortedArrays {
 public:
-
     /**
      * @param: [input_array, timestamp_array, size_array, priority_array, secondary_order_array]
      * @paramType: [ARRAY_VARCHAR | ARRAY_INT | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_DATETIME, ARRAY_TIMESTAMP, ARRAY_INT, ARRAY_INT, ARRAY_INT | ARRAY_BIGINT | ARRAY_DOUBLE | ARRAY_VARCHAR]

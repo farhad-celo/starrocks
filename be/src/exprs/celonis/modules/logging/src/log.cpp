@@ -14,8 +14,8 @@
 namespace celonis::accelerator::log {
 
 namespace {
-legacy_embedded_format::json::json_object_t merge_message_and_details(const std::string& message,
-                                                      const legacy_embedded_format::json::json_object_t& details = {}) {
+legacy_embedded_format::json::json_object_t merge_message_and_details(
+    const std::string& message, const legacy_embedded_format::json::json_object_t& details = {}) {
   legacy_embedded_format::json::json_object_t json{details};
   json[DATADOG_LOG_MESSAGE_ATTRIBUTE] = message;
   return json;
@@ -45,19 +45,19 @@ void error(const std::string& s) { jerror(s); }
 
 #ifdef CELOSTAR
 void jinfo(const std::string& message, const legacy_embedded_format::json::json_object_t& details) {
-    LOG(INFO) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
+  LOG(INFO) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
 }
 
 void jwarn(const std::string& message, const legacy_embedded_format::json::json_object_t& details) {
-    LOG(WARNING) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
+  LOG(WARNING) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
 }
 
 void jdebug(const std::string& message, const legacy_embedded_format::json::json_object_t& details) {
-    VLOG(1) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
+  VLOG(1) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
 }
 
 void jerror(const std::string& message, const legacy_embedded_format::json::json_object_t& details) {
-    LOG(ERROR) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
+  LOG(ERROR) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
 }
 
 void flush() { google::FlushLogFiles(google::INFO); }

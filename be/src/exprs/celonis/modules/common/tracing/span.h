@@ -2,12 +2,13 @@
 
 #include <experimental/propagate_const>
 #include <memory>
-#include <opentelemetry/common/attribute_value.h>
-#include <opentelemetry/nostd/shared_ptr.h>
-#include <opentelemetry/version.h>  // required for opentelemetry namespace
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <opentelemetry/common/attribute_value.h>
+#include <opentelemetry/nostd/shared_ptr.h>
+#include <opentelemetry/version.h>  // required for opentelemetry namespace
 
 #include "legacy_embedded_ctl/checked_ptr.h"
 #include "legacy_embedded_ctl/mutex.h"

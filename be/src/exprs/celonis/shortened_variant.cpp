@@ -6,8 +6,7 @@
 
 namespace starrocks {
 namespace {
-ColumnPtr celonis_shortened_variant_impl(const Column& elements,
-                                         const UInt32Column& offsets,
+ColumnPtr celonis_shortened_variant_impl(const Column& elements, const UInt32Column& offsets,
                                          const NullColumn::Container* null_element_offsets,
                                          const NullColumn::Container* null_array_offsets, int64_t max_cycle_length) {
     const size_t num_array = offsets.size() - 1;
@@ -17,7 +16,7 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
     UInt32Column::Container& result_offsets = result_array->offsets_column()->get_data();
     ColumnPtr& result_elements = result_array->elements_column();
     using ValueType = RunTimeCppType<TYPE_VARCHAR>;
-    auto elements_ptr = (const ValueType *) (elements.raw_data());
+    auto elements_ptr = (const ValueType*)(elements.raw_data());
 
     result_offsets.reserve(num_array);
     std::vector<uint32_t> src_index;
@@ -69,14 +68,14 @@ ColumnPtr celonis_shortened_variant_impl(const Column& elements,
             new_offset++;
         }
         result_offsets.push_back(new_offset);
-
     }
     result_elements->append_selective(elements, src_index);
     return result_array;
 }
-}  // namespace
+} // namespace
 
-StatusOr<ColumnPtr> CelonisShortenedVariant::celonis_shortened_variant(FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisShortenedVariant::celonis_shortened_variant(FunctionContext* context,
+                                                                       const Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     const Column* array = columns[0].get();
@@ -85,12 +84,12 @@ StatusOr<ColumnPtr> CelonisShortenedVariant::celonis_shortened_variant(FunctionC
     DCHECK_GT(columns[1]->size(), 0);
     ColumnViewer<TYPE_BIGINT> max_cycle_len_col(columns[1]);
     int64_t max_cycle_length = max_cycle_len_col.value(0);
-    ColumnPtr result = celonis_shortened_variant_impl(*array_data.elements, *array_data.offsets,
-                                                      array_data.null_elements, array_data.null_arrays,
-                                                      max_cycle_length);
+    ColumnPtr result =
+            celonis_shortened_variant_impl(*array_data.elements, *array_data.offsets, array_data.null_elements,
+                                           array_data.null_arrays, max_cycle_length);
     if (array_data.null_arrays != nullptr) {
         return NullableColumn::create(std::move(result), down_cast<const NullableColumn*>(array)->null_column());
-   }
+    }
     return result;
 }
 } // namespace starrocks

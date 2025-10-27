@@ -6,7 +6,6 @@ namespace starrocks {
 
 class CelonisEncodeVariant {
 public:
-
     /**
      * @param: [variant, activity_array]
      * @paramType columns: [ARRAY_VARCHAR, ARRAY_VARCHAR]

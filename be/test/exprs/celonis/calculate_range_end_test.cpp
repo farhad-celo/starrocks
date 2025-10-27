@@ -4,7 +4,6 @@
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
-
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
 
@@ -18,10 +17,9 @@ protected:
 
 private:
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_DATETIME),
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                TypeDescriptor::from_logical_type(TYPE_BIGINT)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_DATETIME),
+                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                            TypeDescriptor::from_logical_type(TYPE_BIGINT)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_DATETIME);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -37,13 +35,11 @@ private:
         return result;
     }
 
-    StatusOr<ColumnPtr>
-    RunConstantConfig(const Datum& step_size, const Datum& step_count) {
+    StatusOr<ColumnPtr> RunConstantConfig(const Datum& step_size, const Datum& step_count) {
         step_size_column_->append_datum(step_size);
         step_count_column_->append_datum(step_count);
-        ctx_->set_constant_columns(
-                {nullptr, ConstColumn::create(step_size_column_, start_column_->size()),
-                 ConstColumn::create(step_count_column_, start_column_->size())});
+        ctx_->set_constant_columns({nullptr, ConstColumn::create(step_size_column_, start_column_->size()),
+                                    ConstColumn::create(step_count_column_, start_column_->size())});
         StatusOr<ColumnPtr> result;
         result = CelonisCalculateRangeEnd::calculate_range_end(
                 ctx_.get(), {start_column_, ConstColumn::create(step_size_column_, start_column_->size()),

@@ -120,7 +120,7 @@ static void do_bench(benchmark::State& state) {
     std::uniform_int_distribution<int> char_dist(0, delimiter_chars.size() - 1);
 
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
 

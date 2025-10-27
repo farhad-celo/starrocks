@@ -1,13 +1,14 @@
 #include "exprs/celonis/abc_model.h"
 
-#include "column/column_viewer.h"
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+
 #include "column/column_builder.h"
 #include "column/column_hash.h"
+#include "column/column_viewer.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 namespace starrocks {
 
@@ -15,9 +16,10 @@ namespace {
 
 static const double EPS = 1e-9;
 
-template<LogicalType LT>
+template <LogicalType LT>
 class AbcModel {
     using CppType = RunTimeCppType<LT>;
+
 public:
     int64_t label(CppType x, int64_t pk_hash) const {
         for (int label = 1; label <= 3; ++label) {
@@ -28,9 +30,8 @@ public:
                 if (it == num_to_probs_.end()) {
                     return label;
                 } else {
-                    double prob =
-                            static_cast<double>(safe_abs(pk_hash)) /
-                            static_cast<double>(std::numeric_limits<int64_t>::max());
+                    double prob = static_cast<double>(safe_abs(pk_hash)) /
+                                  static_cast<double>(std::numeric_limits<int64_t>::max());
                     if (prob < it->second[1]) {
                         return 1;
                     } else if (prob < it->second[2]) {
@@ -56,7 +57,7 @@ public:
             return std::nullopt;
         }
         std::vector<CppType> boundaries;
-        for (const auto& boundary_str: boundary_strs) {
+        for (const auto& boundary_str : boundary_strs) {
             try {
                 auto boundary = boost::lexical_cast<CppType>(boundary_str);
                 boundaries.push_back(boundary);
@@ -73,7 +74,7 @@ public:
         if (!parts[1].empty()) {
             std::vector<std::string> num_section_strs;
             boost::split(num_section_strs, parts[1], boost::is_any_of(";"));
-            for (const auto& num_section_str: num_section_strs) {
+            for (const auto& num_section_str : num_section_strs) {
                 std::vector<std::string> value_strs;
                 boost::split(value_strs, num_section_str, boost::is_any_of(","));
                 if (value_strs.size() != 4) {
@@ -108,9 +109,8 @@ public:
 
 private:
     AbcModel(const std::vector<std::pair<CppType, CppType>>& ranges,
-             const phmap::flat_hash_map<CppType, std::vector<double>, StdHash<CppType>>& num_to_probs) : ranges_(ranges),
-                                                                                     num_to_probs_(
-                                                                                             num_to_probs) {}
+             const phmap::flat_hash_map<CppType, std::vector<double>, StdHash<CppType>>& num_to_probs)
+            : ranges_(ranges), num_to_probs_(num_to_probs) {}
 
     // [{0, 0}, {lo_1, hi_1}, {lo_2, hi_2}, {lo_3, hi_3}]
     std::vector<std::pair<CppType, CppType>> ranges_;
@@ -120,7 +120,7 @@ private:
 
 } // namespace
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct AbcModelStateFragmentLocal {
     AbcModelStateFragmentLocal() : model(std::nullopt) {}
 
@@ -128,7 +128,7 @@ struct AbcModelStateFragmentLocal {
     ScalarFunction function;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisAbcModel<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
@@ -155,7 +155,7 @@ Status CelonisAbcModel<LT>::prepare(FunctionContext* context, FunctionContext::F
     return Status::OK();
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisAbcModel<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         const auto* state = reinterpret_cast<const AbcModelStateFragmentLocal<LT>*>(
@@ -165,11 +165,9 @@ Status CelonisAbcModel<LT>::close(FunctionContext* context, FunctionContext::Fun
     return Status::OK();
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr>
-CelonisAbcModel<LT>::apply_abc_model_non_constant_model([[maybe_unused]]FunctionContext* context,
-                                                        const Columns& columns) {
-
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_non_constant_model([[maybe_unused]] FunctionContext* context,
+                                                                            const Columns& columns) {
     ColumnViewer value_viewer = ColumnViewer<LT>(columns[0]);
     ColumnViewer pk_hash_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
     ColumnViewer model_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
@@ -195,8 +193,8 @@ CelonisAbcModel<LT>::apply_abc_model_non_constant_model([[maybe_unused]]Function
     return result.build(all_const);
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_constant_model([[maybe_unused]]FunctionContext* context,
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_constant_model([[maybe_unused]] FunctionContext* context,
                                                                         const Columns& columns) {
     ColumnViewer value_viewer = ColumnViewer<LT>(columns[0]);
     ColumnViewer pk_hash_viewer = ColumnViewer<TYPE_BIGINT>(columns[1]);
@@ -218,10 +216,9 @@ StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model_constant_model([[maybe_
         }
     }
     return result.build(all_const);
-
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model(FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(3, columns.size());
     const auto* state = reinterpret_cast<const AbcModelStateFragmentLocal<LT>*>(
@@ -229,10 +226,8 @@ StatusOr<ColumnPtr> CelonisAbcModel<LT>::apply_abc_model(FunctionContext* contex
     return state->function(context, columns);
 }
 
-template
-class CelonisAbcModel<TYPE_BIGINT>;
+template class CelonisAbcModel<TYPE_BIGINT>;
 
-template
-class CelonisAbcModel<TYPE_DOUBLE>;
+template class CelonisAbcModel<TYPE_DOUBLE>;
 
 } // namespace starrocks

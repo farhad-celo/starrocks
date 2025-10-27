@@ -28,7 +28,8 @@ class buffer_allocation_node final {
   using allocator_type = default_tracking_allocator_t<value_type>;
 
   explicit buffer_allocation_node(size_type size, const allocator_type& allocator)
-      : buffer_{legacy_embedded_ctl::make_static_array_for_overwrite<value_type>(size, LEGACY_EMBEDDED_ALLOC_MSG(BUFFER_ALLOC_MSG), allocator)} {}
+      : buffer_{legacy_embedded_ctl::make_static_array_for_overwrite<value_type>(
+            size, LEGACY_EMBEDDED_ALLOC_MSG(BUFFER_ALLOC_MSG), allocator)} {}
 
   // These constructors are required for std::uses_allocator construction
   // See https://en.cppreference.com/w/cpp/memory/uses_allocator

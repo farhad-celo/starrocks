@@ -1,23 +1,23 @@
 #include "exprs/celonis/linear_regression.h"
 
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+
 #include "column/column_builder.h"
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 namespace starrocks {
 
 namespace {
 
 class LinearRegressionModel {
-
 public:
-    LinearRegressionModel(double intercept, const std::vector<double>& coefficients) : intercept_(intercept),
-                                                                                       coefficients_(coefficients) {}
+    LinearRegressionModel(double intercept, const std::vector<double>& coefficients)
+            : intercept_(intercept), coefficients_(coefficients) {}
 
     StatusOr<double> predict(const std::vector<double>& x) const {
         if (x.size() != coefficients_.size()) {
@@ -109,9 +109,8 @@ Status CelonisLinearRegression::predict_close(FunctionContext* context, Function
     return Status::OK();
 }
 
-StatusOr<ColumnPtr>
-CelonisLinearRegression::predict_linear_regression_non_constant_model([[maybe_unused]]FunctionContext* context,
-                                                                      const Columns& columns) {
+StatusOr<ColumnPtr> CelonisLinearRegression::predict_linear_regression_non_constant_model(
+        [[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto& model_column = columns[1];
@@ -163,10 +162,8 @@ CelonisLinearRegression::predict_linear_regression_non_constant_model([[maybe_un
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisLinearRegression::predict_linear_regression_constant_model([[maybe_unused]]FunctionContext* context,
-                                                                  const Columns& columns) {
-
+StatusOr<ColumnPtr> CelonisLinearRegression::predict_linear_regression_constant_model(
+        [[maybe_unused]] FunctionContext* context, const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
@@ -213,8 +210,8 @@ CelonisLinearRegression::predict_linear_regression_constant_model([[maybe_unused
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisLinearRegression::predict_linear_regression(FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisLinearRegression::predict_linear_regression(FunctionContext* context,
+                                                                       const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     const auto* state = reinterpret_cast<const LinearRegressionStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));

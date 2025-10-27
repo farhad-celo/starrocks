@@ -1,13 +1,13 @@
 #include "exprs/celonis/peek_merged_sorted_arrays.h"
 
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -18,13 +18,11 @@ protected:
     void TearDown() override {}
 
 private:
-    template<LogicalType InputLT, LogicalType SecondaryLT>
+    template <LogicalType InputLT, LogicalType SecondaryLT>
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY), TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_ARRAY), TypeDescriptor::from_logical_type(TYPE_ARRAY),
                 TypeDescriptor::from_logical_type(TYPE_ARRAY)};
         auto return_type = TypeDescriptor::from_logical_type(InputLT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -36,9 +34,8 @@ private:
         secondary_order_column_ = ColumnHelper::create_column(celonis::array_type(SecondaryLT), false);
     }
 
-    void
-    AddRow(const DatumArray& input_array, const DatumArray& timestamp_array, const DatumArray& size_array,
-           const DatumArray& priority_array, const DatumArray& secondary_order_array) {
+    void AddRow(const DatumArray& input_array, const DatumArray& timestamp_array, const DatumArray& size_array,
+                const DatumArray& priority_array, const DatumArray& secondary_order_array) {
         input_column_->append_datum(input_array);
         timestamp_column_->append_datum(timestamp_array);
         size_column_->append_datum(size_array);
@@ -46,14 +43,11 @@ private:
         secondary_order_column_->append_datum(secondary_order_array);
     }
 
-    template<LogicalType InputLT>
+    template <LogicalType InputLT>
     StatusOr<ColumnPtr> Run() {
-        StatusOr<ColumnPtr> result = CelonisPeekMergedSortedArrays<InputLT>::peek_merged_sorted_arrays(ctx_.get(),
-                                                                                                       {input_column_,
-                                                                                                        timestamp_column_,
-                                                                                                        size_column_,
-                                                                                                        priority_column_,
-                                                                                                        secondary_order_column_});
+        StatusOr<ColumnPtr> result = CelonisPeekMergedSortedArrays<InputLT>::peek_merged_sorted_arrays(
+                ctx_.get(),
+                {input_column_, timestamp_column_, size_column_, priority_column_, secondary_order_column_});
         return result;
     }
 
@@ -82,23 +76,17 @@ TEST_F(CelonisPeekMergedSortedArraysTest, datetime_input_and_bigint_secondary_or
     AddRow(DatumArray{TimestampValue::create(2110, 1, 1, 0, 0, 0), TimestampValue::create(2120, 1, 1, 0, 0, 0),
                       TimestampValue::create(2215, 1, 1, 0, 0, 0), TimestampValue::create(2225, 1, 1, 0, 0, 0),
                       TimestampValue::create(2310, 1, 1, 0, 0, 0), TimestampValue::create(2315, 1, 1, 0, 0, 0),
-                      TimestampValue::create(2320, 1, 1, 0, 0, 0)}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{1L, 1L, 3L, 3L, 2L, 2L, 2L});
+                      TimestampValue::create(2320, 1, 1, 0, 0, 0)},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{1L, 1L, 3L, 3L, 2L, 2L, 2L});
     AddRow(DatumArray{TimestampValue::create(1010, 1, 1, 0, 0, 0), TimestampValue::create(1020, 1, 1, 0, 0, 0),
                       TimestampValue::create(2010, 1, 1, 0, 0, 0), TimestampValue::create(2120, 1, 1, 0, 0, 0)},
-           DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
-           DatumArray{2L, 2L, 1L, 1L});
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2}, DatumArray{1, 1}, DatumArray{2L, 2L, 1L, 1L});
     const auto rs = Run<InputLT>();
     ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
@@ -111,21 +99,16 @@ TEST_F(CelonisPeekMergedSortedArraysTest, int_input_and_bigint_secondary_order) 
     const LogicalType InputLT = TYPE_INT;
     const LogicalType SecondaryLT = TYPE_BIGINT;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{110, 120, 215, 225, 310, 315, 320}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{1L, 1L, 3L, 3L, 2L, 2L, 2L});
-    AddRow(DatumArray{1010, 1020, 2010, 2020}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
-           DatumArray{2L, 2L, 1L, 1L});
+    AddRow(DatumArray{110, 120, 215, 225, 310, 315, 320},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{1L, 1L, 3L, 3L, 2L, 2L, 2L});
+    AddRow(DatumArray{1010, 1020, 2010, 2020},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2}, DatumArray{1, 1}, DatumArray{2L, 2L, 1L, 1L});
     const auto rs = Run<InputLT>();
     ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
@@ -138,33 +121,24 @@ TEST_F(CelonisPeekMergedSortedArraysTest, double_input_and_varchar_secondary_ord
     const LogicalType InputLT = TYPE_DOUBLE;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{110.5, 120.5, 215.5, 225.5, 310.5, 315.5, 320.5}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{"apple", "apple", "cat", "cat", "bus", "bus", "bus"});
-    AddRow(DatumArray{1010.5, 1020.5, kNullDatum, 2020.5}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
-           DatumArray{"bus", "bus", "apple", "apple"});
-    AddRow(DatumArray{1010.5, 1020.5, 2010.5, 2020.5}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 2},
-           DatumArray{"apple", "bus", "apple", "bus"});
-    AddRow(DatumArray{1010.5, 1020.5, 2010.5, 2020.5}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 2},
-           DatumArray{"apple", "bus", "bus", "bus"});
+    AddRow(DatumArray{110.5, 120.5, 215.5, 225.5, 310.5, 315.5, 320.5},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{"apple", "apple", "cat", "cat", "bus", "bus", "bus"});
+    AddRow(DatumArray{1010.5, 1020.5, kNullDatum, 2020.5},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2}, DatumArray{1, 1}, DatumArray{"bus", "bus", "apple", "apple"});
+    AddRow(DatumArray{1010.5, 1020.5, 2010.5, 2020.5},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2}, DatumArray{1, 2}, DatumArray{"apple", "bus", "apple", "bus"});
+    AddRow(DatumArray{1010.5, 1020.5, 2010.5, 2020.5},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2}, DatumArray{1, 2}, DatumArray{"apple", "bus", "bus", "bus"});
     const auto rs = Run<InputLT>();
     ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
@@ -179,39 +153,28 @@ TEST_F(CelonisPeekMergedSortedArraysTest, varchar_input_and_varchar_secondary_or
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{kNullDatum, "b", "c", "d", "e", "f", "g"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
-    AddRow(DatumArray{"apple", "bus", "cat", "dog"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2}, DatumArray{1, 1},
-           DatumArray{"b", "b", "a", "a"});
-    AddRow(DatumArray{kNullDatum, kNullDatum, kNullDatum, "d", kNullDatum, "foo", "g"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
-    AddRow(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 25),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{kNullDatum, "b", "c", "d", "e", "f", "g"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{"apple", "bus", "cat", "dog"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2}, DatumArray{1, 1}, DatumArray{"b", "b", "a", "a"});
+    AddRow(DatumArray{kNullDatum, kNullDatum, kNullDatum, "d", kNullDatum, "foo", "g"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum, kNullDatum},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 25),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto rs = Run<InputLT>();
     ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
@@ -226,8 +189,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_literal_input_array_column) {
     const LogicalType InputLT = TYPE_INT;
     const LogicalType SecondaryLT = TYPE_BIGINT;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1},
-           DatumArray{});
+    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1}, DatumArray{});
     // Set input array column to NULL literal.
     input_column_ = ColumnHelper::create_const_null_column(1);
     const auto rs = Run<InputLT>();
@@ -239,8 +201,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_literal_timestamp_array_column) {
     const LogicalType InputLT = TYPE_INT;
     const LogicalType SecondaryLT = TYPE_BIGINT;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1},
-           DatumArray{});
+    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1}, DatumArray{});
     // Set timestamp array column to NULL literal.
     timestamp_column_ = ColumnHelper::create_const_null_column(1);
     const auto rs = Run<InputLT>();
@@ -252,8 +213,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_literal_size_array_column) {
     const LogicalType InputLT = TYPE_INT;
     const LogicalType SecondaryLT = TYPE_BIGINT;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1},
-           DatumArray{});
+    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1}, DatumArray{});
     // Set size array column to NULL literal.
     size_column_ = ColumnHelper::create_const_null_column(1);
     const auto rs = Run<InputLT>();
@@ -265,8 +225,7 @@ TEST_F(CelonisPeekMergedSortedArraysTest, empty_input_arrays) {
     const LogicalType InputLT = TYPE_INT;
     const LogicalType SecondaryLT = TYPE_BIGINT;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1},
-           DatumArray{});
+    AddRow(DatumArray{}, DatumArray{}, DatumArray{0, 0, 0}, DatumArray{1, 1, 1}, DatumArray{});
     const auto rs = Run<InputLT>();
     ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
@@ -279,15 +238,12 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_timestamp) {
         const LogicalType InputLT = TYPE_VARCHAR;
         const LogicalType SecondaryLT = TYPE_VARCHAR;
         Prepare<InputLT, SecondaryLT>();
-        AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
-                       TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                       TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                       kNullDatum,
-                       TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                       TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                       TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                       TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-               DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+        AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"},
+               DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                          kNullDatum, TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                          TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                          TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+               DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
         const auto rs = Run<InputLT>();
         ASSERT_TRUE(rs.ok()) << rs.status().message();
         const auto& result = rs.value();
@@ -298,15 +254,11 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_timestamp) {
         const LogicalType InputLT = TYPE_VARCHAR;
         const LogicalType SecondaryLT = TYPE_VARCHAR;
         Prepare<InputLT, SecondaryLT>();
-        AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
-                       kNullDatum,
-                       TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                       kNullDatum,
-                       TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                       kNullDatum,
-                       TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                       TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-               DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+        AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"},
+               DatumArray{kNullDatum, TimestampValue::create(2023, 1, 1, 0, 0, 20), kNullDatum,
+                          TimestampValue::create(2023, 1, 1, 0, 0, 15), kNullDatum,
+                          TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+               DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
         const auto rs = Run<InputLT>();
         ASSERT_TRUE(rs.ok()) << rs.status().message();
         const auto& result = rs.value();
@@ -319,15 +271,12 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_secondary_order) {
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", kNullDatum, "e", "b"});
+    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", kNullDatum, "e", "b"});
     const auto rs = Run<InputLT>();
     ASSERT_TRUE(rs.ok()) << rs.status().message();
     const auto& result = rs.value();
@@ -339,15 +288,12 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_size) {
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, kNullDatum, 3}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, kNullDatum, 3}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "size_array should not have NULL elements.");
@@ -357,15 +303,12 @@ TEST_F(CelonisPeekMergedSortedArraysTest, null_priority) {
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, kNullDatum},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, kNullDatum}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "priority_array should not have NULL elements.");
@@ -375,15 +318,12 @@ TEST_F(CelonisPeekMergedSortedArraysTest, input_array_size_different_from_timest
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g", "b"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g", "b"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "The size of input_array and timestamp_array should not be different.");
@@ -393,15 +333,12 @@ TEST_F(CelonisPeekMergedSortedArraysTest, size_array_size_different_from_priorit
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 3}, DatumArray{1, 1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 3}, DatumArray{1, 1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "The size of size_array and priority_array should not be different.");
@@ -411,15 +348,12 @@ TEST_F(CelonisPeekMergedSortedArraysTest, wrong_size_array) {
     const LogicalType InputLT = TYPE_VARCHAR;
     const LogicalType SecondaryLT = TYPE_VARCHAR;
     Prepare<InputLT, SecondaryLT>();
-    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"}, DatumArray{
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 10),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 15),
-                   TimestampValue::create(2023, 1, 1, 0, 0, 20)}, DatumArray{2, 2, 4}, DatumArray{1, 1, 1},
-           DatumArray{"a", "a", "c", "c", "b", "b", "b"});
+    AddRow(DatumArray{"a", "b", "c", "d", "e", "f", "g"},
+           DatumArray{TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 15), TimestampValue::create(2023, 1, 1, 0, 0, 20),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 10), TimestampValue::create(2023, 1, 1, 0, 0, 15),
+                      TimestampValue::create(2023, 1, 1, 0, 0, 20)},
+           DatumArray{2, 2, 4}, DatumArray{1, 1, 1}, DatumArray{"a", "a", "c", "c", "b", "b", "b"});
     const auto result = Run<InputLT>();
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(),

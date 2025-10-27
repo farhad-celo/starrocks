@@ -291,9 +291,9 @@ class table {
   }
 
   template <typename T>
-  column_t add_column(const col_name& column_name, const col_id& column_id, const legacy_embedded_ctl::shared_static_array<T>& data,
-                      const null_flags_t& null_flags, const column_processing_state& state,
-                      const table_row_limit_t table_row_limit) {
+  column_t add_column(const col_name& column_name, const col_id& column_id,
+                      const legacy_embedded_ctl::shared_static_array<T>& data, const null_flags_t& null_flags,
+                      const column_processing_state& state, const table_row_limit_t table_row_limit) {
     // Use static_assert instead of enable_if to get a more helpful compile error
     // compared to a candidate error due to substitution failure
     static_assert(!std::is_same<cel_string_t, T>(),
@@ -334,15 +334,17 @@ class table {
     return col;
   }
 
-  column_t add_string_column(const col_name& column_name, const col_id& column_id, legacy_embedded_ctl::static_array<cel_string_t> ptrs,
+  column_t add_string_column(const col_name& column_name, const col_id& column_id,
+                             legacy_embedded_ctl::static_array<cel_string_t> ptrs,
                              legacy_embedded_ctl::static_array<char> string_bfr, const null_flags_t& null_flags,
                              table_row_limit_t table_row_limit);
 
   /* Same as above but with the option to pass a cache key */
   [[nodiscard]] column_t add_string_column(const col_name& column_name, const col_id& column_id,
-                                           const col_cache_key& column_cache_key, legacy_embedded_ctl::static_array<cel_string_t> ptrs,
-                                           legacy_embedded_ctl::static_array<char> string_bfr, const null_flags_t& null_flags,
-                                           const table_row_limit_t table_row_limit) {
+                                           const col_cache_key& column_cache_key,
+                                           legacy_embedded_ctl::static_array<cel_string_t> ptrs,
+                                           legacy_embedded_ctl::static_array<char> string_bfr,
+                                           const null_flags_t& null_flags, const table_row_limit_t table_row_limit) {
     auto col{
         add_string_column(column_name, column_id, std::move(ptrs), std::move(string_bfr), null_flags, table_row_limit)};
     legacy_embedded_debug_assert(col->config_.cache_key.empty());

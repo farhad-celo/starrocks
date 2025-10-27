@@ -1,13 +1,12 @@
-#include "exprs/celonis/string_functions.h"
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
+#include "exprs/celonis/string_functions.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -20,10 +19,8 @@ protected:
 private:
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR), TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_BIGINT), TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -41,17 +38,14 @@ private:
     }
 
     StatusOr<ColumnPtr> Run() {
-        DeferOp close_fragment_local([this] {
-            CelonisStringFunctions::match_strings_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [this] { CelonisStringFunctions::match_strings_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisStringFunctions::match_strings_prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisStringFunctions::match_strings_close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local(
+                [this] { CelonisStringFunctions::match_strings_close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisStringFunctions::match_strings_prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
-        auto result = CelonisStringFunctions::match_strings(ctx_.get(),
-                                                            {string_column_, match_strings_column_, top_k_column_,
-                                                             separator_column_});
+        auto result = CelonisStringFunctions::match_strings(
+                ctx_.get(), {string_column_, match_strings_column_, top_k_column_, separator_column_});
         return result;
     }
 
@@ -72,7 +66,6 @@ private:
     ColumnPtr match_strings_column_;
     ColumnPtr top_k_column_;
     ColumnPtr separator_column_;
-
 };
 
 TEST_F(CelonisMatchStringsTest, empty_input) {
@@ -102,8 +95,9 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_1) {
     Prepare();
     string_column_->append_datum("Shirts");
     string_column_->append_datum("Pants");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, kNullDatum,
-                                         kNullDatum).value();
+    const auto result =
+            RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, kNullDatum, kNullDatum)
+                    .value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt", result->get(0).get_slice());
     EXPECT_EQ("Sweatpants", result->get(1).get_slice());
@@ -113,8 +107,8 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_2) {
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum("Pants");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2L,
-                                         "##").value();
+    const auto result =
+            RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2L, "##").value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt##Sweatshirt", result->get(0).get_slice());
     EXPECT_EQ("Sweatpants##Short pants", result->get(1).get_slice());
@@ -136,8 +130,8 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_4) {
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum("Pants");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 2L,
-                                         kNullDatum).value();
+    const auto result =
+            RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 2L, kNullDatum).value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt, Sweatpants", result->get(0).get_slice());
     EXPECT_EQ("Sweatpants, T-Shirt", result->get(1).get_slice());
@@ -147,8 +141,8 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_5) {
     Prepare();
     string_column_->append_datum("Shirt");
     string_column_->append_datum("Pants");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 10L,
-                                         kNullDatum).value();
+    const auto result =
+            RunConstantMatch(DatumArray{"T-Shirt", "T-Shirt", "Sweatpants", "Sweatpants"}, 10L, kNullDatum).value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt, Sweatpants", result->get(0).get_slice());
     EXPECT_EQ("Sweatpants, T-Shirt", result->get(1).get_slice());
@@ -160,8 +154,7 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_6) {
     string_column_->append_datum("Pants");
     string_column_->append_datum("Pants");
     string_column_->append_datum("Shirt");
-    const auto result = RunConstantMatch(DatumArray{"BSP", "CSP", "DSP", "ASP"}, 10L,
-                                         kNullDatum).value();
+    const auto result = RunConstantMatch(DatumArray{"BSP", "CSP", "DSP", "ASP"}, 10L, kNullDatum).value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(0).get_slice());
     EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(1).get_slice());
@@ -174,8 +167,8 @@ TEST_F(CelonisMatchStringsTest, null_input_string_and_const_match_strings) {
     string_column_->append_datum("Shirt");
     string_column_->append_datum(kNullDatum);
     string_column_->append_datum("Shirt");
-    const auto result = RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2L,
-                                         "##").value();
+    const auto result =
+            RunConstantMatch(DatumArray{"T-Shirt", "Sweatshirt", "Short pants", "Sweatpants"}, 2L, "##").value();
     ASSERT_EQ(string_column_->size(), result->size());
     EXPECT_EQ("T-Shirt##Sweatshirt", result->get(0).get_slice());
     EXPECT_TRUE(result->get(1).is_null());

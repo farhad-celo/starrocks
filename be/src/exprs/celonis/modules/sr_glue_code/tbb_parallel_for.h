@@ -1,19 +1,19 @@
 #pragma once
 
+#include <mutex>
+#include <optional>
+#include <string>
+
 #include <tbb/parallel_for.h>
 
 #include <ctl/assert.h>
-
-#include <optional>
-#include <mutex>
-#include <string>
 
 namespace sr_glue_code {
 
 namespace details {
 
 class tbb_error_propagation_helper {
-public:
+ public:
   tbb_error_propagation_helper() = default;
 
   [[nodiscard]] bool has_error() const {
@@ -41,13 +41,13 @@ public:
     return number_of_errors_;
   }
 
-private:
+ private:
   mutable std::shared_mutex mtx_{};
   std::optional<std::string> optional_error_msg_{std::nullopt};
   int number_of_errors_{0};
 };
 
-} // namespace details
+}  // namespace details
 
 struct error_state {
   std::string error_msg{};
@@ -68,7 +68,7 @@ using optional_error_state_t = std::optional<error_state>;
  *
  * https://www.intel.com/content/www/us/en/docs/onetbb/developer-guide-api-reference/2022-0/exceptions-and-cancellation.html
  */
-template<typename TBB_RANGE, typename TBB_LOOP_BODY>
+template <typename TBB_RANGE, typename TBB_LOOP_BODY>
 [[nodiscard]] optional_error_state_t non_throwing_tbb_parallel_for(const TBB_RANGE& range, const TBB_LOOP_BODY& body) {
   details::tbb_error_propagation_helper error_propagation_helper{};
   tbb::parallel_for(range, [&](const auto& r) {
@@ -82,15 +82,17 @@ template<typename TBB_RANGE, typename TBB_LOOP_BODY>
   });
 
   if (error_propagation_helper.has_error()) [[unlikely]] {
-    return std::make_optional<error_state>(error_propagation_helper.error_message(), error_propagation_helper.number_of_errors());
+    return std::make_optional<error_state>(error_propagation_helper.error_message(),
+                                           error_propagation_helper.number_of_errors());
   }
 
   return std::nullopt;
 }
 
 /** Same as above but for parallel_for_each */
-template<typename TBB_RANGE, typename TBB_LOOP_BODY>
-[[nodiscard]] optional_error_state_t non_throwing_tbb_parallel_for_each(const TBB_RANGE& range, const TBB_LOOP_BODY& body) {
+template <typename TBB_RANGE, typename TBB_LOOP_BODY>
+[[nodiscard]] optional_error_state_t non_throwing_tbb_parallel_for_each(const TBB_RANGE& range,
+                                                                        const TBB_LOOP_BODY& body) {
   details::tbb_error_propagation_helper error_propagation_helper{};
   tbb::parallel_for_each(range, [&](const auto& r) {
     try {
@@ -103,10 +105,11 @@ template<typename TBB_RANGE, typename TBB_LOOP_BODY>
   });
 
   if (error_propagation_helper.has_error()) [[unlikely]] {
-    return std::make_optional<error_state>(error_propagation_helper.error_message(), error_propagation_helper.number_of_errors());
+    return std::make_optional<error_state>(error_propagation_helper.error_message(),
+                                           error_propagation_helper.number_of_errors());
   }
 
   return std::nullopt;
 }
 
-} // namespace sr_glue_code
+}  // namespace sr_glue_code

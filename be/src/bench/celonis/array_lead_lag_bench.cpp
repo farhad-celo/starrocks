@@ -81,8 +81,7 @@ static void bench(benchmark::State& state, ScalarFunction scalar_function) {
         total_rows += num_rows;
         auto input_column =
                 ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
-        auto offset_column =
-                ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_BIGINT), true);
+        auto offset_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_BIGINT), true);
         for (int i = 0; i < num_rows; i++) {
             input_column->append_datum(input_array);
             offset_column->append_datum(static_cast<int64_t>(uniform_value(rng)));

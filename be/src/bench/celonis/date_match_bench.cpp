@@ -45,7 +45,7 @@ TimestampValue generate_random_timestamp(std::mt19937_64& rng) {
 
 ColumnPtr generate_filter_array(std::mt19937_64& rng, int num_rows, int64_t min_val, int64_t max_val) {
     ColumnPtr array_column = ColumnHelper::create_column(TypeDescriptor(TYPE_ARRAY_BIGINT), true);
-    std::uniform_int_distribution<int> array_size_dist(1, 5);  // 1-5 elements per array
+    std::uniform_int_distribution<int> array_size_dist(1, 5); // 1-5 elements per array
     std::uniform_int_distribution<int64_t> value_dist(min_val, max_val);
 
     DatumArray array_datum;
@@ -87,11 +87,11 @@ static void BM_DateMatch(benchmark::State& state) {
         }
 
         // Generate filter arrays for years, quarters, months, weeks, days
-        ColumnPtr years_column = generate_filter_array(rng, num_rows, 1970, 2100);      // years
-        ColumnPtr quarters_column = generate_filter_array(rng, num_rows, 1, 4);         // quarters (1-4)
-        ColumnPtr months_column = generate_filter_array(rng, num_rows, 1, 12);          // months (1-12)
-        ColumnPtr weeks_column = generate_filter_array(rng, num_rows, 1, 53);           // weeks (1-53)
-        ColumnPtr days_column = generate_filter_array(rng, num_rows, 1, 31);            // days (1-31)
+        ColumnPtr years_column = generate_filter_array(rng, num_rows, 1970, 2100); // years
+        ColumnPtr quarters_column = generate_filter_array(rng, num_rows, 1, 4);    // quarters (1-4)
+        ColumnPtr months_column = generate_filter_array(rng, num_rows, 1, 12);     // months (1-12)
+        ColumnPtr weeks_column = generate_filter_array(rng, num_rows, 1, 53);      // weeks (1-53)
+        ColumnPtr days_column = generate_filter_array(rng, num_rows, 1, 31);       // days (1-31)
 
         ctx->set_constant_columns({nullptr, years_column, quarters_column, months_column, weeks_column, days_column});
         // Prepare function context
@@ -99,9 +99,8 @@ static void BM_DateMatch(benchmark::State& state) {
         EXPECT_TRUE(CelonisTimeFunctions::date_match_prepare(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
 
         state.ResumeTiming();
-        auto result = CelonisTimeFunctions::date_match(ctx.get(),
-                                                       {timestamp_column, years_column, quarters_column, months_column,
-                                                        weeks_column, days_column});
+        auto result = CelonisTimeFunctions::date_match(
+                ctx.get(), {timestamp_column, years_column, quarters_column, months_column, weeks_column, days_column});
         EXPECT_TRUE(result.ok());
         EXPECT_FALSE(result.value()->only_null());
         state.PauseTiming();

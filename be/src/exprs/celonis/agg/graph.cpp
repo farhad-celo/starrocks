@@ -74,8 +74,8 @@ void CelonisGraphAggregateState::update(FunctionContext* ctx, const Column** col
             // we will consider that a,b form an edge.
             continue;
         }
-        int32_t activity_id = maybe_add_activity(activity_map_, b_elements->get_slice(offset),
-            ctx->mem_pool(), &mem).first;
+        int32_t activity_id =
+                maybe_add_activity(activity_map_, b_elements->get_slice(offset), ctx->mem_pool(), &mem).first;
         activity_stats_.resize(activity_map_.size());
         activity_updated_count_cases.resize(activity_map_.size(), 0);
         ActivityStats& a_stats = activity_stats_[activity_id];
@@ -108,7 +108,6 @@ void CelonisGraphAggregateState::update(FunctionContext* ctx, const Column** col
     if (end_activity_id != -1) {
         activity_stats_[end_activity_id].count_end += count;
     }
-
 
     ctx->add_mem_usage(mem);
 }
@@ -151,7 +150,7 @@ void CelonisGraphAggregateState::serialize(uint8_t* dst) const {
     size_t num_activities = activity_map_.size();
     memcpy(dst, &num_activities, sizeof(size_t));
     dst += sizeof(size_t);
-    for (const auto& stats: activity_stats_) {
+    for (const auto& stats : activity_stats_) {
         memcpy(dst, &stats.count, sizeof(size_t));
         dst += sizeof(size_t);
         memcpy(dst, &stats.count_case, sizeof(size_t));
@@ -166,7 +165,7 @@ void CelonisGraphAggregateState::serialize(uint8_t* dst) const {
     size_t num_edges = edge_stats_.size();
     memcpy(dst, &num_edges, sizeof(size_t));
     dst += sizeof(size_t);
-    for (const auto& p: edge_stats_) {
+    for (const auto& p : edge_stats_) {
         const auto& edge = p.first;
         const auto& stats = p.second;
         memcpy(dst, &edge.src, sizeof(int32_t));
@@ -193,11 +192,11 @@ size_t CelonisGraphAggregateState::serialized_size() const {
     result += 4 * sizeof(size_t) * activity_stats_.size();
 
     // edge_stats
-    result += sizeof(size_t);        // num_edges
+    result += sizeof(size_t); // num_edges
     result += (2 * sizeof(int32_t) + 2 * sizeof(size_t)) * edge_stats_.size();
 
-    result += sizeof(int64_t);       // edge_count_
-    result += sizeof(uint8_t);       // enable_proto_encoding_
+    result += sizeof(int64_t); // edge_count_
+    result += sizeof(uint8_t); // enable_proto_encoding_
 
     return result;
 }
@@ -297,12 +296,11 @@ void CelonisGraphAggregateState::finalize_to_column(FunctionContext* ctx, Column
     LOG(INFO) << log_prefix << ": distinct activity count = " << activity_map_.size() << std::endl;
 
     if (activity_map_.size() > MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES) {
-        ctx->set_error(std::string(
-                               "CELONIS_GRAPH: the size of activity_map is " + std::to_string(activity_map_.size()) +
-                               " which is greater than the limit " +
-                               std::to_string(MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES))
-                               .c_str(),
-                       false);
+        ctx->set_error(
+                std::string("CELONIS_GRAPH: the size of activity_map is " + std::to_string(activity_map_.size()) +
+                            " which is greater than the limit " + std::to_string(MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES))
+                        .c_str(),
+                false);
         return;
     }
     if (activity_map_.empty()) {
@@ -352,10 +350,8 @@ std::optional<std::string> CelonisGraphAggregateState::base64_encoded_string() c
     // Edge stats
     if (edge_count_ >= 0) {
         statistics_proto.set_e_count(edge_stats_.size());
-        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(
-                edge_stats_, activity_map_, edge_count_);
-        EdgeStatsProcessor<SliceHashMap>::build_edge_stats_proto(
-                sorted_edges, statistics_proto);
+        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(edge_stats_, activity_map_, edge_count_);
+        EdgeStatsProcessor<SliceHashMap>::build_edge_stats_proto(sorted_edges, statistics_proto);
     }
     std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto, (100LL << 20), false);
     if (!encoded_string.has_value()) {
@@ -397,10 +393,8 @@ std::optional<std::string> CelonisGraphAggregateState::json_string() const {
     rapidjson::Value e_stats(rapidjson::kArrayType);
     if (edge_count_ >= 0) {
         d.AddMember("e_count", edge_stats_.size(), allocator);
-        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(
-                edge_stats_, activity_map_, edge_count_);
-        e_stats = EdgeStatsProcessor<SliceHashMap>::build_edge_stats_json(
-                sorted_edges, allocator);
+        auto sorted_edges = EdgeStatsProcessor<SliceHashMap>::get_sorted_edges(edge_stats_, activity_map_, edge_count_);
+        e_stats = EdgeStatsProcessor<SliceHashMap>::build_edge_stats_json(sorted_edges, allocator);
     }
     d.AddMember("e_stats", e_stats, allocator);
 
@@ -416,23 +410,21 @@ std::string CelonisGraphAggregateState::get_log_prefix(const std::string& query_
     return "CELONIS_GRAPH (" + query_id + ")";
 }
 
-
 // ********************************************************************************
 //         End of CelonisGraphAggregateState
 // ********************************************************************************
-
 
 // ********************************************************************************
 //         Start of CelonisGraphAggregationFunction
 // ********************************************************************************
 
 void CelonisGraphAggregationFunction::update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
-    size_t row_num) const {
+                                             size_t row_num) const {
     this->data(state).update(ctx, columns, row_num);
 }
 
 void CelonisGraphAggregationFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,
-    size_t row_num) const {
+                                            size_t row_num) const {
     // merge internal state with column[row_num]
     // the column type is binary
     if (column->is_null(row_num)) {
@@ -441,12 +433,12 @@ void CelonisGraphAggregationFunction::merge(FunctionContext* ctx, const Column* 
     const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
     Slice slice = input_column->get_slice(row_num);
     size_t mem_usage = 0;
-    mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*) slice.data, slice.size);
+    mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size);
     ctx->add_mem_usage(mem_usage);
 }
 
-void CelonisGraphAggregationFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr
-    __restrict state, Column* to) const {
+void CelonisGraphAggregationFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
+                                                          Column* to) const {
     // append our serialized state to column "to"
     auto* column = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(to));
     if (to->is_nullable()) {
@@ -459,14 +451,14 @@ void CelonisGraphAggregationFunction::serialize_to_column(FunctionContext* ctx, 
     column->get_offset().emplace_back(new_size);
 }
 
-void CelonisGraphAggregationFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t
-    chunk_size, ColumnPtr* dst) const {
+void CelonisGraphAggregationFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
+                                                                  size_t chunk_size, ColumnPtr* dst) const {
     // Used for streaming aggregation. Not implemented.
     throw std::runtime_error("celonis_graph: convert_to_serialize_format not supported");
 }
 
-void CelonisGraphAggregationFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr
-    __restrict state, Column* to) const {
+void CelonisGraphAggregationFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,
+                                                         Column* to) const {
     this->data(state).finalize_to_column(ctx, to);
 }
 
@@ -478,4 +470,4 @@ std::string CelonisGraphAggregationFunction::get_name() const {
 //         End of CelonisGraphAggregationFunction
 // ********************************************************************************
 
-}
+} // namespace starrocks

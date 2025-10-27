@@ -1,12 +1,14 @@
-#include <algorithm>
+#include "exprs/celonis/agg/calc_string_bucket_width_boundaries.h"
+
 #include <gtest/gtest.h>
+
+#include <algorithm>
 
 #include "../util.h"
 #include "column/struct_column.h"
 #include "column/type_traits.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/agg/calc_string_bucket_width_boundaries.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 
@@ -46,17 +48,12 @@ protected:
 
     void TearDown() override {}
 
-    TypeDescriptor get_return_type() {
-        return celonis::array_type(TYPE_VARCHAR);
-    }
+    TypeDescriptor get_return_type() { return celonis::array_type(TYPE_VARCHAR); }
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                TypeDescriptor::from_logical_type(TYPE_LARGEINT),
-                TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                TypeDescriptor::from_logical_type(TYPE_DOUBLE)
-        };
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR), TypeDescriptor::from_logical_type(TYPE_LARGEINT),
+                TypeDescriptor::from_logical_type(TYPE_BIGINT), TypeDescriptor::from_logical_type(TYPE_DOUBLE)};
         auto return_type = get_return_type();
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -78,31 +75,28 @@ protected:
         auto result_array = result->get(0).get_array();
         ASSERT_EQ(result_array.size(), expected_array.size());
         for (int i = 0; i < expected_array.size(); ++i) {
-            auto debug_string = [&]() {
-                return fmt::format("index: {}", i);
-            };
+            auto debug_string = [&]() { return fmt::format("index: {}", i); };
             if (expected_array[i].is_null()) {
                 EXPECT_TRUE(result_array[i].is_null()) << debug_string();
             } else if (result_array[i].is_null()) {
                 EXPECT_FALSE(result_array[i].is_null()) << debug_string();
             } else {
                 EXPECT_EQ(result_array[i].get_slice().to_string(), expected_array[i].get_slice().to_string())
-                                    << debug_string();
+                        << debug_string();
             }
         }
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(const std::vector<std::optional<std::string>>& strings,
-              const std::vector<std::optional<int128_t>>& hashes, int64_t width,
-              double sample_ratio) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            const std::vector<std::optional<std::string>>& strings, const std::vector<std::optional<int128_t>>& hashes,
+            int64_t width, double sample_ratio) {
         auto local_ctx = get_ctx();
 
         const AggregateFunction* func =
                 get_aggregate_function("celonis_calc_string_bucket_width_boundaries", TYPE_VARCHAR, TYPE_ARRAY, false);
 
         auto string_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
-        for (const auto& str: strings) {
+        for (const auto& str : strings) {
             if (str.has_value()) {
                 string_col->append_datum(Slice(str.value()));
             } else {
@@ -111,7 +105,7 @@ protected:
         }
 
         auto hash_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_LARGEINT), true);
-        for (const auto& hash128: hashes) {
+        for (const auto& hash128 : hashes) {
             if (hash128.has_value()) {
                 hash_col->append_datum(hash128.value());
             } else {
@@ -189,9 +183,8 @@ protected:
 
     void Run(const std::vector<std::optional<std::string>>& strings1,
              const std::vector<std::optional<std::string>>& strings2,
-             const std::vector<std::optional<int128_t>>& hashes1,
-             const std::vector<std::optional<int128_t>>& hashes2, int64_t width, double sample_ratio,
-             const std::optional<Datum>& expected) {
+             const std::vector<std::optional<int128_t>>& hashes1, const std::vector<std::optional<int128_t>>& hashes2,
+             int64_t width, double sample_ratio, const std::optional<Datum>& expected) {
         RunMerge(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
         RunMergeToNew(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
     }

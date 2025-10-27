@@ -31,9 +31,8 @@ struct TestCaseNonConst {
 class CelonisEncodeStringTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_INT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 

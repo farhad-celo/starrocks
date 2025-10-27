@@ -56,8 +56,8 @@ DeconstructedOutputColumn create_output_column(const Column& input_timestamp_col
     if (input_timestamp_column.is_nullable()) {
         auto* nullable_input{down_cast<const NullableColumn*>(&input_timestamp_column)};
         ColumnPtr array_null_flags = nullable_input->null_column()->clone();
-        output_reordering = NullableColumn::create(std::move(output_reordering),
-                                                   down_cast<NullColumn*>(array_null_flags.get()));
+        output_reordering =
+                NullableColumn::create(std::move(output_reordering), down_cast<NullColumn*>(array_null_flags.get()));
     }
 
     // Fill the reordering arrays for each case with iotas.

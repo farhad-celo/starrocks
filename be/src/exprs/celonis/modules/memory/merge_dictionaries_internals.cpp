@@ -4,13 +4,13 @@
 #include <functional>
 #include <memory>
 #include <numeric>
-#include <oneapi/tbb/parallel_for.h>
-#include <oneapi/tbb/parallel_for_each.h>
 #include <optional>
 #include <type_traits>
 #include <utility>
 
 #include <fmt/format.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_for_each.h>
 
 #include "legacy_embedded_ctl/static_array.h"
 #include "legacy_embedded_ctl/utility.h"
@@ -30,7 +30,8 @@ namespace celonis::accelerator::memory {
 
 namespace {
 
-constexpr legacy_embedded_ctl::overloaded<std::less<cel_int_t>, std::less<cel_float_t>, std::less<cel_date_t>, cel_string_compare>
+constexpr legacy_embedded_ctl::overloaded<std::less<cel_int_t>, std::less<cel_float_t>, std::less<cel_date_t>,
+                                          cel_string_compare>
     dictionary_cmp{};
 
 struct heap_merge_next {
@@ -128,18 +129,18 @@ struct merge_type_traits<cel_string_t> {
 namespace details {
 
 template <typename T>
-merged_partition_data<T> extend_dictionary_partition(const legacy_embedded_ctl::array_view<const T>& dict_view, const T& val,
-                                                     const common::execution_context& context) {
-  const size_t insert_at{
-      legacy_embedded_ctl::cast<size_t>(std::distance(dict_view.begin(), std::ranges::lower_bound(dict_view, val, dictionary_cmp)))};
+merged_partition_data<T> extend_dictionary_partition(const legacy_embedded_ctl::array_view<const T>& dict_view,
+                                                     const T& val, const common::execution_context& context) {
+  const size_t insert_at{legacy_embedded_ctl::cast<size_t>(
+      std::distance(dict_view.begin(), std::ranges::lower_bound(dict_view, val, dictionary_cmp)))};
   const auto is_present{insert_at < dict_view.size() && !dictionary_cmp(val, dict_view[insert_at])};
 
   std::vector<legacy_embedded_ctl::static_array<row_id>> mappings{};
   mappings.reserve(2);
   mappings.emplace_back(memory::tracking::make_static_array_for_overwrite<row_id>(
       dict_view.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context));
-  mappings.emplace_back(
-      memory::tracking::make_static_array_for_overwrite<row_id>(1, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context));
+  mappings.emplace_back(memory::tracking::make_static_array_for_overwrite<row_id>(
+      1, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context));
   mappings.back().front() = insert_at;
 
   std::iota(std::begin(mappings.front()), std::next(std::begin(mappings.front()), insert_at), row_id{});
@@ -162,8 +163,8 @@ merged_partition_data<T> extend_dictionary_partition(const legacy_embedded_ctl::
 }
 
 template <class T>
-merged_partition_data<T> merge_n_dictionary_partitions(const std::vector<legacy_embedded_ctl::array_view<const T>>& dict_views,
-                                                       const common::execution_context& context) {
+merged_partition_data<T> merge_n_dictionary_partitions(
+    const std::vector<legacy_embedded_ctl::array_view<const T>>& dict_views, const common::execution_context& context) {
   std::vector<row_id> dict_sizes;
   std::vector<legacy_embedded_ctl::static_array<row_id>> mapping;
   for (const auto& dict_view : dict_views) {
@@ -244,10 +245,10 @@ merged_partition_data<T> merge_2_dictionary_partitions(const legacy_embedded_ctl
   const auto* const rhs_last{rhs.end()};
   std::vector<legacy_embedded_ctl::static_array<row_id>> mappings{};
   mappings.reserve(2);
-  mappings.emplace_back(
-      memory::tracking::make_static_array_for_overwrite<row_id>(lhs.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context));
-  mappings.emplace_back(
-      memory::tracking::make_static_array_for_overwrite<row_id>(rhs.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context));
+  mappings.emplace_back(memory::tracking::make_static_array_for_overwrite<row_id>(
+      lhs.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context));
+  mappings.emplace_back(memory::tracking::make_static_array_for_overwrite<row_id>(
+      rhs.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context));
   row_id lhs_mapping_index{};
   row_id rhs_mapping_index{};
   while (lhs_first != lhs_last && rhs_first != rhs_last) {
@@ -571,7 +572,8 @@ template merge_results<cel_string_t> merge(const std::vector<disjunct_partition<
                                            const common::execution_context&);
 
 template <typename T>
-sizes_and_offsets<T> calculate_sizes_and_offsets(const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions) {
+sizes_and_offsets<T> calculate_sizes_and_offsets(
+    const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions) {
   sizes_and_offsets<T> result;
   auto& partition_sizes{result.partition_sizes};
   auto& partition_offsets{result.partition_offsets};
@@ -579,15 +581,17 @@ sizes_and_offsets<T> calculate_sizes_and_offsets(const legacy_embedded_ctl::stat
   const auto num_sizes{result_partitions.size()};
   const auto num_offsets{result_partitions.size() + NULL_ELEMENT_SIZE};
 
-  partition_sizes = legacy_embedded_ctl::make_static_array_for_overwrite<size_t>(num_sizes, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG));
-  partition_offsets = legacy_embedded_ctl::make_static_array_for_overwrite<size_t>(num_offsets, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG));
+  partition_sizes = legacy_embedded_ctl::make_static_array_for_overwrite<size_t>(
+      num_sizes, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG));
+  partition_offsets = legacy_embedded_ctl::make_static_array_for_overwrite<size_t>(
+      num_offsets, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG));
   partition_offsets[0] = NULL_ELEMENT_SIZE;
 
   if constexpr (std::is_same_v<T, cel_string_t>) {
-    result.buffer_sizes =
-        legacy_embedded_ctl::make_static_array_for_overwrite<size_t>(num_sizes, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG));
-    result.buffer_offsets =
-        legacy_embedded_ctl::make_static_array_for_overwrite<size_t>(num_offsets, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG));
+    result.buffer_sizes = legacy_embedded_ctl::make_static_array_for_overwrite<size_t>(
+        num_sizes, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG));
+    result.buffer_offsets = legacy_embedded_ctl::make_static_array_for_overwrite<size_t>(
+        num_offsets, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG));
     result.buffer_offsets[0] = NULL_STRING.size();
   }
 
@@ -629,8 +633,8 @@ template sizes_and_offsets<cel_string_t> calculate_sizes_and_offsets<cel_string_
     const legacy_embedded_ctl::static_array<result_partition<cel_string_t>>&);
 
 template <typename T>
-legacy_embedded_ctl::static_array<flattened_partition> flatten(const size_t num_input_partitions,
-                                               const std::vector<disjunct_partition<T>>& disjunct_partitions) {
+legacy_embedded_ctl::static_array<flattened_partition> flatten(
+    const size_t num_input_partitions, const std::vector<disjunct_partition<T>>& disjunct_partitions) {
   auto flattened_partitions{legacy_embedded_ctl::make_static_array_for_overwrite<flattened_partition>(
       num_input_partitions, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
 
@@ -646,12 +650,12 @@ legacy_embedded_ctl::static_array<flattened_partition> flatten(const size_t num_
   return flattened_partitions;
 }
 
-template legacy_embedded_ctl::static_array<flattened_partition> flatten<cel_int_t>(const size_t,
-                                                                   const std::vector<disjunct_partition<cel_int_t>>&);
+template legacy_embedded_ctl::static_array<flattened_partition> flatten<cel_int_t>(
+    const size_t, const std::vector<disjunct_partition<cel_int_t>>&);
 template legacy_embedded_ctl::static_array<flattened_partition> flatten<cel_float_t>(
     const size_t, const std::vector<disjunct_partition<cel_float_t>>&);
-template legacy_embedded_ctl::static_array<flattened_partition> flatten<cel_date_t>(const size_t,
-                                                                    const std::vector<disjunct_partition<cel_date_t>>&);
+template legacy_embedded_ctl::static_array<flattened_partition> flatten<cel_date_t>(
+    const size_t, const std::vector<disjunct_partition<cel_date_t>>&);
 template legacy_embedded_ctl::static_array<flattened_partition> flatten<cel_string_t>(
     const size_t, const std::vector<disjunct_partition<cel_string_t>>&);
 
@@ -685,14 +689,14 @@ void copy_dictionary_partition(const legacy_embedded_ctl::array_view<const cel_s
 }
 
 template <typename T>
-dictionary_data<T> copy_dictionary_partitions(const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions,
-                                              const sizes_and_offsets<T>& sizes_and_offsets,
-                                              common::execution_context& context) {
+dictionary_data<T> copy_dictionary_partitions(
+    const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions,
+    const sizes_and_offsets<T>& sizes_and_offsets, common::execution_context& context) {
   dictionary_data<T> result;
 
   const size_t output_dictionary_size{sizes_and_offsets.partition_offsets.back()};
-  result.dictionary = memory::tracking::make_static_array_for_overwrite<T>(output_dictionary_size,
-                                                                           LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context);
+  result.dictionary = memory::tracking::make_static_array_for_overwrite<T>(
+      output_dictionary_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context);
 
   if constexpr (std::is_same_v<T, cel_string_t>) {
     const size_t output_buffer_size{std::accumulate(sizes_and_offsets.buffer_sizes.begin(),
@@ -735,14 +739,17 @@ template <typename T>
 legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>> copy_mapping_partitions(
     const std::vector<typed_dictionary<T>*>& typed_dictionaries,
     const std::vector<disjunct_partition<T>>& disjunct_partitions,
-    const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions, const legacy_embedded_ctl::static_array<size_t>& partition_offsets,
-    const legacy_embedded_ctl::static_array<flattened_partition>& flattened_partitions, common::execution_context& context) {
+    const legacy_embedded_ctl::static_array<result_partition<T>>& result_partitions,
+    const legacy_embedded_ctl::static_array<size_t>& partition_offsets,
+    const legacy_embedded_ctl::static_array<flattened_partition>& flattened_partitions,
+    common::execution_context& context) {
   auto output_mappings{memory::tracking::make_static_array_for_overwrite<legacy_embedded_ctl::static_array<row_id>>(
       typed_dictionaries.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)};
 
   for (std::size_t i{0}; i < typed_dictionaries.size(); ++i) {
     auto output_mapping{memory::tracking::make_static_array_for_overwrite<row_id>(
-        typed_dictionaries.at(i)->get_size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), context)};
+        typed_dictionaries.at(i)->get_size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG),
+        context)};
     output_mapping[0] = 0;  // NULL always maps to NULL
     output_mappings[i] = std::move(output_mapping);
   }
@@ -783,27 +790,39 @@ legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>> cop
   return output_mappings;
 }
 
-template legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>> copy_mapping_partitions<cel_int_t>(
-    const std::vector<typed_dictionary<cel_int_t>*>&, const std::vector<disjunct_partition<cel_int_t>>&,
-    const legacy_embedded_ctl::static_array<result_partition<cel_int_t>>&, const legacy_embedded_ctl::static_array<size_t>&,
-    const legacy_embedded_ctl::static_array<flattened_partition>&, common::execution_context&);
-template legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>> copy_mapping_partitions<cel_float_t>(
-    const std::vector<typed_dictionary<cel_float_t>*>&, const std::vector<disjunct_partition<cel_float_t>>&,
-    const legacy_embedded_ctl::static_array<result_partition<cel_float_t>>&, const legacy_embedded_ctl::static_array<size_t>&,
-    const legacy_embedded_ctl::static_array<flattened_partition>&, common::execution_context&);
-template legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>> copy_mapping_partitions<cel_date_t>(
-    const std::vector<typed_dictionary<cel_date_t>*>&, const std::vector<disjunct_partition<cel_date_t>>&,
-    const legacy_embedded_ctl::static_array<result_partition<cel_date_t>>&, const legacy_embedded_ctl::static_array<size_t>&,
-    const legacy_embedded_ctl::static_array<flattened_partition>&, common::execution_context&);
-template legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>> copy_mapping_partitions<cel_string_t>(
-    const std::vector<typed_dictionary<cel_string_t>*>&, const std::vector<disjunct_partition<cel_string_t>>&,
-    const legacy_embedded_ctl::static_array<result_partition<cel_string_t>>&, const legacy_embedded_ctl::static_array<size_t>&,
-    const legacy_embedded_ctl::static_array<flattened_partition>&, common::execution_context&);
+template legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>>
+copy_mapping_partitions<cel_int_t>(const std::vector<typed_dictionary<cel_int_t>*>&,
+                                   const std::vector<disjunct_partition<cel_int_t>>&,
+                                   const legacy_embedded_ctl::static_array<result_partition<cel_int_t>>&,
+                                   const legacy_embedded_ctl::static_array<size_t>&,
+                                   const legacy_embedded_ctl::static_array<flattened_partition>&,
+                                   common::execution_context&);
+template legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>>
+copy_mapping_partitions<cel_float_t>(const std::vector<typed_dictionary<cel_float_t>*>&,
+                                     const std::vector<disjunct_partition<cel_float_t>>&,
+                                     const legacy_embedded_ctl::static_array<result_partition<cel_float_t>>&,
+                                     const legacy_embedded_ctl::static_array<size_t>&,
+                                     const legacy_embedded_ctl::static_array<flattened_partition>&,
+                                     common::execution_context&);
+template legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>>
+copy_mapping_partitions<cel_date_t>(const std::vector<typed_dictionary<cel_date_t>*>&,
+                                    const std::vector<disjunct_partition<cel_date_t>>&,
+                                    const legacy_embedded_ctl::static_array<result_partition<cel_date_t>>&,
+                                    const legacy_embedded_ctl::static_array<size_t>&,
+                                    const legacy_embedded_ctl::static_array<flattened_partition>&,
+                                    common::execution_context&);
+template legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>>
+copy_mapping_partitions<cel_string_t>(const std::vector<typed_dictionary<cel_string_t>*>&,
+                                      const std::vector<disjunct_partition<cel_string_t>>&,
+                                      const legacy_embedded_ctl::static_array<result_partition<cel_string_t>>&,
+                                      const legacy_embedded_ctl::static_array<size_t>&,
+                                      const legacy_embedded_ctl::static_array<flattened_partition>&,
+                                      common::execution_context&);
 
 template <typename T>
-std::pair<raw_dictionary_t, legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>>> construct_and_merge_typed_dictionaries(
-    const std::vector<non_null_dictionary>& dictionaries, const std::string& op_name,
-    common::execution_context& context) {
+std::pair<raw_dictionary_t, legacy_embedded_ctl::static_array<legacy_embedded_ctl::static_array<row_id>>>
+construct_and_merge_typed_dictionaries(const std::vector<non_null_dictionary>& dictionaries, const std::string& op_name,
+                                       common::execution_context& context) {
   auto typed_dictionaries{details::to_typed_dictionaries<T>(dictionaries, op_name)};
   auto dictionary_accessors{details::get_dictionary_accessors(typed_dictionaries, context)};
   auto input_partitions{details::partition(dictionary_accessors)};

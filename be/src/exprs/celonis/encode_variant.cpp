@@ -17,7 +17,7 @@ public:
     ActivityMap() = default;
 
     explicit ActivityMap(const DatumArray& array) {
-        for (const auto& activity: array) {
+        for (const auto& activity : array) {
             if (activity.is_null()) {
                 continue;
             }
@@ -39,7 +39,7 @@ struct EncodeVariantStateFragmentLocal {
     bool null_map = false;
     ScalarFunction function;
 };
-}
+} // namespace
 
 Status CelonisEncodeVariant::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
@@ -77,15 +77,15 @@ Status CelonisEncodeVariant::close(FunctionContext* context, FunctionContext::Fu
     return Status::OK();
 }
 
-StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_non_constant_map([[maybe_unused]]FunctionContext* context,
+StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_non_constant_map([[maybe_unused]] FunctionContext* context,
                                                                           const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr variant_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData variant_data = prepare_array_input(variant_column.get());
-    const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *variant_data.elements).get_data().data();
+    const auto& activities =
+            down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*variant_data.elements).get_data().data();
     const auto& offsets = variant_data.offsets->get_data().data();
 
     Int32Column::Ptr array_index_column = Int32Column::create();
@@ -118,19 +118,19 @@ StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_non_constant_map([[mayb
     array_offsets->append(offset);
     return NullableColumn::create(
             ArrayColumn::create(NullableColumn::create(array_index_column, NullColumn::create(offset, 0)),
-                                array_offsets), null_column);
-
+                                array_offsets),
+            null_column);
 }
 
-StatusOr<ColumnPtr>
-CelonisEncodeVariant::encode_variant_constant_map([[maybe_unused]]FunctionContext* context, const Columns& columns) {
+StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_constant_map([[maybe_unused]] FunctionContext* context,
+                                                                      const Columns& columns) {
     DCHECK_EQ(2, columns.size());
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr variant_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData variant_data = prepare_array_input(variant_column.get());
-    const auto& activities = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(
-            *variant_data.elements).get_data().data();
+    const auto& activities =
+            down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*variant_data.elements).get_data().data();
     const auto& offsets = variant_data.offsets->get_data().data();
 
     const auto* state = reinterpret_cast<const EncodeVariantStateFragmentLocal*>(
@@ -164,8 +164,8 @@ CelonisEncodeVariant::encode_variant_constant_map([[maybe_unused]]FunctionContex
     array_offsets->append(offset);
     return NullableColumn::create(
             ArrayColumn::create(NullableColumn::create(array_index_column, NullColumn::create(offset, 0)),
-                                array_offsets), null_column);
-
+                                array_offsets),
+            null_column);
 }
 
 StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant(FunctionContext* context, const Columns& columns) {
@@ -173,6 +173,5 @@ StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant(FunctionContext* contex
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
-
 
 } // namespace starrocks

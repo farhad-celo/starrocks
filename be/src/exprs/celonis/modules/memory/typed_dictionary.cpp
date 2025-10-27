@@ -225,8 +225,8 @@ raw_dictionary_t typed_dictionary<T>::copy_to_raw_dictionary(common::execution_c
   legacy_embedded_ctl::static_array<T> output_array;
   {
     const auto data{get_const_data(context)};
-    output_array =
-        memory::tracking::make_static_array_for_overwrite<T>(data.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context);
+    output_array = memory::tracking::make_static_array_for_overwrite<T>(
+        data.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context);
     std::copy(data.begin(), data.end(), output_array.begin());
   }
 
@@ -239,7 +239,8 @@ void typed_dictionary<T>::set_delete_from_disk_when_destructed(const bool value)
 }
 
 template <typename T>
-dictionary_t typed_dictionary<T>::create_dictionary(legacy_embedded_ctl::static_array<T>&& data, const std::string& swap_file_name,
+dictionary_t typed_dictionary<T>::create_dictionary(legacy_embedded_ctl::static_array<T>&& data,
+                                                    const std::string& swap_file_name,
                                                     const management::swap_info& sinfo,
                                                     const std::string& description) {
   return std::make_shared<typed_dictionary<T>>(management::raw_data_handler<T>::create_data_handler(
@@ -308,8 +309,8 @@ raw_dictionary_t typed_dictionary<cel_string_t>::copy_to_raw_dictionary(common::
   legacy_embedded_ctl::static_array<cel_string_t> output_array;
   {
     const auto data{get_const_data(context)};
-    buffer = memory::tracking::make_static_array_for_overwrite<char>(data.buffer_size(),
-                                                                     LEGACY_EMBEDDED_ALLOC_MSG("Allocation for the buffer"), context);
+    buffer = memory::tracking::make_static_array_for_overwrite<char>(
+        data.buffer_size(), LEGACY_EMBEDDED_ALLOC_MSG("Allocation for the buffer"), context);
     std::copy_n(data.buffer_begin(), data.buffer_size(), buffer.data());
     output_array = memory::tracking::make_static_array_for_overwrite<cel_string_t>(
         data.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context);
@@ -401,11 +402,9 @@ std::string typed_dictionary<cel_string_t>::get_string_value(row_id ptr) const {
   return get_string_value_opt(ptr).value_or("NULL");
 }
 
-[[nodiscard]] dictionary_t typed_dictionary<cel_string_t>::create_dictionary(legacy_embedded_ctl::static_array<cel_string_t>&& ptr,
-                                                                             legacy_embedded_ctl::static_array<char>&& buffer,
-                                                                             const std::string& swap_file,
-                                                                             const management::swap_info& sinfo,
-                                                                             const std::string& description) {
+[[nodiscard]] dictionary_t typed_dictionary<cel_string_t>::create_dictionary(
+    legacy_embedded_ctl::static_array<cel_string_t>&& ptr, legacy_embedded_ctl::static_array<char>&& buffer,
+    const std::string& swap_file, const management::swap_info& sinfo, const std::string& description) {
   return std::make_shared<typed_dictionary<cel_string_t>>(management::string_data_handler::create_data_handler(
       std::move(ptr), std::move(buffer), swap_file, management::pointer_data_handler_swap_type::SWAPPED_DICTIONARY,
       sinfo, description));

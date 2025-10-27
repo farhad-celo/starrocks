@@ -1,7 +1,8 @@
 #include "util.h"
+
 #include "exprs/celonis/util.h"
-#include "google/protobuf/util/json_util.h"
 #include "google/protobuf/stubs/strutil.h"
+#include "google/protobuf/util/json_util.h"
 
 namespace starrocks::celonis {
 
@@ -22,9 +23,8 @@ std::string get_workday_mask_str(int n_days, const std::unordered_set<int>& one_
             int byte_index = i / 8;
             int bit_index = i % 8;
             unsigned char bit_value_to_set = (1 << bit_index);
-            mask_data[byte_index] = static_cast<char>(
-                    static_cast<unsigned char>(mask_data[byte_index]) | bit_value_to_set
-            );
+            mask_data[byte_index] =
+                    static_cast<char>(static_cast<unsigned char>(mask_data[byte_index]) | bit_value_to_set);
         }
     }
     std::string base64_mask;
@@ -41,10 +41,10 @@ std::string to_base64_encoded_string(const ::celonis::accelerator::Calendar& cal
         binary_string = std::move(compress_string(binary_string, true));
     }
 
-    int cipher_len = (size_t)(4.0 * ceil((double) binary_string.length() / 3.0)) + 1;
+    int cipher_len = (size_t)(4.0 * ceil((double)binary_string.length() / 3.0)) + 1;
     char p[cipher_len];
 
-    int len = base64_encode3((unsigned char*) binary_string.data(), binary_string.length(), (unsigned char*)p);
+    int len = base64_encode3((unsigned char*)binary_string.data(), binary_string.length(), (unsigned char*)p);
     std::string encoded_string(p, len);
     return encoded_string;
 }

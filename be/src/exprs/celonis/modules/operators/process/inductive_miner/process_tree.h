@@ -180,13 +180,13 @@ struct process_tree {
 
   template <typename F>
   [[nodiscard]] bool any_child_of(const process_tree::node_type& n, F&& f) const {
-    return std::visit(
-        legacy_embedded_ctl::overloaded{[&f](const exclusive& p) { return std::any_of(begin(p.children), end(p.children), f); },
-                        [&f](const redo& p) { return std::any_of(begin(p.children), end(p.children), f); },
-                        [&f](const parallel& p) { return std::any_of(begin(p.children), end(p.children), f); },
-                        [&f](const sequence& p) { return std::any_of(begin(p.children), end(p.children), f); },
-                        [](const auto& /*not used */) { return false; }},
-        n);
+    return std::visit(legacy_embedded_ctl::overloaded{
+                          [&f](const exclusive& p) { return std::any_of(begin(p.children), end(p.children), f); },
+                          [&f](const redo& p) { return std::any_of(begin(p.children), end(p.children), f); },
+                          [&f](const parallel& p) { return std::any_of(begin(p.children), end(p.children), f); },
+                          [&f](const sequence& p) { return std::any_of(begin(p.children), end(p.children), f); },
+                          [](const auto& /*not used */) { return false; }},
+                      n);
   }
 };
 

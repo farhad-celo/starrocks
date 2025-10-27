@@ -1,5 +1,6 @@
-#include <algorithm>
 #include <gtest/gtest.h>
+
+#include <algorithm>
 #include <nlohmann/json.hpp>
 #include <random>
 
@@ -141,7 +142,7 @@ public:
                 for (const auto& [k, v] : actual[key][i].items()) {
                     if (to_ignore.count(k) == 0) {
                         EXPECT_TRUE(array[i].contains(k))
-                                            << " redundant element " << k << " in " << key << "[" << i << "]";
+                                << " redundant element " << k << " in " << key << "[" << i << "]";
                     }
                 }
             }
@@ -156,9 +157,11 @@ public:
 
     void Run(const VariantRows& variant_rows, const std::string& expected, Column::Ptr weight_column,
              double imfd_frequency_threshold = 0.0) {
-        const AggregateFunction* func = get_aggregate_function("celonis_inductive_miner", TYPE_ARRAY, TYPE_VARCHAR, false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_inductive_miner", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto variants = build_variant_column(variant_rows);
-        auto threshold_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(imfd_frequency_threshold, variant_rows.size());
+        auto threshold_column =
+                ColumnHelper::create_const_column<TYPE_DOUBLE>(imfd_frequency_threshold, variant_rows.size());
 
         Columns constant_columns;
         constant_columns.push_back(nullptr);
@@ -219,10 +222,9 @@ TEST_F(CelonisInductiveMinerTest, FilterThresholdAboveOneLeadsToFailure) {
 }
 
 TEST_F(CelonisInductiveMinerTest, Q1) {
-    VariantRows variants = {{"A", "B", "E"},
-                            {"A", "B", "F"}};
+    VariantRows variants = {{"A", "B", "E"}, {"A", "B", "F"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -277,8 +279,7 @@ TEST_F(CelonisInductiveMinerTest, Q1) {
 
 TEST_F(CelonisInductiveMinerTest, Q1_consistency) {
     // Different variants' order with the same expected.
-    VariantRows variants = {{"A", "B", "F"},
-                            {"A", "B", "E"}};
+    VariantRows variants = {{"A", "B", "F"}, {"A", "B", "E"}};
     std::string expected =
             R"json({
             "vertex_properties": [
@@ -333,12 +334,9 @@ TEST_F(CelonisInductiveMinerTest, Q1_consistency) {
     Run(variants, expected);
 }
 TEST_F(CelonisInductiveMinerTest, Q2) {
-    VariantRows variants = {{"A", "C", "D"},
-                            {"A", "D", "C"},
-                            {"A", "A", "C", "D"},
-                            {"B", "C", "D"}};
+    VariantRows variants = {{"A", "C", "D"}, {"A", "D", "C"}, {"A", "A", "C", "D"}, {"B", "C", "D"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -416,11 +414,9 @@ TEST_F(CelonisInductiveMinerTest, Q2) {
 }
 
 TEST_F(CelonisInductiveMinerTest, L1) {
-    VariantRows variants = {{"A", "B", "C", "D"},
-                            {"A", "C", "B", "D"},
-                            {"A", "E", "D"}};
+    VariantRows variants = {{"A", "B", "C", "D"}, {"A", "C", "B", "D"}, {"A", "E", "D"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -497,7 +493,7 @@ TEST_F(CelonisInductiveMinerTest, L2) {
                             {"A", "B", "C", "E", "F", "C", "B", "D"},
                             {"A", "C", "B", "E", "F", "B", "C", "E", "F", "C", "B", "D"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -587,7 +583,7 @@ TEST_F(CelonisInductiveMinerTest, L3) {
                             {"A", "B", "D", "C", "E", "G"},
                             {"A", "B", "C", "D", "E", "F", "B", "C", "D", "E", "F", "B", "D", "C", "E", "G"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -681,12 +677,9 @@ TEST_F(CelonisInductiveMinerTest, L3) {
 }
 
 TEST_F(CelonisInductiveMinerTest, L4) {
-    VariantRows variants = {{"A", "C", "D"},
-                            {"B", "C", "D"},
-                            {"A", "C", "E"},
-                            {"B", "C", "E"}};
+    VariantRows variants = {{"A", "C", "D"}, {"B", "C", "D"}, {"A", "C", "E"}, {"B", "C", "E"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -762,7 +755,7 @@ TEST_F(CelonisInductiveMinerTest, L5) {
                             {"A", "B", "C", "D", "E", "B", "F"},
                             {"A", "E", "B", "C", "D", "B", "F"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -848,12 +841,9 @@ TEST_F(CelonisInductiveMinerTest, L5) {
 }
 
 TEST_F(CelonisInductiveMinerTest, L6) {
-    VariantRows variants = {{"A", "C", "E", "G"},
-                            {"A", "E", "C", "G"},
-                            {"B", "D", "F", "G"},
-                            {"B", "F", "D", "G"}};
+    VariantRows variants = {{"A", "C", "E", "G"}, {"A", "E", "C", "G"}, {"B", "D", "F", "G"}, {"B", "F", "D", "G"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -1027,11 +1017,9 @@ TEST_F(CelonisInductiveMinerTest, L7) {
 */
 
 TEST_F(CelonisInductiveMinerTest, L8) {
-    VariantRows variants = {{"A", "B", "D"},
-                            {"A", "B", "C", "B", "D"},
-                            {"A", "B", "C", "B", "C", "B", "D"}};
+    VariantRows variants = {{"A", "B", "D"}, {"A", "B", "C", "B", "D"}, {"A", "B", "C", "B", "C", "B", "D"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -1085,10 +1073,9 @@ TEST_F(CelonisInductiveMinerTest, L8) {
 }
 
 TEST_F(CelonisInductiveMinerTest, L9) {
-    VariantRows variants = {{"A", "C", "D"},
-                            {"B", "C", "E"}};
+    VariantRows variants = {{"A", "C", "D"}, {"B", "C", "E"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -1160,7 +1147,7 @@ TEST_F(CelonisInductiveMinerTest, L9) {
 TEST_F(CelonisInductiveMinerTest, L10) {
     VariantRows variants = {{"A", "A"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 5,
@@ -1190,10 +1177,9 @@ TEST_F(CelonisInductiveMinerTest, L10) {
 }
 
 TEST_F(CelonisInductiveMinerTest, L11) {
-    VariantRows variants = {{"A", "B", "C"},
-                            {"A", "C"}};
+    VariantRows variants = {{"A", "B", "C"}, {"A", "C"}};
     std::string expected =
-        R"json({
+            R"json({
             "vertex_properties": [
                 {
                     "process_tree_type": 3,
@@ -1266,10 +1252,7 @@ TEST_F(CelonisInductiveMinerTest, EmptyLogBaseCase) {
  */
 
 TEST_F(CelonisInductiveMinerTest, SequenceWithSkippedActivities) {
-    VariantRows variants = {{"A", "B", "C"},
-                            {"B", "C"},
-                            {"A", "C"},
-                            {"A", "B"}};
+    VariantRows variants = {{"A", "B", "C"}, {"B", "C"}, {"A", "C"}, {"A", "B"}};
     std::string expected =
             R"json({
             "vertex_properties": [
@@ -1357,9 +1340,7 @@ TEST_F(CelonisInductiveMinerTest, SequenceWithSkippedActivities) {
 }
 
 TEST_F(CelonisInductiveMinerTest, SequenceSkippingFirstActivity_2xBC_1xABC) {
-    VariantRows variants = {{"B", "C"},
-                            {"B", "C"},
-                            {"A", "B", "C"}};
+    VariantRows variants = {{"B", "C"}, {"B", "C"}, {"A", "B", "C"}};
     std::string expected =
             R"json({
             "vertex_properties": [
@@ -1415,9 +1396,7 @@ TEST_F(CelonisInductiveMinerTest, SequenceSkippingFirstActivity_2xBC_1xABC) {
 }
 
 TEST_F(CelonisInductiveMinerTest, SequenceSkippingFirstActivity_1xBC_2xABC) {
-    VariantRows variants = {{"B", "C"},
-                            {"A", "B", "C"},
-                            {"A", "B", "C"}};
+    VariantRows variants = {{"B", "C"}, {"A", "B", "C"}, {"A", "B", "C"}};
     std::string expected =
             R"json({
             "vertex_properties": [
@@ -1529,8 +1508,7 @@ TEST_F(CelonisInductiveMinerTest, SecretTauLoopFallback) {
 }
 
 TEST_F(CelonisInductiveMinerTest, RepeatedLogs) {
-    VariantRows variants = {{"A", "B", "A"},
-                            {"A", "B", "A"}};
+    VariantRows variants = {{"A", "B", "A"}, {"A", "B", "A"}};
     std::string expected =
             R"json({
             "vertex_properties": [
@@ -1562,8 +1540,7 @@ TEST_F(CelonisInductiveMinerTest, RepeatedLogs) {
 }
 
 TEST_F(CelonisInductiveMinerTest, SkipFirst) {
-    VariantRows variants = {{"E", "B", "C"},
-                            {"B", "C"}};
+    VariantRows variants = {{"E", "B", "C"}, {"B", "C"}};
     std::string expected =
             R"json({
             "vertex_properties": [
@@ -1699,8 +1676,8 @@ TEST_F(CelonisInductiveMinerTest, FilterInfrequentBehavior) {
 */
 
 TEST_F(CelonisInductiveMinerTest, LowThresholdNoFiltering) {
-    VariantRows variants = {{"A", "B", "D", "E"}, // 4
-                            {"A", "C", "B", "D", "E"}, // 4
+    VariantRows variants = {{"A", "B", "D", "E"},                 // 4
+                            {"A", "C", "B", "D", "E"},            // 4
                             {"A", "B", "D", "C", "B", "D", "E"}}; // 1
     std::string expected =
             R"json({
@@ -1799,8 +1776,7 @@ TEST_F(CelonisInductiveMinerTest, LowThresholdNoFiltering) {
 // While there are 10 more tests in Saola inductive_miner_test.cpp, the above tests would be enough to check porting.
 
 TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
-    VariantRows variants = {{"A", "B", "C"},
-                            {"A", "B", "D"}};
+    VariantRows variants = {{"A", "B", "C"}, {"A", "B", "D"}};
     std::string expected =
             R"json({
             "vertex_properties": [
@@ -1958,8 +1934,7 @@ TEST_F(CelonisInductiveMinerTest, col1_of_mo_bpmn_graph_example) {
 }
 
 TEST_F(CelonisInductiveMinerTest, col2_of_mo_bpmn_graph_example) {
-    VariantRows variants = {{"E", "B", "C"},
-                            {"B", "C"}};
+    VariantRows variants = {{"E", "B", "C"}, {"B", "C"}};
     std::string expected =
             R"json({
             "vertex_properties": [

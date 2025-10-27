@@ -6,7 +6,6 @@ namespace starrocks {
 
 class CelonisIndexActivity {
 public:
-
     /**
      * @param: [input_array, mode, direction]
      * @paramType columns: [Any ARRAY, VARCHAR, VARCHAR]
@@ -17,10 +16,8 @@ public:
      */
     DEFINE_VECTORIZED_FN(celonis_index_activity);
 
-    static Status celonis_index_activity_prepare(FunctionContext* context,
-                                                 FunctionContext::FunctionStateScope scope);
-    static Status celonis_index_activity_close(FunctionContext* context,
-                                               FunctionContext::FunctionStateScope scope);
+    static Status celonis_index_activity_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status celonis_index_activity_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
 
 } // namespace starrocks

@@ -44,9 +44,7 @@ private:
 
 class TestJsonEvaluator {
 public:
-    explicit TestJsonEvaluator(const std::string& json_string) {
-        document_.Parse(json_string.c_str());
-    }
+    explicit TestJsonEvaluator(const std::string& json_string) { document_.Parse(json_string.c_str()); }
 
     template <typename T>
     void evaluate(const char* table, const char* column, const std::vector<T>& values) {
@@ -59,13 +57,13 @@ public:
                     << "table: " << table << ", column: " << column << ", row: " << i;
             if constexpr (std::is_same_v<T, int>) {
                 EXPECT_EQ(table_values[i][column].GetInt(), values[i])
-                                    << "table: " << table << ", column: " << column << ", row: " << i;
+                        << "table: " << table << ", column: " << column << ", row: " << i;
             } else if constexpr (std::is_same_v<T, int64_t>) {
                 EXPECT_EQ(table_values[i][column].GetInt64(), values[i])
-                                    << "table: " << table << ", column: " << column << ", row: " << i;
+                        << "table: " << table << ", column: " << column << ", row: " << i;
             } else if constexpr (std::is_same_v<T, std::string>) {
                 EXPECT_EQ(table_values[i][column].GetString(), values[i])
-                                    << "table: " << table << ", column: " << column << ", row: " << i;
+                        << "table: " << table << ", column: " << column << ", row: " << i;
             }
         }
     }
@@ -123,7 +121,8 @@ private:
     }
 
     std::string inductive_miner(const VariantRows& variant_rows, int64_t weight = 1L) {
-        const AggregateFunction* func = get_aggregate_function("celonis_inductive_miner", TYPE_ARRAY, TYPE_VARCHAR, false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_inductive_miner", TYPE_ARRAY, TYPE_VARCHAR, false);
         auto variant_column = build_variant_column(variant_rows);
         auto weight_column = ColumnHelper::create_const_column<TYPE_BIGINT>(weight, variant_rows.size());
         auto threshold_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(0.0, variant_rows.size());
@@ -478,15 +477,15 @@ TEST_F(CelonisMoBpmnGraphTest, pql_mo_bpmn_graph_example) {
     e.evaluate<int>("bpmn_activities", "NODE_ID", {2, 3, 6, 7, 12});
 
     e.evaluate<int>("bpmn_model_descriptions", "OBJECT_ID", {0, 1});
-    e.evaluate<std::string>("bpmn_model_descriptions", "BPMN_MODEL_DESCRIPTION", {
-            "[[0 BPMN_START][1 BPMN_END][2 BPMN_TASK 'A'][3 BPMN_TASK 'B'][4 BPMN_EXCLUSIVE_CHOICE][5 "
-            "BPMN_EXCLUSIVE_CHOICE][6 BPMN_TASK 'C'][7 BPMN_TASK 'D']],[[0 2][2 3][3 4][4 6][4 7][5 1][6 5][7 5]]",
-            "[[3 BPMN_TASK 'B'][6 BPMN_TASK 'C'][8 BPMN_START][9 BPMN_END][10 BPMN_EXCLUSIVE_CHOICE][11 "
-            "BPMN_EXCLUSIVE_CHOICE][12 BPMN_TASK 'E']],[[3 6][6 9][8 10][10 11][10 12][11 3][12 11]]"});
+    e.evaluate<std::string>(
+            "bpmn_model_descriptions", "BPMN_MODEL_DESCRIPTION",
+            {"[[0 BPMN_START][1 BPMN_END][2 BPMN_TASK 'A'][3 BPMN_TASK 'B'][4 BPMN_EXCLUSIVE_CHOICE][5 "
+             "BPMN_EXCLUSIVE_CHOICE][6 BPMN_TASK 'C'][7 BPMN_TASK 'D']],[[0 2][2 3][3 4][4 6][4 7][5 1][6 5][7 5]]",
+             "[[3 BPMN_TASK 'B'][6 BPMN_TASK 'C'][8 BPMN_START][9 BPMN_END][10 BPMN_EXCLUSIVE_CHOICE][11 "
+             "BPMN_EXCLUSIVE_CHOICE][12 BPMN_TASK 'E']],[[3 6][6 9][8 10][10 11][10 12][11 3][12 11]]"});
 }
 
 TEST_F(CelonisMoBpmnGraphTest, pql_mo_bpmn_graph_example_with_inductive_miner_consistency) {
-
     auto evaluate = [](const std::string& json_result) {
         TestJsonEvaluator e(json_result);
 
@@ -502,48 +501,41 @@ TEST_F(CelonisMoBpmnGraphTest, pql_mo_bpmn_graph_example_with_inductive_miner_co
         e.evaluate<int>("bpmn_activities", "NODE_ID", {2, 3, 6, 7, 12});
 
         e.evaluate<int>("bpmn_model_descriptions", "OBJECT_ID", {0, 1});
-        e.evaluate<std::string>("bpmn_model_descriptions", "BPMN_MODEL_DESCRIPTION", {
-                "[[0 BPMN_START][1 BPMN_END][2 BPMN_TASK 'A'][3 BPMN_TASK 'B'][4 BPMN_EXCLUSIVE_CHOICE][5 "
-                "BPMN_EXCLUSIVE_CHOICE][6 BPMN_TASK 'C'][7 BPMN_TASK 'D']],[[0 2][2 3][3 4][4 6][4 7][5 1][6 5][7 5]]",
-                "[[3 BPMN_TASK 'B'][6 BPMN_TASK 'C'][8 BPMN_START][9 BPMN_END][10 BPMN_EXCLUSIVE_CHOICE][11 "
-                "BPMN_EXCLUSIVE_CHOICE][12 BPMN_TASK 'E']],[[3 6][6 9][8 10][10 11][10 12][11 3][12 11]]"});
+        e.evaluate<std::string>(
+                "bpmn_model_descriptions", "BPMN_MODEL_DESCRIPTION",
+                {"[[0 BPMN_START][1 BPMN_END][2 BPMN_TASK 'A'][3 BPMN_TASK 'B'][4 BPMN_EXCLUSIVE_CHOICE][5 "
+                 "BPMN_EXCLUSIVE_CHOICE][6 BPMN_TASK 'C'][7 BPMN_TASK 'D']],[[0 2][2 3][3 4][4 6][4 7][5 1][6 5][7 5]]",
+                 "[[3 BPMN_TASK 'B'][6 BPMN_TASK 'C'][8 BPMN_START][9 BPMN_END][10 BPMN_EXCLUSIVE_CHOICE][11 "
+                 "BPMN_EXCLUSIVE_CHOICE][12 BPMN_TASK 'E']],[[3 6][6 9][8 10][10 11][10 12][11 3][12 11]]"});
     };
 
     {
-        VariantRows variants1 = {{"A", "B", "C"},
-                                 {"A", "B", "D"}};
-        VariantRows variants2 = {{"E", "B", "C"},
-                                 {"B", "C"}};
+        VariantRows variants1 = {{"A", "B", "C"}, {"A", "B", "D"}};
+        VariantRows variants2 = {{"E", "B", "C"}, {"B", "C"}};
 
         auto result = run({Slice(inductive_miner(variants1)), Slice(inductive_miner(variants2))});
         ASSERT_TRUE(result.ok());
         evaluate(result.value());
     }
     {
-        VariantRows variants1 = {{"A", "B", "D"},
-                                 {"A", "B", "C"}};
-        VariantRows variants2 = {{"E", "B", "C"},
-                                 {"B", "C"}};
+        VariantRows variants1 = {{"A", "B", "D"}, {"A", "B", "C"}};
+        VariantRows variants2 = {{"E", "B", "C"}, {"B", "C"}};
 
         auto result = run({Slice(inductive_miner(variants1)), Slice(inductive_miner(variants2))});
         ASSERT_TRUE(result.ok());
         evaluate(result.value());
     }
     {
-        VariantRows variants1 = {{"A", "B", "C"},
-                                 {"A", "B", "D"}};
-        VariantRows variants2 = {{"B", "C"},
-                                 {"E", "B", "C"}};
+        VariantRows variants1 = {{"A", "B", "C"}, {"A", "B", "D"}};
+        VariantRows variants2 = {{"B", "C"}, {"E", "B", "C"}};
 
         auto result = run({Slice(inductive_miner(variants1)), Slice(inductive_miner(variants2))});
         ASSERT_TRUE(result.ok());
         evaluate(result.value());
     }
     {
-        VariantRows variants1 = {{"A", "B", "D"},
-                                 {"A", "B", "C"}};
-        VariantRows variants2 = {{"B", "C"},
-                                 {"E", "B", "C"}};
+        VariantRows variants1 = {{"A", "B", "D"}, {"A", "B", "C"}};
+        VariantRows variants2 = {{"B", "C"}, {"E", "B", "C"}};
 
         auto result = run({Slice(inductive_miner(variants1)), Slice(inductive_miner(variants2))});
         ASSERT_TRUE(result.ok());
@@ -923,11 +915,12 @@ TEST_F(CelonisMoBpmnGraphTest, high_object_count) {
     e.evaluate<int>("bpmn_activities", "NODE_ID", {2, 3, 6, 7, 12});
 
     e.evaluate<int>("bpmn_model_descriptions", "OBJECT_ID", {0, 1});
-    e.evaluate<std::string>("bpmn_model_descriptions", "BPMN_MODEL_DESCRIPTION", {
-            "[[0 BPMN_START][1 BPMN_END][2 BPMN_TASK 'A'][3 BPMN_TASK 'B'][4 BPMN_EXCLUSIVE_CHOICE][5 "
-            "BPMN_EXCLUSIVE_CHOICE][6 BPMN_TASK 'C'][7 BPMN_TASK 'D']],[[0 2][2 3][3 4][4 6][4 7][5 1][6 5][7 5]]",
-            "[[3 BPMN_TASK 'B'][6 BPMN_TASK 'C'][8 BPMN_START][9 BPMN_END][10 BPMN_EXCLUSIVE_CHOICE][11 "
-            "BPMN_EXCLUSIVE_CHOICE][12 BPMN_TASK 'E']],[[3 6][6 9][8 10][10 11][10 12][11 3][12 11]]"});
+    e.evaluate<std::string>(
+            "bpmn_model_descriptions", "BPMN_MODEL_DESCRIPTION",
+            {"[[0 BPMN_START][1 BPMN_END][2 BPMN_TASK 'A'][3 BPMN_TASK 'B'][4 BPMN_EXCLUSIVE_CHOICE][5 "
+             "BPMN_EXCLUSIVE_CHOICE][6 BPMN_TASK 'C'][7 BPMN_TASK 'D']],[[0 2][2 3][3 4][4 6][4 7][5 1][6 5][7 5]]",
+             "[[3 BPMN_TASK 'B'][6 BPMN_TASK 'C'][8 BPMN_START][9 BPMN_END][10 BPMN_EXCLUSIVE_CHOICE][11 "
+             "BPMN_EXCLUSIVE_CHOICE][12 BPMN_TASK 'E']],[[3 6][6 9][8 10][10 11][10 12][11 3][12 11]]"});
 }
 TEST_F(CelonisMoBpmnGraphTest, invalid_json_spec) {
     Slice no_statistics(

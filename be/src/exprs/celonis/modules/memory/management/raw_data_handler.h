@@ -32,8 +32,9 @@ class raw_data_handler final : public data_handler {
   static constexpr const char* RAW_DATA_HANDLER_SWAP_IN_KEY = "RAW_DATA_HANDLER_SWAP_IN";
   static constexpr const char* RAW_DATA_HANDLER_SWAP_OUT_KEY = "RAW_DATA_HANDLER_SWAP_OUT";
 
-  static raw_data_handler_t<T> create_data_handler(legacy_embedded_ctl::static_array<T> data, const std::string& swap_file,
-                                                   const swap_info& sinfo, const std::string& description);
+  static raw_data_handler_t<T> create_data_handler(legacy_embedded_ctl::static_array<T> data,
+                                                   const std::string& swap_file, const swap_info& sinfo,
+                                                   const std::string& description);
 
   static raw_data_handler_t<T> create_temp_data_handler(legacy_embedded_ctl::static_array<T> data);
 
@@ -96,8 +97,8 @@ class raw_data_handler final : public data_handler {
   /**
    * This function returns a pointer to the immutable stored data.
    */
-  const_data_accessor_t get_const_data(const common::execution_context& context = {}) requires(
-      requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; });
+  const_data_accessor_t get_const_data(const common::execution_context& context = {})
+    requires(requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; });
 
   std::string description() const override { return desc; }
 
@@ -109,8 +110,9 @@ class raw_data_handler final : public data_handler {
   ~raw_data_handler() override;
 
  private:
-  raw_data_handler(load_status status, legacy_embedded_ctl::shared_static_array<T> data, size_t size, std::string swap_file,
-                   swap_info swap_information, bool persisted, size_t size_on_disk, std::string description);
+  raw_data_handler(load_status status, legacy_embedded_ctl::shared_static_array<T> data, size_t size,
+                   std::string swap_file, swap_info swap_information, bool persisted, size_t size_on_disk,
+                   std::string description);
 
   legacy_embedded_ctl::shared_static_array<T> swap_in_data(const common::execution_context& context);
 

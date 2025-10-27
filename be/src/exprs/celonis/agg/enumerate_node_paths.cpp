@@ -1,7 +1,8 @@
 #include "enumerate_node_paths.h"
 
-#include <cmath>
 #include <fmt/format.h>
+
+#include <cmath>
 
 #include "column/array_column.h"
 #include "column/binary_column.h"
@@ -18,13 +19,22 @@ namespace starrocks {
 namespace {
 
 enum InputColumnIndex {
-    OUT_COLUMNS, IN_COLUMNS, PK_COLUMNS, OUT_START, OUT_END, IN_START, IN_END, OUT_ALL, IN_ALL, ALLOW_CYCLES,
-    LENGTH_COMPARISON, LENGTH, NUMBER_OF_COLUMNS
+    OUT_COLUMNS,
+    IN_COLUMNS,
+    PK_COLUMNS,
+    OUT_START,
+    OUT_END,
+    IN_START,
+    IN_END,
+    OUT_ALL,
+    IN_ALL,
+    ALLOW_CYCLES,
+    LENGTH_COMPARISON,
+    LENGTH,
+    NUMBER_OF_COLUMNS
 };
 
-enum LengthComparison {
-    LESS, LESS_EQUAL, EQUAL, GREATER, GREATER_EQUAL, NOT_EQUAL
-};
+enum LengthComparison { LESS, LESS_EQUAL, EQUAL, GREATER, GREATER_EQUAL, NOT_EQUAL };
 
 LengthComparison parseLengthComparison(std::string str) {
     std::transform(str.begin(), str.end(), str.begin(), ::toupper);
@@ -43,8 +53,8 @@ public:
     ColumnsKeyDictionary(FunctionContext* ctx, const Column** columns, LogicalType* logical_types) {
         int32_t num_columns = ctx->get_arg_type(0)->children.size();
         columns_key_info_[ColumnsInfoType::OUT] = ColumnsKey::CommonInfo{columns, logical_types, num_columns};
-        columns_key_info_[ColumnsInfoType::IN] = ColumnsKey::CommonInfo{columns + num_columns, logical_types,
-                                                                        num_columns};
+        columns_key_info_[ColumnsInfoType::IN] =
+                ColumnsKey::CommonInfo{columns + num_columns, logical_types, num_columns};
         // Assign ID 0 to all NULLs.
         may_add_key(ColumnsInfoType::OUT, -1);
     }
@@ -113,9 +123,9 @@ private:
     HashSet<int32_t> is_not_all_;
 
     std::vector<EdgeInfo> stack_;
-    std::vector<int32_t> path_; // The current path
+    std::vector<int32_t> path_;           // The current path
     std::vector<int32_t> path_pk_offset_; // PK offsets in the current path. Used when allow_cycles is true.
-    HashSet<int32_t> visited_; // To check if a node (or a pk when allow_cycles is true) has been visited.
+    HashSet<int32_t> visited_;            // To check if a node (or a pk when allow_cycles is true) has been visited.
 };
 
 template <>
@@ -190,13 +200,13 @@ NodePathEnumerator<allow_cycles>::NodePathEnumerator(FunctionContext* ctx, const
     }
     if (out_start == nullptr && in_start == nullptr) {
         // Implicit Start
-        for (auto out_idx: outs) {
+        for (auto out_idx : outs) {
             if (out_idx != 0 && !ins.contains(out_idx)) {
                 stack_.emplace_back(out_idx);
             }
         }
         // Finds a single node path with (OUT:NULL, IN:in_idx).
-        for (const auto& [in_idx, out_idxes]: reverse_edges) {
+        for (const auto& [in_idx, out_idxes] : reverse_edges) {
             if (in_idx != 0 && out_idxes.size() == 1 && out_idxes[0] == 0) {
                 stack_.emplace_back(in_idx);
             }
@@ -252,7 +262,7 @@ void NodePathEnumerator<allow_cycles>::Enumerate(Column* to) {
         if (*checked) return;
         int length = this->path_.size();
         if ((this->length_comparison_ == LESS && length < this->length_) ||
-            (this->length_comparison_ == LESS_EQUAL &&  length <= this->length_) ||
+            (this->length_comparison_ == LESS_EQUAL && length <= this->length_) ||
             (this->length_comparison_ == EQUAL && length == this->length_) ||
             (this->length_comparison_ == GREATER && length > this->length_) ||
             (this->length_comparison_ == GREATER_EQUAL && length >= this->length_) ||
@@ -278,7 +288,7 @@ void NodePathEnumerator<allow_cycles>::Enumerate(Column* to) {
         }
         auto it = edges_map_.find(pathLast);
         if (it == edges_map_.end()) {
-            if (is_end_.empty())  {
+            if (is_end_.empty()) {
                 may_add_path_to_results(&checked);
             }
             continue;
@@ -289,14 +299,14 @@ void NodePathEnumerator<allow_cycles>::Enumerate(Column* to) {
             continue;
         }
         int prev_node = -1;
-        for (auto edge: it->second) {
+        for (auto edge : it->second) {
             // We visit a node once.
             if (edge.in_index == prev_node) {
                 continue;
             }
 
             if (edge.in_index == 0) {
-                if (is_end_.empty())  {
+                if (is_end_.empty()) {
                     may_add_path_to_results(&checked);
                 }
                 continue;
@@ -366,7 +376,8 @@ private:
 
     std::vector<int32_t> stack_;
     std::vector<int32_t> path_; // The current path
-    phmap::flat_hash_map<int32_t, size_t, StdHash<int32_t>> visit_info_; // The distance when a node is added for traversing.
+    phmap::flat_hash_map<int32_t, size_t, StdHash<int32_t>>
+            visit_info_;        // The distance when a node is added for traversing.
     HashSet<int32_t> exported_; // To check if a pair has been exported.
 };
 
@@ -418,7 +429,6 @@ void TransitiveEdgeEnumerator::NextPath() {
     }
     DCHECK(path_.empty());
 }
-
 
 void TransitiveEdgeEnumerator::Enumerate(Column* to) {
     if (max_length_ == 0) {
@@ -490,9 +500,7 @@ void TransitiveEdgeEnumerator::Enumerate(Column* to) {
 class Enumerator {
 public:
     Enumerator() = default;
-    ~Enumerator() {
-        delete impl_;
-    }
+    ~Enumerator() { delete impl_; }
 
     void Enumerate(FunctionContext* ctx, const CelonisEnumerateAggregateState& state,
                    CelonisEnumerateAggregateFunction::Mode mode, Column* to) {
@@ -515,8 +523,7 @@ private:
     EnumeratorImplBase* impl_ = nullptr;
 };
 
-CelonisEnumerateAggregateState::CelonisEnumerateAggregateState() : enumerator(new Enumerator()) {
-}
+CelonisEnumerateAggregateState::CelonisEnumerateAggregateState() : enumerator(new Enumerator()) {}
 
 CelonisEnumerateAggregateState::~CelonisEnumerateAggregateState() {
     if (data_columns != nullptr) {
@@ -651,9 +658,12 @@ void CelonisEnumerateAggregateFunction::create_impl(FunctionContext* ctx, Celoni
         if (is_nulls == nullptr) {
             state.allow_cycles = ColumnHelper::get_const_value<TYPE_BOOLEAN>(
                     ctx->get_constant_column(InputColumnIndex::ALLOW_CYCLES));
-            state.length_comparison = parseLengthComparison(ColumnHelper::get_const_value<TYPE_VARCHAR>(
-                    ctx->get_constant_column(InputColumnIndex::LENGTH_COMPARISON)).to_string());
-            state.length = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(InputColumnIndex::LENGTH));
+            state.length_comparison =
+                    parseLengthComparison(ColumnHelper::get_const_value<TYPE_VARCHAR>(
+                                                  ctx->get_constant_column(InputColumnIndex::LENGTH_COMPARISON))
+                                                  .to_string());
+            state.length =
+                    ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(InputColumnIndex::LENGTH));
         }
     } else {
         DCHECK(mode_ == Mode::TRANSITIVE_EDGES);
@@ -672,8 +682,8 @@ void CelonisEnumerateAggregateFunction::create_impl(FunctionContext* ctx, Celoni
     state.hash_set = std::make_unique<DedupColumnsKeyHashSet>();
 }
 
-void CelonisEnumerateAggregateFunction::reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state)
-        const {
+void CelonisEnumerateAggregateFunction::reset(FunctionContext* ctx, const Columns& args,
+                                              AggDataPtr __restrict state) const {
     auto& state_impl = this->data(state);
     if (state_impl.data_columns != nullptr) {
         for (auto& col : *state_impl.data_columns) {
@@ -713,13 +723,13 @@ void CelonisEnumerateAggregateFunction::update_impl(FunctionContext* ctx, const 
 
 void CelonisEnumerateAggregateFunction::update(FunctionContext* ctx, const Column** columns,
                                                AggDataPtr __restrict state, size_t row_num) const {
-    update_impl(ctx, columns,state, row_num, 1);
+    update_impl(ctx, columns, state, row_num, 1);
 }
 
 void CelonisEnumerateAggregateFunction::update_batch_single_state(FunctionContext* ctx, size_t chunk_size,
-                                                                  const Column** columns, AggDataPtr __restrict state)
-        const {
-    update_impl(ctx, columns,state, 0, chunk_size);
+                                                                  const Column** columns,
+                                                                  AggDataPtr __restrict state) const {
+    update_impl(ctx, columns, state, 0, chunk_size);
 }
 
 void CelonisEnumerateAggregateFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,

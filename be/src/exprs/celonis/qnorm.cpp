@@ -1,10 +1,11 @@
 #include "exprs/celonis/qnorm.h"
 
 #include <cmath>
+
 #include "column/array_column.h"
-#include "column/column_viewer.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
+#include "column/column_viewer.h"
 #include "exprs/function_context.h"
 
 namespace starrocks {
@@ -37,14 +38,12 @@ namespace {
     if (std::fabs(q) <= split) {
         // Central region
         double r = q * q;
-        result = q * (((a3 * r + a2) * r + a1) * r + a0) /
-                 ((((b4 * r + b3) * r + b2) * r + b1) * r + 1.0);
+        result = q * (((a3 * r + a2) * r + a1) * r + a0) / ((((b4 * r + b3) * r + b2) * r + b1) * r + 1.0);
     } else {
         // Tail regions
         double r = (q > 0.0) ? (1.0 - input) : input;
         r = std::sqrt(-std::log(r));
-        result = (((c3 * r + c2) * r + c1) * r + c0) /
-                 ((d2 * r + d1) * r + 1.0);
+        result = (((c3 * r + c2) * r + c1) * r + c0) / ((d2 * r + d1) * r + 1.0);
         if (q < 0.0) {
             result = -result;
         }
@@ -53,10 +52,10 @@ namespace {
     return result;
 }
 
-}
+} // namespace
 
-StatusOr<ColumnPtr>
-CelonisQnorm::qnorm([[maybe_unused]] starrocks::FunctionContext* context, const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisQnorm::qnorm([[maybe_unused]] starrocks::FunctionContext* context,
+                                        const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     DCHECK_EQ(columns.size(), 1);
     const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);

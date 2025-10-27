@@ -1,14 +1,15 @@
 #pragma once
 
+#include <chrono>
+
 #include "column/column_helper.h"
 #include "column/hash_set.h"
 #include "exprs/celonis/agg/variant_stats_utils.h"
 #include "exprs/function_context.h"
 #include "rapidjson/document.h"
+#include "util/uuid_generator.h"
 #include "variant.h"
 #include "variant_agg.h"
-#include "util/uuid_generator.h"
-#include <chrono>
 
 namespace starrocks {
 
@@ -79,7 +80,6 @@ public:
 
     uint64_t merging_states() const { return merging_states_; }
 
-
 private:
     int64_t edge_count_ = (1LL << 32); // very large number to output all edges.
     bool skip_variant_analysis_ = false;
@@ -110,11 +110,11 @@ public:
 private:
     std::optional<std::string> json_string(const std::optional<VariantAnalysisResult>& variant_analysis) const;
 
-    std::optional<std::string>
-    base64_encoded_string(const std::optional<VariantAnalysisResult>& variant_analysis, const std::string& query_id) const;
+    std::optional<std::string> base64_encoded_string(const std::optional<VariantAnalysisResult>& variant_analysis,
+                                                     const std::string& query_id) const;
 
-    std::optional<std::string>
-    to_string(const std::optional<VariantAnalysisResult>& analysis_result, const std::string& query_id) const;
+    std::optional<std::string> to_string(const std::optional<VariantAnalysisResult>& analysis_result,
+                                         const std::string& query_id) const;
 
     std::string get_log_prefix(const std::string& query_id) const;
 

@@ -2,15 +2,15 @@
 
 #include "column/column.h"
 #include "rapidjson/document.h"
-#include "variant.h"
 #include "runtime/mem_pool.h"
+#include "variant.h"
 
 // Forward-declare protobuf message classes
 namespace celonis {
 namespace accelerator {
-    class Statistics;
+class Statistics;
 }
-}
+} // namespace celonis
 
 namespace starrocks {
 
@@ -18,10 +18,11 @@ constexpr size_t MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES = std::numeric_limits<int16
 
 // Basic statistics on an Edge.
 struct EdgeStats {
-    size_t count{0};      // Number of times this edge appears
-    size_t count_case{0}; // Number distinct cases this edge appears in
+    size_t count{0};                       // Number of times this edge appears
+    size_t count_case{0};                  // Number distinct cases this edge appears in
     const Variant* last_variant = nullptr; // last variant to update count_case
-    const std::vector<int32_t>* last_variant_v2 = nullptr; // last variant to update count_case, used in variant_stats_v2
+    const std::vector<int32_t>* last_variant_v2 =
+            nullptr; // last variant to update count_case, used in variant_stats_v2
 
     bool equal(const EdgeStats& other) { return count == other.count && count_case == other.count_case; }
 
@@ -83,7 +84,7 @@ struct VariantAnalysisResult {
  * @return A std::pair containing the activity's unique integer index and its hash value.
  */
 std::pair<int32_t, size_t> maybe_add_activity(SliceHashMap& activity_map, const Slice& activity, MemPool* mem_pool,
-    size_t* memory);
+                                              size_t* memory);
 
 /**
  * @brief Serializes an activity map into a byte buffer.
@@ -117,9 +118,9 @@ size_t get_serialized_size(const SliceHashMap& activity_map);
  * @param[out] memory A pointer to a memory usage counter, which is incremented when a new activity is added to the map.
  * @return A pointer to the position in the source buffer immediately after the consumed data.
  */
-const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src, std::vector<std::pair<int32_t, size_t>>& index_vector,
-    SliceHashMap& activity_map, MemPool* mem_pool, size_t* memory);
-
+const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src,
+                                                  std::vector<std::pair<int32_t, size_t>>& index_vector,
+                                                  SliceHashMap& activity_map, MemPool* mem_pool, size_t* memory);
 
 /**
  * Serializes a variant map into a byte buffer. It's a map from variants to their counts.
@@ -150,8 +151,9 @@ size_t get_serialized_size(const VariantHashMap& variant_map);
  * @param[out] variant_map The local variant hash map into which the deserialized variants will be merged.
  * @return A pointer to the position in the source buffer immediately after the last byte read.
  */
-const uint8_t* deserialize_variant_map_and_merge(const uint8_t* src, const std::vector<std::pair<int32_t, size_t>>& index_vector,
-    VariantHashMap& variant_map);
+const uint8_t* deserialize_variant_map_and_merge(const uint8_t* src,
+                                                 const std::vector<std::pair<int32_t, size_t>>& index_vector,
+                                                 VariantHashMap& variant_map);
 
 // TODO(xingyuan): Move analyze_variants in variant_stats_v2 to this utils file as well
 /**
@@ -167,14 +169,14 @@ const uint8_t* deserialize_variant_map_and_merge(const uint8_t* src, const std::
  *         represented as const references (iterators) to elements in the original VariantHashMap.
  */
 VariantAnalysisResult analyze_variants_for_explore_process(const VariantHashMap& variant_counts,
-    const SliceHashMap& activity_map, const std::vector<ActivityStats>& activity_stats,
-    const std::string& log_prefix);
+                                                           const SliceHashMap& activity_map,
+                                                           const std::vector<ActivityStats>& activity_stats,
+                                                           const std::string& log_prefix);
 
 void build_variant_analysis_proto(const VariantAnalysisResult& variant_analysis_result,
-    ::celonis::accelerator::Statistics& statistics_proto, const std::string& log_prefix);
+                                  ::celonis::accelerator::Statistics& statistics_proto, const std::string& log_prefix);
 
-void build_variant_analysis_json(const VariantAnalysisResult& variant_analysis_result,
-    rapidjson::Document& d, rapidjson::Document::AllocatorType& allocator);
+void build_variant_analysis_json(const VariantAnalysisResult& variant_analysis_result, rapidjson::Document& d,
+                                 rapidjson::Document::AllocatorType& allocator);
 
 } // namespace starrocks
-

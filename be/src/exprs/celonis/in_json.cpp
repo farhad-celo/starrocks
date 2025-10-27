@@ -6,9 +6,9 @@
 #include "column/column_viewer.h"
 #include "column/hash_set.h"
 #include "exprs/builtin_functions.h"
-#include "exprs/function_context.h"
 #include "exprs/celonis/base64.h"
 #include "exprs/celonis/util.h"
+#include "exprs/function_context.h"
 #include "nlohmann/json.hpp"
 
 namespace starrocks {
@@ -38,24 +38,23 @@ bool is_likely_base64_compressed(const std::string& str) {
     return true;
 }
 
-
 // To use SliceHashSet for TYPE_VARCHAR. Copied from ../in_const_predicate.hpp.
-template<LogicalType LT, typename Enable = void>
+template <LogicalType LT, typename Enable = void>
 struct LHashSet {
     using LType = HashSet<RunTimeCppType<LT>>;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct LHashSet<LT, std::enable_if_t<isSliceLT<LT>>> {
     using LType = SliceHashSet;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 using LHashSetType = typename LHashSet<LT>::LType;
 
 } // namespace
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct InJsonStateFragmentLocal {
     LHashSetType<LT> match_set;
     bool match_has_null = false;
@@ -64,7 +63,7 @@ struct InJsonStateFragmentLocal {
     std::vector<std::string> strings;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
@@ -93,7 +92,7 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
         // Handle ARRAY_VARCHAR case
         auto array = match_column->get(0).get_array();
         size_t size = 0;
-        for (const auto& element: array) {
+        for (const auto& element : array) {
             if (element.is_null()) {
                 return Status::InvalidArgument("[" + function_name + "] Array can not contain null values.");
             } else {
@@ -101,7 +100,7 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
             }
         }
         json_str_raw.reserve(size);
-        for (const auto& element: array) {
+        for (const auto& element : array) {
             json_str_raw.append(element.get_slice().data, element.get_slice().size);
         }
     } else {
@@ -135,15 +134,15 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
         }
         json_array = json::parse(json_str);
     } catch (const std::exception& e) {
-        return Status::InvalidArgument(
-                "[" + function_name + "] Exception (" + std::string(e.what()) + ") during parsing JSON string: " + json_str);
+        return Status::InvalidArgument("[" + function_name + "] Exception (" + std::string(e.what()) +
+                                       ") during parsing JSON string: " + json_str);
     }
     if (!json_array.is_array()) {
         return Status::InvalidArgument("[" + function_name + "] The JSON string is not an array.");
     }
     if constexpr (lt_is_string<LT>) {
         phmap::flat_hash_set<std::string> seen;
-        for (const json& item: json_array) {
+        for (const json& item : json_array) {
             if (item.is_null()) {
                 state->match_has_null = true;
                 continue;
@@ -154,11 +153,11 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
                 state->strings.push_back(s);
             }
         }
-        for (const auto& str: state->strings) {
+        for (const auto& str : state->strings) {
             state->match_set.insert(Slice(str.data(), str.size()));
         }
     } else {
-        for (const json& item: json_array) {
+        for (const json& item : json_array) {
             if (item.is_null()) {
                 state->match_has_null = true;
                 continue;
@@ -169,7 +168,7 @@ Status CelonisInJson<LT>::prepare(FunctionContext* context, FunctionContext::Fun
     return Status::OK();
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 Status CelonisInJson<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         const auto* state = reinterpret_cast<const InJsonStateFragmentLocal<LT>*>(
@@ -179,21 +178,21 @@ Status CelonisInJson<LT>::close(FunctionContext* context, FunctionContext::Funct
     return Status::OK();
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_non_constant_match([[maybe_unused]]FunctionContext* context,
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_non_constant_match([[maybe_unused]] FunctionContext* context,
                                                                   const Columns& columns) {
     return Status::NotSupported("The non-const version of CELONIS_IN_JSON is not supported.");
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_array_non_constant_match([[maybe_unused]]FunctionContext* context,
-                                                                  const Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_array_non_constant_match([[maybe_unused]] FunctionContext* context,
+                                                                        const Columns& columns) {
     return Status::NotSupported("The non-const version of CELONIS_IN_JSON_ARRAY is not supported.");
 }
 
-template<LogicalType LT>
-StatusOr<ColumnPtr>
-CelonisInJson<LT>::in_json_constant_match([[maybe_unused]]FunctionContext* context, const Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_constant_match([[maybe_unused]] FunctionContext* context,
+                                                              const Columns& columns) {
     const auto& value_column = columns[0];
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
 
@@ -214,30 +213,26 @@ CelonisInJson<LT>::in_json_constant_match([[maybe_unused]]FunctionContext* conte
     return result.build(all_const);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisInJson<LT>::in_json(FunctionContext* context, const Columns& columns) {
     const auto* state = reinterpret_cast<const InJsonStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisInJson<LT>::in_json_array(FunctionContext* context, const Columns& columns) {
     const auto* state = reinterpret_cast<const InJsonStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
 
-template
-class CelonisInJson<TYPE_INT>;
+template class CelonisInJson<TYPE_INT>;
 
-template
-class CelonisInJson<TYPE_BIGINT>;
+template class CelonisInJson<TYPE_BIGINT>;
 
-template
-class CelonisInJson<TYPE_DOUBLE>;
+template class CelonisInJson<TYPE_DOUBLE>;
 
-template
-class CelonisInJson<TYPE_VARCHAR>;
+template class CelonisInJson<TYPE_VARCHAR>;
 
 } // namespace starrocks

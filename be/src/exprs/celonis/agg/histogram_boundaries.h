@@ -16,7 +16,7 @@ struct CelonisHistogramBoundariesAggregateState {
     using CppType = RunTimeCppType<LT>;
     using CounterType = RunTimeCppType<TYPE_BIGINT>;
     using BucketMap = std::conditional_t<IsSlice<CppType>, std::map<Slice, CounterType, Slice::Comparator>,
-            std::map<CppType, CounterType>>;
+                                         std::map<CppType, CounterType>>;
 
     auto may_insert_boundary(MemPool* mem_pool, const CppType& value) {
         auto it = bucket_map.find(value);
@@ -45,7 +45,7 @@ struct CelonisHistogramBoundariesAggregateState {
     // Returns the total size in bytes required to encode this object.
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(uint32_t);                         // size of bucket_map
+        result += sizeof(uint32_t); // size of bucket_map
         if constexpr (IsSlice<CppType>) {
             result += sizeof(uint32_t) * bucket_map.size(); // sizes of keys
             for (const auto& [key, counter] : bucket_map) {
@@ -198,7 +198,7 @@ public:
             create_impl(ctx, columns, state_impl);
         }
         if (columns[0]->is_nullable() && columns[0]->is_null(row_num)) {
-          return;
+            return;
         }
         this->data(state).update(ctx, columns[0], row_num);
     }
@@ -238,14 +238,14 @@ public:
                             Column* to) const override {
         auto& state_impl = this->data(state);
         if (!state_impl.initialized) {
-          to->append_default();
-          return;
+            to->append_default();
+            return;
         }
         DatumArray class_bounds_lower;
         DatumArray class_bounds_upper;
         DatumArray class_count;
         auto prev_it = state_impl.bucket_map.cend();
-        for (auto it = state_impl.bucket_map.cbegin() ; it != state_impl.bucket_map.cend(); prev_it = it++) {
+        for (auto it = state_impl.bucket_map.cbegin(); it != state_impl.bucket_map.cend(); prev_it = it++) {
             if (prev_it == state_impl.bucket_map.cend()) {
                 if (!state_impl.no_lower_bound) {
                     continue;

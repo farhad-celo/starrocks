@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "factory_calendar.h"
+
 #include "exprs/celonis/agg/util.h"
 #include "gutil/strings/strcat.h"
 #include "modules/query/calendars.pb.h"
@@ -24,7 +25,7 @@ namespace {
 // SR places an upper limit of 1M of STRING. We use 900K which is less than 1M.
 static const size_t MAX_STRING_SIZE = 900000;
 
-}
+} // namespace
 
 FactoryCalendarAggregateState::~FactoryCalendarAggregateState() {
     if (start_timestamp != nullptr) {
@@ -44,15 +45,15 @@ FactoryCalendarAggregateState::~FactoryCalendarAggregateState() {
 void FactoryCalendarAggregateFunction::create(FunctionContext* ctx, AggDataPtr __restrict ptr) const {
     auto num = ctx->get_num_args();
     DCHECK(num == 3);
-    auto* state = new(ptr) FactoryCalendarAggregateState;
+    auto* state = new (ptr) FactoryCalendarAggregateState;
     state->start_timestamp = std::make_unique<TimestampColumn>();
     state->end_timestamp = std::make_unique<TimestampColumn>();
     state->calendar_id = std::make_unique<BinaryColumn>();
     state->is_calendar_id_null = std::make_unique<BooleanColumn>();
 }
 
-void
-FactoryCalendarAggregateFunction::reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const {
+void FactoryCalendarAggregateFunction::reset(FunctionContext* ctx, const Columns& args,
+                                             AggDataPtr __restrict state) const {
     auto& state_impl = this->data(state);
     if (state_impl.start_timestamp != nullptr) {
         state_impl.start_timestamp.reset(nullptr);
@@ -103,18 +104,20 @@ void FactoryCalendarAggregateFunction::merge(FunctionContext* ctx, const Column*
                                              size_t row_num) const {
     auto& input_columns = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column))->fields();
     auto& state_impl = this->data(state);
-    auto start_timestamp_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(0).get()));
+    auto start_timestamp_column =
+            down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(0).get()));
     auto end_timestamp_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(1).get()));
     auto calendar_id_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(2).get()));
-    auto is_calendar_id_null_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(3).get()));
+    auto is_calendar_id_null_column =
+            down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(3).get()));
     auto& offsets = start_timestamp_column->offsets().get_data();
     const auto start = offsets[row_num];
     const auto end = offsets[row_num + 1];
     for (auto i = start; i < end; ++i) {
-       state_impl.start_timestamp->append_datum(start_timestamp_column->elements().get(i));
-       state_impl.end_timestamp->append_datum(end_timestamp_column->elements().get(i));
-       state_impl.calendar_id->append_datum(calendar_id_column->elements().get(i));
-       state_impl.is_calendar_id_null->append_datum(is_calendar_id_null_column->elements().get(i));
+        state_impl.start_timestamp->append_datum(start_timestamp_column->elements().get(i));
+        state_impl.end_timestamp->append_datum(end_timestamp_column->elements().get(i));
+        state_impl.calendar_id->append_datum(calendar_id_column->elements().get(i));
+        state_impl.is_calendar_id_null->append_datum(is_calendar_id_null_column->elements().get(i));
     }
 }
 
@@ -157,18 +160,14 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     std::vector<int32_t> row_idxes(n_rows);
     std::iota(row_idxes.begin(), row_idxes.end(), 0);
 
-    auto ts_to_epoch_millis = [&](const Datum& tv) {
-        return tv.get_timestamp().diff_microsecond(epoch) / 1000L;
-    };
+    auto ts_to_epoch_millis = [&](const Datum& tv) { return tv.get_timestamp().diff_microsecond(epoch) / 1000L; };
 
     // Sort order:
     // - All NULL calendar_id entries (sorted by timestamps)
     // - All non-NULL calendar_id entries (sorted by calendar_id, then timestamps)
     auto less_rows = [&](int32_t lhs, int32_t rhs) {
-        const bool lhs_null = static_cast<bool>(
-                state_impl.is_calendar_id_null->get(lhs).get_uint8());
-        const bool rhs_null = static_cast<bool>(
-                state_impl.is_calendar_id_null->get(rhs).get_uint8());
+        const bool lhs_null = static_cast<bool>(state_impl.is_calendar_id_null->get(lhs).get_uint8());
+        const bool rhs_null = static_cast<bool>(state_impl.is_calendar_id_null->get(rhs).get_uint8());
 
         if (lhs_null != rhs_null) {
             // one NULL, one non-NULL
@@ -176,34 +175,26 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
             return lhs_null;
         }
         if (!lhs_null) {
-            const int cmp = state_impl.calendar_id
-                    ->get(lhs)
-                    .get_slice()
-                    .compare(state_impl.calendar_id
-                                     ->get(rhs)
-                                     .get_slice());
+            const int cmp =
+                    state_impl.calendar_id->get(lhs).get_slice().compare(state_impl.calendar_id->get(rhs).get_slice());
             if (cmp != 0) {
                 return cmp < 0;
             }
         }
-        const int64_t start_lhs = ts_to_epoch_millis(
-                state_impl.start_timestamp->get(lhs));
-        const int64_t start_rhs = ts_to_epoch_millis(
-                state_impl.start_timestamp->get(rhs));
+        const int64_t start_lhs = ts_to_epoch_millis(state_impl.start_timestamp->get(lhs));
+        const int64_t start_rhs = ts_to_epoch_millis(state_impl.start_timestamp->get(rhs));
         if (start_lhs != start_rhs) {
             return start_lhs < start_rhs;
         }
 
-        const int64_t end_lhs = ts_to_epoch_millis(
-                state_impl.end_timestamp->get(lhs));
-        const int64_t end_rhs = ts_to_epoch_millis(
-                state_impl.end_timestamp->get(rhs));
+        const int64_t end_lhs = ts_to_epoch_millis(state_impl.end_timestamp->get(lhs));
+        const int64_t end_rhs = ts_to_epoch_millis(state_impl.end_timestamp->get(rhs));
         return end_lhs < end_rhs;
     };
 
     std::sort(row_idxes.begin(), row_idxes.end(), less_rows);
     celonis::accelerator::Calendar calendar_proto;
-    for (auto row_idx: row_idxes) {
+    for (auto row_idx : row_idxes) {
         celonis::accelerator::FactoryCalendarEntry entry;
         const int64_t start_date =
                 state_impl.start_timestamp->get(row_idx).get_timestamp().diff_microsecond(epoch) / 1000L;
@@ -217,11 +208,13 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         }
         *calendar_proto.mutable_factory_calendar()->add_entries() = entry;
     }
-    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto,
-                                                                          DEFAULT_CELONIS_PROTO_SIZE_LIMIT, false);
+    std::optional<std::string> calendar_string =
+            to_base64_encoded_string(calendar_proto, DEFAULT_CELONIS_PROTO_SIZE_LIMIT, false);
     if (!calendar_string.has_value()) {
         ctx->set_error(StrCat("Calendar proto serialized size (", calendar_proto.ByteSizeLong(),
-                              " bytes) exceeds maximum supported length (1GB)").c_str(), false);
+                              " bytes) exceeds maximum supported length (1GB)")
+                               .c_str(),
+                       false);
         return;
     }
 
@@ -231,7 +224,7 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         calendar_pieces.emplace_back(calendar_string->substr(i, MAX_STRING_SIZE));
     }
     DatumArray array;
-    for (const auto& calendar_piece: calendar_pieces) {
+    for (const auto& calendar_piece : calendar_pieces) {
         array.emplace_back(calendar_piece.c_str());
     }
     to->append_datum(array);
@@ -239,8 +232,7 @@ void FactoryCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
 
 // convert each cell of a row to a [nullable] array in a struct
 void FactoryCalendarAggregateFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
-                                                                   size_t chunk_size,
-                                                                   ColumnPtr* dst) const {
+                                                                   size_t chunk_size, ColumnPtr* dst) const {
     DCHECK(src.size() == 3);
     std::vector<size_t> valid_indexes;
     for (size_t row = 0; row < chunk_size; ++row) {
@@ -282,6 +274,8 @@ void FactoryCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
     }
 }
 
-std::string FactoryCalendarAggregateFunction::get_name() const { return "celonis_make_factory_calendar"; }
+std::string FactoryCalendarAggregateFunction::get_name() const {
+    return "celonis_make_factory_calendar";
+}
 
 } // namespace starrocks

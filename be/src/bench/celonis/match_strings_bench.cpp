@@ -159,7 +159,9 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
         state.ResumeTiming();
         ASSERT_TRUE(CelonisStringFunctions::match_strings_prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
         ASSERT_TRUE(CelonisStringFunctions::match_strings_prepare(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
-        ASSERT_TRUE(CelonisStringFunctions::match_strings(ctx.get(), {input_column, match_column, top_k_column, separator_column}).ok());
+        ASSERT_TRUE(CelonisStringFunctions::match_strings(ctx.get(),
+                                                          {input_column, match_column, top_k_column, separator_column})
+                            .ok());
         ASSERT_TRUE(CelonisStringFunctions::match_strings_close(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
         ASSERT_TRUE(CelonisStringFunctions::match_strings_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
     }

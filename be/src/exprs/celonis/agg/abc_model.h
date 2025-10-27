@@ -1,5 +1,8 @@
 #pragma once
 
+#include <boost/algorithm/string/join.hpp>
+#include <execution>
+
 #include "column/column_helper.h"
 #include "column/object_column.h"
 #include "column/type_traits.h"
@@ -9,12 +12,10 @@
 #include "gutil/casts.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
-#include <boost/algorithm/string/join.hpp>
-#include <execution>
 
 namespace starrocks {
 
-template<LogicalType LT, typename T = RunTimeCppType<LT>>
+template <LogicalType LT, typename T = RunTimeCppType<LT>>
 std::string to_model(const std::vector<std::pair<std::optional<T>, std::optional<T>>>& ranges,
                      const std::map<T, std::vector<size_t>>& num_to_counter) {
     // create the model
@@ -36,7 +37,7 @@ std::string to_model(const std::vector<std::pair<std::optional<T>, std::optional
     model += boost::algorithm::join(value_strs, ",");
     model += ":";
     std::vector<std::string> num_section_strs;
-    for (const auto& [num, counter]: num_to_counter) {
+    for (const auto& [num, counter] : num_to_counter) {
         std::vector<std::string> items;
         items.push_back(std::to_string(num));
         size_t total = std::accumulate(counter.begin(), counter.end(), static_cast<size_t>(0));
@@ -49,7 +50,7 @@ std::string to_model(const std::vector<std::pair<std::optional<T>, std::optional
     return model;
 }
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct CelonisAbcModelAggregateState {
     using CppType = RunTimeCppType<LT>;
 
@@ -60,8 +61,7 @@ struct CelonisAbcModelAggregateState {
         } else {
             int64_t pk_hash = pk_hash_column->get(row_num).get<int64_t>();
             double prob =
-                    static_cast<double>(safe_abs(pk_hash)) /
-                    static_cast<double>(std::numeric_limits<int64_t>::max());
+                    static_cast<double>(safe_abs(pk_hash)) / static_cast<double>(std::numeric_limits<int64_t>::max());
             if (prob < sample_ratio) {
                 nums[num]++;
             }
@@ -71,9 +71,9 @@ struct CelonisAbcModelAggregateState {
     // Returns the total size in bytes required to encode this object.
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(uint32_t);                                  // size of nums
-        result += (sizeof(CppType) + sizeof(size_t)) * nums.size();  // key-value pairs in nums
-        result += sizeof(double) * 3;                                // sample_ratio, ratio_a, ratio_b
+        result += sizeof(uint32_t);                                 // size of nums
+        result += (sizeof(CppType) + sizeof(size_t)) * nums.size(); // key-value pairs in nums
+        result += sizeof(double) * 3;                               // sample_ratio, ratio_a, ratio_b
         return result;
     }
 
@@ -85,7 +85,7 @@ struct CelonisAbcModelAggregateState {
         uint32_t nums_size = nums.size();
         memcpy(dst, &nums_size, sizeof(uint32_t));
         dst += sizeof(uint32_t);
-        for (const auto& [num, count]: nums) {
+        for (const auto& [num, count] : nums) {
             memcpy(dst, &num, sizeof(CppType));
             dst += sizeof(CppType);
             memcpy(dst, &count, sizeof(size_t));
@@ -143,15 +143,14 @@ struct CelonisAbcModelAggregateState {
  * @return: VARCHAR
  *
  */
-template<LogicalType LT, typename T = RunTimeCppType<LT>>
+template <LogicalType LT, typename T = RunTimeCppType<LT>>
 class CelonisAbcModelAggregationFunction final
         : public AggregateFunctionBatchHelper<CelonisAbcModelAggregateState<LT>,
-                CelonisAbcModelAggregationFunction<LT, T>> {
+                                              CelonisAbcModelAggregationFunction<LT, T>> {
 public:
     using ColumnType = RunTimeColumnType<LT>;
 
-    void create_impl(FunctionContext* ctx, const Column** columns,
-                     CelonisAbcModelAggregateState<LT>& state) const {
+    void create_impl(FunctionContext* ctx, const Column** columns, CelonisAbcModelAggregateState<LT>& state) const {
         DCHECK_EQ(ctx->get_num_args(), 5);
         state.initialized = true;
         state.sample_ratio = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(2));
@@ -180,7 +179,7 @@ public:
             return;
         }
         Slice slice = input_column->get_slice(row_num);
-        this->data(state).deserialize_and_merge((const uint8_t*) slice.data, slice.size);
+        this->data(state).deserialize_and_merge((const uint8_t*)slice.data, slice.size);
     }
 
     void serialize_to_column(FunctionContext* ctx __attribute__((unused)), ConstAggDataPtr __restrict state,
@@ -223,7 +222,7 @@ public:
 
         // Calculate total sum considering counts
         double total_sum = 0.0;
-        for (const auto& [num, count]: state_impl.nums) {
+        for (const auto& [num, count] : state_impl.nums) {
             total_sum += static_cast<double>(num) * static_cast<double>(count);
         }
 
@@ -243,7 +242,7 @@ public:
         std::vector<size_t> counter(4, 0);
 
         // traverse number from high to low
-        for (const auto& [num, count]: sorted_nums) {
+        for (const auto& [num, count] : sorted_nums) {
             for (auto i = 0; i < count; ++i) {
                 cur_sum += static_cast<double>(num);
                 int category = 3;

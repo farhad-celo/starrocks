@@ -163,4 +163,4 @@ private:
     DEFINE_VECTORIZED_FN(match_strings_non_constant);
 };
 
-}  // namespace starrocks
+} // namespace starrocks

@@ -138,11 +138,9 @@ class materialized_typed_data : public materialized_data {
     null_flags->set_delete_from_disk_when_destructed(value);
   }
 
-  static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(const std::string& id,
-                                                                            const management::swap_info& s_info,
-                                                                            const std::string& description,
-                                                                            row_id row_count, legacy_embedded_ctl::static_array<T> data,
-                                                                            const memory::null_flags_t& null_flags) {
+  static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(
+      const std::string& id, const management::swap_info& s_info, const std::string& description, row_id row_count,
+      legacy_embedded_ctl::static_array<T> data, const memory::null_flags_t& null_flags) {
     std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
         null_flags, id + management::NULL_FLAGS_NEW_ENDING, s_info, description + management::NULL_FLAGS_DESC));
     management::raw_data_handler_t<T> data_handler = management::raw_data_handler<T>::create_data_handler(

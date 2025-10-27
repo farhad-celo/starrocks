@@ -30,13 +30,9 @@ struct CelonisArrayLeadLagAggregateState {
      */
     Datum current_row{};
 
-    [[nodiscard]] const Datum& get_kth_non_null_element() const {
-        return last_k_non_null.at(current_kth_element);
-    }
+    [[nodiscard]] const Datum& get_kth_non_null_element() const { return last_k_non_null.at(current_kth_element); }
 
-    [[nodiscard]] bool not_enough_not_null_elements() const {
-        return last_k_non_null.back().is_null();
-    }
+    [[nodiscard]] bool not_enough_not_null_elements() const { return last_k_non_null.back().is_null(); }
 
     void add(const Datum& datum) {
         if (datum.is_null()) {
@@ -81,7 +77,7 @@ public:
         if (current_row.is_null()) {
             state_impl.current_row = kNullDatum;
             return;
-        } 
+        }
 
         const auto& current_array = current_row.get_array();
 
@@ -89,7 +85,7 @@ public:
         out.resize(current_array.size());
 
         // Write into output and keep updating the last k non-null values
-        for(size_t idx = 0; idx < out.size(); ++idx) {
+        for (size_t idx = 0; idx < out.size(); ++idx) {
             if (state_impl.not_enough_not_null_elements()) {
                 // As long as we have not collected enough non-null values, output NULLs
                 out.at(idx) = kNullDatum;

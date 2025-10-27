@@ -3,6 +3,7 @@
 #include <fmt/format.h>
 #include <re2/re2.h>
 
+#include <algorithm>
 #include <utility>
 
 #include "column/binary_column.h"
@@ -13,7 +14,6 @@
 #include "exprs/like_predicate.h"
 #include "gutil/strings/substitute.h"
 #include "util/utf8.h"
-#include <algorithm>
 
 namespace starrocks {
 
@@ -47,14 +47,10 @@ static std::string to_lowercase(const Slice& slice) {
     return result;
 }
 
-enum class LikeFunctionType {
-    LIKE_NON_CONSTANT,
-    LIKE_CONSTANT_NO_WILDCARD,
-    LIKE_PREDICATE
-};
+enum class LikeFunctionType { LIKE_NON_CONSTANT, LIKE_CONSTANT_NO_WILDCARD, LIKE_PREDICATE };
 
 struct LikeStateFragmentLocal {
-    std::string lowercase_pattern;  // For optimized case-insensitive substring search
+    std::string lowercase_pattern; // For optimized case-insensitive substring search
     ScalarFunction function;
     LikeFunctionType function_type;
 };

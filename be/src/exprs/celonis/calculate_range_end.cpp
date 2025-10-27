@@ -1,12 +1,13 @@
 #include "exprs/celonis/calculate_range_end.h"
 
+#include <sstream>
+
 #include "column/array_column.h"
-#include "column/column_viewer.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
+#include "column/column_viewer.h"
 #include "exprs/function_context.h"
 #include "types/date_value.h"
-#include <sstream>
 
 namespace starrocks {
 
@@ -47,7 +48,7 @@ static TimestampValue add_timeunits(const TimestampValue& timestamp, char time_u
         adds.push_back(add_value);
     }
     TimestampValue rv = timestamp;
-    for (auto add: adds) {
+    for (auto add : adds) {
         if (time_unit == 'h') {
             rv = rv.add<TimeUnit::HOUR>(add);
         } else if (time_unit == 'D') {
@@ -62,11 +63,10 @@ static TimestampValue add_timeunits(const TimestampValue& timestamp, char time_u
     return rv;
 }
 
-}
+} // namespace
 
-StatusOr<ColumnPtr>
-CelonisCalculateRangeEnd::calculate_range_end([[maybe_unused]] starrocks::FunctionContext* context,
-                                              const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisCalculateRangeEnd::calculate_range_end([[maybe_unused]] starrocks::FunctionContext* context,
+                                                                  const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 3);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);

@@ -15,7 +15,7 @@ namespace celonis::accelerator::memory {
 using table_group_t = starrocks::celonis::ResultTableMap;
 #else
 // Use transparent comparator to make lookup work with string views
-using table_map_t = std::map<std::string, memory::table_t, std::less<>>;
+using table_map_t = std::map<std::string, memory::table_t, std::less<> >;
 
 /**
  * For now table groups can be thought of as a temporary immutable containers that can be used to return a set of

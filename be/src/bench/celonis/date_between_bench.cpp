@@ -88,7 +88,9 @@ static void BM_DateBetween(benchmark::State& state) {
         }
         ctx->set_constant_columns({nullptr, nullptr, nullptr});
         state.ResumeTiming();
-        EXPECT_TRUE(CelonisTimeFunctions::date_between(ctx.get(), {first_date_column, second_date_column, third_date_column}).ok());
+        EXPECT_TRUE(CelonisTimeFunctions::date_between(ctx.get(),
+                                                       {first_date_column, second_date_column, third_date_column})
+                            .ok());
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);

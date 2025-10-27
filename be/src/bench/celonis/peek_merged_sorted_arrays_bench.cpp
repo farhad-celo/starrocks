@@ -117,13 +117,14 @@ static void BM_PeekMergedSortedArraysVARCHAR(benchmark::State& state) {
         }
 
         state.ResumeTiming();
-        ASSERT_TRUE(CelonisPeekMergedSortedArrays<TYPE_VARCHAR>::peek_merged_sorted_arrays(ctx.get(),
-                {input_column, timestamp_column, size_column, priority_column, secondary_order_column}).ok());
+        ASSERT_TRUE(CelonisPeekMergedSortedArrays<TYPE_VARCHAR>::peek_merged_sorted_arrays(
+                            ctx.get(),
+                            {input_column, timestamp_column, size_column, priority_column, secondary_order_column})
+                            .ok());
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
-
 
 // Args: Number of rows / Number of arrays / Minimum size of inner array / Maximum size of inner array
 BENCHMARK(BM_PeekMergedSortedArraysVARCHAR)->ArgsProduct({{10000}, {5, 10, 20, 30}, {5, 10}, {15, 30}});

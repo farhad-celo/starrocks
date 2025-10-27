@@ -13,8 +13,8 @@
 #include <tbb/enumerable_thread_specific.h>
 
 #include <cpml/conformance/alignment.h>
-#include <cpml/model/transformations.h>
 #include <cpml/model/bpmn_graph.h>
+#include <cpml/model/transformations.h>
 #include <ctl/algorithm.h>
 #include <ctl/array_view.h>
 #include <ctl/assert.h>
@@ -32,16 +32,16 @@
 #include "align_model_statistics.h"
 #include "align_model_types.h"
 #include "modules/common/execution_context.h"
+#include "modules/memory/cache/remap_variants.h"
+#include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/row_id.h"
-#include "modules/memory/cache/variant_trace_cache.h"
-#include "modules/memory/cache/remap_variants.h"
 // #include "modules/memory/table_utils.h"
+#include "exprs/celonis/cpml_utils/sr_context.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/operators/aggregation/string_aggregation.h"
 #include "modules/operators/process/align_model/replay_aligned_variant.h"
 #include "modules/sr_glue_code/tbb_parallel_for.h"
-#include "exprs/celonis/cpml_utils/sr_context.h"
-#include "legacy_embedded_ctl/static_array.h"
 
 namespace celonis::accelerator::operators::process::align_model {
 
@@ -51,8 +51,7 @@ class variant_accessor final : public cpml::variant::variant_accessor {
  public:
   explicit variant_accessor(const memory::cache::variant_entries_t& variant_entries,
                             const common::execution_context& ctx)
-      : variants_{memory::cache::remap_variants<cpml::activity_id_t>(*variant_entries, std::identity{}, ctx)} {
-  }
+      : variants_{memory::cache::remap_variants<cpml::activity_id_t>(*variant_entries, std::identity{}, ctx)} {}
 
   [[nodiscard]] size_type size() const override { return ctl::cast<size_type>(variants_.size()); }
 
@@ -90,7 +89,9 @@ prune_variants_result prune_variants(const memory::cache::variant_trace_cache_t&
                                      const cpml::model::petri_net& petri_net,
                                      const common::execution_context& context) {
   // TODO(a.swoboda) This could be parallelized; however, this will only pay off for very large variant trace buffers
-  const auto petri_net_activity_ids{ctl::transform_to<cpml::distinct_activity_ids_t>(petri_net.transitions(), &cpml::model::pn::transition::label, &cpml::model::pn::transition_id_to_transition_mapping_t::value_type::second)};
+  const auto petri_net_activity_ids{ctl::transform_to<cpml::distinct_activity_ids_t>(
+      petri_net.transitions(), &cpml::model::pn::transition::label,
+      &cpml::model::pn::transition_id_to_transition_mapping_t::value_type::second)};
   std::vector<row_id> buffer{};
   std::vector<row_id> projection{};
   const auto traces{variants->get_traces(context)};
@@ -105,10 +106,11 @@ prune_variants_result prune_variants(const memory::cache::variant_trace_cache_t&
       }
     }
   }
-  prune_variants_result result{legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
-                                   buffer.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG)),
-                               legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
-                                   buffer.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
+  prune_variants_result result{
+      legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
+          buffer.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG)),
+      legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
+          buffer.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
   std::ranges::copy(buffer, result.pruned_activity_ids.begin());
   std::ranges::copy(projection, result.pruned_trace_ids.begin());
   return result;
@@ -352,7 +354,9 @@ std::pair<alignments_t, cpml::conformance::behavioral_relations> align_model(
     const common::execution_context& context) {
   ctl::wall_timer_t bpmn_graph_to_petri_net_timer{};
   const auto cpml_ctx{starrocks::celonis::cpml_utils::make_sr_function_context()};
-  const auto pn{cpml::model::to_petri_net<cpml::model::compute_mappings::NO, cpml::model::filter_out_bpmn_edge_transitions::YES>(bpmn_model, cpml_ctx)};
+  const auto pn{
+      cpml::model::to_petri_net<cpml::model::compute_mappings::NO, cpml::model::filter_out_bpmn_edge_transitions::YES>(
+          bpmn_model, cpml_ctx)};
   stats.bpmn_graph_to_petri_net = bpmn_graph_to_petri_net_timer.elapsed_wall_time_so_far();
 
   using duration_unit_for_logging_t = std::chrono::microseconds;
@@ -378,9 +382,8 @@ std::pair<alignments_t, cpml::conformance::behavioral_relations> align_model(
       "time_pruned_variant_computation", pruned_variants_computation_timer.elapsed_wall_time_so_far(), callback);
   callback("pruned_variant_count", pruned_variants->get_num_traces());
 
-  const auto [pruned_alignments,
-              parallel_vertices]{compute_pruned_alignments(pruned_variants, bpmn_model, config.execution_strategy,
-                                                           align_variants_context, json_alignment_stats)};
+  const auto [pruned_alignments, parallel_vertices]{compute_pruned_alignments(
+      pruned_variants, bpmn_model, config.execution_strategy, align_variants_context, json_alignment_stats)};
 
   ctl::wall_timer_t map_pruned_to_full_non_empty_variants_timer{};
   // Map the alignment on the pruned variants to the full variants including the filtered activities
@@ -415,19 +418,21 @@ replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_gra
         return std::nullopt;
       }};
 
-  const auto optional_error_state{sr_glue_code::non_throwing_tbb_parallel_for(tbb::blocked_range<size_t>{0, alignments.size()},
-                    [&replay_results, &bpmn_graphs, &alignments = std::as_const(alignments),
-                     &replay_result_fn = std::as_const(replay_result_fn)](const auto& range) {
-                      const auto& bpmn_graph{bpmn_graphs.local()};
-                      for (size_t index{range.begin()}; index < range.end(); ++index) {
-                        const auto& aligned_variant{alignments.at(index)};
-                        replay_results.at(index) = replay_result_fn(bpmn_graph, aligned_variant);
-                      }
-                    })};
+  const auto optional_error_state{sr_glue_code::non_throwing_tbb_parallel_for(
+      tbb::blocked_range<size_t>{0, alignments.size()},
+      [&replay_results, &bpmn_graphs, &alignments = std::as_const(alignments),
+       &replay_result_fn = std::as_const(replay_result_fn)](const auto& range) {
+        const auto& bpmn_graph{bpmn_graphs.local()};
+        for (size_t index{range.begin()}; index < range.end(); ++index) {
+          const auto& aligned_variant{alignments.at(index)};
+          replay_results.at(index) = replay_result_fn(bpmn_graph, aligned_variant);
+        }
+      })};
 
   if (optional_error_state.has_value()) {
-    throw common::internal_exception{"ALIGN_MODEL - Error within parallel replay: {} (a total of {} errors within loop).",
-      optional_error_state->error_msg, optional_error_state->number_of_errors};
+    throw common::internal_exception{
+        "ALIGN_MODEL - Error within parallel replay: {} (a total of {} errors within loop).",
+        optional_error_state->error_msg, optional_error_state->number_of_errors};
   }
 
   return replay_results;

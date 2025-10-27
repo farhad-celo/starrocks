@@ -21,7 +21,7 @@ struct TrimmedMeanState {
     std::vector<CppType> items;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct TrimmedMeanParallelExecutionThreshold {
     static constexpr int64_t value = 1000;
 };
@@ -45,7 +45,7 @@ Running 10 iterations for each size
     10000000         1725.10          651.40            2.65x
 */
 
-template<>
+template <>
 struct TrimmedMeanParallelExecutionThreshold<TYPE_INT> {
     static constexpr int64_t value = 10'000'000;
 };
@@ -67,7 +67,7 @@ struct TrimmedMeanParallelExecutionThreshold<TYPE_INT> {
     10000000         3901.20         1132.10            3.45x
 */
 
-template<>
+template <>
 struct TrimmedMeanParallelExecutionThreshold<TYPE_BIGINT> {
     static constexpr int64_t value = 400'000;
 };
@@ -88,7 +88,7 @@ struct TrimmedMeanParallelExecutionThreshold<TYPE_BIGINT> {
      1000000          938.00          199.40            4.70x
     10000000         9427.80         1156.60            8.15x
 */
-template<>
+template <>
 struct TrimmedMeanParallelExecutionThreshold<TYPE_DOUBLE> {
     static constexpr int64_t value = 100'000;
 };
@@ -101,7 +101,7 @@ struct TrimmedMeanParallelExecutionThreshold<TYPE_DOUBLE> {
  * upper_cutoff (optional) : Between 0 and 100. Default is 5.
  * Supports PQL TRIMMED_MEAN https://confluence.celonis.com/display/PQLdevelopment/TRIMMED_MEAN
  */
-template<LogicalType LT>
+template <LogicalType LT>
 class CelonisTrimmedMeanAggregateFunction final
         : public AggregateFunctionBatchHelper<TrimmedMeanState<LT>, CelonisTrimmedMeanAggregateFunction<LT>> {
 public:
@@ -179,9 +179,8 @@ public:
             return;
         }
         if (lower_cutoff + upper_cutoff > 100) {
-            ctx->set_error(
-                    "CELONIS_TRIMMED_MEAN: Sum of lower cutoff and upper cutoff must be in interval [0, 100].",
-                    false);
+            ctx->set_error("CELONIS_TRIMMED_MEAN: Sum of lower cutoff and upper cutoff must be in interval [0, 100].",
+                           false);
             column->append_default();
             return;
         }
@@ -227,14 +226,10 @@ public:
         // Use parallel execution only for large arrays (> parallel_threshold)
         const auto count = static_cast<int64_t>(last) - static_cast<int64_t>(first);
         if (count > parallel_threshold) {
-            sum = std::reduce(std::execution::par_unseq,
-                              new_vector.begin() + first,
-                              new_vector.begin() + last);
+            sum = std::reduce(std::execution::par_unseq, new_vector.begin() + first, new_vector.begin() + last);
         } else {
             // Sequential sum for small arrays to avoid parallel overhead
-            sum = std::accumulate(new_vector.begin() + first,
-                                  new_vector.begin() + last,
-                                  static_cast<CppType>(0));
+            sum = std::accumulate(new_vector.begin() + first, new_vector.begin() + last, static_cast<CppType>(0));
         }
         auto mean = static_cast<double>(sum) / count;
         column->append(mean);

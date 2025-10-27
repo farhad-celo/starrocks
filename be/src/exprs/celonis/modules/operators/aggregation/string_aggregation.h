@@ -44,8 +44,8 @@ namespace celonis::accelerator::operators::aggregation {
 [[nodiscard]] memory::builders::result_column_builder_t execute_parallel_string_agg_operator(
     const std::string& op_name, common::execution_context& context, const projection_vector_t& projection,
     const std::shared_ptr<cube::filter_bitset_t>& accepted_rows, const memory::column_t& source_column,
-    row_id group_count, const std::string& delimiter, const legacy_embedded_ctl::static_array<row_id>& group_aligned_permutation,
-    size_t grain_size);
+    row_id group_count, const std::string& delimiter,
+    const legacy_embedded_ctl::static_array<row_id>& group_aligned_permutation, size_t grain_size);
 
 [[nodiscard]] std::pair<cube::execution::columns_and_common_table, std::vector<OrderByDirection>>
 compute_orderby_fetcher_and_order_directions(const OrderByExpressions& order_by_expressions,
@@ -53,10 +53,9 @@ compute_orderby_fetcher_and_order_directions(const OrderByExpressions& order_by_
                                              const common::execution_context& context,
                                              const memory::column_lookup_t& order_by_expression_columns);
 
-[[nodiscard]] legacy_embedded_ctl::static_array<row_id> compute_group_aligned_permutation_simple(const memory::column_t& source_column,
-                                                                                 common::execution_context& context,
-                                                                                 const projection_vector_t& projection,
-                                                                                 row_id target_table_size);
+[[nodiscard]] legacy_embedded_ctl::static_array<row_id> compute_group_aligned_permutation_simple(
+    const memory::column_t& source_column, common::execution_context& context, const projection_vector_t& projection,
+    row_id target_table_size);
 
 /**
  * The caller is responsible for pulling up the source_column and orderby columns to the common table.
@@ -111,8 +110,8 @@ using value_idx_to_group_id_mapping_t = memory::join_projection_vector_t;
 // Deprecated: Use the more general interface above 'generalized_variant_row_ids_computation'
 #ifdef CELOSTAR
 [[nodiscard]] memory::cache::variant_trace_cache_t compute_variant_row_ids(
-        const memory::table_to_column_projection& table_to_column_projection,
-        const common::execution_context& context, size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);
+    const memory::table_to_column_projection& table_to_column_projection, const common::execution_context& context,
+    size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);
 #else
 [[nodiscard]] memory::cache::variant_trace_cache_t compute_variant_row_ids(
     const memory::table_to_column_projection& table_to_column_projection,

@@ -44,16 +44,18 @@ class pointer_data_handler final : public data_handler {
 
  public:
   [[nodiscard]] static std::shared_ptr<pointer_data_handler<T>> create_data_handler(
-      const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr, const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer,
+      const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr,
+      const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer, const std::string& swap_file,
+      pointer_data_handler_swap_type type, swap_info sinfo, const std::string& description);
+
+  [[nodiscard]] static std::shared_ptr<pointer_data_handler<T>> create_data_handler(
+      legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& buffer,
       const std::string& swap_file, pointer_data_handler_swap_type type, swap_info sinfo,
       const std::string& description);
 
-  [[nodiscard]] static std::shared_ptr<pointer_data_handler<T>> create_data_handler(
-      legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& buffer, const std::string& swap_file,
-      pointer_data_handler_swap_type type, swap_info sinfo, const std::string& description);
-
   [[nodiscard]] static std::shared_ptr<pointer_data_handler> create_temp_data_handler(
-      const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr, const legacy_embedded_ctl::shared_static_array<STORAGE_T>& str_buffer);
+      const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr,
+      const legacy_embedded_ctl::shared_static_array<STORAGE_T>& str_buffer);
 
   [[nodiscard]] static std::shared_ptr<pointer_data_handler> create_temp_data_handler(
       legacy_embedded_ctl::static_array<POINTER_T>&& ptr, legacy_embedded_ctl::static_array<STORAGE_T>&& str_buffer);
@@ -159,9 +161,9 @@ class pointer_data_handler final : public data_handler {
 
 #ifndef CELOSTAR
   template <typename TYPE>
-  [[nodiscard]] loaded_data<TYPE> swap_in_impl(
-      const std::string& swap_file, std::atomic<size_t>& size, std::atomic<size_t>& size_on_disk,
-      std::atomic<bool>& broken_swap_file) requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>);
+  [[nodiscard]] loaded_data<TYPE> swap_in_impl(const std::string& swap_file, std::atomic<size_t>& size,
+                                               std::atomic<size_t>& size_on_disk, std::atomic<bool>& broken_swap_file)
+    requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>);
 #endif
 
   // The following functions are used only for enabling gdb_verify_command_test.py - CPL-9353

@@ -1,17 +1,16 @@
 #include "exprs/celonis/transpose_array_of_struct.h"
 
 #include "column/array_column.h"
-#include "column/struct_column.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
+#include "column/struct_column.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
 
 namespace starrocks {
 
-StatusOr<ColumnPtr>
-CelonisTransposeArrayOfStruct::transpose_array_of_struct(starrocks::FunctionContext* context,
-                                                         const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisTransposeArrayOfStruct::transpose_array_of_struct(starrocks::FunctionContext* context,
+                                                                             const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const size_t n_rows = columns[0]->size();

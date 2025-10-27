@@ -166,7 +166,6 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
     int excluding_all_nodes_length = state.range(7);
     int nodes_any_length = state.range(8);
 
-
     using UniformInt = std::uniform_int_distribution<std::mt19937::result_type>;
     std::random_device dev;
     std::mt19937 rng(dev());
@@ -200,7 +199,7 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     int total_rows = 0;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
         auto variant_column = ColumnHelper::create_column(
@@ -221,39 +220,36 @@ static void do_bench(benchmark::State& state, MatchType match_type) {
         auto any_nodes_column = ColumnHelper::create_column(
                 TypeDescriptor::create_array_type(TypeDescriptor::create_varchar_type(20)), false);
         switch (match_type) {
-            case CONSTANT:
+        case CONSTANT:
+            starting_nodes_column->append_datum(gen_rand_array(starting_nodes_length));
+            nodes_column->append_datum(gen_rand_array(nodes_length));
+            ending_nodes_column->append_datum(gen_rand_array(ending_nodes_length));
+            excluding_nodes_column->append_datum(gen_rand_array(excluding_nodes_length));
+            excluding_all_nodes_column->append_datum(gen_rand_array(excluding_all_nodes_length));
+            any_nodes_column->append_datum(gen_rand_array(nodes_any_length));
+            ctx->set_constant_columns({nullptr, starting_nodes_column, nodes_column, ending_nodes_column,
+                                       excluding_nodes_column, excluding_all_nodes_column, any_nodes_column});
+            break;
+        case NON_CONSTANT:
+            for (int i = 0; i < num_rows; i++) {
                 starting_nodes_column->append_datum(gen_rand_array(starting_nodes_length));
                 nodes_column->append_datum(gen_rand_array(nodes_length));
                 ending_nodes_column->append_datum(gen_rand_array(ending_nodes_length));
                 excluding_nodes_column->append_datum(gen_rand_array(excluding_nodes_length));
                 excluding_all_nodes_column->append_datum(gen_rand_array(excluding_all_nodes_length));
                 any_nodes_column->append_datum(gen_rand_array(nodes_any_length));
-                ctx->set_constant_columns(
-                        {nullptr, starting_nodes_column, nodes_column, ending_nodes_column, excluding_nodes_column,
-                         excluding_all_nodes_column, any_nodes_column});
-                break;
-            case NON_CONSTANT:
-                for (int i = 0; i < num_rows; i++) {
-                    starting_nodes_column->append_datum(gen_rand_array(starting_nodes_length));
-                    nodes_column->append_datum(gen_rand_array(nodes_length));
-                    ending_nodes_column->append_datum(gen_rand_array(ending_nodes_length));
-                    excluding_nodes_column->append_datum(gen_rand_array(excluding_nodes_length));
-                    excluding_all_nodes_column->append_datum(gen_rand_array(excluding_all_nodes_length));
-                    any_nodes_column->append_datum(gen_rand_array(nodes_any_length));
-                }
-                ctx->set_constant_columns({nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr});
-                break;
+            }
+            ctx->set_constant_columns({nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr});
+            break;
         }
 
         state.ResumeTiming();
         ASSERT_TRUE(CelonisMatchActivitiesFunctions::prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
         ASSERT_TRUE(CelonisMatchActivitiesFunctions::prepare(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
-        ASSERT_TRUE(CelonisMatchActivitiesFunctions::celonis_match_activities(ctx.get(),
-                                                                              {variant_column, starting_nodes_column,
-                                                                               nodes_column, ending_nodes_column,
-                                                                               excluding_nodes_column,
-                                                                               excluding_all_nodes_column,
-                                                                               any_nodes_column}).ok());
+        ASSERT_TRUE(CelonisMatchActivitiesFunctions::celonis_match_activities(
+                            ctx.get(), {variant_column, starting_nodes_column, nodes_column, ending_nodes_column,
+                                        excluding_nodes_column, excluding_all_nodes_column, any_nodes_column})
+                            .ok());
         ASSERT_TRUE(CelonisMatchActivitiesFunctions::close(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
         ASSERT_TRUE(CelonisMatchActivitiesFunctions::close(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
     }
@@ -275,20 +271,25 @@ static void BM_MatchActivitiesConstantLargeMatchesConfig(benchmark::State& state
 
 // Args: Number of rows/ Length of each variant / Number of possible values / Starting nodes length / Nodes length / Ending nodes length / Excluding nodes length / Excluding all nodes length / Any nodes length
 // STARTING nodes
-BENCHMARK(BM_MatchActivitiesNonConstantConfig)->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {5, 10}, {0}, {0}, {0}, {0}, {0}});
-BENCHMARK(BM_MatchActivitiesConstantConfig)->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {5, 10}, {0}, {0}, {0}, {0}, {0}});
-BENCHMARK(BM_MatchActivitiesConstantLargeMatchesConfig)->ArgsProduct({{1000, 10000, 100000, 1000000}, {20}, {5000}, {3000}, {0}, {0}, {0}, {0}, {0}});
+BENCHMARK(BM_MatchActivitiesNonConstantConfig)
+        ->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {5, 10}, {0}, {0}, {0}, {0}, {0}});
+BENCHMARK(BM_MatchActivitiesConstantConfig)
+        ->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {5, 10}, {0}, {0}, {0}, {0}, {0}});
+BENCHMARK(BM_MatchActivitiesConstantLargeMatchesConfig)
+        ->ArgsProduct({{1000, 10000, 100000, 1000000}, {20}, {5000}, {3000}, {0}, {0}, {0}, {0}, {0}});
 // NODES
-BENCHMARK(BM_MatchActivitiesConstantConfig)->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {0}, {1, 5, 10}, {0}, {0}, {0}, {0}});
+BENCHMARK(BM_MatchActivitiesConstantConfig)
+        ->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {0}, {1, 5, 10}, {0}, {0}, {0}, {0}});
 // ENDING nodes
-BENCHMARK(BM_MatchActivitiesConstantConfig)->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {0}, {0}, {5, 10}, {0}, {0}, {0}});
+BENCHMARK(BM_MatchActivitiesConstantConfig)
+        ->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {0}, {0}, {5, 10}, {0}, {0}, {0}});
 // EXCLUDING_ALL nodes
-BENCHMARK(BM_MatchActivitiesConstantConfig)->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {0}, {0}, {0}, {0}, {5, 10}, {0}});
+BENCHMARK(BM_MatchActivitiesConstantConfig)
+        ->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {0}, {0}, {0}, {0}, {5, 10}, {0}});
 // ANY_NODES
-BENCHMARK(BM_MatchActivitiesConstantConfig)->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {0}, {0}, {0}, {0}, {0}, {5, 10}});
-
+BENCHMARK(BM_MatchActivitiesConstantConfig)
+        ->ArgsProduct({{1000, 10000, 100000}, {20}, {20, 40, 60}, {0}, {0}, {0}, {0}, {0}, {5, 10}});
 
 } // namespace starrocks
 
 BENCHMARK_MAIN();
-

@@ -1,12 +1,14 @@
-#include <algorithm>
+#include "exprs/celonis/agg/histogram_boundaries.h"
+
 #include <gtest/gtest.h>
+
+#include <algorithm>
 
 #include "../util.h"
 #include "column/struct_column.h"
 #include "column/type_traits.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 
@@ -18,20 +20,20 @@ class ManagedAggrState {
 public:
     ~ManagedAggrState() { _func->destroy(_ctx, _state); }
 
-    static std::unique_ptr<ManagedAggrState> create(FunctionContext *ctx, const AggregateFunction *func) {
+    static std::unique_ptr<ManagedAggrState> create(FunctionContext* ctx, const AggregateFunction* func) {
         return std::make_unique<ManagedAggrState>(ctx, func);
     }
 
     AggDataPtr state() { return _state; }
 
 private:
-    ManagedAggrState(FunctionContext *ctx, const AggregateFunction *func) : _ctx(ctx), _func(func) {
+    ManagedAggrState(FunctionContext* ctx, const AggregateFunction* func) : _ctx(ctx), _func(func) {
         _state = _mem_pool.allocate_aligned(func->size(), func->alignof_size());
         _func->create(_ctx, _state);
     }
 
-    FunctionContext *_ctx;
-    const AggregateFunction *_func;
+    FunctionContext* _ctx;
+    const AggregateFunction* _func;
     MemPool _mem_pool;
     AggDataPtr _state;
 };
@@ -71,16 +73,14 @@ protected:
                 FunctionContext::create_context(nullptr, mem_pools_.back().get(), return_type, std::move(arg_types)));
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void EvaluateField(StructColumn* st, const std::string& field_name, const DatumArray& expected) {
         auto field = st->field_column(field_name);
         ASSERT_EQ(field->size(), 1);
         auto result_array = field->get(0).get_array();
         ASSERT_EQ(result_array.size(), expected.size());
         for (int i = 0; i < expected.size(); ++i) {
-            auto debug_string = [&]() {
-                return fmt::format("field: {}, index: {}", field_name, i);
-            };
+            auto debug_string = [&]() { return fmt::format("field: {}, index: {}", field_name, i); };
             if (expected[i].is_null()) {
                 EXPECT_TRUE(result_array[i].is_null()) << debug_string();
             } else if (field->is_null(i)) {
@@ -92,7 +92,7 @@ protected:
         }
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Evaluate(Column* result, const DatumStruct& expected) {
         if (expected.empty()) {
             EXPECT_TRUE(result->is_null(0));
@@ -104,12 +104,12 @@ protected:
         EvaluateField<TYPE_BIGINT>(st, "class_count", expected[2].get_array());
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(LogicalType logical_type, const DatumArray& input, const DatumArray& boundaries, bool no_lower_bound,
-              bool no_upper_bound) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            LogicalType logical_type, const DatumArray& input, const DatumArray& boundaries, bool no_lower_bound,
+            bool no_upper_bound) {
         auto local_ctx = get_ctx(logical_type);
 
-        const AggregateFunction *func =
+        const AggregateFunction* func =
                 get_aggregate_function("celonis_histogram_boundaries", logical_type, TYPE_STRUCT, false);
 
         auto input_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(logical_type), true);
@@ -122,7 +122,7 @@ protected:
         auto boundaries_col = ColumnHelper::create_column(celonis::array_type(logical_type), true);
         boundaries_col->append_datum(boundaries);
 
-        std::vector<const Column *> raw_columns;
+        std::vector<const Column*> raw_columns;
         raw_columns.resize(4);
         raw_columns[0] = input_col.get();
         raw_columns[1] = no_lower_bound_col.get();
@@ -136,7 +136,7 @@ protected:
         return {std::move(local_ctx), std::move(state), func};
     }
 
-    template<LogicalType LT>
+    template <LogicalType LT>
     void Run(const DatumArray& input, const DatumArray& boundaries, bool no_lower_bound, bool no_upper_bound,
              const DatumStruct& expected) {
         auto [local_ctx, state, func] = RunUpdate(LT, input, boundaries, no_lower_bound, no_upper_bound);
@@ -157,9 +157,8 @@ TEST_F(CelonisHistogramBoundariesTest, histogram11_bigint_no_upper_bound_merge) 
     auto boundaries = DatumArray{100L, 150L, 300L};
     auto no_lower_bound = false;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{100L, 150L, 300L},
-                                DatumArray{150L, 300L, kNullDatum},
-                                DatumArray{4L, 0L, 1L}};
+    auto expected =
+            DatumStruct{DatumArray{100L, 150L, 300L}, DatumArray{150L, 300L, kNullDatum}, DatumArray{4L, 0L, 1L}};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, boundaries, no_lower_bound, no_upper_bound);
     auto [local_ctx2, state2, func2] = RunUpdate(logical_type, input2, boundaries, no_lower_bound, no_upper_bound);
@@ -185,13 +184,11 @@ TEST_F(CelonisHistogramBoundariesTest, merge_to_new_state) {
     auto boundaries = DatumArray{100L, 150L, 300L};
     auto no_lower_bound = false;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{100L, 150L, 300L},
-                                DatumArray{150L, 300L, kNullDatum},
-                                DatumArray{4L, 0L, 1L}};
+    auto expected =
+            DatumStruct{DatumArray{100L, 150L, 300L}, DatumArray{150L, 300L, kNullDatum}, DatumArray{4L, 0L, 1L}};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, boundaries, no_lower_bound, no_upper_bound);
     auto [local_ctx2, state2, func2] = RunUpdate(logical_type, input2, boundaries, no_lower_bound, no_upper_bound);
-
 
     // Serialize state1 and state2
     ColumnPtr serde_col = BinaryColumn::create();
@@ -223,9 +220,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram12_bigint) {
     auto boundaries = DatumArray{100L, 150L, 300L};
     auto no_lower_bound = false;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{100L, 150L},
-                                DatumArray{150L, 300L},
-                                DatumArray{4L, 1L}};
+    auto expected = DatumStruct{DatumArray{100L, 150L}, DatumArray{150L, 300L}, DatumArray{4L, 1L}};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, boundaries, no_lower_bound, no_upper_bound);
     auto [local_ctx2, state2, func2] = RunUpdate(logical_type, input2, boundaries, no_lower_bound, no_upper_bound);
@@ -249,9 +244,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram23_bigint_no_merge) {
     auto boundaries = DatumArray{2L, 5L, 4L, 3L, 1L};
     auto no_lower_bound = false;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{1L, 2L, 3L, 4L},
-                                DatumArray{2L, 3L, 4L, 5L},
-                                DatumArray{1L, 1L, 1L, 1L}};
+    auto expected = DatumStruct{DatumArray{1L, 2L, 3L, 4L}, DatumArray{2L, 3L, 4L, 5L}, DatumArray{1L, 1L, 1L, 1L}};
 
     Run<TYPE_BIGINT>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -261,9 +254,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram24_no_lower_bound) {
     auto boundaries = DatumArray{500L};
     auto no_lower_bound = true;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{kNullDatum},
-                                DatumArray{500L},
-                                DatumArray{3L}};
+    auto expected = DatumStruct{DatumArray{kNullDatum}, DatumArray{500L}, DatumArray{3L}};
 
     Run<TYPE_BIGINT>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -273,9 +264,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram25_no_upper_bound) {
     auto boundaries = DatumArray{200L};
     auto no_lower_bound = false;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{200L},
-                                DatumArray{kNullDatum},
-                                DatumArray{3L}};
+    auto expected = DatumStruct{DatumArray{200L}, DatumArray{kNullDatum}, DatumArray{3L}};
 
     Run<TYPE_BIGINT>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -285,9 +274,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram26_empty_boundaries) {
     auto boundaries = DatumArray{};
     auto no_lower_bound = true;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{kNullDatum},
-                                DatumArray{kNullDatum},
-                                DatumArray{4L}};
+    auto expected = DatumStruct{DatumArray{kNullDatum}, DatumArray{kNullDatum}, DatumArray{4L}};
 
     Run<TYPE_BIGINT>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -299,9 +286,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram26_empty_boundaries_with_merge_t
     auto boundaries = DatumArray{};
     auto no_lower_bound = true;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{kNullDatum},
-                                DatumArray{kNullDatum},
-                                DatumArray{4L}};
+    auto expected = DatumStruct{DatumArray{kNullDatum}, DatumArray{kNullDatum}, DatumArray{4L}};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, boundaries, no_lower_bound, no_upper_bound);
     auto [local_ctx2, state2, func2] = RunUpdate(logical_type, input2, boundaries, no_lower_bound, no_upper_bound);
@@ -336,9 +321,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram29_double_merge) {
     auto boundaries = DatumArray{100., 500.};
     auto no_lower_bound = false;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{100.},
-                                DatumArray{500.},
-                                DatumArray{2L}};
+    auto expected = DatumStruct{DatumArray{100.}, DatumArray{500.}, DatumArray{2L}};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, boundaries, no_lower_bound, no_upper_bound);
     auto [local_ctx2, state2, func2] = RunUpdate(logical_type, input2, boundaries, no_lower_bound, no_upper_bound);
@@ -362,9 +345,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram30_double_no_lower_bound) {
     auto boundaries = DatumArray{500.};
     auto no_lower_bound = true;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{kNullDatum},
-                                DatumArray{500.},
-                                DatumArray{3L}};
+    auto expected = DatumStruct{DatumArray{kNullDatum}, DatumArray{500.}, DatumArray{3L}};
 
     Run<TYPE_DOUBLE>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -374,9 +355,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram31_double_no_upper_bound) {
     auto boundaries = DatumArray{200.};
     auto no_lower_bound = false;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{200.},
-                                DatumArray{kNullDatum},
-                                DatumArray{3L}};
+    auto expected = DatumStruct{DatumArray{200.}, DatumArray{kNullDatum}, DatumArray{3L}};
 
     Run<TYPE_DOUBLE>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -386,9 +365,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram32_double_empty_boundaries) {
     auto boundaries = DatumArray{};
     auto no_lower_bound = true;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{kNullDatum},
-                                DatumArray{kNullDatum},
-                                DatumArray{4L}};
+    auto expected = DatumStruct{DatumArray{kNullDatum}, DatumArray{kNullDatum}, DatumArray{4L}};
 
     Run<TYPE_DOUBLE>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -410,8 +387,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram44_varchar_no_lower_bound_no_upp
     auto boundaries = DatumArray{"D", "G", "J"};
     auto no_lower_bound = true;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{kNullDatum, "D", "G", "J"},
-                                DatumArray{"D", "G", "J", kNullDatum},
+    auto expected = DatumStruct{DatumArray{kNullDatum, "D", "G", "J"}, DatumArray{"D", "G", "J", kNullDatum},
                                 DatumArray{3L, 3L, 3L, 1L}};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, boundaries, no_lower_bound, no_upper_bound);
@@ -438,8 +414,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram44_varchar_merge_with_new_state)
     auto boundaries = DatumArray{"D", "G", "J"};
     auto no_lower_bound = true;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{kNullDatum, "D", "G", "J"},
-                                DatumArray{"D", "G", "J", kNullDatum},
+    auto expected = DatumStruct{DatumArray{kNullDatum, "D", "G", "J"}, DatumArray{"D", "G", "J", kNullDatum},
                                 DatumArray{3L, 3L, 3L, 1L}};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, boundaries, no_lower_bound, no_upper_bound);
@@ -473,9 +448,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram45_varchar_no_upper_bound) {
     auto boundaries = DatumArray{"F"};
     auto no_lower_bound = false;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{"F"},
-                                DatumArray{kNullDatum},
-                                DatumArray{5L}};
+    auto expected = DatumStruct{DatumArray{"F"}, DatumArray{kNullDatum}, DatumArray{5L}};
 
     Run<TYPE_VARCHAR>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -485,9 +458,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram46_varchar) {
     auto boundaries = DatumArray{"B", "E", "H"};
     auto no_lower_bound = false;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{"B", "E"},
-                                DatumArray{"E", "H"},
-                                DatumArray{3L, 3L}};
+    auto expected = DatumStruct{DatumArray{"B", "E"}, DatumArray{"E", "H"}, DatumArray{3L, 3L}};
 
     Run<TYPE_VARCHAR>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -497,9 +468,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram47_varchar) {
     auto boundaries = DatumArray{"A", "E", "H", "K"};
     auto no_lower_bound = false;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{"A", "E", "H"},
-                                DatumArray{"E", "H", "K"},
-                                DatumArray{4L, 3L, 3L}};
+    auto expected = DatumStruct{DatumArray{"A", "E", "H"}, DatumArray{"E", "H", "K"}, DatumArray{4L, 3L, 3L}};
 
     Run<TYPE_VARCHAR>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -509,9 +478,7 @@ TEST_F(CelonisHistogramBoundariesTest, histogram50_bigint_no_lower_bound_no_uppe
     auto boundaries = DatumArray{200L};
     auto no_lower_bound = true;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{kNullDatum, 200L},
-                                DatumArray{200L, kNullDatum},
-                                DatumArray{1L, 3L}};
+    auto expected = DatumStruct{DatumArray{kNullDatum, 200L}, DatumArray{200L, kNullDatum}, DatumArray{1L, 3L}};
 
     Run<TYPE_BIGINT>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -521,26 +488,21 @@ TEST_F(CelonisHistogramBoundariesTest, histogram51_double_no_lower_bound_no_uppe
     auto boundaries = DatumArray{200.};
     auto no_lower_bound = true;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{kNullDatum, 200.},
-                                DatumArray{200., kNullDatum},
-                                DatumArray{1L, 3L}};
+    auto expected = DatumStruct{DatumArray{kNullDatum, 200.}, DatumArray{200., kNullDatum}, DatumArray{1L, 3L}};
 
     Run<TYPE_DOUBLE>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
 
 TEST_F(CelonisHistogramBoundariesTest, histogram_one_data_boundary_no_lower_bound) {
     auto logical_type = TYPE_DATETIME;
-    auto input1 = DatumArray{TimestampValue::create(2019, 1, 1, 13, 0, 0),
-                             TimestampValue::create(2019, 1, 2, 13, 0, 0),
+    auto input1 = DatumArray{TimestampValue::create(2019, 1, 1, 13, 0, 0), TimestampValue::create(2019, 1, 2, 13, 0, 0),
                              TimestampValue::create(2019, 1, 3, 13, 0, 0)};
-    auto input2 = DatumArray{TimestampValue::create(2019, 1, 4, 13, 0, 0),
-                             TimestampValue::create(2019, 1, 5, 13, 0, 0),
+    auto input2 = DatumArray{TimestampValue::create(2019, 1, 4, 13, 0, 0), TimestampValue::create(2019, 1, 5, 13, 0, 0),
                              TimestampValue::create(2019, 1, 6, 13, 0, 0)};
     auto boundaries = DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0)};
     auto no_lower_bound = true;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{kNullDatum},
-                                DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0)},
+    auto expected = DatumStruct{DatumArray{kNullDatum}, DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0)},
                                 DatumArray{2L}};
 
     auto [local_ctx1, state1, func] = RunUpdate(logical_type, input1, boundaries, no_lower_bound, no_upper_bound);
@@ -561,53 +523,42 @@ TEST_F(CelonisHistogramBoundariesTest, histogram_one_data_boundary_no_lower_boun
 }
 
 TEST_F(CelonisHistogramBoundariesTest, histogram_one_data_boundary_no_upper_bound) {
-    auto input = DatumArray{TimestampValue::create(2019, 1, 1, 13, 0, 0),
-                       TimestampValue::create(2019, 1, 2, 13, 0, 0),
-                       TimestampValue::create(2019, 1, 3, 13, 0, 0),
-                       TimestampValue::create(2019, 1, 4, 13, 0, 0),
-                       TimestampValue::create(2019, 1, 5, 13, 0, 0),
-                       TimestampValue::create(2019, 1, 6, 13, 0, 0)};
+    auto input = DatumArray{TimestampValue::create(2019, 1, 1, 13, 0, 0), TimestampValue::create(2019, 1, 2, 13, 0, 0),
+                            TimestampValue::create(2019, 1, 3, 13, 0, 0), TimestampValue::create(2019, 1, 4, 13, 0, 0),
+                            TimestampValue::create(2019, 1, 5, 13, 0, 0), TimestampValue::create(2019, 1, 6, 13, 0, 0)};
     auto boundaries = DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0)};
     auto no_lower_bound = false;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0)},
-                                DatumArray{kNullDatum},
+    auto expected = DatumStruct{DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0)}, DatumArray{kNullDatum},
                                 DatumArray{4L}};
 
     Run<TYPE_DATETIME>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
 
 TEST_F(CelonisHistogramBoundariesTest, histogram_one_data_boundary_no_lower_bound_no_upper_bound) {
-    auto input = DatumArray{TimestampValue::create(2019, 1, 1, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 2, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 3, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 4, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 5, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 6, 13, 0, 0)};
+    auto input = DatumArray{TimestampValue::create(2019, 1, 1, 13, 0, 0), TimestampValue::create(2019, 1, 2, 13, 0, 0),
+                            TimestampValue::create(2019, 1, 3, 13, 0, 0), TimestampValue::create(2019, 1, 4, 13, 0, 0),
+                            TimestampValue::create(2019, 1, 5, 13, 0, 0), TimestampValue::create(2019, 1, 6, 13, 0, 0)};
     auto boundaries = DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0)};
     auto no_lower_bound = true;
     auto no_upper_bound = true;
-    auto expected = DatumStruct{DatumArray{kNullDatum, TimestampValue::create(2019, 1, 3, 13, 0, 0)},
-                                DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0), kNullDatum},
-                                DatumArray{2L, 4L}};
+    auto expected =
+            DatumStruct{DatumArray{kNullDatum, TimestampValue::create(2019, 1, 3, 13, 0, 0)},
+                        DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0), kNullDatum}, DatumArray{2L, 4L}};
 
     Run<TYPE_DATETIME>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
 
 TEST_F(CelonisHistogramBoundariesTest, histogram_more_than_one_data_boundary) {
-    auto input = DatumArray{TimestampValue::create(2019, 1, 1, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 2, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 3, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 4, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 5, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 6, 13, 0, 0)};
-    auto boundaries = DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0),
-                                 TimestampValue::create(2019, 1, 5, 13, 0, 0)};
+    auto input = DatumArray{TimestampValue::create(2019, 1, 1, 13, 0, 0), TimestampValue::create(2019, 1, 2, 13, 0, 0),
+                            TimestampValue::create(2019, 1, 3, 13, 0, 0), TimestampValue::create(2019, 1, 4, 13, 0, 0),
+                            TimestampValue::create(2019, 1, 5, 13, 0, 0), TimestampValue::create(2019, 1, 6, 13, 0, 0)};
+    auto boundaries =
+            DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0), TimestampValue::create(2019, 1, 5, 13, 0, 0)};
     auto no_lower_bound = false;
     auto no_upper_bound = false;
     auto expected = DatumStruct{DatumArray{TimestampValue::create(2019, 1, 3, 13, 0, 0)},
-                                DatumArray{TimestampValue::create(2019, 1, 5, 13, 0, 0)},
-                                DatumArray{2L}};
+                                DatumArray{TimestampValue::create(2019, 1, 5, 13, 0, 0)}, DatumArray{2L}};
 
     Run<TYPE_DATETIME>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -617,9 +568,7 @@ TEST_F(CelonisHistogramBoundariesTest, null_value) {
     auto boundaries = DatumArray{100L, 150L, 300L};
     auto no_lower_bound = false;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{100L, 150L},
-                                DatumArray{150L, 300L},
-                                DatumArray{4L, 1L}};
+    auto expected = DatumStruct{DatumArray{100L, 150L}, DatumArray{150L, 300L}, DatumArray{4L, 1L}};
 
     Run<TYPE_BIGINT>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }
@@ -629,9 +578,7 @@ TEST_F(CelonisHistogramBoundariesTest, unordered_duplicated_boundaries) {
     auto boundaries = DatumArray{300L, 150L, 300L, 100L};
     auto no_lower_bound = false;
     auto no_upper_bound = false;
-    auto expected = DatumStruct{DatumArray{100L, 150L},
-                                DatumArray{150L, 300L},
-                                DatumArray{4L, 1L}};
+    auto expected = DatumStruct{DatumArray{100L, 150L}, DatumArray{150L, 300L}, DatumArray{4L, 1L}};
 
     Run<TYPE_BIGINT>(input, boundaries, no_lower_bound, no_upper_bound, expected);
 }

@@ -18,39 +18,39 @@ enum Label {
     CASE_END,
 };
 
-template<typename ActivityCppType>
-int findActivity(const ActivityCppType* activity_elements, const NullColumn::Container* activity_nulls, uint32_t begin_offset,
-                 uint32_t end_offset, const ActivityCppType& name, Label label) {
+template <typename ActivityCppType>
+int findActivity(const ActivityCppType* activity_elements, const NullColumn::Container* activity_nulls,
+                 uint32_t begin_offset, uint32_t end_offset, const ActivityCppType& name, Label label) {
     int64_t begin = static_cast<int64_t>(begin_offset);
     int64_t end = static_cast<int64_t>(end_offset);
     // Saola does not ignore NULLs for CASE_START and CASE_END
     switch (label) {
-        case CASE_START:
-            return begin;
-        case CASE_END:
-            return end - 1;
-        case FIRST:
-            for (auto i = begin; i < end; ++i) {
-                if (activity_nulls != nullptr && (*activity_nulls)[i]) {
-                    continue;
-                }
-                if (activity_elements[i] == name) {
-                    return i;
-                }
+    case CASE_START:
+        return begin;
+    case CASE_END:
+        return end - 1;
+    case FIRST:
+        for (auto i = begin; i < end; ++i) {
+            if (activity_nulls != nullptr && (*activity_nulls)[i]) {
+                continue;
             }
-            return -1;
-        case LAST:
-            for (auto i = end - 1; i >= begin; --i) {
-                if (activity_nulls != nullptr && (*activity_nulls)[i]) {
-                    continue;
-                }
-                if (activity_elements[i] == name) {
-                    return i;
-                }
+            if (activity_elements[i] == name) {
+                return i;
             }
-            return -1;
-        default:
-            return -1;
+        }
+        return -1;
+    case LAST:
+        for (auto i = end - 1; i >= begin; --i) {
+            if (activity_nulls != nullptr && (*activity_nulls)[i]) {
+                continue;
+            }
+            if (activity_elements[i] == name) {
+                return i;
+            }
+        }
+        return -1;
+    default:
+        return -1;
     }
 }
 
@@ -64,13 +64,14 @@ Label parseLabel(const std::string& format) {
 
 } // namespace
 
-template<LogicalType ActivityLT>
-StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_throughput([[maybe_unused]] FunctionContext* context, const Columns& columns) {
+template <LogicalType ActivityLT>
+StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_throughput(
+        [[maybe_unused]] FunctionContext* context, const Columns& columns) {
     using ActivityColumn = RunTimeColumnType<ActivityLT>;
     using TimestampColumn = RunTimeColumnType<TYPE_BIGINT>;
 
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[0] });
-    RETURN_IF_COLUMNS_ONLY_NULL({ columns[1] });
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
+    RETURN_IF_COLUMNS_ONLY_NULL({columns[1]});
     if (UNLIKELY(columns[0]->size() != columns[1]->size())) {
         std::stringstream error;
         error << "unmatched activity offsets (" << columns[0]->size() << ") and timestamp offsets ("
@@ -85,7 +86,8 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
 
     ColumnPtr timestamp_column = ColumnHelper::unpack_and_duplicate_const_column(columns[1]->size(), columns[1]);
     UnnestedArrayData timestamp_array_data = prepare_array_input(timestamp_column.get());
-    const auto* timestamp_elements = down_cast<const TimestampColumn*>(timestamp_array_data.elements)->get_data().data();
+    const auto* timestamp_elements =
+            down_cast<const TimestampColumn*>(timestamp_array_data.elements)->get_data().data();
 
     auto start_activity = ColumnViewer<ActivityLT>(columns[2]).value(0);
     auto end_activity = ColumnViewer<ActivityLT>(columns[3]).value(0);
@@ -120,22 +122,25 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
             throw std::runtime_error(error.str());
         }
 
-        int start_activity_idx = findActivity(activity_elements, activity_array_data.null_elements, activity_offsets_ptr[i],
-                                              activity_offsets_ptr[i + 1], start_activity, start_label);
+        int start_activity_idx =
+                findActivity(activity_elements, activity_array_data.null_elements, activity_offsets_ptr[i],
+                             activity_offsets_ptr[i + 1], start_activity, start_label);
         if (start_activity_idx < 0) {
             // Did not find the start activity.
             result.append_null();
             continue;
         }
-        int end_activity_idx = findActivity(activity_elements, activity_array_data.null_elements, activity_offsets_ptr[i],
-                                            activity_offsets_ptr[i + 1], end_activity, end_label);
+        int end_activity_idx =
+                findActivity(activity_elements, activity_array_data.null_elements, activity_offsets_ptr[i],
+                             activity_offsets_ptr[i + 1], end_activity, end_label);
         if (end_activity_idx < 0) {
             // Did not find the end activity.
             result.append_null();
             continue;
         }
 
-        if (timestamp_array_data.null_elements != nullptr && (*timestamp_array_data.null_elements)[start_activity_idx]) {
+        if (timestamp_array_data.null_elements != nullptr &&
+            (*timestamp_array_data.null_elements)[start_activity_idx]) {
             // Start timestamp is null.
             result.append_null();
             continue;
@@ -157,12 +162,9 @@ StatusOr<ColumnPtr> CelonisCalcThroughputFunctions<ActivityLT>::celonis_calc_thr
     return result.build(all_const);
 }
 
-template
-class CelonisCalcThroughputFunctions<TYPE_INT>;
+template class CelonisCalcThroughputFunctions<TYPE_INT>;
 
-template
-class CelonisCalcThroughputFunctions<TYPE_BIGINT>;
+template class CelonisCalcThroughputFunctions<TYPE_BIGINT>;
 
-template
-class CelonisCalcThroughputFunctions<TYPE_VARCHAR>;
+template class CelonisCalcThroughputFunctions<TYPE_VARCHAR>;
 } // namespace starrocks

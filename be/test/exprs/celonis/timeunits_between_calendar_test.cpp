@@ -1,14 +1,12 @@
-#include "exprs/celonis/time_functions.h"
-
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
+#include "exprs/celonis/time_functions.h"
 #include "exprs/function_context.h"
-#include "util.h"
-#include "util/defer_op.h"
-
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
+#include "util.h"
+#include "util/defer_op.h"
 
 namespace starrocks {
 
@@ -23,10 +21,8 @@ protected:
 private:
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_DATETIME),
-                TypeDescriptor::from_logical_type(TYPE_DATETIME),
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                TypeDescriptor::from_logical_type(TYPE_DATETIME), TypeDescriptor::from_logical_type(TYPE_DATETIME),
+                TypeDescriptor::from_logical_type(TYPE_VARCHAR), TypeDescriptor::from_logical_type(TYPE_ARRAY),
                 TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_DATETIME);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -50,17 +46,16 @@ private:
         RETURN_IF_ERROR(
                 CelonisTimeFunctions::timeunits_between_calendar_prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
-        result = CelonisTimeFunctions::timeunits_between_calendar(ctx_.get(),
-                                                                  {from_timestamp_column_, to_timestamp_column_,
-                                                                   time_unit_column_,
-                                                                   calendar_column_, calendar_id_column_});
+        result = CelonisTimeFunctions::timeunits_between_calendar(
+                ctx_.get(), {from_timestamp_column_, to_timestamp_column_, time_unit_column_, calendar_column_,
+                             calendar_id_column_});
         return result;
     }
 
-    StatusOr<ColumnPtr>
-    RunConstantCalendar(const std::vector<std::string>& calendar_strs, const std::string& time_unit) {
+    StatusOr<ColumnPtr> RunConstantCalendar(const std::vector<std::string>& calendar_strs,
+                                            const std::string& time_unit) {
         DatumArray calendar_array;
-        for (const auto& calendar_str: calendar_strs) {
+        for (const auto& calendar_str : calendar_strs) {
             calendar_array.emplace_back(calendar_str.c_str());
         }
         time_unit_column_->append_datum(time_unit.c_str());
@@ -72,10 +67,9 @@ private:
     }
 
     StatusOr<ColumnPtr> RunConstantCalendar() {
-        ctx_->set_constant_columns(
-                {nullptr, nullptr, ConstColumn::create(time_unit_column_, from_timestamp_column_->size()),
-                 ConstColumn::create(calendar_column_, from_timestamp_column_->size()),
-                 nullptr});
+        ctx_->set_constant_columns({nullptr, nullptr,
+                                    ConstColumn::create(time_unit_column_, from_timestamp_column_->size()),
+                                    ConstColumn::create(calendar_column_, from_timestamp_column_->size()), nullptr});
         return Run();
     }
 
@@ -151,15 +145,16 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, workdays_between_const_factory_calen
     from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
     to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 6, 0, 0, 0));
     calendar_id_column_->append_datum(kNullDatum);
-    const auto result = RunConstantCalendar(
-            {R"({"factory_calendar": {)",
-             R"("entries": [)",
-             R"({"start_date": 115200000, "end_date": 147600000},)", // 1970-01-02 08:00:00 → 1970-01-02 17:00:00
-             R"({"start_date": 288000000, "end_date": 306000000},)", // 1970-01-04 08:00:00 → 1970-01-04 13:00:00
-             R"({"start_date": 316800000, "end_date": 320400000},)", // 1970-01-04 16:00:00 → 1970-01-04 17:00:00
-             R"({"start_date": 460800000, "end_date": 493200000})",  // 1970-01-06 08:00:00 → 1970-01-06 17:00:00
-             R"(] })",
-             R"(})"}, "WORKDAYS").value();
+    const auto result =
+            RunConstantCalendar(
+                    {R"({"factory_calendar": {)", R"("entries": [)",
+                     R"({"start_date": 115200000, "end_date": 147600000},)", // 1970-01-02 08:00:00 → 1970-01-02 17:00:00
+                     R"({"start_date": 288000000, "end_date": 306000000},)", // 1970-01-04 08:00:00 → 1970-01-04 13:00:00
+                     R"({"start_date": 316800000, "end_date": 320400000},)", // 1970-01-04 16:00:00 → 1970-01-04 17:00:00
+                     R"({"start_date": 460800000, "end_date": 493200000})", // 1970-01-06 08:00:00 → 1970-01-06 17:00:00
+                     R"(] })", R"(})"},
+                    "WORKDAYS")
+                    .value();
     ASSERT_EQ(from_timestamp_column_->size(), result->size());
     EXPECT_EQ(2, result->get(0).get_double());
 }
@@ -171,15 +166,12 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, workdays_between_non_const_factory_c
     time_unit_column_->append_datum("WORKDAYS");
     calendar_id_column_->append_datum(kNullDatum);
     calendar_column_->append_datum(DatumArray{
-            R"({"factory_calendar": {)",
-            R"("entries": [)",
+            R"({"factory_calendar": {)", R"("entries": [)",
             R"({"start_date": 115200000, "end_date": 147600000},)", // 1970-01-02 08:00:00 → 1970-01-02 17:00:00
             R"({"start_date": 288000000, "end_date": 306000000},)", // 1970-01-04 08:00:00 → 1970-01-04 13:00:00
             R"({"start_date": 316800000, "end_date": 320400000},)", // 1970-01-04 16:00:00 → 1970-01-04 17:00:00
             R"({"start_date": 460800000, "end_date": 493200000})",  // 1970-01-06 08:00:00 → 1970-01-06 17:00:00
-            R"(] })",
-            R"(})"
-    });
+            R"(] })", R"(})"});
     const auto result = Run().value();
     ASSERT_EQ(from_timestamp_column_->size(), result->size());
     EXPECT_EQ(2, result->get(0).get_double());
@@ -195,12 +187,10 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, non_const_weekday_calendar) {
     time_unit_column_->append_datum("DAYS");
     calendar_id_column_->append_datum(kNullDatum);
     calendar_id_column_->append_datum(kNullDatum);
-    calendar_column_->append_datum(DatumArray{R"({"factory_calendar": {)",
-                                              R"("entries": {"start_date": 28800000, "end_date": 61200000 })",
-                                              R"(} })"});
-    calendar_column_->append_datum(DatumArray{R"({"factory_calendar": {)",
-                                              R"("entries": {"start_date": 28800000, "end_date": 61200000 })",
-                                              R"(} })"});
+    calendar_column_->append_datum(DatumArray{
+            R"({"factory_calendar": {)", R"("entries": {"start_date": 28800000, "end_date": 61200000 })", R"(} })"});
+    calendar_column_->append_datum(DatumArray{
+            R"({"factory_calendar": {)", R"("entries": {"start_date": 28800000, "end_date": 61200000 })", R"(} })"});
     const auto result = Run().value();
     ASSERT_EQ(from_timestamp_column_->size(), result->size());
     EXPECT_EQ(1.0, result->get(0).get_double());
@@ -216,15 +206,18 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_weekday_calendar) {
         to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 1, 2, 0, 0));
         calendar_id_column_->append_datum(kNullDatum);
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
-                                                        R"({"weekday_calendar": {)",
-                                                        // [8:00 am, 5:00 pm]
-                                                        R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"(} })"}, "DAYS").value();
+        const auto result =
+                RunConstantCalendar(
+                        {R"({"weekday_calendar": {)",
+                         // [8:00 am, 5:00 pm]
+                         R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"(} })"},
+                        "DAYS")
+                        .value();
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
         EXPECT_EQ(1.125, result->get(0).get_double());
         EXPECT_EQ(-1.875, result->get(1).get_double());
@@ -243,15 +236,18 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_weekday_calendar) {
         calendar_id_column_->append_datum(kNullDatum);
         calendar_id_column_->append_datum(kNullDatum);
         calendar_id_column_->append_datum(kNullDatum);
-        const auto result = RunConstantCalendar({
-                                                        R"({"weekday_calendar": {)",
-                                                        // [8:00 am, 5:00 pm]
-                                                        R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                                        R"(} })"}, "WORKDAYS").value();
+        const auto result =
+                RunConstantCalendar(
+                        {R"({"weekday_calendar": {)",
+                         // [8:00 am, 5:00 pm]
+                         R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"("tuesday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"("thursday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"("friday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"("saturday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
+                         R"(} })"},
+                        "WORKDAYS")
+                        .value();
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
         EXPECT_EQ(3.0, result->get(0).get_double());
         EXPECT_EQ(-5.0, result->get(1).get_double());
@@ -307,7 +303,8 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_weekday_calendar) {
                 }
               }
             }
-        )", &calendar_proto);
+        )",
+                                                      &calendar_proto);
         std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto, true);
         const auto result = RunConstantCalendar({encoded_string.c_str()}, "WORKDAYS").value();
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
@@ -363,7 +360,8 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_weekday_calendar) {
                 }
               }
             }
-        )", &calendar_proto);
+        )",
+                                                      &calendar_proto);
         std::string encoded_string = celonis::to_base64_encoded_string(calendar_proto, false);
         const auto result = RunConstantCalendar({encoded_string.c_str()}, "WORKDAYS").value();
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
@@ -380,24 +378,25 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_intersect_calendar) {
     to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 6, 0, 0, 0));
     calendar_id_column_->append_datum(kNullDatum);
     calendar_id_column_->append_datum(kNullDatum);
-    const auto result = RunConstantCalendar({R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
-                                             R"("entries": {"start_date": 1514880000000, "end_date": 1514912400000}, )",
-                                             R"("entries": {"start_date": 1514966400000, "end_date": 1514998800000}, )",
-                                             R"("entries": {"start_date": 1515052800000, "end_date": 1515085200000}, )",
-                                             R"("entries": {"start_date": 1515225600000, "end_date": 1515258000000}, )",
-                                             R"("entries": {"start_date": 1515312000000, "end_date": 1515326400000}, )",
-                                             R"("entries": {"start_date": 1515398400000, "end_date": 1515430800000}, )",
-                                             R"("entries": {"start_date": 1515484800000, "end_date": 1515517200000}, )",
-                                             R"( }}, )",
-                                             R"("calendar2": {"weekday_calendar": {)",
-                                             R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
-                                             R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
-                                             R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
-                                             R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
-                                             R"("saturday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
-                                             R"("sunday": {"use_day": true, "shift": {"begin": 46800000, "end": 54000000} }, )",
-                                             R"(}})",
-                                             R"(}})"}, "WORKDAYS").value();
+    const auto result =
+            RunConstantCalendar({R"({"intersect_calendar": {"calendar1": {"factory_calendar": {)",
+                                 R"("entries": {"start_date": 1514880000000, "end_date": 1514912400000}, )",
+                                 R"("entries": {"start_date": 1514966400000, "end_date": 1514998800000}, )",
+                                 R"("entries": {"start_date": 1515052800000, "end_date": 1515085200000}, )",
+                                 R"("entries": {"start_date": 1515225600000, "end_date": 1515258000000}, )",
+                                 R"("entries": {"start_date": 1515312000000, "end_date": 1515326400000}, )",
+                                 R"("entries": {"start_date": 1515398400000, "end_date": 1515430800000}, )",
+                                 R"("entries": {"start_date": 1515484800000, "end_date": 1515517200000}, )", R"( }}, )",
+                                 R"("calendar2": {"weekday_calendar": {)",
+                                 R"("monday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                 R"("tuesday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                 R"("thursday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                 R"("friday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                 R"("saturday": {"use_day": true, "shift": {"begin": 32400000, "end": 61200000} }, )",
+                                 R"("sunday": {"use_day": true, "shift": {"begin": 46800000, "end": 54000000} }, )",
+                                 R"(}})", R"(}})"},
+                                "WORKDAYS")
+                    .value();
     ASSERT_EQ(from_timestamp_column_->size(), result->size());
     EXPECT_EQ(2.0, result->get(0).get_double());
     EXPECT_EQ(-2.0, result->get(1).get_double());
@@ -411,10 +410,14 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, null_id_when_id_is_required) {
     to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 0, 0, 0));
     calendar_id_column_->append_datum("id1");
     calendar_id_column_->append_datum(kNullDatum);
-    const auto result = RunConstantCalendar({R"({"factory_calendar": {)",
-                                             R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "id1"}, )",
-                                             R"("entries": {"start_date": 1514768400000, "end_date": 1515546000000, "calendar_id": "id2"})",
-                                             R"(} })"}, "MILLISECONDS").value();
+    const auto result =
+            RunConstantCalendar(
+                    {R"({"factory_calendar": {)",
+                     R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "id1"}, )",
+                     R"("entries": {"start_date": 1514768400000, "end_date": 1515546000000, "calendar_id": "id2"})",
+                     R"(} })"},
+                    "MILLISECONDS")
+                    .value();
     ASSERT_EQ(from_timestamp_column_->size(), result->size());
     EXPECT_EQ(1000, result->get(0).get_double());
     EXPECT_TRUE(result->get(1).is_null());
@@ -434,8 +437,7 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, outside_of_scope) {
             to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 6, 0, 0, 0));
             calendar_id_column_->append_datum(kNullDatum);
             calendar_column_->append_datum(DatumArray{R"({"factory_calendar": {)",
-                                                      R"("entries": {"start_date": 0, "end_date": 1000 })",
-                                                      R"(} })"});
+                                                      R"("entries": {"start_date": 0, "end_date": 1000 })", R"(} })"});
         }
         const auto result = Run().value();
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
@@ -455,10 +457,11 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, outside_of_scope) {
             from_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
             to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 6, 0, 0, 0));
             calendar_id_column_->append_datum("id1");
-            calendar_column_->append_datum(DatumArray{R"({"factory_calendar": {)",
-                                                      R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "id1"}, )",
-                                                      R"("entries": {"start_date": 1514768400000, "end_date": 1515546000000, "calendar_id": "id2"})",
-                                                      R"(} })"});
+            calendar_column_->append_datum(DatumArray{
+                    R"({"factory_calendar": {)",
+                    R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "id1"}, )",
+                    R"("entries": {"start_date": 1514768400000, "end_date": 1515546000000, "calendar_id": "id2"})",
+                    R"(} })"});
         }
         const auto result = Run().value();
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
@@ -478,10 +481,11 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, outside_of_scope) {
             from_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
             to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 6, 0, 0, 0));
             calendar_id_column_->append_datum("id2");
-            calendar_column_->append_datum(DatumArray{R"({"factory_calendar": {)",
-                                                      R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "id1"}, )",
-                                                      R"("entries": {"start_date": 1514768400000, "end_date": 1515546000000, "calendar_id": "id2"})",
-                                                      R"(} })"});
+            calendar_column_->append_datum(DatumArray{
+                    R"({"factory_calendar": {)",
+                    R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "id1"}, )",
+                    R"("entries": {"start_date": 1514768400000, "end_date": 1515546000000, "calendar_id": "id2"})",
+                    R"(} })"});
         }
         const auto result = Run().value();
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
@@ -501,10 +505,11 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, outside_of_scope) {
             from_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 2, 0, 0, 0));
             to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 6, 0, 0, 0));
             calendar_id_column_->append_datum("id");
-            calendar_column_->append_datum(DatumArray{R"({"factory_calendar": {)",
-                                                      R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "id1"}, )",
-                                                      R"("entries": {"start_date": 1514768400000, "end_date": 1515546000000, "calendar_id": "id2"})",
-                                                      R"(} })"});
+            calendar_column_->append_datum(DatumArray{
+                    R"({"factory_calendar": {)",
+                    R"("entries": {"start_date": 0, "end_date": 1000, "calendar_id": "id1"}, )",
+                    R"("entries": {"start_date": 1514768400000, "end_date": 1515546000000, "calendar_id": "id2"})",
+                    R"(} })"});
         }
         const auto result = Run().value();
         ASSERT_EQ(from_timestamp_column_->size(), result->size());
@@ -528,15 +533,15 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, null_input) {
     time_unit_column_->append_datum("DAYS");
     time_unit_column_->append_datum(kNullDatum);
     time_unit_column_->append_datum("DAYS");
-    calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
-                                              R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                              R"(} })"});
-    calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
-                                              R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                              R"(} })"});
-    calendar_column_->append_datum(DatumArray{R"({"weekday_calendar": {)",
-                                              R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                                              R"(} })"});
+    calendar_column_->append_datum(
+            DatumArray{R"({"weekday_calendar": {)",
+                       R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )", R"(} })"});
+    calendar_column_->append_datum(
+            DatumArray{R"({"weekday_calendar": {)",
+                       R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )", R"(} })"});
+    calendar_column_->append_datum(
+            DatumArray{R"({"weekday_calendar": {)",
+                       R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )", R"(} })"});
     calendar_column_->append_datum(kNullDatum);
     calendar_id_column_->append_datum(kNullDatum);
     calendar_id_column_->append_datum(kNullDatum);
@@ -556,11 +561,9 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, invalid_input) {
         to_timestamp_column_->append_datum(TimestampValue::create(2018, 1, 6, 1, 0, 0));
         time_unit_column_->append_datum("DAYS");
         calendar_column_->append_datum(DatumArray{
-                R"({"weekday_calendar": {)",
-                kNullDatum,
+                R"({"weekday_calendar": {)", kNullDatum,
                 // [8:00 am, 5:00 pm]
-                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"(} })"});
+                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )", R"(} })"});
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
@@ -574,8 +577,7 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, invalid_input) {
         calendar_column_->append_datum(DatumArray{
                 R"({"weekday_calendar": {)",
                 // [8:00 am, 5:00 pm]
-                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )",
-                R"(} })"});
+                R"("monday": {"use_day": true, "shift": {"begin": 28800000, "end": 61200000} }, )", R"(} })"});
         calendar_id_column_->append_datum(kNullDatum);
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
@@ -660,15 +662,11 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, year_gaps_in_workday_calendar) {
         from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 1, 0, 0));
         to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 6, 1, 0, 0));
         time_unit_column_->append_datum("DAYS");
-        calendar_column_->append_datum(DatumArray{
-                R"({"workday_calendar": {)",
-                R"("entries": { "year": 1970, )",
-                celonis::get_workday_mask_str(365, {0, 10, 15}).c_str(),
-                R"(, calendar_id: "id1"},)",
-                R"("entries": { "year": 1972, )",
-                celonis::get_workday_mask_str(366, {11}).c_str(),
-                R"(, calendar_id: "id1"},)",
-                R"( }})"});
+        calendar_column_->append_datum(DatumArray{R"({"workday_calendar": {)", R"("entries": { "year": 1970, )",
+                                                  celonis::get_workday_mask_str(365, {0, 10, 15}).c_str(),
+                                                  R"(, calendar_id: "id1"},)", R"("entries": { "year": 1972, )",
+                                                  celonis::get_workday_mask_str(366, {11}).c_str(),
+                                                  R"(, calendar_id: "id1"},)", R"( }})"});
         calendar_id_column_->append_datum("id1");
         const auto result = Run();
         ASSERT_TRUE(result.status().is_invalid_argument());
@@ -679,15 +677,11 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, year_gaps_in_workday_calendar) {
         from_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 2, 1, 0, 0));
         to_timestamp_column_->append_datum(TimestampValue::create(1970, 1, 6, 1, 0, 0));
         time_unit_column_->append_datum("DAYS");
-        calendar_column_->append_datum(DatumArray{
-                R"({"workday_calendar": {)",
-                R"("entries": { "year": 1970, )",
-                celonis::get_workday_mask_str(365, {0, 10, 15}).c_str(),
-                R"(, calendar_id: "id1"},)",
-                R"("entries": { "year": 1972, )",
-                celonis::get_workday_mask_str(366, {11}).c_str(),
-                R"(, calendar_id: "id2"},)",
-                R"( }})"});
+        calendar_column_->append_datum(DatumArray{R"({"workday_calendar": {)", R"("entries": { "year": 1970, )",
+                                                  celonis::get_workday_mask_str(365, {0, 10, 15}).c_str(),
+                                                  R"(, calendar_id: "id1"},)", R"("entries": { "year": 1972, )",
+                                                  celonis::get_workday_mask_str(366, {11}).c_str(),
+                                                  R"(, calendar_id: "id2"},)", R"( }})"});
         calendar_id_column_->append_datum("id1");
         const auto result = Run();
         ASSERT_TRUE(result.status().ok());
@@ -704,15 +698,10 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, const_year_gaps_in_workday_calendar)
     std::string y1970_mask = celonis::get_workday_mask_str(365, {0, 10, 15});
     std::string y1972_mask = celonis::get_workday_mask_str(366, {11});
 
-    const auto result = RunConstantCalendar({R"({"workday_calendar": {)",
-                                             R"("entries": { "year": 1970, )",
-                                             y1970_mask,
-                                             R"(, calendar_id: "id1"},)",
-                                             R"("entries": { "year": 1972, )",
-                                             y1972_mask,
-                                             R"(, calendar_id: "id1"},)",
-                                             R"( }})"},
-                                            "DAYS");
+    const auto result = RunConstantCalendar(
+            {R"({"workday_calendar": {)", R"("entries": { "year": 1970, )", y1970_mask, R"(, calendar_id: "id1"},)",
+             R"("entries": { "year": 1972, )", y1972_mask, R"(, calendar_id: "id1"},)", R"( }})"},
+            "DAYS");
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "Year gaps are found in the workday calendar configuration.");
 }
@@ -732,11 +721,8 @@ TEST_F(CelonisTimeunitsBetweenCalendarTest, year_boundary_edge_case) {
     to_timestamp_column_->append_datum(TimestampValue::create(2025, 1, 2, 0, 0, 0));
 
     // Calendar that spans 2024 full year
-    DatumArray calendar_array{
-            R"({"factory_calendar": {)",
-            R"("entries": {"start_date": 1704067200000, "end_date": 1735689600000} )",
-            R"(} })"
-    };
+    DatumArray calendar_array{R"({"factory_calendar": {)",
+                              R"("entries": {"start_date": 1704067200000, "end_date": 1735689600000} )", R"(} })"};
 
     for (auto i = 0; i < from_timestamp_column_->size(); ++i) {
         time_unit_column_->append_datum("DAYS");

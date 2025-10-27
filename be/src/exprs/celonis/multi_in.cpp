@@ -1,9 +1,9 @@
 #include "exprs/celonis/multi_in.h"
 
 #include "column/array_column.h"
-#include "column/struct_column.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
+#include "column/struct_column.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
 
@@ -13,7 +13,7 @@ namespace {
 
 // Visitor to extract integer value
 struct IntExtractor {
-    template<typename T>
+    template <typename T>
     std::optional<int64_t> operator()(const T& value) const {
         if constexpr (std::is_integral_v<T>) {
             return static_cast<int64_t>(value);
@@ -25,7 +25,7 @@ struct IntExtractor {
 
 // Visitor to extract floating-point value
 struct FloatExtractor {
-    template<typename T>
+    template <typename T>
     std::optional<double> operator()(const T& value) const {
         if constexpr (std::is_floating_point_v<T>) {
             return static_cast<double>(value);
@@ -102,7 +102,7 @@ struct MatchLists {
         for (auto j = 0; j < num_input_fields; ++j) {
             keys.push_back(input_fields[j]->get(row).convert2DatumKey());
         }
-        for (const auto& match_keys: keys_list) {
+        for (const auto& match_keys : keys_list) {
             bool match = true;
             for (auto j = 0; j < num_input_fields; ++j) {
                 if (!equal(keys[j], match_keys[j])) {
@@ -128,7 +128,7 @@ struct MultiInStateFragmentLocal {
     ScalarFunction function;
 };
 
-}
+} // namespace
 
 Status CelonisMultiIn::prepare(starrocks::FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
@@ -157,9 +157,8 @@ Status CelonisMultiIn::close(starrocks::FunctionContext* context, FunctionContex
     return Status::OK();
 }
 
-StatusOr<ColumnPtr>
-CelonisMultiIn::multi_in([[maybe_unused]] starrocks::FunctionContext* context,
-                         const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisMultiIn::multi_in([[maybe_unused]] starrocks::FunctionContext* context,
+                                             const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 2);
     DCHECK(columns[0]->is_struct());
     const auto* state = reinterpret_cast<const MultiInStateFragmentLocal*>(
@@ -167,9 +166,8 @@ CelonisMultiIn::multi_in([[maybe_unused]] starrocks::FunctionContext* context,
     return state->function(context, columns);
 }
 
-StatusOr<ColumnPtr>
-CelonisMultiIn::multi_in_constant_config([[maybe_unused]] starrocks::FunctionContext* context,
-                                         const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisMultiIn::multi_in_constant_config([[maybe_unused]] starrocks::FunctionContext* context,
+                                                             const starrocks::Columns& columns) {
     auto& input_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     const auto* state = reinterpret_cast<const MultiInStateFragmentLocal*>(
@@ -185,9 +183,8 @@ CelonisMultiIn::multi_in_constant_config([[maybe_unused]] starrocks::FunctionCon
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr>
-CelonisMultiIn::multi_in_non_constant_config([[maybe_unused]] starrocks::FunctionContext* context,
-                                             const starrocks::Columns& columns) {
+StatusOr<ColumnPtr> CelonisMultiIn::multi_in_non_constant_config([[maybe_unused]] starrocks::FunctionContext* context,
+                                                                 const starrocks::Columns& columns) {
     auto& input_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[0].get()))->fields();
     auto& match_fields = down_cast<const StructColumn*>(ColumnHelper::get_data_column(columns[1].get()))->fields();
     const auto n_fields = input_fields.size();

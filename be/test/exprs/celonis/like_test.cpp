@@ -1,13 +1,13 @@
 #include "exprs/celonis/like.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util/defer_op.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -22,22 +22,17 @@ protected:
 
 private:
     StatusOr<ColumnPtr> Run(const ColumnPtr& input, const ColumnPtr& pattern) {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
         auto return_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
         Columns columns;
         columns.push_back(input);
         columns.push_back(pattern);
         ctx->set_constant_columns(columns);
-        DeferOp close_fragment_local([&ctx] {
-            CelonisLike::like_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local([&ctx] { CelonisLike::like_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisLike::like_prepare(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([&ctx] {
-            CelonisLike::like_close(ctx.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local([&ctx] { CelonisLike::like_close(ctx.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisLike::like_prepare(ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
         auto result = CelonisLike::like(ctx.get(), columns);
         return result;
@@ -56,8 +51,8 @@ private:
         ColumnViewer<TYPE_BOOLEAN> result_viewer(result_column);
         for (int row = 0; row < num_rows; row++) {
             EXPECT_EQ(result_viewer.value(row), expected_[row])
-                            << "haystack: " << (input_viewer.is_null(row) ? "NULL" : input_viewer.value(row))
-                            << ", needle: " << (pattern_viewer.is_null(row) ? "NULL" : pattern_viewer.value(row));
+                    << "haystack: " << (input_viewer.is_null(row) ? "NULL" : input_viewer.value(row))
+                    << ", needle: " << (pattern_viewer.is_null(row) ? "NULL" : pattern_viewer.value(row));
         }
     }
 

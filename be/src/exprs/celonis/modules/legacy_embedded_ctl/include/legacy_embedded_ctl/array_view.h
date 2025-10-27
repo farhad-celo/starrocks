@@ -56,13 +56,13 @@ class array_view {
 
   /** Begin iterator + size ctor: view for the range [begin, begin + size) */
   template <std::contiguous_iterator It>
-  requires details::type_compatible<T, std::iter_reference_t<It>>  //
+    requires details::type_compatible<T, std::iter_reference_t<It>>  //
   constexpr array_view(It begin, size_type size) : begin_(std::to_address(begin)), size_{size} {}
 
   /** Begin iterator + end iterator ctor: view for the range [begin, end) */
   template <std::contiguous_iterator It, std::sized_sentinel_for<It> End>
-  requires details::type_compatible<T, std::iter_reference_t<It>> &&(!std::is_convertible_v<End, size_type>)  //
-      constexpr array_view(It first, End last)
+    requires details::type_compatible<T, std::iter_reference_t<It>> && (!std::is_convertible_v<End, size_type>)  //
+  constexpr array_view(It first, End last)
       : begin_{std::to_address(first)}, size_{static_cast<size_type>(std::distance(first, last))} {
     if (const auto end{std::to_address(last)}; begin_ > end) {
       throw out_of_range{"Invalid pointer range. Reason: The begin pointer [{}] comes after the end pointer [{}].",
@@ -72,9 +72,9 @@ class array_view {
 
   /** Range ctor: view for the (entire) range [begin of range, end of range) */
   template <contiguous_sized_range RANGE>
-  requires(std::ranges::borrowed_range<RANGE> || std::is_const_v<T>) &&   //
-      details::type_compatible<T, std::ranges::range_reference_t<RANGE>>  //
-      constexpr array_view(RANGE&& range)                                 // NOLINT(google-explicit-constructor)
+    requires(std::ranges::borrowed_range<RANGE> || std::is_const_v<T>) &&       //
+            details::type_compatible<T, std::ranges::range_reference_t<RANGE>>  //
+  constexpr array_view(RANGE&& range)                                           // NOLINT(google-explicit-constructor)
       : array_view{std::ranges::data(range), std::ranges::size(range)} {}
 
   /* element access: Note a const view does affect the const'ness of the elements. See comment below for the iterator */
@@ -231,9 +231,10 @@ constexpr array_view<T> array_view<T>::sub_view(const size_type offset, const si
   auto* const new_begin{begin_ + offset};
   auto* const new_end{new_begin + size};
   // Only to document the post condition. Always guaranteed by the invariants of internal state.
-  legacy_embedded_debug_assert((size == 0 || points_into_view(new_begin)), "'new_begin' must point into view for non-empty sub view.");
+  legacy_embedded_debug_assert((size == 0 || points_into_view(new_begin)),
+                               "'new_begin' must point into view for non-empty sub view.");
   legacy_embedded_debug_assert((size == 0 || points_into_view(new_end - 1)),
-               "'new_end-1' must point into view for non-empty sub view.");
+                               "'new_end-1' must point into view for non-empty sub view.");
   return {new_begin, new_end};
 }
 

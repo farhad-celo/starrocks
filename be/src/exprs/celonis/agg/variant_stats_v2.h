@@ -1,7 +1,9 @@
 #pragma once
 
-#include "column/hash_set.h"
+#include <boost/algorithm/string/join.hpp>
+
 #include "column/column_helper.h"
+#include "column/hash_set.h"
 #include "column/object_column.h"
 #include "column/type_traits.h"
 #include "column/vectorized_fwd.h"
@@ -11,12 +13,10 @@
 #include "gutil/casts.h"
 #include "runtime/mem_pool.h"
 #include "variant.h"
-#include <boost/algorithm/string/join.hpp>
 
 namespace starrocks {
 
 struct CelonisVariantStatsAggregateV2State {
-
     using EdgeHashMap = phmap::flat_hash_map<Edge, EdgeStats, HashOnEdge, EqualOnEdge>;
 
     void update(FunctionContext* ctx, const Column** columns, size_t row_num) {
@@ -55,7 +55,7 @@ struct CelonisVariantStatsAggregateV2State {
             activity_array_.clear();
             auto array = columns[2]->get(0).get_array();
             activity_array_.reserve(array.size());
-            for (const auto& datum: array) {
+            for (const auto& datum : array) {
                 if (datum.is_null()) {
                     continue;
                 }
@@ -74,8 +74,8 @@ struct CelonisVariantStatsAggregateV2State {
             return;
         }
 
-        const ArrayColumn& activity_column = *(down_cast<const ArrayColumn*>(
-                ColumnHelper::get_data_column(columns[0])));
+        const ArrayColumn& activity_column =
+                *(down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(columns[0])));
         const UInt32Column::Container& c_offset = activity_column.offsets().get_data();
         const Column* activity_elements = &activity_column.elements();
         const NullableColumn* nc = dynamic_cast<const NullableColumn*>(activity_elements);
@@ -155,27 +155,28 @@ struct CelonisVariantStatsAggregateV2State {
         DCHECK(activity_array_initialized_);
         size_t result = 0;
         // activity_array
-        result += sizeof(size_t);        // length of activity_array
-        result += sizeof(size_t);        // serialized_size of activities in activity_array: sum(len(activity) + 1 for activity in activity_array)
+        result += sizeof(size_t); // length of activity_array
+        result += sizeof(
+                size_t); // serialized_size of activities in activity_array: sum(len(activity) + 1 for activity in activity_array)
         result += activity_array_serialized_size();
 
         // activity_stats
         result += 4 * sizeof(size_t) * activity_array_.size();
 
         // edge_stats
-        result += sizeof(size_t);        // number of unique edges
+        result += sizeof(size_t); // number of unique edges
         result += (2 * sizeof(int32_t) + 2 * sizeof(size_t)) * edge_stats_.size();
 
-        result += sizeof(int64_t);       // edge_count_
-        result += sizeof(uint8_t);       // skip_variant_analysis_
-        result += sizeof(uint8_t);       // enable_proto_encoding_
-        result += sizeof(size_t);        // num_variants
-        result += sizeof(size_t);        // total_number_of_activities
+        result += sizeof(int64_t); // edge_count_
+        result += sizeof(uint8_t); // skip_variant_analysis_
+        result += sizeof(uint8_t); // enable_proto_encoding_
+        result += sizeof(size_t);  // num_variants
+        result += sizeof(size_t);  // total_number_of_activities
         const size_t num_variants = lengths_.size();
         result += num_variants * sizeof(size_t);  // length1, length2, ...
         result += num_variants * sizeof(int64_t); // count1, count2, ...
         const size_t total = num_activities();
-        result += total * activity_serialized_size();        // activities
+        result += total * activity_serialized_size(); // activities
         return result;
     }
 
@@ -208,12 +209,12 @@ struct CelonisVariantStatsAggregateV2State {
         size_t total_activity_size = activity_array_serialized_size();
         memcpy(dst, &total_activity_size, sizeof(size_t));
         dst += sizeof(size_t);
-        for (const auto& activity: activity_array_) {
+        for (const auto& activity : activity_array_) {
             memcpy(dst, activity.data(), activity.size() + 1);
             dst += activity.size() + 1;
         }
         // activity_stats
-        for (const auto& stats: activity_stats_) {
+        for (const auto& stats : activity_stats_) {
             memcpy(dst, &stats.count, sizeof(size_t));
             dst += sizeof(size_t);
             memcpy(dst, &stats.count_case, sizeof(size_t));
@@ -229,7 +230,7 @@ struct CelonisVariantStatsAggregateV2State {
         memcpy(dst, &num_edges, sizeof(size_t));
         dst += sizeof(size_t);
 
-        for (const auto& p: edge_stats_) {
+        for (const auto& p : edge_stats_) {
             const auto& edge = p.first;
             const auto& stats = p.second;
             memcpy(dst, &edge.src, sizeof(int32_t));
@@ -386,13 +387,9 @@ struct CelonisVariantStatsAggregateV2State {
         return {offsets_.at(idx), offsets_.at(idx + 1)};
     }
 
-    bool no_activities() const {
-        return activity_array_.empty();
-    }
+    bool no_activities() const { return activity_array_.empty(); }
 
-    bool no_variants() const {
-        return lengths_.empty();
-    }
+    bool no_variants() const { return lengths_.empty(); }
 
     bool skip_variant_analysis() const { return skip_variant_analysis_; }
 
@@ -435,18 +432,13 @@ struct CelonisVariantStatsAggregateV2State {
     VariantAnalysisResult analyze_variants() const;
 
 private:
+    size_t activity_serialized_size() const { return use_16bit_activity_ ? sizeof(int16_t) : sizeof(int32_t); }
 
-    size_t activity_serialized_size() const {
-        return use_16bit_activity_ ? sizeof(int16_t) : sizeof(int32_t);
-    }
-
-    size_t num_activities() const {
-        return use_16bit_activity_ ? activities_16bit_.size() : activities_.size();
-    }
+    size_t num_activities() const { return use_16bit_activity_ ? activities_16bit_.size() : activities_.size(); }
 
     size_t activity_array_serialized_size() const {
         size_t result = 0;
-        for (const auto& activity: activity_array_) {
+        for (const auto& activity : activity_array_) {
             result += activity.size() + 1;
         }
         return result;
@@ -498,11 +490,10 @@ private:
  */
 class CelonisVariantStateV2AggregationFunction final
         : public AggregateFunctionBatchHelper<CelonisVariantStatsAggregateV2State,
-                CelonisVariantStateV2AggregationFunction> {
+                                              CelonisVariantStateV2AggregationFunction> {
 public:
-
-    void
-    update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state, size_t row_num) const override;
+    void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
+                size_t row_num) const override;
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override;
 
@@ -518,9 +509,7 @@ public:
     std::string get_name() const override;
 
 private:
-
     std::string get_log_prefix(const std::string& query_id) const;
-
 };
 
 } // namespace starrocks

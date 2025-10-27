@@ -1,13 +1,13 @@
 #include "exprs/celonis/encode_string.h"
 
 #include "column/column_builder.h"
+#include "column/column_hash.h"
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
-#include "util/phmap/phmap.h"
 #include "util/hash.h"
-#include "column/column_hash.h"
+#include "util/phmap/phmap.h"
 
 namespace starrocks {
 

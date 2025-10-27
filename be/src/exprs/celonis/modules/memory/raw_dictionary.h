@@ -51,10 +51,13 @@ class typed_raw_dictionary : public raw_dictionary {
 template <>
 class typed_raw_dictionary<cel_string_t> : public raw_dictionary {
  public:
-  typed_raw_dictionary(legacy_embedded_ctl::static_array<cel_string_t>&& data, legacy_embedded_ctl::static_array<char>&& buffer)
+  typed_raw_dictionary(legacy_embedded_ctl::static_array<cel_string_t>&& data,
+                       legacy_embedded_ctl::static_array<char>&& buffer)
       : raw_dictionary{data_type::cel_string}, data_{std::move(data)}, buffer_{std::move(buffer)} {}
 
-  [[nodiscard]] legacy_embedded_ctl::static_array<cel_string_t>&& release_data() && noexcept { return std::move(data_); }
+  [[nodiscard]] legacy_embedded_ctl::static_array<cel_string_t>&& release_data() && noexcept {
+    return std::move(data_);
+  }
   [[nodiscard]] legacy_embedded_ctl::static_array<char>&& release_buffer() && noexcept { return std::move(buffer_); }
   [[nodiscard]] size_t buffer_size() const noexcept { return buffer_.size(); }
   [[nodiscard]] dictionary_t convert_to_dictionary_t_release_data(const std::string& swap_file,

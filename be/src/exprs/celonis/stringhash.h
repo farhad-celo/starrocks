@@ -13,7 +13,6 @@ public:
      * Supports PQL STRINGHASH: https://docs.celonis.com/en/stringhash.html
      */
     DEFINE_VECTORIZED_FN(stringhash);
-
 };
 
 } // namespace starrocks

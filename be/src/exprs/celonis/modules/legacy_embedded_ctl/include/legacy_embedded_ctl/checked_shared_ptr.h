@@ -147,7 +147,8 @@ namespace std {
 
 template <typename T>
 struct hash<celonis::accelerator::legacy_embedded_ctl::checked_shared_ptr<T>> {
-  [[nodiscard]] constexpr size_t operator()(const celonis::accelerator::legacy_embedded_ctl::checked_shared_ptr<T>& p) const {
+  [[nodiscard]] constexpr size_t operator()(
+      const celonis::accelerator::legacy_embedded_ctl::checked_shared_ptr<T>& p) const {
     return std::hash<T*>{}(p.get());
   }
 };

@@ -82,7 +82,8 @@ execution_context::execution_context(execution_context&& other_context) noexcept
   }
 }
 
-void execution_context::set_memory_tracking_strategy(legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy) {
+void execution_context::set_memory_tracking_strategy(
+    legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy) {
   memory_tracking_strategy_ = std::move(memory_tracking_strategy);
 }
 

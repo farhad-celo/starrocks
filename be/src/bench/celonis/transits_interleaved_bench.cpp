@@ -68,8 +68,8 @@ TypeDescriptor logical_types_to_struct_type(const std::vector<LogicalType>& logi
     return struct_type;
 }
 
-TypeDescriptor
-get_return_type(const TypeDescriptor& left_key_struct_type, const TypeDescriptor& right_key_struct_type) {
+TypeDescriptor get_return_type(const TypeDescriptor& left_key_struct_type,
+                               const TypeDescriptor& right_key_struct_type) {
     TypeDescriptor struct_type;
     struct_type.type = LogicalType::TYPE_STRUCT;
 
@@ -89,33 +89,29 @@ get_return_type(const TypeDescriptor& left_key_struct_type, const TypeDescriptor
     return struct_type;
 }
 
-std::unique_ptr<FunctionContext>
-get_ctx(const TypeDescriptor& left_key_struct_type, const TypeDescriptor& right_key_struct_type) {
+std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& left_key_struct_type,
+                                         const TypeDescriptor& right_key_struct_type) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(left_key_struct_type),
             AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_DATETIME),
             AnyValUtil::column_type_to_type_desc(right_key_struct_type),
             AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_DATETIME),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN))
-    };
-    auto return_type = AnyValUtil::column_type_to_type_desc(
-            get_return_type(left_key_struct_type, right_key_struct_type));
-    return std::unique_ptr<FunctionContext>(
-            FunctionContext::create_test_context(std::move(arg_types), return_type));
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN))};
+    auto return_type =
+            AnyValUtil::column_type_to_type_desc(get_return_type(left_key_struct_type, right_key_struct_type));
+    return std::unique_ptr<FunctionContext>(FunctionContext::create_test_context(std::move(arg_types), return_type));
 }
 
 void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays,
-            const std::optional<DatumArray>& left_timestamps,
-            const std::optional<DatumArray>& left_sortings,
+            const std::optional<DatumArray>& left_timestamps, const std::optional<DatumArray>& left_sortings,
             const std::optional<std::vector<DatumArray>>& right_keys_arrays,
-            const std::optional<DatumArray>& right_timestamps,
-            const std::optional<DatumArray>& right_sortings,
+            const std::optional<DatumArray>& right_timestamps, const std::optional<DatumArray>& right_sortings,
             std::optional<bool> first_last_only, const ColumnPtr& left_primary_keys_column,
             const ColumnPtr& left_timestamps_column, const ColumnPtr& left_sortings_column,
             const ColumnPtr& right_primary_keys_column, const ColumnPtr& right_timestamps_column,
             const ColumnPtr& right_sortings_column, const ColumnPtr& first_last_only_column) {
-    auto& left_fields = down_cast<StructColumn*>(
-            ColumnHelper::get_data_column(left_primary_keys_column.get()))->fields_column();
+    auto& left_fields =
+            down_cast<StructColumn*>(ColumnHelper::get_data_column(left_primary_keys_column.get()))->fields_column();
     auto left_null_column = down_cast<NullableColumn*>(left_primary_keys_column.get());
     if (left_keys_arrays.has_value()) {
         left_null_column->null_column_data().emplace_back(0);
@@ -135,8 +131,8 @@ void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays,
     } else {
         left_sortings_column->append_datum(kNullDatum);
     }
-    auto& right_fields = down_cast<StructColumn*>(
-            ColumnHelper::get_data_column(right_primary_keys_column.get()))->fields_column();
+    auto& right_fields =
+            down_cast<StructColumn*>(ColumnHelper::get_data_column(right_primary_keys_column.get()))->fields_column();
     auto right_null_column = down_cast<NullableColumn*>(right_primary_keys_column.get());
     if (right_keys_arrays.has_value()) {
         right_null_column->null_column_data().emplace_back(0);
@@ -212,7 +208,7 @@ static void BM_TransitsInterleaved(benchmark::State& state) {
 
     int total_rows = 0;
     TimestampValue timestamp;
-    for (auto _: state) {
+    for (auto _ : state) {
         state.PauseTiming();
         left_primary_keys_column = ColumnHelper::create_column(left_key_struct_type, true);
         left_timestamps_column = ColumnHelper::create_column(TYPE_ARRAY_DATETIME, true);
@@ -237,23 +233,15 @@ static void BM_TransitsInterleaved(benchmark::State& state) {
                 timestamp.from_unix_second(unix_timestamp);
                 right_timestamps.emplace_back(timestamp);
             }
-            AddRow(key_arrays, left_timestamps, left_sortings, key_arrays, right_timestamps, right_sortings,
-                   false, left_primary_keys_column,
-                   left_timestamps_column,
-                   left_sortings_column,
-                   right_primary_keys_column,
-                   right_timestamps_column,
-                   right_sortings_column,
-                   first_last_only_column);
+            AddRow(key_arrays, left_timestamps, left_sortings, key_arrays, right_timestamps, right_sortings, false,
+                   left_primary_keys_column, left_timestamps_column, left_sortings_column, right_primary_keys_column,
+                   right_timestamps_column, right_sortings_column, first_last_only_column);
         }
         state.ResumeTiming();
-        auto result = CelonisTransitsInterleaved::transits_interleaved(ctx.get(), {left_primary_keys_column,
-                                                                                   left_timestamps_column,
-                                                                                   left_sortings_column,
-                                                                                   right_primary_keys_column,
-                                                                                   right_timestamps_column,
-                                                                                   right_sortings_column,
-                                                                                   first_last_only_column});
+        auto result = CelonisTransitsInterleaved::transits_interleaved(
+                ctx.get(),
+                {left_primary_keys_column, left_timestamps_column, left_sortings_column, right_primary_keys_column,
+                 right_timestamps_column, right_sortings_column, first_last_only_column});
         ASSERT_TRUE(result.ok()) << result.status().message();
     }
     state.counters["RowInvRate"] =

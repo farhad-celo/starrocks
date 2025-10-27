@@ -1,12 +1,14 @@
-#include <algorithm>
+#include "exprs/celonis/agg/enumerate_node_paths.h"
+
 #include <gtest/gtest.h>
+
+#include <algorithm>
 
 #include "column/column_builder.h"
 #include "column/fixed_length_column.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/agg/enumerate_node_paths.h"
 #include "gutil/strings/strcat.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
@@ -124,7 +126,8 @@ protected:
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
 
-    ColumnPtr prepare_input_column(FunctionContext* ctx, const std::vector<std::vector<DatumArray>>& input, int index, int size) {
+    ColumnPtr prepare_input_column(FunctionContext* ctx, const std::vector<std::vector<DatumArray>>& input, int index,
+                                   int size) {
         if (index >= input.size() || input[index].empty()) {
             return ColumnHelper::create_const_null_column(size);
         }
@@ -151,18 +154,18 @@ protected:
         return column;
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(const std::vector<LogicalType>& value_logical_types, const std::vector<LogicalType>& pk_logical_types,
-              const std::vector<std::vector<DatumArray>>& input, const std::vector<DatumArray>& options,
-              bool allow_cycles, const std::string& length_comparison, int length) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            const std::vector<LogicalType>& value_logical_types, const std::vector<LogicalType>& pk_logical_types,
+            const std::vector<std::vector<DatumArray>>& input, const std::vector<DatumArray>& options,
+            bool allow_cycles, const std::string& length_comparison, int length) {
         auto value_type = logical_types_to_struct_type(value_logical_types);
         auto pk_type = logical_types_to_struct_type(pk_logical_types);
         auto bool_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
 
         auto local_ctx = get_ctx(value_type, pk_type);
 
-        const AggregateFunction* func = get_aggregate_function("celonis_enumerate_node_paths", TYPE_STRUCT, TYPE_STRUCT,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_enumerate_node_paths", TYPE_STRUCT, TYPE_STRUCT, false);
 
         int size = input[0][0].size();
         Columns columns;
@@ -177,7 +180,7 @@ protected:
         columns.push_back(ColumnHelper::create_const_column<TYPE_BIGINT>(length, size));
 
         std::vector<ColumnPtr> const_columns;
-        std::vector<const Column *> raw_columns;
+        std::vector<const Column*> raw_columns;
         for (auto& column : columns) {
             if (column->is_constant()) {
                 const_columns.push_back(column);
@@ -203,7 +206,8 @@ protected:
             for (int row = 0; row < fields[f]->size(); ++row) {
                 auto result_array = fields[f]->get(row).get_array();
                 auto expected_array = expected[f][row];
-                ASSERT_EQ(result_array.size(), expected_array.size()) << "row: " << row << "\n" << result->debug_string();
+                ASSERT_EQ(result_array.size(), expected_array.size()) << "row: " << row << "\n"
+                                                                      << result->debug_string();
                 bool is_slice = std::holds_alternative<Slice>(result_array[0].convert2DatumKey());
                 for (int i = 0; i < expected_array.size(); ++i) {
                     auto debug_string = [&]() {
@@ -281,12 +285,11 @@ protected:
         Evaluate(result.get(), expected);
     }
 
-    void Run(const std::vector<LogicalType>& value_logical_types,
-                  const std::vector<LogicalType>& pk_logical_types,
-                  const std::vector<std::vector<DatumArray>>& input1, const std::vector<DatumArray>& options1,
-                  const std::vector<std::vector<DatumArray>>& input2, const std::vector<DatumArray>& options2,
-                  bool allow_cycles, const std::string& length_comparison, int length,
-                  const std::vector<std::vector<DatumArray>>& expected) {
+    void Run(const std::vector<LogicalType>& value_logical_types, const std::vector<LogicalType>& pk_logical_types,
+             const std::vector<std::vector<DatumArray>>& input1, const std::vector<DatumArray>& options1,
+             const std::vector<std::vector<DatumArray>>& input2, const std::vector<DatumArray>& options2,
+             bool allow_cycles, const std::string& length_comparison, int length,
+             const std::vector<std::vector<DatumArray>>& expected) {
         RunMerge(value_logical_types, pk_logical_types, input1, options1, input2, options2, allow_cycles,
                  length_comparison, length, expected);
         RunMergeToNew(value_logical_types, pk_logical_types, input1, options1, input2, options2, allow_cycles,
@@ -308,11 +311,9 @@ TEST_F(CelonisEnumerateNodePathsTest, ex1_basic) {
     std::string lc = "LESS_EQUAL";
     int len = 10;
 
-    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"B", "C", "E", "H"},
-                                                      DatumArray{"B", "C", "E", "G"},
+    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"B", "C", "E", "H"}, DatumArray{"B", "C", "E", "G"},
                                                       DatumArray{"B", "C", "D", "G"},
-                                                      DatumArray{"B", "C", "D", "F", "G"},
-                                                      DatumArray{"A"}}};
+                                                      DatumArray{"B", "C", "D", "F", "G"}, DatumArray{"A"}}};
     Run(value_lts, pk_lts, input1, options1, input2, options2, allow_cycles, lc, len, expected);
 }
 
@@ -322,24 +323,19 @@ TEST_F(CelonisEnumerateNodePathsTest, ex2_options) {
 
     std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "C"}},
                                                    {DatumArray{kNullDatum, "C", "D", "E"}}};
-    std::vector<DatumArray> options1 = {DatumArray{false, false, true, true},
-                                        DatumArray{false, false, false, false},
-                                        DatumArray{false, true, false, false},
-                                        DatumArray{false, false, false, false}};
+    std::vector<DatumArray> options1 = {DatumArray{false, false, true, true}, DatumArray{false, false, false, false},
+                                        DatumArray{false, true, false, false}, DatumArray{false, false, false, false}};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"D", "D", "E", "E", "F"}},
                                                    {DatumArray{"F", "G", "G", "H", "G"}}};
-    std::vector<DatumArray> options2 = {DatumArray{false, false, false, false, false},
-                                        DatumArray{false, false, false, false, true},
-                                        DatumArray{false, false, false, false, false},
-                                        DatumArray{true, true, true, true, true}};
+    std::vector<DatumArray> options2 = {
+            DatumArray{false, false, false, false, false}, DatumArray{false, false, false, false, true},
+            DatumArray{false, false, false, false, false}, DatumArray{true, true, true, true, true}};
     bool allow_cycles = false;
     std::string lc = "LESS_EQUAL";
     int len = 10;
 
-    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"C", "E", "H"},
-                                                      DatumArray{"C", "E", "G"},
-                                                      DatumArray{"C", "D", "G"},
-                                                      DatumArray{"C", "D", "F"},
+    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"C", "E", "H"}, DatumArray{"C", "E", "G"},
+                                                      DatumArray{"C", "D", "G"}, DatumArray{"C", "D", "F"},
                                                       DatumArray{"C", "D", "F", "G"}}};
     Run(value_lts, pk_lts, input1, options1, input2, options2, allow_cycles, lc, len, expected);
 }
@@ -369,14 +365,12 @@ TEST_F(CelonisEnumerateNodePathsTest, ex3_all) {
     std::string lc = "LESS_EQUAL";
     int len = 10;
 
-    std::vector<std::vector<DatumArray>> expected = {
-            {
-                    DatumArray{"I"},
-                    DatumArray{"B", "C", "E", "H"},
-                    DatumArray{"B", "C", "E", "G"},
-                    DatumArray{"A"},
-            }
-    };
+    std::vector<std::vector<DatumArray>> expected = {{
+            DatumArray{"I"},
+            DatumArray{"B", "C", "E", "H"},
+            DatumArray{"B", "C", "E", "G"},
+            DatumArray{"A"},
+    }};
     Run(value_lts, pk_lts, input1, options1, input2, options2, allow_cycles, lc, len, expected);
 }
 
@@ -384,9 +378,8 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_cycles) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
     auto pk_lts = std::vector<LogicalType>{LogicalType::TYPE_BIGINT};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "A", "B", "B"}},
-                                                   {DatumArray{"B", "B", "C", "C"}},
-                                                   {DatumArray{1L, 2L, 3L, 4L}}};
+    std::vector<std::vector<DatumArray>> input1 = {
+            {DatumArray{"A", "A", "B", "B"}}, {DatumArray{"B", "B", "C", "C"}}, {DatumArray{1L, 2L, 3L, 4L}}};
     std::vector<DatumArray> options1 = {};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"B", "B", "C", "C", "F"}},
                                                    {DatumArray{"C", "E", "B", "D", "B"}},
@@ -397,15 +390,15 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_cycles) {
     int len = 10;
 
     std::vector<std::vector<DatumArray>> expected = {{
-                                                             DatumArray{"F", "B", "E"},
-                                                             DatumArray{"F", "B", "C", "D"},
-                                                             DatumArray{"F", "B", "C", "B", "E"},
-                                                             DatumArray{"F", "B", "C", "B", "C", "D"},
-                                                             DatumArray{"A", "B", "E"},
-                                                             DatumArray{"A", "B", "C", "D"},
-                                                             DatumArray{"A", "B", "C", "B", "E"},
-                                                             DatumArray{"A", "B", "C", "B", "C", "D"},
-                                                     }};
+            DatumArray{"F", "B", "E"},
+            DatumArray{"F", "B", "C", "D"},
+            DatumArray{"F", "B", "C", "B", "E"},
+            DatumArray{"F", "B", "C", "B", "C", "D"},
+            DatumArray{"A", "B", "E"},
+            DatumArray{"A", "B", "C", "D"},
+            DatumArray{"A", "B", "C", "B", "E"},
+            DatumArray{"A", "B", "C", "B", "C", "D"},
+    }};
     Run(value_lts, pk_lts, input1, options1, input2, options2, allow_cycles, lc, len, expected);
 }
 
@@ -413,17 +406,14 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_multiple_fields) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR, LogicalType::TYPE_BIGINT};
     auto pk_lts = std::vector<LogicalType>{LogicalType::TYPE_BIGINT, LogicalType::TYPE_VARCHAR};
 
-    std::vector<std::vector<DatumArray>> input1 = {
-            {DatumArray{"A", "A", "B", "B"}, DatumArray{1L, 1L, 2L, 2L}},
-            {DatumArray{"B", "B", "C", "C"}, DatumArray{2L, 2L, 3L, 3L}},
-            {DatumArray{1L, 2L, 3L, 4L}, DatumArray{"a", "b", "c", "d"}}
-    };
+    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "A", "B", "B"}, DatumArray{1L, 1L, 2L, 2L}},
+                                                   {DatumArray{"B", "B", "C", "C"}, DatumArray{2L, 2L, 3L, 3L}},
+                                                   {DatumArray{1L, 2L, 3L, 4L}, DatumArray{"a", "b", "c", "d"}}};
     std::vector<DatumArray> options1 = {};
     std::vector<std::vector<DatumArray>> input2 = {
             {DatumArray{"B", "B", "C", "C", "F"}, DatumArray{2L, 2L, 3L, 3L, 6L}},
             {DatumArray{"C", "E", "B", "D", "B"}, DatumArray{3L, 5L, 2L, 4L, 2L}},
-            {DatumArray{5L, 6L, 7L, 8L, 9L}, DatumArray{"e", "f", "g", "h", "i"}}
-    };
+            {DatumArray{5L, 6L, 7L, 8L, 9L}, DatumArray{"e", "f", "g", "h", "i"}}};
     std::vector<DatumArray> options2 = {};
     bool allow_cycles = true;
     std::string lc = "LESS_EQUAL";
@@ -461,9 +451,8 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_with_multiple_chunks) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
     auto pk_lts = std::vector<LogicalType>{LogicalType::TYPE_BIGINT};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "A", "B", "B"}},
-                                                   {DatumArray{"B", "B", "C", "C"}},
-                                                   {DatumArray{1L, 2L, 3L, 4L}}};
+    std::vector<std::vector<DatumArray>> input1 = {
+            {DatumArray{"A", "A", "B", "B"}}, {DatumArray{"B", "B", "C", "C"}}, {DatumArray{1L, 2L, 3L, 4L}}};
     std::vector<DatumArray> options1 = {};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"B", "B", "C", "C", "F"}},
                                                    {DatumArray{"C", "E", "B", "D", "B"}},
@@ -490,11 +479,11 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_with_multiple_chunks) {
     // First chunk
     auto result = local_ctx1->create_column(local_ctx1->get_return_type(), false);
     std::vector<std::vector<DatumArray>> expected = {{
-                                                             DatumArray{"F", "B", "E"},
-                                                             DatumArray{"F", "B", "C", "D"},
-                                                             DatumArray{"F", "B", "C", "B", "E"},
-                                                             DatumArray{"F", "B", "C", "B", "C", "D"},
-                                                     }};
+            DatumArray{"F", "B", "E"},
+            DatumArray{"F", "B", "C", "D"},
+            DatumArray{"F", "B", "C", "B", "E"},
+            DatumArray{"F", "B", "C", "B", "C", "D"},
+    }};
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
     EXPECT_EQ(result->size(), 4);
     Evaluate(result.get(), expected);
@@ -502,11 +491,11 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_with_multiple_chunks) {
     // Second chunk
     result = local_ctx1->create_column(local_ctx1->get_return_type(), false);
     expected = {{
-                        DatumArray{"A", "B", "E"},
-                        DatumArray{"A", "B", "C", "D"},
-                        DatumArray{"A", "B", "C", "B", "E"},
-                        DatumArray{"A", "B", "C", "B", "C", "D"},
-                }};
+            DatumArray{"A", "B", "E"},
+            DatumArray{"A", "B", "C", "D"},
+            DatumArray{"A", "B", "C", "B", "E"},
+            DatumArray{"A", "B", "C", "B", "C", "D"},
+    }};
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
     EXPECT_EQ(result->size(), 4);
     Evaluate(result.get(), expected);
@@ -526,9 +515,8 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_with_multiple_chunks_not_aligned) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
     auto pk_lts = std::vector<LogicalType>{LogicalType::TYPE_BIGINT};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "A", "B", "B"}},
-                                                   {DatumArray{"B", "B", "C", "C"}},
-                                                   {DatumArray{1L, 2L, 3L, 4L}}};
+    std::vector<std::vector<DatumArray>> input1 = {
+            {DatumArray{"A", "A", "B", "B"}}, {DatumArray{"B", "B", "C", "C"}}, {DatumArray{1L, 2L, 3L, 4L}}};
     std::vector<DatumArray> options1 = {};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"B", "B", "C", "C", "F"}},
                                                    {DatumArray{"C", "E", "B", "D", "B"}},
@@ -555,10 +543,10 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_with_multiple_chunks_not_aligned) {
     // First chunk
     auto result = local_ctx1->create_column(local_ctx1->get_return_type(), false);
     std::vector<std::vector<DatumArray>> expected = {{
-                                                             DatumArray{"F", "B", "E"},
-                                                             DatumArray{"F", "B", "C", "D"},
-                                                             DatumArray{"F", "B", "C", "B", "E"},
-                                                     }};
+            DatumArray{"F", "B", "E"},
+            DatumArray{"F", "B", "C", "D"},
+            DatumArray{"F", "B", "C", "B", "E"},
+    }};
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
     EXPECT_EQ(result->size(), 3);
     Evaluate(result.get(), expected);
@@ -566,10 +554,10 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_with_multiple_chunks_not_aligned) {
     // Second chunk
     result = local_ctx1->create_column(local_ctx1->get_return_type(), false);
     expected = {{
-                        DatumArray{"F", "B", "C", "B", "C", "D"},
-                        DatumArray{"A", "B", "E"},
-                        DatumArray{"A", "B", "C", "D"},
-                }};
+            DatumArray{"F", "B", "C", "B", "C", "D"},
+            DatumArray{"A", "B", "E"},
+            DatumArray{"A", "B", "C", "D"},
+    }};
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
     EXPECT_EQ(result->size(), 3);
     Evaluate(result.get(), expected);
@@ -577,9 +565,9 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_with_multiple_chunks_not_aligned) {
     // Third chunk
     result = local_ctx1->create_column(local_ctx1->get_return_type(), false);
     expected = {{
-                        DatumArray{"A", "B", "C", "B", "E"},
-                        DatumArray{"A", "B", "C", "B", "C", "D"},
-                }};
+            DatumArray{"A", "B", "C", "B", "E"},
+            DatumArray{"A", "B", "C", "B", "C", "D"},
+    }};
     func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
     EXPECT_EQ(result->size(), 2);
     Evaluate(result.get(), expected);
@@ -596,9 +584,8 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_greater_equal) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
     auto pk_lts = std::vector<LogicalType>{LogicalType::TYPE_BIGINT};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "A", "B", "B"}},
-                                                   {DatumArray{"B", "B", "C", "C"}},
-                                                   {DatumArray{1L, 2L, 3L, 4L}}};
+    std::vector<std::vector<DatumArray>> input1 = {
+            {DatumArray{"A", "A", "B", "B"}}, {DatumArray{"B", "B", "C", "C"}}, {DatumArray{1L, 2L, 3L, 4L}}};
     std::vector<DatumArray> options1 = {};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"B", "B", "C", "C", "F"}},
                                                    {DatumArray{"C", "E", "B", "D", "B"}},
@@ -609,11 +596,11 @@ TEST_F(CelonisEnumerateNodePathsTest, ex4_pk_greater_equal) {
     int len = 5;
 
     std::vector<std::vector<DatumArray>> expected = {{
-                                                             DatumArray{"F", "B", "C", "B", "E"},
-                                                             DatumArray{"F", "B", "C", "B", "C", "D"},
-                                                             DatumArray{"A", "B", "C", "B", "E"},
-                                                             DatumArray{"A", "B", "C", "B", "C", "D"},
-                                                     }};
+            DatumArray{"F", "B", "C", "B", "E"},
+            DatumArray{"F", "B", "C", "B", "C", "D"},
+            DatumArray{"A", "B", "C", "B", "E"},
+            DatumArray{"A", "B", "C", "B", "C", "D"},
+    }};
     Run(value_lts, pk_lts, input1, options1, input2, options2, allow_cycles, lc, len, expected);
 }
 

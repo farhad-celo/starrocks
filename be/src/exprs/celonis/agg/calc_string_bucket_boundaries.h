@@ -1,5 +1,8 @@
 #pragma once
 
+#include <boost/multiprecision/cpp_bin_float.hpp>
+#include <set>
+
 #include "column/column_helper.h"
 #include "column/object_column.h"
 #include "column/type_traits.h"
@@ -8,13 +11,10 @@
 #include "exprs/celonis/util.h"
 #include "gutil/casts.h"
 #include "runtime/mem_pool.h"
-#include <set>
-#include <boost/multiprecision/cpp_bin_float.hpp>
 
 namespace starrocks {
 
 struct CelonisCalcStringBucketCountBoundariesAggregateState {
-
     // This function assumes the row_num row of string_column and hash_column does not contain NULL.
     void update(const Column* string_column, const Column* hash_column, size_t row_num) {
         auto string_value = string_column->get(row_num).get_slice().to_string();
@@ -44,15 +44,15 @@ struct CelonisCalcStringBucketCountBoundariesAggregateState {
     // Returns the total size in bytes required to encode this object.
     size_t serialized_size() const {
         size_t result = 0;
-        result += sizeof(uint32_t);                   // size of strings
-        for (const auto& str: strings) {
+        result += sizeof(uint32_t); // size of strings
+        for (const auto& str : strings) {
             result += str.size() + 1;
         }
-        result += sizeof(double);                     // sample_ratio
-        result += sizeof(int64_t);                    // count
-        result += sizeof(uint8_t);                    // min_max_set
-        result += min_string.size() + 1;              // min_string
-        result += max_string.size() + 1;              // max_string
+        result += sizeof(double);        // sample_ratio
+        result += sizeof(int64_t);       // count
+        result += sizeof(uint8_t);       // min_max_set
+        result += min_string.size() + 1; // min_string
+        result += max_string.size() + 1; // max_string
         return result;
     }
 
@@ -140,9 +140,8 @@ struct CelonisCalcStringBucketCountBoundariesAggregateState {
  */
 class CelonisCalcStringBucketCountBoundariesAggregationFunction final
         : public AggregateFunctionBatchHelper<CelonisCalcStringBucketCountBoundariesAggregateState,
-                CelonisCalcStringBucketCountBoundariesAggregationFunction> {
+                                              CelonisCalcStringBucketCountBoundariesAggregationFunction> {
 public:
-
     void create_impl(FunctionContext* ctx, const Column** columns,
                      CelonisCalcStringBucketCountBoundariesAggregateState& state) const {
         DCHECK_EQ(ctx->get_num_args(), 4);
@@ -179,7 +178,7 @@ public:
             return;
         }
         Slice slice = input_column->get_slice(row_num);
-        this->data(state).deserialize_and_merge((const uint8_t*) slice.data, slice.size);
+        this->data(state).deserialize_and_merge((const uint8_t*)slice.data, slice.size);
     }
 
     void serialize_to_column(FunctionContext* ctx __attribute__((unused)), ConstAggDataPtr __restrict state,
@@ -228,9 +227,8 @@ public:
         }
         const auto n = state_impl.count;
         if (n > MAX_NUM_BUCKETS) {
-            ctx->set_error(
-                    std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
-                    false);
+            ctx->set_error(std::string("The number of buckets is more than " + std::to_string(MAX_NUM_BUCKETS)).c_str(),
+                           false);
             return;
         }
         // The output column is nullable, populate null_data.
@@ -243,7 +241,7 @@ public:
         auto* elements_column = array_column->elements_column().get();
         auto* offsets_column = array_column->offsets_column().get();
         int n_elements = 0;
-        for (const auto& boundary: boundaries) {
+        for (const auto& boundary : boundaries) {
             elements_column->append_datum(Slice(boundary));
             ++n_elements;
         }

@@ -70,9 +70,10 @@ struct all_inputs {
 
 struct specific_inputs {
   template <typename... ARGS>
-  requires(sizeof...(ARGS) > 0 &&
-           (legacy_embedded_ctl::is_one_of_v<ARGS, framework::operator_node*, framework::operator_node_pointers_t> &&
-            ...)) explicit specific_inputs(const ARGS&... operator_nodes)
+    requires(sizeof...(ARGS) > 0 &&
+             (legacy_embedded_ctl::is_one_of_v<ARGS, framework::operator_node*, framework::operator_node_pointers_t> &&
+              ...))
+  explicit specific_inputs(const ARGS&... operator_nodes)
       : operator_nodes_{details::concat_operator_nodes(operator_nodes...)} {}
 
   framework::operator_node_pointers_t operator_nodes_;
@@ -90,11 +91,14 @@ using dictify_t = std::variant<dictify::unknown_inputs,    // inputs that have t
 /** Type to indicate whether implicit dictification shall occur and to provide details for that dictification. */
 class no_dictify_request {
  public:
-  constexpr explicit no_dictify_request(
-      legacy_embedded_ctl::source_location source_location = legacy_embedded_ctl::source_location{std::experimental::source_location::current()})
+  constexpr explicit no_dictify_request(legacy_embedded_ctl::source_location source_location =
+                                            legacy_embedded_ctl::source_location{
+                                                std::experimental::source_location::current()})
       : source_location_{source_location} {}
 
-  [[nodiscard]] constexpr const legacy_embedded_ctl::source_location& get_source_location() const { return source_location_; }
+  [[nodiscard]] constexpr const legacy_embedded_ctl::source_location& get_source_location() const {
+    return source_location_;
+  }
 
  private:
   legacy_embedded_ctl::source_location source_location_;

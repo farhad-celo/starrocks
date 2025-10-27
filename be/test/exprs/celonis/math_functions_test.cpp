@@ -1,10 +1,10 @@
 #include "exprs/celonis/math_functions.h"
 
-#include "column/column_helper.h"
-#include "exprs/anyval_util.h"
-
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+
+#include "column/column_helper.h"
+#include "exprs/anyval_util.h"
 
 namespace starrocks {
 

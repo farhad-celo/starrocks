@@ -12,20 +12,16 @@ struct CmpOnEdgeOrderedID {
         return std::tie(x.ordered_src, x.ordered_dst) < std::tie(y.ordered_src, y.ordered_dst);
     }
 };
-}
+} // namespace
 
-template<typename ActivityMapType>
-std::vector<EdgeHashMap::const_iterator>
-EdgeStatsProcessor<ActivityMapType>::get_sorted_edges(const EdgeHashMap& edge_stats,
-                                                      const ActivityMapType& activity_map,
-                                                      size_t edge_count) {
+template <typename ActivityMapType>
+std::vector<EdgeHashMap::const_iterator> EdgeStatsProcessor<ActivityMapType>::get_sorted_edges(
+        const EdgeHashMap& edge_stats, const ActivityMapType& activity_map, size_t edge_count) {
     std::vector<int32_t> activity_unordered_to_ordered = create_activity_ordering_map(activity_map);
 
     std::priority_queue<EdgeOrderedID, std::vector<EdgeOrderedID>, CmpOnEdgeOrderedID> pq;
     for (auto it = edge_stats.cbegin(); it != edge_stats.cend(); ++it) {
-        pq.push({activity_unordered_to_ordered[it->first.src],
-                 activity_unordered_to_ordered[it->first.dst],
-                 it});
+        pq.push({activity_unordered_to_ordered[it->first.src], activity_unordered_to_ordered[it->first.dst], it});
         if (pq.size() > edge_count) {
             pq.pop();
         }
@@ -39,12 +35,9 @@ EdgeStatsProcessor<ActivityMapType>::get_sorted_edges(const EdgeHashMap& edge_st
     return rv;
 }
 
-template<typename ActivityMapType>
-rapidjson::Value
-EdgeStatsProcessor<ActivityMapType>::build_edge_stats_json(
-        const std::vector<EdgeHashMap::const_iterator>& sorted_edges,
-        rapidjson::Document::AllocatorType& allocator) {
-
+template <typename ActivityMapType>
+rapidjson::Value EdgeStatsProcessor<ActivityMapType>::build_edge_stats_json(
+        const std::vector<EdgeHashMap::const_iterator>& sorted_edges, rapidjson::Document::AllocatorType& allocator) {
     rapidjson::Value e_stats(rapidjson::kArrayType);
     for (const auto& edge_it : sorted_edges) {
         rapidjson::Value obj = edge_it->second.to_json(allocator);
@@ -55,12 +48,10 @@ EdgeStatsProcessor<ActivityMapType>::build_edge_stats_json(
     return e_stats;
 }
 
-template<typename ActivityMapType>
-void
-EdgeStatsProcessor<ActivityMapType>::build_edge_stats_proto(
+template <typename ActivityMapType>
+void EdgeStatsProcessor<ActivityMapType>::build_edge_stats_proto(
         const std::vector<EdgeHashMap::const_iterator>& sorted_edges,
         celonis::accelerator::Statistics& statistics_proto) {
-
     for (const auto& edge_it : sorted_edges) {
         celonis::accelerator::EdgeStatsEntry entry;
         entry.set_count(edge_it->second.count);
@@ -72,11 +63,8 @@ EdgeStatsProcessor<ActivityMapType>::build_edge_stats_proto(
 }
 
 // Specialization for variant_stats.cpp (SliceHashMap activity map)
-template<>
-std::vector<int32_t>
-EdgeStatsProcessor<SliceHashMap>::create_activity_ordering_map(
-        const SliceHashMap& activity_map) {
-
+template <>
+std::vector<int32_t> EdgeStatsProcessor<SliceHashMap>::create_activity_ordering_map(const SliceHashMap& activity_map) {
     std::map<SliceWithHash, int32_t> ordered_activity_map(activity_map.begin(), activity_map.end());
     std::vector<int32_t> activity_unordered_to_ordered(activity_map.size());
     int index = 0;
@@ -88,11 +76,9 @@ EdgeStatsProcessor<SliceHashMap>::create_activity_ordering_map(
 }
 
 // Specialization for variant_stats_v2.cpp (vector-based activity array)
-template<>
-std::vector<int32_t>
-EdgeStatsProcessor<std::vector<std::string>>::create_activity_ordering_map(
+template <>
+std::vector<int32_t> EdgeStatsProcessor<std::vector<std::string>>::create_activity_ordering_map(
         const std::vector<std::string>& activity_array) {
-
     std::map<std::string, int32_t> ordered_activity_map;
     for (auto i = 0; i < activity_array.size(); ++i) {
         ordered_activity_map.insert({activity_array[i], i});

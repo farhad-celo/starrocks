@@ -1,12 +1,12 @@
 #include "exprs/celonis/table_function/count_edges.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "../util.h"
 #include "column/column_helper.h"
 #include "exprs/function_context.h"
 #include "testutil/assert.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 

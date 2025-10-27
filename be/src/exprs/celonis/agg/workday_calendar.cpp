@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "workday_calendar.h"
+
 #include "exprs/celonis/agg/util.h"
 #include "gutil/strings/strcat.h"
 #include "modules/query/calendars.pb.h"
@@ -24,7 +25,7 @@ namespace {
 // SR places an upper limit of 1M of STRING. We use 900K which is less than 1M.
 static const size_t MAX_STRING_SIZE = 900000;
 
-}
+} // namespace
 
 WorkdayCalendarAggregateState::~WorkdayCalendarAggregateState() {
     if (year != nullptr) {
@@ -44,15 +45,15 @@ WorkdayCalendarAggregateState::~WorkdayCalendarAggregateState() {
 void WorkdayCalendarAggregateFunction::create(FunctionContext* ctx, AggDataPtr __restrict ptr) const {
     auto num = ctx->get_num_args();
     DCHECK(num == 3);
-    auto* state = new(ptr) WorkdayCalendarAggregateState;
+    auto* state = new (ptr) WorkdayCalendarAggregateState;
     state->year = std::make_unique<Int64Column>();
     state->is_workdays = std::make_unique<BinaryColumn>();
     state->calendar_id = std::make_unique<BinaryColumn>();
     state->is_calendar_id_null = std::make_unique<BooleanColumn>();
 }
 
-void
-WorkdayCalendarAggregateFunction::reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const {
+void WorkdayCalendarAggregateFunction::reset(FunctionContext* ctx, const Columns& args,
+                                             AggDataPtr __restrict state) const {
     auto& state_impl = this->data(state);
     if (state_impl.year != nullptr) {
         state_impl.year.reset(nullptr);
@@ -103,7 +104,8 @@ void WorkdayCalendarAggregateFunction::merge(FunctionContext* ctx, const Column*
     auto year_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(0).get()));
     auto is_workdays_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(1).get()));
     auto calendar_id_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(2).get()));
-    auto is_calendar_id_null_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(3).get()));
+    auto is_calendar_id_null_column =
+            down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(3).get()));
     auto& offsets = year_column->offsets().get_data();
     const auto start = offsets[row_num];
     const auto end = offsets[row_num + 1];
@@ -168,14 +170,13 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
                     int byte_index = j / 8;
                     int bit_index = j % 8;
                     unsigned char bit_value_to_set = (1 << bit_index);
-                    mask_data[byte_index] = static_cast<char>(
-                            static_cast<unsigned char>(mask_data[byte_index]) | bit_value_to_set
-                    );
+                    mask_data[byte_index] =
+                            static_cast<char>(static_cast<unsigned char>(mask_data[byte_index]) | bit_value_to_set);
                 }
             }
             entry.set_workday_mask(mask_data);
         } else {
-            for (char is_workday: is_workdays) {
+            for (char is_workday : is_workdays) {
                 if (is_workday == '0') {
                     entry.add_is_workday(false);
                 } else {
@@ -203,11 +204,13 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
         *calendar_proto.mutable_workday_calendar()->add_entries() = std::move(entry);
     }
 
-    std::optional<std::string> calendar_string = to_base64_encoded_string(calendar_proto,
-                                                                          DEFAULT_CELONIS_PROTO_SIZE_LIMIT, true);
+    std::optional<std::string> calendar_string =
+            to_base64_encoded_string(calendar_proto, DEFAULT_CELONIS_PROTO_SIZE_LIMIT, true);
     if (!calendar_string.has_value()) {
         ctx->set_error(StrCat("Calendar proto serialized size (", calendar_proto.ByteSizeLong(),
-                              " bytes) exceeds maximum supported length (1GB)").c_str(), false);
+                              " bytes) exceeds maximum supported length (1GB)")
+                               .c_str(),
+                       false);
         return;
     }
 
@@ -218,7 +221,7 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
     }
     DatumArray array;
     array.reserve(calendar_pieces.size());
-    for (const auto& calendar_piece: calendar_pieces) {
+    for (const auto& calendar_piece : calendar_pieces) {
         array.emplace_back(calendar_piece.c_str());
     }
     to->append_datum(array);
@@ -226,8 +229,7 @@ void WorkdayCalendarAggregateFunction::finalize_to_column(FunctionContext* ctx, 
 
 // convert each cell of a row to a [nullable] array in a struct
 void WorkdayCalendarAggregateFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
-                                                                   size_t chunk_size,
-                                                                   ColumnPtr* dst) const {
+                                                                   size_t chunk_size, ColumnPtr* dst) const {
     DCHECK(src.size() == 3);
     std::vector<size_t> valid_indexes;
     for (size_t row = 0; row < chunk_size; ++row) {
@@ -248,7 +250,7 @@ void WorkdayCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
         DatumArray is_workdays_array;
         DatumArray calendar_id_array;
         DatumArray is_calendar_id_null_array;
-        for (auto i: valid_indexes) {
+        for (auto i : valid_indexes) {
             year_array.push_back(src[0]->get(i));
             is_workdays_array.push_back(src[1]->get(i));
             if (src[2]->is_null(i)) {
@@ -266,6 +268,8 @@ void WorkdayCalendarAggregateFunction::convert_to_serialize_format(FunctionConte
     }
 }
 
-std::string WorkdayCalendarAggregateFunction::get_name() const { return "celonis_make_workday_calendar"; }
+std::string WorkdayCalendarAggregateFunction::get_name() const {
+    return "celonis_make_workday_calendar";
+}
 
 } // namespace starrocks

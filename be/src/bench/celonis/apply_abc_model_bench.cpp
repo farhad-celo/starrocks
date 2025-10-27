@@ -47,19 +47,17 @@ BM_AbcModelConstantDouble/100000/2    2366804 ns      2366738 ns          278 Ro
 
 namespace starrocks {
 
-template<LogicalType LT>
+template <LogicalType LT>
 static void do_bench_abc_model(benchmark::State& state) {
     using CppType = RunTimeCppType<LT>;
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<int64_t> pk_hash_dist(
-            std::numeric_limits<int64_t>::min(),
-            std::numeric_limits<int64_t>::max()
-    );
+    std::uniform_int_distribution<int64_t> pk_hash_dist(std::numeric_limits<int64_t>::min(),
+                                                        std::numeric_limits<int64_t>::max());
 
     int num_rows = state.range(0);
-    int num_special_cases = state.range(1);  // Number of values with probability distributions
+    int num_special_cases = state.range(1); // Number of values with probability distributions
 
     // Generate model string
     std::string model_str;
@@ -70,17 +68,17 @@ static void do_bench_abc_model(benchmark::State& state) {
         // Add special cases with probability distributions
         for (int i = 0; i < num_special_cases; i++) {
             if (i > 0) model_str += ";";
-            int64_t value = 50 + i * 5;  // Values within first range
+            int64_t value = 50 + i * 5; // Values within first range
             model_str += std::to_string(value) + ",0.3,0.4,0.3";
         }
-    } else {  // TYPE_DOUBLE
+    } else { // TYPE_DOUBLE
         // Example ranges for DOUBLE: [0.0,100.0], [200.0,300.0], [400.0,500.0]
         model_str = "0.0,100.0,200.0,300.0,400.0,500.0:";
 
         // Add special cases with probability distributions
         for (int i = 0; i < num_special_cases; i++) {
             if (i > 0) model_str += ";";
-            double value = 50.0 + i * 5.0;  // Values within first range
+            double value = 50.0 + i * 5.0; // Values within first range
             model_str += std::to_string(value) + ",0.3,0.4,0.3";
         }
     }
@@ -88,8 +86,7 @@ static void do_bench_abc_model(benchmark::State& state) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))
-    };
+            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
     auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -98,23 +95,23 @@ static void do_bench_abc_model(benchmark::State& state) {
     auto generate_value = [&]() -> CppType {
         double r = range_selector(rng);
         if constexpr (LT == TYPE_BIGINT) {
-            if (r < 0.4) {  // 40% in range 1
+            if (r < 0.4) { // 40% in range 1
                 return std::uniform_int_distribution<int64_t>(0, 100)(rng);
-            } else if (r < 0.7) {  // 30% in range 2
+            } else if (r < 0.7) { // 30% in range 2
                 return std::uniform_int_distribution<int64_t>(200, 300)(rng);
-            } else if (r < 0.9) {  // 20% in range 3
+            } else if (r < 0.9) { // 20% in range 3
                 return std::uniform_int_distribution<int64_t>(400, 500)(rng);
-            } else {  // 10% out of range
+            } else { // 10% out of range
                 return std::uniform_int_distribution<int64_t>(600, 700)(rng);
             }
-        } else {  // TYPE_DOUBLE
-            if (r < 0.4) {  // 40% in range 1
+        } else {           // TYPE_DOUBLE
+            if (r < 0.4) { // 40% in range 1
                 return std::uniform_real_distribution<double>(0.0, 100.0)(rng);
-            } else if (r < 0.7) {  // 30% in range 2
+            } else if (r < 0.7) { // 30% in range 2
                 return std::uniform_real_distribution<double>(200.0, 300.0)(rng);
-            } else if (r < 0.9) {  // 20% in range 3
+            } else if (r < 0.9) { // 20% in range 3
                 return std::uniform_real_distribution<double>(400.0, 500.0)(rng);
-            } else {  // 10% out of range
+            } else { // 10% out of range
                 return std::uniform_real_distribution<double>(600.0, 700.0)(rng);
             }
         }
@@ -136,8 +133,7 @@ static void do_bench_abc_model(benchmark::State& state) {
         }
 
         // Model column is constant
-        ColumnPtr model_column = ColumnHelper::create_const_column<TYPE_VARCHAR>(
-                Slice(model_str), num_rows);
+        ColumnPtr model_column = ColumnHelper::create_const_column<TYPE_VARCHAR>(Slice(model_str), num_rows);
 
         Columns columns;
         columns.push_back(value_column);
@@ -153,8 +149,7 @@ static void do_bench_abc_model(benchmark::State& state) {
         ASSERT_OK(CelonisAbcModel<LT>::close(ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
     }
 
-    state.counters["RowsPerSecond"] =
-            benchmark::Counter(total_rows, benchmark::Counter::kIsRate);
+    state.counters["RowsPerSecond"] = benchmark::Counter(total_rows, benchmark::Counter::kIsRate);
     state.counters["TimePerRow"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }

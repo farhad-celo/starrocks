@@ -94,14 +94,14 @@ template <typename T>
  * @brief Factory to create a static array with the given sized range
  */
 template <typename T, std::ranges::sized_range RANGE>
-requires(!std::same_as<RANGE, std::initializer_list<T>>) [[nodiscard]] static_array<T> make_static_array(
-    RANGE&& range, const utils::allocation_reason& reason,
-    utils::allocation_priority priority = utils::allocation_priority::LOW);
+  requires(!std::same_as<RANGE, std::initializer_list<T>>)
+[[nodiscard]] static_array<T> make_static_array(RANGE&& range, const utils::allocation_reason& reason,
+                                                utils::allocation_priority priority = utils::allocation_priority::LOW);
 
 template <typename T, std::ranges::sized_range RANGE>
-requires(!std::same_as<RANGE, std::initializer_list<T>>)
-    [[nodiscard]] static_array<T> make_static_array(RANGE&& range, const utils::allocation_reason& reason,
-                                                    static_array_allocator_type<T> allocator);
+  requires(!std::same_as<RANGE, std::initializer_list<T>>)
+[[nodiscard]] static_array<T> make_static_array(RANGE&& range, const utils::allocation_reason& reason,
+                                                static_array_allocator_type<T> allocator);
 
 template <typename T>
 void swap(static_array<T>& lhs, static_array<T>& rhs) noexcept;
@@ -159,14 +159,15 @@ template <typename T>
                                                               static_array_allocator_type<T> allocator);
 
 template <typename T, std::ranges::sized_range RANGE>
-requires(!std::same_as<RANGE, std::initializer_list<T>>) [[nodiscard]] shared_static_array<T> make_shared_static_array(
+  requires(!std::same_as<RANGE, std::initializer_list<T>>)
+[[nodiscard]] shared_static_array<T> make_shared_static_array(
     RANGE&& range, const utils::allocation_reason& reason,
     utils::allocation_priority priority = utils::allocation_priority::LOW);
 
 template <typename T, std::ranges::sized_range RANGE>
-requires(!std::same_as<RANGE, std::initializer_list<T>>)
-    [[nodiscard]] shared_static_array<T> make_shared_static_array(RANGE&& range, const utils::allocation_reason& reason,
-                                                                  static_array_allocator_type<T> allocator);
+  requires(!std::same_as<RANGE, std::initializer_list<T>>)
+[[nodiscard]] shared_static_array<T> make_shared_static_array(RANGE&& range, const utils::allocation_reason& reason,
+                                                              static_array_allocator_type<T> allocator);
 
 template <typename T>
 void swap(shared_static_array<T>& lhs, shared_static_array<T>& rhs) noexcept;
@@ -245,15 +246,17 @@ inline static_array<T> make_static_array(std::initializer_list<T> init, const ut
 }
 
 template <typename T, std::ranges::sized_range RANGE>
-requires(!std::same_as<RANGE, std::initializer_list<T>>) inline static_array<T> make_static_array(
-    RANGE&& range, const utils::allocation_reason& reason, const utils::allocation_priority priority) {
+  requires(!std::same_as<RANGE, std::initializer_list<T>>)
+inline static_array<T> make_static_array(RANGE&& range, const utils::allocation_reason& reason,
+                                         const utils::allocation_priority priority) {
   return details::make_static_array<T, details::non_shared>(std::forward<RANGE>(range), reason,
                                                             make_default_tracking_allocator<T>(reason, priority, true));
 }
 
 template <typename T, std::ranges::sized_range RANGE>
-requires(!std::same_as<RANGE, std::initializer_list<T>>) inline static_array<T> make_static_array(
-    RANGE&& range, const utils::allocation_reason& reason, static_array_allocator_type<T> allocator) {
+  requires(!std::same_as<RANGE, std::initializer_list<T>>)
+inline static_array<T> make_static_array(RANGE&& range, const utils::allocation_reason& reason,
+                                         static_array_allocator_type<T> allocator) {
   return details::make_static_array<T, details::non_shared>(std::forward<RANGE>(range), reason, std::move(allocator));
 }
 
@@ -336,15 +339,17 @@ inline shared_static_array<T> make_shared_static_array(std::initializer_list<T> 
 }
 
 template <typename T, std::ranges::sized_range RANGE>
-requires(!std::same_as<RANGE, std::initializer_list<T>>) inline shared_static_array<T> make_shared_static_array(
-    RANGE&& range, const utils::allocation_reason& reason, const utils::allocation_priority priority) {
+  requires(!std::same_as<RANGE, std::initializer_list<T>>)
+inline shared_static_array<T> make_shared_static_array(RANGE&& range, const utils::allocation_reason& reason,
+                                                       const utils::allocation_priority priority) {
   return details::make_static_array<T, details::shared>(std::forward<RANGE>(range), reason,
                                                         make_default_tracking_allocator<T>(reason, priority, true));
 }
 
 template <typename T, std::ranges::sized_range RANGE>
-requires(!std::same_as<RANGE, std::initializer_list<T>>) inline shared_static_array<T> make_shared_static_array(
-    RANGE&& range, const utils::allocation_reason& reason, static_array_allocator_type<T> allocator) {
+  requires(!std::same_as<RANGE, std::initializer_list<T>>)
+inline shared_static_array<T> make_shared_static_array(RANGE&& range, const utils::allocation_reason& reason,
+                                                       static_array_allocator_type<T> allocator) {
   return details::make_static_array<T, details::shared>(std::forward<RANGE>(range), reason, std::move(allocator));
 }
 

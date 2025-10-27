@@ -41,14 +41,9 @@ BM_AddWorkdays/10000          100562 ns       100516 ns         6879 RowInvRate=
 BM_AddWorkdays/100000         976092 ns       976101 ns          710 RowInvRate=9.76101ns
 */
 
-static const phmap::flat_hash_map<std::string, int64_t> TIME_UNIT_TO_MS = {
-        {"DAYS",         86400000L},
-        {"WORKDAYS",     86400000L},
-        {"HOURS",        3600000L},
-        {"MINUTES",      60000L},
-        {"SECONDS",      1000L},
-        {"MILLISECONDS", 1L}
-};
+static const phmap::flat_hash_map<std::string, int64_t> TIME_UNIT_TO_MS = {{"DAYS", 86400000L}, {"WORKDAYS", 86400000L},
+                                                                           {"HOURS", 3600000L}, {"MINUTES", 60000L},
+                                                                           {"SECONDS", 1000L},  {"MILLISECONDS", 1L}};
 
 static void do_bench(benchmark::State& state, const std::string& time_unit) {
     date::init_date_cache(); // This is needed for using TimestampValue.
@@ -66,8 +61,7 @@ static void do_bench(benchmark::State& state, const std::string& time_unit) {
             AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_VARCHAR)),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))),
             AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_VARCHAR))};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_DATETIME));
+    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_DATETIME));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     TimestampValue timestamp;
@@ -75,12 +69,9 @@ static void do_bench(benchmark::State& state, const std::string& time_unit) {
     for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
-        auto timestamp_column =
-                ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
-        auto add_column =
-            ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
-        auto unit_column =
-                ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto timestamp_column = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+        auto add_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), true);
+        auto unit_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
         auto calendar_column =
                 ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
         auto calendar_id_column = ColumnHelper::create_const_null_column(num_rows);
@@ -98,20 +89,17 @@ static void do_bench(benchmark::State& state, const std::string& time_unit) {
         }
         ctx->set_constant_columns({nullptr, nullptr, unit_column, calendar_column, nullptr});
         state.ResumeTiming();
-        ASSERT_OK(CelonisTimeFunctions::add_timeunits_calendar_prepare(ctx.get(),
-                                                                       FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
-        ASSERT_OK(
-                CelonisTimeFunctions::add_timeunits_calendar_prepare(ctx.get(),
-                                                                     FunctionContext::FunctionStateScope::THREAD_LOCAL));
-        EXPECT_TRUE(CelonisTimeFunctions::add_timeunits_calendar(ctx.get(),
-                                                                 {timestamp_column, add_column, unit_column,
-                                                                  calendar_column,
-                                                                  calendar_id_column}).ok());
-        ASSERT_OK(CelonisTimeFunctions::add_timeunits_calendar_close(ctx.get(),
-                                                                     FunctionContext::FunctionStateScope::THREAD_LOCAL));
-        ASSERT_OK(
-                CelonisTimeFunctions::add_timeunits_calendar_close(ctx.get(),
-                                                                   FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        ASSERT_OK(CelonisTimeFunctions::add_timeunits_calendar_prepare(
+                ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        ASSERT_OK(CelonisTimeFunctions::add_timeunits_calendar_prepare(
+                ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+        EXPECT_TRUE(CelonisTimeFunctions::add_timeunits_calendar(
+                            ctx.get(), {timestamp_column, add_column, unit_column, calendar_column, calendar_id_column})
+                            .ok());
+        ASSERT_OK(CelonisTimeFunctions::add_timeunits_calendar_close(
+                ctx.get(), FunctionContext::FunctionStateScope::THREAD_LOCAL));
+        ASSERT_OK(CelonisTimeFunctions::add_timeunits_calendar_close(
+                ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);

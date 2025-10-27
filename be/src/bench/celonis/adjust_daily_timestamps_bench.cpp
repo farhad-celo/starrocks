@@ -62,7 +62,7 @@ TimestampValue generate_random_timestamp(std::mt19937_64& rng, bool day_based = 
 
 ColumnPtr generate_timestamp_arrays(std::mt19937_64& rng, int num_cases, int avg_activities_per_case) {
     ColumnPtr array_column = ColumnHelper::create_column(TypeDescriptor(TYPE_ARRAY_DATETIME), true);
-    std::uniform_int_distribution<int> case_size_dist(1, avg_activities_per_case * 2);  // Vary case sizes
+    std::uniform_int_distribution<int> case_size_dist(1, avg_activities_per_case * 2); // Vary case sizes
 
     for (int i = 0; i < num_cases; i++) {
         DatumArray case_timestamps;
@@ -122,10 +122,8 @@ static void BM_AdjustDailyTimestamps_WithSorting(benchmark::State& state) {
 
     FunctionContext::TypeDesc return_type;
     return_type.type = TYPE_STRUCT;
-    return_type.children = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))
-    };
+    return_type.children = {AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
+                            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
     return_type.field_names = {"adjusted_timestamps", "reordering"};
 
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -164,10 +162,8 @@ static void BM_AdjustDailyTimestamps_WithoutSorting(benchmark::State& state) {
 
     FunctionContext::TypeDesc return_type;
     return_type.type = TYPE_STRUCT;
-    return_type.children = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))
-    };
+    return_type.children = {AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
+                            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
     return_type.field_names = {"adjusted_timestamps", "reordering"};
 
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));

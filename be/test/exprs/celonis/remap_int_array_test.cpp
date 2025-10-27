@@ -1,13 +1,13 @@
 #include "exprs/celonis/remap_int_array.h"
 
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -33,8 +33,8 @@ private:
         new_array_column_ = ColumnHelper::create_column(celonis::array_type(TYPE_BIGINT), false);
     }
 
-    void
-    AddRow(const DatumArray& input_array, const DatumArray& old_array, const DatumArray& new_array, const Datum& default_value) {
+    void AddRow(const DatumArray& input_array, const DatumArray& old_array, const DatumArray& new_array,
+                const Datum& default_value) {
         input_array_column_->append_datum(input_array);
         old_array_column_->append_datum(old_array);
         new_array_column_->append_datum(new_array);
@@ -42,28 +42,24 @@ private:
     }
 
     StatusOr<ColumnPtr> Run(bool has_default) {
-        DeferOp close_fragment_local([this] {
-            CelonisRemapIntArray::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL);
-        });
+        DeferOp close_fragment_local(
+                [this] { CelonisRemapIntArray::close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
         RETURN_IF_ERROR(CelonisRemapIntArray::prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local([this] {
-            CelonisRemapIntArray::close(ctx_.get(), FunctionContext::THREAD_LOCAL);
-        });
+        DeferOp close_thread_local([this] { CelonisRemapIntArray::close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
         RETURN_IF_ERROR(CelonisRemapIntArray::prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
         if (has_default) {
-            result = CelonisRemapIntArray::remap_int_array(ctx_.get(),
-                                                          {input_array_column_, old_array_column_, new_array_column_,
-                                                           default_column_});
+            result = CelonisRemapIntArray::remap_int_array(
+                    ctx_.get(), {input_array_column_, old_array_column_, new_array_column_, default_column_});
         } else {
             result = CelonisRemapIntArray::remap_int_array(ctx_.get(),
-                                                          {input_array_column_, old_array_column_, new_array_column_});
+                                                           {input_array_column_, old_array_column_, new_array_column_});
         }
         return result;
     }
 
-    StatusOr<ColumnPtr>
-    RunConstantValueMap(const DatumArray& old_array, const DatumArray& new_array, bool has_default) {
+    StatusOr<ColumnPtr> RunConstantValueMap(const DatumArray& old_array, const DatumArray& new_array,
+                                            bool has_default) {
         old_array_column_->append_datum(old_array);
         new_array_column_->append_datum(new_array);
         const auto nrows = input_array_column_->size();
@@ -91,8 +87,7 @@ TEST_F(CelonisRemapIntArrayTest, remap_int_array_const_inconsistent_value_map) {
 
     const auto result = RunConstantValueMap(old_array, new_array, true);
     EXPECT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ("[prepare] old value array must have the same length as new value array.",
-              result.status().message());
+    EXPECT_EQ("[prepare] old value array must have the same length as new value array.", result.status().message());
 }
 
 TEST_F(CelonisRemapIntArrayTest, remap_int_array_non_const_inconsistent_value_map) {
@@ -102,8 +97,7 @@ TEST_F(CelonisRemapIntArrayTest, remap_int_array_non_const_inconsistent_value_ma
 
     const auto result = Run(true);
     EXPECT_TRUE(result.status().is_invalid_argument());
-    EXPECT_EQ("old value array must have the same length as new value array.",
-              result.status().message());
+    EXPECT_EQ("old value array must have the same length as new value array.", result.status().message());
 }
 
 TEST_F(CelonisRemapIntArrayTest, remap_int_array_empty_input_column) {

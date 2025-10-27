@@ -23,13 +23,15 @@ namespace celonis::accelerator::memory::tracking {
  */
 
 inline common::char_buffer make_tracked_char_buffer(const common::execution_context& context) {
-  return common::char_buffer{spawn_allocator<char>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))};
+  return common::char_buffer{
+      spawn_allocator<char>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG))};
 }
 
 inline common::output_string_buffer make_tracked_output_string_buffer(
     const common::execution_context& context, common::output_string_buffer::strategy_t char_buffer_strategy) {
-  return common::output_string_buffer{spawn_allocator<char>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG)),
-                                      char_buffer_strategy};
+  return common::output_string_buffer{
+      spawn_allocator<char>(context, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMBER_INIT_MSG)),
+      char_buffer_strategy};
 }
 
 }  // namespace celonis::accelerator::memory::tracking

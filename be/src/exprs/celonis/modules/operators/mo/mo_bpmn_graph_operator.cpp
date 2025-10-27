@@ -3,14 +3,13 @@
 #include <cmath>
 #include <mutex>
 
-#include <cpml/model/transformations.h>
 #include <cpml/model/bpmn/merge.h>
 #include <cpml/model/process_tree.h>
 #include <cpml/model/pt/node_to_counts_mapping.h>
+#include <cpml/model/transformations.h>
 #include <ctl/algorithm.h>
 
 #include "exprs/celonis/cpml_utils/sr_context.h"
-
 #include "legacy_embedded_ctl/assert.h"
 #include "legacy_embedded_format/json/json.h"
 #include "log/log.h"
@@ -54,21 +53,22 @@ namespace {
 using process_tree_with_counts_t = process::process_tree;
 using process_tree_ptr_t = ctl::checked_raw_ptr<const process_tree_with_counts_t>;
 
-void generate_node_id_mapping_recurse(
-    const process::process_tree& current_node, cpml::model::node_id_t& current_node_id,
-    const std::function<void(process_tree_ptr_t, cpml::model::node_id_t)>& callback);
+void generate_node_id_mapping_recurse(const process::process_tree& current_node,
+                                      cpml::model::node_id_t& current_node_id,
+                                      const std::function<void(process_tree_ptr_t, cpml::model::node_id_t)>& callback);
 
 class id_mapping {
-public:
+ public:
   /** Generates the ID mapping for the given process tree */
   [[nodiscard]] static id_mapping generate(const process::process_tree& tree) {
     id_mapping mapping{};
     auto& internal_boost_bimap{mapping.mapping_};
 
-    const auto callback{[&internal_boost_bimap](const process_tree_ptr_t node_ptr, const cpml::model::node_id_t node_id) {
-      using bimap_value_t = bimap_t::value_type;
-      internal_boost_bimap.insert(bimap_value_t{node_ptr, node_id});
-    }};
+    const auto callback{
+        [&internal_boost_bimap](const process_tree_ptr_t node_ptr, const cpml::model::node_id_t node_id) {
+          using bimap_value_t = bimap_t::value_type;
+          internal_boost_bimap.insert(bimap_value_t{node_ptr, node_id});
+        }};
 
     cpml::model::node_id_t initial_node_id{0};
     generate_node_id_mapping_recurse(tree, initial_node_id, callback);
@@ -81,14 +81,14 @@ public:
     return mapping_.left.at(node_ptr);
   }
 
-private:
+ private:
   using bimap_t = boost::bimap<process_tree_ptr_t, cpml::model::node_id_t>;
   bimap_t mapping_;
 };
 
-void generate_node_id_mapping_recurse(
-    const process::process_tree& current_node, cpml::model::node_id_t& current_node_id,
-    const std::function<void(process_tree_ptr_t, cpml::model::node_id_t)>& callback) {
+void generate_node_id_mapping_recurse(const process::process_tree& current_node,
+                                      cpml::model::node_id_t& current_node_id,
+                                      const std::function<void(process_tree_ptr_t, cpml::model::node_id_t)>& callback) {
   callback(std::addressof(current_node), current_node_id++);
   for (const auto& child_node : current_node.get_children()) {
     generate_node_id_mapping_recurse(child_node, current_node_id, callback);
@@ -148,8 +148,8 @@ void generate_node_id_mapping_recurse(
   auto node_without_counts_ptr_to_node_id_mapping{cpml::model::pt::id_mapping::generate(*tree_without_counts_ptr, ctx)};
   auto node_id_to_counts{std::move(node_counts_bldr).build()};
   cpml::model::pt::tree_and_counts_mapping tree_and_counts{std::move(tree_without_counts_ptr),
-                                                     std::move(node_without_counts_ptr_to_node_id_mapping),
-                                                     std::move(node_id_to_counts)};
+                                                           std::move(node_without_counts_ptr_to_node_id_mapping),
+                                                           std::move(node_id_to_counts)};
   return tree_and_counts;
 }
 
@@ -190,7 +190,8 @@ process::bpmn::bpmn_graph_with_block_structure filtered_eventlog_to_bpmn(
         is_valid_tree(replayed_result)) {
       tree = replayed_result;
     } else {  // replay failed, so return the original (inconsistent) inductive miner result
-      legacy_embedded_warning_assert(false, fmt::format("Replay generated an inconsistent process tree {}", pt2dot(tree, nullptr)));
+      legacy_embedded_warning_assert(
+          false, fmt::format("Replay generated an inconsistent process tree {}", pt2dot(tree, nullptr)));
     }
   }
   return process::bpmn::convert_to_bpmn_graph_with_block_structure(tree);
@@ -257,9 +258,10 @@ double cost_of(const process::bpmn::bpmn_graph& graph) {
   }
   const auto num_gateways{
       std::accumulate(begin(graph.get_vertices()), end(graph.get_vertices()), 0., [](double acc, const auto& pair) {
-        return acc + std::visit(legacy_embedded_ctl::overloaded{[](const process::bpmn::parallel& /*unused*/) { return 1; },
-                                                [](const process::bpmn::exclusive_choice& /*unused*/) { return 1; },
-                                                [](const auto& /*fallback*/) { return 0; }},
+        return acc + std::visit(legacy_embedded_ctl::overloaded{
+                                    [](const process::bpmn::parallel& /*unused*/) { return 1; },
+                                    [](const process::bpmn::exclusive_choice& /*unused*/) { return 1; },
+                                    [](const auto& /*fallback*/) { return 0; }},
                                 pair.second.get_vertex_type());
       })};
   return num_gateways / static_cast<double>(num_nodes);
@@ -323,7 +325,8 @@ std::pair<incremental_eventlog, size_t> get_incremental_eventlog(
       //      std::iota(begin(activities_to_cover), end(activities_to_cover), row_id{0});
       //      return incremental_eventlog::activity_cover(
       //          activities_to_cover, activity_column, case_column,
-      //          cube::filter_bitset_t{legacy_embedded_ctl::cast<size_t>(activity_column->get_row_count(context)), false}, context);
+      //          cube::filter_bitset_t{legacy_embedded_ctl::cast<size_t>(activity_column->get_row_count(context)),
+      //          false}, context);
       //    }
     case mo_bpmn_graph_data_selection_strategy::happy_path_strategy::set_cover:
     case mo_bpmn_graph_data_selection_strategy::happy_path_strategy::frequency:
@@ -332,7 +335,8 @@ std::pair<incremental_eventlog, size_t> get_incremental_eventlog(
       return std::pair{
           incremental_eventlog::frequency_decreasing(
               activity_column, case_column,
-              cube::filter_bitset_t{legacy_embedded_ctl::cast<size_t>(activity_column->get_row_count(context)), false}, context),
+              cube::filter_bitset_t{legacy_embedded_ctl::cast<size_t>(activity_column->get_row_count(context)), false},
+              context),
           size_t{1}};
   }
 }
@@ -462,8 +466,8 @@ mo_bpmn_graph_operator::mo_bpmn_graph_operator(std::vector<process::process_tree
     : process_trees_(std::move(process_trees)),
       statistics_(std::move(statistics)),
       activity_columns_(std::move(activity_columns)),
-      operator_context_{parent_context.create_sub_context(
-          get_user_visible_operator_name(), {{"computation_inputs", process_trees_.size()}})} {}
+      operator_context_{parent_context.create_sub_context(get_user_visible_operator_name(),
+                                                          {{"computation_inputs", process_trees_.size()}})} {}
 #else
 mo_bpmn_graph_operator::mo_bpmn_graph_operator(const mo_bpmn_graph_query_expressions_t& mo_bpmn_graph_query_expressions,
                                                cube::query_scope& scope,
@@ -479,7 +483,8 @@ mo_bpmn_graph_operator::result_type mo_bpmn_graph_operator::compute() const {
   const auto [graph, dictionary, statistics] = compute_graph();
 #ifdef CELOSTAR
   // TODO(j.kim): Review 32bit row_id and its limit.
-  return {process::bpmn::create_bpmn_tables_from_bpmn_graph(graph, dictionary, memory::MAX_TABLE_ROW_LIMIT, operator_context_),
+  return {process::bpmn::create_bpmn_tables_from_bpmn_graph(graph, dictionary, memory::MAX_TABLE_ROW_LIMIT,
+                                                            operator_context_),
           statistics};
 #else
   return {create_bpmn_tables_from_bpmn_graph(graph, dictionary, scope_.get_table_row_limit(), operator_context_),
@@ -494,13 +499,14 @@ mo_bpmn_graph_operator::compute_graph_result mo_bpmn_graph_operator::compute_gra
     const auto ctx{starrocks::celonis::cpml_utils::make_sr_function_context()};
     return cpml::model::to_bpmn_graph_with_block_structure(pt_and_counts, oid++, ctx);
   }};
-  const auto graphs{ctl::transform_to<std::vector<cpml::model::bpmn_graph_with_block_structure>>(process_trees_, transform_func)};
+  const auto graphs{
+      ctl::transform_to<std::vector<cpml::model::bpmn_graph_with_block_structure>>(process_trees_, transform_func)};
 
   std::vector<process::inductive_miner_statistics> statistics{statistics_};
   std::vector<std::pair<memory::dictionary_t, std::string>> dictionaries(activity_columns_.size());
   std::transform(begin(activity_columns_), end(activity_columns_), begin(dictionaries),
                  [this](const auto& activity_column) {
-                     return std::pair{activity_column->get_dict(operator_context_), activity_column->get_name()};
+                   return std::pair{activity_column->get_dict(operator_context_), activity_column->get_name()};
                  });
 #else
   // transform the activity columns to BPMN graphs (one each)
@@ -522,7 +528,8 @@ mo_bpmn_graph_operator::compute_graph_result mo_bpmn_graph_operator::compute_gra
   // TODO(bluppes): CPL-7544 remove eventually
   const auto dictionary_data{string_dict.get_const_data(operator_context_)};
 #ifndef CELOSTAR
-  legacy_embedded_format::json::json_object_t log_details{{"Merged graph", process::bpmn2dot(graph, dictionary_data.get())}};
+  legacy_embedded_format::json::json_object_t log_details{
+      {"Merged graph", process::bpmn2dot(graph, dictionary_data.get())}};
   log::jinfo("Merged graph information", log_details);
 #endif
 
@@ -576,10 +583,10 @@ details::bpmn_graph_with_dict merge_bpmn_graphs(
   auto merge_result{memory::merge_n_dictionaries_raw(
       dictionaries, mo_bpmn_graph_operator::get_user_visible_operator_name(), context)};
   auto dict{std::visit(legacy_embedded_ctl::overloaded{[](memory::raw_dictionary_t&& raw_dict) {
-                                         return raw_dict->convert_to_dictionary_t_release_data(
-                                             "", memory::management::no_swap(), "");
-                                       },
-                                       [](memory::dictionary_t&& dict) { return std::move(dict); }},
+                                                         return raw_dict->convert_to_dictionary_t_release_data(
+                                                             "", memory::management::no_swap(), "");
+                                                       },
+                                                       [](memory::dictionary_t&& dict) { return std::move(dict); }},
                        std::move(merge_result.dictionary_variant))};
 
   std::vector<cpml::model::bpmn::graph_and_activity_remapping> merge_input{};

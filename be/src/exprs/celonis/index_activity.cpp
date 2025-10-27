@@ -1,8 +1,8 @@
 #include "exprs/celonis/index_activity.h"
 
 #include "column/array_column.h"
-#include "column/column_hash.h"
 #include "column/column.h"
+#include "column/column_hash.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
 
@@ -10,7 +10,7 @@ namespace starrocks {
 
 namespace {
 
-enum class Mode {INVALID, ORDER, LOOP, TYPE};
+enum class Mode { INVALID, ORDER, LOOP, TYPE };
 
 Mode getMode(Slice mode) {
     if (mode == "INDEX_ACTIVITY_ORDER") {
@@ -23,7 +23,7 @@ Mode getMode(Slice mode) {
     return Mode::INVALID;
 }
 
-enum class Direction {INVALID, FORWARD, REVERSE};
+enum class Direction { INVALID, FORWARD, REVERSE };
 
 Direction getDirection(Slice direction) {
     if (direction == "FORWARD") {
@@ -34,7 +34,7 @@ Direction getDirection(Slice direction) {
     return Direction::INVALID;
 }
 
-template<bool is_reverse>
+template <bool is_reverse>
 ColumnPtr index_activity_order_impl(const Column* array_column) {
     UnnestedArrayData array_data = prepare_array_input(array_column);
     const size_t num_rows = array_data.offsets->size() - 1;
@@ -86,7 +86,7 @@ ColumnPtr index_activity_order_impl(const Column* array_column) {
     return result_array;
 }
 
-template<bool is_reverse>
+template <bool is_reverse>
 ColumnPtr index_activity_loop_impl(const Column* array_column) {
     UnnestedArrayData array_data = prepare_array_input(array_column);
     const auto& elements = *array_data.elements;
@@ -100,7 +100,7 @@ ColumnPtr index_activity_loop_impl(const Column* array_column) {
     std::vector<uint32_t> hash(elements.size(), 0);
     elements.fnv_hash(hash.data(), 0, elements.size());
 
-    std::vector<int64_t> temp_for_reverse;  // -1: NULL, >1 : Max count of a loop starting
+    std::vector<int64_t> temp_for_reverse; // -1: NULL, >1 : Max count of a loop starting
 
     for (size_t i = 0; i < num_rows; i++) {
         size_t offset = offsets_ptr[i];
@@ -148,7 +148,7 @@ ColumnPtr index_activity_loop_impl(const Column* array_column) {
                 } else {
                     if (loop > 1L) {
                         count = loop;
-                    } else if (count > 1L){
+                    } else if (count > 1L) {
                         count--;
                     }
                     result_elements->append_datum(count);
@@ -159,7 +159,7 @@ ColumnPtr index_activity_loop_impl(const Column* array_column) {
     return result_array;
 }
 
-template<bool is_reverse>
+template <bool is_reverse>
 ColumnPtr index_activity_type_impl(const Column* array_column) {
     UnnestedArrayData array_data = prepare_array_input(array_column);
     const auto& elements = *array_data.elements;
@@ -186,12 +186,13 @@ ColumnPtr index_activity_type_impl(const Column* array_column) {
         std::size_t operator()(const Element& x) const { return x.hash; }
     };
 
-    phmap::flat_hash_map<Element, int64_t, HashOnElement , EqualOnElement> element_counter_map;
+    phmap::flat_hash_map<Element, int64_t, HashOnElement, EqualOnElement> element_counter_map;
 
     std::vector<uint32_t> hash(elements.size(), 0);
     elements.fnv_hash(hash.data(), 0, elements.size());
 
-    std::vector<int64_t> temp_for_reverse;  // 0: NULL, >0 : Max count of a loop starting, <0 : -(index of a loop starting + 1)
+    std::vector<int64_t>
+            temp_for_reverse; // 0: NULL, >0 : Max count of a loop starting, <0 : -(index of a loop starting + 1)
 
     for (size_t i = 0; i < num_rows; i++) {
         size_t offset = offsets_ptr[i];
@@ -242,13 +243,13 @@ ColumnPtr index_activity_type_impl(const Column* array_column) {
     return result_array;
 }
 
-}  // namespace
+} // namespace
 
 struct CelonisIndexActivityStateFragmentLocal {
     ColumnPtr (*function)(const Column*);
 };
 
-Status CelonisIndexActivity::celonis_index_activity_prepare(starrocks::FunctionContext *context,
+Status CelonisIndexActivity::celonis_index_activity_prepare(starrocks::FunctionContext* context,
                                                             FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         if (!context->is_constant_column(1)) {
@@ -291,7 +292,7 @@ Status CelonisIndexActivity::celonis_index_activity_prepare(starrocks::FunctionC
     return Status::OK();
 }
 
-Status CelonisIndexActivity::celonis_index_activity_close(starrocks::FunctionContext *context,
+Status CelonisIndexActivity::celonis_index_activity_close(starrocks::FunctionContext* context,
                                                           FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         const auto* state_fragment_local = reinterpret_cast<const CelonisIndexActivityStateFragmentLocal*>(
@@ -301,8 +302,7 @@ Status CelonisIndexActivity::celonis_index_activity_close(starrocks::FunctionCon
     return Status::OK();
 }
 
-StatusOr<ColumnPtr> CelonisIndexActivity::celonis_index_activity(FunctionContext* context,
-                                                                 const Columns& columns) {
+StatusOr<ColumnPtr> CelonisIndexActivity::celonis_index_activity(FunctionContext* context, const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const Column* array_column = columns[0].get();
     const auto* state = reinterpret_cast<const CelonisIndexActivityStateFragmentLocal*>(
@@ -310,8 +310,7 @@ StatusOr<ColumnPtr> CelonisIndexActivity::celonis_index_activity(FunctionContext
 
     auto result = state->function(array_column);
     if (array_column->has_null()) {
-        return NullableColumn::create(std::move(result),
-                                      down_cast<const NullableColumn*>(array_column)->null_column());
+        return NullableColumn::create(std::move(result), down_cast<const NullableColumn*>(array_column)->null_column());
     }
     return result;
 }

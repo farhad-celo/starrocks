@@ -1,5 +1,6 @@
-#include <algorithm>
 #include <gtest/gtest.h>
+
+#include <algorithm>
 
 #include "column/column_builder.h"
 #include "column/fixed_length_column.h"
@@ -95,8 +96,8 @@ private:
 
     std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& value_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                value_type,                                        // outColumns
-                value_type,                                        // inColumns
+                value_type,                                    // outColumns
+                value_type,                                    // inColumns
                 TypeDescriptor::from_logical_type(TYPE_BIGINT) // maxLength
         };
         auto return_type = get_return_type(value_type);
@@ -104,7 +105,8 @@ private:
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
 
-    ColumnPtr prepare_input_column(FunctionContext* ctx, const std::vector<std::vector<DatumArray>>& input, int index, int size) {
+    ColumnPtr prepare_input_column(FunctionContext* ctx, const std::vector<std::vector<DatumArray>>& input, int index,
+                                   int size) {
         if (index >= input.size() || input[index].empty()) {
             return ColumnHelper::create_const_null_column(size);
         }
@@ -119,15 +121,15 @@ private:
         return column;
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(const std::vector<LogicalType>& value_logical_types,
-              const std::vector<std::vector<DatumArray>>& input, int max_length) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            const std::vector<LogicalType>& value_logical_types, const std::vector<std::vector<DatumArray>>& input,
+            int max_length) {
         auto value_type = logical_types_to_struct_type(value_logical_types);
 
         auto local_ctx = get_ctx(value_type);
 
-        const AggregateFunction* func = get_aggregate_function("celonis_enumerate_transitive_edges", TYPE_STRUCT, TYPE_STRUCT,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_enumerate_transitive_edges", TYPE_STRUCT, TYPE_STRUCT, false);
 
         int size = input[0][0].size();
         Columns columns;
@@ -137,7 +139,7 @@ private:
         columns.push_back(ColumnHelper::create_const_column<TYPE_BIGINT>(max_length, size));
 
         std::vector<ColumnPtr> const_columns;
-        std::vector<const Column *> raw_columns;
+        std::vector<const Column*> raw_columns;
         for (auto& column : columns) {
             if (column->is_constant()) {
                 const_columns.push_back(column);
@@ -155,8 +157,8 @@ private:
         return {std::move(local_ctx), std::move(state), func};
     }
 
-    void Evaluate(Column* result, const std::vector<std::vector<DatumArray>>& expected,
-                  bool reset_expected_set = true, bool check_remaining_expected_set = true) {
+    void Evaluate(Column* result, const std::vector<std::vector<DatumArray>>& expected, bool reset_expected_set = true,
+                  bool check_remaining_expected_set = true) {
         ASSERT_EQ(expected.size(), 2);
         int num_fields = expected[0].size();
         int num_rows = expected[0][0].size();
@@ -262,8 +264,7 @@ private:
         Evaluate(result.get(), expected);
     }
 
-    void Run(const std::vector<LogicalType>& value_logical_types,
-             const std::vector<std::vector<DatumArray>>& input1,
+    void Run(const std::vector<LogicalType>& value_logical_types, const std::vector<std::vector<DatumArray>>& input1,
              const std::vector<std::vector<DatumArray>>& input2, int max_length,
              const std::vector<std::vector<DatumArray>>& expected) {
         RunMerge(value_logical_types, input1, input2, max_length, expected);
@@ -276,10 +277,8 @@ private:
 TEST_F(CelonisEnumerateTransitiveEdgesTest, basic) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B"}},
-                                                   {DatumArray{kNullDatum, "C"}}};
-    std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"C"}},
-                                                   {DatumArray{"D"}}};
+    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B"}}, {DatumArray{kNullDatum, "C"}}};
+    std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"C"}}, {DatumArray{"D"}}};
     int max_len = 10;
 
     std::vector<std::vector<DatumArray>> expected = {{DatumArray{"A", "B", "B", "B", "C", "C", "D"}},
@@ -290,8 +289,7 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, basic) {
 TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_visit) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "D"}},
-                                                   {DatumArray{"B", "C", "D", "B"}}};
+    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "D"}}, {DatumArray{"B", "C", "D", "B"}}};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"A", "E", "A", "F", "G"}},
                                                    {DatumArray{"E", "D", "F", "G", "D"}}};
     int max_len = 10;
@@ -303,18 +301,17 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_visit) {
     // F-G-D-B-C
     // G-D-B-C
     std::vector<std::vector<DatumArray>> expected = {
-            {DatumArray{"A", "A", "A", "A", "A", "A", "A", "B", "B", "B", "C", "C", "C", "D", "D", "D",
-                        "E", "E", "E", "E", "F", "F", "F", "F", "F", "G", "G", "G", "G"}},
-            {DatumArray{"A", "B", "C", "D", "E", "F", "G", "B", "C", "D", "C", "D", "B", "D", "B", "C",
-                        "E", "D", "B", "C", "F", "G", "D", "B", "C", "G", "D", "B", "C"}}};
+            {DatumArray{"A", "A", "A", "A", "A", "A", "A", "B", "B", "B", "C", "C", "C", "D", "D",
+                        "D", "E", "E", "E", "E", "F", "F", "F", "F", "F", "G", "G", "G", "G"}},
+            {DatumArray{"A", "B", "C", "D", "E", "F", "G", "B", "C", "D", "C", "D", "B", "D", "B",
+                        "C", "E", "D", "B", "C", "F", "G", "D", "B", "C", "G", "D", "B", "C"}}};
     Run(value_lts, input1, input2, max_len, expected);
 }
 
 TEST_F(CelonisEnumerateTransitiveEdgesTest, max_length) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "D"}},
-                                                   {DatumArray{"B", "C", "D", "B"}}};
+    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "D"}}, {DatumArray{"B", "C", "D", "B"}}};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"A", "E", "A", "F", "G"}},
                                                    {DatumArray{"E", "D", "F", "G", "D"}}};
     int max_len = 3;
@@ -326,10 +323,10 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, max_length) {
     // F-G-D
     // G-D-B
     std::vector<std::vector<DatumArray>> expected = {
-            {DatumArray{"A", "A", "A", "A", "A", "A", "A", "B", "B", "B", "C", "C", "C", "D", "D", "D",
-                        "E", "E", "E", "F", "F", "F", "G", "G", "G"}},
-            {DatumArray{"A", "B", "C", "D", "E", "F", "G", "B", "C", "D", "C", "D", "B", "D", "B", "C",
-                        "E", "D", "B", "F", "G", "D", "G", "D", "B"}}};
+            {DatumArray{"A", "A", "A", "A", "A", "A", "A", "B", "B", "B", "C", "C", "C",
+                        "D", "D", "D", "E", "E", "E", "F", "F", "F", "G", "G", "G"}},
+            {DatumArray{"A", "B", "C", "D", "E", "F", "G", "B", "C", "D", "C", "D", "B",
+                        "D", "B", "C", "E", "D", "B", "F", "G", "D", "G", "D", "B"}}};
     Run(value_lts, input1, input2, max_len, expected);
 }
 
@@ -342,10 +339,9 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_fields) {
                                                    {DatumArray{"D"}, DatumArray{4L}}};
     int max_len = 10;
 
-    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"A", "B", "B", "B", "C", "C", "D"},
-                                                      DatumArray{1L, 2L, 2L, 2L, 3L, 3L, 4L}},
-                                                     {DatumArray{"A", "B", "C", "D", "C", "D", "D"},
-                                                      DatumArray{1L, 2L, 3L, 4L, 3L, 4L, 4L}}};
+    std::vector<std::vector<DatumArray>> expected = {
+            {DatumArray{"A", "B", "B", "B", "C", "C", "D"}, DatumArray{1L, 2L, 2L, 2L, 3L, 3L, 4L}},
+            {DatumArray{"A", "B", "C", "D", "C", "D", "D"}, DatumArray{1L, 2L, 3L, 4L, 3L, 4L, 4L}}};
     Run(value_lts, input1, input2, max_len, expected);
 }
 
@@ -358,10 +354,9 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_fields_any_null_1) {
                                                    {DatumArray{"D"}, DatumArray{4L}}};
     int max_len = 10;
 
-    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"A", "B", "B", "B", "C", "C", "D"},
-                                                             DatumArray{1L, 2L, 2L, 2L, 3L, 3L, 4L}},
-                                                     {DatumArray{"A", "B", "C", "D", "C", "D", "D"},
-                                                             DatumArray{1L, 2L, 3L, 4L, 3L, 4L, 4L}}};
+    std::vector<std::vector<DatumArray>> expected = {
+            {DatumArray{"A", "B", "B", "B", "C", "C", "D"}, DatumArray{1L, 2L, 2L, 2L, 3L, 3L, 4L}},
+            {DatumArray{"A", "B", "C", "D", "C", "D", "D"}, DatumArray{1L, 2L, 3L, 4L, 3L, 4L, 4L}}};
     Run(value_lts, input1, input2, max_len, expected);
 }
 
@@ -374,10 +369,9 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_fields_any_null_2) {
                                                    {DatumArray{"D"}, DatumArray{4L}}};
     int max_len = 10;
 
-    std::vector<std::vector<DatumArray>> expected = {{DatumArray{"A", "B", "B", "B", "C", "C", "D"},
-                                                             DatumArray{1L, 2L, 2L, 2L, 3L, 3L, 4L}},
-                                                     {DatumArray{"A", "B", "C", "D", "C", "D", "D"},
-                                                             DatumArray{1L, 2L, 3L, 4L, 3L, 4L, 4L}}};
+    std::vector<std::vector<DatumArray>> expected = {
+            {DatumArray{"A", "B", "B", "B", "C", "C", "D"}, DatumArray{1L, 2L, 2L, 2L, 3L, 3L, 4L}},
+            {DatumArray{"A", "B", "C", "D", "C", "D", "D"}, DatumArray{1L, 2L, 3L, 4L, 3L, 4L, 4L}}};
     Run(value_lts, input1, input2, max_len, expected);
 }
 
@@ -386,8 +380,7 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_chunks) {
     config::vector_chunk_size = 10;
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
 
-    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "D"}},
-                                                   {DatumArray{"B", "C", "D", "B"}}};
+    std::vector<std::vector<DatumArray>> input1 = {{DatumArray{"A", "B", "C", "D"}}, {DatumArray{"B", "C", "D", "B"}}};
     std::vector<std::vector<DatumArray>> input2 = {{DatumArray{"A", "E", "A", "F", "G"}},
                                                    {DatumArray{"E", "D", "F", "G", "D"}}};
     int max_len = 10;
@@ -399,10 +392,10 @@ TEST_F(CelonisEnumerateTransitiveEdgesTest, multiple_chunks) {
     // F-G-D-B-C
     // G-D-B-C
     std::vector<std::vector<DatumArray>> expected = {
-            {DatumArray{"A", "A", "A", "A", "A", "A", "A", "B", "B", "B", "C", "C", "C", "D", "D", "D",
-                        "E", "E", "E", "E", "F", "F", "F", "F", "F", "G", "G", "G", "G"}},
-            {DatumArray{"A", "B", "C", "D", "E", "F", "G", "B", "C", "D", "C", "D", "B", "D", "B", "C",
-                        "E", "D", "B", "C", "F", "G", "D", "B", "C", "G", "D", "B", "C"}}};
+            {DatumArray{"A", "A", "A", "A", "A", "A", "A", "B", "B", "B", "C", "C", "C", "D", "D",
+                        "D", "E", "E", "E", "E", "F", "F", "F", "F", "F", "G", "G", "G", "G"}},
+            {DatumArray{"A", "B", "C", "D", "E", "F", "G", "B", "C", "D", "C", "D", "B", "D", "B",
+                        "C", "E", "D", "B", "C", "F", "G", "D", "B", "C", "G", "D", "B", "C"}}};
 
     auto [local_ctx1, state1, func] = RunUpdate(value_lts, input1, max_len);
     auto [local_ctx2, state2, func2] = RunUpdate(value_lts, input2, max_len);

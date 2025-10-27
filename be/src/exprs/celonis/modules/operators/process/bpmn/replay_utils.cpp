@@ -63,9 +63,7 @@ using cpml::model::bpmn::vertex_type;
   tokens_t producible_tokens_in_marking{};
   producible_tokens_in_marking.reserve(outgoing_vertices.size());
   std::ranges::transform(outgoing_vertices, std::back_inserter(producible_tokens_in_marking),
-                         [&vertex_id](const vertex_id_type outgoing_id) {
-                           return token_t{vertex_id, outgoing_id};
-                         });
+                         [&vertex_id](const vertex_id_type outgoing_id) { return token_t{vertex_id, outgoing_id}; });
 
   transitions_t transitions{};
   transitions.reserve(consumable_tokens_in_marking.size() * producible_tokens_in_marking.size());
@@ -226,17 +224,15 @@ bool end_marking_reached(const bpmn_graph& model, const marking_t& marking) {
 bool vertex_reached(const bpmn_graph& model, const marking_t& marking, const vertex_id_type target) {
   // If any of the ingoing edges of the target vertex is in the marking, the vertex has been reached
   const auto& predecessors{model.ingoing_vertices().at(target)};
-  return std::ranges::any_of(predecessors, [&](const vertex_id_type vertex) {
-    return marking.contains(token_t{vertex, target});
-  });
+  return std::ranges::any_of(predecessors,
+                             [&](const vertex_id_type vertex) { return marking.contains(token_t{vertex, target}); });
 }
 
 bool vertex_reached_inverse(const bpmn_graph& model, const marking_t& marking, const vertex_id_type target) {
   // If any of the ingoing edges of the target vertex is in the marking, the vertex has been reached
   const auto& successors{model.outgoing_vertices().at(target)};
-  return std::ranges::any_of(successors, [&](const vertex_id_type vertex) {
-    return marking.contains(token_t{target, vertex});
-  });
+  return std::ranges::any_of(successors,
+                             [&](const vertex_id_type vertex) { return marking.contains(token_t{target, vertex}); });
 }
 
 std::optional<vertex_id_type> get_vertex_id_for_task(const bpmn_graph& model, const row_id activity_id) {

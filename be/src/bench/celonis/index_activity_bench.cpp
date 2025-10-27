@@ -107,8 +107,9 @@ static void do_bench(benchmark::State& state, const std::string& mode, const std
                 CelonisIndexActivity::celonis_index_activity_prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
         ASSERT_TRUE(
                 CelonisIndexActivity::celonis_index_activity_prepare(ctx.get(), FunctionContext::THREAD_LOCAL).ok());
-        ASSERT_TRUE(CelonisIndexActivity::celonis_index_activity(ctx.get(),
-                                                                 {variant_column, mode_column, direction_column}).ok());
+        ASSERT_TRUE(
+                CelonisIndexActivity::celonis_index_activity(ctx.get(), {variant_column, mode_column, direction_column})
+                        .ok());
         ASSERT_TRUE(
                 CelonisIndexActivity::celonis_index_activity_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL).ok());
         ASSERT_TRUE(CelonisIndexActivity::celonis_index_activity_close(ctx.get(), FunctionContext::THREAD_LOCAL).ok());

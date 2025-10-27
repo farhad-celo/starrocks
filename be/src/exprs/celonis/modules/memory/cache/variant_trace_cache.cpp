@@ -102,8 +102,8 @@ variant_id_to_group_size_mapping_t compute_variant_id_to_group_size_mapping_from
   const auto number_of_variants{variant_entries.get_num_traces()};
   const auto& sub_ctx{ctx.create_sub_context("compute_variant_id_to_group_size_mapping_from_col_ptrs", {})};
   variant_id_to_group_size_mapping_t variant_id_to_group_size_mapping{
-      memory::tracking::make_static_array_value_init<size_t>(number_of_variants, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG),
-                                                             sub_ctx)};
+      memory::tracking::make_static_array_value_init<size_t>(
+          number_of_variants, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RETURN_VALUE_MSG), sub_ctx)};
   compute_and_fill_mapping_from_col_ptrs<VARIANT_ID_TO_GROUP_SIZE>(variant_entries, variant_id_to_group_size_mapping);
   return variant_id_to_group_size_mapping;
 }

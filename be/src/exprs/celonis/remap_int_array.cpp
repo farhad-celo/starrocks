@@ -3,9 +3,9 @@
 #include "column/array_column.h"
 #include "column/column_hash.h"
 #include "column/column_helper.h"
+#include "column/hash_set.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/function_context.h"
-#include "column/hash_set.h"
 
 namespace starrocks {
 
@@ -16,7 +16,7 @@ struct IntValueHashMap {
     using NullSet = HashSet<int64_t>;
 
     HashMap value_map;
-    NullSet null_mappings;  // Keys that map to NULL
+    NullSet null_mappings;                            // Keys that map to NULL
     std::optional<int64_t> null_value = std::nullopt; // value that NULL maps to
 
     IntValueHashMap() = default;
@@ -54,9 +54,7 @@ struct IntValueHashMap {
         }
     }
 
-    std::optional<int64_t> get_null_mapping() const {
-        return null_value;
-    }
+    std::optional<int64_t> get_null_mapping() const { return null_value; }
 };
 
 struct RemapIntArrayStateFragmentLocal {
@@ -111,9 +109,8 @@ Status CelonisRemapIntArray::close(FunctionContext* context, FunctionContext::Fu
     return Status::OK();
 }
 
-StatusOr<ColumnPtr>
-CelonisRemapIntArray::remap_int_array_non_constant_value_map([[maybe_unused]]FunctionContext* context,
-                                                             const Columns& columns) {
+StatusOr<ColumnPtr> CelonisRemapIntArray::remap_int_array_non_constant_value_map(
+        [[maybe_unused]] FunctionContext* context, const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     const auto& input_array_column = columns[0];
     const auto& old_value_column = columns[1];
@@ -196,7 +193,7 @@ CelonisRemapIntArray::remap_int_array_non_constant_value_map([[maybe_unused]]Fun
     return result;
 }
 
-StatusOr<ColumnPtr> CelonisRemapIntArray::remap_int_array_constant_value_map([[maybe_unused]]FunctionContext* context,
+StatusOr<ColumnPtr> CelonisRemapIntArray::remap_int_array_constant_value_map([[maybe_unused]] FunctionContext* context,
                                                                              const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     const auto& input_array_column = columns[0];

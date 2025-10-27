@@ -240,8 +240,7 @@ public:
         utils = new FunctionUtils();
         ctx = utils->get_fn_ctx();
 
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(LOGICAL_TYPE)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(LOGICAL_TYPE)};
         auto return_type = TypeDescriptor::from_logical_type(LOGICAL_TYPE);
         local_ctx = std::unique_ptr<FunctionContext>{
                 FunctionContext::create_test_context(std::move(arg_types), return_type)};
@@ -383,7 +382,8 @@ TYPED_TEST(CelonisProductTest, product_test_convert_to_serialize_format) {
 
     serialization_column->check_or_die();
 
-    auto* serialized_struct_column = down_cast<StructColumn*>(ColumnHelper::get_data_column(serialization_column.get()));
+    auto* serialized_struct_column =
+            down_cast<StructColumn*>(ColumnHelper::get_data_column(serialization_column.get()));
     auto* serialized_stage_column = down_cast<FixedLengthColumn<RawStageFieldType>*>(
             ColumnHelper::get_data_column(serialized_struct_column->fields_column()[0].get()));
     auto* serialized_product_column = down_cast<FixedLengthColumn<T>*>(

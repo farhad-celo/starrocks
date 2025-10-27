@@ -1,16 +1,17 @@
 #include "exprs/celonis/calc_throughput.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "exprs/function_context.h"
 #include "util.h"
 
-#include <glog/logging.h>
-#include <gtest/gtest.h>
-
 namespace starrocks {
 
 namespace {
-void create_const_params(ColumnPtr* start_activity, ColumnPtr* end_activity, ColumnPtr* start_label, ColumnPtr* end_label) {
+void create_const_params(ColumnPtr* start_activity, ColumnPtr* end_activity, ColumnPtr* start_label,
+                         ColumnPtr* end_label) {
     *start_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     (*start_activity)->append_datum(Slice("a"));
 
@@ -23,7 +24,7 @@ void create_const_params(ColumnPtr* start_activity, ColumnPtr* end_activity, Col
     *end_label = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     (*end_label)->append_datum(Slice("first"));
 }
-}  // namespace
+} // namespace
 
 class CelonisCalcThroughputTest : public ::testing::Test {
 protected:
@@ -32,8 +33,8 @@ protected:
     void TearDown() override {}
 
     void testOne(const DatumArray& activities, const DatumArray& timestamps, const std::string& start,
-                 const std::string& end, const std::string& start_label,
-                 const std::string& end_label, bool nullable, const Datum& expected) {
+                 const std::string& end, const std::string& start_label, const std::string& end_label, bool nullable,
+                 const Datum& expected) {
         auto activity_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, nullable);
         activity_array->append_datum(activities);
         auto timestamp_array = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, nullable);
@@ -52,8 +53,9 @@ protected:
         end_label_col->append_datum(Slice(end_label));
 
         const auto result = CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
-                nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col,
-                          end_label_col}).value();
+                                    nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col,
+                                              start_label_col, end_label_col})
+                                    .value();
         ASSERT_EQ(1, result->size());
         if (expected.is_null()) {
             EXPECT_TRUE(result->is_null(0));
@@ -89,7 +91,9 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstInt) {
     auto end_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     end_label_col->append_datum(Slice("first"));
     const auto result = CelonisCalcThroughputFunctions<TYPE_BIGINT>::celonis_calc_throughput(
-            nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
+                                nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col,
+                                          start_label_col, end_label_col})
+                                .value();
     ASSERT_EQ(1, result->size());
     EXPECT_EQ(9L, result->get(0).get_int64());
 }
@@ -111,7 +115,9 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstInt32) {
     auto end_label_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     end_label_col->append_datum(Slice("first"));
     const auto result = CelonisCalcThroughputFunctions<TYPE_INT>::celonis_calc_throughput(
-            nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
+                                nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col,
+                                          start_label_col, end_label_col})
+                                .value();
     ASSERT_EQ(1, result->size());
     EXPECT_EQ(9L, result->get(0).get_int64());
 }
@@ -125,13 +131,12 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstNonMatchingArraySizes) {
 
     ColumnPtr start_activity_col, end_activity_col, start_label_col, end_label_col;
     create_const_params(&start_activity_col, &end_activity_col, &start_label_col, &end_label_col);
-    EXPECT_THROW((void) CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
-                         nullptr, {
-    activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col
-}
+    EXPECT_THROW((void)CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
+                         nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col,
+                                   start_label_col, end_label_col}
 
-),
-std::runtime_error);
+                         ),
+                 std::runtime_error);
 }
 #endif
 
@@ -139,11 +144,12 @@ TEST_F(CelonisCalcThroughputTest, FirstToFirstNullInput) {
     auto activity_array = ColumnHelper::create_const_null_column(1);
     auto timestamp_array = ColumnHelper::create_const_null_column(1);
 
-
     ColumnPtr start_activity_col, end_activity_col, start_label_col, end_label_col;
     create_const_params(&start_activity_col, &end_activity_col, &start_label_col, &end_label_col);
     const auto result = CelonisCalcThroughputFunctions<TYPE_INT>::celonis_calc_throughput(
-            nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
+                                nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col,
+                                          start_label_col, end_label_col})
+                                .value();
 
     ASSERT_EQ(1, result->size());
     ASSERT_TRUE(result->get(0).is_null());
@@ -167,13 +173,12 @@ TEST_F(CelonisCalcThroughputTest, InvalidLabel) {
     ColumnPtr end_label = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     end_label->append_datum(Slice("first"));
 
-    EXPECT_THROW((void) CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
-                         nullptr, {
-    activity_array, timestamp_array, start_activity, end_activity, start_label, end_label
-}
+    EXPECT_THROW(
+            (void)CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
+                    nullptr, {activity_array, timestamp_array, start_activity, end_activity, start_label, end_label}
 
-),
-std::runtime_error);
+                    ),
+            std::runtime_error);
 }
 #endif
 
@@ -205,7 +210,9 @@ TEST_F(CelonisCalcThroughputTest, InputArrayIsSometimesNull) {
 
     // Only row 2 has non-NULL data in both activity and timestamp columns.
     const auto result = CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
-            nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
+                                nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col,
+                                          start_label_col, end_label_col})
+                                .value();
 
     ASSERT_EQ(4, result->size());
     EXPECT_TRUE(result->get(0).is_null());
@@ -244,8 +251,7 @@ TEST_F(CelonisCalcThroughputTest, LaseToFirst2) {
 
 TEST_F(CelonisCalcThroughputTest, CaseStartAndEnd1) {
     testOne(DatumArray{kNullDatum, "a1", "a1", "a2", "a2", "a3", kNullDatum},
-            DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "",
-            "", "case_start", "case_end", true, 199L);
+            DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L}, "", "", "case_start", "case_end", true, 199L);
 }
 
 TEST_F(CelonisCalcThroughputTest, CaseStartAndEnd2) {
@@ -264,8 +270,7 @@ TEST_F(CelonisCalcThroughputTest, CaseStart1) {
 
 TEST_F(CelonisCalcThroughputTest, CaseStart2) {
     testOne(DatumArray{kNullDatum, "a1", "a1", "a2", "a2", "a3", "a3"}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L},
-            "",
-            "a2", "case_start", "first", false, 9L);
+            "", "a2", "case_start", "first", false, 9L);
 }
 
 TEST_F(CelonisCalcThroughputTest, CaseEnd1) {
@@ -275,8 +280,7 @@ TEST_F(CelonisCalcThroughputTest, CaseEnd1) {
 
 TEST_F(CelonisCalcThroughputTest, CaseEnd2) {
     testOne(DatumArray{"a1", "a1", "a1", "a2", "a2", "a3", kNullDatum}, DatumArray{1L, 2L, 3L, 10L, 20L, 100L, 200L},
-            "a1",
-            "", "last", "case_end", false, 197L);
+            "a1", "", "last", "case_end", false, 197L);
 }
 
 TEST_F(CelonisCalcThroughputTest, LastToLast1) {
@@ -301,11 +305,13 @@ TEST_F(CelonisCalcThroughputTest, MissingEnd) {
 }
 
 TEST_F(CelonisCalcThroughputTest, StartTimestampIsNull) {
-    testOne(DatumArray{"a1", "a2", "a3"}, DatumArray{kNullDatum, 10L, 100L}, "a1", "a3", "first", "first", false, kNullDatum);
+    testOne(DatumArray{"a1", "a2", "a3"}, DatumArray{kNullDatum, 10L, 100L}, "a1", "a3", "first", "first", false,
+            kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, EndTimestampIsNull) {
-    testOne(DatumArray{"a1", "a2", "a3"}, DatumArray{1L, 10L, kNullDatum}, "a1", "a3", "first", "first", false, kNullDatum);
+    testOne(DatumArray{"a1", "a2", "a3"}, DatumArray{1L, 10L, kNullDatum}, "a1", "a3", "first", "first", false,
+            kNullDatum);
 }
 
 TEST_F(CelonisCalcThroughputTest, ActivityContainsNull) {
@@ -322,7 +328,7 @@ TEST_F(CelonisCalcThroughputTest, MultipleRows) {
     timestamp_array->append_datum(DatumArray{1L});
     timestamp_array->append_datum(DatumArray{1L, 10L});
     timestamp_array->append_datum(DatumArray{1L, kNullDatum, 100L});
-    timestamp_array->append_datum(DatumArray{kNullDatum,  10L, 20L, 100L});
+    timestamp_array->append_datum(DatumArray{kNullDatum, 10L, 20L, 100L});
 
     auto start_activity_col = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false, true, 0);
     start_activity_col->append_datum(Slice("a1"));
@@ -337,7 +343,9 @@ TEST_F(CelonisCalcThroughputTest, MultipleRows) {
     end_label_col->append_datum(Slice("last"));
 
     const auto result = CelonisCalcThroughputFunctions<TYPE_VARCHAR>::celonis_calc_throughput(
-            nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col, start_label_col, end_label_col}).value();
+                                nullptr, {activity_array, timestamp_array, start_activity_col, end_activity_col,
+                                          start_label_col, end_label_col})
+                                .value();
     ASSERT_EQ(4, result->size());
     EXPECT_TRUE(result->get(0).is_null());
     EXPECT_EQ(9L, result->get(1).get_int64());

@@ -32,7 +32,6 @@ BM_Qnorm/100000    1825655 ns      1825667 ns          385 RowInvRate=18.2567ns
 */
 
 static void BM_Qnorm(benchmark::State& state) {
-
     std::random_device rd;
     std::mt19937 gen(rd());
 

@@ -99,7 +99,8 @@ class typed_dictionary : public dictionary {
    * @param description The description of the swap file.
    * @return A typed dictionary of datatype T.
    */
-  [[nodiscard]] static dictionary_t create_dictionary(legacy_embedded_ctl::static_array<T>&& data, const std::string& swap_file_name,
+  [[nodiscard]] static dictionary_t create_dictionary(legacy_embedded_ctl::static_array<T>&& data,
+                                                      const std::string& swap_file_name,
                                                       const management::swap_info& sinfo,
                                                       const std::string& description);
 
@@ -184,8 +185,8 @@ class typed_dictionary<cel_string_t> : public dictionary {
    * @return A typed dictionary of the string data type.
    */
   [[nodiscard]] static dictionary_t create_dictionary(legacy_embedded_ctl::static_array<cel_string_t>&& ptr,
-                                                      legacy_embedded_ctl::static_array<char>&& buffer, const std::string& swap_file,
-                                                      const management::swap_info& sinfo,
+                                                      legacy_embedded_ctl::static_array<char>&& buffer,
+                                                      const std::string& swap_file, const management::swap_info& sinfo,
                                                       const std::string& description);
 
 #ifndef CELOSTAR

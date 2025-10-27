@@ -1,13 +1,14 @@
-#include <algorithm>
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
+#include "../util.h"
 #include "column/column_builder.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
-#include "runtime/runtime_state.h"
-#include "../util.h"
 #include "gutil/strings/strcat.h"
+#include "runtime/runtime_state.h"
 #include "testutil/function_utils.h"
 
 namespace starrocks {
@@ -43,6 +44,7 @@ public:
     CelonisClusterStringsTest() = default;
 
     TypeDescriptor TYPE_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
+
 protected:
     void SetUp() override {}
 
@@ -69,19 +71,17 @@ protected:
         auto return_type = get_return_type();
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
-        return std::unique_ptr<FunctionContext>(
-                FunctionContext::create_context(runtime_states_.back().get(), mem_pools_.back().get(), return_type,
-                                                std::move(arg_types)));
-
+        return std::unique_ptr<FunctionContext>(FunctionContext::create_context(
+                runtime_states_.back().get(), mem_pools_.back().get(), return_type, std::move(arg_types)));
     }
 
-    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*>
-    RunUpdate(const std::vector<std::optional<std::string>>& strings, const std::vector<int128_t>& hashes,
-              int64_t edit_threshold, const std::string& weighted_tokens, int64_t token_weight) {
+    std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
+            const std::vector<std::optional<std::string>>& strings, const std::vector<int128_t>& hashes,
+            int64_t edit_threshold, const std::string& weighted_tokens, int64_t token_weight) {
         auto local_ctx = get_ctx();
 
-        const AggregateFunction* func = get_aggregate_function("celonis_cluster_strings", TYPE_VARCHAR, TYPE_STRUCT,
-                                                               false);
+        const AggregateFunction* func =
+                get_aggregate_function("celonis_cluster_strings", TYPE_VARCHAR, TYPE_STRUCT, false);
 
         const auto size = strings.size();
         Columns columns;
@@ -103,7 +103,7 @@ protected:
 
         std::vector<ColumnPtr> const_columns;
         std::vector<const Column*> raw_columns;
-        for (auto& column: columns) {
+        for (auto& column : columns) {
             if (column->is_constant()) {
                 const_columns.push_back(column);
             } else {
@@ -243,10 +243,8 @@ TEST_F(CelonisClusterStringsTest, simple) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"cholate", "chocolate", "chocolaet"};
     std::vector<int128_t> hashes2 = {3, 1, 4};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "chocolate"},
-                                                                             {2, "chocolate"},
-                                                                             {3, "chocolate"},
-                                                                             {4, "chocolate"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "chocolate"}, {2, "chocolate"}, {3, "chocolate"}, {4, "chocolate"}};
 
     Run(strings1, hashes1, strings2, hashes2, 2, "", 1, expected);
 }
@@ -256,10 +254,8 @@ TEST_F(CelonisClusterStringsTest, alphabetical_order) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"Harry Potter", "Larry Squatter"};
     std::vector<int128_t> hashes2 = {3, 4};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "Harry Potter"},
-                                                                             {2, "Harry Potter"},
-                                                                             {3, "Harry Potter"},
-                                                                             {4, "Harry Potter"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "Harry Potter"}, {2, "Harry Potter"}, {3, "Harry Potter"}, {4, "Harry Potter"}};
 
     Run(strings1, hashes1, strings2, hashes2, 4, "", 1, expected);
 }
@@ -269,9 +265,8 @@ TEST_F(CelonisClusterStringsTest, weighted_string) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"FLUX DIFFUSER 3000"};
     std::vector<int128_t> hashes2 = {3};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "FLUX DIFFUSER 9000"},
-                                                                             {2, "FLUX DIFFUSER 9000"},
-                                                                             {3, "FLUX DIFFUSER 3000"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "FLUX DIFFUSER 9000"}, {2, "FLUX DIFFUSER 9000"}, {3, "FLUX DIFFUSER 3000"}};
 
     Run(strings1, hashes1, strings2, hashes2, 4, "0123456789", 10, expected);
 }
@@ -281,12 +276,8 @@ TEST_F(CelonisClusterStringsTest, clustering_is_transitive) {
     std::vector<int128_t> hashes1 = {1, 2, 3};
     std::vector<std::optional<std::string>> strings2 = {"ice am", "ic am", "i am"};
     std::vector<int128_t> hashes2 = {4, 5, 6};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "i am"},
-                                                                             {2, "i am"},
-                                                                             {3, "i am"},
-                                                                             {4, "i am"},
-                                                                             {5, "i am"},
-                                                                             {6, "i am"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "i am"}, {2, "i am"}, {3, "i am"},
+                                                                             {4, "i am"}, {5, "i am"}, {6, "i am"}};
 
     Run(strings1, hashes1, strings2, hashes2, 1, "", 1, expected);
 }
@@ -296,9 +287,7 @@ TEST_F(CelonisClusterStringsTest, single_core) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"EBC"};
     std::vector<int128_t> hashes2 = {3};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "ABC"},
-                                                                             {2, "ABC"},
-                                                                             {3, "ABC"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "ABC"}, {2, "ABC"}, {3, "ABC"}};
 
     Run(strings1, hashes1, strings2, hashes2, 1, "", 1, expected);
 }
@@ -308,9 +297,8 @@ TEST_F(CelonisClusterStringsTest, strings_no_overlap) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"UVWXYZOPQ"};
     std::vector<int128_t> hashes2 = {3};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "ABCDEFG"},
-                                                                             {2, "HIGKLMN"},
-                                                                             {3, "UVWXYZOPQ"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "ABCDEFG"}, {2, "HIGKLMN"}, {3, "UVWXYZOPQ"}};
 
     Run(strings1, hashes1, strings2, hashes2, 1, "", 1, expected);
 }
@@ -330,10 +318,8 @@ TEST_F(CelonisClusterStringsTest, null_with_non_null_values) {
     std::vector<int128_t> hashes1 = {1, 2, 1};
     std::vector<std::optional<std::string>> strings2 = {"abdd", std::nullopt, "abcde", std::nullopt};
     std::vector<int128_t> hashes2 = {3, 1, 4, 1};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, std::nullopt},
-                                                                             {2, "abcd"},
-                                                                             {3, "abcd"},
-                                                                             {4, "abcd"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, std::nullopt}, {2, "abcd"}, {3, "abcd"}, {4, "abcd"}};
 
     Run(strings1, hashes1, strings2, hashes2, 3, "", 1, expected);
 }
@@ -343,10 +329,8 @@ TEST_F(CelonisClusterStringsTest, filter_stable) {
     std::vector<int128_t> hashes1 = {1, 2, 3};
     std::vector<std::optional<std::string>> strings2 = {"laola", "saola"};
     std::vector<int128_t> hashes2 = {4, 1};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "saola"},
-                                                                             {2, "saola"},
-                                                                             {3, "saola"},
-                                                                             {4, "saola"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "saola"}, {2, "saola"}, {3, "saola"}, {4, "saola"}};
 
     Run(strings1, hashes1, strings2, hashes2, 2, "", 1, expected);
 }
@@ -356,10 +340,8 @@ TEST_F(CelonisClusterStringsTest, linear_cluster) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"EBD", "EFD"};
     std::vector<int128_t> hashes2 = {3, 4};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "ABC"},
-                                                                             {2, "ABC"},
-                                                                             {3, "ABC"},
-                                                                             {4, "ABC"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "ABC"}, {2, "ABC"}, {3, "ABC"}, {4, "ABC"}};
 
     Run(strings1, hashes1, strings2, hashes2, 1, "", 1, expected);
 }
@@ -369,13 +351,8 @@ TEST_F(CelonisClusterStringsTest, different_weight_and_length_1) {
     std::vector<int128_t> hashes1 = {1, 2, 3};
     std::vector<std::optional<std::string>> strings2 = {"abd", "adef", "Xghijk", "X"};
     std::vector<int128_t> hashes2 = {4, 5, 6, 7};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "abd"},
-                                                                             {2, "abXY"},
-                                                                             {3, "abd"},
-                                                                             {4, "abd"},
-                                                                             {5, "abd"},
-                                                                             {6, "X"},
-                                                                             {7, "X"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "abd"}, {2, "abXY"}, {3, "abd"}, {4, "abd"}, {5, "abd"}, {6, "X"}, {7, "X"}};
 
     Run(strings1, hashes1, strings2, hashes2, 5, "abcXY", 3, expected);
 }
@@ -385,11 +362,8 @@ TEST_F(CelonisClusterStringsTest, different_weight_and_length_2) {
     std::vector<int128_t> hashes1 = {1, 2, 3};
     std::vector<std::optional<std::string>> strings2 = {"bcde", "A"};
     std::vector<int128_t> hashes2 = {4, 5};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "A"},
-                                                                             {2, "abc"},
-                                                                             {3, "abc"},
-                                                                             {4, "abc"},
-                                                                             {5, "A"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "A"}, {2, "abc"}, {3, "abc"}, {4, "abc"}, {5, "A"}};
 
     Run(strings1, hashes1, strings2, hashes2, 9, "abcXY", 3, expected);
 }
@@ -399,13 +373,8 @@ TEST_F(CelonisClusterStringsTest, large_edit_threshold) {
     std::vector<int128_t> hashes1 = {1, 2, 3};
     std::vector<std::optional<std::string>> strings2 = {"abd", "adef", "Xghijk", "X", "abd"};
     std::vector<int128_t> hashes2 = {4, 5, 6, 7, 4};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "abd"},
-                                                                             {2, "abd"},
-                                                                             {3, "abd"},
-                                                                             {4, "abd"},
-                                                                             {5, "abd"},
-                                                                             {6, "abd"},
-                                                                             {7, "abd"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "abd"}, {2, "abd"}, {3, "abd"}, {4, "abd"}, {5, "abd"}, {6, "abd"}, {7, "abd"}};
 
     Run(strings1, hashes1, strings2, hashes2, 16, "", 0, expected);
 }
@@ -415,9 +384,8 @@ TEST_F(CelonisClusterStringsTest, unicode) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"\uFFD4\u3076\u3089"};
     std::vector<int128_t> hashes2 = {3};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "\u3082\u3076\u3089"},
-                                                                             {2, "\u3082\u3076\u3089"},
-                                                                             {3, "\u3082\u3076\u3089"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "\u3082\u3076\u3089"}, {2, "\u3082\u3076\u3089"}, {3, "\u3082\u3076\u3089"}};
 
     Run(strings1, hashes1, strings2, hashes2, 1, "", 1, expected);
 }
@@ -446,10 +414,8 @@ TEST_F(CelonisClusterStringsTest, simple_case_1) {
     std::vector<int128_t> hashes1 = {1, 2, 1};
     std::vector<std::optional<std::string>> strings2 = {"Pitza", "Bizza"};
     std::vector<int128_t> hashes2 = {3, 4};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "Pizza"},
-                                                                             {2, "Pizza"},
-                                                                             {3, "Pizza"},
-                                                                             {4, "Pizza"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "Pizza"}, {2, "Pizza"}, {3, "Pizza"}, {4, "Pizza"}};
     Run(strings1, hashes1, strings2, hashes2, 2, "", 0, expected);
 }
 
@@ -459,9 +425,7 @@ TEST_F(CelonisClusterStringsTest, simple_case_2) {
     std::vector<std::optional<std::string>> strings2 = {"CD"};
     std::vector<int128_t> hashes2 = {3};
     // "CD" is not in the same cluster as "AA", because they do not share any chars.
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "AA"},
-                                                                             {2, "AA"},
-                                                                             {3, "CD"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "AA"}, {2, "AA"}, {3, "CD"}};
     Run(strings1, hashes1, strings2, hashes2, 2, "", 0, expected);
 }
 
@@ -470,10 +434,8 @@ TEST_F(CelonisClusterStringsTest, zero_token_weight) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"AA34567", "A789A123"};
     std::vector<int128_t> hashes2 = {3, 4};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "1AA"},
-                                                                             {2, "1AA"},
-                                                                             {3, "1AA"},
-                                                                             {4, "1AA"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "1AA"}, {2, "1AA"}, {3, "1AA"}, {4, "1AA"}};
     // since the cost of digits is zero, all the strings belong to the same cluster.
     Run(strings1, hashes1, strings2, hashes2, 0, "0123456789", 0, expected);
 }
@@ -483,8 +445,7 @@ TEST_F(CelonisClusterStringsTest, zero_weight_char_not_considered_when_checking_
     std::vector<int128_t> hashes1 = {1};
     std::vector<std::optional<std::string>> strings2 = {"AC"};
     std::vector<int128_t> hashes2 = {2};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "AB"},
-                                                                             {2, "AC"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "AB"}, {2, "AC"}};
     // Since the weight of 'A' is zero, "AB" and "AC" do not share any common chars. Their edit distance is infinite.
     Run(strings1, hashes1, strings2, hashes2, 4, "A", 0, expected);
 }
@@ -494,9 +455,8 @@ TEST_F(CelonisClusterStringsTest, unicode_weighted_tokens) {
     std::vector<int128_t> hashes1 = {1, 2};
     std::vector<std::optional<std::string>> strings2 = {"\uFFD4\u3076\u3089"};
     std::vector<int128_t> hashes2 = {3};
-    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {{1, "\u3082\u3076\u3089"},
-                                                                             {2, "\u3082\u3076\u3089"},
-                                                                             {3, "\uFFD4\u3076\u3089"}};
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "\u3082\u3076\u3089"}, {2, "\u3082\u3076\u3089"}, {3, "\uFFD4\u3076\u3089"}};
 
     Run(strings1, hashes1, strings2, hashes2, 1, "xyz\uFFD4", 10, expected);
 }

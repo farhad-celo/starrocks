@@ -23,7 +23,8 @@ namespace celonis::accelerator::memory::management {
 static constexpr std::chrono::seconds WARNING_UPPER_BOUND{10};
 
 memory_manager::memory_manager(std::shared_ptr<cube::execution::tracking::operator_statistics> op_statistics)
-    : meminfo_fetcher_([]() { return legacy_embedded_ctl::fetch_current_full_meminfo(); }), op_statistics_(std::move(op_statistics)) {}
+    : meminfo_fetcher_([]() { return legacy_embedded_ctl::fetch_current_full_meminfo(); }),
+      op_statistics_(std::move(op_statistics)) {}
 
 void memory_manager::set_meminfo_fetcher(std::function<legacy_embedded_ctl::full_meminfo()> meminfo_fetcher) {
   meminfo_fetcher_ = std::move(meminfo_fetcher);
@@ -137,21 +138,21 @@ bool memory_manager::evict_cache_if_needed(const memory_threshold& threshold, co
     usage = curr_memory_status.in_use_global_percentage();
 
     if (!usage.has_value()) {
-      log::jwarn("Failed to retrieve usage",
-                 legacy_embedded_ctl::meminfo_change_json(old_memory_status, curr_memory_status, std::nullopt, "Eviction"));
+      log::jwarn("Failed to retrieve usage", legacy_embedded_ctl::meminfo_change_json(
+                                                 old_memory_status, curr_memory_status, std::nullopt, "Eviction"));
       return true;  // leave function as we can not get current memory usage
     }
 
     if (usage.value() <= threshold.lower()) {
-      log::jinfo("End memory eviction early",
-                 legacy_embedded_ctl::meminfo_change_json(old_memory_status, curr_memory_status, std::nullopt, "Eviction"));
+      log::jinfo("End memory eviction early", legacy_embedded_ctl::meminfo_change_json(
+                                                  old_memory_status, curr_memory_status, std::nullopt, "Eviction"));
       return true;  // leave function as enough data was evicted
     }
   }
 #endif
 
-  log::jinfo("High Memory",
-             legacy_embedded_ctl::meminfo_change_json(old_memory_status, curr_memory_status, not_swapped_bytes, "Eviction"));
+  log::jinfo("High Memory", legacy_embedded_ctl::meminfo_change_json(old_memory_status, curr_memory_status,
+                                                                     not_swapped_bytes, "Eviction"));
   return true;
 }
 
@@ -204,8 +205,8 @@ void memory_manager::force_swap_out(common::execution_context& context) const {
     (*it)->force_swap_out(context);
   }
   const auto new_memory_status = get_memory_status();
-  log::jinfo("Forced Swap-Out",
-             legacy_embedded_ctl::meminfo_change_json(old_memory_status, new_memory_status, std::nullopt, "Forced Swap-Out"));
+  log::jinfo("Forced Swap-Out", legacy_embedded_ctl::meminfo_change_json(old_memory_status, new_memory_status,
+                                                                         std::nullopt, "Forced Swap-Out"));
 
   release_unused_buffers();
 }
@@ -220,8 +221,8 @@ void memory_manager::force_compress() const {
     group->force_compress();
   }
   const auto new_memory_status = get_memory_status();
-  log::jinfo("Forced Compression",
-             legacy_embedded_ctl::meminfo_change_json(old_memory_status, new_memory_status, std::nullopt, "Forced Compression"));
+  log::jinfo("Forced Compression", legacy_embedded_ctl::meminfo_change_json(old_memory_status, new_memory_status,
+                                                                            std::nullopt, "Forced Compression"));
 }
 #endif
 
@@ -392,7 +393,8 @@ void memory_manager::report_jemalloc_and_tracker_stats(const collect_garbage_mem
     if (!jemalloc_stats.has_value()) {
       return;
     }
-    auto tracker_used{legacy_embedded_ctl::global_memory_consumption_tracker::get_consumption_tracker().cur_net_allocated()};
+    auto tracker_used{
+        legacy_embedded_ctl::global_memory_consumption_tracker::get_consumption_tracker().cur_net_allocated()};
     log::jinfo("Reporting jemalloc and tracker stats", {{"allocated", jemalloc_stats->allocated},
                                                         {"active", jemalloc_stats->active},
                                                         {"metadata_size", jemalloc_stats->metadata_size},

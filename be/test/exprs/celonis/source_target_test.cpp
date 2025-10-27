@@ -39,9 +39,8 @@ protected:
                             StatusOr<ColumnPtr> (*fn)(FunctionContext*, const Columns&),
                             const std::string& config = ANY_TO_ANY) {
         auto modifier = ColumnHelper::create_const_column<TYPE_VARCHAR>(config, input->size());
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                array_type_desc,
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {array_type_desc,
+                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
         if (group.has_value()) {
             arg_types.push_back(TYPE_ARRAY_BIGINT);
         }

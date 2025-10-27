@@ -1,11 +1,11 @@
 #include "exprs/celonis/to_double.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/anyval_util.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -14,7 +14,6 @@ protected:
     void SetUp() override {}
 
     void TearDown() override {}
-
 };
 
 TEST_F(CelonisToDoubleTest, const_null_column) {

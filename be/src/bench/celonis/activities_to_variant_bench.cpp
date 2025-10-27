@@ -113,7 +113,7 @@ static void BM_ActivitiesToVariant(benchmark::State& state) {
 }
 
 // Number of rows / Number of distinct activities / Variant length / NULL activity percentage
-BENCHMARK(BM_ActivitiesToVariant) ->ArgsProduct({{10000, 100000}, {20, 100, 1000}, {20, 40}, {0, 5}});
+BENCHMARK(BM_ActivitiesToVariant)->ArgsProduct({{10000, 100000}, {20, 100, 1000}, {20, 40}, {0, 5}});
 
 } // namespace starrocks
 

@@ -4,7 +4,7 @@
 
 namespace starrocks {
 
-template<LogicalType LT>
+template <LogicalType LT>
 class CelonisToDouble {
 public:
     /**

@@ -3,15 +3,14 @@
 #include "column/array_column.h"
 #include "column/column_builder.h"
 #include "column/column_helper.h"
-#include "exprs/function_context.h"
 #include "exprs/celonis/util.h"
+#include "exprs/function_context.h"
 
 namespace starrocks {
 
-template<LogicalType LT>
-StatusOr<ColumnPtr>
-CelonisArrayAvg<LT>::array_avg([[maybe_unused]] starrocks::FunctionContext* context,
-                               const starrocks::Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisArrayAvg<LT>::array_avg([[maybe_unused]] starrocks::FunctionContext* context,
+                                                   const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
@@ -52,13 +51,10 @@ CelonisArrayAvg<LT>::array_avg([[maybe_unused]] starrocks::FunctionContext* cont
     return result.build(all_const);
 }
 
-template
-class CelonisArrayAvg<TYPE_INT>;
+template class CelonisArrayAvg<TYPE_INT>;
 
-template
-class CelonisArrayAvg<TYPE_BIGINT>;
+template class CelonisArrayAvg<TYPE_BIGINT>;
 
-template
-class CelonisArrayAvg<TYPE_DOUBLE>;
+template class CelonisArrayAvg<TYPE_DOUBLE>;
 
 } // namespace starrocks

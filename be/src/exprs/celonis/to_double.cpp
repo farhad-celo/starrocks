@@ -8,10 +8,9 @@
 
 namespace starrocks {
 
-template<LogicalType LT>
-StatusOr<ColumnPtr>
-CelonisToDouble<LT>::to_double([[maybe_unused]] starrocks::FunctionContext* context,
-                               const starrocks::Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisToDouble<LT>::to_double([[maybe_unused]] starrocks::FunctionContext* context,
+                                                   const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
@@ -36,16 +35,12 @@ CelonisToDouble<LT>::to_double([[maybe_unused]] starrocks::FunctionContext* cont
     return result.build(all_const);
 }
 
-template
-class CelonisToDouble<TYPE_DOUBLE>;
+template class CelonisToDouble<TYPE_DOUBLE>;
 
-template
-class CelonisToDouble<TYPE_INT>;
+template class CelonisToDouble<TYPE_INT>;
 
-template
-class CelonisToDouble<TYPE_BIGINT>;
+template class CelonisToDouble<TYPE_BIGINT>;
 
-template
-class CelonisToDouble<TYPE_DATETIME>;
+template class CelonisToDouble<TYPE_DATETIME>;
 
 } // namespace starrocks

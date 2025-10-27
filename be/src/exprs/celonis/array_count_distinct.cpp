@@ -4,33 +4,32 @@
 #include "column/column_helper.h"
 #include "column/hash_set.h"
 #include "exprs/builtin_functions.h"
-#include "exprs/function_context.h"
 #include "exprs/celonis/util.h"
+#include "exprs/function_context.h"
 
 namespace starrocks {
 
 namespace {
 
 // To use SliceHashSet for TYPE_VARCHAR. Copied from ../in_const_predicate.hpp.
-template<LogicalType LT, typename Enable = void>
+template <LogicalType LT, typename Enable = void>
 struct LHashSet {
     using LType = HashSet<RunTimeCppType<LT>>;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 struct LHashSet<LT, std::enable_if_t<isSliceLT<LT>>> {
     using LType = SliceHashSet;
 };
 
-template<LogicalType LT>
+template <LogicalType LT>
 using LHashSetType = typename LHashSet<LT>::LType;
 
 } // namespace
 
-template<LogicalType LT>
-StatusOr<ColumnPtr>
-CelonisArrayCountDistinct<LT>::array_count_distinct([[maybe_unused]] starrocks::FunctionContext* context,
-                                                    const starrocks::Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisArrayCountDistinct<LT>::array_count_distinct(
+        [[maybe_unused]] starrocks::FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK_EQ(columns.size(), 1);
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
@@ -61,19 +60,14 @@ CelonisArrayCountDistinct<LT>::array_count_distinct([[maybe_unused]] starrocks::
     return result.build(all_const);
 }
 
-template
-class CelonisArrayCountDistinct<TYPE_INT>;
+template class CelonisArrayCountDistinct<TYPE_INT>;
 
-template
-class CelonisArrayCountDistinct<TYPE_BIGINT>;
+template class CelonisArrayCountDistinct<TYPE_BIGINT>;
 
-template
-class CelonisArrayCountDistinct<TYPE_DOUBLE>;
+template class CelonisArrayCountDistinct<TYPE_DOUBLE>;
 
-template
-class CelonisArrayCountDistinct<TYPE_DATETIME>;
+template class CelonisArrayCountDistinct<TYPE_DATETIME>;
 
-template
-class CelonisArrayCountDistinct<TYPE_VARCHAR>;
+template class CelonisArrayCountDistinct<TYPE_VARCHAR>;
 
 } // namespace starrocks

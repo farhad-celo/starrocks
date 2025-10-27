@@ -35,16 +35,16 @@ public:
     std::size_t operator()(const SlicePairWithHash& slice) const { return slice.hash; }
 };
 
-template<bool element_has_null>
-std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, const Column& elements, const UInt32Column& offsets,
-                          const NullColumn::Container* null_offsets,
-                          const NullColumn::Container* activity_array_nulls) {
-
+template <bool element_has_null>
+std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, const Column& elements,
+                                                   const UInt32Column& offsets,
+                                                   const NullColumn::Container* null_offsets,
+                                                   const NullColumn::Container* activity_array_nulls) {
     const size_t num_rows = offsets.size() - 1;
     auto offsets_ptr = offsets.get_data().data();
     // TODO: other types
     using ValueType = RunTimeCppType<TYPE_VARCHAR>;
-    auto elements_ptr = (const ValueType*) (elements.raw_data());
+    auto elements_ptr = (const ValueType*)(elements.raw_data());
 
     Columns result;
     auto offset_column = UInt32Column::create();
@@ -57,7 +57,8 @@ std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, co
     result.emplace_back(target_column_ptr);
     result.emplace_back(count_column_ptr);
 
-    using SliceCountHashMap = phmap::flat_hash_map<SlicePairWithHash, int64_t, HashOnSlicePairWithHash, EqualOnSlicePairWithHash>;
+    using SliceCountHashMap =
+            phmap::flat_hash_map<SlicePairWithHash, int64_t, HashOnSlicePairWithHash, EqualOnSlicePairWithHash>;
     SliceCountHashMap edges_count;
     std::vector<SlicePairWithHash> distinct_edges;
     for (size_t i = 0; i < num_rows; i++) {
@@ -100,7 +101,7 @@ std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, co
             }
         }
         offset_column->append(result_offset);
-        for (const auto& edge: distinct_edges) {
+        for (const auto& edge : distinct_edges) {
             source_column_ptr->append(edge.src);
             target_column_ptr->append(edge.target);
             count_column_ptr->append(edges_count[edge]);
@@ -110,7 +111,7 @@ std::pair<Columns, UInt32Column::Ptr> process_impl(TableFunctionState* state, co
 
     return std::make_pair(result, UInt32Column::Ptr(std::move(offset_column)));
 }
-}  // namespace
+} // namespace
 
 std::pair<Columns, UInt32Column::Ptr> CountEdges::process(RuntimeState* runtime_state,
                                                           TableFunctionState* state) const {
@@ -146,4 +147,4 @@ std::pair<Columns, UInt32Column::Ptr> CountEdges::process(RuntimeState* runtime_
     return process_impl<false>(state, *activity_elements, activity_offsets, activity_nulls, activity_array_nulls);
 }
 
-}  // namespace starrocks
+} // namespace starrocks

@@ -1,13 +1,13 @@
 #include "exprs/celonis/index_activity.h"
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
-
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 
 namespace starrocks {
 
@@ -24,10 +24,9 @@ protected:
 private:
     StatusOr<ColumnPtr> run(const TypeDescriptor& array_type_desc, const std::string& mode,
                             const std::string& direction, ColumnPtr input) {
-        std::vector<FunctionContext::TypeDesc> arg_types = {
-                array_type_desc,
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {array_type_desc,
+                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
         auto return_type = TYPE_ARRAY_BIGINT;
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -38,8 +37,8 @@ private:
         ctx->set_constant_columns(columns);
 
         DeferOp op([&ctx] {
-            CelonisIndexActivity::celonis_index_activity_close(
-                    ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+            CelonisIndexActivity::celonis_index_activity_close(ctx.get(),
+                                                               FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
         });
 
         RETURN_IF_ERROR(CelonisIndexActivity::celonis_index_activity_prepare(
@@ -48,8 +47,8 @@ private:
         return result;
     }
 
-    void run_test(const TypeDescriptor& array_type_desc, const std::string& mode,
-                  const std::string& direction, ColumnPtr input) {
+    void run_test(const TypeDescriptor& array_type_desc, const std::string& mode, const std::string& direction,
+                  ColumnPtr input) {
         auto result = run(array_type_desc, mode, direction, std::move(input));
         ASSERT_TRUE(result.ok()) << result.status().message();
         evaluator_.evaluate(result.value());
@@ -63,10 +62,8 @@ TEST_F(CelonisIndexActivityTest, const_null_column_mode_direction) {
     auto mode_column = ColumnHelper::create_const_null_column(2);
     auto direction_column = ColumnHelper::create_const_null_column(2);
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TYPE_ARRAY_INT,
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TYPE_ARRAY_INT, TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     auto return_type = TYPE_ARRAY_BIGINT;
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
@@ -77,12 +74,13 @@ TEST_F(CelonisIndexActivityTest, const_null_column_mode_direction) {
     ctx->set_constant_columns(columns);
 
     DeferOp op([&ctx] {
-        CelonisIndexActivity::celonis_index_activity_close(
-                ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        CelonisIndexActivity::celonis_index_activity_close(ctx.get(),
+                                                           FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
     });
 
     ASSERT_TRUE(CelonisIndexActivity::celonis_index_activity_prepare(
-            ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+                        ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                        .ok());
 }
 
 TEST_F(CelonisIndexActivityTest, index_activity_order_empty_input) {
