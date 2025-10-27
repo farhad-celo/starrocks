@@ -6,7 +6,7 @@
 #include "column/column_helper.h"
 #include "column/datum_tuple.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/string_functions.cpp"
+#include "exprs/celonis/string_functions.h"
 #include "exprs/function_context.h"
 #include "runtime/types.h"
 
