@@ -1,22 +1,47 @@
+#include "exprs/celonis/like/in_like.h"
+
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/string_functions.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
 
 namespace starrocks {
 
-class CelonisInLikeTest : public ::testing::Test {
+struct InLikeFunctions {
+    using PrepareFunc = std::function<Status(FunctionContext*, FunctionContext::FunctionStateScope)>;
+    using CloseFunc = std::function<Status(FunctionContext*, FunctionContext::FunctionStateScope)>;
+    using ExecFunc = std::function<StatusOr<ColumnPtr>(FunctionContext*, const Columns&)>;
+
+    PrepareFunc prepare_fn;
+    ExecFunc exec_fn;
+    CloseFunc close_fn;
+    std::string name;
+};
+
+const InLikeFunctions in_like_v1 = {.prepare_fn = celonis::like::v1::CelonisInLike::in_like_prepare,
+                                    .exec_fn = celonis::like::v1::CelonisInLike::in_like,
+                                    .close_fn = celonis::like::v1::CelonisInLike::in_like_close,
+                                    .name = "in_like_v1"};
+
+const InLikeFunctions in_like_v2 = {.prepare_fn = celonis::like::v2::CelonisInLike::in_like_prepare,
+                                    .exec_fn = celonis::like::v2::CelonisInLike::in_like,
+                                    .close_fn = celonis::like::v2::CelonisInLike::in_like_close,
+                                    .name = "in_like_v2"};
+
+struct PrintInLikeImplName {
+    std::string operator()(const ::testing::TestParamInfo<InLikeFunctions>& info) const { return info.param.name; }
+};
+
+class CelonisInLikeTest : public ::testing::TestWithParam<InLikeFunctions> {
 protected:
     void SetUp() override {}
 
     void TearDown() override {}
 
-private:
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
                                                             TypeDescriptor::from_logical_type(TYPE_ARRAY)};
@@ -33,14 +58,14 @@ private:
     }
 
     StatusOr<ColumnPtr> Run() {
-        DeferOp close_fragment_local(
-                [this] { CelonisStringFunctions::in_like_close(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
-        RETURN_IF_ERROR(CelonisStringFunctions::in_like_prepare(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
-        DeferOp close_thread_local(
-                [this] { CelonisStringFunctions::in_like_close(ctx_.get(), FunctionContext::THREAD_LOCAL); });
-        RETURN_IF_ERROR(CelonisStringFunctions::in_like_prepare(ctx_.get(), FunctionContext::THREAD_LOCAL));
+        const auto& funcs = GetParam();
+
+        DeferOp close_fragment_local([this, &funcs] { funcs.close_fn(ctx_.get(), FunctionContext::FRAGMENT_LOCAL); });
+        RETURN_IF_ERROR(funcs.prepare_fn(ctx_.get(), FunctionContext::FRAGMENT_LOCAL));
+        DeferOp close_thread_local([this, &funcs] { funcs.close_fn(ctx_.get(), FunctionContext::THREAD_LOCAL); });
+        RETURN_IF_ERROR(funcs.prepare_fn(ctx_.get(), FunctionContext::THREAD_LOCAL));
         StatusOr<ColumnPtr> result;
-        result = CelonisStringFunctions::in_like(ctx_.get(), {string_column_, patterns_column_});
+        result = funcs.exec_fn(ctx_.get(), {string_column_, patterns_column_});
         return result;
     }
 
@@ -57,7 +82,10 @@ private:
     ColumnPtr patterns_column_;
 };
 
-TEST_F(CelonisInLikeTest, const_patterns_normal_cases) {
+INSTANTIATE_TEST_SUITE_P(InLikeImpls, CelonisInLikeTest, ::testing::Values(in_like_v1, in_like_v2),
+                         PrintInLikeImplName());
+
+TEST_P(CelonisInLikeTest, const_patterns_normal_cases) {
     {
         Prepare();
         string_column_->append_datum("asddqqW_A_W");
@@ -176,13 +204,37 @@ TEST_F(CelonisInLikeTest, const_patterns_normal_cases) {
     }
 }
 
-TEST_F(CelonisInLikeTest, empty_input) {
+TEST_P(CelonisInLikeTest, const_patterns_many_patterns) {
+    {
+        Prepare();
+        string_column_->append_datum("aa");
+
+        constexpr size_t num_patterns = 100;
+        std::vector<std::string> patterns;
+        patterns.reserve(num_patterns);
+        for (int i = 1; i < num_patterns + 1; i++) {
+            patterns.emplace_back(std::string(i, 'a'));
+        }
+
+        std::vector<Datum> slices;
+        slices.reserve(num_patterns);
+        for (const auto& pattern : patterns) {
+            slices.emplace_back(Slice(pattern));
+        }
+
+        const auto result = RunConstantPatterns(DatumArray(std::move(slices))).value();
+        ASSERT_EQ(string_column_->size(), result->size());
+        EXPECT_EQ(1L, result->get(0).get_int64());
+    }
+}
+
+TEST_P(CelonisInLikeTest, empty_input) {
     Prepare();
     const auto result = RunConstantPatterns(DatumArray{"ä", "ö", "ü", "ß"}).value();
     ASSERT_EQ(string_column_->size(), result->size());
 }
 
-TEST_F(CelonisInLikeTest, const_patterns_german_chars) {
+TEST_P(CelonisInLikeTest, const_patterns_german_chars) {
     {
         Prepare();
         string_column_->append_datum("Ä");
@@ -224,7 +276,7 @@ TEST_F(CelonisInLikeTest, const_patterns_german_chars) {
     }
 }
 
-TEST_F(CelonisInLikeTest, const_patterns_with_null_pattern) {
+TEST_P(CelonisInLikeTest, const_patterns_with_null_pattern) {
     Prepare();
     string_column_->append_datum("asddqqW_A_W");
     string_column_->append_datum(kNullDatum);
@@ -246,7 +298,7 @@ TEST_F(CelonisInLikeTest, const_patterns_with_null_pattern) {
     EXPECT_EQ(0L, result->get(7).get_int64());
 }
 
-TEST_F(CelonisInLikeTest, const_patterns_with_duplicate_patterns) {
+TEST_P(CelonisInLikeTest, const_patterns_with_duplicate_patterns) {
     Prepare();
     string_column_->append_datum("asddqqW_A_W");
     string_column_->append_datum(kNullDatum);
@@ -268,7 +320,7 @@ TEST_F(CelonisInLikeTest, const_patterns_with_duplicate_patterns) {
     EXPECT_EQ(0L, result->get(7).get_int64());
 }
 
-TEST_F(CelonisInLikeTest, const_null_patterns) {
+TEST_P(CelonisInLikeTest, const_null_patterns) {
     Prepare();
     string_column_->append_datum("asddqqW_A_W");
     string_column_->append_datum(kNullDatum);
@@ -290,7 +342,76 @@ TEST_F(CelonisInLikeTest, const_null_patterns) {
     EXPECT_EQ(0L, result->get(7).get_int64());
 }
 
-TEST_F(CelonisInLikeTest, non_const_patterns) {
+TEST_P(CelonisInLikeTest, const_patterns_starts_with) {
+    Prepare();
+    string_column_->append_datum("OLAPasdFFF");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("OLAP123__aäü+");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("0LAP");
+    string_column_->append_datum("OLAP");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("OLA123");
+
+    auto result = RunConstantPatterns(DatumArray{"OLAP%", "OLA%", "OLAPä%"}).value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(0L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+    EXPECT_EQ(0L, result->get(4).get_int64());
+    EXPECT_EQ(1L, result->get(5).get_int64());
+    EXPECT_EQ(0L, result->get(6).get_int64());
+    EXPECT_EQ(1L, result->get(7).get_int64());
+}
+
+TEST_P(CelonisInLikeTest, const_patterns_ends_with) {
+    Prepare();
+    string_column_->append_datum("asdFFFOLAP");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("123__aäü+OLA");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("0LAP");
+    string_column_->append_datum("OLAP");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("OLA123");
+
+    auto result = RunConstantPatterns(DatumArray{"%OLAP"}).value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(0L, result->get(1).get_int64());
+    EXPECT_EQ(0L, result->get(2).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+    EXPECT_EQ(0L, result->get(4).get_int64());
+    EXPECT_EQ(1L, result->get(5).get_int64());
+    EXPECT_EQ(0L, result->get(6).get_int64());
+    EXPECT_EQ(0L, result->get(7).get_int64());
+}
+
+TEST_P(CelonisInLikeTest, const_patterns_advanced_cases) {
+    Prepare();
+    string_column_->append_datum("asdFFFOLAP");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("123__aäü+OLA");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("0LAP");
+    string_column_->append_datum("OLAP");
+    string_column_->append_datum(kNullDatum);
+    string_column_->append_datum("OLA123");
+
+    auto result = RunConstantPatterns(DatumArray{"%OLAP%", "%3\\_%", "%0%L%A%P%"}).value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ(1L, result->get(0).get_int64());
+    EXPECT_EQ(0L, result->get(1).get_int64());
+    EXPECT_EQ(1L, result->get(2).get_int64());
+    EXPECT_EQ(0L, result->get(3).get_int64());
+    EXPECT_EQ(1L, result->get(4).get_int64());
+    EXPECT_EQ(1L, result->get(5).get_int64());
+    EXPECT_EQ(0L, result->get(6).get_int64());
+    EXPECT_EQ(0L, result->get(7).get_int64());
+}
+
+TEST_P(CelonisInLikeTest, non_const_patterns) {
     Prepare();
     AddRow("asddqqW_A_W", DatumArray{"%A%", "%B%"});
     AddRow(kNullDatum, DatumArray{"A"});
@@ -328,7 +449,7 @@ TEST_F(CelonisInLikeTest, non_const_patterns) {
     EXPECT_EQ(1L, result->get(15).get_int64());
 }
 
-TEST_F(CelonisInLikeTest, non_const_patterns_with_const_pattern_column) {
+TEST_P(CelonisInLikeTest, non_const_patterns_with_const_pattern_column) {
     Prepare();
     AddRow("asddqqW_A_W", DatumArray{"%A%", "%B%"});
     string_column_ = ConstColumn::create(string_column_, 3);
@@ -338,5 +459,4 @@ TEST_F(CelonisInLikeTest, non_const_patterns_with_const_pattern_column) {
     ASSERT_EQ(1, result->size());
     EXPECT_EQ(1L, result->get(0).get_int64());
 }
-
 } // namespace starrocks

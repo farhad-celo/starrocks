@@ -201,6 +201,7 @@ set(EXEC_FILES
         ./exprs/celonis/match_strings_test.cpp
         ./exprs/celonis/match_process_test.cpp
         ./exprs/celonis/math_functions_test.cpp
+        ./exprs/celonis/match_pattern_util_test.cpp
         ./exprs/celonis/mo_bpmn_graph_test.cpp
         ./exprs/celonis/multi_in_test.cpp
         ./exprs/celonis/patindex_test.cpp

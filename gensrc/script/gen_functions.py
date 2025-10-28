@@ -92,6 +92,7 @@ ${license}
 #include "exprs/celonis/index_activity.h"
 #include "exprs/celonis/kmeans.h"
 #include "exprs/celonis/like.h"
+#include "exprs/celonis/like/in_like.h"
 #include "exprs/celonis/linear_regression.h"
 #include "exprs/celonis/match_activities.h"
 #include "exprs/celonis/match_process.h"

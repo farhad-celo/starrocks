@@ -65,8 +65,8 @@ StatusOr<ColumnPtr> CelonisPatindex::patindex_non_constant_pattern([[maybe_unuse
         }
         const auto input_string = input_string_viewer.value(row).to_string();
         const auto pattern = pattern_viewer.value(row).to_string();
-        result.append(pattern_index(input_string.data(), pattern.data(),
-                                    (has_occurrence ? columns[2]->get(row).get_int64() : 1)));
+        result.append(celonis::pattern_index(input_string.data(), pattern.data(),
+                                             (has_occurrence ? columns[2]->get(row).get_int64() : 1)));
     }
     return result.build(all_const);
 }
@@ -86,8 +86,8 @@ StatusOr<ColumnPtr> CelonisPatindex::patindex_constant_pattern([[maybe_unused]] 
             continue;
         }
         const std::string input_string = input_string_viewer.value(row).to_string();
-        result.append(pattern_index(input_string.data(), pattern->data(),
-                                    (has_occurrence ? columns[2]->get(row).get_int64() : 1)));
+        result.append(celonis::pattern_index(input_string.data(), pattern->data(),
+                                             (has_occurrence ? columns[2]->get(row).get_int64() : 1)));
     }
     return result.build(all_const);
 }

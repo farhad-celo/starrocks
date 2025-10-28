@@ -115,14 +115,6 @@ public:
     DEFINE_VECTORIZED_FN(string_to_int);
 
     /**
-     * @param: [input_string, patterns]
-     * @paramType: [VARCHAR, ARRAY_VARCHAR]
-     * @return: BIGINT
-     * Implements PQL IN_LIKE https://docs.celonis.com/en/in_like.html
-     */
-    DEFINE_VECTORIZED_FN(in_like);
-
-    /**
      * @param: [input_string, match_strings, top_k, separator]
      * @paramType: [VARCHAR, ARRAY_VARCHAR, INT, VARCHAR]
      * @return: VARCHAR
@@ -148,9 +140,6 @@ public:
 
     static Status translate_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status translate_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
-
-    static Status in_like_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
-    static Status in_like_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
     static Status match_strings_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status match_strings_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);

@@ -4,19 +4,10 @@
 
 #include <boost/locale/utf.hpp>
 
-// The implementation is copied from Saola: cpm-query-engine/blob/main/query-engine/src/main/native/cpm-accelerator/modules/operators/jit/expressions/string/string_utils.cpp
-namespace starrocks {
+// The implementation is copied from Saola: https://github.com/celonis/cpm-query-engine/blob/main/query-engine/src/main/native/cpm-accelerator/modules/cube/operator_compare/match_pattern.cpp
+namespace starrocks::celonis {
 
 namespace {
-
-constexpr char ESCAPE_CHAR{'\\'};
-constexpr char MATCH_ONE{'_'};
-constexpr char MATCH_ANY{'%'};
-
-struct MatchingPosition {
-    const char* input_itr;
-    const char* pattern_itr;
-};
 
 template <typename ITERATOR>
 [[nodiscard]] constexpr size_t count_repeated_escape_chars(ITERATOR begin, const ITERATOR end) {
@@ -132,12 +123,14 @@ bool is_valid_utf8(std::string_view input) noexcept {
     }
     return length;
 }
+} // namespace
 
+namespace details {
 /**
  * This implements the ends_with step of the match_pattern algorithm.
  * The behavior and input/output is analogous to match_pattern_starts_with.
  */
-std::optional<MatchingPosition> match_pattern_ends_with(const std::string_view input, const std::string_view pattern) {
+std::optional<matching_position> match_pattern_ends_with(const std::string_view input, const std::string_view pattern) {
     auto input_itr{input.rbegin()};
     auto pattern_itr{pattern.rbegin()};
     for (; input_itr != input.rend() && pattern_itr != pattern.rend(); ++pattern_itr, ++input_itr) {
@@ -161,7 +154,7 @@ std::optional<MatchingPosition> match_pattern_ends_with(const std::string_view i
             }
             continue;
         case MATCH_ANY:
-            return MatchingPosition{input_itr.base(), pattern_itr.base()};
+            return matching_position{input_itr.base(), pattern_itr.base()};
         default:
             if (pattern_char != input_char) {
                 return std::nullopt;
@@ -172,11 +165,11 @@ std::optional<MatchingPosition> match_pattern_ends_with(const std::string_view i
 
     if (input_itr == input.rend()) {
         if (pattern_itr == pattern.rend() || *pattern_itr == MATCH_ANY) {
-            return MatchingPosition{input_itr.base(), pattern_itr.base()};
+            return matching_position{input_itr.base(), pattern_itr.base()};
         }
         return std::nullopt;
     }
-    return MatchingPosition{input_itr.base(), pattern_itr.base()};
+    return matching_position{input_itr.base(), pattern_itr.base()};
 }
 
 /**
@@ -195,8 +188,8 @@ std::optional<MatchingPosition> match_pattern_ends_with(const std::string_view i
  * Example: Input "XXXXdef" and pattern "abc%def"
  * Output: empty optional
  */
-std::optional<MatchingPosition> match_pattern_starts_with(const std::string_view input,
-                                                          const std::string_view pattern) {
+std::optional<matching_position> match_pattern_starts_with(const std::string_view input,
+                                                           const std::string_view pattern) {
     const auto* input_itr{input.begin()};
     const auto* pattern_itr{pattern.begin()};
     for (; input_itr != input.end() && pattern_itr != pattern.end(); ++pattern_itr, ++input_itr) {
@@ -208,7 +201,7 @@ std::optional<MatchingPosition> match_pattern_starts_with(const std::string_view
             input_itr += get_utf8_offset(input_char) - 1;
             continue;
         case MATCH_ANY:
-            return MatchingPosition{input_itr, pattern_itr};
+            return matching_position{input_itr, pattern_itr};
         case ESCAPE_CHAR: {
             const auto escaped_pattern_char{*(++pattern_itr)};
             pattern_char = escaped_pattern_char;
@@ -224,11 +217,11 @@ std::optional<MatchingPosition> match_pattern_starts_with(const std::string_view
 
     if (input_itr == input.end()) {
         if (pattern_itr == pattern.end() || *pattern_itr == MATCH_ANY) {
-            return MatchingPosition{input_itr, pattern_itr};
+            return matching_position{input_itr, pattern_itr};
         }
         return std::nullopt;
     }
-    return MatchingPosition{input_itr, pattern_itr};
+    return matching_position{input_itr, pattern_itr};
 }
 
 /**
@@ -245,9 +238,9 @@ std::optional<MatchingPosition> match_pattern_starts_with(const std::string_view
  * This function returns a starting position of the match if all character sequences appear in the input,
  * otherwise std::nullopt.
  */
-std::optional<MatchingPosition> match_pattern_contains(const std::string_view input, const std::string_view pattern) {
+std::optional<matching_position> match_pattern_contains(const std::string_view input, const std::string_view pattern) {
     if (pattern.begin() == pattern.end()) {
-        return MatchingPosition{input.begin(), pattern.begin()};
+        return matching_position{input.begin(), pattern.begin()};
     }
 
     const char* match_start{nullptr};
@@ -268,7 +261,7 @@ std::optional<MatchingPosition> match_pattern_contains(const std::string_view in
         }
     }
 
-    return MatchingPosition{match_start, pattern.begin()};
+    return matching_position{match_start, pattern.begin()};
 }
 
 /**
@@ -336,9 +329,9 @@ std::optional<const char*> find_match_start(const std::string_view input, const 
         return std::nullopt;
     }
 
-    std::optional<MatchingPosition> matching_position{std::nullopt};
+    std::optional<matching_position> matching_position{std::nullopt};
     if (contains_step_begin == ends_with_match->pattern_itr) {
-        matching_position = MatchingPosition{ends_with_match->input_itr, contains_step_begin};
+        matching_position = details::matching_position{ends_with_match->input_itr, contains_step_begin};
     } else {
         // Step 3: "Contains step" - Check that all character sequences within 2 % signs appear in the input in that order
         matching_position =
@@ -353,6 +346,7 @@ std::optional<const char*> find_match_start(const std::string_view input, const 
     }
     return matching_position->input_itr;
 }
+} // namespace details
 
 /**
  * Find a matching index of the given pattern against the given input.
@@ -369,14 +363,12 @@ std::optional<const char*> find_match_start(const std::string_view input, const 
  * @return index if the pattern matches or 0
  */
 size_t pattern_index(const std::string_view input, const std::string_view pattern_sv) {
-    if (auto match_index{find_match_start(input, pattern_sv)}) {
+    if (auto match_index{details::find_match_start(input, pattern_sv)}) {
         auto diff{count_code_points(input) - count_code_points(*match_index)};
         return diff + 1;
     }
     return 0;
 }
-
-} // namespace
 
 int64_t pattern_index(const char* const text, const char* const pattern, const int64_t occurrence) {
     size_t last_found_offset{0};
@@ -415,4 +407,8 @@ int64_t pattern_index(const char* const text, const char* const pattern, const i
     } while (true);
 }
 
-} // namespace starrocks
+bool match_pattern(const std::string_view input, const pattern_t pattern_sv) {
+    return details::find_match_start(input, pattern_sv.get()) != std::nullopt;
+}
+
+} // namespace starrocks::celonis

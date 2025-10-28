@@ -143,6 +143,8 @@ set(CELONIS_FILES
   celonis/cpml_utils/sr_context.cpp
   celonis/cpml_utils/sr_trace_accessor.cpp
   celonis/cpml_utils/sr_variant_accessor.cpp
+  celonis/like/in_like.cpp
+  celonis/like/like.cpp
   celonis/abc_model.cpp
   celonis/adjust_daily_timestamps.cpp
   celonis/align_model_v1.cpp
