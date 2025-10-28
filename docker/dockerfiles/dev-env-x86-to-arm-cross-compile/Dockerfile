@@ -1,4 +1,4 @@
-FROM ghcr.io/celonis/celostar/starrocks-dev-env:pr1868-3.3-ee1f4e26-celo-amd
+FROM ghcr.io/celonis/celostar/starrocks-dev-env:pr1996-3.3-f2255f48-celo-amd
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

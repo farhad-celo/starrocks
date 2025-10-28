@@ -46,9 +46,9 @@ ARG BUILD_ROOT
 COPY . $BUILD_ROOT
 
 RUN apt-get update && \
-    apt-get -y install wget lsb-release wget software-properties-common gnupg unzip gh && \
-    apt-get -y install build-essential python3-dev autotools-dev libicu-dev libbz2-dev gcc-12 g++-12 cmake && \
-    apt-get -y install libfmt-dev nlohmann-json3-dev
+    apt-get -y install wget lsb-release wget software-properties-common gnupg unzip gh \
+    build-essential python3-dev autotools-dev libicu-dev libbz2-dev gcc-12 g++-12 cmake \
+    libfmt-dev nlohmann-json3-dev
 
 RUN wget https://apt.llvm.org/llvm.sh && chmod +x ./llvm.sh && ./llvm.sh 17 all
 
@@ -113,3 +113,5 @@ COPY --from=build_stage2 /root/.m2 /root/.m2/
 COPY --from=build_stage2 /root/.mvn /root/.mvn/
 # Copy starlet dependencies
 COPY --from=starlet /release $STARLET_INSTALL_DIR
+# Install clang-format
+RUN apt-get update && apt-get install -y clang-format
