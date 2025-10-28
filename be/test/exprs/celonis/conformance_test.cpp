@@ -250,7 +250,7 @@ TEST_F(CelonisConformanceTest, pql_conformance_input_handling) {
         array->append_datum(DatumArray{"A"});
         array->append_datum(DatumArray{null_v});
 
-        auto json_spec{ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, array->size())};
+        auto json_spec = ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, array->size());
 
         auto expected{ColumnHelper::create_column(TYPE_ARRAY_BIGINT, true)};
         expected->append_datum(DatumArray{make_no_violation_result(), make_no_violation_result()});
@@ -525,7 +525,7 @@ TEST_F(CelonisReadableConformanceTest, pql_conformance_input_handling) {
         array->append_datum(DatumArray{"A"});
         array->append_datum(DatumArray{null_v});
 
-        auto json_spec{ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, size)};
+        auto json_spec = ColumnHelper::create_const_column<TYPE_VARCHAR>(jsonInput, size);
 
         auto expected{ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, true)};
         expected->append_datum(DatumArray{make_no_violation_readable_result(), make_no_violation_readable_result()});
