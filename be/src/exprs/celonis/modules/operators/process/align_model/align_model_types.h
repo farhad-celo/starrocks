@@ -139,8 +139,7 @@ constexpr std::array<edge_type, ctl::enum_to_underlying_type(edge_type::SIZE)> E
     edge_type::L1_EXCLUSIVE_VIOLATION};
 
 template <typename T, typename F>
-  requires(std::is_invocable_r_v<T, F, edge_type>)
-[[nodiscard]] edge_type_array<T> for_each_edge_type(F&& functor) {
+requires(std::is_invocable_r_v<T, F, edge_type>) [[nodiscard]] edge_type_array<T> for_each_edge_type(F&& functor) {
   static_assert(EDGE_TYPES[0] == edge_type::SYNC, "Edge type must be at the position of their int representation.");
   static_assert(EDGE_TYPES[1] == edge_type::MODEL, "Edge type must be at the position of their int representation.");
   static_assert(EDGE_TYPES[2] == edge_type::SKIP, "Edge type must be at the position of their int representation.");

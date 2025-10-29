@@ -12,7 +12,7 @@ namespace celonis::accelerator::operators::mo {
 
 class MoBpmnGraphHelper {
  public:
-  MoBpmnGraphHelper() {};
+  MoBpmnGraphHelper(){};
 
   StatusOr<std::string> execute(const std::vector<std::string>& process_trees_json);
 };

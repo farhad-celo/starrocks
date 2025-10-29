@@ -32,8 +32,8 @@ using condensed_alignments_t = std::vector<std::optional<condensed_alignment_t>>
 using condensed_alignments_view_t = ctl::array_view<const condensed_alignments_t::value_type>;
 
 template <typename PREDICATE>
-  requires(std::is_invocable_r_v<bool, PREDICATE, const alignment_move&>)
-condensed_alignments_t compute_filtered_alignments(alignments_view_t full_alignments, PREDICATE&& predicate) {
+requires(std::is_invocable_r_v<bool, PREDICATE, const alignment_move&>) condensed_alignments_t
+    compute_filtered_alignments(alignments_view_t full_alignments, PREDICATE&& predicate) {
   return ctl::transform_to<condensed_alignments_t>(
       full_alignments, [&](const auto& maybe_alignment) mutable -> std::optional<condensed_alignment_t> {
         if (!maybe_alignment.has_value()) {

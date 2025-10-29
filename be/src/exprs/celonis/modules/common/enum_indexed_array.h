@@ -23,8 +23,8 @@ namespace celonis::accelerator::common {
  * @tparam VAL The value stored in the map. Must be default and move constructible.
  */
 template <typename IDX, typename VAL>
-  requires(std::is_enum_v<IDX> && std::unsigned_integral<std::underlying_type_t<IDX>>)
-class enum_indexed_array : private std::array<VAL, static_cast<std::size_t>(IDX::SIZE)> {
+requires(std::is_enum_v<IDX>&& std::unsigned_integral<std::underlying_type_t<IDX>>) class enum_indexed_array
+    : private std::array<VAL, static_cast<std::size_t>(IDX::SIZE)> {
  public:
   using underlying_type = std::array<VAL, static_cast<std::size_t>(IDX::SIZE)>;
   // /* member types */
@@ -55,12 +55,11 @@ class enum_indexed_array : private std::array<VAL, static_cast<std::size_t>(IDX:
   };
 
   // /* special functions */
-  enum_indexed_array()
-    requires(std::is_move_constructible_v<VAL>)
-  = default;
+  enum_indexed_array() requires(std::is_move_constructible_v<VAL>) = default;
   template <typename... Args>
-    requires(std::is_same_v<Args, VAL> && ... && std::is_move_constructible_v<VAL>)
-  explicit enum_indexed_array(Args&&... args) : underlying_type{std::forward<Args&&>(args)...} {}
+  requires(std::is_same_v<Args, VAL>&&...&& std::is_move_constructible_v<VAL>) explicit enum_indexed_array(
+      Args&&... args)
+      : underlying_type{std::forward<Args&&>(args)...} {}
 
   // /* iterators */
   using underlying_type::begin;

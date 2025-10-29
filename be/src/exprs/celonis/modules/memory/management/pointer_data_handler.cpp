@@ -58,8 +58,7 @@ template <typename T>
 inline void convert_to_relative_addresses(
     legacy_embedded_ctl::shared_static_array<T>& pointers,
     const legacy_embedded_ctl::shared_static_array<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) noexcept
-  requires(std::is_pointer_v<T>)
-{
+    requires(std::is_pointer_v<T>) {
   const uintptr_t buffer_offset = reinterpret_cast<uintptr_t>(buffer.get());
   for (size_t i = 0; i < pointers.size(); i++) {
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -72,8 +71,7 @@ template <typename T>
 inline void convert_to_absolute_addresses(
     legacy_embedded_ctl::shared_static_array<T>& pointers,
     const legacy_embedded_ctl::shared_static_array<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) noexcept
-  requires(std::is_pointer_v<T>)
-{
+    requires(std::is_pointer_v<T>) {
   const uintptr_t buffer_offset = reinterpret_cast<uintptr_t>(buffer.get());
   for (size_t i = 0; i < pointers.size(); i++) {
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -84,9 +82,7 @@ inline void convert_to_absolute_addresses(
 template <typename T>
 io::compressed_data compress_pointers(const loaded_data<T>& pointers,
                                       const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer,
-                                      bool write_with_sorting)
-  requires(std::is_pointer_v<T>)
-{
+                                      bool write_with_sorting) requires(std::is_pointer_v<T>) {
   if constexpr (std::is_same_v<T, cel_string_t>) {
     if (write_with_sorting) {
       io::unsorted_string_pointer_byte_iterator pointer_it{std::span{pointers.data},
@@ -102,9 +98,7 @@ io::compressed_data compress_pointers(const loaded_data<T>& pointers,
 template <typename T>
 io::compressed_data compress_buffer(const loaded_data<T>& pointers,
                                     const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer,
-                                    bool write_with_sorting)
-  requires(std::is_pointer_v<T>)
-{
+                                    bool write_with_sorting) requires(std::is_pointer_v<T>) {
   if constexpr (std::is_same_v<T, cel_string_t>) {
     if (write_with_sorting) {
       io::unsorted_string_buffer_byte_iterator iter{std::span{pointers.data}, std::span{buffer.data}};
@@ -117,10 +111,9 @@ io::compressed_data compress_buffer(const loaded_data<T>& pointers,
 }
 
 template <typename T>
-loaded_data<T> decompress_pointers(const io::compressed_data& compressed_pointers, const size_t uncompressed_size,
-                                   const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer)
-  requires(std::is_pointer_v<T>)
-{
+loaded_data<T> decompress_pointers(
+    const io::compressed_data& compressed_pointers, const size_t uncompressed_size,
+    const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer) requires(std::is_pointer_v<T>) {
   auto pointers{legacy_embedded_ctl::make_shared_static_array_for_overwrite<T>(
       uncompressed_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::MEMORY_FOR_DECOMPRESSION_MSG))};
   io::decompress_from_memory_mt(compressed_pointers, io::as_byte_span(std::span{pointers}));
@@ -187,9 +180,7 @@ template <typename T>
 std::optional<size_t> write_out_pointers(const loaded_data<T>& pointers,
                                          const loaded_data<std::remove_const_t<std::remove_pointer_t<T>>>& buffer,
                                          const std::string& swap_file, const swap_info& sinfo, bool write_with_sorting,
-                                         common::execution_context& context)
-  requires(std::is_pointer_v<T>)
-{
+                                         common::execution_context& context) requires(std::is_pointer_v<T>) {
   if (!sinfo.is_swappable()) {
     // no swap is still kind of success, but without returning size on disk
     return std::nullopt;
@@ -803,11 +794,9 @@ void pointer_data_handler<T>::swap_in_buffer(data_handler_data<STORAGE_T>& buffe
 #ifndef CELOSTAR
 template <typename T>
 template <typename TYPE>
-loaded_data<TYPE> pointer_data_handler<T>::swap_in_impl(const std::string& swap_file, std::atomic<size_t>& size,
-                                                        std::atomic<size_t>& size_on_disk,
-                                                        std::atomic<bool>& broken_swap_file)
-  requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>)
-{
+loaded_data<TYPE> pointer_data_handler<T>::swap_in_impl(
+    const std::string& swap_file, std::atomic<size_t>& size, std::atomic<size_t>& size_on_disk,
+    std::atomic<bool>& broken_swap_file) requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>) {
   try {
     if (!data_handler::swap_file_exists(swap_file, sinfo_)) {
       log::jerror("Could not find swap file.", {{"swap_file", swap_file}, {"description", desc_}});

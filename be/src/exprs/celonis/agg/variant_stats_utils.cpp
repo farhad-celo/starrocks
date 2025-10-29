@@ -76,9 +76,9 @@ size_t get_serialized_size(const SliceHashMap& activity_map) {
     }
     return result;
 }
-const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src,
-                                                  MemPool* mem_pool,
-                                                  SliceHashMap& activity_map, std::vector<std::pair<int32_t, size_t>>& index_vector, size_t* memory) {
+const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src, MemPool* mem_pool, SliceHashMap& activity_map,
+                                                  std::vector<std::pair<int32_t, size_t>>& index_vector,
+                                                  size_t* memory) {
     uint32_t num_activities;
     memcpy(&num_activities, src, sizeof(uint32_t));
     src += sizeof(uint32_t);

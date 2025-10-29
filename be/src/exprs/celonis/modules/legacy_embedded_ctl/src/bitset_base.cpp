@@ -263,9 +263,9 @@ void bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::zero_unused_bits() noexcept
 // like the other child types: dynamic_bitset_t, dynamic_bitset_parallel_t, bitset_mutable_view_t
 template typename bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                    legacy_embedded_ctl::bitset_view_t>::value_type
-    bitset_crtp_base<details::bitset_types::parallelism_setting{false},
-                     legacy_embedded_ctl::bitset_view_t>::get_block_value_at_index(const block_index_type block_index)
-        const noexcept;
+bitset_crtp_base<details::bitset_types::parallelism_setting{false},
+                 legacy_embedded_ctl::bitset_view_t>::get_block_value_at_index(const block_index_type block_index)
+    const noexcept;
 
 template bool bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                legacy_embedded_ctl::bitset_view_t>::all() const noexcept;
@@ -278,31 +278,31 @@ template bool bitset_crtp_base<details::bitset_types::parallelism_setting{false}
 
 template typename bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                    legacy_embedded_ctl::bitset_view_t>::block_index_type
-    bitset_crtp_base<details::bitset_types::parallelism_setting{false},
-                     legacy_embedded_ctl::bitset_view_t>::num_blocks() const noexcept;
+bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::num_blocks()
+    const noexcept;
 
 template bool bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                legacy_embedded_ctl::bitset_view_t>::empty() const noexcept;
 
 template typename bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                    legacy_embedded_ctl::bitset_view_t>::size_type
-    bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::count(
-        const bit_index_type idx_from, bit_index_type idx_to) const noexcept;
+bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::count(
+    const bit_index_type idx_from, bit_index_type idx_to) const noexcept;
 
 template typename bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                    legacy_embedded_ctl::bitset_view_t>::bit_index_type
-    bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::find_first(
-        const bit_index_type idx_from, bit_index_type idx_to) const noexcept;
+bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::find_first(
+    const bit_index_type idx_from, bit_index_type idx_to) const noexcept;
 
 template typename bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                    legacy_embedded_ctl::bitset_view_t>::bit_index_type
-    bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::find_next(
-        const bit_index_type idx_from, const bit_index_type idx_to) const noexcept;
+bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::find_next(
+    const bit_index_type idx_from, const bit_index_type idx_to) const noexcept;
 
 template typename bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                    legacy_embedded_ctl::bitset_view_t>::bit_index_type
-    bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::find_from(
-        block_index_type block_index, const block_index_type upper_bound_block_index) const noexcept;
+bitset_crtp_base<details::bitset_types::parallelism_setting{false}, legacy_embedded_ctl::bitset_view_t>::find_from(
+    block_index_type block_index, const block_index_type upper_bound_block_index) const noexcept;
 
 template class bitset_crtp_base<details::bitset_types::parallelism_setting{false},
                                 legacy_embedded_ctl::dynamic_bitset_t>;

@@ -73,8 +73,7 @@ class bitset_crtp_base {
    * @param index the position to set the bit at
    * @return the bitset (for chaining)
    */
-  DERIVED& experimental_atomic_set(bit_index_type index) noexcept
-    requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM);
+  DERIVED& experimental_atomic_set(bit_index_type index) noexcept requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM);
 
   /**
    * @brief This function implements a variant of experimental_atomic_set that first tests the respective bit and
@@ -83,7 +82,7 @@ class bitset_crtp_base {
    * atomic set will always be faster.
    */
   void experimental_atomic_set_if_unset(bit_index_type index) noexcept
-    requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM);
+      requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM);
 
   /**
    * @brief sets all bits in the bitset
@@ -199,10 +198,8 @@ class bitset_crtp_base {
    */
   [[nodiscard]] bit_index_type find_next(bit_index_type idx_from, bit_index_type idx_to = npos) const noexcept;
 
-  [[nodiscard]] const block_type* data() const noexcept
-    requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM);
-  [[nodiscard]] block_type* data() noexcept
-    requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM);
+  [[nodiscard]] const block_type* data() const noexcept requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM);
+  [[nodiscard]] block_type* data() noexcept requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM);
 
   /**
    * @brief used to apply each index of a set bit in the range [idx_from, idx_to) to a given callable
@@ -322,9 +319,7 @@ inline DERIVED& bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::set(const bit_in
 
 template <parallelism_settings_t PARALLELISM_SETTING, typename DERIVED>
 inline DERIVED& bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::experimental_atomic_set(
-    const bit_index_type index) noexcept
-  requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM)
-{
+    const bit_index_type index) noexcept requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM) {
   legacy_embedded_debug_assert(!PARALLELISM_ENABLED);
   legacy_embedded_debug_assert(index < size());
   const auto [block_index, bit_index] = details::block_and_bit_index::get(index);
@@ -340,9 +335,7 @@ inline DERIVED& bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::experimental_ato
 
 template <parallelism_settings_t PARALLELISM_SETTING, typename DERIVED>
 inline void bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::experimental_atomic_set_if_unset(
-    const bit_index_type index) noexcept
-  requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM)
-{
+    const bit_index_type index) noexcept requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM) {
   legacy_embedded_debug_assert(!PARALLELISM_ENABLED);
   legacy_embedded_debug_assert(index < size());
 
@@ -462,8 +455,7 @@ inline bool bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::test_set(const bit_i
 template <parallelism_settings_t PARALLELISM_SETTING, typename DERIVED>
 inline const typename bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::block_type*
 bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::data() const noexcept
-  requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM)
-{
+    requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM) {
   legacy_embedded_debug_assert(
       !PARALLELISM_ENABLED, "Access to the bitset's internal blocks is only allowed for the non-parallelized bitset.");
   legacy_embedded_debug_assert(std::is_same_v<block_type, value_type>,
@@ -474,9 +466,7 @@ bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::data() const noexcept
 
 template <parallelism_settings_t PARALLELISM_SETTING, typename DERIVED>
 inline typename bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::block_type*
-bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::data() noexcept
-  requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM)
-{
+bitset_crtp_base<PARALLELISM_SETTING, DERIVED>::data() noexcept requires(!PARALLELISM_SETTING.ENABLE_PARALLELISM) {
   legacy_embedded_debug_assert(
       !PARALLELISM_ENABLED, "Access to the bitset's internal blocks is only allowed for the non-parallelized bitset.");
   legacy_embedded_debug_assert(std::is_same_v<block_type, value_type>,

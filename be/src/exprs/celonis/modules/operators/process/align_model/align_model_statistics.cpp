@@ -23,23 +23,27 @@ namespace {
 using duration_unit_for_logging_t = std::chrono::microseconds;
 
 template <typename F, typename T, typename P = std::identity>
-  requires(
-      /* Projection P must be invocable with type in the optional */
-      std::invocable<P, typename std::remove_cvref_t<T>> &&
-      /* Functor F must be invocable with return type of the projection */
-      std::invocable<F, std::invoke_result_t<P, std::remove_cvref_t<T>>>)
-void invoke_with_if_has_value(F&& functor, const std::optional<T> value, P projection = {}) {
+requires(
+    /* Projection P must be invocable with type in the optional */
+    std::invocable<P, typename std::remove_cvref_t<T>>&&
+        /* Functor F must be invocable with return type of the projection */
+        std::invocable<
+            F, std::invoke_result_t<P, std::remove_cvref_t<T>>>) void invoke_with_if_has_value(F&& functor,
+                                                                                               const std::optional<T>
+                                                                                                   value,
+                                                                                               P projection = {}) {
   if (value.has_value()) {
     functor(projection(*value));
   }
 }
 
 template <typename T, typename P = std::identity>
-  requires(
-      /* Projection P must be invocable with type in the optional */
-      std::invocable<P, typename std::remove_cvref_t<T>>)
-void add_if_has_value(format::json::json_object_t& json_object, const std::string& counter_name,
-                      const std::optional<T> value, P projection = {}) {
+requires(
+    /* Projection P must be invocable with type in the optional */
+    std::invocable<P, typename std::remove_cvref_t<T>>) void add_if_has_value(format::json::json_object_t& json_object,
+                                                                              const std::string& counter_name,
+                                                                              const std::optional<T> value,
+                                                                              P projection = {}) {
   invoke_with_if_has_value(
       [&json_object, &counter_name](const format::json::json_value_t& val) { json_object[counter_name] = val; }, value,
       projection);

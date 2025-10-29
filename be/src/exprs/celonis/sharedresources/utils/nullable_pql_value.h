@@ -49,13 +49,11 @@ public:
                                                 : std::nullopt} {}
 
     // NOLINTNEXTLINE(google-explicit-constructor)
-    nullable_pql_value(std::string value)
-        requires(std::is_same_v<T, cel_string_t>)
+    nullable_pql_value(std::string value) requires(std::is_same_v<T, cel_string_t>)
             : nullable_value_{std::move(value)} {}
 
     // NOLINTNEXTLINE(google-explicit-constructor)
-    nullable_pql_value(std::string_view value)
-        requires(std::is_same_v<T, cel_string_t>)
+    nullable_pql_value(std::string_view value) requires(std::is_same_v<T, cel_string_t>)
             : nullable_value_{std::string{value}} {}
 
     /** Checks if the value is not null */

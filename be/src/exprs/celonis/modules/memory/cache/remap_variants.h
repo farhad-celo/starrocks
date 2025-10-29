@@ -12,7 +12,9 @@
 namespace celonis::accelerator::memory::cache {
 
 template <typename From, typename To>
-concept non_narrowing_conversion = requires(From f) { To{f}; };
+concept non_narrowing_conversion = requires(From f) {
+  To{f};
+};
 
 template <typename T>
 concept valid_variant_element_type = std::signed_integral<T> && non_narrowing_conversion<trace_element_type, T>;

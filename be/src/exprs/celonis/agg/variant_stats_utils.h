@@ -118,9 +118,9 @@ size_t get_serialized_size(const SliceHashMap& activity_map);
  * @param[out] memory A pointer to a memory usage counter, which is incremented when a new activity is added to the map.
  * @return A pointer to the position in the source buffer immediately after the consumed data.
  */
-const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src,
-                                                  MemPool* mem_pool,
-                                                  SliceHashMap& activity_map, std::vector<std::pair<int32_t, size_t>>& index_vector, size_t* memory);
+const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src, MemPool* mem_pool, SliceHashMap& activity_map,
+                                                  std::vector<std::pair<int32_t, size_t>>& index_vector,
+                                                  size_t* memory);
 
 /**
  * Serializes a variant map into a byte buffer. It's a map from variants to their counts.
