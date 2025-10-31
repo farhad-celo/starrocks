@@ -27,6 +27,7 @@ import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class CelonisPredicateStatisticsCalculatorTest {
@@ -155,5 +156,120 @@ public class CelonisPredicateStatisticsCalculatorTest {
         checkCelonisInStatistics(col1, Lists.newArrayList(col2, col3, const1, const2, col5), statistics,
                 statistics.getOutputRowCount() * 0.5 * StatisticsEstimateCoefficient.IN_PREDICATE_DEFAULT_FILTER_COEFFICIENT,
                 0, 100, 1, 1000);
+    }
+
+    private void checkCelonisMultiInStatistics(List<ColumnRefOperator> multiInColumns, List<List<ScalarOperator>> matches,
+                                               Statistics statistics, double expectedRowCount, List<Double> expectedNullsFraction,
+                                               List<Double> expectedDistinctValuesCount, List<Double> expectedMin,
+                                               List<Double> expectedMax) {
+
+        List<ScalarOperator> columnsStructArgs = new ArrayList<>();
+        for (int i = 0; i < multiInColumns.size(); ++i) {
+            columnsStructArgs.add(new ConstantOperator(String.format("col%d", i), Type.VARCHAR));
+            columnsStructArgs.add(multiInColumns.get(i));
+        }
+        CallOperator columnsStruct = new CallOperator(FunctionSet.NAMED_STRUCT, Type.ANY_STRUCT, columnsStructArgs);
+
+        List<ScalarOperator> matchesStructArgs = new ArrayList<>();
+        for (int i = 0; i < matches.size(); ++i) {
+            matchesStructArgs.add(new ConstantOperator(String.format("col%d", i), Type.VARCHAR));
+            matchesStructArgs.add(new ArrayOperator(Type.INT, true, matches.get(i)));
+        }
+        CallOperator matchesStruct = new CallOperator(FunctionSet.NAMED_STRUCT, Type.ANY_STRUCT, matchesStructArgs);
+        CallOperator celonisMultiIn = new CallOperator(FunctionSet.CELONIS_MULTI_IN, Type.BOOLEAN,
+                Lists.newArrayList(columnsStruct, matchesStruct));
+        Statistics celonisMultiInStatistics =
+                PredicateStatisticsCalculator.statisticsCalculate(celonisMultiIn, statistics);
+
+        for (int i = 0; i < multiInColumns.size(); ++i) {
+            ColumnRefOperator multiInColumn = multiInColumns.get(i);
+            ColumnStatistic multiInColumnStatistics = celonisMultiInStatistics.getColumnStatistic(multiInColumn);
+            Assert.assertEquals(expectedRowCount, celonisMultiInStatistics.getOutputRowCount(), 0.1);
+            Assert.assertEquals(expectedNullsFraction.get(i), multiInColumnStatistics.getNullsFraction(), 0.1);
+            Assert.assertEquals(expectedDistinctValuesCount.get(i), multiInColumnStatistics.getDistinctValuesCount(), 0.1);
+            Assert.assertEquals(expectedMin.get(i), multiInColumnStatistics.getMinValue(), 0.1);
+            Assert.assertEquals(expectedMax.get(i), multiInColumnStatistics.getMaxValue(), 0.1);
+        }
+    }
+
+    @Test
+    public void testCelonisMultiInSelectivity() {
+        ColumnRefOperator col1 = new ColumnRefOperator(0, Type.INT, "c1", true);
+        ColumnRefOperator col2 = new ColumnRefOperator(1, Type.INT, "c2", true);
+        ColumnRefOperator col3 = new ColumnRefOperator(2, Type.INT, "c3", true);
+        ColumnRefOperator col4 = new ColumnRefOperator(3, Type.INT, "c4", true);
+        ColumnRefOperator col5 = new ColumnRefOperator(4, Type.INT, "c5", true);
+
+        Statistics statistics = Statistics.builder()
+                .addColumnStatistic(col1,
+                        ColumnStatistic.builder()
+                                .setMinValue(1)
+                                .setMaxValue(1000)
+                                .setNullsFraction(0.5)
+                                .setDistinctValuesCount(100)
+                                .build())
+                .addColumnStatistic(col2,
+                        ColumnStatistic.builder()
+                                .setMinValue(200)
+                                .setMaxValue(600)
+                                .setNullsFraction(0.4)
+                                .setDistinctValuesCount(30)
+                                .build())
+                .addColumnStatistic(col3,
+                        ColumnStatistic.builder()
+                                .setMinValue(400)
+                                .setMaxValue(1200)
+                                .setNullsFraction(0.0)
+                                .setDistinctValuesCount(20)
+                                .build())
+                .addColumnStatistic(col4,
+                        ColumnStatistic.unknown())
+                .addColumnStatistic(col5,
+                        ColumnStatistic.builder()
+                                .setMinValue(Double.NaN)
+                                .setMaxValue(1000)
+                                .setNullsFraction(0.0)
+                                .setDistinctValuesCount(40)
+                                .build())
+                .setOutputRowCount(10000).build();
+
+        // with overlapping constant matches.
+        checkCelonisMultiInStatistics(List.of(col1, col2),
+                List.of(List.of(new ConstantOperator(100, Type.INT), new ConstantOperator(800, Type.INT)),
+                        List.of(new ConstantOperator(300, Type.INT), new ConstantOperator(500, Type.INT))),
+                statistics, 6.66, List.of(0.0, 0.0), List.of(2.0, 2.0), List.of(100.0, 300.0), List.of(800.0, 500.0));
+
+        // with overlapping constant and null matches.
+        checkCelonisMultiInStatistics(List.of(col1, col2),
+                List.of(List.of(new ConstantOperator(100, Type.INT), ConstantOperator.createNull(Type.INT)),
+                        List.of(new ConstantOperator(300, Type.INT), new ConstantOperator(500, Type.INT))),
+                statistics, 170.0, List.of(0.98, 0.0), List.of(1.0, 2.0), List.of(100.0, 300.0), List.of(100.0, 500.0));
+
+        // with one overlapping and one non-overlapping constant match.
+        checkCelonisMultiInStatistics(List.of(col1, col2),
+                List.of(List.of(new ConstantOperator(100, Type.INT), new ConstantOperator(1200, Type.INT)),
+                        List.of(new ConstantOperator(500, Type.INT), new ConstantOperator(700, Type.INT))),
+                statistics, 3.33, List.of(0.0, 0.0), List.of(1.0, 1.0), List.of(100.0, 500.0), List.of(100.0, 500.0));
+
+        // with one non-overlapping constant match and one non-overlapping null match.
+        checkCelonisMultiInStatistics(List.of(col1, col3),
+                List.of(List.of(new ConstantOperator(100, Type.INT), new ConstantOperator(1200, Type.INT)),
+                        List.of(ConstantOperator.createNull(Type.INT), new ConstantOperator(500, Type.INT))),
+                statistics, 1.0, List.of(0.0, 0.0), List.of(0.0, 0.0),
+                List.of(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+                List.of(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY));
+
+        // with unknown column statistics.
+        checkCelonisMultiInStatistics(List.of(col1, col4),
+                List.of(List.of(new ConstantOperator(100, Type.INT), new ConstantOperator(800, Type.INT)),
+                        List.of(new ConstantOperator(300, Type.INT), new ConstantOperator(500, Type.INT))),
+                statistics, 100.0, List.of(0.0, 0.0), List.of(2.0, 1.0), List.of(100.0, Double.NEGATIVE_INFINITY),
+                List.of(800.0, Double.POSITIVE_INFINITY));
+
+        // with Nan column statistics.
+        checkCelonisMultiInStatistics(List.of(col1, col5),
+                List.of(List.of(new ConstantOperator(100, Type.INT), new ConstantOperator(800, Type.INT)),
+                        List.of(new ConstantOperator(300, Type.INT), new ConstantOperator(500, Type.INT))),
+                statistics, 100.0, List.of(0.0, 0.0), List.of(2.0, 40.0), List.of(100.0, Double.NaN), List.of(800.0, 1000.0));
     }
 }
