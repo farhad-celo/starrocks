@@ -43,6 +43,7 @@ struct PartitionChunks {
 
     const size_t partition_idx;
 
+    size_t total_rows_seen = 0;
     void reset() {
         chunks.clear();
         select_indexes.clear();
@@ -92,6 +93,7 @@ struct PartitionHashMapBase {
 
     int64_t total_num_rows = 0;
     int64_t max_partition_size = 0;
+    int64_t total_null_rows = 0;
 
     bool init_null_key_partition = false;
     static constexpr size_t kNullKeyPartitionIdx = 0;
@@ -156,7 +158,10 @@ protected:
         // If there is skew disable passthrough.
         // Wait for at least adjust_passthrough_min_rows rows.
         // Note that this check is per thread. Each thread decides independently to passthrough.
-        bool skew = max_partition_size / (total_num_rows * 1.0)  > 0.3;
+        bool skew = (max_partition_size / (total_num_rows + 1.0)  > 0.1)
+                || (total_null_rows /  (total_num_rows + 1.0) > 0.1);
+
+
         if (config::adjust_passthrough && (total_num_rows < config::adjust_passthrough_min_rows || skew)) {
             return;
         }
@@ -165,6 +170,15 @@ protected:
         size_t partition_num_hwm = enable_pre_agg ? 32768 : 512;
 
         if (partition_num > partition_num_hwm && total_num_rows < 10000 * partition_num) {
+            LOG(INFO) << "check_passthrough enable. "
+                      << " partition_num "  <<  partition_num
+                      << " total_num_rows " << total_num_rows
+                      << " total_null_rows " << total_null_rows
+                      << " max_partition_size " << max_partition_size
+                      << " skew " << skew
+                      << " adjust_passthrough " << config::adjust_passthrough
+                      << std::endl;
+
             is_passthrough = true;
         }
     }
@@ -234,7 +248,11 @@ protected:
         }
 
         for (const auto& key : visited_keys) {
-            flush(*(hash_map[key]), chunk);
+            auto& v = *(hash_map[key]);
+            flush(v, chunk);
+            if (v.total_rows_seen > max_partition_size) {
+                max_partition_size = v.total_rows_seen;
+            }
         }
 
         if constexpr (!std::is_same_v<std::nullptr_t, std::decay_t<decltype(partition_chunk_consumer)>>) {
@@ -306,6 +324,7 @@ protected:
             null_key_value.chunks.back()->append(*chunk, offset, cur_remain_size);
             null_key_value.remain_size = chunk_size - null_key_value.chunks.back()->num_rows();
             total_num_rows += size;
+            total_null_rows += size;
 
             if constexpr (!std::is_same_v<std::nullptr_t, std::decay_t<decltype(partition_chunk_consumer)>>) {
                 RETURN_IF_ERROR(consume_full_chunks(null_key_value,
@@ -326,6 +345,7 @@ protected:
                 PartitionChunks* value_ptr = nullptr;
                 if (null_flag_data[i] == 1) {
                     value_ptr = &null_key_value;
+                    total_null_rows++;
                 } else {
                     const auto& key = key_loader(i);
                     visited_keys.insert(key);
@@ -354,12 +374,17 @@ protected:
                     alloc_new_buffer(value, chunk);
                 }
                 value.select_indexes.push_back(i);
+                value.total_rows_seen++;
                 value.remain_size--;
                 total_num_rows++;
             }
 
             for (const auto& key : visited_keys) {
-                flush(*(hash_map[key]), chunk);
+                auto& v = *(hash_map[key]);
+                flush(v, chunk);
+                if (v.total_rows_seen > max_partition_size) {
+                    max_partition_size = v.total_rows_seen;
+                }
             }
             flush(null_key_value, chunk);
 
