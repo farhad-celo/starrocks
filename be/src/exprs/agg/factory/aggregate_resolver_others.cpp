@@ -133,9 +133,9 @@ void AggregateFuncResolver::register_celonis() {
     add_general_mapping_notnull("celonis_sorted_last", false,
                                 AggregateFactory::MakeCelonisSortedLastAggregateFunction());
 
-    add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_DOUBLE, PercentileState<TYPE_BIGINT>>(
+    add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_DOUBLE, TrimmedMeanState<TYPE_BIGINT>>(
             "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_BIGINT>());
-    add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, PercentileState<TYPE_DOUBLE>>(
+    add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, TrimmedMeanState<TYPE_DOUBLE>>(
             "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_DOUBLE>());
 
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
