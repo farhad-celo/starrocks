@@ -532,13 +532,16 @@ TEST_F(CelonisVariantStatsTest, test_no_merge) {
 
     std::string e_s =
             "{'dict':[{'id':3,'name':'a4'},{'id':2,'name':'a3'},{'id':0,'name':'a1'},{'id':1,'name':'a2'}],'a_stats':[{"
-            "'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0},{'count':3,'count_case':3,'count_start':0,'"
-            "count_end':2,'id':1},{'count':2,'count_case':2,'count_start':1,'count_end':1,'id':2},{'count':1,'count_"
-            "case':1,'count_start':0,'count_end':1,'id':3}],'e_stats':[{'count':3,'count_case':3,'src':0,'dst':1},{'"
-            "count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3}],'top':[{'id':0,'top':"
-            "[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':1,'top':[{'variant':[0,1],'count':2},{'"
-            "variant':[0,1,2],'count':1}]},{'id':2,'top':[{'variant':[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{"
-            "'id':3,'top':[{'variant':[2,3],'count':1}]}],'happy':{'variant':[0,1],'count':2},'e_count':3}";
+            "'count':3,'count_case':3,'count_start':3,'count_end':0,'id':0},"
+            "{'count':3,'count_case':3,'count_start':0,'count_end':2,'id':1},{'count':2,'count_case':2,'count_start':1,"
+            "'count_end':1,'id':2},"
+            "{'count':1,'count_case':1,'count_start':0,'count_end':1,'id':3}],'e_count':3,'e_stats':[{'count':3,'count_"
+            "case':3,'src':0,'dst':1},"
+            "{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'count_case':1,'src':2,'dst':3}],'top':[{'id':0,'"
+            "top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]}, "
+            "{'id':1,'top':[{'variant':[0,1],'count':2},{'variant':[0,1,2],'count':1}]},{'id':2,'top':[{'variant':[2,3]"
+            ",'count':1},{'variant':[0,1,2],'count':1}]},{'id':3,'top':[{'variant':[2,3],'count':1}]}],'happy':{'"
+            "variant':[0,1],'count':2}}";
     match(e_s, rs);
 }
 
@@ -630,11 +633,11 @@ TEST_F(CelonisVariantStatsTest, test_merge_distinct_dict) {
             "count_start':0,'count_end':1,'id':5}],'e_stats':[{'count':1,'count_case':1,'src':1,'dst':2},{'count':1,'"
             "count_case':1,'src':2,'dst':3},{'count':1,'count_case':1,'src':0,'dst':3},{'count':3,'count_case':3,'src':"
             "0,'dst':1},{'count':1,'count_case':1,'src':3,'dst':4},{'count':2,'count_case':1,'src':1,'dst':1},{'count':"
-            "1,'count_case':1,'src':1,'dst':5}],'top':[{'id':0,'top':[{'variant':[0,1,2],'count':1},{'variant':[0,1,1,"
-            "1,5],'count':1},{'variant':[0,3,4],'count':1},{'variant':[0,1],'count':1}]},{'id':1,'top':[{'variant':[0,"
-            "1,2],'count':1},{'variant':[0,1,1,1,5],'count':1},{'variant':[0,1],'count':1}]},{'id':2,'top':[{'variant':"
-            "[0,1,2],'count':1},{'variant':[2,3],'count':1}]},{'id':3,'top':[{'variant':[0,3,4],'count':1},{'variant':["
-            "2,3],'count':1}]},{'id':4,'top':[{'variant':[0,3,4],'count':1}]},{'id':5,'top':[{'variant':[0,1,1,1,5],'"
+            "1,'count_case':1,'src':1,'dst':5}],'top':[{'id':0,'top':[{'variant':[0,1],'count':1},{'variant':[0,3,4],'"
+            "count':1},{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1}]},{'id':1,'top':[{'variant':[0,"
+            "1],'count':1},{'variant':[0,1,2],'count':1},{'variant':[0,1,1,1,5],'count':1}]},{'id':2,'top':[{'variant':"
+            "[2,3],'count':1},{'variant':[0,1,2],'count':1}]},{'id':3,'top':[{'variant':[2,3],'count':1},{'variant':[0,"
+            "3,4],'count':1}]},{'id':4,'top':[{'variant':[0,3,4],'count':1}]},{'id':5,'top':[{'variant':[0,1,1,1,5],'"
             "count':1}]}],'happy':{'variant':[0,1],'count':1},'e_count':7}";
     match(e_s, rs);
 }
