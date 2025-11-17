@@ -187,18 +187,40 @@ struct VariantStatsResult {
     bool equal_e_count(const VariantStatsResult& other) { return e_count == other.e_count; }
 
     bool equal_top(const VariantStatsResult& other, const std::vector<int>& remap_idx) {
-        // Top variants per activity are sorted by frequency.
+        // Compare as unordered collections;
         if (top.size() != other.top.size()) {
             return false;
         }
+        auto cmp = [](const auto& lhs, const auto& rhs) {
+            if (lhs.first != rhs.first) {
+                return lhs.first < rhs.first;
+            }
+            return lhs.second < rhs.second;
+        };
         for (int i = 0; i < top.size(); i++) {
             int pos = remap_idx[i];
             if (top[pos].size() != other.top[i].size()) {
                 return false;
             }
-            for (int j = 0; j < other.top[i].size(); j++) {
-                if (!top[pos][j].first.equal_remap_for_testing(other.top[i][j].first, remap_idx)) return false;
-                if (top[pos][j].second != other.top[i][j].second) return false;
+            std::vector<std::pair<std::vector<int32_t>, int>> this_top;
+            this_top.reserve(top[pos].size());
+            for (const auto& entry : top[pos]) {
+                this_top.emplace_back(entry.first.data, entry.second);
+            }
+            std::vector<std::pair<std::vector<int32_t>, int>> other_top;
+            other_top.reserve(other.top[i].size());
+            for (const auto& entry : other.top[i]) {
+                std::vector<int32_t> mapped;
+                mapped.reserve(entry.first.data.size());
+                for (auto id : entry.first.data) {
+                    mapped.push_back(remap_idx[id]);
+                }
+                other_top.emplace_back(std::move(mapped), entry.second);
+            }
+            std::sort(this_top.begin(), this_top.end(), cmp);
+            std::sort(other_top.begin(), other_top.end(), cmp);
+            if (this_top != other_top) {
+                return false;
             }
         }
         return true;
