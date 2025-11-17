@@ -1,5 +1,6 @@
 #include "exprs/celonis/agg/variant_stats_utils.h"
 
+#include "common/config.h"
 #include "modules/query/variantstats.pb.h"
 
 namespace starrocks {
@@ -215,12 +216,17 @@ VariantAnalysisResult analyze_variants_for_explore_process(const VariantHashMap&
         v_count[index++] = it;
     }
     LOG(INFO) << log_prefix << ": started variants sorting\n";
-    std::sort(v_count.begin(), v_count.end(), [](const VRef& lhs, const VRef& rhs) {
-        if (lhs->second != rhs->second) {
-            return lhs->second > rhs->second;
-        }
-        return lhs->first.hash < rhs->first.hash;
-    });
+    if (config::variant_stats_use_count_only_sort) {
+        std::sort(v_count.begin(), v_count.end(),
+                  [](const VRef& lhs, const VRef& rhs) { return lhs->second > rhs->second; });
+    } else {
+        std::sort(v_count.begin(), v_count.end(), [](const VRef& lhs, const VRef& rhs) {
+            if (lhs->second != rhs->second) {
+                return lhs->second > rhs->second;
+            }
+            return lhs->first.hash < rhs->first.hash;
+        });
+    }
     LOG(INFO) << log_prefix << ": done variants sorting (variant_map_ size = " << variant_counts.size() << ")\n";
 
     // 2. Find a happy variant

@@ -62,6 +62,10 @@ CONF_mInt32(multi_array_agg_serialization_threshold, "2");
 CONF_mInt32(adjust_passthrough_min_rows, "10000");
 CONF_mBool(adjust_passthrough, "false");
 
+// Set to true to use only count-based sorting in variant stats (non-deterministic).
+// When false, uses deterministic sorting with hash as tie-breaker.
+CONF_mBool(variant_stats_use_count_only_sort, "true");
+
 
 // End of Celonis configures
 
