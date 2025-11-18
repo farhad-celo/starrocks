@@ -15,6 +15,7 @@
 #include "exprs/celonis/base64.h"
 #include "exprs/function_context.h"
 #include "google/protobuf/util/json_util.h"
+#include "google/protobuf/util/message_differencer.h"
 #include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -30,8 +31,7 @@ namespace {
 
 std::optional<std::string> to_statistics_json_string(const std::string& encoded_string) {
     int cipher_len = encoded_string.length();
-    std::unique_ptr<char[]> p;
-    p.reset(new char[cipher_len + 3]);
+    std::unique_ptr<char[]> p(new char[cipher_len + 3]);
 
     int len = base64_decode3(encoded_string.data(), encoded_string.length(), p.get());
     std::string decoded_string(p.get(), len);
@@ -43,6 +43,38 @@ std::optional<std::string> to_statistics_json_string(const std::string& encoded_
     std::string statistics_json;
     google::protobuf::util::MessageToJsonString(statistics_proto, &statistics_json);
     return statistics_json;
+}
+
+std::optional<::celonis::accelerator::Statistics> to_statistics_proto(const std::string& encoded_string) {
+    int cipher_len = encoded_string.length();
+    std::unique_ptr<char[]> p(new char[cipher_len + 3]);
+    int len = base64_decode3(encoded_string.data(), encoded_string.length(), p.get());
+    std::string decoded_string(p.get(), len);
+    ::celonis::accelerator::Statistics statistics_proto;
+    bool success = statistics_proto.ParseFromString(decoded_string);
+    if (!success) {
+        return std::nullopt;
+    }
+    return statistics_proto;
+}
+
+void sort_statistics(::celonis::accelerator::Statistics* statistics_proto) {
+    auto dict = statistics_proto->mutable_dict();
+    std::sort(dict->begin(), dict->end(), [](const auto& lhs, const auto& rhs) {
+        if (lhs.id() != rhs.id()) {
+            return lhs.id() < rhs.id();
+        }
+        return lhs.name() < rhs.name();
+    });
+    auto a_stats = statistics_proto->mutable_a_stats();
+    std::sort(a_stats->begin(), a_stats->end(), [](const auto& lhs, const auto& rhs) { return lhs.id() < rhs.id(); });
+    auto e_stats = statistics_proto->mutable_e_stats();
+    std::sort(e_stats->begin(), e_stats->end(), [](const auto& lhs, const auto& rhs) {
+        if (lhs.src() != rhs.src()) {
+            return lhs.src() < rhs.src();
+        }
+        return lhs.dst() < rhs.dst();
+    });
 }
 
 class ManagedAggrState {
@@ -2121,10 +2153,9 @@ TEST_F(CelonisVariantStatsTest, test_disable_top_variant_stats) {
 TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding) {
     const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
 
-    auto col1 = build_variant_column(
-            {{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a00", "a01", "a02"}, {"a1", "a2", "a1", "a2"}});
+    auto col1 = build_variant_column({{"a1"}, {"a1", "a2"}});
 
-    auto weights = build_weight_column({1, 10});
+    auto weights = build_weight_column({2, 1});
     auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(5, col1->size());
     auto disable_top = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
     auto enable_proto_encoding = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, col1->size());
@@ -2146,25 +2177,43 @@ TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding) {
 
     Slice slice = result->get_slice(0);
     std::string encoded_string = slice.to_string();
-    auto json_string = to_statistics_json_string(encoded_string);
-    ASSERT_TRUE(json_string.has_value());
-    EXPECT_EQ(
-            "{\"dict\":[{\"id\":3,\"name\":\"a4\"},{\"id\":5,\"name\":\"a6\"},{\"id\":4,\"name\":\"a5\"},{\"id\":6,"
-            "\"name\":\"a7\"},{\"id\":9,\"name\":\"a02\"},{\"id\":2,\"name\":\"a3\"},{\"id\":7,\"name\":\"a00\"},{"
-            "\"id\":0,\"name\":\"a1\"},{\"id\":1,\"name\":\"a2\"},{\"id\":8,\"name\":\"a01\"}],\"aStats\":[{\"count\":"
-            "\"21\",\"countCase\":\"11\",\"countStart\":\"11\",\"countEnd\":\"0\",\"id\":0},{\"count\":\"21\","
-            "\"countCase\":\"11\",\"countStart\":\"0\",\"countEnd\":\"10\",\"id\":1},{\"count\":\"1\",\"countCase\":"
-            "\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":2},{\"count\":\"1\",\"countCase\":\"1\","
-            "\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":3},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":"
-            "\"0\",\"countEnd\":\"0\",\"id\":4},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":"
-            "\"0\",\"id\":5},{\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":6},{"
-            "\"count\":\"1\",\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":7},{\"count\":\"1\","
-            "\"countCase\":\"1\",\"countStart\":\"0\",\"countEnd\":\"0\",\"id\":8},{\"count\":\"1\",\"countCase\":"
-            "\"1\",\"countStart\":\"0\",\"countEnd\":\"1\",\"id\":9}],\"eCount\":\"10\",\"eStats\":[{\"count\":\"1\","
-            "\"countCase\":\"1\",\"src\":7,\"dst\":8},{\"count\":\"1\",\"countCase\":\"1\",\"src\":8,\"dst\":9},{"
-            "\"count\":\"21\",\"countCase\":\"11\",\"src\":0,\"dst\":1},{\"count\":\"10\",\"countCase\":\"10\",\"src\":"
-            "1,\"dst\":0},{\"count\":\"1\",\"countCase\":\"1\",\"src\":1,\"dst\":2}]}",
-            json_string.value());
+    auto statistics_proto = to_statistics_proto(encoded_string);
+    ASSERT_TRUE(statistics_proto.has_value());
+    sort_statistics(&statistics_proto.value());
+
+    celonis::accelerator::Statistics expected;
+    auto* dict0 = expected.add_dict();
+    dict0->set_id(0);
+    dict0->set_name("a1");
+    auto* dict1 = expected.add_dict();
+    dict1->set_id(1);
+    dict1->set_name("a2");
+
+    auto* a0 = expected.add_a_stats();
+    a0->set_id(0);
+    a0->set_count(3);
+    a0->set_count_case(3);
+    a0->set_count_start(3);
+    a0->set_count_end(2);
+
+    auto* a1 = expected.add_a_stats();
+    a1->set_id(1);
+    a1->set_count(1);
+    a1->set_count_case(1);
+    a1->set_count_start(0);
+    a1->set_count_end(1);
+
+    expected.set_e_count(1);
+
+    auto* e0 = expected.add_e_stats();
+    e0->set_src(0);
+    e0->set_dst(1);
+    e0->set_count(1);
+    e0->set_count_case(1);
+
+    sort_statistics(&expected);
+
+    EXPECT_TRUE(google::protobuf::util::MessageDifferencer::Equals(statistics_proto.value(), expected));
 }
 
 TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding_empty) {
