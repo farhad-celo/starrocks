@@ -80,6 +80,7 @@
 #include "exprs/celonis/agg/variant_stats.h"
 #include "exprs/celonis/agg/variant_stats_v2.h"
 #include "exprs/celonis/agg/graph.h"
+#include "exprs/celonis/agg/explore_process.h"
 #include "exprs/celonis/agg/weekday_calendar.h"
 #include "exprs/celonis/agg/workday_calendar.h"
 #include "exprs/celonis/agg/mode.h"
@@ -303,6 +304,8 @@ public:
     static AggregateFunctionPtr MakeCelonisVariantStatsV2AggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisGraphAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisExploreProcessAggregateFunction();
 
     static AggregateFunctionPtr MakePercentileApproxAggregateFunction();
 

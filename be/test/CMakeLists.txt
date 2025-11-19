@@ -152,6 +152,9 @@ set(EXEC_FILES
         ./exprs/celonis/agg/cluster_variants_test.cpp
         ./exprs/celonis/agg/enumerate_node_paths_test.cpp
         ./exprs/celonis/agg/enumerate_transitive_edges_test.cpp
+        ./exprs/celonis/agg/explore_process_test_utils.cpp
+        ./exprs/celonis/agg/explore_process_test.cpp
+        ./exprs/celonis/agg/explore_process_variant_stats_validation_test.cpp
         ./exprs/celonis/agg/graph_test.cpp
         ./exprs/celonis/agg/graph_variant_stats_validation_test.cpp
         ./exprs/celonis/agg/histogram_boundaries_test.cpp

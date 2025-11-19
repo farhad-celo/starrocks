@@ -323,6 +323,7 @@ public class FunctionSet {
     public static final String CELONIS_VARIANT_STATS = "celonis_variant_stats";
     public static final String CELONIS_VARIANT_STATS_V2 = "celonis_variant_stats_v2";
     public static final String CELONIS_GRAPH = "celonis_graph";
+    public static final String CELONIS_EXPLORE_PROCESS = "celonis_explore_process";
     public static final String CELONIS_MAKE_FACTORY_CALENDAR = "celonis_make_factory_calendar";
     public static final String CELONIS_MAKE_WEEKDAY_CALENDAR = "celonis_make_weekday_calendar";
     public static final String CELONIS_MAKE_WORKDAY_CALENDAR = "celonis_make_workday_calendar";
@@ -1279,6 +1280,12 @@ public class FunctionSet {
                 Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT, Type.BIGINT), Type.VARCHAR, Type.VARCHAR,
                 false, false, false));
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_GRAPH,
+                Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT, Type.BIGINT, Type.BOOLEAN), Type.VARCHAR, Type.VARCHAR,
+                false, false, false));
+        // celonis_explore_process
+        // @param: [ variant_column, count_column, min_variant_count_threshold_on_leaf, enable_proto_encoding ]
+        // @paramType columns: [ ARRAY_VARCHAR, BIGINT, BIGINT, BOOLEAN ]
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_EXPLORE_PROCESS,
                 Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT, Type.BIGINT, Type.BOOLEAN), Type.VARCHAR, Type.VARCHAR,
                 false, false, false));
         // celonis_trimmed_mean

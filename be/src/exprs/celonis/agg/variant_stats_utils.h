@@ -15,6 +15,7 @@ class Statistics;
 namespace starrocks {
 
 constexpr size_t MAX_ALLOWED_NUM_DISTINCT_ACTIVITIES = std::numeric_limits<int16_t>::max();
+constexpr size_t MAX_ALLOWED_PROTO_SERIALIZED_SIZE = 100LL << 20; // 100M
 
 // Basic statistics on an Edge.
 struct EdgeStats {

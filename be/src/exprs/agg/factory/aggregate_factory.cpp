@@ -150,6 +150,10 @@ AggregateFunctionPtr AggregateFactory::MakeCelonisGraphAggregateFunction() {
     return std::make_shared<CelonisGraphAggregationFunction>();
 }
 
+AggregateFunctionPtr AggregateFactory::MakeCelonisExploreProcessAggregateFunction() {
+    return std::make_shared<CelonisExploreProcessAggregationFunction>();
+}
+
 AggregateFunctionPtr AggregateFactory::MakePercentileApproxAggregateFunction() {
     return std::make_shared<PercentileApproxAggregateFunction>();
 }

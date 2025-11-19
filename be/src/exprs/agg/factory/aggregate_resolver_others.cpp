@@ -141,6 +141,7 @@ void AggregateFuncResolver::register_celonis() {
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats_v2");
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_graph");
+    add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_explore_process");
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_STRUCT>("celonis_cluster_variants");
 
     auto add_product_aggregate_mapping{[this]<LogicalType LT>() {

@@ -245,6 +245,9 @@ public:
             } else if (name == "celonis_graph") {
                 auto celonis_graph = AggregateFactory::MakeCelonisGraphAggregateFunction();
                 return AggregateFactory::MakeNullableAggregateFunctionVariadic<CelonisGraphAggregateState>(celonis_graph);
+            } else if (name == "celonis_explore_process") {
+                auto celonis_explore_process = AggregateFactory::MakeCelonisExploreProcessAggregateFunction();
+                return AggregateFactory::MakeNullableAggregateFunctionVariadic<CelonisExploreProcessAggregateState>(celonis_explore_process);
             } else if (name == "celonis_cluster_variants") {
                 // cluster_variants accepts NULL variant
                 return AggregateFactory::MakeCelonisClusterVariantsAggregateFunction();
@@ -258,6 +261,8 @@ public:
                 return AggregateFactory::MakeCelonisVariantStatsV2AggregateFunction();
             } else if (name == "celonis_graph") {
                 return AggregateFactory::MakeCelonisGraphAggregateFunction();
+            } else if (name == "celonis_explore_process") {
+                return AggregateFactory::MakeCelonisExploreProcessAggregateFunction();
             } else if (name == "celonis_cluster_variants") {
                 return AggregateFactory::MakeCelonisClusterVariantsAggregateFunction();
             }
