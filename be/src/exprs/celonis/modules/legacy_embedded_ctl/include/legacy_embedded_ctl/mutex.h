@@ -29,7 +29,7 @@ class owning_mutex {
  public:
   owning_mutex() = default;
   template <typename... ARGS>
-    requires std::constructible_from<RESOURCE_TYPE, ARGS...>
+  requires std::constructible_from<RESOURCE_TYPE, ARGS...>
   explicit owning_mutex(std::in_place_t /* in_place_t */, ARGS&&... args) : data_{std::forward<ARGS>(args)...} {}
 
   template <typename T = RESOURCE_TYPE>

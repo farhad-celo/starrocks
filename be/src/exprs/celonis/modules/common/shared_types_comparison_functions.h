@@ -269,8 +269,8 @@ struct greater_equal<cel_float_t, cel_int_t> final {
 template <typename LHS_T, typename MID_T = LHS_T, typename RHS_T = LHS_T>
 struct between final {
   constexpr bool operator()(const LHS_T& lhs, const MID_T& mid, const RHS_T& rhs) const
-      noexcept(noexcept(std::declval<LHS_T>() >= std::declval<MID_T>()) &&
-               noexcept(std::declval<LHS_T>() <= std::declval<RHS_T>())) {
+      noexcept(noexcept(std::declval<LHS_T>() >= std::declval<MID_T>()) && noexcept(std::declval<LHS_T>() <=
+                                                                                    std::declval<RHS_T>())) {
     static_assert(std::is_same_v<LHS_T, MID_T> && std::is_same_v<MID_T, RHS_T>,
                   "The given types are not allowed to be used in the comparison.");
     static_assert(is_supported_type<LHS_T>(), "The type of the left-hand side argument is not supported.");

@@ -395,9 +395,8 @@ template <typename FUNCTION, class TUPLE>
 }
 
 template <typename FUNCTION, class TUPLE, class FIRST_ARG, class... ARGS>
-  requires(std::is_base_of_v<column_ptrs_abstract_base, std::remove_cvref_t<FIRST_ARG>>)
-[[nodiscard]] decltype(auto) cast_execute_column_pointers_impl(FUNCTION&& f, TUPLE&& args_tuple, FIRST_ARG&& first_arg,
-                                                               ARGS&&... args) {
+requires(std::is_base_of_v<column_ptrs_abstract_base, std::remove_cvref_t<FIRST_ARG>>) [[nodiscard]] decltype(auto)
+    cast_execute_column_pointers_impl(FUNCTION&& f, TUPLE&& args_tuple, FIRST_ARG&& first_arg, ARGS&&... args) {
   switch (first_arg.get_type()) {
     case col_pointer_type::PTR_64: {
       if constexpr (COL_PTR_64_NEEDED) {

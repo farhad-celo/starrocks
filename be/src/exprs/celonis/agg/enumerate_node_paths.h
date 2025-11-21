@@ -77,7 +77,9 @@ struct ColumnsKey {
         return info->columns[idx]->get(offset);
     }
 
-    bool has_any_null() const { return offset == -1; }
+    bool has_any_null() const {
+        return offset == -1;
+    }
 };
 
 struct EqualOnColumnsKey {
@@ -156,7 +158,9 @@ struct DedupColumnsKey {
         return info->columns[idx]->get(offset);
     }
 
-    bool is_all_nulls() const { return offset == -1; }
+    bool is_all_nulls() const {
+        return offset == -1;
+    }
 };
 
 struct EqualOnDedupColumnsKey {

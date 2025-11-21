@@ -20,11 +20,9 @@ protected:
 private:
     void Prepare() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT)),
-                AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT)),
-                AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT)),
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))};
-        auto return_type = AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT));
+                celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_BIGINT),
+                TypeDescriptor::from_logical_type(TYPE_BIGINT)};
+        auto return_type = celonis::array_type(TYPE_BIGINT);
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         input_array_column_ = ColumnHelper::create_column(celonis::array_type(TYPE_BIGINT), true);

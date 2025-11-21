@@ -223,21 +223,24 @@ struct max_integer {};
 
 // One type: T is result type
 template <typename T>
-  requires is_standard_integer_v<T>
-struct max_integer<T> : std::type_identity<std::remove_cvref_t<T>> {};
+requires is_standard_integer_v<T>
+struct max_integer<T> : std::type_identity<std::remove_cvref_t<T>> {
+};
 
 // Two types: T with larger max integer value is result type
 template <typename LHS_T, typename RHS_T>
-  requires is_standard_integer_v<LHS_T> && is_standard_integer_v<RHS_T>
+requires is_standard_integer_v<LHS_T> && is_standard_integer_v<RHS_T>
 struct max_integer<LHS_T, RHS_T> : std::conditional<std::numeric_limits<std::remove_reference_t<LHS_T>>::max() >=
                                                         std::numeric_limits<std::remove_reference_t<RHS_T>>::max(),
-                                                    std::remove_cvref_t<LHS_T>, std::remove_cvref_t<RHS_T>> {};
+                                                    std::remove_cvref_t<LHS_T>, std::remove_cvref_t<RHS_T>> {
+};
 
 /* Three+ types: recursively calls itself until only two types are left. At this point the recursion stops and always
  * the larger T is returned as result type to the previous call. */
 template <typename T, typename... Ts>
-  requires is_standard_integer_v<T> && (is_standard_integer_v<Ts> && ...)
-struct max_integer<T, Ts...> : max_integer<T, typename max_integer<Ts...>::type> {};
+requires is_standard_integer_v<T> &&
+    (is_standard_integer_v<Ts>&&...) struct max_integer<T, Ts...> : max_integer<T, typename max_integer<Ts...>::type> {
+};
 
 /**
  * @brief type trait which returns the 'largest' integer type of the types in the parameter pack given to it

@@ -97,8 +97,8 @@ class raw_data_handler final : public data_handler {
   /**
    * This function returns a pointer to the immutable stored data.
    */
-  const_data_accessor_t get_const_data(const common::execution_context& context = {})
-    requires(requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; });
+  const_data_accessor_t get_const_data(const common::execution_context& context = {}) requires(
+      requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; });
 
   std::string description() const override { return desc; }
 

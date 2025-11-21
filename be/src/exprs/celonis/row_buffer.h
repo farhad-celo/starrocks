@@ -10,9 +10,9 @@ using RowIdxType = std::size_t;
 using ColumnIdxType = std::size_t;
 
 template <typename T>
-concept RowBufferSupportedType =
-        SerializableType<T> && (std::is_arithmetic_v<T> || std::is_same_v<T, Slice> || std::is_same_v<T, DateValue> ||
-                                std::is_same_v<T, TimestampValue> || std::is_same_v<T, DecimalV2Value>);
+concept RowBufferSupportedType = SerializableType<T> &&
+        (std::is_arithmetic_v<T> || std::is_same_v<T, Slice> || std::is_same_v<T, DateValue> ||
+         std::is_same_v<T, TimestampValue> || std::is_same_v<T, DecimalV2Value>);
 
 class RowBufferRowAccessor {
 public:

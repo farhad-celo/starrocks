@@ -121,7 +121,7 @@ void for_each_group(ACCESSOR accessor, size_t grain_size, F f) {
 }
 
 template <typename INDEX = row_id, typename ACCESSOR, typename F, typename LOCALS>
-  requires requires(LOCALS&& locals) { locals.local(); }
+requires requires(LOCALS&& locals) { locals.local(); }
 void for_each_group(ACCESSOR accessor, size_t grain_size, F f, LOCALS&& locals) {
   const auto group_aligned_range{
       common::generate_case_aligned_blocks(accessor, legacy_embedded_ctl::cast<row_id>(accessor.size()), grain_size)};

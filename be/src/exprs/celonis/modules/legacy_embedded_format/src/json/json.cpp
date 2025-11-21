@@ -67,8 +67,8 @@ struct _Extra_visit_slot_needed<_Maybe_variant_cookie,
   struct _Variant_never_valueless : false_type {};  // NOLINT(bugprone-reserved-identifier)
 
   static constexpr bool value =
-      (is_same_v<_Maybe_variant_cookie, __variant_cookie> || is_same_v<_Maybe_variant_cookie, __variant_idx_cookie>) &&
-      !_Variant_never_valueless::value;
+      (is_same_v<_Maybe_variant_cookie, __variant_cookie> ||
+       is_same_v<_Maybe_variant_cookie, __variant_idx_cookie>)&&!_Variant_never_valueless::value;
 };
 
 template <typename _Maybe_variant_cookie>  // NOLINT(bugprone-reserved-identifier)
@@ -77,8 +77,8 @@ struct _Extra_visit_slot_needed<_Maybe_variant_cookie,
   struct _Variant_never_valueless : false_type {};  // NOLINT(bugprone-reserved-identifier)
 
   static constexpr bool value =
-      (is_same_v<_Maybe_variant_cookie, __variant_cookie> || is_same_v<_Maybe_variant_cookie, __variant_idx_cookie>) &&
-      !_Variant_never_valueless::value;
+      (is_same_v<_Maybe_variant_cookie, __variant_cookie> ||
+       is_same_v<_Maybe_variant_cookie, __variant_idx_cookie>)&&!_Variant_never_valueless::value;
 };
 }  // namespace std::__detail::__variant
 #endif

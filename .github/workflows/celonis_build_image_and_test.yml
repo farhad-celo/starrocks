@@ -1,0 +1,95 @@
+name: celonis_build_image_and_test.yml
+run-name: 'Celostar-Starrocks Build Image and Test: ${{ github.ref_name }}'
+on:
+  push:
+    branches:
+      - gh-branch-3.5-6ff4e436-2025-11-25T03-10-06
+
+
+permissions:
+  contents: write
+  # Needed for the 'trilom/file-changes-action' action
+  pull-requests: read
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+  GITHUB_USERNAME: ${{ github.repository }}
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest
+
+jobs:
+  build-arm:
+    runs-on: [ runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}" ]
+    outputs:
+      artifact_image_tag: ${{ env.RANDOM_TAG }}
+      allin1_image: ${{ env.RANDOM_TAG }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Pull dev env image
+        run: |
+          echo ${{ env.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+          docker pull ${{ env.BUILDER }}
+
+      - name: Generate random image tag
+        id: tag
+        run: echo "RANDOM_TAG=$(uuidgen | tr 'A-Z' 'a-z')" >> $GITHUB_ENV
+
+      - name: Build artifact image
+        id: build-artifact
+        uses: ./.github/actions/build-artifact
+        with:
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.RANDOM_TAG }}
+          to_push: 'true'
+
+      - name: Build and push allin1 image
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.RANDOM_TAG }}
+          image_tag: ${{ env.RANDOM_TAG }}
+          pull_artifact: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Build and push fe-be
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.RANDOM_TAG }}
+          image_tag: ${{ env.RANDOM_TAG }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+
+  celostar-compliance-test:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: build-arm
+    env:
+      test_image_tag: ${{ needs.build-arm.outputs.allin1_image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run celostar compliance test
+        id: run-test
+        uses: ./.github/actions/trigger-celostar-test
+        with:
+          owner: celonis
+          repo: celostar
+          workflow_file: "compliance-test.yml"
+          payload: '{\"event_type\":\"trigger_compliance_test\",\"client_payload\":{\"image_tag\":\"${test_image_tag}\"}}'
+
+      - name: Summarize the result
+        if: always() && steps.run-test.outcome != 'skipped'
+        run: |
+          {
+            echo "The compliance test workflow is: ${{steps.run-test.outputs.workflow_url}}"
+          } >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true

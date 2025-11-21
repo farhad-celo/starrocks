@@ -26,7 +26,7 @@ env:
   RELEASE_VERSION: presubmit-test
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  Builder: ghcr.io/celonis/celostar/starrocks-dev-env:3.5.6-2e5f7565
+  Builder: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest
 
 jobs:
   presubmit-test:

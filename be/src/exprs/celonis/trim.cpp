@@ -36,7 +36,7 @@ void trim_if(std::string& value, const phmap::flat_hash_set<char, StdHash<char>>
 }
 
 template <typename TrimFn>
-    requires std::invocable<TrimFn, std::string&, int32_t>
+requires std::invocable<TrimFn, std::string&, int32_t>
 [[nodiscard]] ColumnPtr trim_for_each(
         const ColumnPtr& input_column, TrimFn&& trim_fn,
         const std::optional<ColumnViewer<TYPE_VARCHAR>>& characters_column = std::nullopt) {

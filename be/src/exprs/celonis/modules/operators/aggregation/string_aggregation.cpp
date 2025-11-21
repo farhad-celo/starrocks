@@ -1238,8 +1238,8 @@ struct column_info<true> {
   const memory::column_t& column;
 };
 template <typename... MAYBE_COLUMN>
-  requires(std::is_convertible_v<MAYBE_COLUMN &&, const memory::column_t&> && ...) && (sizeof...(MAYBE_COLUMN) < 2)
-column_info(row_id, MAYBE_COLUMN&&...) -> column_info<(sizeof...(MAYBE_COLUMN) > 0)>;
+requires(std::is_convertible_v<MAYBE_COLUMN&&, const memory::column_t&>&&...) &&
+    (sizeof...(MAYBE_COLUMN) < 2) column_info(row_id, MAYBE_COLUMN&&...)->column_info<(sizeof...(MAYBE_COLUMN) > 0)>;
 #endif
 
 /**
@@ -1293,8 +1293,8 @@ struct exec_parallel_string_aggregation {
   }
 
   template <class ACCESSOR>
-    requires std::is_integral_v<std::remove_reference_t<decltype(std::declval<ACCESSOR>()[row_id{}])>>
-  decltype(auto) operator()(const ACCESSOR & string_col_ptrs_ac) {
+  requires std::is_integral_v<std::remove_reference_t<decltype(std::declval<ACCESSOR>()[row_id{}])>>
+  decltype(auto) operator()(const ACCESSOR& string_col_ptrs_ac) {
     if (output_row_count == 0) {
 #ifndef CELOSTAR
       if constexpr (COMPUTE_STRINGS) {

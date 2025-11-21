@@ -79,7 +79,7 @@ class replay_caches {
   //  across query executions by having it in the cube. Same for the other caches
   class enabled_transitions_cache enabled_transitions_cache_;
 
-  class non_conforming_prefix_cache non_conforming_prefix_cache_{};
+  class non_conforming_prefix_cache non_conforming_prefix_cache_ {};
 
   class linearized_transitions_cache linearized_transitions_cache_;
 };

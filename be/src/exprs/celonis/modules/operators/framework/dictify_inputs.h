@@ -70,10 +70,9 @@ struct all_inputs {
 
 struct specific_inputs {
   template <typename... ARGS>
-    requires(sizeof...(ARGS) > 0 &&
-             (legacy_embedded_ctl::is_one_of_v<ARGS, framework::operator_node*, framework::operator_node_pointers_t> &&
-              ...))
-  explicit specific_inputs(const ARGS&... operator_nodes)
+  requires(sizeof...(ARGS) > 0 &&
+           (legacy_embedded_ctl::is_one_of_v<ARGS, framework::operator_node*, framework::operator_node_pointers_t> &&
+            ...)) explicit specific_inputs(const ARGS&... operator_nodes)
       : operator_nodes_{details::concat_operator_nodes(operator_nodes...)} {}
 
   framework::operator_node_pointers_t operator_nodes_;

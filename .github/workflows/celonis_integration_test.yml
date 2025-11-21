@@ -13,7 +13,7 @@ on:
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.5.6
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5.6-2e5f7565
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 

@@ -132,8 +132,9 @@ void process_tree::sequence::recalculate_counts() { object_count = children.fron
 const std::vector<process_tree::count_type>& process_tree::get_redo_count() const {
   static const std::vector<process_tree::count_type> empty_{std::vector<process_tree::count_type>()};
 
-  return std::visit(legacy_embedded_ctl::overloaded([](const redo& p) -> auto& { return p.child_redo_counts; },
-                                                    [](const auto& /*unused*/) -> auto& { return empty_; }),
+  return std::visit(legacy_embedded_ctl::overloaded(
+                        [](const redo& p) -> auto& { return p.child_redo_counts; },
+                        [](const auto& /*unused*/) -> auto& { return empty_; }),
                     node);
 }
 
@@ -267,7 +268,9 @@ void collapse_children_of_equal_type<process_tree::exclusive>(process_tree::excl
         }
         return excl;
       },
-      [](const auto& child, const auto& count) { return std::pair{child, count}; });
+      [](const auto& child, const auto& count) {
+        return std::pair{child, count};
+      });
 }
 
 void minimize_children(process_tree::parent& parent_node) {

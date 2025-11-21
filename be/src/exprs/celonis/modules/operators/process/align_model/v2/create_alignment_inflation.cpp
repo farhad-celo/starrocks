@@ -102,7 +102,7 @@ struct alignment_columns {
         vertex_label(vertex_label),
         move_type(move_type),
         activity_index(activity_index),
-        deviation_category(deviation_category) {};
+        deviation_category(deviation_category){};
 };
 
 struct association_columns {
@@ -139,7 +139,7 @@ struct association_columns {
         model_vertex_id(model_vertex_id),
         vertex_label(vertex_label),
         move_type(move_type),
-        deviation_category(deviation_category) {};
+        deviation_category(deviation_category){};
 };
 
 using buffer_lookup_t = std::unordered_set<std::string_view>;

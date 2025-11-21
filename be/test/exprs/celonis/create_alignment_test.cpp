@@ -257,9 +257,9 @@ public:
 
 protected:
     CelonisCreateAlignmentTest()
-            : arg_types_{{AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-                          AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))}},
-              return_type_(AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))) {
+            : arg_types_{{TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                          TypeDescriptor::from_logical_type(TYPE_VARCHAR)}},
+              return_type_(TypeDescriptor::from_logical_type(TYPE_STRUCT)) {
         // Initialize the struct type descriptor properly
         auto struct_desc = TypeDescriptor::from_logical_type(TYPE_STRUCT);
         std::vector<TypeDescriptor> children = {celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR),
@@ -285,7 +285,7 @@ protected:
         }
         struct_desc.children = std::move(children);
         struct_desc.field_names = std::move(field_names);
-        return_type_ = AnyValUtil::column_type_to_type_desc(struct_desc);
+        return_type_ = struct_desc;
     }
 
     void SetUp() override {}
@@ -293,10 +293,8 @@ protected:
     void TearDown() override {}
 
 private:
-    FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR =
-            AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_VARCHAR));
-    FunctionContext::TypeDesc TYPEDESC_ARRAY_BIGINT =
-            AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT));
+    FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
+    FunctionContext::TypeDesc TYPEDESC_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
 
     class Evaluator {
     public:

@@ -908,6 +908,12 @@ public class FunctionSet {
                     .add(INTERSECT_COUNT)
                     .add(LC_PERCENTILE_DISC)
                     .add(MAP_AGG)
+                    // Celonis functions
+                    .add(CELONIS_BUILD_LINEAR_REGRESSION_MODEL)
+                    .add(CELONIS_MAKE_FACTORY_CALENDAR)
+                    .add(CELONIS_MAKE_WEEKDAY_CALENDAR)
+                    .add(CELONIS_MAKE_WORKDAY_CALENDAR)
+                    .add(MULTI_ARRAY_AGG)
                     .build();
 
     public static final Set<String> RANK_RALATED_FUNCTIONS =

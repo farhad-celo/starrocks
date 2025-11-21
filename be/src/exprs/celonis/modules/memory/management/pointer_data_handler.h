@@ -161,9 +161,9 @@ class pointer_data_handler final : public data_handler {
 
 #ifndef CELOSTAR
   template <typename TYPE>
-  [[nodiscard]] loaded_data<TYPE> swap_in_impl(const std::string& swap_file, std::atomic<size_t>& size,
-                                               std::atomic<size_t>& size_on_disk, std::atomic<bool>& broken_swap_file)
-    requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>);
+  [[nodiscard]] loaded_data<TYPE> swap_in_impl(
+      const std::string& swap_file, std::atomic<size_t>& size, std::atomic<size_t>& size_on_disk,
+      std::atomic<bool>& broken_swap_file) requires(std::is_same_v<TYPE, STORAGE_T> || std::is_same_v<TYPE, POINTER_T>);
 #endif
 
   // The following functions are used only for enabling gdb_verify_command_test.py - CPL-9353

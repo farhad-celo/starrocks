@@ -13,7 +13,7 @@ concurrency:
 env:
   SOURCE_BRANCH: branch-3.3-f2255f48-celo
   TARGET_BRANCH: celostar-3.5.6-dev
-  Builder: ghcr.io/celonis/celostar/starrocks-dev-env:3.5.6-2e5f7565
+  Builder: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest
 
 jobs:
   merge-to-target:

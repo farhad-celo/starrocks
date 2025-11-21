@@ -21,7 +21,7 @@ struct SortDescriptor {
 
 template <typename T>
 concept ComparableType = std::is_arithmetic_v<T> || std::is_same_v<T, Slice> || std::is_same_v<T, DateValue> ||
-                         std::is_same_v<T, TimestampValue> || std::is_same_v<T, DecimalV2Value>;
+        std::is_same_v<T, TimestampValue> || std::is_same_v<T, DecimalV2Value>;
 
 struct DatumComparator {
     inline CmpResult operator()(Datum& lhs, Datum& rhs, SortDescriptor sort_desc);
@@ -32,17 +32,13 @@ struct DatumComparator {
 namespace {
 
 template <typename T>
-CmpResult cmp(const T& lhs, const T& rhs)
-    requires ComparableType<T>
-{
+CmpResult cmp(const T& lhs, const T& rhs) requires ComparableType<T> {
     return static_cast<CmpResult>(SorterComparator<T>::compare(lhs, rhs));
 }
 
 template <typename T>
-    requires std::is_arithmetic_v<T>
-CmpResult cmp(const T& lhs, const T& rhs)
-    requires ComparableType<T>
-{
+requires std::is_arithmetic_v<T> CmpResult cmp(const T& lhs, const T& rhs)
+requires ComparableType<T> {
     return static_cast<CmpResult>(SorterComparator<T>::compare(lhs, rhs));
 }
 

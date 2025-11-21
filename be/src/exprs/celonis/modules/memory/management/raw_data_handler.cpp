@@ -429,9 +429,8 @@ template <typename T>
 #endif
 
 template <typename T>
-const_data_accessor<T> raw_data_handler<T>::get_const_data(const common::execution_context& context)
-  requires(requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; })
-{
+const_data_accessor<T> raw_data_handler<T>::get_const_data(const common::execution_context& context) requires(
+    requires(legacy_embedded_ctl::shared_static_array<T> ptr) { const_data_accessor<T>{ptr}; }) {
   last_usage = mem_clock_t::now();
   usage_count++;
 

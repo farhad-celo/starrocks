@@ -16,7 +16,7 @@ struct signed_to_unsigned {
 };
 
 template <typename T>
-    requires std::is_unsigned_v<T>
+requires std::is_unsigned_v<T>
 struct signed_to_unsigned<T> {
     using Type = std::make_signed_t<T>;
 };
@@ -29,7 +29,7 @@ template <typename T>
 struct TestedValues {};
 
 template <typename T>
-    requires std::is_arithmetic_v<T>
+requires std::is_arithmetic_v<T>
 struct TestedValues<T> {
     static constexpr T LOW_VALUE{std::numeric_limits<T>::min()};
     // Starrocks automatically converts unsigned to signed types, so we cannot use a value that would become negative

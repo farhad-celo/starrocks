@@ -15,7 +15,7 @@ class RowAccessor {
 public:
     using SliceSizeType = uint32_t;
 
-    RowAccessor(FunctionContext* ctx) : ctx_(ctx) {};
+    RowAccessor(FunctionContext* ctx) : ctx_(ctx){};
     virtual ~RowAccessor() = default;
 
     // Seeks to the next column and returns true if it is NULL.
@@ -194,9 +194,13 @@ public:
         current_ = row_;
     }
 
-    size_t serialized_size() override { return size_; }
+    size_t serialized_size() override {
+        return size_;
+    }
 
-    virtual void serialize(uint8_t* dst) override { memcpy(dst, row_, size_); }
+    virtual void serialize(uint8_t* dst) override {
+        memcpy(dst, row_, size_);
+    }
 
 private:
     const uint8_t* row_;
