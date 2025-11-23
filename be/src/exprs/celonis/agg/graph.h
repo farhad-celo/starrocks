@@ -31,6 +31,12 @@ private:
     uint64_t merging_microseconds_ = 0;
     uint64_t merging_bytes_ = 0;
     uint64_t merging_states_ = 0;
+
+    // Reusable tracking containers to avoid repeated allocations in update()
+    // Tracks which activities have been updated in current case
+    std::vector<uint8_t> activity_updated_count_cases_;
+    // Tracks which edges have been updated in current case
+    phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> edge_updated_count_cases_;
 };
 
 /**

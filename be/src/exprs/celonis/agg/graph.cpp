@@ -61,9 +61,10 @@ void CelonisGraphAggregateState::update(FunctionContext* ctx, const Column** col
     size_t mem = 0;
     size_t n = c_offset[row_num + 1] - c_offset[row_num];
 
-    // Using vector<uint8_t> instead of vector<bool> for performance reasons. Logically it's a vector of bools.
-    std::vector<uint8_t> activity_updated_count_cases(activity_map_.size(), 0);
-    phmap::flat_hash_set<Edge, HashOnEdge, EqualOnEdge> edge_updated_count_cases;
+    // Clear and prepare reusable tracking containers
+    activity_updated_count_cases_.assign(activity_map_.size(), 0);
+    edge_updated_count_cases_.clear();
+
     int32_t prev_activity_id = -1;
     int32_t start_activity_id = -1;
     int32_t end_activity_id = -1;
@@ -77,18 +78,18 @@ void CelonisGraphAggregateState::update(FunctionContext* ctx, const Column** col
         int32_t activity_id =
                 maybe_add_activity(b_elements->get_slice(offset), ctx->mem_pool(), activity_map_, &mem).first;
         activity_stats_.resize(activity_map_.size());
-        activity_updated_count_cases.resize(activity_map_.size(), 0);
+        activity_updated_count_cases_.resize(activity_map_.size(), 0);
         ActivityStats& a_stats = activity_stats_[activity_id];
         a_stats.count += count;
-        if (activity_updated_count_cases[activity_id] == 0) {
-            activity_updated_count_cases[activity_id] = 1;
+        if (activity_updated_count_cases_[activity_id] == 0) {
+            activity_updated_count_cases_[activity_id] = 1;
             a_stats.count_case += count;
         }
         if (prev_activity_id >= 0) {
             Edge e(prev_activity_id, activity_id);
             auto& e_stats = edge_stats_[e];
             e_stats.count += count;
-            auto [it, inserted] = edge_updated_count_cases.insert(e);
+            auto [it, inserted] = edge_updated_count_cases_.insert(e);
             if (inserted) {
                 e_stats.count_case += count;
             }
