@@ -631,16 +631,27 @@ StatusOr<ColumnPtr> CelonisStringFunctions::sanitize_invalid_utf8(starrocks::Fun
             continue;
         }
 
-        // Sanitization logic is copied from query-engine/src/main/native/cpm-accelerator/modules/format/src/utf/utf_utils.cpp
-        // in cpm-query-engine repository.
-        auto input = std::string_view(str_viewer.value(row));
-        size_t found = input.find('\0');
-        input = input.substr(0, found);
+        auto input_slice = str_viewer.value(row);
+        const char* data = input_slice.data;
+        size_t size = input_slice.size;
+        // Truncate at first '\0'
+        const void* null_pos = std::memchr(data, '\0', size);
+        if (null_pos != nullptr) {
+            size = static_cast<const char*>(null_pos) - data;
+        }
+        if (simdutf::validate_utf8(data, size)) {
+            result.append(Slice(data, size));
+            continue;
+        }
         sanitized.clear();
-        sanitized.reserve(input.length());
-        for (const auto* itr = input.begin(); itr != input.end();) {
+        sanitized.reserve(size);
+        const char* itr = data;
+        const char* end = data + size;
+        while (itr < end) {
             const char* start = itr;
-            const auto decoded{boost::locale::utf::utf_traits<char>::decode(itr, input.end())};
+            // Sanitization logic is copied from query-engine/src/main/native/cpm-accelerator/modules/format/src/utf/utf_utils.cpp
+            // in cpm-query-engine repository.
+            const auto decoded{boost::locale::utf::utf_traits<char>::decode(itr, end)};
             if (decoded == boost::locale::utf::illegal || decoded == boost::locale::utf::incomplete) {
                 sanitized.push_back(REPLACEMENT_CHAR);
             } else {
