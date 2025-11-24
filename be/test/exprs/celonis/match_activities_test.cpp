@@ -143,6 +143,20 @@ TEST_F(CelonisMatchActivitiesTest, with_nodes) {
     EXPECT_EQ(1, result->get(2).get_int64());
 }
 
+TEST_F(CelonisMatchActivitiesTest, with_duplicate_nodes) {
+    Prepare();
+    // nodes = {"A", "B"}
+    // activity = {"A", "A"} -> Should return 0.
+    activity_column_->append_datum(DatumArray{"A", "A"});
+
+    auto nodes_array = DatumArray{"A", "B"};
+    auto empty_array = DatumArray{};
+    const auto result =
+            RunConstantConfig(empty_array, nodes_array, empty_array, empty_array, empty_array, empty_array).value();
+    ASSERT_EQ(activity_column_->size(), result->size());
+    EXPECT_EQ(0, result->get(0).get_int64());
+}
+
 TEST_F(CelonisMatchActivitiesTest, with_excluding_nodes) {
     Prepare();
     activity_column_->append_datum(DatumArray{"string1", "string2"});

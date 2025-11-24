@@ -91,10 +91,10 @@ int64_t _match_activities(size_t row, const UnnestedArrayData& activity_array_da
         last_visit_index = index;
         const auto& value = activities[index];
         if (nodes.find(value) != nodes.end()) {
-            if (nodes_mode && nodes_seen.size() + 1 == nodes.size()) {
+            nodes_seen.insert(value);
+            if (nodes_mode && nodes_seen.size() == nodes.size()) {
                 return 1L;
             }
-            nodes_seen.insert(value);
         }
 
         // activity array does not contain all the activities in nodes, return early.
