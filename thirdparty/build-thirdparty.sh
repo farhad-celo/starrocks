@@ -1571,6 +1571,10 @@ build_libxml2
 build_azure
 build_libdivide
 
+# Build thirdparties only used by Celonis.
+. ${TP_DIR}/build-thirdparty-celonis.sh
+build_thirdparty_celonis
+
 if [[ "${MACHINE_TYPE}" != "aarch64" ]]; then
     build_breakpad
     build_libdeflate
