@@ -110,28 +110,34 @@ struct CelonisKMeansModelAggregateState {
         size_t num_features;
         memcpy(&num_features, src, sizeof(size_t));
         src += sizeof(size_t);
-        if (num_features_ <= 0) {
-            num_features_ = num_features;
-        } else {
-            if (num_features_ != num_features) {
-                inconsistent_dimension_ = true;
-                return;
-            }
-        }
+
         size_t num_points = 0;
         memcpy(&num_points, src, sizeof(size_t));
         src += sizeof(size_t);
-        num_points_ += num_points;
-        for (auto i = 0; i < num_points; ++i) {
+
+        if (num_points > 0) {
+            if (num_features_ <= 0) {
+                num_features_ = num_features;
+            } else {
+                if (num_features_ != num_features) {
+                    inconsistent_dimension_ = true;
+                    return;
+                }
+            }
+
+            num_points_ += num_points;
             std::vector<double> point;
             point.reserve(num_features_);
-            for (auto j = 0; j < num_features_; ++j) {
-                double num = 0.0;
-                memcpy(&num, src, sizeof(double));
-                src += sizeof(double);
-                point.push_back(num);
+            for (auto i = 0; i < num_points; ++i) {
+                point.clear();
+                for (auto j = 0; j < num_features_; ++j) {
+                    double num = 0.0;
+                    memcpy(&num, src, sizeof(double));
+                    src += sizeof(double);
+                    point.push_back(num);
+                }
+                points_.push_back(point);
             }
-            points_.push_back(point);
         }
         DCHECK_EQ(src, end);
     }
