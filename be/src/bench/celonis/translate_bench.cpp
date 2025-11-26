@@ -13,25 +13,31 @@
 namespace starrocks {
 
 /*
-2025-06-08T11:29:50+00:00
+2025-11-26T18:47:45+00:00
 Running ./be/build_Release/src/bench/celonis/output/translate_bench
-Run on (32 X 2445.43 MHz CPU s)
+Run on (32 X 3246.79 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 12.36, 9.10, 6.62
+Load Average: 7.92, 6.37, 3.49
 // Args: Number of rows / String length
 -------------------------------------------------------------------------------------------
 Benchmark                                 Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------
-BM_TranslateCommonCase/1000/20       237189 ns       237192 ns         2950 RowInvRate=237.192ns
-BM_TranslateCommonCase/10000/20     2338438 ns      2338418 ns          299 RowInvRate=233.842ns
-BM_TranslateCommonCase/100000/20   23288693 ns     23288109 ns           30 RowInvRate=232.881ns
-BM_TranslateCommonCase/1000/40       437283 ns       437290 ns         1598 RowInvRate=437.29ns
-BM_TranslateCommonCase/10000/40     4331049 ns      4331051 ns          161 RowInvRate=433.105ns
-BM_TranslateCommonCase/100000/40   43198463 ns     43197986 ns           16 RowInvRate=431.98ns
+BM_TranslateAsciiOnly/1000/20        249351 ns       249343 ns         2809 RowInvRate=249.343ns
+BM_TranslateAsciiOnly/10000/20      2460837 ns      2460687 ns          285 RowInvRate=246.069ns
+BM_TranslateAsciiOnly/100000/20    24446033 ns     24444854 ns           28 RowInvRate=244.449ns
+BM_TranslateAsciiOnly/1000/40        461928 ns       461918 ns         1515 RowInvRate=461.918ns
+BM_TranslateAsciiOnly/10000/40      4570476 ns      4570350 ns          153 RowInvRate=457.035ns
+BM_TranslateAsciiOnly/100000/40    45788666 ns     45788078 ns           15 RowInvRate=457.881ns
+BM_TranslateCommonCase/1000/20       242655 ns       242652 ns         2886 RowInvRate=242.652ns
+BM_TranslateCommonCase/10000/20     2393795 ns      2393815 ns          293 RowInvRate=239.382ns
+BM_TranslateCommonCase/100000/20   23816225 ns     23815505 ns           29 RowInvRate=238.155ns
+BM_TranslateCommonCase/1000/40       450953 ns       450953 ns         1554 RowInvRate=450.953ns
+BM_TranslateCommonCase/10000/40     4448631 ns      4448506 ns          157 RowInvRate=444.851ns
+BM_TranslateCommonCase/100000/40   44453946 ns     44450884 ns           16 RowInvRate=444.509ns
 */
 
 std::string gen_random_str(int min_length, int max_length) {
@@ -100,11 +106,16 @@ static void do_bench(benchmark::State& state, const std::string& pattern, const 
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
 }
 
+static void BM_TranslateAsciiOnly(benchmark::State& state) {
+    do_bench(state, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz");
+}
+
 static void BM_TranslateCommonCase(benchmark::State& state) {
     do_bench(state, "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ", "abcdefghijklmnopqrstuvwxyzäöü");
 }
 
 // Args: Number of rows / String length
+BENCHMARK(BM_TranslateAsciiOnly)->ArgsProduct({{1000, 10000, 100000}, {20, 40}});
 BENCHMARK(BM_TranslateCommonCase)->ArgsProduct({{1000, 10000, 100000}, {20, 40}});
 
 } // namespace starrocks
