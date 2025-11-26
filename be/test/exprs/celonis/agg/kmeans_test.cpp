@@ -419,4 +419,50 @@ TEST_F(CelonisBuildKMeansModelTest, inconsistent_point_dimension) {
     Run(points, num_clusters, random_seed, {}, {}, true);
 }
 
+TEST_F(CelonisBuildKMeansModelTest, merge_empty_state) {
+    auto points1 = DatumArray{DatumArray{1.0}, DatumArray{2.0}};
+    auto points2 = DatumArray{kNullDatum}; // Input that results in 0 valid points, but initializes num_clusters_
+    int64_t num_clusters = 1;
+    double random_seed = 0;
+
+    auto [local_ctx1, state1, func] = RunUpdate(points1, num_clusters, random_seed);
+    auto [local_ctx2, state2, func2] = RunUpdate(points2, num_clusters, random_seed);
+
+    // Serialize state2 (empty)
+    ColumnPtr serialize_col = BinaryColumn::create();
+    func->serialize_to_column(local_ctx2.get(), state2->state(), serialize_col.get());
+
+    // Merge state2 into state1
+    func->merge(local_ctx1.get(), serialize_col.get(), state1->state(), 0);
+
+    // Get the result - should not fail
+    auto result = ColumnHelper::create_column(get_return_type(), true);
+    func->finalize_to_column(local_ctx1.get(), state1->state(), result.get());
+
+    std::vector<std::vector<double>> expected_centroids = {{0.5}};
+    std::vector<std::pair<double, double>> expected_limits = {{1, 2}};
+    match_model(result->get(0).get_slice().to_string(), expected_limits, expected_centroids);
+}
+
+TEST_F(CelonisBuildKMeansModelTest, single_cluster_optimization_multi_dimensional) {
+    // Create a larger dataset with 3 features to test the compute_mean optimization
+    auto points = DatumArray{
+            DatumArray{1.0, 2.0, 3.0},    DatumArray{4.0, 5.0, 6.0},    DatumArray{7.0, 8.0, 9.0},
+            DatumArray{10.0, 11.0, 12.0}, DatumArray{13.0, 14.0, 15.0}, DatumArray{16.0, 17.0, 18.0},
+            DatumArray{19.0, 20.0, 21.0}, DatumArray{22.0, 23.0, 24.0},
+    };
+    int64_t num_clusters = 1;
+    double random_seed = 42;
+
+    // Expected mean for each dimension:
+    // Dimension 0: (1+4+7+10+13+16+19+22)/8 = 92/8 = 11.5
+    // Dimension 1: (2+5+8+11+14+17+20+23)/8 = 100/8 = 12.5
+    // Dimension 2: (3+6+9+12+15+18+21+24)/8 = 108/8 = 13.5
+    // After normalization: all become (11.5-1)/(22-1) = 10.5/21 = 0.5 for each dimension
+    std::vector<std::vector<double>> expected_centroids = {{0.5, 0.5, 0.5}};
+    std::vector<std::pair<double, double>> expected_limits = {{1.0, 22.0}, {2.0, 23.0}, {3.0, 24.0}};
+
+    Run(points, num_clusters, random_seed, expected_limits, expected_centroids);
+}
+
 } // namespace starrocks

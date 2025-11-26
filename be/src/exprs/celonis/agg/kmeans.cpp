@@ -92,6 +92,26 @@ std::string to_string(double value) {
     return decimal_str.substr(0, last_non_zero + 1);
 }
 
+// Computes the mean (centroid) of all points
+std::vector<double> compute_mean(const std::vector<std::vector<double>>& points) {
+    if (points.empty()) {
+        return {};
+    }
+    const auto npoints = points.size();
+    const auto nfeatures = points[0].size();
+    std::vector<double> mean(nfeatures, 0.0);
+    for (const auto& point : points) {
+        for (size_t i = 0; i < nfeatures; ++i) {
+            mean[i] += point[i];
+        }
+    }
+
+    for (size_t i = 0; i < nfeatures; ++i) {
+        mean[i] /= npoints;
+    }
+    return mean;
+}
+
 std::optional<std::string> to_model(const std::vector<std::pair<double, double>>& limits,
                                     const std::vector<std::vector<double>>& centroids) {
     uint64_t size = 0;
@@ -362,7 +382,11 @@ void CelonisKMeansAggregationFunction::finalize_to_column(FunctionContext* ctx, 
     DCHECK_GT(num_clusters, 0);
     std::vector<std::vector<double>> centroids;
     const auto& [limits, normalized_points] = normalize_points(points);
-    if (num_clusters == normalized_points.size()) {
+    if (num_clusters == 1) {
+        // Optimization: when k=1, simply compute the mean of all points
+        LOG(INFO) << "CELONIS_BUILD_KMEANS_MODEL: computing mean for single cluster.\n";
+        centroids.push_back(compute_mean(normalized_points));
+    } else if (num_clusters == normalized_points.size()) {
         centroids = normalized_points;
         std::sort(centroids.begin(), centroids.end());
     } else {
