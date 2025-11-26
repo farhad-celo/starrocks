@@ -63,39 +63,53 @@ void CelonisExploreProcessAggregateState::update(FunctionContext* ctx, const Col
             variant.add(idx_hash.first, idx_hash.second);
         }
     }
+    // Enlarge activity stats vectors if new activities are found.
+    activity_stats_.resize(activity_map_.size());
+    activity_self_loop_count_case_.resize(activity_map_.size());
+
     // Add the variant into the variant_map.
     variant_map_[variant] += count;
+
+    // Update activity stats.
+    if (!variant.data.empty()) {
+        activity_updated_count_cases_.assign(activity_map_.size(), 0);
+        activity_self_loop_updated_count_cases_.assign(activity_map_.size(), 0);
+        for (size_t i = 0; i < variant.data.size(); ++i) {
+            auto activity_id = variant.data[i];
+            ActivityStats& a_stats = activity_stats_[activity_id];
+            a_stats.count += count;
+            if (activity_updated_count_cases_[activity_id] == 0) {
+                activity_updated_count_cases_[activity_id] = 1;
+                a_stats.count_case += count;
+            }
+            if (i > 0 && variant.data[i - 1] == activity_id &&
+                activity_self_loop_updated_count_cases_[activity_id] == 0) {
+                activity_self_loop_updated_count_cases_[activity_id] = 1;
+                activity_self_loop_count_case_[activity_id] += count;
+            }
+        }
+        activity_stats_[variant.data[0]].count_start += count;
+        activity_stats_[variant.data[variant.data.size() - 1]].count_end += count;
+    }
 
     ctx->add_mem_usage(memory);
 }
 
 void CelonisExploreProcessAggregateState::serialize_to_column(FunctionContext* ctx, Column* to) const {
-    // The current implementation assumes that `activity_stats_` is empty when this function is called.
-    // We explicitly enforce this assumption to be true. This is to prevent from returning wrong results given
-    // unexpected changes in the engine which breaks the assumption.
-    if (!activity_stats_.empty()) {
-        ctx->set_error(std::string("CELONIS_EXPLORE_PROCESS: unexpected non-empty activity_stats_ during serialization")
-                               .c_str(),
-                       false);
-        return;
-    }
     // append our serialized state to column "to"
     auto* column = down_cast<BinaryColumn*>(ColumnHelper::get_data_column(to));
     if (to->is_nullable()) {
         down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
     }
 
-    auto activity_stats_pair = get_activity_stats_from_variant_map();
-
     const std::string log_prefix = get_log_prefix(ctx);
-    const auto& variant_map = min_variant_count_threshold_on_leaf_ <= 1
-                                      ? variant_map_
-                                      : get_trimmed_variant_map(log_prefix, activity_stats_pair.first);
+    const auto& variant_map =
+            min_variant_count_threshold_on_leaf_ <= 1 ? variant_map_ : get_trimmed_variant_map(log_prefix);
 
     size_t old_size = column->get_bytes().size();
-    size_t new_size = old_size + serialized_size(variant_map, activity_stats_pair);
+    size_t new_size = old_size + serialized_size(variant_map);
     column->get_bytes().resize(new_size);
-    serialize(column->get_bytes().data() + old_size, variant_map, activity_stats_pair);
+    serialize(column->get_bytes().data() + old_size, variant_map);
     column->get_offset().emplace_back(new_size);
 }
 
@@ -204,41 +218,7 @@ void CelonisExploreProcessAggregateState::finalize_to_column(FunctionContext* ct
     down_cast<BinaryColumn*>(to)->append(rv.value());
 }
 
-std::pair<std::vector<ActivityStats>, std::vector<size_t>>
-CelonisExploreProcessAggregateState::get_activity_stats_from_variant_map() const {
-    size_t activity_size = activity_map_.size();
-    std::vector<ActivityStats> activity_stats(activity_size);
-    std::vector<size_t> activity_self_loop_count_case(activity_size);
-
-    std::vector<size_t> activity_last_saw_variant(activity_size);
-    std::vector<size_t> activity_self_loop_last_saw_variant(activity_size);
-
-    for (const auto& [variant, count] : variant_map_) {
-        if (variant.data.size() != 0) {
-            activity_stats[variant.data.front()].count_start += count;
-            activity_stats[variant.data.back()].count_end += count;
-        }
-        for (int i = 0; i < variant.data.size(); i++) {
-            auto activity_id = variant.data[i];
-            ActivityStats& a_stats = activity_stats[activity_id];
-            a_stats.count += count;
-            if (activity_last_saw_variant[activity_id] != variant.hash) {
-                a_stats.count_case += count;
-                activity_last_saw_variant[activity_id] = variant.hash;
-            }
-            if (i > 0 && variant.data[i - 1] == activity_id &&
-                activity_self_loop_last_saw_variant[activity_id] != variant.hash) {
-                activity_self_loop_count_case[activity_id] += count;
-                activity_self_loop_last_saw_variant[activity_id] = variant.hash;
-            }
-        }
-    }
-
-    return {activity_stats, activity_self_loop_count_case};
-}
-
-VariantHashMap CelonisExploreProcessAggregateState::get_trimmed_variant_map(
-        const std::string& log_prefix, const std::vector<ActivityStats>& activity_stats) const {
+VariantHashMap CelonisExploreProcessAggregateState::get_trimmed_variant_map(const std::string& log_prefix) const {
     auto time_start = std::chrono::steady_clock::now();
 
     std::vector<VRef> sorted_vrefs;
@@ -261,7 +241,7 @@ VariantHashMap CelonisExploreProcessAggregateState::get_trimmed_variant_map(
 
     VariantHashMap trimmed_variant_map;
 
-    auto count_range = activity_stats | std::views::transform(&ActivityStats::count);
+    auto count_range = activity_stats_ | std::views::transform(&ActivityStats::count);
     std::vector<size_t> activity_remaining_count(begin(count_range), end(count_range));
 
     // Trim low-count variants (below threshold) unless they contain the last occurrence of any activity
@@ -304,13 +284,8 @@ VariantHashMap CelonisExploreProcessAggregateState::get_trimmed_variant_map(
     return trimmed_variant_map;
 }
 
-void CelonisExploreProcessAggregateState::serialize(
-        uint8_t* dst, const VariantHashMap& variant_map,
-        const std::pair<std::vector<ActivityStats>, std::vector<size_t>>& activity_stats_pair) const {
-    const auto& activity_stats = activity_stats_pair.first;
-    const auto& activity_self_loop_count_case = activity_stats_pair.second;
-
-    DCHECK_EQ(activity_map_.size(), activity_stats.size());
+void CelonisExploreProcessAggregateState::serialize(uint8_t* dst, const VariantHashMap& variant_map) const {
+    DCHECK_EQ(activity_map_.size(), activity_stats_.size());
 
     dst = serialize_activity_map(dst, activity_map_);
     dst = serialize_variant_map(dst, variant_map);
@@ -319,8 +294,8 @@ void CelonisExploreProcessAggregateState::serialize(
     size_t num_activities = activity_map_.size();
     memcpy(dst, &num_activities, sizeof(size_t));
     dst += sizeof(size_t);
-    for (size_t i = 0; i < activity_stats.size(); ++i) {
-        const auto& stats = activity_stats[i];
+    for (size_t i = 0; i < activity_stats_.size(); ++i) {
+        const auto& stats = activity_stats_[i];
         memcpy(dst, &stats.count, sizeof(size_t));
         dst += sizeof(size_t);
         memcpy(dst, &stats.count_case, sizeof(size_t));
@@ -329,7 +304,7 @@ void CelonisExploreProcessAggregateState::serialize(
         dst += sizeof(size_t);
         memcpy(dst, &stats.count_end, sizeof(size_t));
         dst += sizeof(size_t);
-        size_t self_loop_count_case = activity_self_loop_count_case[i];
+        size_t self_loop_count_case = activity_self_loop_count_case_[i];
         memcpy(dst, &self_loop_count_case, sizeof(size_t));
         dst += sizeof(size_t);
     }
@@ -341,9 +316,7 @@ void CelonisExploreProcessAggregateState::serialize(
     dst += sizeof(uint8_t);
 }
 
-size_t CelonisExploreProcessAggregateState::serialized_size(
-        const VariantHashMap& variant_map,
-        const std::pair<std::vector<ActivityStats>, std::vector<size_t>>& activity_stats_pair) const {
+size_t CelonisExploreProcessAggregateState::serialized_size(const VariantHashMap& variant_map) const {
     // Activities Dictionary and Variant Statistics
     size_t result = 0;
     result += get_serialized_size(activity_map_);
@@ -352,7 +325,7 @@ size_t CelonisExploreProcessAggregateState::serialized_size(
     // activity_stats
     result += sizeof(size_t); // num_activities
     result += 5 * sizeof(size_t) *
-              activity_stats_pair.first.size(); // Combined size of activity_stats_ and activity_self_loop_count_case_
+              activity_stats_.size(); // Combined size of activity_stats_ and activity_self_loop_count_case_
 
     result += sizeof(int64_t); // min_variant_count_threshold_on_leaf_
     result += sizeof(uint8_t); // enable_proto_encoding_

@@ -13,19 +13,13 @@ public:
     void finalize_to_column(FunctionContext* ctx, Column* to) const;
 
 private:
-    // Computes activity stats from the variant_map_ state.
-    // Returns a pair whose first is a list of `ActivityStats`, and second is a list of activity_self_loop_count_case stats
-    std::pair<std::vector<ActivityStats>, std::vector<size_t>> get_activity_stats_from_variant_map() const;
     // Drops variants whose counts are smaller than min_variant_count_threshold_on_leaf_. When intending to drop a
     // variant, it is checked whether dropping it will incur a "phantom" activity in the serialized data. If yes, the
     // variant won't be dropped. A phantom activity means that it's not associated with any variant.
     // Variants are sorted ascendingly before the drop happens.
-    VariantHashMap get_trimmed_variant_map(const std::string& log_prefix,
-                                           const std::vector<ActivityStats>& activity_stats) const;
-    void serialize(uint8_t* dst, const VariantHashMap& variant_map,
-                   const std::pair<std::vector<ActivityStats>, std::vector<size_t>>& activity_stats_pair) const;
-    size_t serialized_size(const VariantHashMap& variant_map,
-                           const std::pair<std::vector<ActivityStats>, std::vector<size_t>>& activity_stats_pair) const;
+    VariantHashMap get_trimmed_variant_map(const std::string& log_prefix) const;
+    void serialize(uint8_t* dst, const VariantHashMap& variant_map) const;
+    size_t serialized_size(const VariantHashMap& variant_map) const;
 
     std::optional<std::string> base64_encoded_string(const VariantAnalysisResult& variant_analysis,
                                                      const std::string& log_prefix) const;
@@ -44,6 +38,13 @@ private:
     uint64_t merging_microseconds_ = 0;
     uint64_t merging_bytes_ = 0;
     uint64_t merging_states_ = 0;
+
+    // Reusable tracking containers to avoid repeated allocations in update()
+    // Using vector<uint8_t> instead of vector<bool> for performance reasons. Logically it's a vector of bools.
+    // Tracks which activities have been updated in current case
+    std::vector<uint8_t> activity_updated_count_cases_;
+    // Tracks which activities' self-loops have been updated in current case
+    std::vector<uint8_t> activity_self_loop_updated_count_cases_;
 };
 
 /**
