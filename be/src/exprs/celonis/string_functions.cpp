@@ -25,6 +25,28 @@ namespace starrocks {
 
 namespace {
 
+static const uint8_t* ASCII_TO_LOWER_MAP = []() {
+    static uint8_t map[256];
+    for (int i = 0; i < 256; ++i) {
+        map[i] = static_cast<uint8_t>(i); // Default: no change
+    }
+    for (int i = 'A'; i <= 'Z'; ++i) {
+        map[i] = static_cast<uint8_t>(i + 32); // Convert uppercase ASCII to lowercase
+    }
+    return map;
+}();
+
+static const uint8_t* ASCII_TO_UPPER_MAP = []() {
+    static uint8_t map[256];
+    for (int i = 0; i < 256; ++i) {
+        map[i] = static_cast<uint8_t>(i); // Default: no change
+    }
+    for (int i = 'a'; i <= 'z'; ++i) {
+        map[i] = static_cast<uint8_t>(i - 32); // Convert lowercase ASCII to uppercase
+    }
+    return map;
+}();
+
 constexpr std::string_view CELONIS_XX_HASH3_128_V2 = "CELONIS_XX_HASH3_128_V2";
 constexpr std::string_view CELONIS_XX_HASH3_128_V3 = "CELONIS_XX_HASH3_128_V3";
 constexpr std::string_view CELONIS_XX_HASH3_128_V4 = "CELONIS_XX_HASH3_128_V4";
@@ -540,9 +562,7 @@ public:
         for (size_t i = 0; i < size; ++i) {
             char ch = src_ptr[i];
 
-            if ('A' <= ch && ch <= 'Z') {
-                dst_ptr[i] = ch + 32;
-            } else if (ch == '\xC3' && (i + 1) < size) {
+            if (UNLIKELY(ch == '\xC3' && (i + 1) < size)) {
                 // Character: Ä | UTF-8 Bytes: ['0xC3', '0x84']
                 // Character: Ö | UTF-8 Bytes: ['0xC3', '0x96']
                 // Character: Ü | UTF-8 Bytes: ['0xC3', '0x9C']
@@ -554,7 +574,7 @@ public:
                     dst_ptr[i] = ch;
                 }
             } else {
-                dst_ptr[i] = ch;
+                dst_ptr[i] = ASCII_TO_LOWER_MAP[static_cast<uint8_t>(ch)];
             }
         }
 
@@ -590,9 +610,7 @@ public:
         for (size_t i = 0; i < size; ++i) {
             char ch = src_ptr[i];
 
-            if ('a' <= ch && ch <= 'z') {
-                dst_ptr[i] = ch - 32;
-            } else if (ch == '\xC3' && (i + 1) < size) {
+            if (UNLIKELY(ch == '\xC3' && (i + 1) < size)) {
                 // Character: ä | UTF-8 Bytes: ['0xC3', '0xA4']
                 // Character: ö | UTF-8 Bytes: ['0xC3', '0xB6']
                 // Character: ü | UTF-8 Bytes: ['0xC3', '0xBC']
@@ -604,7 +622,7 @@ public:
                     dst_ptr[i] = ch;
                 }
             } else {
-                dst_ptr[i] = ch;
+                dst_ptr[i] = ASCII_TO_UPPER_MAP[static_cast<uint8_t>(ch)];
             }
         }
 

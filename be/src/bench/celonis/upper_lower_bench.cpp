@@ -13,31 +13,31 @@
 namespace starrocks {
 
 /*
-2025-07-29T22:50:04+00:00
+2025-11-25T10:46:21+00:00
 Running ./be/build_Release/src/bench/celonis/output/upper_lower_bench
-Run on (32 X 3289.17 MHz CPU s)
+Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
   L1 Data 32 KiB (x16)
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 4.44, 4.70, 2.99
+Load Average: 7.33, 5.95, 4.15
 // Args: Number of rows / Average string length
 -----------------------------------------------------------------------------
 Benchmark                   Time             CPU   Iterations UserCounters...
 -----------------------------------------------------------------------------
-BM_Upper/10000/10      367237 ns       366652 ns         1904 RowInvRate=36.6652ns
-BM_Upper/100000/10    3555056 ns      3554382 ns          198 RowInvRate=35.5438ns
-BM_Upper/10000/20      707189 ns       706971 ns          988 RowInvRate=70.6971ns
-BM_Upper/100000/20    7009578 ns      7008924 ns           99 RowInvRate=70.0892ns
-BM_Upper/10000/40     1411637 ns      1411394 ns          496 RowInvRate=141.139ns
-BM_Upper/100000/40   13980038 ns     13979172 ns           50 RowInvRate=139.792ns
-BM_Lower/10000/10      360179 ns       359970 ns         1941 RowInvRate=35.997ns
-BM_Lower/100000/10    3596964 ns      3596285 ns          196 RowInvRate=35.9628ns
-BM_Lower/10000/20      711125 ns       710901 ns          974 RowInvRate=71.0901ns
-BM_Lower/100000/20    7037106 ns      7036473 ns          100 RowInvRate=70.3647ns
-BM_Lower/10000/40     1408930 ns      1408748 ns          499 RowInvRate=140.875ns
-BM_Lower/100000/40   13971299 ns     13970168 ns           50 RowInvRate=139.702ns
+BM_Upper/10000/10       56882 ns        56799 ns        12308 RowInvRate=5.67989ns
+BM_Upper/100000/10     561020 ns       560804 ns         1256 RowInvRate=5.60804ns
+BM_Upper/10000/20      103988 ns       103920 ns         6640 RowInvRate=10.392ns
+BM_Upper/100000/20    1054494 ns      1054115 ns          675 RowInvRate=10.5412ns
+BM_Upper/10000/40      203007 ns       202962 ns         3442 RowInvRate=20.2962ns
+BM_Upper/100000/40    1908906 ns      1908417 ns          371 RowInvRate=19.0842ns
+BM_Lower/10000/10       58031 ns        57891 ns        12117 RowInvRate=5.78913ns
+BM_Lower/100000/10     577893 ns       577551 ns         1240 RowInvRate=5.77551ns
+BM_Lower/10000/20      107800 ns       107683 ns         6544 RowInvRate=10.7683ns
+BM_Lower/100000/20    1038114 ns      1037764 ns          668 RowInvRate=10.3776ns
+BM_Lower/10000/40      204665 ns       204601 ns         3424 RowInvRate=20.4601ns
+BM_Lower/100000/40    1892191 ns      1891690 ns          379 RowInvRate=18.9169ns
 */
 
 std::string generate_random_string(int min_len, int max_len) {
