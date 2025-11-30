@@ -440,39 +440,36 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]
 
     ColumnBuilder<TYPE_VARCHAR> result(num_rows);
     constexpr std::string_view separator = ", ";
+    const size_t separator_len = separator.length();
     faststring variant;
+
+    const bool has_null_arrays = (activities_data.null_arrays != nullptr);
+    const bool has_null_elements = (activities_data.null_elements != nullptr);
+
     for (auto row = 0; row < num_rows; ++row) {
-        if (activities_data.null_arrays != nullptr && (*activities_data.null_arrays)[row] != 0) {
+        if (has_null_arrays && (*activities_data.null_arrays)[row] != 0) {
             result.append_nulls(1);
             continue;
         }
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
-        size_t count = 0;
-        size_t total_length = 0;
-        for (auto i = start; i < end; ++i) {
-            if (activities_data.null_elements != nullptr && (*activities_data.null_elements)[i] != 0) {
-                continue;
-            }
-            ++count;
-            total_length += activities[i].size;
-        }
-        if (count == 0) {
-            result.append_nulls(1);
-            continue;
-        }
         variant.clear();
-        variant.reserve(total_length + (count - 1) * separator.length());
         bool first = true;
+        size_t valid_elements_count = 0;
         for (auto i = start; i < end; ++i) {
-            if (activities_data.null_elements != nullptr && (*activities_data.null_elements)[i] != 0) {
+            if (has_null_elements && (*activities_data.null_elements)[i] != 0) {
                 continue;
             }
             if (!first) {
-                variant.append(separator.data(), separator.length());
+                variant.append(separator.data(), separator_len);
             }
             variant.append(activities[i].data, activities[i].size);
             first = false;
+            valid_elements_count++;
+        }
+        if (valid_elements_count == 0) {
+            result.append_nulls(1);
+            continue;
         }
         result.append(Slice(variant.data(), variant.size()));
     }

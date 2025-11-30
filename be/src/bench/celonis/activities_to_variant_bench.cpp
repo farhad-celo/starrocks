@@ -13,7 +13,7 @@
 namespace starrocks {
 
 /*
-2025-06-08T11:03:50+00:00
+2025-11-23T16:14:40+00:00
 Running ./be/build_Release/src/bench/celonis/output/activities_to_variant_bench
 Run on (32 X 2445.43 MHz CPU s)
 CPU Caches:
@@ -21,35 +21,35 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 512 KiB (x16)
   L3 Unified 32768 KiB (x2)
-Load Average: 8.45, 4.88, 3.04
+Load Average: 15.42, 6.42, 3.56
 // Number of rows / Number of distinct activities / Variant length / NULL activity percentage
 --------------------------------------------------------------------------------------------------
 Benchmark                                        Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------------------------------
-BM_ActivitiesToVariant/10000/20/20/0       1311791 ns      1311740 ns          537 RowInvRate=131.174ns
-BM_ActivitiesToVariant/100000/20/20/0     21599895 ns     21598768 ns           34 RowInvRate=215.988ns
-BM_ActivitiesToVariant/10000/100/20/0      1297012 ns      1297023 ns          535 RowInvRate=129.702ns
-BM_ActivitiesToVariant/100000/100/20/0    22267631 ns     22267412 ns           31 RowInvRate=222.674ns
-BM_ActivitiesToVariant/10000/1000/20/0     1343837 ns      1343842 ns          527 RowInvRate=134.384ns
-BM_ActivitiesToVariant/100000/1000/20/0   23646703 ns     23642697 ns           29 RowInvRate=236.427ns
-BM_ActivitiesToVariant/10000/20/40/0       2804384 ns      2804190 ns          259 RowInvRate=280.419ns
-BM_ActivitiesToVariant/100000/20/40/0     43181892 ns     43182148 ns           15 RowInvRate=431.821ns
-BM_ActivitiesToVariant/10000/100/40/0      2727385 ns      2727289 ns          243 RowInvRate=272.729ns
-BM_ActivitiesToVariant/100000/100/40/0    41736233 ns     41736404 ns           17 RowInvRate=417.364ns
-BM_ActivitiesToVariant/10000/1000/40/0     2797260 ns      2797077 ns          249 RowInvRate=279.708ns
-BM_ActivitiesToVariant/100000/1000/40/0   42907029 ns     42906553 ns           16 RowInvRate=429.066ns
-BM_ActivitiesToVariant/10000/20/20/5       1630374 ns      1630363 ns          416 RowInvRate=163.036ns
-BM_ActivitiesToVariant/100000/20/20/5     26183525 ns     26182115 ns           26 RowInvRate=261.821ns
-BM_ActivitiesToVariant/10000/100/20/5      1665294 ns      1665123 ns          431 RowInvRate=166.512ns
-BM_ActivitiesToVariant/100000/100/20/5    26717973 ns     26717086 ns           26 RowInvRate=267.171ns
-BM_ActivitiesToVariant/10000/1000/20/5     1694907 ns      1694857 ns          414 RowInvRate=169.486ns
-BM_ActivitiesToVariant/100000/1000/20/5   27700125 ns     27695157 ns           25 RowInvRate=276.952ns
-BM_ActivitiesToVariant/10000/20/40/5       3244239 ns      3243889 ns          213 RowInvRate=324.389ns
-BM_ActivitiesToVariant/100000/20/40/5     46558015 ns     46555275 ns           15 RowInvRate=465.553ns
-BM_ActivitiesToVariant/10000/100/40/5      3254239 ns      3254186 ns          208 RowInvRate=325.419ns
-BM_ActivitiesToVariant/100000/100/40/5    47094508 ns     47092897 ns           14 RowInvRate=470.929ns
-BM_ActivitiesToVariant/10000/1000/40/5     3343522 ns      3343575 ns          209 RowInvRate=334.357ns
-BM_ActivitiesToVariant/100000/1000/40/5   48342908 ns     48342293 ns           15 RowInvRate=483.423ns
+BM_ActivitiesToVariant/10000/20/20/0       1238494 ns      1238396 ns          569 RowInvRate=123.84ns
+BM_ActivitiesToVariant/100000/20/20/0     19846280 ns     19843695 ns           39 RowInvRate=198.437ns
+BM_ActivitiesToVariant/10000/100/20/0      1339009 ns      1338765 ns          506 RowInvRate=133.877ns
+BM_ActivitiesToVariant/100000/100/20/0    19043008 ns     19042107 ns           37 RowInvRate=190.421ns
+BM_ActivitiesToVariant/10000/1000/20/0     1319194 ns      1319271 ns          511 RowInvRate=131.927ns
+BM_ActivitiesToVariant/100000/1000/20/0   19481310 ns     19480114 ns           35 RowInvRate=194.801ns
+BM_ActivitiesToVariant/10000/20/40/0       2471885 ns      2471653 ns          284 RowInvRate=247.165ns
+BM_ActivitiesToVariant/100000/20/40/0     36757998 ns     36753848 ns           19 RowInvRate=367.538ns
+BM_ActivitiesToVariant/10000/100/40/0      2476460 ns      2476281 ns          267 RowInvRate=247.628ns
+BM_ActivitiesToVariant/100000/100/40/0    38338823 ns     38333732 ns           18 RowInvRate=383.337ns
+BM_ActivitiesToVariant/10000/1000/40/0     2637299 ns      2637173 ns          272 RowInvRate=263.717ns
+BM_ActivitiesToVariant/100000/1000/40/0   39145093 ns     39143386 ns           18 RowInvRate=391.434ns
+BM_ActivitiesToVariant/10000/20/20/5       1392610 ns      1392654 ns          494 RowInvRate=139.265ns
+BM_ActivitiesToVariant/100000/20/20/5     20511512 ns     20510612 ns           35 RowInvRate=205.106ns
+BM_ActivitiesToVariant/10000/100/20/5      1344688 ns      1344697 ns          493 RowInvRate=134.47ns
+BM_ActivitiesToVariant/100000/100/20/5    20386803 ns     20383999 ns           34 RowInvRate=203.84ns
+BM_ActivitiesToVariant/10000/1000/20/5     1400845 ns      1400719 ns          498 RowInvRate=140.072ns
+BM_ActivitiesToVariant/100000/1000/20/5   20841824 ns     20841868 ns           34 RowInvRate=208.419ns
+BM_ActivitiesToVariant/10000/20/40/5       2640883 ns      2640666 ns          267 RowInvRate=264.067ns
+BM_ActivitiesToVariant/100000/20/40/5     38635763 ns     38631392 ns           18 RowInvRate=386.314ns
+BM_ActivitiesToVariant/10000/100/40/5      2648670 ns      2648038 ns          263 RowInvRate=264.804ns
+BM_ActivitiesToVariant/100000/100/40/5    38882396 ns     38880367 ns           18 RowInvRate=388.804ns
+BM_ActivitiesToVariant/10000/1000/40/5     2815016 ns      2814638 ns          250 RowInvRate=281.464ns
+BM_ActivitiesToVariant/100000/1000/40/5   40569583 ns     40565154 ns           17 RowInvRate=405.652ns
 */
 
 static void do_bench(benchmark::State& state) {
