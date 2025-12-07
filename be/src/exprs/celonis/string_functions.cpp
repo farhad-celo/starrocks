@@ -1,6 +1,7 @@
 #include "exprs/celonis/string_functions.h"
 
 #include <boost/locale/utf.hpp>
+#include <charconv>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -66,22 +67,9 @@ Status xxh3_128bits_update_v3(XXH3_state_t* state, const void* input, size_t len
     // Also hash the value "_" + std::string(len) + "_"
     char len_buffer[32]; // enough for any size_t value
     len_buffer[0] = '_';
-    char* p = len_buffer + 1;
-    size_t temp_len = len;
-
-    // Extract digits in reverse order
-    char* digit_start = p;
-    do {
-        *p++ = '0' + (temp_len % 10);
-        temp_len /= 10;
-    } while (temp_len > 0);
-
-    // Reverse the digits in place
-    char* digit_end = p - 1;
-    while (digit_start < digit_end) {
-        char temp = *digit_start;
-        *digit_start++ = *digit_end;
-        *digit_end-- = temp;
+    auto [p, ec] = std::to_chars(len_buffer + 1, len_buffer + 32, len);
+    if (ec != std::errc()) {
+        return Status::InternalError("Convert len to string failed");
     }
     *p++ = '_';
     RETURN_IF_ERROR(xxh3_128bits_update(state, len_buffer, p - len_buffer));
@@ -106,9 +94,8 @@ inline Status validate_slice_template(const Slice& slice) {
     return Status::OK();
 }
 
-template <bool hash96, bool enable_validation, std::string_view const& function_name>
-StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const starrocks::Columns& columns,
-                                    Status (*hash_update_func)(XXH3_state_t*, const void*, size_t)) {
+template <bool hash96, bool enable_validation, std::string_view const& function_name, auto hash_update_func>
+StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const starrocks::Columns& columns) {
     DCHECK(columns.size() >= 1);
     const auto [all_const, n_rows] = ColumnHelper::num_packed_rows(columns);
     const uint128_t default_xxhash_seed = XXHASH3_128_SEED;
@@ -117,11 +104,11 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
     if (UNLIKELY(code != XXH_OK)) {
         return Status::InternalError(std::string(function_name).append(": init xxh3 state failed"));
     }
-    std::vector<XXH3_state_t> states;
-    states.reserve(n_rows);
-
+    using ResultBuilderType = std::conditional_t<hash96, ColumnBuilder<TYPE_VARCHAR>, ColumnBuilder<TYPE_LARGEINT>>;
+    ResultBuilderType builder(n_rows);
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
-        states.assign(n_rows, init_state);
+        // TODO(y.zhang): Change array version to row-by-row processing.
+        std::vector<XXH3_state_t> states(n_rows, init_state);
         DCHECK_EQ(1, columns.size());
         // columns[0] is NULL literal
         if (columns[0]->only_null()) {
@@ -167,99 +154,112 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
                 }
             }
         }
-    } else {
-        size_t num_const_columns = 0;
-        while (num_const_columns < columns.size()) {
-            if (columns[num_const_columns]->is_constant()) {
-                ++num_const_columns;
-            } else {
-                break;
+        if constexpr (!hash96) {
+            for (int row = 0; row < n_rows; ++row) {
+                XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
+                int128_t res = ((int128_t)value.high64 << 64) | (uint64_t)value.low64;
+                builder.append(res, false);
             }
-        }
-        std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
-        column_viewers.reserve(columns.size());
-        for (const auto& column : columns) {
-            column_viewers.emplace_back(column);
-        }
-        // Handle the leading constant columns
-        if (n_rows > 0) {
-            for (auto i = 0; i < num_const_columns; ++i) {
-                const auto& viewer = column_viewers[i];
-                if (!viewer.is_null(0)) {
-                    if constexpr (enable_validation) {
-                        RETURN_IF_ERROR(
-                                (validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(0))));
-                    }
-                    RETURN_IF_ERROR(hash_update_func(&(init_state), viewer.value(0).data, viewer.value(0).size));
-                } else {
-                    RETURN_IF_ERROR(hash_update_func(&(init_state), XXHASH3_128_NULL_STRING.data(),
-                                                     XXHASH3_128_NULL_STRING.size()));
-                }
+            return builder.build(all_const);
+        } else {
+            char buf[12];
+            for (int row = 0; row < n_rows; ++row) {
+                XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
+                // Use all the 8 bytes from high64
+                std::memcpy(buf, &value.high64, 8);
+                // Use the top 4 bytes from low64.
+                std::memcpy(buf + 8, &value.low64, 4);
+                builder.append(Slice(buf, 12));
             }
+            return builder.build(all_const);
         }
-        states.assign(n_rows, init_state);
-        for (auto i = num_const_columns; i < columns.size(); ++i) {
+    }
+
+    size_t num_leading_const_columns = 0;
+    while (num_leading_const_columns < columns.size()) {
+        if (columns[num_leading_const_columns]->is_constant()) {
+            ++num_leading_const_columns;
+        } else {
+            break;
+        }
+    }
+    std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
+    column_viewers.reserve(columns.size());
+    for (const auto& column : columns) {
+        column_viewers.emplace_back(column);
+    }
+
+    // Handle the leading constant columns
+    // We only need to hash leading constant columns once.
+    if (num_leading_const_columns > 0) {
+        for (auto i = 0; i < num_leading_const_columns; ++i) {
             const auto& viewer = column_viewers[i];
-            for (size_t row = 0; row < n_rows; ++row) {
-                if (!viewer.is_null(row)) {
-                    if constexpr (enable_validation) {
-                        RETURN_IF_ERROR(
-                                (validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(row))));
-                    }
-                    RETURN_IF_ERROR(hash_update_func(&(states[row]), viewer.value(row).data, viewer.value(row).size));
-                } else {
-                    RETURN_IF_ERROR(hash_update_func(&(states[row]), XXHASH3_128_NULL_STRING.data(),
-                                                     XXHASH3_128_NULL_STRING.size()));
+            if (!viewer.is_null(0)) {
+                if constexpr (enable_validation) {
+                    RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(0))));
                 }
+                RETURN_IF_ERROR(hash_update_func(&(init_state), viewer.value(0).data, viewer.value(0).size));
+            } else {
+                RETURN_IF_ERROR(hash_update_func(&(init_state), XXHASH3_128_NULL_STRING.data(),
+                                                 XXHASH3_128_NULL_STRING.size()));
             }
         }
     }
-    if constexpr (!hash96) {
-        ColumnBuilder<TYPE_LARGEINT> builder(n_rows);
-        for (int row = 0; row < n_rows; ++row) {
-            XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
+
+    char buf[12];
+    for (size_t row = 0; row < n_rows; ++row) {
+        XXH3_state_t state = init_state;
+        // Update state for each column
+        for (auto col_idx = num_leading_const_columns; col_idx < columns.size(); ++col_idx) {
+            const auto& viewer = column_viewers[col_idx];
+            if (!viewer.is_null(row)) {
+                if constexpr (enable_validation) {
+                    RETURN_IF_ERROR(
+                            (validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(viewer.value(row))));
+                }
+                RETURN_IF_ERROR(hash_update_func(&state, viewer.value(row).data, viewer.value(row).size));
+            } else {
+                RETURN_IF_ERROR(
+                        hash_update_func(&state, XXHASH3_128_NULL_STRING.data(), XXHASH3_128_NULL_STRING.size()));
+            }
+        }
+        // Finalize and append result
+        XXH128_hash_t value = XXH3_128bits_digest(&state);
+        if constexpr (!hash96) {
             int128_t res = ((int128_t)value.high64 << 64) | (uint64_t)value.low64;
             builder.append(res, false);
-        }
-        return builder.build(all_const);
-    } else {
-        ColumnBuilder<TYPE_VARCHAR> builder(n_rows);
-        char buf[12];
-        for (int row = 0; row < n_rows; ++row) {
-            XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
-            // Use all the 8 bytes from high64
+        } else {
             std::memcpy(buf, &value.high64, 8);
-            // Use the top 4 bytes from low64.
             std::memcpy(buf + 8, &value.low64, 4);
             builder.append(Slice(buf, 12));
         }
-        return builder.build(all_const);
     }
+    return builder.build(all_const);
 }
 
 } // namespace
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v2(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
-    return xx_hash3_helper<false, true, CELONIS_XX_HASH3_128_V2>(context, columns, xxh3_128bits_update);
+    return xx_hash3_helper<false, true, CELONIS_XX_HASH3_128_V2, xxh3_128bits_update>(context, columns);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v3(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
-    return xx_hash3_helper<false, true, CELONIS_XX_HASH3_128_V3>(context, columns, xxh3_128bits_update_v3);
+    return xx_hash3_helper<false, true, CELONIS_XX_HASH3_128_V3, xxh3_128bits_update_v3>(context, columns);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_v4(starrocks::FunctionContext* context,
                                                             const starrocks::Columns& columns) {
     if (context->get_arg_type(0)->type != TYPE_ARRAY && columns.size() == 1) {
-        return xx_hash3_helper<false, false, CELONIS_XX_HASH3_128_V4>(context, columns, xxh3_128bits_update);
+        return xx_hash3_helper<false, false, CELONIS_XX_HASH3_128_V4, xxh3_128bits_update>(context, columns);
     }
-    return xx_hash3_helper<false, false, CELONIS_XX_HASH3_128_V4>(context, columns, xxh3_128bits_update_v4);
+    return xx_hash3_helper<false, false, CELONIS_XX_HASH3_128_V4, xxh3_128bits_update_v4>(context, columns);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_96(starrocks::FunctionContext* context,
                                                         const starrocks::Columns& columns) {
-    return xx_hash3_helper<true, true, CELONIS_XX_HASH3_96>(context, columns, xxh3_128bits_update_v3);
+    return xx_hash3_helper<true, true, CELONIS_XX_HASH3_96, xxh3_128bits_update_v3>(context, columns);
 }
 
 StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128(starrocks::FunctionContext* context,
