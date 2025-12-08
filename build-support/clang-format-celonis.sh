@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -eo pipefail
 
 ROOT=`dirname "$0"`
