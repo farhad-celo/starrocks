@@ -106,9 +106,8 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
     }
     using ResultBuilderType = std::conditional_t<hash96, ColumnBuilder<TYPE_VARCHAR>, ColumnBuilder<TYPE_LARGEINT>>;
     ResultBuilderType builder(n_rows);
+    char buf[12];
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
-        // TODO(y.zhang): Change array version to row-by-row processing.
-        std::vector<XXH3_state_t> states(n_rows, init_state);
         DCHECK_EQ(1, columns.size());
         // columns[0] is NULL literal
         if (columns[0]->only_null()) {
@@ -131,50 +130,45 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
         const auto& slices = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
         for (size_t row = 0; row < n_rows; ++row) {
+            XXH3_state_t state = init_state;
             if (columns[0]->is_null(row)) {
-                RETURN_IF_ERROR(hash_update_func(&states[row], XXHASH3_128_NULL_ARRAY_STRING.data(),
+                RETURN_IF_ERROR(hash_update_func(&state, XXHASH3_128_NULL_ARRAY_STRING.data(),
                                                  XXHASH3_128_NULL_ARRAY_STRING.size()));
-                continue;
-            }
-            const auto start = offsets[row];
-            const auto end = offsets[row + 1];
-            for (auto i = start; i < end; ++i) {
-                const bool is_null = string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0;
-                if (!is_null) {
-                    if constexpr (enable_validation) {
-                        // validate that the input string does not conflict with the reserved null string.
-                        RETURN_IF_ERROR((validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(slices[i])));
-                        RETURN_IF_ERROR(
-                                (validate_slice_template<XXHASH3_128_NULL_ARRAY_STRING, function_name>(slices[i])));
+            } else {
+                const auto start = offsets[row];
+                const auto end = offsets[row + 1];
+                for (auto i = start; i < end; ++i) {
+                    const bool is_null = string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0;
+                    if (!is_null) {
+                        if constexpr (enable_validation) {
+                            // validate that the input string does not conflict with the reserved null string.
+                            RETURN_IF_ERROR(
+                                    (validate_slice_template<XXHASH3_128_NULL_STRING, function_name>(slices[i])));
+                            RETURN_IF_ERROR(
+                                    (validate_slice_template<XXHASH3_128_NULL_ARRAY_STRING, function_name>(slices[i])));
+                        }
+                        RETURN_IF_ERROR(hash_update_func(&state, slices[i].data, slices[i].size));
+                    } else {
+                        RETURN_IF_ERROR(hash_update_func(&state, XXHASH3_128_NULL_STRING.data(),
+                                                         XXHASH3_128_NULL_STRING.size()));
                     }
-                    RETURN_IF_ERROR(hash_update_func(&states[row], slices[i].data, slices[i].size));
-                } else {
-                    RETURN_IF_ERROR(hash_update_func(&states[row], XXHASH3_128_NULL_STRING.data(),
-                                                     XXHASH3_128_NULL_STRING.size()));
                 }
             }
-        }
-        if constexpr (!hash96) {
-            for (int row = 0; row < n_rows; ++row) {
-                XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
+            if constexpr (!hash96) {
+                XXH128_hash_t value = XXH3_128bits_digest(&state);
                 int128_t res = ((int128_t)value.high64 << 64) | (uint64_t)value.low64;
                 builder.append(res, false);
-            }
-            return builder.build(all_const);
-        } else {
-            char buf[12];
-            for (int row = 0; row < n_rows; ++row) {
-                XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
+            } else {
+                XXH128_hash_t value = XXH3_128bits_digest(&state);
                 // Use all the 8 bytes from high64
                 std::memcpy(buf, &value.high64, 8);
                 // Use the top 4 bytes from low64.
                 std::memcpy(buf + 8, &value.low64, 4);
                 builder.append(Slice(buf, 12));
             }
-            return builder.build(all_const);
         }
+        return builder.build(all_const);
     }
-
     size_t num_leading_const_columns = 0;
     while (num_leading_const_columns < columns.size()) {
         if (columns[num_leading_const_columns]->is_constant()) {
@@ -205,8 +199,6 @@ StatusOr<ColumnPtr> xx_hash3_helper(starrocks::FunctionContext* context, const s
             }
         }
     }
-
-    char buf[12];
     for (size_t row = 0; row < n_rows; ++row) {
         XXH3_state_t state = init_state;
         // Update state for each column
