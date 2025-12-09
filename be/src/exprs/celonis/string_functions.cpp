@@ -354,9 +354,7 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
     if (UNLIKELY(code != XXH_OK)) {
         return Status::InternalError("CELONIS_XX_HASH3_128_NULLABLE: init xxh3 state failed");
     }
-    std::vector<XXH3_state_t> states(num_rows, init_state);
-    std::vector<bool> is_null_vec(num_rows, false);
-
+    ColumnBuilder<TYPE_LARGEINT> builder(num_rows);
     if (context->get_arg_type(0)->type == TYPE_ARRAY) {
         DCHECK_EQ(1, columns.size());
         if (columns[0]->only_null()) {
@@ -370,46 +368,49 @@ StatusOr<ColumnPtr> CelonisStringFunctions::xx_hash3_128_nullable(starrocks::Fun
                 down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*string_data.elements).get_data().data();
         const auto& offsets = string_data.offsets->get_data().data();
         for (size_t row = 0; row < num_rows; ++row) {
+            bool is_null = false;
+            XXH3_state_t state = init_state;
             if (columns[0]->is_null(row)) {
-                is_null_vec[row] = true;
-                continue;
-            }
-            const auto start = offsets[row];
-            const auto end = offsets[row + 1];
-            for (auto i = start; i < end; ++i) {
-                if (string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0) {
-                    is_null_vec[row] = true;
-                    break;
+                is_null = true;
+            } else {
+                const auto start = offsets[row];
+                const auto end = offsets[row + 1];
+                for (auto i = start; i < end; ++i) {
+                    if (string_data.null_elements != nullptr && (*string_data.null_elements)[i] != 0) {
+                        is_null = true;
+                        break;
+                    }
+                    Slice slice = strings[i];
+                    RETURN_IF_ERROR(xxh3_128bits_update_v3(&state, slice.data, slice.size));
                 }
-                Slice slice = strings[i];
-                RETURN_IF_ERROR(xxh3_128bits_update_v3(&states[row], slice.data, slice.size));
             }
+            XXH128_hash_t value = XXH3_128bits_digest(&state);
+            int128_t res = ((int128_t)value.high64 << 64) | (uint64_t)value.low64;
+            builder.append(res, is_null);
         }
-    } else {
-        std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
-        column_viewers.reserve(columns.size());
-        for (const auto& column : columns) {
-            column_viewers.emplace_back(column);
-        }
-        for (const auto& viewer : column_viewers) {
-            for (size_t row = 0; row < num_rows; ++row) {
-                if (is_null_vec[row]) {
-                    continue;
-                }
-                if (viewer.is_null(row)) {
-                    is_null_vec[row] = true;
-                    continue;
-                }
-                auto slice = viewer.value(row);
-                RETURN_IF_ERROR(xxh3_128bits_update_v3(&states[row], slice.data, slice.size));
-            }
-        }
+        return builder.build(all_const);
     }
-    ColumnBuilder<TYPE_LARGEINT> builder(num_rows);
-    for (int row = 0; row < num_rows; ++row) {
-        XXH128_hash_t value = XXH3_128bits_digest(&states[row]);
+
+    std::vector<ColumnViewer<TYPE_VARCHAR>> column_viewers;
+    column_viewers.reserve(columns.size());
+    for (const auto& column : columns) {
+        column_viewers.emplace_back(column);
+    }
+
+    for (size_t row = 0; row < num_rows; ++row) {
+        bool is_null = false;
+        XXH3_state_t state = init_state;
+        for (const auto& viewer : column_viewers) {
+            if (viewer.is_null(row)) {
+                is_null = true;
+                break;
+            }
+            auto slice = viewer.value(row);
+            RETURN_IF_ERROR(xxh3_128bits_update_v3(&state, slice.data, slice.size));
+        }
+        XXH128_hash_t value = XXH3_128bits_digest(&state);
         int128_t res = ((int128_t)value.high64 << 64) | (uint64_t)value.low64;
-        builder.append(res, is_null_vec[row]);
+        builder.append(res, is_null);
     }
     return builder.build(all_const);
 }
