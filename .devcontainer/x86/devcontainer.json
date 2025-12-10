@@ -1,0 +1,25 @@
+{
+    "name": "sr-dev-homcc",
+    "containerUser": "root",
+    "remoteUser": "root",
+    "build": {
+        "dockerfile": "../../docker/dockerfiles/dev-env-homcc-base/x86/Dockerfile",
+        "context": "../../docker/dockerfiles/dev-env-homcc-base"
+    },
+    "postCreateCommand": "cp .devcontainer/CMakePresets.json be/CMakePresets.json",
+    "containerEnv": {
+        // This is covered by the CMake presets already but still useful to have in case you want to execute build.sh
+        "STARROCKS_GCC_HOME": "/usr/",
+        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/lib",
+        "STARROCKS_LINKER": "lld",
+        "CMAKE_GENERATOR": "ninja",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+    },
+    "customizations": {
+        "jetbrains": {
+            "settings": {
+                "com.intellij:app:HttpConfigurable.use_proxy_pac": true
+            }
+        }
+    }
+}
