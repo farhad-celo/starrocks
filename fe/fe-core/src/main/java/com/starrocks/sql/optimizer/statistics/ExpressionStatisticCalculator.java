@@ -516,6 +516,13 @@ public class ExpressionStatisticCalculator {
                     "column statistics missing for expr: %s. column statistics: %s",
                     call, childrenColumnStatistics);
 
+            ColumnStatistic callStatistic =
+                    CelonisExpressionStatisticsCalculator.callCalculate(call, childrenColumnStatistics, inputStatistics,
+                            rowCount);
+            if (callStatistic != null) {
+                return callStatistic;
+            }
+
             if (childrenColumnStatistics.stream().anyMatch(ColumnStatistic::isUnknown) ||
                     inputStatistics.getColumnStatistics().values().stream().allMatch(ColumnStatistic::isUnknown)) {
                 return deriveBasicColStats(call);
@@ -598,44 +605,6 @@ public class ExpressionStatisticCalculator {
             double nullsFraction = columnStatistic.getNullsFraction();
             final boolean minMaxValueInfinite = Double.isInfinite(minValue) || Double.isInfinite(maxValue);
             switch (callOperator.getFnName().toLowerCase()) {
-                // Begin CELONIS cases
-                case FunctionSet.CELONIS_XX_HASH3_128:
-                case FunctionSet.CELONIS_XX_HASH3_128_V2:
-                case FunctionSet.CELONIS_XX_HASH3_128_V3:
-                case FunctionSet.CELONIS_XX_HASH3_128_V4:
-                    minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
-                    maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
-                    nullsFraction = 0.0;
-                    break;
-                case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
-                    minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
-                    maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
-                    break;
-                case FunctionSet.CELONIS_ARRAY_BOOL_OR:
-                    minValue = 0;
-                    maxValue = 1;
-                    distinctValue = 3;
-                    break;
-                case FunctionSet.CELONIS_SQUARE:
-                    double celonisSquareMinValue;
-                    double celonisSquareMaxValue = Math.max(minValue * minValue, maxValue * maxValue);
-                    if (minValue < 0 && maxValue < 0 || minValue >= 0 && maxValue >= 0) {
-                        celonisSquareMinValue = Math.min(minValue * minValue, maxValue * maxValue);
-                    } else {
-                        celonisSquareMinValue = 0;
-                    }
-                    minValue = celonisSquareMinValue;
-                    maxValue = celonisSquareMaxValue;
-                    break;
-                case FunctionSet.CELONIS_GREATEST:
-                case FunctionSet.CELONIS_LEAST:
-                case FunctionSet.CELONIS_UPPER:
-                case FunctionSet.CELONIS_LOWER:
-                case FunctionSet.CELONIS_TO_DOUBLE:
-                case FunctionSet.CELONIS_STRING_TO_DOUBLE:
-                    // Just use the input's statistics as output's statistics
-                    break;
-                // End CELONIS cases
                 case FunctionSet.SIGN:
                     minValue = -1;
                     maxValue = 1;

@@ -618,38 +618,6 @@ public class ExpressionStatisticsCalculatorTest {
     }
 
     @Test
-    public void testCelonisUnaryFunctionCall() {
-        ColumnRefOperator columnRefOperator = new ColumnRefOperator(0, Type.INT, "id", true);
-
-        Statistics.Builder builder = Statistics.builder();
-        double min = 0.0;
-        double max = 100.0;
-        double distinctValue = 80;
-        double nullsFraction = 0.2;
-        Statistics statistics = builder.addColumnStatistic(columnRefOperator,
-                        ColumnStatistic.builder().setMinValue(min).setMaxValue(max).
-                                setDistinctValuesCount(distinctValue).setNullsFraction(nullsFraction).setAverageRowSize(10).
-                                build())
-                .setOutputRowCount(100).build();
-        // test CELONIS_XX_HASH3_128_V3 function
-        CallOperator callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3,
-                Type.INT, Lists.newArrayList(columnRefOperator));
-        ColumnStatistic columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
-        Assertions.assertEquals(1.7014118346046923E38, columnStatistic.getMaxValue(), 0.001);
-        Assertions.assertEquals(-1.7014118346046923E38, columnStatistic.getMinValue(), 0.001);
-        Assertions.assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
-        Assertions.assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
-        // test CELONIS_XX_HASH3_128_NULLABLE function
-        callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.INT,
-                Lists.newArrayList(columnRefOperator));
-        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
-        Assertions.assertEquals(1.7014118346046923E38, columnStatistic.getMaxValue(), 0.001);
-        Assertions.assertEquals(-1.7014118346046923E38, columnStatistic.getMinValue(), 0.001);
-        Assertions.assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
-        Assertions.assertEquals(0.2, columnStatistic.getNullsFraction(), 0.001);
-    }
-
-    @Test
     public void testBinaryFunctionCall() {
         ColumnRefOperator left = new ColumnRefOperator(0, Type.INT, "left", true);
         ColumnRefOperator right = new ColumnRefOperator(1, Type.INT, "right", true);

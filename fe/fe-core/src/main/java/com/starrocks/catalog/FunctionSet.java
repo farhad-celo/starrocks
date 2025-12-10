@@ -560,6 +560,8 @@ public class FunctionSet {
     public static final String CELONIS_TO_DOUBLE = "celonis_to_double";
     public static final String CELONIS_STRING_TO_DOUBLE = "celonis_string_to_double";
     public static final String CELONIS_SHORTENED_VARIANT = "celonis_shortened_variant";
+    public static final String CELONIS_REMAP_VALUES = "celonis_remap_values";
+    public static final String CELONIS_REMAP_VALUES_CONST = "celonis_remap_values_const";
 
     // Celonis window functions:
     public static final String CELONIS_MOVING_TRIMMED_MEAN = "celonis_moving_trimmed_mean";
