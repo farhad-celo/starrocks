@@ -133,7 +133,7 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
 
     std::vector<size_t> a_lastseen(activity_map_.size());
     size_t total_count = 0;
-    LOG(INFO) << log_prefix << ": started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
+    LOG(INFO) << log_prefix << ": started traversing variant_map (length = " << variant_map_.size() << ")\n";
     for (const auto& [variant, count] : variant_map_) {
         total_count += count;
         for (int i = 0; i < variant.data.size(); i++) {
@@ -167,8 +167,8 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     }
     LOG(INFO) << log_prefix << ": total number of variants = " << total_count << "\n";
     LOG(INFO) << log_prefix << ": done traversing variant_map\n";
-    LOG(INFO) << log_prefix << ": size of activity_stats_ = " << activity_stats_.size() << "\n";
-    LOG(INFO) << log_prefix << ": size of edge_map_ = " << edge_map_.size() << "\n";
+    LOG(INFO) << log_prefix << ": size of activity_stats = " << activity_stats_.size() << "\n";
+    LOG(INFO) << log_prefix << ": size of edge_map = " << edge_map_.size() << "\n";
     std::optional<VariantAnalysisResult> variant_analysis = std::nullopt;
     if (!skip_variant_analysis_) {
         LOG(INFO) << log_prefix << ": started analyzing variants\n";
