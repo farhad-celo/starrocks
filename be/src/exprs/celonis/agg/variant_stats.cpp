@@ -132,8 +132,10 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     }
 
     std::vector<size_t> a_lastseen(activity_map_.size());
+    size_t total_count = 0;
     LOG(INFO) << log_prefix << ": started traversing variant_map_ (length = " << variant_map_.size() << ")\n";
     for (const auto& [variant, count] : variant_map_) {
+        total_count += count;
         for (int i = 0; i < variant.data.size(); i++) {
             auto activity_id = variant.data[i];
             ActivityStats& a_stats = activity_stats_[activity_id];
@@ -163,6 +165,7 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
         ctx->set_error("variant_stats detects cancelled.", false);
         return std::nullopt;
     }
+    LOG(INFO) << log_prefix << ": total number of variants = " << total_count << "\n";
     LOG(INFO) << log_prefix << ": done traversing variant_map\n";
     LOG(INFO) << log_prefix << ": size of activity_stats_ = " << activity_stats_.size() << "\n";
     LOG(INFO) << log_prefix << ": size of edge_map_ = " << edge_map_.size() << "\n";
