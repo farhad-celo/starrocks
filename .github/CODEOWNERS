@@ -1,3 +1,68 @@
 # These owners will be the default owners for everything in the repo. Unless a later match takes precedence, they will
 # be requested for review when someone opens a pull request.
-* @dengliu @jkim650 @hagonzal @zhangyaqi1989 @jxWho @mingmxu @pavan-kalyan @lxynov
+* @jkim650 @hagonzal @zhangyaqi1989 @jxWho @mingmxu @pavan-kalyan @lxynov
+
+# Repository Configs, CI, workflows, ...
+/.github/ @jxWho @mingmxu @pavan-kalyan
+/.github/CODEOWNERS @jkim650 @hagonzal @zhangyaqi1989 @jxWho @mingmxu @pavan-kalyan @lxynov
+/sonar-project.properties @jxWho @mingmxu @pavan-kalyan
+
+# Build Infrastructure
+/.devcontainer/ @jxWho @jkim650 @mingmxu @OliLay @pavan-kalyan
+/docker/ @jxWho @jkim650 @mingmxu @OliLay @pavan-kalyan
+/thirdparty/ @jxWho @jkim650
+/thirdparty/build-celonis-libraries.sh @jxWho @WeberNick
+/thirdparty/build-thirdparty-celonis.sh @jxWho @WeberNick
+/thirdparty/vars-celonis.sh @jxWho @WeberNick
+/build.sh @jxWho @jkim650 @mingmxu @pavan-kalyan
+/.dockerignore @jxWho @jkim650 @mingmxu @pavan-kalyan
+
+# Source code and binaries
+/be/ @jkim650 @hagonzal @zhangyaqi1989 @lxynov
+/be/src/exprs/celonis/cpml_utils/ @jkim650 @zhangyaqi1989 @WeberNick
+/be/src/exprs/celonis/modules/ @jkim650 @zhangyaqi1989 @WeberNick
+/bin/ @jkim650 @hagonzal @zhangyaqi1989
+/fe/ @jkim650 @hagonzal @zhangyaqi1989
+
+# Misc
+/celonis/ @jxWho @jkim650 @mingmxu @pavan-kalyan
+/celonis/tools/dev-env.sh @jxWho @jkim650 @mingmxu @WeberNick
+/celostar-docs/ @mingmxu
+/gensrc/ @jkim650 @hagonzal @zhangyaqi1989
+/test/ @jxWho @mingmxu @pavan-kalyan
+/mkdocs.yaml @mingmxu
+/run-be-ut.sh @jkim650 @hagonzal @zhangyaqi1989 @jxWho
+
+# No Codeownership required
+/build-support/
+
+# SR-upstream specific files and directories. Generally there should never be a need for changes except when syncing with upstream. 
+# If changes here are necessary in the future, please move the entry to above sections (probably it makes more sense contributing these changes to the upstream).
+/community/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/conf/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/contrib/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/docs/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/extra/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/fs_brokers/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/images/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/java-extensions/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/licenses-binary/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/licenses/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/tools/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/webroot/ @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/.clang-format @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/.clang-tidy @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/.gitignore @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/.mergify.yml @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/.trivyignore @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/CODE_OF_CONDUCT.md @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/CONTRIBUTING.md @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/LICENSE.txt @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/NOTICE.txt @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/README.md @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/SECURITY.md @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/codecov.yml @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/env.sh @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/run-fe-ut.sh @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/run-java-exts-ut.sh @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
+/trivy.yaml @jkim650 @hagonzal @zhangyaqi1989 @mingmxu
