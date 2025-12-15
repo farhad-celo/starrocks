@@ -101,7 +101,7 @@ jobs:
           fi
 
           # get the current default branch
-          default_branch=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
+          default_branch=${{ github.ref_name }}
           echo "the current default branch is ${default_branch}"
 
           retries=5
