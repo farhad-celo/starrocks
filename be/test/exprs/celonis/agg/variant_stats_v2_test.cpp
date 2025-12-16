@@ -6,7 +6,7 @@
 #include "column/column_builder.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "google/protobuf/util/json_util.h"
 #include "gutil/strings/strcat.h"
 #include "modules/query/variantstats.pb.h"
@@ -74,16 +74,18 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),  // variant
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)), // count
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),  // activity_array
-                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)), // edge_count
-                AnyValUtil::column_type_to_type_desc(
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),  // variant
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)), // count
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_ARRAY)), // activity_array
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_BIGINT)), // edge_count
+                CelonisAnyValUtil::column_type_to_type_desc(
                         TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // skip_variant_analysis
-                AnyValUtil::column_type_to_type_desc(
+                CelonisAnyValUtil::column_type_to_type_desc(
                         TypeDescriptor::from_logical_type(TYPE_BOOLEAN)) // enable_proto_encoding
         };
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(FunctionContext::create_context(

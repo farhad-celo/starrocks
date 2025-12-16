@@ -8,7 +8,7 @@
 
 #include "column/struct_column.h"
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
@@ -59,13 +59,14 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(LogicalType logical_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(logical_type), // input
-                TypeDescriptor::from_logical_type(TYPE_BIGINT),  // pk_hash
-                TypeDescriptor::from_logical_type(TYPE_DOUBLE),  // sample_ratio
-                TypeDescriptor::from_logical_type(TYPE_DOUBLE),  // A
-                TypeDescriptor::from_logical_type(TYPE_DOUBLE),  // B
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(logical_type)), // input
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),  // pk_hash
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_DOUBLE)), // sample_ratio
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)), // A
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)), // B
         };
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(FunctionContext::create_context(

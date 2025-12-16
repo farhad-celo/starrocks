@@ -6,15 +6,15 @@
 
 #include <utility>
 
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 
 namespace starrocks {
 
 class CelonisTrimTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        auto arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
+        auto arg_types = {CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
         context_.reset(FunctionContext::create_test_context(std::move(arg_types), std::move(return_type)));
     }
 

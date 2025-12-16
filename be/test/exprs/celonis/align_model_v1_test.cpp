@@ -9,7 +9,7 @@
 #include "column/array_column.h"
 #include "column/column_helper.h"
 #include "column/struct_column.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "runtime/mem_pool.h"
 #include "testutil/assert.h"
 #include "testutil/function_utils.h"
@@ -21,9 +21,11 @@ namespace starrocks {
 class CelonisAlignModelTest : public testing::Test {
 protected:
     CelonisAlignModelTest()
-            : arg_types_{{TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                          TypeDescriptor::from_logical_type(TYPE_VARCHAR)}},
-              return_type_(TypeDescriptor::from_logical_type(TYPE_STRUCT)) {
+            : arg_types_{{CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
+                          CelonisAnyValUtil::column_type_to_type_desc(
+                                  TypeDescriptor::from_logical_type(TYPE_VARCHAR))}},
+              return_type_(
+                      CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))) {
         // Initialize the struct type descriptor properly
         auto struct_desc = TypeDescriptor::from_logical_type(TYPE_STRUCT);
         struct_desc.children = {celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
@@ -38,7 +40,7 @@ protected:
                                    "association_alignment_index",
                                    "edge_class_id",
                                    "edge_class_type"};
-        return_type_ = struct_desc;
+        return_type_ = CelonisAnyValUtil::column_type_to_type_desc(struct_desc);
     }
 
     void SetUp() override {}
@@ -56,8 +58,10 @@ private:
     static const ResultMap PARALLEL_MODEL_RESULTS;
     static const ResultMap LOOP_MODEL_RESULTS;
 
-    FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
-    FunctionContext::TypeDesc TYPEDESC_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
+    FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR =
+            CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_VARCHAR));
+    FunctionContext::TypeDesc TYPEDESC_ARRAY_BIGINT =
+            CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT));
 
     class Evaluator {
     public:

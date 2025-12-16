@@ -2,7 +2,7 @@
 
 #include "column/column_helper.h"
 #include "column/const_column.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
@@ -17,10 +17,12 @@ protected:
 
 private:
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_DATETIME),
-                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                            TypeDescriptor::from_logical_type(TYPE_BIGINT)};
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_DATETIME);
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DATETIME)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))};
+        auto return_type =
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DATETIME));
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         start_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);

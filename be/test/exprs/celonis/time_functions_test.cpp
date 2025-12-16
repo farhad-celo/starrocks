@@ -4,7 +4,6 @@
 
 #include "column/column_helper.h"
 #include "column/const_column.h"
-#include "exprs/anyval_util.h"
 #include "google/protobuf/text_format.h"
 #include "testutil/function_utils.h"
 #include "types/timestamp_value.h"

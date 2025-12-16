@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "column/column_helper.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/celonis/base64.h"
 #include "exprs/celonis/in_json.h"
 #include "exprs/celonis/util.h"
@@ -28,9 +28,10 @@ protected:
 private:
     template <LogicalType LT>
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(LT),
-                                                            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
         value_column_ = ColumnHelper::create_column(TypeDescriptor(LT), true);

@@ -11,7 +11,6 @@
 #include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
-#include "exprs/anyval_util.h"
 #include "exprs/arithmetic_operation.h"
 #include "exprs/celonis/base64.h"
 #include "exprs/function_context.h"

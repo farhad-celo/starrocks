@@ -6,8 +6,8 @@
 #include "column/fixed_length_column.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/agg/enumerate_node_paths.h"
+#include "exprs/celonis/anyval_util.h"
 #include "gutil/strings/strcat.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
@@ -96,11 +96,11 @@ private:
 
     std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& value_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                value_type,                                    // outColumns
-                value_type,                                    // inColumns
-                TypeDescriptor::from_logical_type(TYPE_BIGINT) // maxLength
+                CelonisAnyValUtil::column_type_to_type_desc(value_type), // outColumns
+                CelonisAnyValUtil::column_type_to_type_desc(value_type), // inColumns
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)) // maxLength
         };
-        auto return_type = get_return_type(value_type);
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(get_return_type(value_type));
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }

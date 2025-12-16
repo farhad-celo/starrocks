@@ -8,7 +8,7 @@
 #include "column/struct_column.h"
 #include "column/type_traits.h"
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 
@@ -52,9 +52,11 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR), TypeDescriptor::from_logical_type(TYPE_LARGEINT),
-                TypeDescriptor::from_logical_type(TYPE_BIGINT), TypeDescriptor::from_logical_type(TYPE_DOUBLE)};
-        auto return_type = get_return_type();
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE))};
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(get_return_type());
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }

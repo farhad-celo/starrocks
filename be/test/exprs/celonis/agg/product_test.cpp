@@ -4,7 +4,7 @@
 
 #include "column/column_helper.h"
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 #include "testutil/function_utils.h"
@@ -240,8 +240,9 @@ public:
         utils = new FunctionUtils();
         ctx = utils->get_fn_ctx();
 
-        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(LOGICAL_TYPE)};
-        auto return_type = TypeDescriptor::from_logical_type(LOGICAL_TYPE);
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LOGICAL_TYPE))};
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LOGICAL_TYPE));
         local_ctx = std::unique_ptr<FunctionContext>{
                 FunctionContext::create_test_context(std::move(arg_types), return_type)};
 

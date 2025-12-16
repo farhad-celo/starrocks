@@ -5,7 +5,7 @@
 
 #include "column/column_helper.h"
 #include "column/const_column.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
 #include "util/defer_op.h"
@@ -22,9 +22,10 @@ private:
     TypeDescriptor TYPE_ARRAY_DOUBLE = celonis::array_type(TYPE_DOUBLE);
 
     void Prepare() {
-        std::vector<FunctionContext::TypeDesc> arg_types = {FunctionContext::TypeDesc{TYPE_ARRAY},
-                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                FunctionContext::TypeDesc{TYPE_ARRAY},
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
         point_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_ARRAY_DOUBLE), true);
         model_column_ = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);

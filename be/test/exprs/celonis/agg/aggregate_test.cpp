@@ -11,12 +11,12 @@
 #include "column/fixed_length_column.h"
 #include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/linear_regression.h"
 #include "exprs/celonis/agg/multi_array_agg.h"
 #include "exprs/celonis/agg/weekday_calendar.h"
 #include "exprs/celonis/agg/workday_calendar.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "gutil/strings/strcat.h"
 #include "runtime/mem_pool.h"
@@ -99,11 +99,12 @@ private:
 TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
     const bool enable_workday_mask_in_workday_calendar = config::enable_workday_mask_in_workday_calendar;
     config::enable_workday_mask_in_workday_calendar = false;
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
 
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_ARRAY);
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     local_ctx->set_runtime_state(runtime_state.get());
@@ -561,11 +562,12 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar) {
 TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mask_enabled) {
     const bool enable_workday_mask_in_workday_calendar = config::enable_workday_mask_in_workday_calendar;
     config::enable_workday_mask_in_workday_calendar = true;
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
 
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_ARRAY);
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     local_ctx->set_runtime_state(runtime_state.get());
@@ -928,11 +930,12 @@ TEST_F(CelonisAggregateTest, test_celonis_make_workday_calendar_with_workday_mas
 }
 
 TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_DATETIME),
-                                                        TypeDescriptor::from_logical_type(TYPE_DATETIME),
-                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DATETIME)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DATETIME)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
 
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_ARRAY);
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     local_ctx->set_runtime_state(runtime_state.get());
@@ -1473,10 +1476,12 @@ TEST_F(CelonisAggregateTest, test_celonis_make_factory_calendar) {
 
 TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR), TypeDescriptor::from_logical_type(TYPE_BIGINT),
-            TypeDescriptor::from_logical_type(TYPE_BIGINT), TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
 
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_ARRAY);
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     local_ctx->set_runtime_state(runtime_state.get());
@@ -1914,10 +1919,12 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_bigint_shift) {
 
 TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR), TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-            TypeDescriptor::from_logical_type(TYPE_VARCHAR), TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
 
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_ARRAY);
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     local_ctx->set_runtime_state(runtime_state.get());
@@ -2174,10 +2181,11 @@ TEST_F(CelonisAggregateTest, test_celonis_make_weekday_calendar_string_shift) {
 }
 
 TEST_F(CelonisAggregateTest, test_celonis_build_linear_regression_model) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {FunctionContext::TypeDesc{TYPE_ARRAY},
-                                                        TypeDescriptor::from_logical_type(TYPE_DOUBLE)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            FunctionContext::TypeDesc{TYPE_ARRAY},
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE))};
 
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     local_ctx->set_runtime_state(runtime_state.get());
@@ -2517,10 +2525,11 @@ TypeDescriptor logical_types_to_struct_type(const std::vector<LogicalType>& logi
 TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
     const int32_t multi_array_agg_serialization_threshold = config::multi_array_agg_serialization_threshold;
     config::multi_array_agg_serialization_threshold = 10;
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
 
-    auto return_type = logical_types_to_struct_type({TYPE_VARCHAR});
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR}));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     std::vector<bool> is_asc_order{false};
@@ -2690,11 +2699,13 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_single_agg_col) {
 TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
     const int32_t multi_array_agg_serialization_threshold = config::multi_array_agg_serialization_threshold;
     config::multi_array_agg_serialization_threshold = 10;
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
 
-    auto return_type = logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR});
+    auto return_type =
+            CelonisAnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     std::vector<bool> is_asc_order{false};
@@ -2800,11 +2811,13 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_agg_cols) {
 TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
     const int32_t multi_array_agg_serialization_threshold = config::multi_array_agg_serialization_threshold;
     config::multi_array_agg_serialization_threshold = 10;
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
 
-    auto return_type = logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR});
+    auto return_type =
+            CelonisAnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}));
     std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
     std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
     std::vector<bool> is_asc_order{false};

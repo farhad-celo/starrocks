@@ -2,7 +2,7 @@
 
 #include "column/column_helper.h"
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
@@ -55,10 +55,11 @@ private:
 };
 
 TEST_F(CelonisTrimmedMeanTest, pql_example_1_bigint) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(30, 1);
@@ -123,10 +124,11 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_1_bigint) {
 }
 
 TEST_F(CelonisTrimmedMeanTest, pql_example_2_bigint) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(50, 1);
@@ -186,10 +188,11 @@ TEST_F(CelonisTrimmedMeanTest, pql_example_2_bigint) {
 }
 
 TEST_F(CelonisTrimmedMeanTest, type_double) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_DOUBLE),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(20, 1);
@@ -255,10 +258,11 @@ TEST_F(CelonisTrimmedMeanTest, type_double) {
 }
 
 TEST_F(CelonisTrimmedMeanTest, type_double_large_input) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_DOUBLE),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(5, 1);
@@ -320,10 +324,11 @@ TEST_F(CelonisTrimmedMeanTest, type_double_large_input) {
 }
 
 TEST_F(CelonisTrimmedMeanTest, null_handling) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
@@ -383,10 +388,11 @@ TEST_F(CelonisTrimmedMeanTest, null_handling) {
 }
 
 TEST_F(CelonisTrimmedMeanTest, invalid_lower_and_upper) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT),
-                                                        TypeDescriptor::from_logical_type(TYPE_INT)};
-    auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
     auto local_ctx = create_function_context(std::move(arg_types), return_type);
 
     auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(60, 1);

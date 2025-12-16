@@ -8,7 +8,7 @@
 #include "column/fixed_length_column.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "gutil/strings/strcat.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
@@ -108,20 +108,23 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& value_type, const TypeDescriptor& pk_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                value_type,                                      // outColumns
-                value_type,                                      // inColumns
-                pk_type,                                         // pkColumns
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // outStart
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // outEnd
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // inStart
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // inEnd
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // outAll
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // inAll
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // allowCycles
-                TypeDescriptor::from_logical_type(TYPE_TINYINT), // lengthComparison
-                TypeDescriptor::from_logical_type(TYPE_BIGINT)   // length
+                CelonisAnyValUtil::column_type_to_type_desc(value_type), // outColumns
+                CelonisAnyValUtil::column_type_to_type_desc(value_type), // inColumns
+                CelonisAnyValUtil::column_type_to_type_desc(pk_type),    // pkColumns
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // outStart
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // outEnd
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // inStart
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // inEnd
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // outAll
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // inAll
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // allowCycles
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_TINYINT)), // lengthComparison
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)) // length
         };
-        auto return_type = get_return_type(value_type);
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(get_return_type(value_type));
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
@@ -160,7 +163,7 @@ protected:
             bool allow_cycles, const std::string& length_comparison, int length) {
         auto value_type = logical_types_to_struct_type(value_logical_types);
         auto pk_type = logical_types_to_struct_type(pk_logical_types);
-        auto bool_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
+        auto bool_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
 
         auto local_ctx = get_ctx(value_type, pk_type);
 

@@ -6,7 +6,7 @@
 #include "column/column_builder.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "gutil/strings/strcat.h"
 #include "runtime/runtime_state.h"
 #include "testutil/function_utils.h"
@@ -62,13 +62,16 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),  // string
-                TypeDescriptor::from_logical_type(TYPE_LARGEINT), // hash
-                TypeDescriptor::from_logical_type(TYPE_BIGINT),   // edit_threshold
-                TypeDescriptor::from_logical_type(TYPE_VARCHAR),  // weighted_tokens
-                TypeDescriptor::from_logical_type(TYPE_BIGINT)    // token_weight
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),  // string
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT)), // hash
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_BIGINT)), // edit_threshold
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)), // weighted_tokens
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_BIGINT)) // token_weight
         };
-        auto return_type = get_return_type();
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(get_return_type());
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(FunctionContext::create_context(

@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "runtime/mem_pool.h"
 
 namespace starrocks {
@@ -60,7 +60,7 @@ protected:
         std::vector<bool> nulls_first;
 
         auto add_column = [&](LogicalType type) {
-            arg_types.push_back(TypeDescriptor::from_logical_type(type));
+            arg_types.push_back(CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(type)));
             columns.push_back(ColumnHelper::create_column(TypeDescriptor::from_logical_type(type), true));
         };
         add_column(LT);
@@ -69,7 +69,7 @@ protected:
             is_asc_order.push_back(sort_column_type.is_asc_order);
             nulls_first.push_back(sort_column_type.nulls_first);
         }
-        auto return_type = TypeDescriptor::from_logical_type(LT);
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT));
 
         std::unique_ptr<FunctionContext> local_ctx(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));

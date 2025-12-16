@@ -171,6 +171,7 @@ set(EXEC_FILES
         ./exprs/celonis/adjust_daily_timestamps_test.cpp
         ./exprs/celonis/align_model_v1_test.cpp
         ./exprs/celonis/align_model_v2_test.cpp
+        ./exprs/celonis/anyval_util.cpp
         ./exprs/celonis/array_avg_test.cpp
         ./exprs/celonis/array_count_distinct_test.cpp
         ./exprs/celonis/array_end_finder_test.cpp

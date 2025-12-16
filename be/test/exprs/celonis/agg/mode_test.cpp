@@ -11,7 +11,7 @@
 #include "column/column_builder.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "runtime/mem_pool.h"
 #include "types/timestamp_value.h"
 #include "util/slice.h"
@@ -183,7 +183,7 @@ private:
         return {prepare_function_execution(col_ptr->has_null()), col_ptr};
     }
 
-    inline static auto type_desc{TypeDescriptor::from_logical_type(LT)};
+    inline static auto type_desc{CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT))};
     std::unique_ptr<MemPool> mem_pool_{std::make_unique<MemPool>()};
     std::unique_ptr<FunctionContext> func_ctx_{
             FunctionContext::create_context(/*state*/ nullptr, mem_pool_.get(), type_desc, {type_desc})};

@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "column/column_helper.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 
 namespace starrocks {
@@ -24,11 +24,12 @@ private:
         std::vector<FunctionContext::TypeDesc> arg_types{};
 
         for (const LogicalType type : types) {
-            arg_types.push_back(TypeDescriptor::from_logical_type(type));
+            arg_types.push_back(CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(type)));
             input_columns.push_back(ColumnHelper::create_column(TypeDescriptor(type), true));
         }
 
-        auto return_type = TypeDescriptor::from_logical_type(types.front());
+        auto return_type =
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(types.front()));
         ctx_.reset(FunctionContext::create_test_context(std::move(arg_types), return_type));
     }
 

@@ -7,7 +7,7 @@
 #include <optional>
 
 #include "column/column_helper.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
 
@@ -39,12 +39,13 @@ protected:
                             StatusOr<ColumnPtr> (*fn)(FunctionContext*, const Columns&),
                             const std::string& config = ANY_TO_ANY) {
         auto modifier = ColumnHelper::create_const_column<TYPE_VARCHAR>(config, input->size());
-        std::vector<FunctionContext::TypeDesc> arg_types = {array_type_desc,
-                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(array_type_desc),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
         if (group.has_value()) {
-            arg_types.push_back(TYPE_ARRAY_BIGINT);
+            arg_types.push_back(CelonisAnyValUtil::column_type_to_type_desc(TYPE_ARRAY_BIGINT));
         }
-        auto return_type = array_type_desc;
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(array_type_desc);
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
         Columns columns;
         columns.push_back(input);

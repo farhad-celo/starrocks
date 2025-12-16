@@ -6,7 +6,7 @@
 #include "column/array_column.h"
 #include "column/struct_column.h"
 #include "eventlog_utils.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
 
@@ -88,10 +88,14 @@ public:
 
 protected:
     CelonisAdjustDailyTimestampsTest()
-            : arg_types_{celonis::array_type(TYPE_DATETIME), celonis::array_type(TYPE_BOOLEAN)}, return_type_() {
+            : arg_types_{CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_DATETIME)),
+                         CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BOOLEAN))},
+              return_type_() {
         return_type_.type = TYPE_STRUCT;
-        return_type_.children.push_back(TypeDescriptor::from_logical_type(TYPE_DATETIME));
-        return_type_.children.push_back(TypeDescriptor::from_logical_type(TYPE_BIGINT));
+        return_type_.children.push_back(
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DATETIME)));
+        return_type_.children.push_back(
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)));
         return_type_.field_names.push_back("adjusted_timestamps");
         return_type_.field_names.push_back("reordering");
     }
@@ -107,7 +111,7 @@ protected:
         columns.push_back(scenario.is_day_based_column);
 
         if (pass_sorting_column == PassSortingColumn::YES) {
-            arg_types_.emplace_back(celonis::array_type(TYPE_BIGINT));
+            arg_types_.emplace_back(CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT)));
             columns.emplace_back(scenario.sorting_column);
         }
 

@@ -8,7 +8,7 @@
 #include "column/struct_column.h"
 #include "column/type_traits.h"
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
 
@@ -62,12 +62,14 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx(LogicalType logical_type) {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                TypeDescriptor::from_logical_type(logical_type), // input
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // no_lower_bound
-                TypeDescriptor::from_logical_type(TYPE_BOOLEAN), // no_upper_bound
-                celonis::array_type(logical_type)                // boundaries
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(logical_type)), // input
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_BOOLEAN)), // no_lower_bound
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_BOOLEAN)),                      // no_upper_bound
+                CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(logical_type)) // boundaries
         };
-        auto return_type = get_return_type(logical_type);
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(get_return_type(logical_type));
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_context(nullptr, mem_pools_.back().get(), return_type, std::move(arg_types)));

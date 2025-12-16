@@ -5,7 +5,7 @@
 
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util/defer_op.h"
 
@@ -22,9 +22,10 @@ protected:
 
 private:
     StatusOr<ColumnPtr> Run(const ColumnPtr& input, const ColumnPtr& pattern) {
-        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
-                                                            TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
         std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
         Columns columns;
         columns.push_back(input);

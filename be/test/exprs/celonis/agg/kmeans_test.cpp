@@ -7,7 +7,7 @@
 #include "../util.h"
 #include "column/struct_column.h"
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "exprs/celonis/util.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
@@ -59,11 +59,12 @@ protected:
 
     std::unique_ptr<FunctionContext> get_ctx() {
         std::vector<FunctionContext::TypeDesc> arg_types = {
-                celonis::array_type(TYPE_DOUBLE),               // point_column
-                TypeDescriptor::from_logical_type(TYPE_BIGINT), // NUM_CLUSTERS
-                TypeDescriptor::from_logical_type(TYPE_INT),    // RANDOM_SEED
+                CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_DOUBLE)), // point_column
+                CelonisAnyValUtil::column_type_to_type_desc(
+                        TypeDescriptor::from_logical_type(TYPE_BIGINT)), // NUM_CLUSTERS
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)), // RANDOM_SEED
         };
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
         mem_pools_.emplace_back(std::make_unique<MemPool>());
         runtime_states_.emplace_back(std::make_unique<RuntimeState>());
         return std::unique_ptr<FunctionContext>(FunctionContext::create_context(

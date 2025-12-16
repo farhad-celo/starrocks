@@ -5,7 +5,7 @@
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "column/struct_column.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "gutil/strings/strcat.h"
 #include "testutil/function_utils.h"
 #include "util.h"
@@ -71,10 +71,15 @@ private:
 
     std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& left_key_struct_type,
                                              const TypeDescriptor& right_key_struct_type) {
-        std::vector<FunctionContext::TypeDesc> arg_types = {left_key_struct_type,  TYPE_ARRAY_VARCHAR,
-                                                            right_key_struct_type, TYPE_ARRAY_VARCHAR,
-                                                            TYPE_ARRAY_VARCHAR,    TYPE_ARRAY_VARCHAR};
-        auto return_type = get_return_type(left_key_struct_type, right_key_struct_type);
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(left_key_struct_type),
+                CelonisAnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
+                CelonisAnyValUtil::column_type_to_type_desc(right_key_struct_type),
+                CelonisAnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
+                CelonisAnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
+                CelonisAnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR)};
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(
+                get_return_type(left_key_struct_type, right_key_struct_type));
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), return_type));
     }

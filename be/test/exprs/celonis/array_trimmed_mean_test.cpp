@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
 #include "util.h"
 
 namespace starrocks {
@@ -18,10 +18,11 @@ protected:
 
 private:
     static std::unique_ptr<FunctionContext> create_context(LogicalType elementType) {
-        std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(elementType),
-                                                            TypeDescriptor::from_logical_type(TYPE_BIGINT),
-                                                            TypeDescriptor::from_logical_type(TYPE_BIGINT)};
-        auto return_type = TypeDescriptor::from_logical_type(TYPE_DOUBLE);
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(elementType)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))};
+        auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
         return std::unique_ptr<FunctionContext>(
                 FunctionContext::create_test_context(std::move(arg_types), std::move(return_type)));
     }
