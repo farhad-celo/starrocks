@@ -91,6 +91,7 @@ struct PartitionHashMapBase {
     bool is_passthrough = false;
 
     int64_t total_num_rows = 0;
+    int64_t max_partition_size = 0;
 
     bool init_null_key_partition = false;
     static constexpr size_t kNullKeyPartitionIdx = 0;
@@ -151,6 +152,15 @@ protected:
         if (is_passthrough) {
             return;
         }
+
+        // If there is skew disable passthrough.
+        // Wait for at least adjust_passthrough_min_rows rows.
+        // Note that this check is per thread. Each thread decides independently to passthrough.
+        bool skew = max_partition_size / (total_num_rows * 1.0)  > 0.3;
+        if (config::adjust_passthrough && (total_num_rows < config::adjust_passthrough_min_rows || skew)) {
+            return;
+        }
+
         auto partition_num = hash_map.size();
         size_t partition_num_hwm = enable_pre_agg ? 32768 : 512;
 
@@ -206,6 +216,10 @@ protected:
             }
 
             auto& value = *(iter->second);
+            if (value.chunks.size() > max_partition_size) {
+                max_partition_size = value.chunks.size();
+            }
+
             if (value.chunks.empty() || value.remain_size <= 0) {
                 if (!value.chunks.empty() && !value.select_indexes.empty()) {
                     value.chunks.back()->append_selective(*chunk, value.select_indexes.data(), 0,

@@ -58,6 +58,11 @@ CONF_mInt64(array_agg_size_limit, "4294967296"); // 2^32
 // in MultiArrayAggAggregateState.
 CONF_mInt32(multi_array_agg_serialization_threshold, "2");
 
+// Minimum number of rows before adjusting passthrough logic.
+CONF_mInt32(adjust_passthrough_min_rows, "10000");
+CONF_mBool(adjust_passthrough, "false");
+
+
 // End of Celonis configures
 
 
