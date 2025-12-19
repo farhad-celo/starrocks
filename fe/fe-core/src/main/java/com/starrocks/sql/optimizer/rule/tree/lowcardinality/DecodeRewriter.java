@@ -50,6 +50,7 @@ import com.starrocks.sql.optimizer.operator.physical.PhysicalProjectOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalScanOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalTableFunctionOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalTopNOperator;
+import com.starrocks.sql.optimizer.operator.physical.PhysicalUnionOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalWindowOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
@@ -255,6 +256,28 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
 
         return rewriteOptExpression(optExpression, newJoin, info.outputStringColumns);
     }
+
+    @Override
+    public OptExpression visitPhysicalUnion(OptExpression optExpression, ColumnRefSet fragmentUseDictExprs) {
+        PhysicalUnionOperator unionOp = optExpression.getOp().cast();
+        DecodeInfo info = context.operatorDecodeInfo.getOrDefault(unionOp, DecodeInfo.EMPTY);
+        ScalarOperator newPredicate = rewritePredicate(unionOp.getPredicate(), info.inputStringColumns);
+        Projection newProjection = rewriteProjection(unionOp.getProjection(), info.inputStringColumns);
+        List<ColumnRefOperator> newColumnRefOp = unionOp.getOutputColumnRefOp().stream().map(
+                c -> info.outputStringColumns.contains(c)
+                        ? context.stringRefToDictRefMap.getOrDefault(c, c) : c).toList();
+        List<List<ColumnRefOperator>> newChildOutputColumns = unionOp.getChildOutputColumns().stream()
+                .map(l -> l.stream()
+                        .map(c -> info.inputStringColumns.contains(c) ?
+                                context.stringRefToDictRefMap.getOrDefault(c, c) : c).toList()
+                ).toList();
+
+        PhysicalUnionOperator newUnionOp = new PhysicalUnionOperator(newColumnRefOp, newChildOutputColumns,
+                unionOp.isUnionAll(), unionOp.getLimit(), newPredicate, newProjection,
+                unionOp.isFromIcebergEqualityDeleteRewrite());
+        return rewriteOptExpression(optExpression, newUnionOp, info.outputStringColumns);
+    }
+
 
     @Override
     public OptExpression visitPhysicalHashAggregate(OptExpression optExpression, ColumnRefSet fragmentUseDictExprs) {
