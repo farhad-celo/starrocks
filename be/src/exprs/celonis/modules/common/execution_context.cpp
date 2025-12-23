@@ -12,13 +12,13 @@
 
 namespace celonis::accelerator::common {
 
-execution_context::execution_context() noexcept
+execution_context::execution_context()
     : span_{std::make_shared<tracing::span>()},
       table_to_user_visible_name_mapping_{std::make_shared<cube::table_to_user_visible_name_mapping>()},
       extended_tables_{std::make_shared<cube::extended_tables>()} {}
 
 execution_context::execution_context(const std::string& operation_name,
-                                     legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy) noexcept
+                                     legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy)
     : span_{std::make_shared<tracing::span>(operation_name, tracing::tags_t{})},
       memory_tracking_strategy_{std::move(memory_tracking_strategy)},
       table_to_user_visible_name_mapping_{std::make_shared<cube::table_to_user_visible_name_mapping>()},
@@ -36,7 +36,7 @@ execution_context::execution_context(const std::string& operation_name,
       extended_tables_{std::make_shared<cube::extended_tables>()} {}
 #endif
 
-execution_context::execution_context(tracing::span&& managed_span, const execution_context* parent) noexcept
+execution_context::execution_context(tracing::span&& managed_span, const execution_context* parent)
     : parent_{parent},
       span_{std::make_shared<tracing::span>(std::move(managed_span))},
       memory_tracking_strategy_{parent_->memory_tracking_strategy_},
@@ -53,7 +53,7 @@ execution_context::execution_context(const execution_context* parent)
       extended_tables_{parent_->extended_tables_.lock_shared([](const auto& tables) { return tables; })} {}
 
 execution_context execution_context::create_sub_context(const std::string& operation_name,
-                                                        const tracing::tags_t& tags) const noexcept {
+                                                        const tracing::tags_t& tags) const {
   return execution_context{span_->start_child_span(operation_name, tags), this};
 }
 

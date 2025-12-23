@@ -33,7 +33,8 @@ class execution_context {
   /**
    * This constructor creates a dummy context which manages a dummy span with no functionality
    */
-  execution_context() noexcept;
+  // Note: noexcept removed because std::make_shared can throw std::bad_alloc
+  execution_context();
 
   /**
    * This constructor creates a context which manages a root span.
@@ -46,8 +47,9 @@ class execution_context {
    * @param memory_tracking_strategy Strategy for memory tracking used in the scope defined by this execution context.
    * Will be inherited to all subcontexts.
    */
+  // Note: noexcept removed because std::make_shared can throw std::bad_alloc
   explicit execution_context(const std::string& operation_name,
-                             legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy = nullptr) noexcept;
+                             legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy = nullptr);
 
 #ifndef CELOSTAR
   /**
@@ -85,7 +87,8 @@ class execution_context {
    * @param tags additional information about the work. Can also be added later to the span of the new context
    * @return the created sub context
    */
-  execution_context create_sub_context(const std::string& operation_name, const tracing::tags_t& tags) const noexcept;
+  // Note: noexcept removed because this calls a constructor that uses std::make_shared
+  execution_context create_sub_context(const std::string& operation_name, const tracing::tags_t& tags) const;
 
   /**
    * Creates a sub context that references the same span as the current context.
@@ -160,7 +163,8 @@ class execution_context {
    * @param managed_span span that is managed by the context
    * @param parent pointer to root execution_context
    */
-  execution_context(tracing::span&& managed_span, const execution_context* parent) noexcept;
+  // Note: noexcept removed because std::make_shared can throw std::bad_alloc
+  execution_context(tracing::span&& managed_span, const execution_context* parent);
 
   /**
    * Constructor for creating a sub context that shares the same span with the root context.
