@@ -60,7 +60,7 @@ class span final {
    * @param operation_name name of work done by this span. Can also be changed later with change_operation_name
    * @param tags additional information about the work. Can also be added later with set_tag.
    */
-  span(const std::string& operation_name, const tags_t& tags) noexcept;
+  span(const std::string& operation_name, const tags_t& tags);
 
   /**
    * If a span context can be extracted from the remote span context this constructor creates a child span of
@@ -73,7 +73,7 @@ class span final {
    * @param remote_span_context context used for extracting a span context
    */
   span(const std::string& operation_name, const tags_t& tags,
-       const CommunicationRequest_ExecutionContext_SpanContext& remote_span_context) noexcept;
+       const CommunicationRequest_ExecutionContext_SpanContext& remote_span_context);
 
   ~span() noexcept;
 
@@ -122,7 +122,7 @@ class span final {
    * this span depends on the work of the child span.
    * Often (but not always) the parent span cannot finish until the child span does.
    */
-  [[nodiscard]] span start_child_span(const std::string& operation_name, const tags_t& tags) const noexcept;
+  [[nodiscard]] span start_child_span(const std::string& operation_name, const tags_t& tags) const;
 
   /**
    * This function indicates to the Datadog Agent to not send the span to Datadog.
@@ -142,7 +142,7 @@ class span final {
   void finish_span();
 
  protected:
-  explicit span(opentelemetry_span_t&& span) noexcept;
+  explicit span(opentelemetry_span_t&& span);
 
  private:
   /**

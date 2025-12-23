@@ -152,7 +152,7 @@ struct distance_sort_key {
                    });
   }
 
-  auto operator()(process::variant_view variant) const noexcept {
+  auto operator()(process::variant_view variant) const {
     thread_local std::vector<COLUMN_PTR_TYPE> sorted_buffer{};
     sorted_buffer.clear();
     for (auto it{variant.begin()}; it != variant.end(); ++it) {

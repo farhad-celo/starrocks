@@ -27,7 +27,7 @@ execution_context::execution_context(const std::string& operation_name,
 #ifndef CELOSTAR
 execution_context::execution_context(const std::string& operation_name,
                                      const CommunicationRequest_ExecutionContext& remote_context,
-                                     legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy) noexcept
+                                     legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy)
     : span_{remote_context.has_span_context()
                 ? std::make_shared<tracing::span>(operation_name, tracing::tags_t{}, remote_context.span_context())
                 : std::make_shared<tracing::span>(operation_name, tracing::tags_t{})},
@@ -70,7 +70,7 @@ execution_context::execution_context(execution_context&& other_context) noexcept
    * In the most common use case the move-constructor is used for creating a new sub context which doesn't have any
    * warnings yet. There is no need to move any warnings, therefore avoid acquiring an unique_lock.
    */
-  if (!other_context.get_warnings().empty()) {
+  if (other_context.has_warnings()) {
     std::unique_lock<std::shared_timed_mutex> other_warnings_lock(other_context.warnings_mutex_,
                                                                   std::chrono::seconds(60));
     if (!other_warnings_lock.owns_lock()) {
@@ -124,9 +124,14 @@ void execution_context::merge_warnings(memory::warnings_container_t warnings) co
   warnings_.merge(std::move(warnings));
 }
 
-memory::warnings_container_t execution_context::get_warnings() const noexcept {
+memory::warnings_container_t execution_context::get_warnings() const {
   std::shared_lock<std::shared_timed_mutex> get_warnings_lock(warnings_mutex_);
   return warnings_;
+}
+
+bool execution_context::has_warnings() const noexcept {
+  std::shared_lock<std::shared_timed_mutex> lock(warnings_mutex_);
+  return !warnings_.empty();
 }
 
 void execution_context::add_user_visible_name_mapping(const memory::table* table,

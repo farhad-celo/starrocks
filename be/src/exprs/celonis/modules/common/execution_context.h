@@ -65,7 +65,7 @@ class execution_context {
    * Will be inherited to all subcontexts.
    */
   execution_context(const std::string& operation_name, const CommunicationRequest_ExecutionContext& remote_context,
-                    legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy = nullptr) noexcept;
+                    legacy_embedded_ctl::abstract_strategy_t memory_tracking_strategy = nullptr);
 #endif
 
   // move-constructor only needed for creating sub context, custom implementation required because mutex is not movable
@@ -139,7 +139,12 @@ class execution_context {
   /**
    * @return a copy of all warnings that are currently stored for this context
    */
-  memory::warnings_container_t get_warnings() const noexcept;
+  memory::warnings_container_t get_warnings() const;
+
+  /**
+   * @return true if there are any warnings stored for this context
+   */
+  [[nodiscard]] bool has_warnings() const noexcept;
 
   void add_user_visible_name_mapping(const memory::table* table, memory::user_visible_table_name name);
 

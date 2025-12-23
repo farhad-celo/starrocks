@@ -308,7 +308,7 @@ class exec_replay_for_source_target final : public exec_replay {
 class exec_replay_for_conformance final : public exec_replay {
  public:
   exec_replay_for_conformance(const model_and_caches_pair& model_and_caches, const row_id row_count,
-                              const row_id case_count, const common::execution_context& context) noexcept
+                              const row_id case_count, const common::execution_context& context)
       : exec_replay{model_and_caches, row_count},
         conforming_rows_{ctl::cast_unsigned(case_count)},
         context_{context} {};

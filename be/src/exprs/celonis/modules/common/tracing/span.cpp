@@ -52,12 +52,12 @@ opentelemetry::context::Context propagate_context(
 
 span::span() noexcept = default;
 
-span::span(const std::string& operation_name, const tags_t& tags) noexcept
+span::span(const std::string& operation_name, const tags_t& tags)
     : span(get_tracer()->StartSpan(operation_name, tags)) {}
 
 #ifndef CELOSTAR
 span::span(const std::string& operation_name, const tags_t& tags,
-           const CommunicationRequest_ExecutionContext_SpanContext& remote_span_context) noexcept
+           const CommunicationRequest_ExecutionContext_SpanContext& remote_span_context)
     : span(get_tracer()->StartSpan(
           operation_name, tags,
           opentelemetry::trace::StartSpanOptions{.start_system_time{},
@@ -66,7 +66,7 @@ span::span(const std::string& operation_name, const tags_t& tags,
                                                  .kind = DEFAULT_SPAN_KIND})) {}
 #endif
 
-span::span(opentelemetry_span_t&& span) noexcept
+span::span(opentelemetry_span_t&& span)
     : span_impl_{std::move(span)}, scope_impl_{span_impl_.lock_mutable([](auto& span_impl) {
         return std::make_unique<opentelemetry::trace::Scope>(get_tracer()->WithActiveSpan(get_underlying(span_impl)));
       })} {}
@@ -145,7 +145,7 @@ void span::set_error(const std::string& message, const std::string& stack_trace)
       });
 }
 
-span span::start_child_span(const std::string& operation_name, const tags_t& tags) const noexcept {
+span span::start_child_span(const std::string& operation_name, const tags_t& tags) const {
   return span_impl_.lock_shared([&operation_name = std::as_const(operation_name),
                                  &tags = std::as_const(tags)](auto& span_impl) -> span {
     if (!span_impl) {

@@ -35,7 +35,7 @@ class column_processing_state {
   void make_bounded_constant_selectable();
   void set_sorted(bool sorted) noexcept { is_sorted_ = sorted; }
   void set_calculated_constant(bool calculated_constant) noexcept { is_calculated_constant_ = calculated_constant; }
-  void set_format(const std::string& format) noexcept { format_ = format; }
+  void set_format(const std::string& format) { format_ = format; }
   void set_filter_unstable(bool filtered) noexcept { is_filter_unstable_ = filtered; }
 
   void merge(const column_processing_state& state);

@@ -60,7 +60,7 @@ class n_largest {
     }
   }
 
-  [[nodiscard]] container_type fetch_n_largest() noexcept {
+  [[nodiscard]] container_type fetch_n_largest() {
     container_type container{};
     container.reserve(top_n_.size());
     while (!top_n_.empty()) {
