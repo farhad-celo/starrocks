@@ -1,0 +1,342 @@
+name: Auto Cherry-pick #${{ github.event.pull_request.number }} to branch-3.5
+
+on:
+  pull_request:
+    types: [closed]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to cherry-pick'
+        required: true
+        type: string
+
+env:
+  TARGET_BRANCH: branch-3.5-77b12702-celo
+  TRIGGER_COMMAND: /cherry-pick
+
+jobs:
+  cherrypick:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@celonis.com"
+      - name: Upgrade GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install gh -y
+          gh --version
+      - name: Determine trigger type and get PR info
+        id: trigger_info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              let prNumber, prAuthor, prTitle, prBody, mergeCommitSha, baseBranch;
+              let shouldRun = false;
+              let isMerged = false;
+
+              // Workflow dispatch (manual)
+              if (context.eventName === 'workflow_dispatch') {
+                const inputPRNumber = context.payload.inputs.pr_number;
+                if (!inputPRNumber || isNaN(parseInt(inputPRNumber))) {
+                  console.log(`Invalid PR number provided: ${inputPRNumber}`);
+                  core.setOutput('should_run', 'false');
+                  core.setOutput('error_message', `Invalid PR number: ${inputPRNumber}`);
+                  return;
+                }
+                prNumber = parseInt(inputPRNumber);
+
+                try {
+                  const prResponse = await github.rest.pulls.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: prNumber
+                  });
+                  const pr = prResponse.data;
+                  prAuthor = pr.user.login;
+                  prTitle = pr.title;
+                  prBody = pr.body || '';
+                  baseBranch = pr.base.ref;
+                  isMerged = pr.merged;
+
+                  if (!pr.merged) {
+                    console.log(`PR #${prNumber} is not merged, cannot cherry-pick`);
+                    core.setOutput('should_run', 'false');
+                    core.setOutput('pr_not_merged', 'true');
+                    core.setOutput('pr_number', prNumber);
+                    return;
+                  }
+
+                  mergeCommitSha = pr.merge_commit_sha;
+                  shouldRun = true;
+                  console.log(`Manual trigger detected for PR #${prNumber}, proceeding with cherry-pick`);
+                } catch (error) {
+                  console.log(`Failed to get PR #${prNumber}: ${error.message}`);
+                  core.setOutput('should_run', 'false');
+                  core.setOutput('error_message', `Failed to get PR #${prNumber}: ${error.message}`);
+                  return;
+                }
+              }
+
+              // PR merged trigger
+              else if (context.eventName === 'pull_request' && context.payload.pull_request.merged === true) {
+                const pr = context.payload.pull_request;
+                prNumber = pr.number;
+                prAuthor = pr.user.login;
+                prTitle = pr.title;
+                prBody = pr.body || '';
+                mergeCommitSha = pr.merge_commit_sha;
+                baseBranch = pr.base.ref;
+                isMerged = true;
+
+                try {
+                  const repoInfo = await github.rest.repos.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo
+                  });
+                  const defaultBranch = repoInfo.data.default_branch;
+
+                  if (baseBranch === defaultBranch) {
+                    shouldRun = true;
+                    console.log(`PR #${prNumber} merged to default branch ${defaultBranch}, proceeding with cherry-pick`);
+                  } else {
+                    console.log(`PR #${prNumber} merged to ${baseBranch}, not default branch ${defaultBranch}, skipping`);
+                  }
+                } catch (error) {
+                  console.log(`Failed to get repo info: ${error.message}`);
+                  core.setOutput('should_run', 'false');
+                  core.setOutput('error_message', `Failed to get repo info: ${error.message}`);
+                  return;
+                }
+              }
+
+              // Comment trigger
+              else if (context.eventName === 'issue_comment') {
+                const comment = context.payload.comment.body.trim();
+                const issue = context.payload.issue;
+
+                if (!issue.pull_request) {
+                  console.log('Comment is on an issue, not a PR, skipping');
+                  return;
+                }
+
+                const triggerCommand = "/cherry-pick";
+                if (!comment.match(new RegExp(`^\\s*${triggerCommand}(\\s|$)`))) {
+                  console.log(`Comment does not contain trigger command "${triggerCommand}", skipping`);
+                  return;
+                }
+
+                try {
+                  const prResponse = await github.rest.pulls.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: issue.number
+                  });
+                  const pr = prResponse.data;
+                  prNumber = pr.number;
+                  prAuthor = pr.user.login;
+                  prTitle = pr.title;
+                  prBody = pr.body || '';
+                  baseBranch = pr.base.ref;
+                  isMerged = pr.merged;
+
+                  if (!pr.merged) {
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: prNumber,
+                      body: `❌ **Cherry-pick failed**: This PR has not been merged yet. Please merge the PR first before attempting to cherry-pick.\n\nUse \`/cherry-pick\` after the PR is merged.`
+                    });
+                    console.log(`PR #${prNumber} is not merged, commented failure message`);
+                    core.setOutput('should_run', 'false');
+                    core.setOutput('pr_not_merged', 'true');
+                    core.setOutput('pr_number', prNumber);
+                    return;
+                  }
+
+                  mergeCommitSha = pr.merge_commit_sha;
+                  shouldRun = true;
+                  console.log(`Comment trigger detected on PR #${prNumber}, proceeding with cherry-pick`);
+                } catch (error) {
+                  console.log(`Failed to get PR from comment: ${error.message}`);
+                  core.setOutput('should_run', 'false');
+                  core.setOutput('error_message', `Failed to get PR from comment: ${error.message}`);
+                  return;
+                }
+              }
+
+              if (!shouldRun) {
+                core.setOutput('should_run', 'false');
+                return;
+              }
+
+              // Final outputs
+              core.setOutput('should_run', 'true');
+              core.setOutput('pr_number', prNumber);
+              core.setOutput('pr_author', prAuthor);
+              core.setOutput('pr_title', prTitle);
+              core.setOutput('pr_body', prBody);
+              core.setOutput('merge_commit_sha', mergeCommitSha);
+              core.setOutput('base_branch', baseBranch);
+              core.setOutput('is_merged', isMerged);
+
+            } catch (error) {
+              console.log(`Unexpected error: ${error.message}`);
+              core.setOutput('should_run', 'false');
+              core.setOutput('error_message', `Unexpected error: ${error.message}`);
+            }
+
+      - name: Get default branch
+        id: default_branch
+        run: |
+          git fetch --all
+          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | sed 's/^[[:space:]]*HEAD branch: //')
+          echo "branch=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Cherry Pick Commit
+        id: cherry_pick
+        run: |
+            set +e
+            
+            COMMIT_SHA="${{ steps.trigger_info.outputs.merge_commit_sha }}"
+            TARGET_BRANCH="${{ env.TARGET_BRANCH }}"
+            
+            git fetch origin "$TARGET_BRANCH" || git fetch origin "$TARGET_BRANCH:$TARGET_BRANCH"
+            git checkout "$TARGET_BRANCH"
+            git pull origin "$TARGET_BRANCH"
+            
+            git log -1 --oneline
+            
+            timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
+            CP_BRANCH="cherry-pick-${{ steps.trigger_info.outputs.pr_number }}-to-${TARGET_BRANCH}-${timestamp}"
+            git checkout -b "$CP_BRANCH"
+            
+            # try to cherry-pick
+            git cherry-pick "$COMMIT_SHA"
+            STATUS=$?
+            
+            if [ $STATUS -ne 0 ]; then
+              echo "Cherry-pick encountered conflicts, attempting auto-resolve by preferring new commit"
+            
+              # list conflicted files
+              git diff --name-only --diff-filter=U > conflicts.txt
+              if [ -s conflicts.txt ]; then
+                while read f; do
+                  # prefer --theirs commits 
+                  git checkout --theirs "$f"
+                  git add "$f"
+                done < conflicts.txt
+              fi
+            
+              # continue cherry-pick
+              git cherry-pick --continue
+              STATUS=$?
+            
+              if [ $STATUS -ne 0 ]; then
+                echo "Cherry-pick still failed after auto-resolve"
+                git cherry-pick --abort || true
+                echo "success=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+            
+            echo "Cherry-pick succeeded"
+            git log -1 --oneline
+            git push origin "$CP_BRANCH"
+            
+            echo "success=true" >> "$GITHUB_OUTPUT"
+            echo "cp_branch=$CP_BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Create PR and capture number
+        if: steps.cherry_pick.outputs.success == 'true'
+        id: create_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch -a
+          git checkout ${{ steps.cherry_pick.outputs.cp_branch }}
+          PR_OUTPUT=$(gh pr create \
+            --title "[Cherry-pick] ${{ steps.trigger_info.outputs.pr_title }}" \
+            --body "Cherry-pick of PR #${{ steps.trigger_info.outputs.pr_number }} by @${{ steps.trigger_info.outputs.pr_author }}" \
+            --base "${{ env.TARGET_BRANCH }}") 
+
+          PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oP '(?<=/pull/)\d+')
+          echo "pull-request-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          
+
+      - name: Assign PR to original author
+        if: steps.trigger_info.outputs.should_run == 'true' && steps.create_pr.outputs.pull-request-number != '' && steps.cherry_pick.outputs.success == 'true'
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
+          PR_AUTHOR: ${{ steps.trigger_info.outputs.pr_author }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const author = process.env.PR_AUTHOR;
+
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              assignees: [author]
+            });
+
+      - name: Comment on original PR
+        if: steps.trigger_info.outputs.should_run == 'true' && steps.create_pr.outputs.pull-request-number != '' && steps.cherry_pick.outputs.success == 'true'
+        uses: actions/github-script@v7
+        env:
+          ORIGINAL_PR_NUMBER: ${{ steps.trigger_info.outputs.pr_number }}
+          NEW_PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
+          TARGET_BRANCH: ${{ env.TARGET_BRANCH }}
+        with:
+          script: |
+            const originalPRNumber = parseInt(process.env.ORIGINAL_PR_NUMBER);
+            const newPRNumber = parseInt(process.env.NEW_PR_NUMBER);
+            const targetBranch = process.env.TARGET_BRANCH;
+            const newPRUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${newPRNumber}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: originalPRNumber,
+              body: `🤖 Automatically created cherry-pick PR to ${targetBranch}: #${newPRNumber}\n\n${newPRUrl}`
+            });
+
+      - name: Comment on original PR (cherry-pick failed)
+        env:
+          ORIGINAL_PR_NUMBER: ${{ steps.trigger_info.outputs.pr_number }}
+          TARGET_BRANCH: ${{ env.TARGET_BRANCH }}
+          COMMIT_SHA: ${{ steps.trigger_info.outputs.commit_sha }}
+        if: steps.cherry_pick.outputs.success == 'false' && steps.trigger_info.outputs.should_run == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = parseInt(process.env.ORIGINAL_PR_NUMBER);
+            const targetBranch = process.env.TARGET_BRANCH;
+            const commitSha = process.env.COMMIT_SHA;
+            const workflow_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `❌ **Cherry-pick failed**
+                workflow run: ${workflow_url}
+                Failed to cherry-pick commit \`${commitSha}\` to branch \`${targetBranch}\`.
+                This is usually caused by conflicts (e.g. modify/delete conflicts in workflow files).
+                Please perform a manual backport if this change is required in the release branch.`});
+
