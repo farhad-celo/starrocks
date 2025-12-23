@@ -197,6 +197,9 @@ set(EXEC_FILES
         ./exprs/celonis/in_json_test.cpp
         ./exprs/celonis/in_json_array_test.cpp
         ./exprs/celonis/index_activity_test.cpp
+        ./exprs/celonis/json_model_creator.cpp
+        ./exprs/celonis/json_model_creator_test.cpp
+        ./exprs/celonis/json_to_model_test.cpp
         ./exprs/celonis/kmeans_test.cpp
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/linear_regression_test.cpp

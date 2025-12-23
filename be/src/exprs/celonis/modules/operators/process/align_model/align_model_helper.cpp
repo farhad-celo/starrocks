@@ -117,8 +117,13 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
   cube::variant_trace_cache_manager variant_trace_cache_manager(memory::management::no_swap());
 
   auto align_model = align_model::create_align_model_tables{
-      activity_column,        case_id_column, case_table, activity_to_case_join, variant_trace_cache_manager,
-      bpmn_model_description, settings};
+      activity_column,
+      case_id_column,
+      case_table,
+      activity_to_case_join,
+      variant_trace_cache_manager,
+      starrocks::celonis::bpmn_model_description::from_proto(bpmn_model_description),
+      settings};
 
   common::execution_context context;
   auto tables = align_model(context);

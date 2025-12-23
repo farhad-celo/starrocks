@@ -196,6 +196,8 @@ set(CELONIS_FILES
   celonis/transits_match.cpp
   celonis/trim.cpp
   celonis/util.cpp
+  celonis/utils/json_to_model.cpp
+  celonis/utils/proto_utils.cpp
 )
 
 add_library(blake2s STATIC IMPORTED)

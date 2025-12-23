@@ -21,6 +21,7 @@
 #include "modules/common/shared_types.h"
 #include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/memory/table_group.h"
+#include "modules/memory/typed_dictionary.h"
 #include "modules/operators/aggregation/string_aggregation.h"
 #include "modules/operators/process/align_model/align_model_table_group_node_settings.h"
 #include "modules/operators/process/align_model/align_model_types.h"
@@ -30,9 +31,9 @@
 #include "modules/operators/process/align_model/v2/create_alignment_inflation.h"
 #include "modules/operators/process/bpmn/bpmn_from_proto.h"
 #include "modules/query/operators.pb.h"
+#include "utils/json_to_model.h"
 
 namespace celonis::accelerator::operators::process::align_model {
-
 namespace {
 constexpr size_t CREATE_TABLE_GRAIN_SIZE{100'000};
 
@@ -69,8 +70,18 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   auto align_model_op_context{context.create_sub_context("create_align_model_tables::operator()", {})};
 
   ctl::wall_timer_t proto_bpmn_model_description_to_bpmn_graph_timer{};
+
+  starrocks::celonis::details::dictionary dict{};
+  debug_assert(activity_column_->is_cel_string_type());
+  const auto dictionary_saola = activity_column_->get_dict(context);
+  const auto* ptr_dict = dynamic_cast<memory::typed_dictionary<cel_string_t>*>(dictionary_saola.get());
+  debug_assert(dictionary_saola.get());
+  for (size_t i{1}; i < dictionary_saola->get_size(); i++) {
+    dict.insert(ptr_dict->get_string_value_view(i));
+  }
+
   const auto [bpmn_graph, bpmn_to_string]{
-      bpmn::convert_from_proto_and_create_string_map(model_description_, activity_column_, align_model_op_context)};
+      starrocks::celonis::details::convert_from_proto_and_create_string_map(model_description_, dict)};
   stats.proto_bpmn_to_bpmn_graph = proto_bpmn_model_description_to_bpmn_graph_timer.elapsed_wall_time_so_far();
   stats.bpmn_graph = bpmn_graph;
 

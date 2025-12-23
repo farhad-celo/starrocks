@@ -402,6 +402,18 @@ std::string typed_dictionary<cel_string_t>::get_string_value(row_id ptr) const {
   return get_string_value_opt(ptr).value_or("NULL");
 }
 
+std::optional<std::string_view> typed_dictionary<cel_string_t>::get_string_value_view_opt(row_id ptr) const {
+  if (ptr == 0) {
+    return std::nullopt;
+  }
+
+  return std::string_view(get_const_data().at(ptr));
+}
+
+std::string_view typed_dictionary<cel_string_t>::get_string_value_view(row_id ptr) const {
+  return get_string_value_view_opt(ptr).value_or("NULL");
+}
+
 [[nodiscard]] dictionary_t typed_dictionary<cel_string_t>::create_dictionary(
     legacy_embedded_ctl::static_array<cel_string_t>&& ptr, legacy_embedded_ctl::static_array<char>&& buffer,
     const std::string& swap_file, const management::swap_info& sinfo, const std::string& description) {

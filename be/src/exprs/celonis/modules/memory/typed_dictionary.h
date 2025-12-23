@@ -168,6 +168,9 @@ class typed_dictionary<cel_string_t> : public dictionary {
   [[nodiscard]] std::string get_string_value(row_id ptr) const override;
   [[nodiscard]] std::optional<std::string> get_string_value_opt(row_id ptr) const override;
 
+  [[nodiscard]] std::string_view get_string_value_view(row_id ptr) const;
+  [[nodiscard]] std::optional<std::string_view> get_string_value_view_opt(row_id ptr) const;
+
   [[nodiscard]] size_t get_size_in_memory() const override;
 
   [[nodiscard]] usage_time_t time_of_last_usage() const override;
