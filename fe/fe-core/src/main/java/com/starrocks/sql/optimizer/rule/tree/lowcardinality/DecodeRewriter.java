@@ -65,6 +65,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_AGGREGATE_FUNCTIONS_WITH_ENCODED_OUTPUT;
+
 /*
  * Rewrite the whole plan using the dict column by from bottom-up
  */
@@ -278,8 +280,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
             }
 
             // merge stage is different from update stage
-            if (FunctionSet.MAX.equals(aggFn.getFnName()) || FunctionSet.MIN.equals(aggFn.getFnName())
-                    || FunctionSet.ANY_VALUE.equals(aggFn.getFnName())) {
+            if (LOW_CARD_AGGREGATE_FUNCTIONS_WITH_ENCODED_OUTPUT.contains(aggFn.getFnName())) {
                 ColumnRefOperator newAggRef = context.stringRefToDictRefMap.getOrDefault(aggRef, aggRef);
                 aggregations.put(newAggRef, context.stringExprToDictExprMap.get(aggFn).cast());
                 inputStringRefs.union(aggRef.getId());
