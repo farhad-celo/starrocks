@@ -45,6 +45,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_AGGREGATE_FUNCTIONS;
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_AGGREGATE_FUNCTIONS_WITH_ENCODED_OUTPUT;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_ARRAY_FUNCTIONS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_STRUCT_FUNCTIONS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_WINDOW_FUNCTIONS;
@@ -145,6 +147,9 @@ class DecodeContext {
                     && fieldsUseRefMap.containsKey(subfieldOperator.getFieldNames().get(0)));
             return getUseStringRef(fieldsUseRefMap.get(subfieldOperator.getFieldNames().get(0)));
         }
+        if (operator instanceof CallOperator && FunctionSet.ARRAY_AGG.equals(((CallOperator) operator).getFnName())) {
+            return getUseStringRef(operator.getChild(0));
+        }
         List<ColumnRefOperator> columnRefs = Lists.newArrayList();
         for (ScalarOperator child : operator.getChildren()) {
             ColumnRefOperator ref = getUseStringRef(child);
@@ -167,7 +172,7 @@ class DecodeContext {
                 continue;
             }
             ColumnRefOperator stringRef = factory.getColumnRef(stringId);
-            ColumnRefOperator dictRef = createNewDictColumn(stringRef);
+            ColumnRefOperator dictRef = createNewDictColumn(stringRef, true);
             stringRefToDictRefMap.put(stringRef, dictRef);
             stringExprToDictExprMap.put(stringRef, exprRewriter.decode(dictRef, stringRef, stringRef));
         }
@@ -241,7 +246,7 @@ class DecodeContext {
 
     // create a new dictionary column and assign the same property except for the type and column id
     // the input column maybe a dictionary column or a string column
-    private ColumnRefOperator createNewDictColumn(ColumnRefOperator column) {
+    private ColumnRefOperator createNewDictColumn(ColumnRefOperator column, boolean registerInFactory) {
         if (column.getType().isStringArrayType()) {
             return factory.create(column.getName(), ArrayType.ARRAY_INT, column.isNullable());
         } else if (column.getType().isStringType()) {
@@ -263,10 +268,57 @@ class DecodeContext {
                 }
             }
             StructType dictType = new StructType(structFields, type.isNamed());
-            return factory.create(column.getName(), dictType, column.isNullable());
+            return registerInFactory
+                    ? factory.create(column.getName(), dictType, column.isNullable())
+                    : new ColumnRefOperator(column.getId(),  dictType, column.getName(), column.isNullable());
         } else {
             throw new IllegalArgumentException("Unsupported dictified type: " +  column.getType());
         }
+    }
+
+    private Function buildFunction(CallOperator call, List<ScalarOperator> args) {
+        String fnName = call.getFnName();
+        if (fnName.equals(FunctionSet.NAMED_STRUCT)) {
+            Type[] argTypes = args.stream().map(ScalarOperator::getType).toArray(Type[]::new);
+            Function fn = ExprUtils.getBuiltinFunction(fnName, argTypes, Function.CompareMode.IS_SUPERTYPE_OF).copy();
+            List<StructField> fields = Lists.newArrayList();
+            for (int i = 0; i < args.size(); i += 2) {
+                fields.add(new StructField(((ConstantOperator) args.get(i)).getVarchar(), argTypes[i + 1]));
+            }
+            fn.setRetType(new StructType(fields, true));
+            return fn;
+        }
+        if (fnName.equals(FunctionSet.ARRAY_AGG)) {
+            AggregateFunction fn =  (AggregateFunction) call.getFunction().copy();
+            Preconditions.checkState(fn.getIntermediateType() != null && fn.getIntermediateType().isStructType());
+            if (call.getArguments().get(0).getType().matchesType(fn.getIntermediateType())) {
+                Preconditions.checkState(call.getArguments().get(0).isColumnRef());
+                ColumnRefOperator intermediateChild = (ColumnRefOperator) call.getArguments().get(0);
+                StructType intermediateType = (StructType) createNewDictColumn(intermediateChild, false).getType();
+                fn.setIntermediateType(intermediateType);
+                fn.setRetType(intermediateType.getField(0).getType());
+                fn.setArgsType(intermediateType.getFields().stream().map(StructField::getType)
+                        .map(type -> ((ArrayType) type).getItemType()).toArray(Type[]::new));
+            } else {
+                Type[] argTypes = args.stream().map(ScalarOperator::getType).toArray(Type[]::new);
+                fn.setArgsType(argTypes);
+                fn.setRetType(new ArrayType(argTypes[0]));
+                List<StructField> structFields = Lists.newArrayList();
+                StructType structType = (StructType) fn.getIntermediateType();
+                for (int i = 0; i < structType.getFields().size(); ++i) {
+                    structFields.add(
+                            new StructField(structType.getField(i).getName(), new ArrayType(args.get(i).getType())));
+                }
+                fn.setIntermediateType(new StructType(structFields, structType.isNamed()));
+            }
+            return fn;
+        } else if (LOW_CARD_AGGREGATE_FUNCTIONS.contains(fnName) && !FunctionSet.ANY_VALUE.equals(fnName)) {
+            Type argType = args.get(0).getType().isArrayType() ? new ArrayType(IntegerType.INT) : IntegerType.INT;
+            return ExprUtils.getBuiltinFunction(fnName, new Type[] {argType},
+                    Function.CompareMode.IS_SUPERTYPE_OF);
+        }
+        Type[] argTypes = args.stream().map(ScalarOperator::getType).toArray(Type[]::new);
+        return ExprUtils.getBuiltinFunction(fnName, argTypes, Function.CompareMode.IS_SUPERTYPE_OF);
     }
 
     // define mode: means the result column is dict, DictExpr should return int/array<int> type
@@ -379,21 +431,6 @@ class DecodeContext {
             return stringRefToDictRefMap.getOrDefault(variable, variable);
         }
 
-        private static Function buildFunction(String fnName, List<ScalarOperator> args) {
-            Type[] argTypes = args.stream().map(ScalarOperator::getType).toArray(Type[]::new);
-            Function fn = ExprUtils.getBuiltinFunction(fnName, argTypes, Function.CompareMode.IS_SUPERTYPE_OF);
-            if (!fnName.equals(FunctionSet.NAMED_STRUCT)) {
-                return fn;
-            }
-            fn = fn.copy();
-            List<StructField> fields = Lists.newArrayList();
-            for (int i = 0; i < args.size(); i += 2) {
-                fields.add(new StructField(((ConstantOperator) args.get(i)).getVarchar(), argTypes[i + 1]));
-            }
-            fn.setRetType(new StructType(fields, true));
-            return fn;
-        }
-
         @Override
         public ScalarOperator visitCall(CallOperator call, Void context) {
             if (!isSupportedArrayFunction(call) && !LOW_CARD_STRUCT_FUNCTIONS.contains(call.getFnName())) {
@@ -405,7 +442,7 @@ class DecodeContext {
                 return call;
             }
 
-            Function fn = buildFunction(call.getFnName(), newChildren);
+            Function fn = buildFunction(call, newChildren);
             ScalarOperator result = new CallOperator(call.getFnName(), fn.getReturnType(), newChildren, fn);
 
             if (FunctionSet.ARRAY_MAX.equalsIgnoreCase(call.getFnName()) ||
@@ -493,13 +530,25 @@ class DecodeContext {
             List<ScalarOperator> newChildren = visitList(call.getChildren(), hasChange);
 
             if (call.getFunction() instanceof AggregateFunction) {
-                Type argType = newChildren.get(0).getType().isStructType() ? newChildren.get(0).getType()
-                        : newChildren.get(0).getType().isArrayType() ? new ArrayType(IntegerType.INT) : IntegerType.INT;
-                Type[] argTypes = new Type[] {argType};
-                Function fn = ExprUtils.getBuiltinFunction(call.getFnName(), argTypes, Function.CompareMode.IS_SUPERTYPE_OF);
+                Function fn = buildFunction(call, newChildren);
                 // min/max function: will rewrite all stage, return type is dict type
-                if (FunctionSet.MAX.equals(call.getFnName()) || FunctionSet.MIN.equals(call.getFnName())
-                        || FunctionSet.ANY_VALUE.equals((call.getFnName()))) {
+                if (FunctionSet.ARRAY_AGG.equals(call.getFnName())) {
+                    AggregateFunction aggFn = (AggregateFunction) fn;
+                    Type retType = call.getType().matchesType(call.getFunction().getReturnType())
+                            ? aggFn.getReturnType() : aggFn.getIntermediateType();
+                    if (call.getArguments().get(0).getType().matchesType(
+                            ((AggregateFunction) call.getFunction()).getIntermediateType())) {
+                        // intermediate children have different types than what is registered in the factory. We need
+                        // to rebuild these children.
+                        Preconditions.checkState(newChildren.get(0).isColumnRef());
+                        ColumnRefOperator newChild = newChildren.get(0).cast();
+                        newChildren = List.of(new ColumnRefOperator(
+                                newChild.getId(), ((AggregateFunction) fn).getIntermediateTypeOrReturnType(),
+                                newChild.getName(), newChild.isNullable()));
+                    }
+                    return new CallOperator(call.getFnName(), retType, newChildren, fn,
+                            call.isDistinct(), call.isRemovedDistinct());
+                } else if (LOW_CARD_AGGREGATE_FUNCTIONS_WITH_ENCODED_OUTPUT.contains(call.getFnName())) {
                     return new CallOperator(call.getFnName(), fn.getReturnType(), newChildren, fn,
                             call.isDistinct(), call.isRemovedDistinct());
                 } else if (FunctionSet.COUNT.equals(call.getFnName()) ||
@@ -521,12 +570,7 @@ class DecodeContext {
             if (!hasChange[0]) {
                 return call;
             }
-
-            Type[] argTypes = new Type[newChildren.size()];
-            for (int i = 0; i < newChildren.size(); i++) {
-                argTypes[i] = newChildren.get(i).getType();
-            }
-            Function fn = ExprUtils.getBuiltinFunction(call.getFnName(), argTypes, Function.CompareMode.IS_SUPERTYPE_OF);
+            Function fn = buildFunction(call, newChildren);
             return new CallOperator(call.getFnName(), fn.getReturnType(), newChildren, fn,
                     call.isDistinct(), call.isRemovedDistinct());
         }

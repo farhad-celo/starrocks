@@ -172,6 +172,8 @@ public class LowCardinalityTest2 extends PlanTestBase {
         connectContext.getSessionVariable().setUseLowCardinalityOptimizeV2(true);
         connectContext.getSessionVariable().setEnableEliminateAgg(false);
         connectContext.getSessionVariable().setEnableRewriteSimpleAggToMetaScan(false);
+        connectContext.getSessionVariable().setEnableArrayAggLowCardinalityOptimize(true);
+        connectContext.getSessionVariable().setEnableStructLowCardinalityOptimize(true);
     }
 
     @AfterAll
@@ -2448,5 +2450,110 @@ public class LowCardinalityTest2 extends PlanTestBase {
         } finally {
             FeConstants.runningUnitTest = false;
         }
+    }
+
+    @Test
+    public void testArrayAggString1Stage() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR(new_planner_agg_stage='1') */
+                ARRAY_AGG(C_NAME ORDER BY C_ADDRESS, LO_DISCOUNT, C_NATION)
+                FROM lineorder_flat
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  2:Decode\n" +
+                "  |  <dict id 43> : <string id 39>\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  1:AGGREGATE (update finalize)\n" +
+                "  |  aggregate: array_agg[([40: C_NAME, INT, false], [41: C_ADDRESS, INT, false], [12: LO_DISCOUNT," +
+                " TINYINT, false], [42: C_NATION, INT, false]); args: INT,INT,TINYINT,INT; result: ARRAY<INT>; args" +
+                " nullable: false; result nullable: true]"), plan);
+    }
+
+    @Test
+    public void testArrayAggString2Stage() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR(new_planner_agg_stage='2') */
+                ARRAY_AGG(C_NAME ORDER BY C_ADDRESS, LO_DISCOUNT, C_NATION)
+                FROM lineorder_flat
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  4:Decode\n" +
+                "  |  <dict id 43> : <string id 39>\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  3:AGGREGATE (merge finalize)\n" +
+                "  |  aggregate: array_agg[([43: array_agg, struct<col1 array<int(11)>, col2 array<int(11)>, col3" +
+                " array<tinyint(4)>, col4 array<int(11)>>, true]); args: INT,INT,TINYINT,INT; result: ARRAY<INT>;" +
+                " args nullable: true; result nullable: true]"), plan);
+    }
+
+    @Test
+    public void testArrayAggString3Stage() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR(new_planner_agg_stage='3') */
+                ARRAY_AGG(DISTINCT C_NAME)
+                FROM lineorder_flat
+                GROUP BY C_REGION
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  Global Dict Exprs:\n" +
+                "    42: DictDefine(40: C_NAME, [<place-holder>])\n" +
+                "\n" +
+                "  6:Decode\n" +
+                "  |  <dict id 42> : <string id 39>\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  5:Project\n" +
+                "  |  output columns:\n" +
+                "  |  42 <-> [42: array_agg, ARRAY<INT>, true]\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  4:AGGREGATE (update finalize)\n" +
+                "  |  aggregate: array_agg[([40: C_NAME, INT, false]); args: INT; result: ARRAY<INT>; args nullable: " +
+                "false; result nullable: true]\n" +
+                "  |  group by: [41: C_REGION, INT, false]"), plan);
+    }
+
+    @Test
+    public void testArrayAggString4Stage() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR(new_planner_agg_stage='4') */
+                ARRAY_AGG(DISTINCT C_NAME ORDER BY C_ADDRESS, LO_DISCOUNT, C_NATION)
+                FROM lineorder_flat
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  7:Decode\n" +
+                "  |  <dict id 43> : <string id 39>\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  6:AGGREGATE (merge finalize)\n" +
+                "  |  aggregate: array_agg[([43: array_agg, struct<col1 array<int(11)>, col2 array<int(11)>, " +
+                "col3 array<tinyint(4)>, col4 array<int(11)>>, true]); args: INT,INT,TINYINT,INT; result: ARRAY<INT>;" +
+                " args nullable: true; result nullable: true]\n"), plan);
+    }
+
+    @Test
+    public void testArrayAggString4StageGetElement() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR(new_planner_agg_stage='4') */
+                UPPER(ARRAY_AGG(DISTINCT C_NAME ORDER BY C_ADDRESS, LO_DISCOUNT, C_NATION)[1])
+                FROM lineorder_flat
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  Global Dict Exprs:\n" +
+                "    45: DictDefine(42: C_NAME, [<place-holder>])\n" +
+                "\n" +
+                "  7:Project\n" +
+                "  |  output columns:\n" +
+                "  |  40 <-> DictDecode([45: array_agg, ARRAY<INT>, true], [upper[(<place-holder>); args: VARCHAR;" +
+                " result: VARCHAR; args nullable: true; result nullable: true]], [45: array_agg, ARRAY<INT>, true]" +
+                "[1])\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  6:AGGREGATE (merge finalize)\n" +
+                "  |  aggregate: array_agg[([45: array_agg, struct<col1 array<int(11)>, col2 array<int(11)>, col3 " +
+                "array<tinyint(4)>, col4 array<int(11)>>, true]); args: INT,INT,TINYINT,INT; result: ARRAY<INT>; args" +
+                " nullable: true; result nullable: true]\n"), plan);
     }
 }

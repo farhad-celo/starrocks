@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.starrocks.catalog.AggregateFunction;
 import com.starrocks.catalog.Column;
 import com.starrocks.catalog.ColumnAccessPath;
 import com.starrocks.catalog.FunctionSet;
@@ -111,7 +112,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
     public static final Set<String> LOW_CARD_AGGREGATE_FUNCTIONS = Sets.newHashSet(FunctionSet.COUNT,
             FunctionSet.MULTI_DISTINCT_COUNT, FunctionSet.MAX, FunctionSet.MIN, FunctionSet.APPROX_COUNT_DISTINCT,
-            FunctionSet.ANY_VALUE);
+            FunctionSet.ANY_VALUE, FunctionSet.ARRAY_AGG);
+
+    public static final Set<String> LOW_CARD_AGGREGATE_FUNCTIONS_WITH_ENCODED_OUTPUT = Sets.newHashSet(
+            FunctionSet.MAX, FunctionSet.MIN, FunctionSet.ANY_VALUE, FunctionSet.ARRAY_AGG);
 
     //TODO(by satanson): it seems that we can support more windows functions in future, at present, we only support
     // LAG/LEAD/FIRST_VALUE/LAST_VALUE and the aggregations functions which can adopt low cardinality optimization
@@ -447,6 +451,11 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return false;
         }
         ScalarOperator define = stringRefToDefineExprMap.get(cid);
+        if (define instanceof CallOperator && FunctionSet.ARRAY_AGG.equals(((CallOperator) define).getFnName())) {
+            Map<String, ColumnRefOperator> fieldsMap = structRefToFieldUseStringRef.get(cid);
+            Preconditions.checkState(fieldsMap != null && fieldsMap.containsKey("col1"));
+            return checkDependOnExpr(fieldsMap.get("col1").getId(), checkList);
+        }
         if (define.getType().isStructType()) {
             Map<String, ColumnRefOperator> fieldsMap = getFieldUseStringRefMap(define);
             if (fieldsMap == null) {
@@ -474,12 +483,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     }
 
     void setDefineExpr(ColumnRefOperator col, ScalarOperator define, int counter) {
-        if (define instanceof CallOperator && ((CallOperator) define).getFnName().equals(FunctionSet.ANY_VALUE)) {
-            Map<String, ColumnRefOperator> fieldsMap = getFieldUseStringRefMap(define.getChild(0));
-            if (fieldsMap != null) {
-                structOpToFieldUseStringRef.put(define, fieldsMap);
-            }
-        }
         stringRefToDefineExprMap.putIfAbsent(col.getId(), define);
         Map<String, ColumnRefOperator> fieldsMap = getFieldUseStringRefMap(define);
         if (fieldsMap != null) {
@@ -874,6 +877,25 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         return info;
     }
 
+    private boolean shouldProcessAggFunction(CallOperator agg) {
+        final boolean enableArrayAgg = sessionVariable.isEnableArrayAggLowCardinalityOptimize()
+                && sessionVariable.isEnableArrayLowCardinalityOptimize()
+                && sessionVariable.isEnableStructLowCardinalityOptimize();
+        final boolean isArrayAgg = FunctionSet.ARRAY_AGG.equals(agg.getFnName());
+        if (isArrayAgg && !enableArrayAgg) {
+            return false;
+        }
+        if (!LOW_CARD_AGGREGATE_FUNCTIONS.contains((agg.getFnName()))) {
+            return false;
+        }
+        if (isArrayAgg) {
+            // ARRAY_AGG dictification is only supported for string inputs for aggregation.
+            return agg.getChildren().stream().allMatch(c -> c.isColumnRef() || c.isConstantRef())
+                    && agg.getChild(0).isColumnRef() && agg.getFunction().getArgs()[0].isStringType();
+        }
+        return agg.getChildren().size() == 1 && agg.getChildren().get(0).isColumnRef();
+    }
+
     @Override
     public DecodeInfo visitPhysicalHashAggregate(OptExpression optExpression, DecodeInfo context) {
         if (context.outputStringColumns.isEmpty()) {
@@ -885,12 +907,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         ColumnRefSet disableColumns = new ColumnRefSet();
         for (ColumnRefOperator key : aggregate.getAggregations().keySet()) {
             CallOperator agg = aggregate.getAggregations().get(key);
-            if (!LOW_CARD_AGGREGATE_FUNCTIONS.contains(agg.getFnName())) {
-                disableColumns.union(agg.getUsedColumns());
-                disableColumns.union(key);
-                continue;
-            }
-            if (agg.getChildren().size() != 1 || !agg.getChildren().get(0).isColumnRef()) {
+            if (!shouldProcessAggFunction(agg)) {
                 disableColumns.union(agg.getUsedColumns());
                 disableColumns.union(key);
             }
@@ -908,15 +925,37 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 continue;
             }
             CallOperator value = aggregate.getAggregations().get(key);
-            if (!info.inputStringColumns.containsAll(value.getUsedColumns())) {
+            if (!info.inputStringColumns.containsAll(value.getUsedColumns())
+                    && !FunctionSet.ARRAY_AGG.equals(value.getFnName())) {
                 continue;
+            } else if (FunctionSet.ARRAY_AGG.equals(value.getFnName())) {
+                // For ARRAY_AGG, we should process if the first input can be dictified
+                Preconditions.checkState(value.getChild(0).isColumnRef());
+                if (!info.inputStringColumns.contains(value.getChild(0).cast())) {
+                    continue;
+                }
             }
             // aggregate ref -> aggregate expr
             stringAggregateExpressions.computeIfAbsent(key.getId(), x -> Lists.newArrayList()).add(value);
             // min/max should replace to dict column, count/count distinct don't need
-            if (FunctionSet.MAX.equals(value.getFnName()) || FunctionSet.MIN.equals(value.getFnName())
-                    || FunctionSet.ANY_VALUE.equals(value.getFnName())) {
+            if (LOW_CARD_AGGREGATE_FUNCTIONS_WITH_ENCODED_OUTPUT.contains(value.getFnName())) {
                 info.outputStringColumns.union(key.getId());
+                AggregateFunction aggFn = (AggregateFunction) value.getFunction();
+                if (aggFn.getIntermediateTypeOrReturnType().isStructType()
+                        && !structRefToFieldUseStringRef.containsKey(key.getId())) {
+                    // Works for ARRAY_AGG and ANY_VALUE which are currently the only Aggregate functions generating
+                    // structs. This will not work if the struct is not generated from the input fields.
+                    StructType structType = (StructType) aggFn.getIntermediateTypeOrReturnType();
+                    Preconditions.checkState(structType.getFields().size() == value.getArguments().size());
+                    Map<String, ColumnRefOperator> fieldsData = Maps.newHashMap();
+                    for (int i = 0; i < value.getArguments().size(); i++) {
+                        if (value.getArguments().get(i).isColumnRef()
+                                && context.outputStringColumns.contains(value.getArguments().get(i).cast())) {
+                            fieldsData.put(structType.getField(i).getName(), value.getArguments().get(i).cast());
+                        }
+                    }
+                    structOpToFieldUseStringRef.put(value, fieldsData);
+                }
                 setDefineExpr(key, value, 1);
             } else if (aggregate.getType().isLocal() || aggregate.getType().isDistinct()) {
                 // count/count distinct, need output dict-set in 1st stage
