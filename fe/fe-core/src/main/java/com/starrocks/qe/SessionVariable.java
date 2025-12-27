@@ -410,6 +410,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String LOW_CARDINALITY_OPTIMIZE_V2 = "low_cardinality_optimize_v2";
     public static final String LOW_CARDINALITY_OPTIMIZE_ON_LAKE = "low_cardinality_optimize_on_lake";
     public static final String ARRAY_LOW_CARDINALITY_OPTIMIZE = "array_low_cardinality_optimize";
+    public static final String ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE = "array_agg_low_cardinality_optimize";
     public static final String STRUCT_LOW_CARDINALITY_OPTIMIZE = "struct_low_cardinality_optimize";
     public static final String CBO_USE_NTH_EXEC_PLAN = "cbo_use_nth_exec_plan";
     public static final String CBO_CTE_REUSE = "cbo_cte_reuse";
@@ -1688,6 +1689,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VarAttr(name = ARRAY_LOW_CARDINALITY_OPTIMIZE)
     private boolean enableArrayLowCardinalityOptimize = true;
 
+    @VarAttr(name = ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE)
+    private boolean enableArrayAggLowCardinalityOptimize = true;
+
     @VarAttr(name = STRUCT_LOW_CARDINALITY_OPTIMIZE)
     private boolean enableStructLowCardinalityOptimize = true;
 
@@ -2189,6 +2193,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public boolean isEnableArrayLowCardinalityOptimize() {
         return enableArrayLowCardinalityOptimize;
+    }
+
+    public boolean isEnableArrayAggLowCardinalityOptimize() {
+        return enableArrayAggLowCardinalityOptimize;
+    }
+
+    public void setEnableArrayAggLowCardinalityOptimize(boolean enableArrayAggLowCardinalityOptimize) {
+        this.enableArrayAggLowCardinalityOptimize = enableArrayAggLowCardinalityOptimize;
     }
 
     public void setEnableStructLowCardinalityOptimize(boolean enableStructLowCardinalityOptimize) {
