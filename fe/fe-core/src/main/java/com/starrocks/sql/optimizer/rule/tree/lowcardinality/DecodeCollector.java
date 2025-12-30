@@ -675,7 +675,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                     int outputColumnId = setOp.getOutputColumnRefOp().get(i).getId();
                     childColumns.forEach(c -> {
                         result.usedStringColumns.union(c);
-                        expressionStringRefCounter.put(c, expressionStringRefCounter.get(c) + 1);
+                        expressionStringRefCounter.put(c, expressionStringRefCounter.getOrDefault(c, 0) + 1);
                     });
                     stringRefToDefineExprMap.put(outputColumnId, setOp.getChildOutputColumns().get(0).get(i));
                     expressionStringRefCounter.put(outputColumnId, 1);
