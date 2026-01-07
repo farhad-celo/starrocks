@@ -2,6 +2,8 @@
     "name": "sr-dev-homcc",
     "containerUser": "root",
     "remoteUser": "root",
+    "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+    "workspaceFolder": "${localWorkspaceFolder}",
     "build": {
         "dockerfile": "../../docker/dockerfiles/dev-env-homcc-base/x86/Dockerfile",
         "context": "../../docker/dockerfiles/dev-env-homcc-base"
@@ -10,10 +12,12 @@
     "containerEnv": {
         // This is covered by the CMake presets already but still useful to have in case you want to execute build.sh
         "STARROCKS_GCC_HOME": "/usr/",
-        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/lib",
+        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/lib:/usr/lib/jvm/java-17-openjdk-amd64/lib/server",
         "STARROCKS_LINKER": "lld",
         "CMAKE_GENERATOR": "ninja",
-        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "STARROCKS_HOME": "${localWorkspaceFolder}",
+        "UDF_RUNTIME_DIR": "lib/udf-runtime"
     },
     "customizations": {
         "jetbrains": {
