@@ -410,19 +410,25 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                     // Having separate counters for each type is not really necessary and a global counter is simpler to
                     // implement, but for now I would like to keep the implementation changes minimal.
                     edge_type_array<size_t> edge_class_id{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
+                    edge_type_array<size_t> edges_per_type{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
+                    for (const auto& component : replay_result_for_case.components()) {
+                      edges_per_type.at(component.component_type) += component.size();
+                    }
+                    for (const auto type : EDGE_TYPES) {
+                      auto& association_cols{association_columns_per_edge_type.at(type)};
+                      const auto reserve_size{edges_per_type.at(type)};
+                      association_cols.edge_class.at(current_variant_row).reserve(reserve_size);
+                      association_cols.alignment_index.at(current_variant_row).reserve(reserve_size);
+                      association_cols.model_vertex_id.at(current_variant_row).reserve(reserve_size);
+                      association_cols.vertex_label.at(current_variant_row).reserve(reserve_size);
+                      association_cols.move_type.at(current_variant_row).reserve(reserve_size);
+                      association_cols.deviation_category.at(current_variant_row).reserve(reserve_size);
+                    }
 
                     for (row_id id = 0; id < replay_result_for_case.components().size(); id++) {
                       auto component{replay_result_for_case.components().at(id)};
                       // Each component contains only a single edge type, fetch those columns
                       auto& association_cols{association_columns_per_edge_type.at(component.component_type)};
-
-                      association_cols.edge_class.at(current_variant_row).reserve(replay_result_for_case.num_rows());
-                      association_cols.alignment_index.at(current_variant_row)
-                          .reserve(replay_result_for_case.num_rows());
-                      association_cols.model_vertex_id.at(current_variant_row)
-                          .reserve(replay_result_for_case.num_rows());
-                      association_cols.vertex_label.at(current_variant_row).reserve(replay_result_for_case.num_rows());
-                      association_cols.move_type.at(current_variant_row).reserve(replay_result_for_case.num_rows());
 
                       for (size_t vertex_id : component.edges_as_vertices) {
                         association_cols.edge_class.at(current_variant_row)
