@@ -58,7 +58,7 @@ NEW_DEV_ENV=""
 function set_and_print_current_dev_env() {
   FILE_TO_EXTRACT_DEV_ENV_FROM="${REPO_ROOT_DIR}/.github/workflows/celonis_presubmit_test.yml"
   echo "Using file '${FILE_TO_EXTRACT_DEV_ENV_FROM}' to extract the currently used dev-env..."
-  CURRENT=$(grep "${DEV_ENV_IMAGE_REGISTRY_PREFIX}" "${REPO_ROOT_DIR}/.github/workflows/celonis_presubmit_test.yml" | awk -F'Builder: ' '{print $2}' | xargs)
+  CURRENT=$(grep "${DEV_ENV_IMAGE_REGISTRY_PREFIX}" "${REPO_ROOT_DIR}/.github/workflows/celonis_presubmit_test.yml" | awk -F'builder_image: ' '{print $2}' | xargs)
   echo "The currently used dev-env is '${CURRENT}'"
 }
 
