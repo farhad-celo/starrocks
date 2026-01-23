@@ -8,8 +8,8 @@
 /sonar-project.properties @jxWho @mingmxu @pavan-kalyan
 
 # Build Infrastructure
-/.devcontainer/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal
-/docker/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal
+/.devcontainer/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal @lxynov
+/docker/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal @lxynov
 /thirdparty/ @jxWho @jkim650 @hagonzal
 /thirdparty/build-celonis-libraries.sh @jxWho @WeberNick @hagonzal
 /thirdparty/build-thirdparty-celonis.sh @jxWho @WeberNick @hagonzal
@@ -19,10 +19,10 @@
 
 # Source code and binaries
 /be/ @jkim650 @hagonzal @zhangyaqi1989 @lxynov @OliLay @martinr0x
-/be/src/exprs/celonis/cpml_utils/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x
-/be/src/exprs/celonis/modules/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x
+/be/src/exprs/celonis/cpml_utils/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov
+/be/src/exprs/celonis/modules/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov
 /bin/ @jkim650 @hagonzal @zhangyaqi1989
-/fe/ @jkim650 @hagonzal @zhangyaqi1989 @OliLay @martinr0x
+/fe/ @jkim650 @hagonzal @zhangyaqi1989 @OliLay @martinr0x @lxynov
 
 # Misc
 /celonis/ @jxWho @jkim650 @mingmxu @pavan-kalyan
