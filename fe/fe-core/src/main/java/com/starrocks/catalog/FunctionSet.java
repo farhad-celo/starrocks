@@ -889,9 +889,41 @@ public class FunctionSet {
     public static final Set<String> INDEX_ONLY_FUNCTIONS =
             ImmutableSet.<String>builder().add().add(NGRAM_SEARCH).add(NGRAM_SEARCH_CASE_INSENSITIVE).build();
 
+    // Celonis unsupported agg state functions (alphabetically sorted)
+    private static final Set<String> CELONIS_UNSUPPORTED_AGG_STATE_FUNCTIONS = ImmutableSet.of(
+                    CELONIS_BUILD_ABC_MODEL,
+                    CELONIS_BUILD_KMEANS_MODEL,
+                    CELONIS_BUILD_LINEAR_REGRESSION_MODEL,
+                    CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL,
+                    CELONIS_CALC_BUCKET_COUNT_BOUNDARIES,
+                    CELONIS_CALC_BUCKET_WIDTH_BOUNDARIES,
+                    CELONIS_CALC_STRING_BUCKET_COUNT_BOUNDARIES,
+                    CELONIS_CALC_STRING_BUCKET_WIDTH_BOUNDARIES,
+                    CELONIS_CLUSTER_STRINGS,
+                    CELONIS_CLUSTER_VARIANTS,
+                    CELONIS_ENUMERATE_NODE_PATHS,
+                    CELONIS_ENUMERATE_TRANSITIVE_EDGES,
+                    CELONIS_EXPLORE_PROCESS,
+                    CELONIS_GRAPH,
+                    CELONIS_HISTOGRAM_BOUNDARIES,
+                    CELONIS_INDUCTIVE_MINER,
+                    CELONIS_MAKE_FACTORY_CALENDAR,
+                    CELONIS_MAKE_WEEKDAY_CALENDAR,
+                    CELONIS_MAKE_WORKDAY_CALENDAR,
+                    CELONIS_MODE,
+                    CELONIS_PERCENTILE_DISC,
+                    CELONIS_PRODUCT,
+                    CELONIS_SORTED_FIRST,
+                    CELONIS_SORTED_LAST,
+                    CELONIS_TRIMMED_MEAN,
+                    CELONIS_VARIANT_STATS,
+                    CELONIS_VARIANT_STATS_V2,
+                    MULTI_ARRAY_AGG);
+
     // Unsupported functions for agg state combinator.
     public static final Set<String> UNSUPPORTED_AGG_STATE_FUNCTIONS =
             new ImmutableSortedSet.Builder<>(String.CASE_INSENSITIVE_ORDER)
+                    .addAll(CELONIS_UNSUPPORTED_AGG_STATE_FUNCTIONS)
                     // TODO: Add unsupported functions here.
                     .add(GROUP_CONCAT) // Unsupported function
                     // UNSUPPORTED functions
@@ -910,12 +942,6 @@ public class FunctionSet {
                     .add(INTERSECT_COUNT)
                     .add(LC_PERCENTILE_DISC)
                     .add(MAP_AGG)
-                    // Celonis functions
-                    .add(CELONIS_BUILD_LINEAR_REGRESSION_MODEL)
-                    .add(CELONIS_MAKE_FACTORY_CALENDAR)
-                    .add(CELONIS_MAKE_WEEKDAY_CALENDAR)
-                    .add(CELONIS_MAKE_WORKDAY_CALENDAR)
-                    .add(MULTI_ARRAY_AGG)
                     .build();
 
     public static final Set<String> RANK_RALATED_FUNCTIONS =
