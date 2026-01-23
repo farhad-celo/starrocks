@@ -13,7 +13,7 @@ on:
         type: string
 
 env:
-  TARGET_BRANCH: branch-3.5-c17d55bc-celo
+  TARGET_BRANCH: branch-3.5-be8040ad-celo
   TRIGGER_COMMAND: /cherry-pick
 
 jobs:
