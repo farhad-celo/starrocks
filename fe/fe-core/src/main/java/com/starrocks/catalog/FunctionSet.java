@@ -530,12 +530,19 @@ public class FunctionSet {
     public static final String NGRAM_SEARCH = "ngram_search";
     public static final String NGRAM_SEARCH_CASE_INSENSITIVE = "ngram_search_case_insensitive";
 
-
     // Celonis functions:
     public static final String MULTI_ARRAY_AGG = "multi_array_agg";
     public static final String CELONIS_ADJUST_DAILY_TIMESTAMPS = "celonis_adjust_daily_timestamps";
     public static final String CELONIS_ALIGN_MODEL = "celonis_align_model";
     public static final String CELONIS_ALIGN_MODEL_V2 = "celonis_align_model_v2";
+    public static final String CELONIS_ARRAY_AVG = "celonis_array_avg";
+    public static final String CELONIS_ARRAY_COUNT = "celonis_array_count";
+    public static final String CELONIS_ARRAY_COUNT_DISTINCT = "celonis_array_count_distinct";
+    public static final String CELONIS_ARRAY_FIRST = "celonis_array_first";
+    public static final String CELONIS_ARRAY_LAST = "celonis_array_last";
+    public static final String CELONIS_ARRAY_LAG = "celonis_array_lag";
+    public static final String CELONIS_ARRAY_LEAD = "celonis_array_lead";
+    public static final String CELONIS_ARRAY_TRIMMED_MEAN = "celonis_array_trimmed_mean";
     public static final String CELONIS_CREATE_ALIGNMENT = "celonis_create_alignment";
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";

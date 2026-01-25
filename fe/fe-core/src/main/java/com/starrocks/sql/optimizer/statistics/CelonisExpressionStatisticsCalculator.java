@@ -17,7 +17,9 @@ package com.starrocks.sql.optimizer.statistics;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.starrocks.analysis.LargeIntLiteral;
+import com.starrocks.catalog.ArrayType;
 import com.starrocks.catalog.FunctionSet;
+import com.starrocks.catalog.ScalarType;
 import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
@@ -32,10 +34,13 @@ import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.POSITIVE_INFINITY;
 
 public class CelonisExpressionStatisticsCalculator {
+
     public static ColumnStatistic callCalculate(CallOperator call, List<ColumnStatistic> childrenColumnStatistics,
                                                 Statistics inputStatistics, double rowCount) {
         if (call.getChildren().size() == 1) {
             return unaryExpressionCalculate(call, childrenColumnStatistics.get(0), rowCount);
+        } else if (call.getChildren().size() == 2) {
+            return binaryExpressionCalculate(call, childrenColumnStatistics.get(0), childrenColumnStatistics.get(1), rowCount);
         } else if (call.getChildren().size() > 2) {
             return multiaryExpressionCalculate(call, childrenColumnStatistics, inputStatistics, rowCount);
         }
@@ -49,10 +54,17 @@ public class CelonisExpressionStatisticsCalculator {
             return null;
         }
 
+        boolean isStaticSizeType = callOperator.getType().isIntegerType() || callOperator.getType().isFloatingPointType()
+                || callOperator.getType().isDateType() || callOperator.getType().isBitmapType() ||
+                callOperator.getType().isFixedPointType();
         double minValue = columnStatistic.getMinValue();
         double maxValue = columnStatistic.getMaxValue();
         double distinctValue = Math.min(rowCount, columnStatistic.getDistinctValuesCount());
         double nullsFraction = columnStatistic.getNullsFraction();
+        double averageRowSize = isStaticSizeType ? callOperator.getType().getTypeSize() : columnStatistic.getAverageRowSize();
+        // Per default, use the DEFAULT_COLLECTION_SIZE and only set this for expressions returning arrays.
+        double collectionSize = ColumnStatistic.DEFAULT_COLLECTION_SIZE;
+
         switch (callOperator.getFnName().toLowerCase()) {
             case FunctionSet.CELONIS_XX_HASH3_128:
             case FunctionSet.CELONIS_XX_HASH3_128_V2:
@@ -65,6 +77,27 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
                 minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
                 maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
+                break;
+            case FunctionSet.CELONIS_ARRAY_COUNT:
+            case FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT:
+                minValue = 0;
+                maxValue = POSITIVE_INFINITY;
+                averageRowSize = ScalarType.BIGINT.getTypeSize();
+                break;
+            case FunctionSet.CELONIS_ARRAY_FIRST:
+            case FunctionSet.CELONIS_ARRAY_LAST:
+                if (callOperator.getType().isArrayType()) {
+                    final var castedType = (ArrayType) callOperator.getType();
+                    averageRowSize = castedType.getItemType().getTypeSize();
+                } else {
+                    // This should not happen since `CELONIS_ARRAY_FIRST/LAST` always work on arrays. As fallback, we set the
+                    // default `averageRowSize`.
+                    averageRowSize = 1;
+                }
+                break;
+            case FunctionSet.CELONIS_ARRAY_AVG:
+            case FunctionSet.CELONIS_ARRAY_TRIMMED_MEAN:
+                averageRowSize = ScalarType.DOUBLE.getTypeSize();
                 break;
             case FunctionSet.CELONIS_ARRAY_BOOL_OR:
                 minValue = 0;
@@ -94,21 +127,13 @@ public class CelonisExpressionStatisticsCalculator {
                 return null;
         }
 
-        final double averageRowSize;
-        if (callOperator.getType().isIntegerType() || callOperator.getType().isFloatingPointType()
-                || callOperator.getType().isDateType() || callOperator.getType().isBitmapType()) {
-            averageRowSize = callOperator.getType().getTypeSize();
-        } else {
-            averageRowSize = columnStatistic.isUnknown() ? callOperator.getType().getTypeSize() :
-                    columnStatistic.getAverageRowSize();
-        }
-
         return ColumnStatistic.builder()
                 .setMinValue(minValue)
                 .setMaxValue(maxValue)
                 .setNullsFraction(nullsFraction)
                 .setAverageRowSize(averageRowSize)
                 .setDistinctValuesCount(distinctValue)
+                .setCollectionSize(collectionSize)
                 .build();
     }
 
@@ -169,7 +194,7 @@ public class CelonisExpressionStatisticsCalculator {
     // Counts the number of distinct values after the mapping is applied, because multiple FROM values could be mapped
     // to the same TO value.
     private static int countDistinctMappedToNonNullValues(Map<ConstantOperator, ConstantOperator> valuesMap,
-                                                   ConstantOperator defaultValue) {
+                                                          ConstantOperator defaultValue) {
         HashSet<ConstantOperator> distinctValues = Sets.newHashSet();
         for (ConstantOperator value : valuesMap.values()) {
             if (!value.isNull()) {
@@ -181,6 +206,39 @@ public class CelonisExpressionStatisticsCalculator {
             distinctValues.add(defaultValue);
         }
         return distinctValues.size();
+    }
+
+    private static ColumnStatistic binaryExpressionCalculate(CallOperator callOperator, ColumnStatistic left,
+                                                             ColumnStatistic right, double rowCount) {
+        if (left.isUnknown() || right.isUnknown()) {
+            return null;
+        }
+
+        double minValue = left.getMinValue();
+        double maxValue = left.getMaxValue();
+        double distinctValues = left.getDistinctValuesCount();
+        double nullsFraction = 1 - ((1 - left.getNullsFraction()) * (1 - right.getNullsFraction()));
+
+        double averageRowSize = left.getAverageRowSize();
+        double collectionSize = left.getCollectionSize();
+
+        switch (callOperator.getFnName().toLowerCase()) {
+            case FunctionSet.CELONIS_ARRAY_LAG:
+            case FunctionSet.CELONIS_ARRAY_LEAD:
+                // Use first child statistics
+                break;
+            default:
+                return null;
+        }
+
+        return ColumnStatistic.builder()
+                .setMinValue(minValue)
+                .setMaxValue(maxValue)
+                .setNullsFraction(nullsFraction)
+                .setAverageRowSize(averageRowSize)
+                .setDistinctValuesCount(distinctValues)
+                .setCollectionSize(collectionSize)
+                .build();
     }
 
     /**
@@ -217,12 +275,11 @@ public class CelonisExpressionStatisticsCalculator {
         double averageRowSize = columnStatistic.getAverageRowSize();
         double nullsFraction = 0;
 
-
         double averageRowSizeTotal = 0.0;
         double averageRowSizeCount = 0.0;
         double columnNonNullsFraction = 1 - columnStatistic.getNullsFraction();
-        boolean isNullMappedToNonNull =  false;
-        boolean isNullMappedToNull =  false;
+        boolean isNullMappedToNonNull = false;
+        boolean isNullMappedToNull = false;
 
         Map<ConstantOperator, ConstantOperator> deduplicatedValuesMap = deduplicateMappedValues(children, columnStatistic,
                 inputStatistics);
