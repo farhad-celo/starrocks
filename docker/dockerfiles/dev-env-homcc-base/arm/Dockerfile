@@ -3,7 +3,7 @@ FROM ghcr.io/celonis/celostar/starrocks-dev-env:pr1996-3.3-f2255f48-celo-arm
 # Setup homcc
 RUN wget https://github.com/celonis/homcc/releases/download/v1.0.2/homcc_arm.deb
 RUN apt update && apt install -y ./homcc_arm.deb
-COPY ../hosts /etc/homcc/hosts
+COPY hosts /etc/homcc/hosts
 ENV HOMCC_DOCKER_CONTAINER=sr-dev
 
 # Some more convenient dev tooling
