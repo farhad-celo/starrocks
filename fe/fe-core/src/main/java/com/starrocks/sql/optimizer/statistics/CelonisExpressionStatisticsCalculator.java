@@ -20,6 +20,7 @@ import com.starrocks.analysis.LargeIntLiteral;
 import com.starrocks.catalog.ArrayType;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
+import com.starrocks.catalog.Type;
 import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
@@ -29,6 +30,7 @@ import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.POSITIVE_INFINITY;
@@ -48,15 +50,18 @@ public class CelonisExpressionStatisticsCalculator {
         return null;
     }
 
+    private static boolean isStaticSizeType(Type type) {
+        return type.isIntegerType() || type.isFloatingPointType() || type.isDateType() ||
+                type.isBitmapType() || type.isFixedPointType();
+    }
+
     private static ColumnStatistic unaryExpressionCalculate(CallOperator callOperator, ColumnStatistic columnStatistic,
                                                             double rowCount) {
         if (columnStatistic.isUnknown()) {
             return null;
         }
 
-        boolean isStaticSizeType = callOperator.getType().isIntegerType() || callOperator.getType().isFloatingPointType()
-                || callOperator.getType().isDateType() || callOperator.getType().isBitmapType() ||
-                callOperator.getType().isFixedPointType();
+        boolean isStaticSizeType = isStaticSizeType(callOperator.getType());
         double minValue = columnStatistic.getMinValue();
         double maxValue = columnStatistic.getMaxValue();
         double distinctValue = Math.min(rowCount, columnStatistic.getDistinctValuesCount());
@@ -86,14 +91,8 @@ public class CelonisExpressionStatisticsCalculator {
                 break;
             case FunctionSet.CELONIS_ARRAY_FIRST:
             case FunctionSet.CELONIS_ARRAY_LAST:
-                if (callOperator.getType().isArrayType()) {
-                    final var castedType = (ArrayType) callOperator.getType();
-                    averageRowSize = castedType.getItemType().getTypeSize();
-                } else {
-                    // This should not happen since `CELONIS_ARRAY_FIRST/LAST` always work on arrays. As fallback, we set the
-                    // default `averageRowSize`.
-                    averageRowSize = 1;
-                }
+                averageRowSize = estimateAverageRowSizeForItemInArray(callOperator.getChild(0),
+                        collectionSize, averageRowSize);
                 break;
             case FunctionSet.CELONIS_ARRAY_AVG:
             case FunctionSet.CELONIS_ARRAY_TRIMMED_MEAN:
@@ -135,6 +134,32 @@ public class CelonisExpressionStatisticsCalculator {
                 .setDistinctValuesCount(distinctValue)
                 .setCollectionSize(collectionSize)
                 .build();
+    }
+
+    private static Optional<Type> extractArrayItemType(ScalarOperator operator) {
+        if (operator.getType().isArrayType()) {
+            final var castedType = (ArrayType) operator.getType();
+            return Optional.of(castedType.getItemType());
+        }
+
+        return Optional.empty();
+    }
+
+    private static double estimateAverageRowSizeForItemInArray(ScalarOperator arrayOperator, double arrayCollectionSize,
+                                                               double arrayAverageRowSize) {
+        final var arrayItemTypeOpt = extractArrayItemType(arrayOperator);
+        if (arrayItemTypeOpt.isPresent()) {
+            final var arrayItemType = arrayItemTypeOpt.get();
+            if (isStaticSizeType(arrayItemType)) {
+                // If it is a static type we know exactly how large the row will be.
+                return arrayItemType.getTypeSize();
+            } else if (arrayCollectionSize > 0) {
+                // If it is a dynamic type, we can approximate using the array stats.
+                return arrayAverageRowSize / arrayCollectionSize;
+            }
+        }
+
+        return 1; // default value as fallback
     }
 
     private static ScalarOperator getChildForCastOperator(ScalarOperator operator) {
@@ -226,6 +251,18 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_ARRAY_LAG:
             case FunctionSet.CELONIS_ARRAY_LEAD:
                 // Use first child statistics
+                break;
+            case FunctionSet.CELONIS_DECODE_STRING:
+                minValue = NEGATIVE_INFINITY;
+                maxValue = POSITIVE_INFINITY;
+                distinctValues = left.getDistinctValuesCount();
+                averageRowSize = estimateAverageRowSizeForItemInArray(callOperator.getChild(1), right.getCollectionSize(),
+                        right.getAverageRowSize());
+                break;
+            case FunctionSet.CELONIS_ENCODE_STRING:
+                minValue = -1;
+                maxValue = left.getDistinctValuesCount() - 1;
+                averageRowSize = ScalarType.INT.getTypeSize();
                 break;
             default:
                 return null;

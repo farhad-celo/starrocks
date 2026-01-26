@@ -35,14 +35,17 @@ public class CelonisExpressionStatisticsCalculatorTest {
     private static class UnaryTestScenario {
         private final ColumnRefOperator intColumnRefOperator;
         private final ColumnRefOperator arrayColumnRefOperator;
+        private final ColumnRefOperator stringArrayColumnRefOperator;
         private final Statistics statistics;
         private final Statistics unknownStatistics;
         private final Statistics emptyCollectionStatistics;
 
         public UnaryTestScenario(ColumnRefOperator intColumnRefOperator, ColumnRefOperator arrayColumnRefOperator,
+                                 ColumnRefOperator stringArrayColumnRefOperator,
                                  Statistics statistics) {
             this.intColumnRefOperator = intColumnRefOperator;
             this.arrayColumnRefOperator = arrayColumnRefOperator;
+            this.stringArrayColumnRefOperator = stringArrayColumnRefOperator;
             this.statistics = statistics;
 
             var unknownStatistics = Statistics.buildFrom(statistics);
@@ -64,6 +67,7 @@ public class CelonisExpressionStatisticsCalculatorTest {
     private static UnaryTestScenario unaryTestScenario() {
         ColumnRefOperator intColumnRefOperator = new ColumnRefOperator(0, Type.INT, "id", true);
         ColumnRefOperator arrayColumnRefOperator = new ColumnRefOperator(1, Type.ARRAY_INT, "array", true);
+        ColumnRefOperator stringArrayColumnRefOperator = new ColumnRefOperator(3, Type.ARRAY_VARCHAR, "stringArray", true);
         Statistics.Builder builder = Statistics.builder();
         double min = 0.0;
         double max = 100.0;
@@ -86,10 +90,19 @@ public class CelonisExpressionStatisticsCalculatorTest {
                                 .setAverageRowSize(40) //
                                 .setCollectionSize(10) //
                                 .build()) //
+                .addColumnStatistic(stringArrayColumnRefOperator, //
+                        ColumnStatistic.builder() //
+                                .setMinValue(NEGATIVE_INFINITY) //
+                                .setMaxValue(POSITIVE_INFINITY) //
+                                .setDistinctValuesCount(80) //
+                                .setNullsFraction(0.2) //
+                                .setAverageRowSize(40) //
+                                .setCollectionSize(10) //
+                                .build()) //
                 .setOutputRowCount(100) //
                 .build();
 
-        return new UnaryTestScenario(intColumnRefOperator, arrayColumnRefOperator, statistics);
+        return new UnaryTestScenario(intColumnRefOperator, arrayColumnRefOperator, stringArrayColumnRefOperator, statistics);
     }
 
     @Test
@@ -321,6 +334,47 @@ public class CelonisExpressionStatisticsCalculatorTest {
 
         assertEquals(ColumnStatistic.unknown(), unknownStatistic);
     }
+
+    @Test
+    public void testCelonisEncodeString() {
+        // GIVEN
+        final var unaryTestScenario = unaryTestScenario();
+        final var statistics = unaryTestScenario.statistics;
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_ENCODE_STRING, Type.VARCHAR,
+                Lists.newArrayList(unaryTestScenario.intColumnRefOperator, unaryTestScenario.stringArrayColumnRefOperator));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+        // THEN
+        assertEquals(79, columnStatistic.getMaxValue(), 0.001);
+        assertEquals(-1, columnStatistic.getMinValue(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.359, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, columnStatistic.getAverageRowSize(), 0.001);
+        assertEquals(-1, columnStatistic.getCollectionSize(), 0.001);
+    }
+
+    @Test
+    public void testCelonisDecodeString() {
+        // GIVEN
+        final var unaryTestScenario = unaryTestScenario();
+        final var statistics = unaryTestScenario.statistics;
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_DECODE_STRING, Type.VARCHAR,
+                Lists.newArrayList(unaryTestScenario.intColumnRefOperator, unaryTestScenario.stringArrayColumnRefOperator));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+        // THEN
+        assertEquals(POSITIVE_INFINITY, columnStatistic.getMaxValue(), 0.001);
+        assertEquals(NEGATIVE_INFINITY, columnStatistic.getMinValue(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.359, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, columnStatistic.getAverageRowSize(), 0.001);
+        assertEquals(-1, columnStatistic.getCollectionSize(), 0.001);
+    }
+
 
     private static void testCelonisRemapValuesUsingFunction(String function) {
         ColumnRefOperator col = new ColumnRefOperator(0, Type.INT, "c", true);

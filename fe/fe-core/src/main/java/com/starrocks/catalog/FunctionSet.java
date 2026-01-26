@@ -313,6 +313,8 @@ public class FunctionSet {
     public static final String CELONIS_CALC_STRING_BUCKET_WIDTH_BOUNDARIES = "celonis_calc_string_bucket_width_boundaries";
     public static final String CELONIS_CLUSTER_STRINGS = "celonis_cluster_strings";
     public static final String CELONIS_CLUSTER_VARIANTS = "celonis_cluster_variants";
+    public static final String CELONIS_DECODE_STRING = "celonis_decode_string";
+    public static final String CELONIS_ENCODE_STRING = "celonis_encode_string";
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
     public static final String CELONIS_MODE = "celonis_mode";
