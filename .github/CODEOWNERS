@@ -29,7 +29,7 @@
 /celonis/tools/dev-env.sh @jxWho @jkim650 @mingmxu @WeberNick
 /celostar-docs/ @mingmxu
 /gensrc/ @jkim650 @hagonzal @zhangyaqi1989
-/test/ @jxWho @mingmxu @pavan-kalyan
+/test/ @jxWho @mingmxu @pavan-kalyan @hagonzal @martinr0x @OliLay @zhangyaqi1989
 /mkdocs.yaml @mingmxu
 /run-be-ut.sh @jkim650 @hagonzal @zhangyaqi1989 @jxWho
 
