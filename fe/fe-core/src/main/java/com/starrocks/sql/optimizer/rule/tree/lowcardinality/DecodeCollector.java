@@ -1417,6 +1417,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             for (int i = 0; i < collectors.size(); i++) {
                 saveDictExpr(collectors.get(i), scalarOperator.getChild(i));
             }
+            if (scalarOperator instanceof CallOperator && collectors.stream().anyMatch(c -> !c.isConstantRef())) {
+                CallOperator call = scalarOperator.cast();
+                logUnsupportedFunctionMetric(call.getFnName());
+            }
             return VARIABLES;
         }
 
@@ -1594,6 +1598,16 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         public ScalarOperator visitMatchExprOperator(MatchExprOperator operator, Void context) {
             matchChildren.union((ColumnRefOperator) operator.getChildren().get(0));
             return merge(visitChildren(operator, context), operator);
+        }
+
+        private void logUnsupportedFunctionMetric(String fn) {
+            COUNTERS.computeIfAbsent(fn, k -> {
+                LongCounterMetric metric = new LongCounterMetric("lco_unsupported_fn", Metric.MetricUnit.NOUNIT,
+                        "lco unsupported fn");
+                metric.addLabel(new MetricLabel("function", fn));
+                MetricRepo.addMetric(metric);
+                return metric;
+            }).increase(1L);
         }
     }
 
