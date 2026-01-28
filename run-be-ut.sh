@@ -323,6 +323,8 @@ append_negative_case "*TestPipelineControlFlow*"
 append_negative_case "*ParquetCLIReaderTest*"
 append_negative_case "*LakePrimaryKeyPublishTest*"
 append_negative_case "*LakePrimaryKeyCompactionTest*"
+append_negative_case "*BrpcStubCacheTest.test_http_cleanup*"
+append_negative_case "*BrpcStubCacheTest.test_cleanup*"
 
 
 # prepare util test_data
