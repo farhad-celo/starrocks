@@ -2938,4 +2938,107 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
     config::multi_array_agg_serialization_threshold = multi_array_agg_serialization_threshold;
 }
 
+TEST_F(CelonisAggregateTest, test_multi_array_agg_merge_batch) {
+    const int32_t origin_threshold = config::multi_array_agg_serialization_threshold;
+    config::multi_array_agg_serialization_threshold = 2;
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR}));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    std::vector<bool> is_asc_order{false};
+    std::vector<bool> nulls_first{true};
+    local_ctx->set_is_asc_order(is_asc_order);
+    local_ctx->set_nulls_first(nulls_first);
+    local_ctx->set_runtime_state(runtime_state.get());
+
+    const AggregateFunction* array_agg_func =
+            get_aggregate_function("multi_array_agg", TYPE_BIGINT, TYPE_STRUCT, false);
+    auto final_state1 = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+    auto final_state2 = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+
+    // Warm up final_state1 so its state is already in column mode before merge_batch.
+    auto char_type = TypeDescriptor::create_varchar_type(30);
+    ColumnPtr warm_char_column = ColumnHelper::create_column(char_type, true);
+    warm_char_column->append_datum("warmA");
+    warm_char_column->append_datum("warmB");
+    warm_char_column->append_datum("warmC");
+    ColumnPtr warm_int_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);
+    warm_int_column->append_datum(100);
+    warm_int_column->append_datum(99);
+    warm_int_column->append_datum(98);
+    std::vector<const Column*> warm_raw_columns{warm_char_column.get(), warm_int_column.get()};
+    array_agg_func->update_batch_single_state(local_ctx.get(), warm_char_column->size(), warm_raw_columns.data(),
+                                              final_state1->state());
+    EXPECT_FALSE(((MultiArrayAggAggregateState*)(final_state1->state()))->data_columns.empty());
+
+    TypeDescriptor type_array_char;
+    type_array_char.type = LogicalType::TYPE_ARRAY;
+    type_array_char.children.emplace_back(TypeDescriptor(LogicalType::TYPE_VARCHAR));
+
+    TypeDescriptor type_array_int;
+    type_array_int.type = LogicalType::TYPE_ARRAY;
+    type_array_int.children.emplace_back(TypeDescriptor(LogicalType::TYPE_INT));
+
+    TypeDescriptor type_struct_char_int;
+    type_struct_char_int.type = LogicalType::TYPE_STRUCT;
+    type_struct_char_int.children.emplace_back(type_array_char);
+    type_struct_char_int.children.emplace_back(type_array_int);
+    type_struct_char_int.field_names.emplace_back("vchar");
+    type_struct_char_int.field_names.emplace_back("int");
+
+    ColumnPtr serialized_col = ColumnHelper::create_column(type_struct_char_int, true);
+
+    // partial state 1 -> final_state1
+    auto partial_state1 = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+    ColumnPtr part1_char = ColumnHelper::create_column(char_type, true);
+    part1_char->append_datum("a");
+    part1_char->append_datum("b");
+    ColumnPtr part1_int = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);
+    part1_int->append_datum(5);
+    part1_int->append_datum(3);
+    std::vector<const Column*> part1_raw_columns{part1_char.get(), part1_int.get()};
+    array_agg_func->update_batch_single_state(local_ctx.get(), part1_char->size(), part1_raw_columns.data(),
+                                              partial_state1->state());
+    array_agg_func->serialize_to_column(local_ctx.get(), partial_state1->state(), serialized_col.get());
+
+    // partial state 2 -> final_state1
+    auto partial_state2 = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+    ColumnPtr part2_char = ColumnHelper::create_column(char_type, true);
+    part2_char->append_datum("c");
+    ColumnPtr part2_int = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);
+    part2_int->append_datum(4);
+    std::vector<const Column*> part2_raw_columns{part2_char.get(), part2_int.get()};
+    array_agg_func->update_batch_single_state(local_ctx.get(), part2_char->size(), part2_raw_columns.data(),
+                                              partial_state2->state());
+    array_agg_func->serialize_to_column(local_ctx.get(), partial_state2->state(), serialized_col.get());
+
+    // partial state 3 -> final_state2
+    auto partial_state3 = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+    ColumnPtr part3_char = ColumnHelper::create_column(char_type, true);
+    part3_char->append_datum("d");
+    ColumnPtr part3_int = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_INT), true);
+    part3_int->append_datum(10);
+    std::vector<const Column*> part3_raw_columns{part3_char.get(), part3_int.get()};
+    array_agg_func->update_batch_single_state(local_ctx.get(), part3_char->size(), part3_raw_columns.data(),
+                                              partial_state3->state());
+    array_agg_func->serialize_to_column(local_ctx.get(), partial_state3->state(), serialized_col.get());
+
+    std::vector<AggDataPtr> states(serialized_col->size());
+    states[0] = final_state1->state();
+    states[1] = final_state1->state();
+    states[2] = final_state2->state();
+
+    array_agg_func->merge_batch(local_ctx.get(), serialized_col->size(), 0, serialized_col.get(), states.data());
+
+    ColumnPtr res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR}), true);
+    array_agg_func->finalize_to_column(local_ctx.get(), final_state1->state(), res_col.get());
+    array_agg_func->finalize_to_column(local_ctx.get(), final_state2->state(), res_col.get());
+    EXPECT_EQ(strcmp(res_col->debug_string().c_str(), "[{col0:['warmA','warmB','warmC','a','c','b']}, {col0:['d']}]"),
+              0);
+    config::multi_array_agg_serialization_threshold = origin_threshold;
+}
+
 } // namespace starrocks

@@ -312,6 +312,57 @@ public:
         }
     }
 
+    void merge_batch(FunctionContext* ctx, size_t chunk_size, size_t state_offset, const Column* column,
+                     AggDataPtr* states) const override {
+        if (chunk_size == 0) {
+            return;
+        }
+
+        const auto* struct_col = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column));
+        const auto& input_columns = struct_col->fields();
+        const size_t num_cols = input_columns.size();
+
+        // Pre-compute array columns and offsets
+        std::vector<const ArrayColumn*> array_cols(num_cols);
+        std::vector<const uint32_t*> offsets(num_cols);
+        for (size_t i = 0; i < num_cols; ++i) {
+            array_cols[i] = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns[i].get()));
+            offsets[i] = array_cols[i]->offsets().get_data().data();
+        }
+
+        // Group consecutive rows by state, reserve, then append
+        size_t row = 0;
+        while (row < chunk_size) {
+            AggDataPtr cur_state = states[row] + state_offset;
+            size_t start = row++;
+            while (row < chunk_size && states[row] + state_offset == cur_state) {
+                ++row;
+            }
+
+            // Calculate total elements for this state batch
+            size_t total = offsets[0][row] - offsets[0][start];
+
+            auto& state_impl = this->data(cur_state);
+            // Pre-reserve if in column mode
+            if (!state_impl.data_columns.empty() && total > 0) {
+                for (size_t i = 0; i < num_cols; ++i) {
+                    state_impl.data_columns[i]->reserve(state_impl.data_columns[i]->size() + total);
+                }
+            }
+
+            // Row-based append
+            for (size_t r = start; r < row; ++r) {
+                for (size_t i = 0; i < num_cols; ++i) {
+                    size_t off = offsets[i][r];
+                    size_t cnt = offsets[i][r + 1] - offsets[i][r];
+                    if (cnt > 0) {
+                        state_impl.update(ctx, array_cols[i]->elements(), i, off, cnt);
+                    }
+                }
+            }
+        }
+    }
+
     // finalize each state->column to a [nullable] array
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         auto defer = DeferOp([&]() {
