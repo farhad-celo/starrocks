@@ -6,6 +6,7 @@ inputs:
   branch:
     required: false
 
+
 runs:
   using: composite
   steps:
@@ -24,20 +25,8 @@ runs:
 
         echo "starting to run presubmit test"
         docker exec ${container_id} bash -c "$(cat celonis/tools/presubmit/presubmit_test.sh)"
-
     - name: Summarize test
       if: ${{ always() && steps.test-new-branch.outcome != 'skipped' && inputs.branch != '' }}
       shell: bash
       run: |
           echo "The test branch is ${{inputs.branch}}" >> $GITHUB_STEP_SUMMARY
-
-# Skip this step as we are using runs-on runner which is ephemeral.
-#    - name: clean up
-#      if: ${{ always() }}
-#      shell: bash
-#      run: |
-#        docker kill ${{ env.container_id }} || true
-#        docker system prune -f
-#        docker volume prune -f
-#        docker logout ghcr.io
-#      continue-on-error: true

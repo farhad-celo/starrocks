@@ -26,17 +26,23 @@ env:
   RELEASE_VERSION: presubmit-test
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  Builder: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest
 
 jobs:
+  setup:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    outputs:
+      builder_image: "ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest"
+    steps:
+      - run: echo "Setting dev env image"
+
   presubmit-test:
     runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
+    needs: setup
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: check Celonis's first commit
         shell: bash
         run: |
@@ -63,10 +69,51 @@ jobs:
       - name: Pull dev env image
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
-          docker pull ${Builder}
+          docker pull ${{ needs.setup.outputs.builder_image }}
 
-      - name: Test
+      - name: Presubmit test
         timeout-minutes: 60
         uses: ./.github/actions/presubmit-test
         with:
-          builder: ${Builder}
+          builder: ${{ needs.setup.outputs.builder_image }}
+      
+  fe-test:
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
+    needs: setup
+    container:
+      image: ${{ needs.setup.outputs.builder_image }}
+      credentials:
+        username: ${{ github.repository }}
+        password: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for changes in 'fe/' folder
+        shell: bash
+        id: check_fe_changed
+        run: |
+          git config --global --add safe.directory $(pwd)
+
+          # Fetch base branch
+          if [ -n "${{ github.base_ref }}" ]; then
+            TARGET_BRANCH="${{ github.base_ref }}"
+          else
+            # `github.base_ref` is empty for just commits without a PR, in that case we use the default branch.
+            TARGET_BRANCH="${{ github.event.repository.default_branch }}"
+          fi
+
+          git fetch origin ${TARGET_BRANCH}
+          # Compare the current state against the base branch, and check for FE changes
+          if git diff --quiet origin/${TARGET_BRANCH} -- fe/; then
+            echo "No changes in fe/*"
+            echo "fe_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Changes detected in fe/*"
+            echo "fe_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: FE unit tests
+        timeout-minutes: 60
+        if: ${{ steps.check_fe_changed.outputs.fe_changed == 'true' }}
+        uses: ./.github/actions/fe-unit-tests

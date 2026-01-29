@@ -1,0 +1,16 @@
+name: FE unit tests
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build FE
+      shell: bash
+      run: |
+        echo "Building FE"
+        ./build.sh --fe --clean
+    - name: Run FE unit tests
+      shell: bash
+      run: |
+        echo "Start to run FE UT"
+        export FE_UT_PARALLEL=6
+        ./run-fe-ut.sh
