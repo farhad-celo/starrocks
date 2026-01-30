@@ -318,6 +318,7 @@ public class FunctionSet {
     public static final String CELONIS_HISTOGRAM_BOUNDARIES = "celonis_histogram_boundaries";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
     public static final String CELONIS_MODE = "celonis_mode";
+    public static final String CELONIS_PATINDEX = "celonis_patindex";
     public static final String CELONIS_PRODUCT = "celonis_product";
     public static final String CELONIS_SORTED_FIRST = "celonis_sorted_first";
     public static final String CELONIS_SORTED_LAST = "celonis_sorted_last";

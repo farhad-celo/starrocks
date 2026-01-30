@@ -264,6 +264,12 @@ public class CelonisExpressionStatisticsCalculator {
                 maxValue = left.getDistinctValuesCount() - 1;
                 averageRowSize = ScalarType.INT.getTypeSize();
                 break;
+            case FunctionSet.CELONIS_PATINDEX:
+                minValue = 0;
+                maxValue =  LargeIntLiteral.LARGE_INT_MAX.doubleValue();
+                averageRowSize = ScalarType.BIGINT.getTypeSize();
+                collectionSize = ColumnStatistic.DEFAULT_COLLECTION_SIZE;
+                break;
             default:
                 return null;
         }
@@ -404,11 +410,18 @@ public class CelonisExpressionStatisticsCalculator {
     private static ColumnStatistic multiaryExpressionCalculate(CallOperator callOperator,
                                                                List<ColumnStatistic> childrenColumnStatistics,
                                                                Statistics inputStatistics, double rowCount) {
+        // Can't be null since this method is only called when > 2 args.
+        final var firstArg = childrenColumnStatistics.get(0);
+        final var secondArg = childrenColumnStatistics.get(1);
+
         switch (callOperator.getFnName().toLowerCase()) {
             case FunctionSet.CELONIS_REMAP_VALUES:
             case FunctionSet.CELONIS_REMAP_VALUES_CONST:
                 return celonisRemapValuesCalculate(callOperator.getChildren(), childrenColumnStatistics, inputStatistics,
                         rowCount);
+            case FunctionSet.CELONIS_PATINDEX:
+                // Re-use binary implementation since third argument does not change stats.
+                return binaryExpressionCalculate(callOperator, firstArg, secondArg, rowCount);
             default:
                 return null;
         }
