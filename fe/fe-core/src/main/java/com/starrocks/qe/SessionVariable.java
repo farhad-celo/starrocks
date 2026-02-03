@@ -947,6 +947,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String BACK_PRESSURE_MAX_ROUNDS = "back_pressure_back_rounds";
     public static final String BACK_PRESSURE_THROTTLE_TIME_UPPER_BOUND = "back_pressure_throttle_time_upper_bound";
 
+    public static final String ENABLE_CELONIS_HASH_MCVS = "enable_celonis_hash_mcvs";
+    
     public static final String LOWER_UPPER_SUPPORT_UTF8 = "lower_upper_support_utf8";
 
     public static final String COLUMN_VIEW_CONCAT_ROWS_LIMIT = "column_view_concat_rows_limit";
@@ -1926,6 +1928,10 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     private int backPressureMaxRounds = 3;
     @VarAttr(name = BACK_PRESSURE_THROTTLE_TIME_UPPER_BOUND)
     private long backPressureThrottleTimeUpperBound = 300;
+    
+    @VarAttr(name = ENABLE_CELONIS_HASH_MCVS)
+    private boolean enableCelonisHashMcvs = false;
+
 
     // Determines whether the upper/lower function supports utf8,
     // introduced by https://github.com/StarRocks/starrocks/pull/56192
@@ -5371,6 +5377,15 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public void setBackPressureThrottleTimeUpperBound(long value) {
         this.backPressureThrottleTimeUpperBound = value;
     }
+    
+    public boolean getEnableCelonisHashMcvs() {
+        return enableCelonisHashMcvs;
+    }
+
+    public void setEnableCelonisHashMcvs(boolean enableCelonisHashMcvs) {
+        this.enableCelonisHashMcvs = enableCelonisHashMcvs;
+    }
+    
 
     public long getColumnViewConcatRowsLimit() {
         return columnViewConcatRowsLimit;

@@ -23,13 +23,20 @@ import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
+import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashFunction;
+import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V3;
+import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V4;
+import com.starrocks.utframe.UtFrameUtils;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.POSITIVE_INFINITY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class CelonisExpressionStatisticsCalculatorTest {
 
@@ -575,4 +582,129 @@ public class CelonisExpressionStatisticsCalculatorTest {
         testCelonisRemapValuesUsingFunction(FunctionSet.CELONIS_REMAP_VALUES_CONST);
     }
 
+    private static class NullSkewTestScenario {
+        private final ColumnRefOperator stringColumnRefOperator = new ColumnRefOperator(0, Type.VARCHAR, "str", true);
+        private final Statistics statistics;
+
+        public NullSkewTestScenario() {
+            final var builder = Statistics.builder();
+            statistics = builder.addColumnStatistic(stringColumnRefOperator, //
+                            ColumnStatistic.builder() //
+                                    .setMinValue(NEGATIVE_INFINITY) //
+                                    .setMaxValue(POSITIVE_INFINITY)
+                                    .setDistinctValuesCount(1000) //
+                                    .setNullsFraction(0.8) //
+                                    .setAverageRowSize(10) //
+                                    .build()) //
+                    .setOutputRowCount(1000) //
+                    .build();
+
+        }
+
+    }
+
+    private static class DataSkewTestScenario {
+        private final ColumnRefOperator stringColumnRefOperator = new ColumnRefOperator(0, Type.VARCHAR, "str", true);
+        private final Statistics statistics;
+
+        public DataSkewTestScenario() {
+            final var builder = Statistics.builder();
+            statistics = builder.addColumnStatistic(stringColumnRefOperator, //
+                            ColumnStatistic.builder() //
+                                    .setMinValue(NEGATIVE_INFINITY) //
+                                    .setMaxValue(POSITIVE_INFINITY)
+                                    .setDistinctValuesCount(1000) //
+                                    .setNullsFraction(0.1) //
+                                    .setAverageRowSize(10) //
+                                    .setHistogram(new Histogram(List.of(), Map.of("skewString1", 500L, "skewString2", 400L)))
+                                    .build()) //
+                    .setOutputRowCount(1000) //
+                    .build();
+
+        }
+
+    }
+
+    @Test
+    public void testCelonisHashMcvProjectionWithNullSkew() {
+        // GIVEN
+        final var context = UtFrameUtils.createDefaultCtx();
+        context.getSessionVariable().setEnableCelonisHashMcvs(true);
+
+        final var nullSkewTestScenario = new NullSkewTestScenario();
+
+        // WHEN
+        CallOperator callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3,
+                Type.VARCHAR, Lists.newArrayList(nullSkewTestScenario.stringColumnRefOperator));
+        ColumnStatistic columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, nullSkewTestScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(1000, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        assertNotNull(columnStatistic.getHistogram());
+        assertEquals(Map.of(new XXHASH3128V3().computeNull().toString(), 800L), columnStatistic.getHistogram().getMCV());
+
+        // WHEN
+        callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V4,
+                Type.VARCHAR, Lists.newArrayList(nullSkewTestScenario.stringColumnRefOperator));
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, nullSkewTestScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(1000, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        assertNotNull(columnStatistic.getHistogram());
+        assertEquals(Map.of(new XXHASH3128V4().computeNull().toString(), 800L), columnStatistic.getHistogram().getMCV());
+    }
+
+    @Test
+    public void testCelonisHashMcvProjectionWithDataSkew() {
+        // GIVEN
+        final var context = UtFrameUtils.createDefaultCtx();
+        context.getSessionVariable().setEnableCelonisHashMcvs(true);
+
+        final var dataSkewTestScenario = new DataSkewTestScenario();
+
+        // WHEN
+        CallOperator callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3,
+                Type.VARCHAR, Lists.newArrayList(dataSkewTestScenario.stringColumnRefOperator));
+        ColumnStatistic columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, dataSkewTestScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(1000, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        assertNotNull(columnStatistic.getHistogram());
+
+        CelonisHashFunction hasher = new XXHASH3128V3();
+        assertThat(columnStatistic.getHistogram().getMCV())
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        hasher.compute("skewString1").toString(), 500L, //
+                        hasher.compute("skewString2").toString(), 400L, //
+                        hasher.computeNull().toString(), 100L //
+                ));
+
+        // WHEN
+        callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V4,
+                Type.VARCHAR, Lists.newArrayList(dataSkewTestScenario.stringColumnRefOperator));
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, dataSkewTestScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(1000, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        assertNotNull(columnStatistic.getHistogram());
+        hasher = new XXHASH3128V4();
+        assertThat(columnStatistic.getHistogram().getMCV())
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        hasher.compute("skewString1").toString(), 500L, //
+                        hasher.compute("skewString2").toString(), 400L, //
+                        hasher.computeNull().toString(), 100L //
+                ));
+    }
 }

@@ -21,21 +21,31 @@ import com.starrocks.catalog.ArrayType;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
+import com.starrocks.metric.LongCounterMetric;
+import com.starrocks.metric.Metric;
+import com.starrocks.metric.MetricRepo;
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
+import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashFunction;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.POSITIVE_INFINITY;
 
 public class CelonisExpressionStatisticsCalculator {
+    private static final ConcurrentHashMap<String, LongCounterMetric> COUNTERS = new ConcurrentHashMap<>();
 
     public static ColumnStatistic callCalculate(CallOperator call, List<ColumnStatistic> childrenColumnStatistics,
                                                 Statistics inputStatistics, double rowCount) {
@@ -70,6 +80,8 @@ public class CelonisExpressionStatisticsCalculator {
         // Per default, use the DEFAULT_COLLECTION_SIZE and only set this for expressions returning arrays.
         double collectionSize = ColumnStatistic.DEFAULT_COLLECTION_SIZE;
 
+        var histogram = columnStatistic.getHistogram();
+
         switch (callOperator.getFnName().toLowerCase()) {
             case FunctionSet.CELONIS_XX_HASH3_128:
             case FunctionSet.CELONIS_XX_HASH3_128_V2:
@@ -78,6 +90,7 @@ public class CelonisExpressionStatisticsCalculator {
                 minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
                 maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
                 nullsFraction = 0.0;
+                histogram = projectHistogramThroughHash(histogram, callOperator, columnStatistic, rowCount);
                 break;
             case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
                 minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
@@ -132,8 +145,55 @@ public class CelonisExpressionStatisticsCalculator {
                 .setNullsFraction(nullsFraction)
                 .setAverageRowSize(averageRowSize)
                 .setDistinctValuesCount(distinctValue)
+                .setHistogram(histogram)
                 .setCollectionSize(collectionSize)
                 .build();
+    }
+
+    /* Logs metrics on how often we propagate the histogram. */
+    private static void logHistogramHashProjection() {
+        COUNTERS.computeIfAbsent("celonis_hash_mcv_propagation", k -> {
+            LongCounterMetric metric = new LongCounterMetric("celonis_hash_mcv_propagation", Metric.MetricUnit.NOUNIT,
+                    "Amount of propagated Celonis hash MCVs");
+            MetricRepo.addMetric(metric);
+            return metric;
+        }).increase(1L);
+    }
+
+    private static Histogram projectHistogramThroughHash(@Nullable Histogram histogram,
+                                                         CallOperator callOperator, ColumnStatistic columnStatistic,
+                                                         double rowCount) {
+        if (ConnectContext.get() == null || !ConnectContext.get().getSessionVariable().getEnableCelonisHashMcvs()) {
+            return null;
+        }
+
+        final var hashFunction = CelonisHashFunction.of(callOperator);
+
+        if (hashFunction == null) {
+            // There is no Java implementation of the hash function, hence we can not project the MCVs.
+            return null;
+        }
+
+        if (!callOperator.getChild(0).getType().isVarchar()) {
+            // For now, we only support this for VARCHAR invocations (i.e. non-array inputs).
+            return null;
+        }
+
+        final var projectedMcvs = new HashMap<String, Long>();
+        // Project the NULL MCV
+        projectedMcvs.put(hashFunction.computeNull().toString(),
+                (long) (rowCount * columnStatistic.getNullsFraction()));
+
+        if (histogram != null) {
+            // Project other (non-null) MCVs
+            projectedMcvs.putAll(histogram.getMCV() //
+                    .entrySet() //
+                    .stream() //
+                    .collect(Collectors.toMap(key -> hashFunction.compute(key.getKey()).toString(), Map.Entry::getValue)));
+        }
+
+        logHistogramHashProjection();
+        return new Histogram(List.of(), projectedMcvs);
     }
 
     private static Optional<Type> extractArrayItemType(ScalarOperator operator) {

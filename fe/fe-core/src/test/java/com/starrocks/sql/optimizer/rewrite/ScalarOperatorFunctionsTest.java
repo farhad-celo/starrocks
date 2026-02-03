@@ -24,6 +24,8 @@ import com.starrocks.common.util.TimeUtils;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
+import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V3;
+import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V4;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1637,5 +1639,47 @@ public class ScalarOperatorFunctionsTest {
                             tc.mode);
             assertEquals(tc.value, result, String.format("test case failed: %s, result = %d", tc, result));
         }
+    }
+
+    @Test
+    public void testCelonisXxHash3128V4() {
+        // GIVEN
+        final var input = "a";
+        ConstantOperator inputOperator = ConstantOperator.createVarchar("a");
+
+        // WHEN / THEN
+        assertEquals(new XXHASH3128V4().compute(input).toString(),
+                ScalarOperatorFunctions.celonisXxHash3128V4(inputOperator).getLargeInt().toString());
+    }
+
+    @Test
+    public void testCelonisXxHash3128V4WithNullInput() {
+        // GIVEN
+        ConstantOperator inputOperator = ConstantOperator.createNull(Type.VARCHAR);
+
+        // WHEN / THEN
+        assertEquals(new XXHASH3128V4().computeNull().toString(),
+                ScalarOperatorFunctions.celonisXxHash3128V4(inputOperator).getLargeInt().toString());
+    }
+
+    @Test
+    public void testCelonisXXHash3128V3() {
+        // GIVEN
+        final var input = "a";
+        ConstantOperator inputOperator = ConstantOperator.createVarchar("a");
+
+        // WHEN / THEN
+        assertEquals(new XXHASH3128V3().compute(input).toString(),
+                ScalarOperatorFunctions.celonisXXHash3128V3(inputOperator).getLargeInt().toString());
+    }
+
+    @Test
+    public void testCelonisXXHash3128V3WithNullInput() {
+        // GIVEN
+        ConstantOperator inputOperator = ConstantOperator.createNull(Type.VARCHAR);
+
+        // WHEN / THEN
+        assertEquals(new XXHASH3128V3().computeNull().toString(),
+                ScalarOperatorFunctions.celonisXXHash3128V3(inputOperator).getLargeInt().toString());
     }
 }
