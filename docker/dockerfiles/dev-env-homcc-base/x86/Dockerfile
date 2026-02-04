@@ -1,4 +1,4 @@
-FROM ghcr.io/celonis/celostar/starrocks-dev-env:pr2035c-3.3-4f90ca75-celo
+FROM ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
 
 # Setup homcc
 RUN wget https://github.com/celonis/homcc/releases/download/v1.0.2/homcc.deb

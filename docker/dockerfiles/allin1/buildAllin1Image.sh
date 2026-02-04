@@ -4,7 +4,7 @@ set -e
 
 RELEASE_VERSION=${RELEASE_VERSION:-"latest"}
 BUILD_TYPE=${BUILD_TYPE:-"Release"}
-BUILDER=${BUILDER:-"ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest"}
+BUILDER=${BUILDER:-"ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107"}
 DD_AGENT_VERSION=${DD_AGENT_VERSION:-"1.56.3"}
 
 docker pull $BUILDER

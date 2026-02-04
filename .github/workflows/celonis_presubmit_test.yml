@@ -31,7 +31,7 @@ jobs:
   setup:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     outputs:
-      builder_image: "ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest"
+      builder_image: "ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107"
     steps:
       - run: echo "Setting dev env image"
 

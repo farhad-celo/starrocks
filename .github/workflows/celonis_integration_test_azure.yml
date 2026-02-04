@@ -15,7 +15,7 @@ on:
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.5
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-latest
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
@@ -474,7 +474,7 @@ jobs:
       - name: GHCR login
         shell: bash
         run: |
-            echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
       - name: Checkout repository
         uses: actions/checkout@v4
         with:

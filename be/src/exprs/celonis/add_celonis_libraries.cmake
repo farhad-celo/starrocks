@@ -2,9 +2,9 @@
 set(CELONIS_LIBRARIES_DIR_PATH "${THIRDPARTY_DIR}CPML") # Must match with the naming used in 'dev-env.Dockerfile'
 # Set paths for each library's include and lib directories
 set(CELONIS_LIBRARIES_INCLUDE_PATH "${CELONIS_LIBRARIES_DIR_PATH}/include/")
-set(CELONIS_FORMATTING_LIBRARY_PATH "${CELONIS_LIBRARIES_DIR_PATH}/lib/libformat.a")
-set(CELONIS_PROCESS_MINING_LIBRARY_PATH "${CELONIS_LIBRARIES_DIR_PATH}/lib/libcpml.a")
-set(CELONIS_TEMPLATE_LIBRARY_PATH "${CELONIS_LIBRARIES_DIR_PATH}/lib/libctl.a")
+set(CELONIS_FORMATTING_LIBRARY_PATH "${CELONIS_LIBRARIES_DIR_PATH}/lib/libcelonis-formatting-library.a")
+set(CELONIS_PROCESS_MINING_LIBRARY_PATH "${CELONIS_LIBRARIES_DIR_PATH}/lib/libcelonis-process-mining-library.a")
+set(CELONIS_TEMPLATE_LIBRARY_PATH "${CELONIS_LIBRARIES_DIR_PATH}/lib/libcelonis-template-library.a")
 
 # Celonis Formatting Library
 add_library(celonis_formatting_library STATIC IMPORTED)

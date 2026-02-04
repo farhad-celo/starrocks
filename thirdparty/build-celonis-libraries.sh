@@ -25,7 +25,7 @@ NAMED_TYPE_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES="${NAMED_TYPE_DIR_NAME_FOR_CELONIS
 NAMED_TYPE_DOWNLOAD_FOR_CELONIS_LIBRARIES="https://github.com/joboccara/NamedType/archive/${NAMED_TYPE_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES}"
 
 # Reference to the Saola release of the Celonis libraries (currently all packaged in the CPML)
-CPML_VERSION="2.240.2"
+CPML_VERSION="1.0.13"
 # Uncomment below for using a locally build CPML
 # Note: When using a locally build CPML, adjust the file path in CPML_VERSION below to point to the local archive
 # CPML_VERSION="/tmp/CPML-main.tar.gz"
@@ -77,7 +77,7 @@ download_and_build_nlohmann_json_for_celonis_libraries() {
   cmake -DCMAKE_VERBOSE_MAKEFILE=OFF -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} .. -DJSON_BuildTests=False
   cmake --build . --parallel ${CMAKE_BUILD_PARALLELISM}
   cmake --install . --prefix ${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}
-#  export NamedType_DIR=${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}/lib/cmake/
+  export nlohmann_json_DIR=${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}/lib/cmake/nlohmann_json
   cd $CELONIS_LIBRARIES_BUILD_ROOT
 }
 
@@ -108,7 +108,13 @@ download_and_build_tbb_for_celonis_libraries() {
   cd tbb && \
   wget -q ${TBB_DOWNLOAD_FOR_CELONIS_LIBRARIES} && \
   tar -xzf ${TBB_ARCHIVE_NAME_FOR_CELONIS_LIBRARIES}
-  export TBB_DIR=${CELONIS_LIBRARIES_BUILD_ROOT}/tbb/oneapi-tbb-2021.11.0/lib/cmake/tbb/
+  export onetbb_DIR=${CELONIS_LIBRARIES_BUILD_ROOT}/tbb/oneapi-tbb-2021.11.0/lib/cmake/tbb/
+
+  # Hacky workaround
+  echo "Renaming TBBConfig.cmake s.t. it can be found by cmake"
+  mv "${onetbb_DIR}/TBBConfig.cmake" "${onetbb_DIR}/onetbb-config.cmake"
+  mv "${onetbb_DIR}/TBBConfigVersion.cmake" "${onetbb_DIR}/onetbb-config-version.cmake"
+
   cd $CELONIS_LIBRARIES_BUILD_ROOT
 }
 
@@ -163,43 +169,49 @@ download_and_build_dependencies_for_celonis_libraries() {
 }
 
 prepare_cpml_archive() {
-  CPML_RESOURCE=$CPML_VERSION
+  CPML_RESOURCE="v${CPML_VERSION}"
   if [[ -f $CPML_VERSION ]] ; then
     echo "Using local CPML archive at $CPML_RESOURCE"
   else
-    CPML_RELEASE="release-${CPML_VERSION}"
-    CPML_RESOURCE="CPML-${CPML_VERSION}.tar.gz"
+    CPML_RELEASE="v${CPML_VERSION}"
+    ARCHIVE_TYPE="tar.gz"
+    CPML_RESOURCE="${CPML_RELEASE}.${ARCHIVE_TYPE}"
 
-    echo "Start to download CPML archive ${CPML_RESOURCE} into current working directory '$(pwd)'"
+    echo "Start to download release archive ${CPML_RELEASE} into current working directory '$(pwd)'"
 
-    gh release download -R celonis/cpm-query-engine $CPML_RELEASE --pattern "${CPML_RESOURCE}"
+    gh version
+    gh release download -R celonis/celonis-process-mining-library $CPML_RELEASE --archive "${ARCHIVE_TYPE}" --output "${CPML_RESOURCE}"
 
     echo "Downloading done"
   fi
 
   echo "Start to extract CPML archive"
-  tar -xzf $CPML_RESOURCE
+  tar -xzf $CPML_RESOURCE --strip-components=1
   echo "Extracting done"
 }
 
 # Variable used below to refer to the current Celonis library we want to build
 CURRENT_CELONIS_LIBRARY_TO_BUILD=""
 
-build_celonis_library() (
+build_celonis_libraries() (
   BUILD_DIR_NAME="build"
-  CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH=${CELONIS_LIBRARIES_BUILD_DIR}/${CURRENT_CELONIS_LIBRARY_TO_BUILD}/${BUILD_DIR_NAME}
+  #CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH=${CELONIS_LIBRARIES_BUILD_DIR}/${CURRENT_CELONIS_LIBRARY_TO_BUILD}/${BUILD_DIR_NAME}
+  CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH=${CELONIS_LIBRARIES_BUILD_DIR}/${BUILD_DIR_NAME}
   # The build output is written to the temporary root build directory because we don't want it in the final build dir
-  BUILD_OUTPUT_FILE="${CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH}/${CURRENT_CELONIS_LIBRARY_TO_BUILD}.log"
+  BUILD_OUTPUT_FILE="${CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH}/build.log"
 
   echo "Build ${CURRENT_CELONIS_LIBRARY_TO_BUILD} at '${CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH}' (build log: '${BUILD_OUTPUT_FILE}')"
 
   mkdir -p $CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH
   cd $CURRENT_CELONIS_LIBRARY_FULL_BUILD_PATH
 
+  # Path to the config.cmake files from the installed thirdparty libs 
+  CMAKE_PREFIX_SEARCH_PATH="${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}/lib/cmake"
+
   cmake -DCMAKE_VERBOSE_MAKEFILE=OFF \
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
     -DBOOST_ROOT=${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR} \
-    -DCMAKE_PREFIX_PATH="${CELONIS_THIRDPARTY_DEPENDENCIES_INSTALL_DIR}/lib/cmake/nlohmann_json" \
+    -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_SEARCH_PATH};${nlohmann_json_DIR};${fmt_DIR};" \
     -DCMAKE_INSTALL_PREFIX=${CELONIS_LIBRARIES_INSTALL_DIR} \
     ..  2>&1 | tee -a ${BUILD_OUTPUT_FILE}
   cmake --build . --parallel ${CMAKE_BUILD_PARALLELISM} 2>&1 | tee -a ${BUILD_OUTPUT_FILE}
@@ -226,14 +238,7 @@ download_and_build_celonis_libraries() {
 
   echo "Start building Celonis libraries"
 
-  CURRENT_CELONIS_LIBRARY_TO_BUILD="celonis-formatting-library"
-  build_celonis_library
-
-  CURRENT_CELONIS_LIBRARY_TO_BUILD="celonis-template-library"
-  build_celonis_library
-
-  CURRENT_CELONIS_LIBRARY_TO_BUILD="celonis-process-mining-library"
-  build_celonis_library
+  build_celonis_libraries
 
   echo "Building done"
 }
