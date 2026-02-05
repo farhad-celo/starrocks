@@ -14,7 +14,7 @@ on:
         default: ''
 
 env:
-  LATEST_UPSTREAM_BRANCH: branch-3.5
+  LATEST_UPSTREAM_BRANCH: branch-3.5-cc
   BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
