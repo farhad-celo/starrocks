@@ -471,17 +471,25 @@ public class CelonisExpressionStatisticsCalculator {
                                                                List<ColumnStatistic> childrenColumnStatistics,
                                                                Statistics inputStatistics, double rowCount) {
         // Can't be null since this method is only called when > 2 args.
-        final var firstArg = childrenColumnStatistics.get(0);
-        final var secondArg = childrenColumnStatistics.get(1);
+        final var firstChildStats = childrenColumnStatistics.get(0);
+        final var secondChildStats = childrenColumnStatistics.get(1);
 
         switch (callOperator.getFnName().toLowerCase()) {
+            case FunctionSet.CELONIS_CALCULATE_RANGE_END:
+            case FunctionSet.CELONIS_CALC_CROP:
+            case FunctionSet.CELONIS_CALC_CROP_TO_NULL:
+            case FunctionSet.CELONIS_MERGE_SORTED_ARRAYS:
+            case FunctionSet.CELONIS_STRING_SPLIT:
+            case FunctionSet.CELONIS_TRANSLATE:
+                // use first child statistics.
+                return firstChildStats;
             case FunctionSet.CELONIS_REMAP_VALUES:
             case FunctionSet.CELONIS_REMAP_VALUES_CONST:
                 return celonisRemapValuesCalculate(callOperator.getChildren(), childrenColumnStatistics, inputStatistics,
                         rowCount);
             case FunctionSet.CELONIS_PATINDEX:
                 // Re-use binary implementation since third argument does not change stats.
-                return binaryExpressionCalculate(callOperator, firstArg, secondArg, rowCount);
+                return binaryExpressionCalculate(callOperator, firstChildStats, secondChildStats, rowCount);
             default:
                 return null;
         }

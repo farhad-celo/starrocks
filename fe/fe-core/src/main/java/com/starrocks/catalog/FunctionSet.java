@@ -546,9 +546,13 @@ public class FunctionSet {
     public static final String CELONIS_ARRAY_LAG = "celonis_array_lag";
     public static final String CELONIS_ARRAY_LEAD = "celonis_array_lead";
     public static final String CELONIS_ARRAY_TRIMMED_MEAN = "celonis_array_trimmed_mean";
+    public static final String CELONIS_CALCULATE_RANGE_END = "celonis_calculate_range_end";
+    public static final String CELONIS_CALC_CROP = "celonis_calc_crop";
+    public static final String CELONIS_CALC_CROP_TO_NULL = "celonis_calc_crop_to_null";
     public static final String CELONIS_CREATE_ALIGNMENT = "celonis_create_alignment";
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";
+    public static final String CELONIS_MERGE_SORTED_ARRAYS = "celonis_merge_sorted_arrays";
     public static final String CELONIS_MULTI_IN = "celonis_multi_in";
     public static final String CELONIS_NULL_TO_EMPTY = "celonis_null_to_empty";
     public static final String CELONIS_TRANSITS_INTERLEAVED = "celonis_transits_interleaved";
@@ -570,6 +574,8 @@ public class FunctionSet {
     public static final String CELONIS_TO_DOUBLE = "celonis_to_double";
     public static final String CELONIS_STRING_TO_DOUBLE = "celonis_string_to_double";
     public static final String CELONIS_SHORTENED_VARIANT = "celonis_shortened_variant";
+    public static final String CELONIS_STRING_SPLIT = "celonis_string_split";
+    public static final String CELONIS_TRANSLATE = "celonis_translate";
     public static final String CELONIS_REMAP_VALUES = "celonis_remap_values";
     public static final String CELONIS_REMAP_VALUES_CONST = "celonis_remap_values_const";
 
