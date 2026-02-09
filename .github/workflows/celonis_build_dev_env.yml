@@ -33,16 +33,37 @@ jobs:
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
 
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build dev env image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           # Check the current branch.
           branch=`git branch --show-current`
           echo "The current branch is ${branch}"
 
           # Build image and always remove intermediate containers.
-          docker buildx build --force-rm=true -q --build-arg prebuild_maven=true --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+          export DOCKER_BUILDKIT=1
+          
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
+            --build-arg prebuild_maven=true \
+            --build-arg GITHUB_TOKEN="${GITHUB_TOKEN}" \
             -f docker/dockerfiles/dev-env/dev-env.Dockerfile \
-            -t ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}-amd . --push
+            -t ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}-amd \
+            -t ${{ env.ECR_REGISTRY }}/celostar/starrocks-dev-env:${image_tag}-amd \
+            .
 
   build-dev-env-image-arm:
     runs-on: [runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}"]
@@ -54,18 +75,36 @@ jobs:
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
 
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build dev env image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           # Check the current branch.
           branch=`git branch --show-current`
           echo "The current branch is ${branch}"
 
           # Build image and always remove intermediate containers.
-          DOCKER_BUILDKIT=1 docker buildx build -q --force-rm=true --build-arg prebuild_maven=true \
-            --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+          DOCKER_BUILDKIT=1 
+          docker buildx build \
+            --platform linux/arm64 \
+            --push \
+            --build-arg prebuild_maven=true \
+            --build-arg GITHUB_TOKEN="${GITHUB_TOKEN}" \
             -f docker/dockerfiles/dev-env/dev-env.Dockerfile \
             -t ghcr.io/celonis/celostar/starrocks-dev-env:${image_tag}-arm \
-            --push .
+            -t ${{ env.ECR_REGISTRY }}/celostar/starrocks-dev-env:${image_tag}-arm \
+            .
 
   build-mul-arch-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
@@ -78,8 +117,21 @@ jobs:
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin 
 
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: build manifest
         shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run:
           export DOCKER_CLI_EXPERIMENTAL=enabled
           
@@ -90,6 +142,15 @@ jobs:
           docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$amd_tag"
           
           docker manifest push "$mul_arch_tag"
+
+      - name: Build and push fe manifest to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-dev-env:${image_tag}-arm"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-dev-env:${image_tag}-amd"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-dev-env:${image_tag}"
 
 
 # Skip this step as we are using runs-on runner which is ephemeral.
