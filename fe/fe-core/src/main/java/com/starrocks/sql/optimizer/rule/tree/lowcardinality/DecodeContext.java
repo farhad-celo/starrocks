@@ -22,12 +22,15 @@ import com.starrocks.catalog.Function;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.sql.ast.expression.ExprUtils;
 import com.starrocks.sql.optimizer.base.ColumnRefFactory;
+import com.starrocks.sql.optimizer.base.ColumnRefSet;
 import com.starrocks.sql.optimizer.operator.Operator;
+import com.starrocks.sql.optimizer.operator.OperatorType;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CollectionElementOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.DictMappingOperator;
+import com.starrocks.sql.optimizer.operator.scalar.LambdaFunctionOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.operator.scalar.SubfieldOperator;
 import com.starrocks.sql.optimizer.rewrite.BaseScalarOperatorShuttle;
@@ -43,10 +46,12 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_ARRAY_FUNCTIONS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_STRUCT_FUNCTIONS;
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeUtil.ExprReplacer;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeUtil.getDictifiedType;
 
 /*
@@ -247,10 +252,11 @@ class DecodeContext {
     // create a new dictionary column and assign the same property except for the type and column id
     // the input column maybe a dictionary column or a string column
     private ColumnRefOperator createNewDictColumn(ColumnRefOperator column) {
+        boolean isLambdaArg = column.getOpType().equals(OperatorType.LAMBDA_ARGUMENT);
         if (column.getType().isStringArrayType()) {
-            return factory.create(column.getName(), ArrayType.ARRAY_INT, column.isNullable());
+            return factory.create(column.getName(), ArrayType.ARRAY_INT, column.isNullable(), isLambdaArg);
         } else if (column.getType().isStringType()) {
-            return factory.create(column.getName(), IntegerType.INT, column.isNullable());
+            return factory.create(column.getName(), IntegerType.INT, column.isNullable(), isLambdaArg);
         } else if (column.getType().isStructType()) {
             Map<String, ColumnRefOperator> fieldsData = getFieldUseStringRefMap(column);
             Preconditions.checkNotNull(fieldsData);
@@ -268,7 +274,7 @@ class DecodeContext {
                 }
             }
             StructType dictType = new StructType(structFields, type.isNamed());
-            return factory.create(column.getName(), dictType, column.isNullable());
+            return factory.create(column.getName(), dictType, column.isNullable(), isLambdaArg);
         } else {
             throw new IllegalArgumentException("Unsupported dictified type: " +  column.getType());
         }
@@ -296,6 +302,7 @@ class DecodeContext {
         // their return type is string, but use low cardinality optimization, we need execute them first
         private ScalarOperator anchorOp;
         private ColumnRefOperator anchorUseDictRef;
+        private ScalarOperator newAnchorOp;
 
         public ScalarOperator decodeStruct(ScalarOperator dictExpression,
                                            ScalarOperator expression,
@@ -338,19 +345,35 @@ class DecodeContext {
             return new CallOperator(FunctionSet.NAMED_STRUCT, fn.getReturnType(), newFields, fn);
         }
 
-        public ScalarOperator decode(ColumnRefOperator useDictRef, ColumnRefOperator useStringRef,
-                                     ScalarOperator expression) {
+        void reset() {
             anchorOp = null;
             anchorUseDictRef = null;
+            newAnchorOp = null;
+        }
+
+        void setDictColumn(ColumnRefOperator dictColumn, Type originalType) {
+            Preconditions.checkState(!dictColumn.getType().isStructType()
+                    && !dictColumn.getOpType().equals(OperatorType.LAMBDA_ARGUMENT));
+            anchorUseDictRef = dictColumn;
+            newAnchorOp = new ColumnRefOperator(dictColumn.getId(), originalType.isArrayType() ?
+                    ((ArrayType) originalType).getItemType() : originalType,
+                    dictColumn.getName(),
+                    dictColumn.isNullable());
+        }
+
+        public ScalarOperator decode(ColumnRefOperator useDictRef, ColumnRefOperator useStringRef,
+                                     ScalarOperator expression) {
+            reset();
+            anchorUseDictRef = useDictRef;
             ScalarOperator result = expression.accept(this, null);
-            if (useStringRef.getType().isVarchar() && anchorUseDictRef == null) {
+            if (useStringRef.getType().isVarchar() && anchorUseDictRef.isColumnRef()) {
                 return new DictMappingOperator(useDictRef, expression.clone(), expression.getType());
             }
             if (result.getType().isStructType()) {
                 Preconditions.checkState(anchorOp == null);
                 return decodeStruct(result, expression, useStringRef);
             }
-            if (result.isColumnRef() && anchorOp == null) {
+            if (result.isColumnRef() && anchorOp == null && false) {
                 // decode array-column-ref
                 return new DictMappingOperator(useDictRef, result, expression.getType());
             } else if (result instanceof CallOperator &&
@@ -368,16 +391,15 @@ class DecodeContext {
                     return result;
                 }
             }
-            result = processAnchor(result);
-            return new DictMappingOperator(expression.getType(), anchorUseDictRef, result, anchorOp);
+            //result = processAnchor(result);
+            return new DictMappingOperator(expression.getType(), anchorUseDictRef, newAnchorOp, result);
         }
 
         public ScalarOperator define(Type type, ColumnRefOperator useStringRef, ScalarOperator expression) {
+            reset();
             ColumnRefOperator useDictRef = stringRefToDictRefMap.get(useStringRef);
-            anchorOp = null;
-            anchorUseDictRef = null;
             ScalarOperator result = expression.accept(this, null);
-            if (useStringRef.getType().isVarchar() && anchorUseDictRef == null) {
+            if (useStringRef.getType().isVarchar() && anchorUseDictRef.isColumnRef()) {
                 return new DictMappingOperator(useDictRef, expression.clone(), useDictRef.getType());
 
             }
@@ -394,16 +416,41 @@ class DecodeContext {
             return result;
         }
 
-        // array rewrite
         @Override
         public ScalarOperator visitVariableReference(ColumnRefOperator variable, Void context) {
-            return stringRefToDictRefMap.getOrDefault(variable, variable);
+            ColumnRefOperator result = stringRefToDictRefMap.getOrDefault(variable, variable);
+            if (!result.getType().isStructType() && !variable.getOpType().equals(OperatorType.LAMBDA_ARGUMENT)) {
+                setDictColumn(result, variable.getType());
+            }
+            return result;
+        }
+
+        // DO NOT SUBMIT
+        static ColumnRefOperator getColumnRef(ScalarOperator op) {
+            if (op.isColumnRef()) {
+                return op.cast();
+            }
+            List<ColumnRefOperator> columns = op.getChildren().stream().map(DictExprRewrite::getColumnRef)
+                    .filter(Objects::nonNull).toList();
+            Preconditions.checkState(columns.size() <= 1);
+            return columns.stream().findFirst().orElse(null);
         }
 
         @Override
         public ScalarOperator visitCall(CallOperator call, Void context) {
             if (!isSupportedArrayFunction(call) && !LOW_CARD_STRUCT_FUNCTIONS.contains(call.getFnName())) {
                 return super.visitCall(call, context);
+            }
+            if (FunctionSet.ARRAY_MAP.equalsIgnoreCase(call.getFnName())) {
+                Preconditions.checkState(call.getChildren().size() == 2);
+                ScalarOperator arrayParam = call.getChildren().get(1).accept(this, context);
+                LambdaFunctionOperator lambdaFn = call.getChild(0).cast();
+                ScalarOperator newLambdaFn = lambdaFn.getLambdaExpr().accept(this, null);
+                ColumnRefOperator lambdaUsedDictRef = getColumnRef(newLambdaFn);
+                ExprReplacer exprReplacer = new ExprReplacer(Map.of(lambdaUsedDictRef, newAnchorOp),
+                        new ColumnRefSet(Collections.singleton(lambdaUsedDictRef)), DecodeContext.this);
+                newAnchorOp = newLambdaFn.accept(exprReplacer, null);
+                return arrayParam;
             }
             boolean[] hasChange = new boolean[1];
             List<ScalarOperator> newChildren = visitList(call.getChildren(), hasChange);
@@ -456,7 +503,7 @@ class DecodeContext {
                 Preconditions.checkNotNull(fieldUseStringRef);
                 ColumnRefOperator childDictRef = stringRefToDictRefMap.get(fieldUseStringRef);
                 Preconditions.checkNotNull(childDictRef);
-                anchorUseDictRef = childDictRef;
+                setDictColumn(childDictRef, fieldUseStringRef.getType());
                 if (operator.getType().isStringType()) {
                     return processAnchor(result);
                 } else {
@@ -470,20 +517,8 @@ class DecodeContext {
             if (anchorOp != null && !anchorOp.equals(expr)) {
                 return expr;
             }
-
-            // e.g. DictExpr(useDictColumn, array_distinct(array_column)[0])
-            // we need compute array_distinct(x)[0] first, then decode to string on the result
-            anchorOp = expr;
-            // mock use column ref, only type is used, ScalarOperatorToExpr will rewrite it
-            // @todo: rewrite ScalarOperatorToExpr process when v1 is deprecated
-            if (anchorUseDictRef == null) {
-                List<ColumnRefOperator> usedColumns = expr.getColumnRefs();
-                Preconditions.checkState(!usedColumns.isEmpty());
-                anchorUseDictRef = usedColumns.get(0);
-            }
-
-            return new ColumnRefOperator(anchorUseDictRef.getId(), expr.getType(),
-                    anchorUseDictRef.getName(), anchorUseDictRef.isNullable());
+            // DO NOT SUBMIT
+            return anchorOp = newAnchorOp;
         }
     }
 

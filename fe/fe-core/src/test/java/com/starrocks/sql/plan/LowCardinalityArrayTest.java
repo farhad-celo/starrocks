@@ -1148,4 +1148,17 @@ public class LowCardinalityArrayTest extends PlanTestBase {
                 "args: INVALID_TYPE; result: ARRAY<INT>; args nullable: true; result nullable: true], ]\n" +
                 "  |  partition by: [1: v1, BIGINT, true]"));
     }
+
+    @Test
+    public void wip() throws Exception {
+
+        String sql = "select /*+SET_VAR(array_low_cardinality_optimize=true)*/" +
+                " ARRAY_MAP(x -> upper(x), a1)\n" +
+                "  from s1;";
+        ExecPlan execPlan = getExecPlan(sql);
+        //String plan = getVerboseExplain(sql);
+        //plan.ex
+        //Assertions.assertTrue(plan.contains("zzz"), plan);
+        Assertions.assertNotNull(execPlan);
+    }
 }

@@ -70,6 +70,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.supportLowCardinality;
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeUtil.getUsedColumns;
 
 /*
  * Rewrite the whole plan using the dict column by from bottom-up
@@ -85,20 +86,6 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         this.factory = factory;
         this.context = context;
         this.sessionVariable = sessionVariable;
-    }
-
-    // For structs, we only return the encoded fields collected by DecodeCollector.
-    static ColumnRefSet getUsedColumns(ScalarOperator scalarOperator, DecodeContext context) {
-        if (scalarOperator.isColumnRef()) {
-            return new ColumnRefSet(((ColumnRefOperator) scalarOperator).getId());
-        }
-        Map<String, ColumnRefOperator> structFieldsData = context.getFieldUseStringRefMap(scalarOperator);
-        if (structFieldsData != null) {
-            return new ColumnRefSet(structFieldsData.values());
-        }
-        ColumnRefSet result = new ColumnRefSet();
-        scalarOperator.getChildren().forEach(c -> result.union(getUsedColumns(c, context)));
-        return result;
     }
 
     public OptExpression rewrite(OptExpression optExpression) {
@@ -760,7 +747,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         }
 
         // replace string predicate to dict predicate
-        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs, context);
+        DecodeUtil.ExprReplacer replacer = new DecodeUtil.ExprReplacer(context.stringExprToDictExprMap, inputs, context);
         return predicate.accept(replacer, null);
     }
 
@@ -769,7 +756,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
             return null;
         }
 
-        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs, context);
+        DecodeUtil.ExprReplacer replacer = new DecodeUtil.ExprReplacer(context.stringExprToDictExprMap, inputs, context);
         Map<ColumnRefOperator, ScalarOperator> newColumnRefMap = Maps.newHashMap();
         for (ColumnRefOperator key : projection.getColumnRefMap().keySet()) {
             ScalarOperator value = projection.getColumnRefMap().get(key);
@@ -811,29 +798,6 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         }
 
         return OptExpression.builder().with(optExpression).setOp(newOp).setLogicalProperty(property).build();
-    }
-
-    private static class ExprReplacer extends BaseScalarOperatorShuttle {
-        private final Map<ScalarOperator, ScalarOperator> exprMapping;
-        private final ColumnRefSet supportColumns;
-        private final DecodeContext context;
-
-        public ExprReplacer(Map<ScalarOperator, ScalarOperator> exprMapping,
-                            ColumnRefSet supportColumns,
-                            DecodeContext context) {
-            this.exprMapping = exprMapping;
-            this.supportColumns = supportColumns;
-            this.context = context;
-        }
-
-        @Override
-        public Optional<ScalarOperator> preprocess(ScalarOperator scalarOperator) {
-            if (exprMapping.containsKey(scalarOperator)
-                    && supportColumns.containsAll(getUsedColumns(scalarOperator, context))) {
-                return Optional.of(exprMapping.get(scalarOperator));
-            }
-            return Optional.empty();
-        }
     }
 
     private static class JoinOnPredicateReplacer extends BaseScalarOperatorShuttle {

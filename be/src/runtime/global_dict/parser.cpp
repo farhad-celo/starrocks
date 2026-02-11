@@ -69,11 +69,6 @@ public:
         DCHECK_GE(_origin_expr.get_num_children(), 2);
         auto place = get_place_holder(_origin_expr.get_child(1));
         auto type = place->type();
-        if (type.type == LogicalType::TYPE_VARCHAR) {
-            _input_type = LogicalType::TYPE_VARCHAR;
-        } else if (type.is_array_type() && type.children[0].type == LogicalType::TYPE_VARCHAR) {
-            _input_type = LogicalType::TYPE_ARRAY;
-        }
     }
 
     static PlaceHolderRef* get_place_holder(Expr* root) {
@@ -90,20 +85,15 @@ public:
     };
 
     StatusOr<ColumnPtr> evaluate_checked(ExprContext* context, Chunk* ptr) override {
-        if (_input_type != LogicalType::TYPE_ARRAY && _input_type != LogicalType::TYPE_VARCHAR) {
-            return Status::InternalError(fmt::format("dictFuncExpr can't resolve type: {}", _dict_opt_ctx->slot_id));
-        }
-
         auto& input = ptr->get_column_by_slot_id(_dict_opt_ctx->slot_id);
         size_t num_rows = ptr->num_rows();
+        auto* data_column = ColumnHelper::get_data_column(input.get());
 
-        if (_input_type == LogicalType::TYPE_VARCHAR) {
-            return _translate_string(input, num_rows);
-        } else {
+        if (data_column->is_array()) {
             return _translate_array(input, num_rows);
+        } else {
+            return _translate_string(input, num_rows);
         }
-
-        return Status::InternalError(fmt::format("dictFuncExpr error on dict: {}", _dict_opt_ctx->slot_id));
     }
 
     Expr* clone(ObjectPool* pool) const override { return pool->add(new DictFuncExpr(_origin_expr, _dict_opt_ctx)); }
@@ -248,9 +238,6 @@ private:
     ColumnPtr _null_column_ptr;
     // data column ptr
     ColumnPtr _data_column_ptr;
-
-    // mark intput column type
-    LogicalType _input_type = TYPE_UNKNOWN;
 
     DictOptimizeContext* _dict_opt_ctx;
 };

@@ -566,7 +566,8 @@ public class ExprExplainVisitor implements AstVisitorExtendInterface<String, Voi
 
     @Override
     public String visitDictMappingExpr(DictMappingExpr node, Void context) {
-        String fnName = node.getType().matchesType(node.getChild(1).getType()) ? "DictDecode" : "DictDefine";
+        String fnName = node.getType().isStringType() || node.getType().isStringArrayType() ? "DictDecode"
+                : "DictDefine";
 
         if (node.getChildren().size() == 2) {
             return fnName + "(" + visit(node.getChild(0)) + ", [" + visit(node.getChild(1)) + "])";

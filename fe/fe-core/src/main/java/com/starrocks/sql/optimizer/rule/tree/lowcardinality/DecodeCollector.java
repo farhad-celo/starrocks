@@ -66,6 +66,7 @@ import com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.InPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.IsNullPredicateOperator;
+import com.starrocks.sql.optimizer.operator.scalar.LambdaFunctionOperator;
 import com.starrocks.sql.optimizer.operator.scalar.LikePredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.MatchExprOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
@@ -147,7 +148,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.ARRAY_MAX, FunctionSet.ARRAY_DISTINCT, // ARRAY -> ARRAY
             FunctionSet.ARRAY_SORT, FunctionSet.REVERSE, FunctionSet.ARRAY_SLICE, FunctionSet.ARRAY_FILTER,
             FunctionSet.ARRAY_LENGTH, // ARRAY -> bigint, return direct
-            FunctionSet.CARDINALITY);
+            FunctionSet.CARDINALITY, FunctionSet.ARRAY_MAP);
 
     private final SessionVariable sessionVariable;
     private final boolean isQuery;
@@ -196,6 +197,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     private final ColumnRefSet matchChildren = new ColumnRefSet();
 
     private final ColumnRefSet scanColumnRefSet = new ColumnRefSet();
+
+    private final ColumnRefSet lambdaColumnRefSet = new ColumnRefSet();
 
     // check if there is a blocking node in plan
     private boolean canBlockingOutput = false;
@@ -371,7 +374,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             }
             // Structs which pass checkDependOnExpr have at least one encoded field. We keep the structs encoded.
             if (globalDicts.containsKey(cid) || expressionStringRefCounter.getOrDefault(cid, 0) != 0
-                    || defineExpr.getType().isStructType()) {
+                    || defineExpr.getType().isStructType() || lambdaColumnRefSet.contains(cid)) {
                 context.allStringColumns.add(cid);
             }
         });
@@ -1413,7 +1416,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
     // Check if an expression can be optimized using a dictionary
     // If the expression only contains a string column, the expression can be optimized using a dictionary
-    private static class DictExpressionCollector extends ScalarOperatorVisitor<ScalarOperator, Void> {
+    private class DictExpressionCollector extends ScalarOperatorVisitor<ScalarOperator, Void> {
         // if expression contains constant-ref, return CONSTANTS, it's can be optmized with other dict-column
         private static final ScalarOperator CONSTANTS = ConstantOperator.TRUE;
         // if expression contains multi columns, return VARIABLES, we should ignore the expression
@@ -1552,6 +1555,21 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 return !result.isConstant() ? call : result;
             }
 
+            if (FunctionSet.ARRAY_MAP.equalsIgnoreCase(call.getFnName())) {
+                if (call.getChildren().size() != 2) {
+                    return forbidden(visitChildren(call, context), call);
+                }
+                ScalarOperator arrayParam = call.getChildren().get(1).accept(this, context);
+                LambdaFunctionOperator lambdaFn = call.getChild(0).cast();
+                if (arrayParam.isColumnRef() && allDictColumnRefs.contains(arrayParam.cast())) {
+                    setDefineExpr(lambdaFn.getRefColumns().get(0), call.getChild(1), 0);
+                    lambdaColumnRefSet.union(lambdaFn.getRefColumns().get(0));
+                    allDictColumnRefs.union(lambdaFn.getRefColumns().get(0));
+                }
+                ScalarOperator lambdaResult = lambdaFn.accept(this, context);
+                return lambdaResult.isConstantRef() ? lambdaResult : arrayParam;
+            }
+
             if (LOW_CARD_STRING_FUNCTIONS.contains(call.getFnName()) ||
                     LOW_CARD_ARRAY_FUNCTIONS.contains(call.getFnName()) ||
                     LOW_CARD_AGGREGATE_FUNCTIONS.contains(call.getFnName())) {
@@ -1666,6 +1684,14 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         public ScalarOperator visitMatchExprOperator(MatchExprOperator operator, Void context) {
             matchChildren.union((ColumnRefOperator) operator.getChildren().get(0));
             return merge(visitChildren(operator, context), operator);
+        }
+
+        @Override
+        public ScalarOperator visitLambdaFunctionOperator(LambdaFunctionOperator operator, Void context) {
+            Preconditions.checkState(operator.getRefColumns().size() == 1);
+            ScalarOperator result = operator.getLambdaExpr().accept(this, null);
+            saveDictExpr(result, operator.getLambdaExpr());
+            return result;
         }
     }
 
