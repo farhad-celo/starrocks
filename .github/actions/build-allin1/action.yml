@@ -80,7 +80,7 @@ runs:
           } >> docker/dockerfiles/allin1/be.conf
         fi
 
-        docker build \
+        docker build --no-cache \
           --build-arg WITH_DEBUG_INFO=true \
           --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
           -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile \

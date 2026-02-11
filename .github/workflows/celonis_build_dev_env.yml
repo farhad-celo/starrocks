@@ -55,7 +55,7 @@ jobs:
           # Build image and always remove intermediate containers.
           export DOCKER_BUILDKIT=1
           
-          docker buildx build \
+          docker buildx build --no-cache \
             --platform linux/amd64 \
             --push \
             --build-arg prebuild_maven=true \
@@ -96,7 +96,7 @@ jobs:
 
           # Build image and always remove intermediate containers.
           DOCKER_BUILDKIT=1 
-          docker buildx build \
+          docker buildx build --no-cache \
             --platform linux/arm64 \
             --push \
             --build-arg prebuild_maven=true \

@@ -46,7 +46,7 @@ runs:
         IMAGE_TAG=${{ inputs.image_tag }}
         ARTIFACT_IMAGE=${{ inputs.artifact_image }}
 
-        docker  build \
+        docker  build --no-cache \
           --build-arg RUN_AS_USER=starrocks \
           --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
           -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile \
@@ -70,7 +70,7 @@ runs:
           git checkout ${{ inputs.branch }}
         fi
 
-        docker build \
+        docker build --no-cache \
           --build-arg RUN_AS_USER=starrocks \
           --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
           -f docker/dockerfiles/be/be-ubuntu.Dockerfile \
