@@ -29,6 +29,10 @@ inputs:
     required: false
     default: 'true'
     description: "Whether to push the image to remote"
+  allin1_dockerfile:
+    required: false
+    default: 'docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile'
+    description: "path to allin1 Dockerfile"
 
 runs:
   using: composite
@@ -83,7 +87,7 @@ runs:
         docker build --no-cache \
           --build-arg WITH_DEBUG_INFO=true \
           --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
-          -f docker/dockerfiles/allin1/allin1-ubuntu.Dockerfile \
+          -f ${{ inputs.allin1_dockerfile }} \
           -t ghcr.io/celonis/celostar/starrocks-allin1:$IMAGE_TAG \
           -t $ECR_REGISTRY/celostar/starrocks-allin1:$IMAGE_TAG .
 

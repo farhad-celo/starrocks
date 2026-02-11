@@ -17,6 +17,14 @@ inputs:
   aws_secret_access_key:
     required: false
     description: "aws access key"
+  fe_dockerfile:
+    required: false
+    default: 'docker/dockerfiles/fe/fe-ubuntu.Dockerfile'
+    description: "path to FE Dockerfile"
+  be_dockerfile:
+    required: false
+    default: 'docker/dockerfiles/be/be-ubuntu.Dockerfile'
+    description: "path to BE Dockerfile"
 
 runs:
   using: composite
@@ -49,14 +57,13 @@ runs:
         docker  build --no-cache \
           --build-arg RUN_AS_USER=starrocks \
           --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
-          -f docker/dockerfiles/fe/fe-ubuntu.Dockerfile \
+          -f ${{ inputs.fe_dockerfile }} \
           -t ghcr.io/celonis/celostar/starrocks-fe:$IMAGE_TAG \
           -t ${ECR_REGISTRY}/celostar/starrocks-fe:$IMAGE_TAG .
         
         docker push  ghcr.io/celonis/celostar/starrocks-fe:$IMAGE_TAG
         docker push  ${ECR_REGISTRY}/celostar/starrocks-fe:$IMAGE_TAG
           
-
     - name: Build and push BE image
       shell: bash
       env:
@@ -73,7 +80,7 @@ runs:
         docker build --no-cache \
           --build-arg RUN_AS_USER=starrocks \
           --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
-          -f docker/dockerfiles/be/be-ubuntu.Dockerfile \
+          -f ${{ inputs.be_dockerfile }} \
           -t ghcr.io/celonis/celostar/starrocks-be:$IMAGE_TAG \
           -t ${ECR_REGISTRY}/celostar/starrocks-be:$IMAGE_TAG .
 

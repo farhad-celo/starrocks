@@ -106,6 +106,76 @@ jobs:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+  # Debian12 build jobs - reuse Ubuntu artifacts with Debian12 Dockerfiles for FE/BE
+  # allin1 uses Ubuntu Dockerfile (has supervisord and required dependencies)
+  build-debian12-arm:
+    runs-on: [ runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}" ]
+    needs: [build-arm]
+    env:
+      image_tag: ${{ github.ref_name }}-debian12-arm
+      artifact_image_tag: ${{ needs.build-arm.outputs.artifact_image_tag }}
+    outputs:
+      allin1_image: ${{ env.image_tag }}
+      fe_be_image: ${{ env.image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and push allin1 image (Debian12)
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.artifact_image_tag }}
+          image_tag: ${{ env.image_tag }}
+          pull_artifact: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          allin1_dockerfile: 'docker/dockerfiles/allin1/allin1-debian12.Dockerfile'
+
+      - name: Build and push fe-be (Debian12)
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.artifact_image_tag }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          fe_dockerfile: 'docker/dockerfiles/fe/fe-debian12.Dockerfile'
+          be_dockerfile: 'docker/dockerfiles/be/be-debian12.Dockerfile'
+
+  build-debian12-x86:
+    runs-on: [ runs-on, runner=64cpu-linux-x64, image=ubuntu24-full-x64, disk=large, "run-id=${{ github.run_id }}" ]
+    needs: [build-x86]
+    env:
+      image_tag: ${{ github.ref_name }}-debian12-x86
+      artifact_image_tag: ${{ needs.build-x86.outputs.artifact_image_tag }}
+    outputs:
+      allin1_image: ${{ env.image_tag }}
+      fe_be_image: ${{ env.image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and push allin1 image (Debian12)
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.artifact_image_tag }}
+          image_tag: ${{ env.image_tag }}
+          pull_artifact: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          allin1_dockerfile: 'docker/dockerfiles/allin1/allin1-debian12.Dockerfile'
+
+      - name: Build and push fe-be (Debian12)
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.artifact_image_tag }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          fe_dockerfile: 'docker/dockerfiles/fe/fe-debian12.Dockerfile'
+          be_dockerfile: 'docker/dockerfiles/be/be-debian12.Dockerfile'
+
   build-and-push-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     needs: [build-arm, build-x86]
@@ -165,7 +235,7 @@ jobs:
           docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
 
           docker manifest push "$mul_arch_tag"
-          
+
           mul_arch_tag="ghcr.io/celonis/celostar/starrocks-fe:${fe_be_image_tag}"
           arm_tag="ghcr.io/celonis/celostar/starrocks-fe:${arm_image_tag}"
           x86_tag="ghcr.io/celonis/celostar/starrocks-fe:${x86_image_tag}"
@@ -182,6 +252,83 @@ jobs:
           arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${arm_image_tag}"
           x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${x86_image_tag}"
           mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${fe_be_image_tag}"
+
+  # Debian12 manifest job - creates multi-arch manifests with -debian12 suffix
+  build-and-push-debian12-manifest:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: [build-debian12-arm, build-debian12-x86]
+    env:
+      arm_image_tag: ${{ needs.build-debian12-arm.outputs.allin1_image }}
+      x86_image_tag: ${{ needs.build-debian12-x86.outputs.allin1_image }}
+      allin1_image_tag: ${{ github.ref_name }}-debian12
+      fe_be_image_tag: ${{ github.ref_name }}-debian12
+    outputs:
+      allin1_image_tag: ${{ env.allin1_image_tag }}
+      fe_be_image_tag: ${{ env.fe_be_image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: GHCR login
+        shell: bash
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push BE manifest to ECR (Debian12)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${arm_image_tag}"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${x86_image_tag}"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${fe_be_image_tag}"
+
+      - name: Build and push FE manifest to ECR (Debian12)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${arm_image_tag}"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${x86_image_tag}"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${fe_be_image_tag}"
+
+      - name: Build and push allin1 manifest (Debian12)
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${arm_image_tag}"
+          x86_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${x86_image_tag}"
+          mul_arch_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${allin1_image_tag}"
+
+      - name: Build and push fe-be manifest to GHCR (Debian12)
+        shell: bash
+        run: |
+          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
+          export DOCKER_CLI_EXPERIMENTAL=enabled
+
+          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-be:${fe_be_image_tag}"
+          arm_tag="ghcr.io/celonis/celostar/starrocks-be:${arm_image_tag}"
+          x86_tag="ghcr.io/celonis/celostar/starrocks-be:${x86_image_tag}"
+
+          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
+          docker manifest push "$mul_arch_tag"
+
+          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-fe:${fe_be_image_tag}"
+          arm_tag="ghcr.io/celonis/celostar/starrocks-fe:${arm_image_tag}"
+          x86_tag="ghcr.io/celonis/celostar/starrocks-fe:${x86_image_tag}"
+
+          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
+          docker manifest push "$mul_arch_tag"
 
   build-asan-arm:
     runs-on: [ runs-on, runner=64cpu-linux-arm64, image=ubuntu22-full-arm64, disk=large, "run-id=${{ github.run_id }}" ]
@@ -324,7 +471,7 @@ jobs:
           docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
 
           docker manifest push "$mul_arch_tag"
-          
+
           mul_arch_tag="ghcr.io/celonis/celostar/starrocks-fe:${fe_be_image_tag}"
           arm_tag="ghcr.io/celonis/celostar/starrocks-fe:${arm_image_tag}"
           x86_tag="ghcr.io/celonis/celostar/starrocks-fe:${x86_image_tag}"
