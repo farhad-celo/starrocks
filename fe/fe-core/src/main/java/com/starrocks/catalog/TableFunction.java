@@ -145,7 +145,27 @@ public class TableFunction extends Function {
                         Lists.newArrayList(Type.ARRAY_VARCHAR), Lists.newArrayList(Type.VARCHAR, Type.VARCHAR, Type.BIGINT));
         functionSet.addBuiltin(countEdgesFunction);
 
+        Vector<Pair<String, Expr>> generateRangeDefaultArgs = new Vector<>();
+        try {
+            generateRangeDefaultArgs.add(new Pair<>("limit", LiteralExpr.create("10000", Type.BIGINT)));
+        } catch (AnalysisException ex) { //ignored
+        }
+
         TableFunction generateRangeFunction = new TableFunction(new FunctionName("celonis_generate_range"),
+                Lists.newArrayList("step", "range_start", "range_end", "limit"),
+                Lists.newArrayList("celonis_generate_range"),
+                Lists.newArrayList(Type.BIGINT, Type.BIGINT, Type.BIGINT, Type.BIGINT),
+                Lists.newArrayList(Type.BIGINT), generateRangeDefaultArgs);
+        functionSet.addBuiltin(generateRangeFunction);
+        generateRangeFunction = new TableFunction(new FunctionName("celonis_generate_range"),
+                Lists.newArrayList("step", "range_start", "range_end", "limit"),
+                Lists.newArrayList("celonis_generate_range"),
+                Lists.newArrayList(Type.VARCHAR, Type.DATETIME, Type.DATETIME, Type.BIGINT),
+                Lists.newArrayList(Type.DATETIME), generateRangeDefaultArgs);
+        functionSet.addBuiltin(generateRangeFunction);
+
+        // Keep legacy signatures during rolling upgrades so new FE can still work with old BE.
+        generateRangeFunction = new TableFunction(new FunctionName("celonis_generate_range"),
                 Lists.newArrayList("celonis_generate_range"),
                 Lists.newArrayList(Type.BIGINT, Type.BIGINT, Type.BIGINT),
                 Lists.newArrayList(Type.BIGINT));

@@ -25,14 +25,18 @@ protected:
     void TearDown() override {}
 
     template <LogicalType LT, LogicalType STEP_LT>
-    std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> Prepare(const std::vector<TestCase>& test_cases) {
+    std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> Prepare(
+            const std::vector<TestCase>& test_cases,
+            int64_t limit = static_cast<int64_t>(DEFAULT_GENERATED_ROWS_LIMIT)) {
         auto step = ColumnHelper::create_column(TypeDescriptor::from_logical_type(STEP_LT), true);
         auto range_start = ColumnHelper::create_column(TypeDescriptor::from_logical_type(LT), true);
         auto range_end = ColumnHelper::create_column(TypeDescriptor::from_logical_type(LT), true);
+        auto limit_col = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_BIGINT), true);
         for (int i = 0; i < test_cases.size(); ++i) {
             step->append_datum(test_cases[i].step);
             range_start->append_datum(test_cases[i].range_start);
             range_end->append_datum(test_cases[i].range_end);
+            limit_col->append_datum(static_cast<int64_t>(limit));
         }
 
         TableFunctionState* table_state;
@@ -41,6 +45,7 @@ protected:
         input.push_back(step);
         input.push_back(range_start);
         input.push_back(range_end);
+        input.push_back(limit_col);
         EXPECT_OK(function->init({}, &table_state));
         table_state->set_params(input);
         EXPECT_OK(function->prepare(table_state));
@@ -174,6 +179,44 @@ TEST_F(CelonisGenerateRangeTest, bigint_start_greater_than_end) {
 
     EXPECT_EQ(table_state->processed_rows(), 1);
     EXPECT_EQ(results[0]->size(), 0);
+    function->close(nullptr, table_state);
+}
+
+TEST_F(CelonisGenerateRangeTest, bigint_custom_limit) {
+    const auto LT = TYPE_BIGINT;
+    std::vector<TestCase> test_cases{{1L, 1L, 100L, {1L, 2L, 3L}}};
+
+    auto [table_state, function] = Prepare<LT, LT>(test_cases, /*limit=*/3);
+    auto [results, offset] = function->process(rt_state_.get(), table_state);
+
+    EXPECT_EQ(results[0]->size(), 3);
+    ASSERT_TRUE(table_state->status().is_invalid_argument());
+    function->close(nullptr, table_state);
+}
+
+TEST_F(CelonisGenerateRangeTest, datetime_custom_limit) {
+    const auto LT = TYPE_DATETIME;
+    const auto STEP_LT = TYPE_VARCHAR;
+    std::vector<TestCase> test_cases{
+            {"1M", TimestampValue::create(2019, 1, 1, 0, 0, 0), TimestampValue::create(2025, 1, 1, 0, 0, 0), {}}};
+
+    auto [table_state, function] = Prepare<LT, STEP_LT>(test_cases, /*limit=*/2);
+    auto [results, offset] = function->process(rt_state_.get(), table_state);
+
+    EXPECT_EQ(results[0]->size(), 2);
+    ASSERT_TRUE(table_state->status().is_invalid_argument());
+    function->close(nullptr, table_state);
+}
+
+TEST_F(CelonisGenerateRangeTest, bigint_negative_limit) {
+    const auto LT = TYPE_BIGINT;
+    std::vector<TestCase> test_cases{{1L, 1L, 10L, {}}};
+
+    auto [table_state, function] = Prepare<LT, LT>(test_cases, /*limit=*/-1);
+    auto [results, offset] = function->process(rt_state_.get(), table_state);
+
+    EXPECT_EQ(results[0]->size(), 0);
+    ASSERT_TRUE(table_state->status().is_invalid_argument());
     function->close(nullptr, table_state);
 }
 

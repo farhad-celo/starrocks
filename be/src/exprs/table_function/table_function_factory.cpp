@@ -146,6 +146,12 @@ void TableFunctionResolver::add_celonis_function_mapping() {
     TableFunctionPtr func_count_edges = std::make_shared<CountEdges>();
     add_function_mapping("celonis_count_edges", {TYPE_ARRAY}, {TYPE_VARCHAR, TYPE_VARCHAR, TYPE_BIGINT},
                          func_count_edges);
+    // 4-arg signatures (new: with explicit limit)
+    add_function_mapping("celonis_generate_range", {TYPE_BIGINT, TYPE_BIGINT, TYPE_BIGINT, TYPE_BIGINT}, {TYPE_BIGINT},
+                         std::make_shared<CelonisGenerateRange<TYPE_BIGINT, TYPE_BIGINT>>());
+    add_function_mapping("celonis_generate_range", {TYPE_VARCHAR, TYPE_DATETIME, TYPE_DATETIME, TYPE_BIGINT},
+                         {TYPE_DATETIME}, std::make_shared<CelonisGenerateRange<TYPE_DATETIME, TYPE_VARCHAR>>());
+    // Legacy 3-arg signatures for compatibility with old FE during rolling upgrades
     add_function_mapping("celonis_generate_range", {TYPE_BIGINT, TYPE_BIGINT, TYPE_BIGINT}, {TYPE_BIGINT},
                          std::make_shared<CelonisGenerateRange<TYPE_BIGINT, TYPE_BIGINT>>());
     add_function_mapping("celonis_generate_range", {TYPE_VARCHAR, TYPE_DATETIME, TYPE_DATETIME}, {TYPE_DATETIME},

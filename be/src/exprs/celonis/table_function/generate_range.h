@@ -11,9 +11,7 @@
 
 namespace starrocks {
 
-// Saola sets the limit to 10000, because for the main application, populating dropdown menus, doesn't require more
-// items. Here we use the same limit. we can increase it when necessary.
-const size_t MAX_GENERATED_ROWS_LIMIT = 10000;
+constexpr int64_t DEFAULT_GENERATED_ROWS_LIMIT = 10000;
 
 template <LogicalType LT, LogicalType StepLT>
 class CelonisGenerateRange final : public TableFunction {
@@ -59,6 +57,11 @@ public:
         auto arg_step = ColumnViewer<StepLT>(state->get_columns()[0]);
         auto arg_range_start = ColumnViewer<LT>(state->get_columns()[1]);
         auto arg_range_end = ColumnViewer<LT>(state->get_columns()[2]);
+        bool has_limit_arg = state->get_columns().size() > 3;
+        std::unique_ptr<ColumnViewer<TYPE_BIGINT>> arg_limit;
+        if (has_limit_arg) {
+            arg_limit = std::make_unique<ColumnViewer<TYPE_BIGINT>>(state->get_columns()[3]);
+        }
         auto curr_row = state->processed_rows();
 
         auto move_to_next_row = [&]() {
@@ -69,7 +72,8 @@ public:
 
         while (res->size() < max_chunk_size && curr_row < arg_range_start.size()) {
             offsets->append(res->size());
-            if (arg_range_start.is_null(curr_row) || arg_range_end.is_null(curr_row) || arg_step.is_null(curr_row)) {
+            if (arg_range_start.is_null(curr_row) || arg_range_end.is_null(curr_row) || arg_step.is_null(curr_row) ||
+                (has_limit_arg && arg_limit->is_null(curr_row))) {
                 move_to_next_row();
             } else {
                 auto range_start = arg_range_start.value(curr_row);
@@ -79,6 +83,12 @@ public:
                     continue;
                 }
                 auto step = arg_step.value(curr_row);
+                auto limit_value = has_limit_arg ? arg_limit->value(curr_row) : DEFAULT_GENERATED_ROWS_LIMIT;
+                if (limit_value <= 0) {
+                    state->set_status(Status::InvalidArgument("limit must be positive"));
+                    break;
+                }
+                auto rows_limit = static_cast<size_t>(limit_value);
                 auto current = range_start;
                 // For TYPE_DATETIME
                 std::function<TimestampValue(const TimestampValue&)> increase_timestamp_func;
@@ -110,10 +120,10 @@ public:
                     auto& data = res->get_data();
                     auto count = max_chunk_size - res->size();
                     for (decltype(count) i = 0; i < count; i++) {
-                        if (state->total_rows_generated_count >= MAX_GENERATED_ROWS_LIMIT) {
+                        if (state->total_rows_generated_count >= rows_limit) {
                             state->set_status(Status::InvalidArgument(
                                     "CELONIS_GENERATE_RANGE: Number of generated rows exceeds the limit of " +
-                                    std::to_string(MAX_GENERATED_ROWS_LIMIT) + "."));
+                                    std::to_string(rows_limit) + "."));
                             break;
                         }
                         data.push_back(current);
@@ -133,20 +143,23 @@ public:
                     auto old_size = res->size();
                     resize_column_uninitialized(res.get(), old_size + count);
                     auto* data = res->get_data().data();
+                    decltype(count) actual_count = 0;
                     for (decltype(count) i = 0; i < count; i++) {
-                        if (state->total_rows_generated_count >= MAX_GENERATED_ROWS_LIMIT) {
+                        if (state->total_rows_generated_count >= rows_limit) {
                             state->set_status(Status::InvalidArgument(
                                     "CELONIS_GENERATE_RANGE: Number of generated rows exceeds the limit of " +
-                                    std::to_string(MAX_GENERATED_ROWS_LIMIT) + "."));
+                                    std::to_string(rows_limit) + "."));
                             break;
                         }
                         data[old_size + i] = current;
+                        actual_count++;
                         state->total_rows_generated_count++;
                         overflow = add_overflow(current, step, &current);
                         if (overflow) {
                             break;
                         }
                     }
+                    res->resize(old_size + actual_count);
                 }
                 // Max generated rows limit reached
                 if (!state->status().ok()) {
