@@ -1612,10 +1612,10 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     private boolean enableStructLowCardinalityOptimize = true;
 
     @VarAttr(name = ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE)
-    private boolean enableArrayAggLowCardinalityOptimize = true;
+    private boolean enableArrayAggLowCardinalityOptimize = false;
 
     @VarAttr(name = MULTI_ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE)
-    private boolean enableMultiArrayAggLowCardinalityOptimize = true;
+    private boolean enableMultiArrayAggLowCardinalityOptimize = false;
 
     @VariableMgr.VarAttr(name = ENABLE_OPTIMIZER_REWRITE_GROUPINGSETS_TO_UNION_ALL)
     private boolean enableRewriteGroupingSetsToUnionAll = false;
