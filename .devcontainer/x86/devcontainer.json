@@ -2,13 +2,13 @@
     "name": "sr-dev-homcc",
     "containerUser": "root",
     "remoteUser": "root",
-    "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/celostar-starrocks,type=bind",
     "workspaceFolder": "${localWorkspaceFolder}",
     "build": {
         "dockerfile": "../../docker/dockerfiles/dev-env-homcc-base/x86/Dockerfile",
-        "context": "../../docker/dockerfiles/dev-env-homcc-base"
+        "context": "../../docker/dockerfiles/dev-env-homcc-base/x86"
     },
-    "postCreateCommand": "cp .devcontainer/CMakePresets.json be/CMakePresets.json",
+    "postCreateCommand": "cp celostar-starrocks/.devcontainer/CMakePresets.json celostar-starrocks/be/CMakePresets.json",
     "containerEnv": {
         // This is covered by the CMake presets already but still useful to have in case you want to execute build.sh
         "STARROCKS_GCC_HOME": "/usr/",
