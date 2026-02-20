@@ -18,11 +18,11 @@
 /.dockerignore @jxWho @jkim650 @mingmxu @pavan-kalyan @hagonzal
 
 # Source code and binaries
-/be/ @jkim650 @hagonzal @zhangyaqi1989 @lxynov @OliLay @martinr0x
+/be/ @jkim650 @hagonzal @zhangyaqi1989 @lxynov @OliLay @martinr0x @farhad-celo
 /be/src/exprs/celonis/cpml_utils/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov
 /be/src/exprs/celonis/modules/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov
 /bin/ @jkim650 @hagonzal @zhangyaqi1989
-/fe/ @jkim650 @hagonzal @zhangyaqi1989 @OliLay @martinr0x @lxynov
+/fe/ @jkim650 @hagonzal @zhangyaqi1989 @OliLay @martinr0x @lxynov @farhad-celo
 
 # Misc
 /celonis/ @jxWho @jkim650 @mingmxu @pavan-kalyan
