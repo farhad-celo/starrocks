@@ -200,6 +200,14 @@ public class PhysicalHashAggregateOperator extends PhysicalOperator {
         return usePerBucketOptmize;
     }
 
+    public boolean isWithLocalShuffle() {
+        return withLocalShuffle;
+    }
+
+    public void setWithLocalShuffle(boolean  withLocalShuffle) {
+        this.withLocalShuffle = withLocalShuffle;
+    }
+
     public boolean isWithoutColocateRequirement() {
         return withoutColocateRequirement;
     }
