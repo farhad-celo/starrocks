@@ -473,10 +473,9 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         exchange.setGlobalDicts(dicts);
         exchange.setGlobalDictsExpr(computeDictExpr(fragmentUseDictExprs));
 
-        if (!(exchange.getDistributionSpec() instanceof HashDistributionSpec)) {
-            return optExpression;
+        if (!(exchange.getDistributionSpec() instanceof HashDistributionSpec spec)) {
+            return rewriteOptExpression(optExpression, exchange, info.outputStringColumns);
         }
-        HashDistributionSpec spec = (HashDistributionSpec) exchange.getDistributionSpec();
         List<DistributionCol> shuffledColumns = Lists.newArrayList();
         for (DistributionCol column : spec.getHashDistributionDesc().getDistributionCols()) {
             if (!info.outputStringColumns.contains(column.getColId())) {
