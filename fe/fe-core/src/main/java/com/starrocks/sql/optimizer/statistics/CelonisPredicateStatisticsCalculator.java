@@ -19,6 +19,7 @@ import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
+import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static com.starrocks.sql.optimizer.statistics.CelonisHistogramStatisticsUtils.estimateCelonisInPredicateWithHistogram;
 
 public class CelonisPredicateStatisticsCalculator {
     public static Statistics estimateCall(CallOperator call, Statistics statistics) {
@@ -47,39 +50,32 @@ public class CelonisPredicateStatisticsCalculator {
         return operator;
     }
 
-    private static boolean hasConstantNullMatch(ScalarOperator operator) {
-        if (operator instanceof ArrayOperator) {
-            ArrayOperator arrayOperator = (ArrayOperator) operator;
-            return arrayOperator.getChildren().stream().anyMatch(ScalarOperator::isConstantNull);
-        }
-
-        return false;
+    private static boolean hasConstantNullMatch(List<ScalarOperator> matchChildrenList) {
+        return matchChildrenList.stream().anyMatch(ScalarOperator::isConstantNull);
     }
 
-    private static ColumnStatistic calculateMatchArrayStatistic(ScalarOperator operator, Statistics statistics) {
-        if (operator instanceof ArrayOperator) {
-            double minValue = Double.POSITIVE_INFINITY;
-            double maxValue = Double.NEGATIVE_INFINITY;
-            double distinctValues = 0;
+    private static ColumnStatistic calculateMatchArrayStatistic(List<ScalarOperator> matches, Statistics statistics) {
+        double minValue = Double.POSITIVE_INFINITY;
+        double maxValue = Double.NEGATIVE_INFINITY;
+        double distinctValues = 0;
 
-            for (ScalarOperator child : operator.getChildren()) {
-                if (child.isConstantNull()) {
-                    continue;
-                }
-
-                ColumnStatistic childColumnStatistic = ExpressionStatisticCalculator.calculate(child, statistics);
-                if (childColumnStatistic.isUnknown()) {
-                    return ColumnStatistic.unknown();
-                }
-
-                minValue = Math.min(minValue, childColumnStatistic.getMinValue());
-                maxValue = Math.max(maxValue, childColumnStatistic.getMaxValue());
-                distinctValues += childColumnStatistic.getDistinctValuesCount();
+        for (ScalarOperator match : matches) {
+            if (match.isConstantNull()) {
+                continue;
             }
 
-            return new ColumnStatistic(minValue, maxValue, 0, 0, distinctValues);
+            ColumnStatistic childColumnStatistic = ExpressionStatisticCalculator.calculate(match, statistics);
+            if (childColumnStatistic.isUnknown()) {
+                return ColumnStatistic.unknown();
+            }
+
+            minValue = Math.min(minValue, childColumnStatistic.getMinValue());
+            maxValue = Math.max(maxValue, childColumnStatistic.getMaxValue());
+            distinctValues += childColumnStatistic.getDistinctValuesCount();
+            // NULL values originating from columns in the match list are ignored.
         }
-        return ColumnStatistic.unknown();
+
+        return new ColumnStatistic(minValue, maxValue, 0, 0, distinctValues);
     }
 
     /**
@@ -98,10 +94,39 @@ public class CelonisPredicateStatisticsCalculator {
 
         // 1. compute CELONIS_IN children column statistics
         ColumnStatistic inColumnStatistic = ExpressionStatisticCalculator.calculate(firstChild, statistics);
-        ColumnStatistic inMatchStatistic = calculateMatchArrayStatistic(secondChild, statistics);
+
+        List<ScalarOperator> matchChildrenList = new ArrayList<>();
+        if (secondChild instanceof ArrayOperator) {
+            matchChildrenList = secondChild.getChildren().stream() //
+                    .map(CelonisPredicateStatisticsCalculator::getChildForCastOperator) //
+                    .distinct() //
+                    .collect(Collectors.toList());
+
+            if (matchChildrenList.isEmpty()) {
+                // If the match list is empty the predicate will always evaluate to false.
+                return Statistics.buildFrom(statistics).setOutputRowCount(0).build();
+            }
+
+            final boolean isArgumentColumnRef = firstChild.isColumnRef();
+            final boolean allConstants = matchChildrenList.stream().allMatch(op -> op instanceof ConstantOperator);
+            if (isArgumentColumnRef && allConstants && !inColumnStatistic.isUnknown() &&
+                    inColumnStatistic.getHistogram() != null) {
+                return estimateCelonisInPredicateWithHistogram(
+                        (ColumnRefOperator) firstChild,
+                        inColumnStatistic,
+                        matchChildrenList.stream()
+                                .map(op -> (ConstantOperator) op)
+                                .collect(Collectors.toList()),
+                        statistics
+                );
+            }
+        }
+
+        ColumnStatistic inMatchStatistic = matchChildrenList.isEmpty() ? ColumnStatistic.unknown() :
+                calculateMatchArrayStatistic(matchChildrenList, statistics);
 
         // 2. compute CELONIS_IN null matches
-        boolean hasNullMatch = hasConstantNullMatch(secondChild);
+        boolean hasNullMatch = hasConstantNullMatch(matchChildrenList);
         double nullCount = Math.min(statistics.getOutputRowCount() * inColumnStatistic.getNullsFraction(),
                 statistics.getOutputRowCount());
 

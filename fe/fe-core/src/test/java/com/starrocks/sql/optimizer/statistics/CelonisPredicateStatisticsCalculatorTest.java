@@ -28,7 +28,9 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class CelonisPredicateStatisticsCalculatorTest {
 
@@ -156,6 +158,134 @@ public class CelonisPredicateStatisticsCalculatorTest {
         checkCelonisInStatistics(col1, Lists.newArrayList(col2, col3, const1, const2, col5), statistics,
                 statistics.getOutputRowCount() * 0.5 * StatisticsEstimateCoefficient.IN_PREDICATE_DEFAULT_FILTER_COEFFICIENT,
                 0, 100, 1, 1000);
+    }
+
+    private static class CelonisInSelectivityScenario {
+        private final ColumnRefOperator columnRef = new ColumnRefOperator(1, Type.INT, "c1", true);
+        public final double rowCount;
+        public final double minValue;
+        public final double maxValue;
+        public final double distinctValuesCount;
+        public final double nullsFraction;
+        private final List<Bucket> buckets;
+        private final Map<String, Long> mcvs;
+
+        public CelonisInSelectivityScenario(double rowCount, double minValue, double maxValue, double distinctValuesCount,
+                                            double nullsFraction,
+                                            List<Bucket> buckets, Map<String, Long> mcvs) {
+            this.rowCount = rowCount;
+            this.minValue = minValue;
+            this.maxValue = maxValue;
+            this.distinctValuesCount = distinctValuesCount;
+            this.nullsFraction = nullsFraction;
+            this.buckets = buckets;
+            this.mcvs = mcvs;
+        }
+
+        public CelonisInSelectivityScenario(double rowCount, double minValue, double maxValue, double distinctValuesCount,
+                                            double nullsFraction) {
+            this.rowCount = rowCount;
+            this.minValue = minValue;
+            this.maxValue = maxValue;
+            this.distinctValuesCount = distinctValuesCount;
+            this.nullsFraction = nullsFraction;
+            this.buckets = List.of();
+            this.mcvs = Map.of();
+        }
+
+        public ColumnStatistic getColumnStatistic() {
+            return ColumnStatistic.builder() //
+                    .setMinValue(minValue) //
+                    .setMaxValue(maxValue) //
+                    .setDistinctValuesCount(distinctValuesCount) //
+                    .setNullsFraction(nullsFraction) //
+                    .setHistogram(new Histogram(buckets, mcvs)) //
+                    .build();
+        }
+
+        public Statistics getStatistics() {
+            return Statistics.builder() //
+                    .setOutputRowCount(rowCount) //
+                    .addColumnStatistic(columnRef, getColumnStatistic()) //
+                    .build();
+        }
+    }
+
+    @Test
+    public void testCelonisInSelectivityWithHistogramOnlyNullMatches() {
+        // GIVEN
+        final var scenario = new CelonisInSelectivityScenario(1000, 1, 40, 1337, 0.1);
+        final var statistics = scenario.getStatistics();
+
+        // Only NULL matches.
+        List<ScalarOperator> matches = Lists.newArrayList(
+                ConstantOperator.createNull(Type.INT),
+                ConstantOperator.createNull(Type.INT),
+                ConstantOperator.createNull(Type.INT)
+        );
+
+        // WHEN / THEN
+        final var expectedRowCount = scenario.rowCount * scenario.nullsFraction;
+        checkCelonisInStatistics(scenario.columnRef, matches, statistics, expectedRowCount, 1.0, 0, scenario.minValue,
+                scenario.maxValue);
+    }
+
+    @Test
+    public void testCelonisInSelectivityWithHistogram() {
+        // GIVEN
+        List<Bucket> buckets = Lists.newArrayList(
+                new Bucket(1, 9, 100L, 20L),
+                new Bucket(11, 19, 200L, 30L),
+                new Bucket(21, 29, 300L, 40L)
+        );
+
+        Map<String, Long> mcv = new HashMap<>();
+        mcv.put("10", 50L);
+        mcv.put("20", 60L);
+        mcv.put("30", 70L);
+        mcv.put("35", 80L);
+
+        final var scenario = new CelonisInSelectivityScenario(1000, 1, 40, 30, 0.1, buckets, mcv);
+        final var statistics = scenario.getStatistics();
+
+        List<ScalarOperator> matches = Lists.newArrayList(
+                ConstantOperator.createInt(10),
+                ConstantOperator.createInt(15),
+                ConstantOperator.createInt(30),
+                ConstantOperator.createInt(50), // <-- to be pruned due to column stats.
+                ConstantOperator.createNull(Type.INT)
+        );
+
+        // WHEN / THEN
+        checkCelonisInStatistics(scenario.columnRef, matches, statistics, 307.3, 0.32, 3, 10, 30);
+    }
+
+    @Test
+    public void testCelonisInSelectivityWithHistogramNoNullMatches() {
+        // GIVEN
+        List<Bucket> buckets = Lists.newArrayList(
+                new Bucket(1, 9, 100L, 20L),
+                new Bucket(11, 19, 200L, 30L),
+                new Bucket(21, 29, 300L, 40L)
+        );
+
+        Map<String, Long> mcv = new HashMap<>();
+        mcv.put("10", 50L);
+        mcv.put("20", 60L);
+        mcv.put("30", 70L);
+        mcv.put("35", 80L);
+
+        final var scenario = new CelonisInSelectivityScenario(1000, 1, 40, 30, 0.1, buckets, mcv);
+        final var statistics = scenario.getStatistics();
+
+        List<ScalarOperator> matches = Lists.newArrayList(
+                ConstantOperator.createInt(10),
+                ConstantOperator.createInt(15),
+                ConstantOperator.createInt(25)
+        );
+
+        // WHEN / THEN
+        checkCelonisInStatistics(scenario.columnRef, matches, statistics, 107.67857142857143, 0.0, matches.size(), 10, 25);
     }
 
     private void checkCelonisMultiInStatistics(List<ColumnRefOperator> multiInColumns, List<List<ScalarOperator>> matches,
