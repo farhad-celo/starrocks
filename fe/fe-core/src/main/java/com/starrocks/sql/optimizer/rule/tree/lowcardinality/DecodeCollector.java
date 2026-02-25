@@ -35,10 +35,8 @@ import com.starrocks.common.FeConstants;
 import com.starrocks.common.Pair;
 import com.starrocks.common.util.UnionFind;
 import com.starrocks.connector.hive.HiveStorageFormat;
-import com.starrocks.metric.LongCounterMetric;
-import com.starrocks.metric.Metric;
 import com.starrocks.metric.MetricLabel;
-import com.starrocks.metric.MetricRepo;
+import com.starrocks.metric.celonis.CelonisMetrics;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.optimizer.OptExpression;
@@ -99,7 +97,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -128,8 +125,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     // and used as window function.
     public static final Set<String> LOW_CARD_WINDOW_FUNCTIONS = Sets.newHashSet(FunctionSet.LAG, FunctionSet.LEAD,
             FunctionSet.FIRST_VALUE, FunctionSet.LAST_VALUE);
-
-    private static final ConcurrentHashMap<String, LongCounterMetric> COUNTERS = new ConcurrentHashMap<>();
 
     static {
         LOW_CARD_AGGREGATE_FUNCTIONS.addAll(CELONIS_LOW_CARD_AGGREGATE_FUNCTIONS);
@@ -439,13 +434,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         } else {
             labels = labels.stream().map(s -> op.getOpType().toString() + "_" + s).toList();
         }
-        labels.stream().map(label -> COUNTERS.computeIfAbsent(label, k -> {
-            LongCounterMetric metric = new LongCounterMetric("lco_decode", Metric.MetricUnit.NOUNIT,
-                    "decode by reason");
-            metric.addLabel(new MetricLabel("op", label));
-            MetricRepo.addMetric(metric);
-            return metric;
-        })).forEach(metric -> metric.increase(1L));
+
+        labels.forEach(label -> {
+            CelonisMetrics.increaseCounter("lco_decode", "decode by reason", new MetricLabel("op", label));
+        });
     }
 
     private boolean checkDependOnExpr(int cid, Collection<Integer> checkList) {
@@ -1672,13 +1664,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         }
 
         private void logUnsupportedFunctionMetric(String fn) {
-            COUNTERS.computeIfAbsent(fn, k -> {
-                LongCounterMetric metric = new LongCounterMetric("lco_unsupported_fn", Metric.MetricUnit.NOUNIT,
-                        "lco unsupported fn");
-                metric.addLabel(new MetricLabel("function", fn));
-                MetricRepo.addMetric(metric);
-                return metric;
-            }).increase(1L);
+            CelonisMetrics.increaseCounter("lco_unsupported_fn", "lco unsupported fn", new MetricLabel("function", fn));
         }
     }
 

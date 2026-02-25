@@ -21,9 +21,7 @@ import com.starrocks.catalog.ArrayType;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
-import com.starrocks.metric.LongCounterMetric;
-import com.starrocks.metric.Metric;
-import com.starrocks.metric.MetricRepo;
+import com.starrocks.metric.celonis.CelonisMetrics;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
@@ -37,7 +35,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -45,7 +42,6 @@ import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.POSITIVE_INFINITY;
 
 public class CelonisExpressionStatisticsCalculator {
-    private static final ConcurrentHashMap<String, LongCounterMetric> COUNTERS = new ConcurrentHashMap<>();
 
     public static ColumnStatistic callCalculate(CallOperator call, List<ColumnStatistic> childrenColumnStatistics,
                                                 Statistics inputStatistics, double rowCount) {
@@ -150,16 +146,6 @@ public class CelonisExpressionStatisticsCalculator {
                 .build();
     }
 
-    /* Logs metrics on how often we propagate the histogram. */
-    private static void logHistogramHashProjection() {
-        COUNTERS.computeIfAbsent("celonis_hash_mcv_propagation", k -> {
-            LongCounterMetric metric = new LongCounterMetric("celonis_hash_mcv_propagation", Metric.MetricUnit.NOUNIT,
-                    "Amount of propagated Celonis hash MCVs");
-            MetricRepo.addMetric(metric);
-            return metric;
-        }).increase(1L);
-    }
-
     private static Histogram projectHistogramThroughHash(@Nullable Histogram histogram,
                                                          CallOperator callOperator, ColumnStatistic columnStatistic,
                                                          double rowCount) {
@@ -192,7 +178,7 @@ public class CelonisExpressionStatisticsCalculator {
                     .collect(Collectors.toMap(key -> hashFunction.compute(key.getKey()).toString(), Map.Entry::getValue)));
         }
 
-        logHistogramHashProjection();
+        CelonisMetrics.increaseCounter("celonis_hash_mcv_propagation", "Amount of propagated Celonis hash MCVs");
         return new Histogram(List.of(), projectedMcvs);
     }
 
