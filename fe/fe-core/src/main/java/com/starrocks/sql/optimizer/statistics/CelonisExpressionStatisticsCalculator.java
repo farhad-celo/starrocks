@@ -123,12 +123,19 @@ public class CelonisExpressionStatisticsCalculator {
                 minValue = celonisSquareMinValue;
                 maxValue = celonisSquareMaxValue;
                 break;
+            case FunctionSet.CELONIS_STRING_TO_DOUBLE:
+            case FunctionSet.CELONIS_TO_DOUBLE:
+                averageRowSize = ScalarType.DOUBLE.getTypeSize();
+                break;
+            case FunctionSet.CELONIS_STRING_TO_INT:
+                averageRowSize = ScalarType.BIGINT.getTypeSize();
+                break;
             case FunctionSet.CELONIS_GREATEST:
             case FunctionSet.CELONIS_LEAST:
             case FunctionSet.CELONIS_UPPER:
             case FunctionSet.CELONIS_LOWER:
-            case FunctionSet.CELONIS_TO_DOUBLE:
-            case FunctionSet.CELONIS_STRING_TO_DOUBLE:
+            case FunctionSet.CELONIS_SANITIZE_INVALID_UTF8:
+            case FunctionSet.CELONIS_STRINGHASH:
                 // Just use the input's statistics as output's statistics
                 break;
             default:
@@ -296,6 +303,9 @@ public class CelonisExpressionStatisticsCalculator {
         switch (callOperator.getFnName().toLowerCase()) {
             case FunctionSet.CELONIS_ARRAY_LAG:
             case FunctionSet.CELONIS_ARRAY_LEAD:
+            case FunctionSet.CELONIS_DEDUP_SORTED_BY:
+            case FunctionSet.CELONIS_LTRIM:
+            case FunctionSet.CELONIS_RTRIM:
                 // Use first child statistics
                 break;
             case FunctionSet.CELONIS_DECODE_STRING:

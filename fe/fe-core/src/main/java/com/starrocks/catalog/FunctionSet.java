@@ -550,6 +550,7 @@ public class FunctionSet {
     public static final String CELONIS_CALC_CROP = "celonis_calc_crop";
     public static final String CELONIS_CALC_CROP_TO_NULL = "celonis_calc_crop_to_null";
     public static final String CELONIS_CREATE_ALIGNMENT = "celonis_create_alignment";
+    public static final String CELONIS_DEDUP_SORTED_BY = "celonis_dedup_sorted_by";
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";
     public static final String CELONIS_MERGE_SORTED_ARRAYS = "celonis_merge_sorted_arrays";
@@ -571,13 +572,18 @@ public class FunctionSet {
     public static final String CELONIS_SQUARE = "celonis_square";
     public static final String CELONIS_UPPER = "celonis_upper";
     public static final String CELONIS_LOWER = "celonis_lower";
-    public static final String CELONIS_TO_DOUBLE = "celonis_to_double";
+    public static final String CELONIS_LTRIM = "celonis_ltrim";
+    public static final String CELONIS_REMAP_VALUES = "celonis_remap_values";
+    public static final String CELONIS_REMAP_VALUES_CONST = "celonis_remap_values_const";
+    public static final String CELONIS_RTRIM = "celonis_rtrim";
+    public static final String CELONIS_SANITIZE_INVALID_UTF8 = "celonis_sanitize_invalid_utf8";
+    public static final String CELONIS_STRINGHASH = "celonis_stringhash";
+    public static final String CELONIS_STRING_TO_INT = "celonis_string_to_int";
     public static final String CELONIS_STRING_TO_DOUBLE = "celonis_string_to_double";
     public static final String CELONIS_SHORTENED_VARIANT = "celonis_shortened_variant";
     public static final String CELONIS_STRING_SPLIT = "celonis_string_split";
     public static final String CELONIS_TRANSLATE = "celonis_translate";
-    public static final String CELONIS_REMAP_VALUES = "celonis_remap_values";
-    public static final String CELONIS_REMAP_VALUES_CONST = "celonis_remap_values_const";
+    public static final String CELONIS_TO_DOUBLE = "celonis_to_double";
 
     // Celonis window functions:
     public static final String CELONIS_MOVING_TRIMMED_MEAN = "celonis_moving_trimmed_mean";
