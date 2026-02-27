@@ -25,6 +25,8 @@ public interface CelonisHashFunction {
 
     static CelonisHashFunction of(CallOperator callOperator) {
         switch (callOperator.getFnName().toLowerCase()) {
+            case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
+                return new XXHASH3128NULLABLE();
             case FunctionSet.CELONIS_XX_HASH3_128_V3:
                 return new XXHASH3128V3();
             case FunctionSet.CELONIS_XX_HASH3_128_V4:

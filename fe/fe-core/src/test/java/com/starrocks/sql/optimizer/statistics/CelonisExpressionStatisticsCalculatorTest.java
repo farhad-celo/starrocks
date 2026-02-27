@@ -24,6 +24,7 @@ import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashFunction;
+import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128NULLABLE;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V3;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V4;
 import com.starrocks.utframe.UtFrameUtils;
@@ -1058,6 +1059,24 @@ public class CelonisExpressionStatisticsCalculatorTest {
                         hasher.compute("skewString1").toString(), 500L, //
                         hasher.compute("skewString2").toString(), 400L, //
                         hasher.computeNull().toString(), 100L //
+                ));
+
+        // WHEN
+        callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE,
+                Type.VARCHAR, Lists.newArrayList(dataSkewTestScenario.stringColumnRefOperator));
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, dataSkewTestScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(1000, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.1, columnStatistic.getNullsFraction(), 0.001);
+        assertNotNull(columnStatistic.getHistogram());
+        hasher = new XXHASH3128NULLABLE();
+        assertThat(columnStatistic.getHistogram().getMCV())
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        hasher.compute("skewString1").toString(), 500L, //
+                        hasher.compute("skewString2").toString(), 400L //
                 ));
     }
 }

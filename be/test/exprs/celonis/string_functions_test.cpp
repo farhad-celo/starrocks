@@ -167,6 +167,35 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_equality_to_fe_implement
     EXPECT_EQ(int128_to_string(result_column->get(3).get_int128()), "-94392335423945087845847157094108824607");
 }
 
+/*
+ * This tests equality to the FE implementation of xx_hash3_128_nullable.
+ * The behavior of this hash function is identical to xx_hash3_128_v3 up to handling of null values.
+ * If you adjust this test, you also must adjust the corresponding frontend implementation.
+ */
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_nullable_equality_to_fe_implementation) {
+    // GIVEN
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+
+    auto column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    column->append_datum("a");
+    column->append_datum("1");
+    column->append_datum("fWn!ɔԕڈ#ÅLm{FΟ̉WʊHUɌIɹ̬©;ޤݦм۸ˢoӏ0");
+    column->append_nulls(1);
+
+    // WHEN
+    ColumnPtr result = CelonisStringFunctions::xx_hash3_128_nullable(ctx.get(), {column}).value();
+
+    // THEN
+    const auto result_column = ColumnHelper::as_column<NullableColumn>(result);
+    EXPECT_EQ(int128_to_string(result_column->get(0).get_int128()), "-3064065747166489328281421148979907626");
+    EXPECT_EQ(int128_to_string(result_column->get(1).get_int128()), "-144608462304864223298616749235096385510");
+    EXPECT_EQ(int128_to_string(result_column->get(2).get_int128()), "-13577519804223448105674676604219862806");
+    EXPECT_TRUE(result_column->get(3).is_null());
+}
+
 TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_collision) {
     std::vector<FunctionContext::TypeDesc> arg_types = {
             CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),

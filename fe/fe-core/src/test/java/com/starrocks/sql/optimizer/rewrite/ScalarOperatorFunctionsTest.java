@@ -24,6 +24,7 @@ import com.starrocks.common.util.TimeUtils;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
+import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128NULLABLE;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V3;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V4;
 import org.junit.jupiter.api.Assertions;
@@ -50,6 +51,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ScalarOperatorFunctionsTest {
@@ -1681,5 +1683,26 @@ public class ScalarOperatorFunctionsTest {
         // WHEN / THEN
         assertEquals(new XXHASH3128V3().computeNull().toString(),
                 ScalarOperatorFunctions.celonisXXHash3128V3(inputOperator).getLargeInt().toString());
+    }
+
+    @Test
+    public void testCelonisXXHash3128Nullable() {
+        // GIVEN
+        final var input = "a";
+        ConstantOperator inputOperator = ConstantOperator.createVarchar("a");
+
+        // WHEN / THEN
+        assertEquals(new XXHASH3128NULLABLE().compute(input).toString(),
+                ScalarOperatorFunctions.celonisXXHash3128Nullable(inputOperator).getLargeInt().toString());
+    }
+
+    @Test
+    public void testCelonisXXHash3128NullableWithNullInput() {
+        // GIVEN
+        ConstantOperator inputOperator = ConstantOperator.createNull(Type.VARCHAR);
+
+        // WHEN / THEN
+        assertNull(new XXHASH3128NULLABLE().computeNull());
+        assertTrue(ScalarOperatorFunctions.celonisXXHash3128Nullable(inputOperator).isNull());
     }
 }

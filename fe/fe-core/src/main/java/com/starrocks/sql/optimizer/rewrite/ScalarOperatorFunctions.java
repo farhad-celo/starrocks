@@ -55,6 +55,7 @@ import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.common.ErrorType;
 import com.starrocks.sql.common.StarRocksPlannerException;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
+import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128NULLABLE;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V3;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V4;
 import org.apache.commons.lang.StringUtils;
@@ -1660,6 +1661,15 @@ public class ScalarOperatorFunctions {
         }
 
         return ConstantOperator.createLargeInt(hash);
+    }
+
+    @ConstantFunction(name = "celonis_xx_hash3_128_nullable", argTypes = {VARCHAR}, returnType = LARGEINT)
+    public static ConstantOperator celonisXXHash3128Nullable(ConstantOperator input) {
+        final var hasher = new XXHASH3128NULLABLE();
+        if (input.isNull()) {
+            return ConstantOperator.createNull(Type.LARGEINT);
+        }
+        return ConstantOperator.createLargeInt(hasher.compute(input.getVarchar()));
     }
 
 }

@@ -91,6 +91,7 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
                 minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
                 maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
+                histogram = projectHistogramThroughHash(histogram, callOperator, columnStatistic, rowCount);
                 break;
             case FunctionSet.CELONIS_ARRAY_COUNT:
             case FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT:
@@ -174,8 +175,10 @@ public class CelonisExpressionStatisticsCalculator {
 
         final var projectedMcvs = new HashMap<String, Long>();
         // Project the NULL MCV
-        projectedMcvs.put(hashFunction.computeNull().toString(),
-                (long) (rowCount * columnStatistic.getNullsFraction()));
+        if (hashFunction.computeNull() != null) {
+            projectedMcvs.put(hashFunction.computeNull().toString(),
+                    (long) (rowCount * columnStatistic.getNullsFraction()));
+        }
 
         if (histogram != null) {
             // Project other (non-null) MCVs
