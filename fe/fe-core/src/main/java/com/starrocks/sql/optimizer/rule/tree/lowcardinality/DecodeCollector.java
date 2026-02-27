@@ -31,6 +31,7 @@ import com.starrocks.catalog.PhysicalPartition;
 import com.starrocks.catalog.StructType;
 import com.starrocks.catalog.Table;
 import com.starrocks.catalog.Type;
+import com.starrocks.common.Config;
 import com.starrocks.common.FeConstants;
 import com.starrocks.common.Pair;
 import com.starrocks.common.util.UnionFind;
@@ -134,7 +135,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.MAX, FunctionSet.MIN);
 
     public static final Set<String> LOW_CARD_STRING_FUNCTIONS =
-            ImmutableSet.of(FunctionSet.APPEND_TRAILING_CHAR_IF_ABSENT, FunctionSet.CONCAT, FunctionSet.CONCAT_WS,
+            Sets.newHashSet(FunctionSet.APPEND_TRAILING_CHAR_IF_ABSENT, FunctionSet.CONCAT, FunctionSet.CONCAT_WS,
                     FunctionSet.HEX, FunctionSet.LEFT, FunctionSet.LIKE, FunctionSet.LOWER, FunctionSet.LPAD,
                     FunctionSet.LTRIM, FunctionSet.REGEXP_EXTRACT, FunctionSet.REGEXP_REPLACE, FunctionSet.REPEAT,
                     FunctionSet.REPLACE, FunctionSet.REVERSE, FunctionSet.RIGHT, FunctionSet.RPAD, FunctionSet.RTRIM,
@@ -142,6 +143,19 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                     FunctionSet.TRIM, FunctionSet.UPPER, FunctionSet.IF, FunctionSet.LENGTH, FunctionSet.CHAR_LENGTH,
                     FunctionSet.COALESCE, FunctionSet.XX_HASH3_64, FunctionSet.XX_HASH3_128, FunctionSet.STR_TO_DATE,
                     FunctionSet.MURMUR_HASH3_32, FunctionSet.IFNULL, FunctionSet.STARTS_WITH, FunctionSet.ENDS_WITH);
+
+    public static final Set<String> CELONIS_LOW_CARD_STRING_FUNCTIONS = ImmutableSet.of(FunctionSet.CELONIS_LOWER,
+            FunctionSet.CELONIS_UPPER, FunctionSet.CELONIS_LIKE, FunctionSet.CELONIS_STRING_TO_DOUBLE,
+            FunctionSet.CELONIS_GREATEST, FunctionSet.CELONIS_XX_HASH3_96, FunctionSet.CELONIS_XX_HASH3_128,
+            FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, FunctionSet.CELONIS_XX_HASH3_128_V2,
+            FunctionSet.CELONIS_XX_HASH3_128_V3, FunctionSet.CELONIS_XX_HASH3_128_V4, FunctionSet.CELONIS_TRANSLATE,
+            FunctionSet.CELONIS_STRING_SPLIT);
+
+    static {
+        if (Config.celonis_enable_scalar_functions_dictification) {
+            LOW_CARD_STRING_FUNCTIONS.addAll(CELONIS_LOW_CARD_STRING_FUNCTIONS);
+        }
+    }
 
     public static final Set<String> LOW_CARD_STRUCT_FUNCTIONS =
             ImmutableSet.of(FunctionSet.NAMED_STRUCT, FunctionSet.STRUCT, FunctionSet.ROW);

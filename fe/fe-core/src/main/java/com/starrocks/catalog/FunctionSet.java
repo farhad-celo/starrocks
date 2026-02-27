@@ -584,6 +584,7 @@ public class FunctionSet {
     public static final String CELONIS_STRING_SPLIT = "celonis_string_split";
     public static final String CELONIS_TRANSLATE = "celonis_translate";
     public static final String CELONIS_TO_DOUBLE = "celonis_to_double";
+    public static final String CELONIS_LIKE = "celonis_like";
 
     // Celonis window functions:
     public static final String CELONIS_MOVING_TRIMMED_MEAN = "celonis_moving_trimmed_mean";
