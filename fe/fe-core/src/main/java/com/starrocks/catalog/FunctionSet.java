@@ -556,6 +556,8 @@ public class FunctionSet {
     public static final String CELONIS_MERGE_SORTED_ARRAYS = "celonis_merge_sorted_arrays";
     public static final String CELONIS_MULTI_IN = "celonis_multi_in";
     public static final String CELONIS_NULL_TO_EMPTY = "celonis_null_to_empty";
+    public static final String CELONIS_PEEK_MERGED_SORTED_ARRAYS = "celonis_peek_merged_sorted_arrays";
+    public static final String CELONIS_QNORM = "celonis_qnorm";
     public static final String CELONIS_TRANSITS_INTERLEAVED = "celonis_transits_interleaved";
     public static final String CELONIS_TRANSITS_MATCH = "celonis_transits_match";
     public static final String CELONIS_TRANSPOSE_ARRAY_OF_STRUCT = "celonis_transpose_array_of_struct";
@@ -570,6 +572,7 @@ public class FunctionSet {
     public static final String CELONIS_IN_JSON_ARRAY = "celonis_in_json_array";
     public static final String CELONIS_ARRAY_BOOL_OR = "celonis_array_bool_or";
     public static final String CELONIS_SQUARE = "celonis_square";
+    public static final String CELONIS_STRING_ARRAY_JOIN = "celonis_string_array_join";
     public static final String CELONIS_UPPER = "celonis_upper";
     public static final String CELONIS_LOWER = "celonis_lower";
     public static final String CELONIS_LTRIM = "celonis_ltrim";

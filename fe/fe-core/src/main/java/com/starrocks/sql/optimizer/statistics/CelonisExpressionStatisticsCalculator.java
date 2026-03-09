@@ -29,6 +29,7 @@ import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashFunction;
+import org.apache.commons.math3.distribution.NormalDistribution;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -131,6 +132,20 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_STRING_TO_INT:
                 averageRowSize = ScalarType.BIGINT.getTypeSize();
                 break;
+            case FunctionSet.CELONIS_QNORM:
+                if (maxValue <= 0 || minValue >= 1) {
+                    // All outputs are NULL since max >= min holds. The BE implementation returns NULL for inputs outside the
+                    // (0,1) interval.
+                    minValue = NEGATIVE_INFINITY;
+                    maxValue = POSITIVE_INFINITY;
+                    nullsFraction = 1.0;
+                    distinctValue = 1;
+                } else {
+                    final var normalDistribution = new NormalDistribution();
+                    minValue = minValue <= 0 ? NEGATIVE_INFINITY : normalDistribution.inverseCumulativeProbability(minValue);
+                    maxValue = maxValue >= 1 ? POSITIVE_INFINITY : normalDistribution.inverseCumulativeProbability(maxValue);
+                }
+                break;
             case FunctionSet.CELONIS_GREATEST:
             case FunctionSet.CELONIS_LEAST:
             case FunctionSet.CELONIS_UPPER:
@@ -215,7 +230,7 @@ public class CelonisExpressionStatisticsCalculator {
             }
         }
 
-        return 1; // default value as fallback
+        return ColumnStatistic.unknown().getAverageRowSize(); // default value as fallback
     }
 
     private static ScalarOperator getChildForCastOperator(ScalarOperator operator) {
@@ -310,6 +325,10 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_LTRIM:
             case FunctionSet.CELONIS_RTRIM:
                 // Use first child statistics
+                break;
+            case FunctionSet.CELONIS_STRING_ARRAY_JOIN:
+                averageRowSize = left.getAverageRowSize() + Math.max(0, left.getCollectionSize() * right.getAverageRowSize());
+                collectionSize = ColumnStatistic.DEFAULT_COLLECTION_SIZE;
                 break;
             case FunctionSet.CELONIS_DECODE_STRING:
                 minValue = NEGATIVE_INFINITY;
@@ -482,6 +501,12 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_TRANSLATE:
                 // use first child statistics.
                 return firstChildStats;
+            case FunctionSet.CELONIS_PEEK_MERGED_SORTED_ARRAYS:
+                final var averageRowSize = estimateAverageRowSizeForItemInArray(callOperator.getChild(0),
+                        firstChildStats.getCollectionSize(), firstChildStats.getAverageRowSize());
+                return ColumnStatistic.builder() //
+                        .setAverageRowSize(averageRowSize) //
+                        .build();
             case FunctionSet.CELONIS_REMAP_VALUES:
             case FunctionSet.CELONIS_REMAP_VALUES_CONST:
                 return celonisRemapValuesCalculate(callOperator.getChildren(), childrenColumnStatistics, inputStatistics,
