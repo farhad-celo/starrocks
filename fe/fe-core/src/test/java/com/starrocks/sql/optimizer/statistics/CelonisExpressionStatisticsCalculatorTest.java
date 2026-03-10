@@ -1234,4 +1234,129 @@ public class CelonisExpressionStatisticsCalculatorTest {
                         hasher.compute("skewString2").toString(), 400L //
                 ));
     }
+    @Test
+    public void testCelonisGreatestLeastFunctionCall() {
+        ColumnRefOperator col1 = new ColumnRefOperator(1, Type.INT, "col1", true);
+        ColumnRefOperator col2 = new ColumnRefOperator(2, Type.INT, "col2", true);
+        ColumnRefOperator col3 = new ColumnRefOperator(3, Type.INT, "col3", true);
+
+        Statistics statistics = Statistics.builder() //
+                .addColumnStatistic(col1, //
+                        ColumnStatistic.builder() //
+                                .setMinValue(10.0) //
+                                .setMaxValue(50.0) //
+                                .setDistinctValuesCount(20) //
+                                .setNullsFraction(0.1) //
+                                .setAverageRowSize(4) //
+                                .build()) //
+                .addColumnStatistic(col2, //
+                        ColumnStatistic.builder() //
+                                .setMinValue(20.0) //
+                                .setMaxValue(70.0) //
+                                .setDistinctValuesCount(30) //
+                                .setNullsFraction(0.2) //
+                                .setAverageRowSize(4) //
+                                .build()) //
+                .addColumnStatistic(col3, //
+                        ColumnStatistic.builder() //
+                                .setMinValue(5.0) //
+                                .setMaxValue(90.0) //
+                                .setDistinctValuesCount(40) //
+                                .setNullsFraction(0.3) //
+                                .setAverageRowSize(4) //
+                                .build()) //
+                .setOutputRowCount(1000.0) //
+                .build();
+
+        // with 1 Column
+        CallOperator greatestCall = new CallOperator(FunctionSet.CELONIS_GREATEST, Type.INT,
+                Lists.newArrayList(col1));
+        ColumnStatistic greatestColumnStatistic = ExpressionStatisticCalculator.calculate(greatestCall, statistics);
+
+        assertEquals(10.0, greatestColumnStatistic.getMinValue(), 0.001);
+        assertEquals(50.0, greatestColumnStatistic.getMaxValue(), 0.001);
+        assertEquals(20.0, greatestColumnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.1, greatestColumnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, greatestColumnStatistic.getAverageRowSize(), 0.001);
+
+        CallOperator leastCall = new CallOperator(FunctionSet.CELONIS_LEAST, Type.INT,
+                Lists.newArrayList(col1));
+        ColumnStatistic leastColumnStatistic = ExpressionStatisticCalculator.calculate(leastCall, statistics);
+
+        assertEquals(10.0, leastColumnStatistic.getMinValue(), 0.001);
+        assertEquals(50.0, leastColumnStatistic.getMaxValue(), 0.001);
+        assertEquals(20.0, leastColumnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.1, leastColumnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, leastColumnStatistic.getAverageRowSize(), 0.001);
+
+        // with 2 Columns
+        greatestCall = new CallOperator(FunctionSet.CELONIS_GREATEST, Type.INT, Lists.newArrayList(col1, col2));
+        greatestColumnStatistic = ExpressionStatisticCalculator.calculate(greatestCall, statistics);
+
+        assertEquals(20.0, greatestColumnStatistic.getMinValue(), 0.001);
+        assertEquals(70.0, greatestColumnStatistic.getMaxValue(), 0.001);
+        assertEquals(50.0, greatestColumnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.1, greatestColumnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, greatestColumnStatistic.getAverageRowSize(), 0.001);
+
+        leastCall = new CallOperator(FunctionSet.CELONIS_LEAST, Type.INT, Lists.newArrayList(col1, col2));
+        leastColumnStatistic = ExpressionStatisticCalculator.calculate(leastCall, statistics);
+
+        assertEquals(10.0, leastColumnStatistic.getMinValue(), 0.001);
+        assertEquals(50.0, leastColumnStatistic.getMaxValue(), 0.001);
+        assertEquals(50.0, leastColumnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.1, leastColumnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, leastColumnStatistic.getAverageRowSize(), 0.001);
+
+        // with 3 Columns
+        greatestCall = new CallOperator(FunctionSet.CELONIS_GREATEST, Type.INT, Lists.newArrayList(col1, col2, col3));
+        greatestColumnStatistic = ExpressionStatisticCalculator.calculate(greatestCall, statistics);
+
+        assertEquals(20.0, greatestColumnStatistic.getMinValue(), 0.001);
+        assertEquals(90.0, greatestColumnStatistic.getMaxValue(), 0.001);
+        assertEquals(90.0, greatestColumnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.1, greatestColumnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, greatestColumnStatistic.getAverageRowSize(), 0.001);
+
+        leastCall = new CallOperator(FunctionSet.CELONIS_LEAST, Type.INT, Lists.newArrayList(col1, col2, col3));
+        leastColumnStatistic = ExpressionStatisticCalculator.calculate(leastCall, statistics);
+
+        assertEquals(5.0, leastColumnStatistic.getMinValue(), 0.001);
+        assertEquals(50.0, leastColumnStatistic.getMaxValue(), 0.001);
+        assertEquals(90.0, leastColumnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.1, leastColumnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, leastColumnStatistic.getAverageRowSize(), 0.001);
+
+        // with string columns
+        ColumnRefOperator stringCol1 = new ColumnRefOperator(10, Type.VARCHAR, "stringCol1", true);
+        ColumnRefOperator stringCol2 = new ColumnRefOperator(11, Type.VARCHAR, "stringCol2", true);
+
+        Statistics stringStatistics = Statistics.builder() //
+                .addColumnStatistic(stringCol1, //
+                        ColumnStatistic.builder() //
+                                .setDistinctValuesCount(20) //
+                                .setNullsFraction(0.1) //
+                                .setAverageRowSize(4) //
+                                .build()) //
+                .addColumnStatistic(stringCol2, //
+                        ColumnStatistic.builder() //
+                                .setDistinctValuesCount(30) //
+                                .setNullsFraction(0.2) //
+                                .setAverageRowSize(100) //
+                                .build()) //
+                .setOutputRowCount(1000.0) //
+                .build();
+
+        greatestCall = new CallOperator(FunctionSet.CELONIS_GREATEST, Type.STRING, Lists.newArrayList(stringCol1, stringCol2));
+        greatestColumnStatistic = ExpressionStatisticCalculator.calculate(greatestCall, stringStatistics);
+
+        assertEquals(52, greatestColumnStatistic.getAverageRowSize(), 0.001);
+
+        leastCall = new CallOperator(FunctionSet.CELONIS_LEAST, Type.STRING, Lists.newArrayList(stringCol1, stringCol2));
+        leastColumnStatistic = ExpressionStatisticCalculator.calculate(leastCall, stringStatistics);
+
+        assertEquals(52, leastColumnStatistic.getAverageRowSize(), 0.001);
+    }
+
+
 }

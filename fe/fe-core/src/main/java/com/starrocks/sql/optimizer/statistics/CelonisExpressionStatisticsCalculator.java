@@ -249,6 +249,40 @@ public class CelonisExpressionStatisticsCalculator {
         return Math.max(left.getMinValue(), right.getMinValue()) <= Math.min(left.getMaxValue(), right.getMaxValue());
     }
 
+    private static ColumnStatistic celonisGreatestLeastCalculate(CallOperator callOperator,
+                                                                 List<ColumnStatistic> childrenColumnStatistics,
+                                                                 double rowCount) {
+        if (childrenColumnStatistics.stream().anyMatch(ColumnStatistic::isUnknown)) {
+            return null;
+        }
+
+        double minValue = callOperator.getFnName().equalsIgnoreCase(FunctionSet.CELONIS_GREATEST) ?
+                childrenColumnStatistics.stream().mapToDouble(ColumnStatistic::getMinValue).max().orElse(NEGATIVE_INFINITY) :
+                childrenColumnStatistics.stream().mapToDouble(ColumnStatistic::getMinValue).min().orElse(NEGATIVE_INFINITY);
+        double maxValue = callOperator.getFnName().equalsIgnoreCase(FunctionSet.CELONIS_GREATEST) ?
+                childrenColumnStatistics.stream().mapToDouble(ColumnStatistic::getMaxValue).max().orElse(POSITIVE_INFINITY) :
+                childrenColumnStatistics.stream().mapToDouble(ColumnStatistic::getMaxValue).min().orElse(POSITIVE_INFINITY);
+        // nulls are only retained if all columns are null.
+        double nullsFraction = childrenColumnStatistics.stream() //
+                .mapToDouble(ColumnStatistic::getNullsFraction) //
+                .min() //
+                .orElse(ColumnStatistic.unknown().getNullsFraction());
+        double distinctValues = Math.min(rowCount,
+                childrenColumnStatistics.stream().mapToDouble(ColumnStatistic::getDistinctValuesCount).sum());
+        double averageRowSize = callOperator.getType().getPrimitiveType().isCharFamily() ?
+                childrenColumnStatistics.stream().mapToDouble(ColumnStatistic::getAverageRowSize).average()
+                        .orElse(callOperator.getType().getTypeSize()) :
+                callOperator.getType().getTypeSize();
+
+        return ColumnStatistic.builder()
+                .setMinValue(minValue)
+                .setMaxValue(maxValue)
+                .setNullsFraction(nullsFraction)
+                .setAverageRowSize(averageRowSize)
+                .setDistinctValuesCount(distinctValues)
+                .build();
+    }
+
     // Deduplicates the mappings to preserve only the last occurrence of each mapped value, because if a value is mapped
     // multiple times, only the last mapping is considered.
     private static Map<ConstantOperator, ConstantOperator> deduplicateMappedValues(List<ScalarOperator> children,
@@ -348,6 +382,9 @@ public class CelonisExpressionStatisticsCalculator {
                 averageRowSize = ScalarType.BIGINT.getTypeSize();
                 collectionSize = ColumnStatistic.DEFAULT_COLLECTION_SIZE;
                 break;
+            case FunctionSet.CELONIS_GREATEST:
+            case FunctionSet.CELONIS_LEAST:
+                return celonisGreatestLeastCalculate(callOperator, List.of(left, right), rowCount);
             default:
                 return null;
         }
@@ -501,6 +538,9 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_TRANSLATE:
                 // use first child statistics.
                 return firstChildStats;
+            case FunctionSet.CELONIS_GREATEST:
+            case FunctionSet.CELONIS_LEAST:
+                return celonisGreatestLeastCalculate(callOperator, childrenColumnStatistics, rowCount);
             case FunctionSet.CELONIS_PEEK_MERGED_SORTED_ARRAYS:
                 final var averageRowSize = estimateAverageRowSizeForItemInArray(callOperator.getChild(0),
                         firstChildStats.getCollectionSize(), firstChildStats.getAverageRowSize());
