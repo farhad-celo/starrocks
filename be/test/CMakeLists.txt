@@ -162,6 +162,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/kmeans_test.cpp
         ./exprs/celonis/agg/mode_test.cpp
         ./exprs/celonis/agg/multi_linear_regression_test.cpp
+        ./exprs/celonis/agg/percentile_disc_test.cpp
         ./exprs/celonis/agg/product_test.cpp
         ./exprs/celonis/agg/top_k_utils_test.cpp
         ./exprs/celonis/agg/sorted_first_last_test.cpp
