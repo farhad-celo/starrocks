@@ -115,7 +115,6 @@ if(STARROCKS_JIT_ENABLE)
 
 endif()
 
-include(celonis/add_celonis_libraries.cmake) # imports the custom Celonis libraries like the CPML
 add_subdirectory(celonis)
 
 set(CELONIS_FILES

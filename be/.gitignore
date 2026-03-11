@@ -4,6 +4,6 @@
 !cmake_modules/
 !src/
 !test/
-!add_celonis_libraries.cmake
+!celonis/
 !CMakeLists.txt
 !extension/

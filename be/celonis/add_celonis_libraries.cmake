@@ -7,6 +7,7 @@ set(CELONIS_PROCESS_MINING_LIBRARY_PATH "${CELONIS_LIBRARIES_DIR_PATH}/lib/libce
 set(CELONIS_TEMPLATE_LIBRARY_PATH "${CELONIS_LIBRARIES_DIR_PATH}/lib/libcelonis-template-library.a")
 
 # Celonis Formatting Library
+message(STATUS "Add 'celonis_formatting_library'")
 add_library(celonis_formatting_library STATIC IMPORTED)
 set_target_properties(celonis_formatting_library PROPERTIES
         IMPORTED_LOCATION "${CELONIS_FORMATTING_LIBRARY_PATH}"
@@ -14,6 +15,7 @@ set_target_properties(celonis_formatting_library PROPERTIES
 )
 
 # Celonis Template Library (CTL)
+message(STATUS "Add 'celonis_template_library'")
 add_library(celonis_template_library STATIC IMPORTED)
 set_target_properties(celonis_template_library PROPERTIES
         IMPORTED_LOCATION "${CELONIS_TEMPLATE_LIBRARY_PATH}"
@@ -21,6 +23,7 @@ set_target_properties(celonis_template_library PROPERTIES
 )
 
 # Celonis Process Mining Library (CPML)
+message(STATUS "Add 'celonis_process_mining_library'")
 add_library(celonis_process_mining_library STATIC IMPORTED)
 set_target_properties(celonis_process_mining_library PROPERTIES
         IMPORTED_LOCATION "${CELONIS_PROCESS_MINING_LIBRARY_PATH}"
