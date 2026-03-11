@@ -1,7 +1,8 @@
 {
     "name": "sr-dev-homcc",
     "build": {
-        "dockerfile": "../../docker/dockerfiles/dev-env-homcc-base/arm/Dockerfile"
+        "dockerfile": "../../docker/dockerfiles/dev-env-homcc-base/arm/Dockerfile",
+        "context": "../../docker/dockerfiles/dev-env-homcc-base/arm"
     },
     "postCreateCommand": "cp .devcontainer/CMakePresets.json be/CMakePresets.json",
     "containerEnv": {
