@@ -1494,7 +1494,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             for (int i = 0; i < collectors.size(); i++) {
                 saveDictExpr(collectors.get(i), scalarOperator.getChild(i));
             }
-            if (scalarOperator instanceof CallOperator && collectors.stream().anyMatch(c -> !c.isConstantRef())) {
+            if (scalarOperator instanceof CallOperator && collectors.stream()
+                    .filter(c -> !c.isConstantRef()).distinct().count() == 1) {
                 CallOperator call = scalarOperator.cast();
                 logUnsupportedFunctionMetric(call.getFnName());
             }
