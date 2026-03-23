@@ -1,0 +1,44 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: celostar-fe
+  title: celostar-fe
+  description: celostar-fe is the FrontEnd of the query engine behind Celostar. FEs are responsible for metadata management, client connection management, query planning, and query scheduling.
+  tags:
+    - celostar
+  annotations:
+    github.com/project-slug: celonis/celostar-starrocks
+    argocd/app-selector: app=celostar-starrocks
+    sonarqube.org/project-key: celonis_celostar-starrocks
+    backstage.io/code-coverage: scm-only
+    backstage.io/techdocs-entity: system:celostar
+    repo-depot.celonis.dev/project-type: JAVA_MAVEN
+    repo-depot.celonis.dev/image-name: celostar-starrocks/fe
+    repo-depot.celonis.dev/dply-release-approval-team: Celostar
+    repo-depot.celonis.dev/workflow-runner-release: runner=64cpu-linux-arm64,image=ubuntu24-full-arm64,disk=large
+  links:
+    - title: Celostar JIRA
+      url: https://celonis.atlassian.net/jira/software/c/projects/CELOSTAR/boards/925
+      icon: dashboard
+      type: jira
+    - title: "#celostar-support"
+      url: https://grid-celonis.enterprise.slack.com/archives/C06P9DZ9FS9
+      icon: group
+      type: slack-channel
+    - title: OpsGenie Oncall group
+      url: https://celonis.app.eu.opsgenie.com/teams/dashboard/b86b4448-2e8c-4ad1-a281-9c858e4e1725/main
+      icon: chat
+      type: opsgenie-team
+    - url: https://www.celonis.dev/docs/default/Component/celostar-wiki/runbooks/
+      title: Runbook
+      icon: dashboard
+      type: runbook
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/celostar
+  tier: "0"
+  system: system:default/celostar
+  dependencyOf:
+    - component:celostar-gateway
+    - component:celostar-be
