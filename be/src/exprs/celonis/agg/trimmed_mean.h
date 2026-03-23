@@ -158,8 +158,29 @@ public:
 
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
                                      ColumnPtr* dst) const override {
-        // Used for streaming aggregation passthrough. Not implemented.
-        throw std::runtime_error("celonis_trimmed_mean: convert_to_serialize_format not supported");
+        DCHECK((*dst)->is_binary());
+        auto* result = down_cast<BinaryColumn*>((*dst).get());
+        Bytes& bytes = result->get_bytes();
+        auto& offsets = result->get_offset();
+
+        // Each row is serialized as: [items_size=1 : 8 bytes][value : sizeof(InputCppType)]
+        constexpr size_t per_row_size = sizeof(size_t) + sizeof(InputCppType);
+        constexpr size_t one = 1;
+
+        const auto* src_column = down_cast<const InputColumnType*>(src[0].get());
+        const auto* src_data = src_column->get_data().data();
+
+        size_t old_size = bytes.size();
+        bytes.resize(old_size + chunk_size * per_row_size);
+        offsets.reserve(offsets.size() + chunk_size);
+
+        uint8_t* cursor = bytes.data() + old_size;
+        for (size_t i = 0; i < chunk_size; i++) {
+            memcpy(cursor, &one, sizeof(size_t));
+            memcpy(cursor + sizeof(size_t), &src_data[i], sizeof(InputCppType));
+            cursor += per_row_size;
+            offsets.emplace_back(old_size + (i + 1) * per_row_size);
+        }
     }
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {

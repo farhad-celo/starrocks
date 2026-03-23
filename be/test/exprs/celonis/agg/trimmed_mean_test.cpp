@@ -452,4 +452,154 @@ TEST_F(CelonisTrimmedMeanTest, invalid_lower_and_upper) {
     ASSERT_EQ(0.0, result_column->get_data()[0]);
 }
 
+TEST_F(CelonisTrimmedMeanTest, convert_to_serialize_format_bigint) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
+
+    auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
+    auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
+
+    const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_BIGINT, TYPE_DOUBLE, false);
+
+    // Build input column with values: 10, 20, 30
+    auto data_column = RunTimeColumnType<TYPE_BIGINT>::create();
+    data_column->append(10);
+    data_column->append(20);
+    data_column->append(30);
+
+    Columns src_columns;
+    src_columns.push_back(data_column);
+
+    // Convert to serialize format (each row becomes an independent serialized state with 1 item)
+    ColumnPtr serde_column = BinaryColumn::create();
+    func->convert_to_serialize_format(local_ctx.get(), src_columns, data_column->size(), &serde_column);
+
+    // Verify: serde_column should have 3 rows, each containing one serialized value
+    ASSERT_EQ(3, serde_column->size());
+
+    // Merge all 3 serialized rows into a single state and finalize
+    auto state = ManagedAggrState::create(ctx, func);
+    for (size_t i = 0; i < 3; i++) {
+        func->merge(local_ctx.get(), serde_column.get(), state->state(), i);
+    }
+
+    auto result_column = RunTimeColumnType<TYPE_DOUBLE>::create();
+    func->finalize_to_column(local_ctx.get(), state->state(), result_column.get());
+    ASSERT_FALSE(local_ctx->has_error());
+    ASSERT_EQ(20.0, result_column->get_data()[0]); // mean(10, 20, 30) = 20
+}
+
+TEST_F(CelonisTrimmedMeanTest, convert_to_serialize_format_double) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
+
+    auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
+    auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
+
+    const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_DOUBLE, TYPE_DOUBLE, false);
+
+    // Build input column with values: 1.5, 2.5, 3.5, 4.5
+    auto data_column = RunTimeColumnType<TYPE_DOUBLE>::create();
+    data_column->append(1.5);
+    data_column->append(2.5);
+    data_column->append(3.5);
+    data_column->append(4.5);
+
+    Columns src_columns;
+    src_columns.push_back(data_column);
+
+    // Convert to serialize format
+    ColumnPtr serde_column = BinaryColumn::create();
+    func->convert_to_serialize_format(local_ctx.get(), src_columns, data_column->size(), &serde_column);
+    ASSERT_EQ(4, serde_column->size());
+
+    // Merge all serialized rows into a single state and finalize
+    auto state = ManagedAggrState::create(ctx, func);
+    for (size_t i = 0; i < 4; i++) {
+        func->merge(local_ctx.get(), serde_column.get(), state->state(), i);
+    }
+
+    auto result_column = RunTimeColumnType<TYPE_DOUBLE>::create();
+    func->finalize_to_column(local_ctx.get(), state->state(), result_column.get());
+    ASSERT_FALSE(local_ctx->has_error());
+    ASSERT_EQ(3.0, result_column->get_data()[0]); // mean(1.5, 2.5, 3.5, 4.5) = 3.0
+}
+
+TEST_F(CelonisTrimmedMeanTest, convert_to_serialize_format_mixed_with_update) {
+    // Test that convert_to_serialize_format output can be merged with update-based state
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DOUBLE));
+    auto local_ctx = create_function_context(std::move(arg_types), return_type);
+
+    auto const_column_lower = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
+    auto const_column_upper = ColumnHelper::create_const_column<TYPE_INT>(0, 1);
+    Columns constant_columns;
+    constant_columns.push_back(nullptr);
+    constant_columns.push_back(const_column_lower);
+    constant_columns.push_back(const_column_upper);
+    local_ctx->set_constant_columns(constant_columns);
+
+    const AggregateFunction* func = get_aggregate_function("celonis_trimmed_mean", TYPE_BIGINT, TYPE_DOUBLE, false);
+
+    // State 1: built via update (values: 10, 20)
+    auto state1 = ManagedAggrState::create(ctx, func);
+    auto data_column1 = RunTimeColumnType<TYPE_BIGINT>::create();
+    data_column1->append(10);
+    data_column1->append(20);
+    auto const_column_lower1 = const_column_lower->clone();
+    auto const_column_upper1 = const_column_upper->clone();
+    std::vector<const Column*> raw_columns1 = {data_column1.get(), const_column_lower1.get(),
+                                               const_column_upper1.get()};
+    func->update_batch_single_state(local_ctx.get(), data_column1->size(), raw_columns1.data(), state1->state());
+
+    // State 2: built via convert_to_serialize_format + merge (values: 30, 40)
+    auto data_column2 = RunTimeColumnType<TYPE_BIGINT>::create();
+    data_column2->append(30);
+    data_column2->append(40);
+    Columns src_columns;
+    src_columns.push_back(data_column2);
+
+    ColumnPtr serde_column2 = BinaryColumn::create();
+    func->convert_to_serialize_format(local_ctx.get(), src_columns, data_column2->size(), &serde_column2);
+
+    // Serialize state1 and merge everything into a final state
+    auto final_state = ManagedAggrState::create(ctx, func);
+
+    // Merge state1 via serialize
+    ColumnPtr serde_column1 = BinaryColumn::create();
+    func->serialize_to_column(local_ctx.get(), state1->state(), serde_column1.get());
+    func->merge(local_ctx.get(), serde_column1.get(), final_state->state(), 0);
+
+    // Merge convert_to_serialize_format rows
+    for (size_t i = 0; i < 2; i++) {
+        func->merge(local_ctx.get(), serde_column2.get(), final_state->state(), i);
+    }
+
+    auto result_column = RunTimeColumnType<TYPE_DOUBLE>::create();
+    func->finalize_to_column(local_ctx.get(), final_state->state(), result_column.get());
+    ASSERT_FALSE(local_ctx->has_error());
+    ASSERT_EQ(25.0, result_column->get_data()[0]); // mean(10, 20, 30, 40) = 25
+}
+
 } // namespace starrocks
