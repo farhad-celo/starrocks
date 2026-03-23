@@ -460,8 +460,27 @@ void ClusterStringsAggregateFunction::serialize_to_column(FunctionContext* ctx, 
 
 void ClusterStringsAggregateFunction::convert_to_serialize_format(FunctionContext* ctx, const Columns& src,
                                                                   size_t chunk_size, ColumnPtr* dst) const {
-    // Used for streaming aggregation. Not implemented.
-    throw std::runtime_error("celonis_cluster_strings: convert_to_serialize_format not supported");
+    auto* column = down_cast<BinaryColumn*>(ColumnHelper::get_data_column((*dst).get()));
+    if ((*dst)->is_nullable()) {
+        auto* nullable = down_cast<NullableColumn*>((*dst).get());
+        nullable->null_column_data().resize(chunk_size, 0);
+    }
+
+    std::vector<const Column*> raw_columns(src.size());
+    for (size_t i = 0; i < src.size(); i++) {
+        raw_columns[i] = src[i].get();
+    }
+
+    for (size_t i = 0; i < chunk_size; i++) {
+        ClusterStringsState state;
+        state.update(ctx, raw_columns.data(), i);
+
+        size_t old_size = column->get_bytes().size();
+        size_t new_size = old_size + state.serialized_size();
+        column->get_bytes().resize(new_size);
+        state.serialize(column->get_bytes().data() + old_size);
+        column->get_offset().emplace_back(new_size);
+    }
 }
 
 void ClusterStringsAggregateFunction::finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,

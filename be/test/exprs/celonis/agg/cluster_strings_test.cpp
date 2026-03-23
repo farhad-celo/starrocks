@@ -453,6 +453,65 @@ TEST_F(CelonisClusterStringsTest, zero_weight_char_not_considered_when_checking_
     Run(strings1, hashes1, strings2, hashes2, 4, "A", 0, expected);
 }
 
+TEST_F(CelonisClusterStringsTest, convert_to_serialize_format) {
+    const AggregateFunction* func = get_aggregate_function("celonis_cluster_strings", TYPE_VARCHAR, TYPE_STRUCT, false);
+
+    // Prepare input columns: [string, hash, edit_threshold, weighted_tokens, token_weight]
+    size_t chunk_size = 3;
+    std::vector<std::optional<std::string>> strings = {"chocolate", "cocolate", std::nullopt};
+    std::vector<int128_t> hashes = {1, 2, 3};
+    int64_t edit_threshold = 2;
+    std::string weighted_tokens = "";
+    int64_t token_weight = 1;
+
+    ColumnPtr string_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    ColumnPtr hash_column = ColumnHelper::create_column(TypeDescriptor(TYPE_LARGEINT), true);
+    for (size_t i = 0; i < chunk_size; ++i) {
+        if (strings[i].has_value()) {
+            string_column->append_datum(Slice(strings[i].value()));
+        } else {
+            string_column->append_nulls(1);
+        }
+        hash_column->append_datum(hashes[i]);
+    }
+
+    Columns src;
+    src.push_back(string_column);
+    src.push_back(hash_column);
+    src.push_back(ColumnHelper::create_const_column<TYPE_BIGINT>(edit_threshold, chunk_size));
+    src.push_back(ColumnHelper::create_const_column<TYPE_VARCHAR>(weighted_tokens, chunk_size));
+    src.push_back(ColumnHelper::create_const_column<TYPE_BIGINT>(token_weight, chunk_size));
+
+    auto local_ctx = get_ctx();
+    std::vector<ColumnPtr> const_columns;
+    for (auto& col : src) {
+        const_columns.push_back(col->is_constant() ? col : nullptr);
+    }
+    local_ctx->set_constant_columns(std::move(const_columns));
+
+    // Call convert_to_serialize_format
+    ColumnPtr dst = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+    func->convert_to_serialize_format(local_ctx.get(), src, chunk_size, &dst);
+
+    // The dst column should have chunk_size rows of serialized data
+    ASSERT_EQ(chunk_size, dst->size());
+
+    // Verify by merging all serialized rows into a single state and finalizing
+    auto merge_ctx = get_ctx();
+    auto state = ManagedAggrState::create(merge_ctx.get(), func);
+    for (size_t i = 0; i < chunk_size; i++) {
+        func->merge(merge_ctx.get(), dst.get(), state->state(), i);
+    }
+
+    auto result = merge_ctx->create_column(merge_ctx->get_return_type(), false);
+    func->finalize_to_column(merge_ctx.get(), state->state(), result.get());
+
+    // Expected: hash 1 -> "chocolate", hash 2 -> "chocolate" (clustered), hash 3 -> null
+    std::vector<std::pair<int128_t, std::optional<std::string>>> expected = {
+            {1, "chocolate"}, {2, "chocolate"}, {3, std::nullopt}};
+    Evaluate(result.get(), expected);
+}
+
 TEST_F(CelonisClusterStringsTest, unicode_weighted_tokens) {
     std::vector<std::optional<std::string>> strings1 = {"\u3082\u3076\u3089", "\u3082\u3077\u3089"};
     std::vector<int128_t> hashes1 = {1, 2};
