@@ -1,6 +1,5 @@
 #pragma once
 
-#include <legacy_embedded_ctl/interval.h>
 #include <numeric>
 #include <ranges>
 #include <vector>
@@ -9,6 +8,8 @@
 
 #include "legacy_embedded_ctl/assert.h"
 #include "legacy_embedded_ctl/conversion.h"
+#include "legacy_embedded_ctl/interval.h"
+#include "modules/common/exceptions.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/column.h"
 #include "modules/memory/const_abstract_column_ptrs_accessor.h"
@@ -131,6 +132,10 @@ struct group_aligned_range {
           break;
         }
       }
+      // next is pointing to the mismatching activity. The range is left inclusive, right exclusive. Therefore we need
+      // to move the pointer one element ahead
+      common::runtime_assert(next < end, "The first mismatch cannot be the end of the interval");
+      ++next;
     }
     begin = next;
     other.end = begin;
