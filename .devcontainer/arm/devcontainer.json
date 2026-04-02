@@ -8,7 +8,7 @@
     "containerEnv": {
         // This is covered by the CMake presets already but still useful to have in case you want to execute build.sh
         "STARROCKS_GCC_HOME": "/usr/",
-        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/lib",
+        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/jemalloc/lib-shared:/var/local/thirdparty/installed/lib",
         "STARROCKS_LINKER": "lld",
         "CMAKE_GENERATOR": "ninja"
     },
@@ -27,7 +27,7 @@
                     {
                         "pattern": "be/{**/test,out/build/**/test}/starrocks_test",
                         "env": {
-                            "LD_LIBRARY_PATH": "${workspaceFolder}/output/be/lib/:/var/local/thirdparty/installed/lib",
+                            "LD_LIBRARY_PATH": "${workspaceFolder}/output/be/lib/:/var/local/thirdparty/installed/jemalloc/lib-shared:/var/local/thirdparty/installed/lib",
                             "STARROCKS_HOME": "${workspaceFolder}",
                             "UDF_RUNTIME_DIR": "${workspaceFolder}"
                         }

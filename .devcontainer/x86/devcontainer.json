@@ -12,7 +12,7 @@
     "containerEnv": {
         // This is covered by the CMake presets already but still useful to have in case you want to execute build.sh
         "STARROCKS_GCC_HOME": "/usr/",
-        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/lib:/usr/lib/jvm/java-17-openjdk-amd64/lib/server",
+        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/jemalloc/lib-shared:/var/local/thirdparty/installed/lib:/usr/lib/jvm/java-17-openjdk-amd64/lib/server",
         "STARROCKS_LINKER": "lld",
         "CMAKE_GENERATOR": "ninja",
         "CMAKE_POLICY_VERSION_MINIMUM": "3.5",

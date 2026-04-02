@@ -32,10 +32,11 @@
             "displayName": "Debug (with tests)",
             "description": "Debug build with tests enabled.",
             "inherits": "default",
-            "binaryDir": "build_Debug",
+            "binaryDir": "build_Debug_Test",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "MAKE_TEST": "ON"
+                "MAKE_TEST": "ON",
+                "STARROCKS_JIT_ENABLE":"ON"
             }
         },
         {
