@@ -17,8 +17,13 @@ ARG ARTIFACTIMAGE=starrocks/artifacts-ubuntu:latest
 FROM debian:12-slim AS package-builder
 WORKDIR /packages
 RUN apt-get update && apt-get download \
-    supervisor nginx mariadb-client netcat-openbsd \
-    binutils openjdk-17-jdk python3 curl vim tree net-tools \
+    supervisor lsb-base \
+    nginx mariadb-client netcat-openbsd \
+    binutils openjdk-17-jdk \
+    python3 python3-minimal python3.11 python3.11-minimal \
+    libpython3-stdlib libpython3.11-stdlib libpython3.11-minimal \
+    python3-pkg-resources \
+    curl vim tree net-tools \
     less tzdata locales && \
     rm -f *systemd* *dbus*
 
@@ -44,8 +49,23 @@ ENV SR_HOME=${DEPLOYDIR}/starrocks
 COPY --from=package-builder /packages/*.deb /tmp/packages/
 
 # Install packages using dpkg (secure base lacks apt-get)
+# Keep broad install tolerant for secure-base package conflicts, then enforce python/supervisor bootstrap.
 RUN dpkg -i /tmp/packages/*.deb || true && \
     dpkg --configure -a || true && \
+    dpkg -i \
+    /tmp/packages/libpython3.11-minimal_*.deb \
+    /tmp/packages/python3.11-minimal_*.deb \
+    /tmp/packages/python3-minimal_*.deb \
+    /tmp/packages/libpython3.11-stdlib_*.deb \
+    /tmp/packages/libpython3-stdlib_*.deb \
+    /tmp/packages/python3.11_*.deb \
+    /tmp/packages/python3_*.deb \
+    /tmp/packages/python3-pkg-resources_*.deb \
+    /tmp/packages/lsb-base_*.deb \
+    /tmp/packages/supervisor_*.deb || true && \
+    dpkg --configure -a || true && \
+    python3 --version && \
+    supervisord --version && \
     rm -rf /tmp/packages
 
 # Configure timezone and locale

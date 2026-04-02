@@ -50,6 +50,24 @@ logerror()
     log_stderr "ERROR $@"
 }
 
+ensure_supervisor_runtime()
+{
+    if ! command -v supervisord >/dev/null 2>&1; then
+        logerror "supervisord is missing. Ensure the allin1 image installs the 'supervisor' package."
+        exit 127
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        logerror "python3 is missing. The allin1 image requires python3 to start supervisord."
+        exit 127
+    fi
+
+    if ! supervisord --version >/dev/null 2>&1; then
+        logerror "supervisord self-check failed. Verify python3 and supervisor package installation."
+        exit 127
+    fi
+}
+
 update_fe_conf_if_run_in_shared_data_mode()
 {
     if [ ! -f $SR_HOME/fe/meta/image/VERSION ]; then
@@ -93,6 +111,7 @@ update_feproxy_config
 # use 127.0.0.1 for all the services, include fe/be
 setup_priority_networks
 update_fe_conf_if_run_in_shared_data_mode
+ensure_supervisor_runtime
 
 # setup supervisor and start
 SUPERVISORD_HOME=$SR_HOME/supervisor
