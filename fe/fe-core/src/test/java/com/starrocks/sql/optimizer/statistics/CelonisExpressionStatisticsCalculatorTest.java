@@ -1359,4 +1359,165 @@ public class CelonisExpressionStatisticsCalculatorTest {
     }
 
 
+
+    private void testCelonisMultiArgHash(String functionName) {
+        // GIVEN
+        final var binaryScenario = binaryTestScenario();
+        var callOperator = new CallOperator(functionName, Type.LARGEINT,
+                Lists.newArrayList(binaryScenario.intColumnRefOperator, binaryScenario.stringColumnRefOperator));
+
+        // WHEN
+        var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, binaryScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(Type.LARGEINT.getTypeSize(), columnStatistic.getAverageRowSize(), 0.001);
+
+        // GIVEN
+        final var multiaryScenario = multiaryTestScenario();
+        callOperator = new CallOperator(functionName, Type.LARGEINT,
+                Lists.newArrayList(multiaryScenario.stringColumnRefOperator,
+                        multiaryScenario.datetimeColumnRefOperator,
+                        multiaryScenario.stringArrayColumnRefOperator));
+
+        // WHEN
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, multiaryScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(Type.LARGEINT.getTypeSize(), columnStatistic.getAverageRowSize(), 0.001);
+
+        // GIVEN
+        final var col1 = new ColumnRefOperator(10, Type.BIGINT, "col1", true);
+        final var col2 = new ColumnRefOperator(11, Type.BIGINT, "col2", true);
+        final var col3 = new ColumnRefOperator(12, Type.BIGINT, "col3", true);
+        final var stats = Statistics.builder()
+                .addColumnStatistic(col1, ColumnStatistic.builder()
+                        .setMinValue(0).setMaxValue(100).setDistinctValuesCount(10)
+                        .setNullsFraction(0.0).setAverageRowSize(8).build())
+                .addColumnStatistic(col2, ColumnStatistic.builder()
+                        .setMinValue(0).setMaxValue(200).setDistinctValuesCount(50)
+                        .setNullsFraction(0.0).setAverageRowSize(8).build())
+                .addColumnStatistic(col3, ColumnStatistic.builder()
+                        .setMinValue(0).setMaxValue(300).setDistinctValuesCount(30)
+                        .setNullsFraction(0.0).setAverageRowSize(8).build())
+                .setOutputRowCount(1000)
+                .build();
+
+        callOperator = new CallOperator(functionName, Type.LARGEINT, Lists.newArrayList(col1, col2));
+        // WHEN
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, stats);
+        // THEN
+        assertEquals(50, columnStatistic.getDistinctValuesCount(), 0.001);
+
+        callOperator = new CallOperator(functionName, Type.LARGEINT, Lists.newArrayList(col1, col2, col3));
+        // WHEN
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, stats);
+        // THEN
+        assertEquals(50, columnStatistic.getDistinctValuesCount(), 0.001);
+    }
+
+    @Test
+    public void testCelonisMultiArgHashXxHash3128() {
+        testCelonisMultiArgHash(FunctionSet.CELONIS_XX_HASH3_128);
+    }
+
+    @Test
+    public void testCelonisMultiArgHashXxHash3128V2() {
+        testCelonisMultiArgHash(FunctionSet.CELONIS_XX_HASH3_128_V2);
+    }
+
+    @Test
+    public void testCelonisMultiArgHashXxHash3128V3() {
+        testCelonisMultiArgHash(FunctionSet.CELONIS_XX_HASH3_128_V3);
+    }
+
+    @Test
+    public void testCelonisMultiArgHashXxHash3128V4() {
+        testCelonisMultiArgHash(FunctionSet.CELONIS_XX_HASH3_128_V4);
+    }
+
+    @Test
+    public void testCelonisMultiArgHashXxHash3128Nullable() {
+        // GIVEN
+        final var binaryScenario = binaryTestScenario();
+        var callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.LARGEINT,
+                Lists.newArrayList(binaryScenario.intColumnRefOperator, binaryScenario.stringColumnRefOperator));
+
+        // WHEN
+        var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, binaryScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        // nullable preserves combined null fraction: 1 - (1-0.2)*(1-0.2) = 0.36
+        assertEquals(0.36, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(Type.LARGEINT.getTypeSize(), columnStatistic.getAverageRowSize(), 0.001);
+
+        // GIVEN
+        final var multiaryScenario = multiaryTestScenario();
+        callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.LARGEINT,
+                Lists.newArrayList(multiaryScenario.stringColumnRefOperator,
+                        multiaryScenario.datetimeColumnRefOperator,
+                        multiaryScenario.stringArrayColumnRefOperator));
+
+        // WHEN
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, multiaryScenario.statistics);
+
+        // THEN
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        // nullable preserves combined null fraction: 1 - (1-0.2)^3 = 0.488
+        assertEquals(0.488, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(Type.LARGEINT.getTypeSize(), columnStatistic.getAverageRowSize(), 0.001);
+
+        // GIVEN
+        // Test NDV = max(children NDVs) with different NDVs
+        final var col1 = new ColumnRefOperator(10, Type.BIGINT, "col1", true);
+        final var col2 = new ColumnRefOperator(11, Type.BIGINT, "col2", true);
+        final var col3 = new ColumnRefOperator(12, Type.BIGINT, "col3", true);
+        final var stats = Statistics.builder()
+                .addColumnStatistic(col1, ColumnStatistic.builder()
+                        .setMinValue(0).setMaxValue(100).setDistinctValuesCount(10)
+                        .setNullsFraction(0.1).setAverageRowSize(8).build())
+                .addColumnStatistic(col2, ColumnStatistic.builder()
+                        .setMinValue(0).setMaxValue(200).setDistinctValuesCount(50)
+                        .setNullsFraction(0.05).setAverageRowSize(8).build())
+                .addColumnStatistic(col3, ColumnStatistic.builder()
+                        .setMinValue(0).setMaxValue(300).setDistinctValuesCount(30)
+                        .setNullsFraction(0.0).setAverageRowSize(8).build())
+                .setOutputRowCount(1000)
+                .build();
+
+        // Binary: NDV = max(10, 50) = 50, nullsFraction = 1 - (1-0.1)*(1-0.05) = 0.145
+        callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.LARGEINT,
+                Lists.newArrayList(col1, col2));
+
+        // WHEN
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, stats);
+
+        // THEN
+        assertEquals(50, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.145, columnStatistic.getNullsFraction(), 0.001);
+
+        // GIVEN
+        // Multiary: NDV = max(10, 50, 30) = 50, nullsFraction = 1 - (1-0.1)*(1-0.05)*(1-0.0) = 0.145
+        callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, Type.LARGEINT,
+                Lists.newArrayList(col1, col2, col3));
+
+        // WHEN
+        columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, stats);
+
+        // THEN
+        assertEquals(50, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.145, columnStatistic.getNullsFraction(), 0.001);
+    }
 }

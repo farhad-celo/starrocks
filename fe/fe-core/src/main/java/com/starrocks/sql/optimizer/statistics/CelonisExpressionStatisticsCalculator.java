@@ -385,6 +385,18 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_GREATEST:
             case FunctionSet.CELONIS_LEAST:
                 return celonisGreatestLeastCalculate(callOperator, List.of(left, right), rowCount);
+            case FunctionSet.CELONIS_XX_HASH3_128:
+            case FunctionSet.CELONIS_XX_HASH3_128_V2:
+            case FunctionSet.CELONIS_XX_HASH3_128_V3:
+            case FunctionSet.CELONIS_XX_HASH3_128_V4:
+                return calculateNonNullableCelonisHashStats(callOperator, List.of(left, right), rowCount);
+            case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
+                minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
+                maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
+                distinctValues = Math.min(rowCount, Math.max(left.getDistinctValuesCount(), right.getDistinctValuesCount()));
+                averageRowSize = callOperator.getType().getTypeSize();
+                collectionSize = ColumnStatistic.DEFAULT_COLLECTION_SIZE;
+                break;
             default:
                 return null;
         }
@@ -554,8 +566,55 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_PATINDEX:
                 // Re-use binary implementation since third argument does not change stats.
                 return binaryExpressionCalculate(callOperator, firstChildStats, secondChildStats, rowCount);
+            case FunctionSet.CELONIS_XX_HASH3_128:
+            case FunctionSet.CELONIS_XX_HASH3_128_V2:
+            case FunctionSet.CELONIS_XX_HASH3_128_V3:
+            case FunctionSet.CELONIS_XX_HASH3_128_V4:
+                return calculateNonNullableCelonisHashStats(callOperator, childrenColumnStatistics, rowCount);
+            case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE: {
+                if (childrenColumnStatistics.stream().anyMatch(ColumnStatistic::isUnknown)) {
+                    return null;
+                }
+
+                double maxNdv = childrenColumnStatistics.stream() //
+                        .mapToDouble(ColumnStatistic::getDistinctValuesCount) //
+                        .max() //
+                        .orElse(ColumnStatistic.unknown().getDistinctValuesCount());
+                // Probability of at least one child being NULL
+                double combinedNullsFraction = 1.0 - childrenColumnStatistics.stream() //
+                        .mapToDouble(childStat -> 1.0 - childStat.getNullsFraction()) //
+                        .reduce(1.0, (firstNullFraction, secondNullFraction) -> firstNullFraction * secondNullFraction);
+                return ColumnStatistic.builder() //
+                        .setMinValue(LargeIntLiteral.LARGE_INT_MIN.doubleValue()) //
+                        .setMaxValue(LargeIntLiteral.LARGE_INT_MAX.doubleValue()) //
+                        .setNullsFraction(combinedNullsFraction) //
+                        .setAverageRowSize(callOperator.getType().getTypeSize()) //
+                        .setDistinctValuesCount(Math.min(rowCount, maxNdv)) //
+                        .build();
+            }
             default:
                 return null;
         }
+    }
+
+
+    private static ColumnStatistic calculateNonNullableCelonisHashStats(CallOperator callOperator,
+                                                                        List<ColumnStatistic> childrenColumnStatistics,
+                                                                        double rowCount) {
+        if (childrenColumnStatistics.stream().anyMatch(ColumnStatistic::isUnknown)) {
+            return null;
+        }
+
+        double maxNdv = childrenColumnStatistics.stream() //
+                .mapToDouble(ColumnStatistic::getDistinctValuesCount) //
+                .max() //
+                .orElse(ColumnStatistic.unknown().getDistinctValuesCount());
+        return ColumnStatistic.builder() //
+                .setMinValue(LargeIntLiteral.LARGE_INT_MIN.doubleValue()) //
+                .setMaxValue(LargeIntLiteral.LARGE_INT_MAX.doubleValue()) //
+                .setNullsFraction(0.0) //
+                .setAverageRowSize(callOperator.getType().getTypeSize()) //
+                .setDistinctValuesCount(Math.min(rowCount, maxNdv)) //
+                .build();
     }
 }
