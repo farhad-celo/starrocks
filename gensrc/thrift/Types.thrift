@@ -324,6 +324,9 @@ struct TAggregateFunction {
   // independent of is_asc_order.
   13: optional list<bool> nulls_first
   14: optional bool is_distinct = false
+
+  // Celonis specific fields
+  30001: optional list<i16> multi_array_agg_column_serialization_size;
 }
 
 struct TTableFunction {
