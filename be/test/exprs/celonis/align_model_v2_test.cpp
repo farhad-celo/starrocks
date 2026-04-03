@@ -8,7 +8,9 @@
 #include "column/array_column.h"
 #include "column/column_helper.h"
 #include "column/struct_column.h"
-#include "exprs/anyval_util.h"
+#include "exprs/celonis/anyval_util.h"
+#include "json_model_creator.h"
+#include "modules/query/operators.pb.h"
 #include "runtime/mem_pool.h"
 #include "testutil/assert.h"
 #include "testutil/function_utils.h"
@@ -21,9 +23,11 @@ namespace starrocks {
 class CelonisAlignModelV2Test : public testing::Test {
 protected:
     CelonisAlignModelV2Test()
-            : arg_types_{{TypeDescriptor::from_logical_type(TYPE_ARRAY),
-                          TypeDescriptor::from_logical_type(TYPE_VARCHAR)}},
-              return_type_(TypeDescriptor::from_logical_type(TYPE_STRUCT)) {
+            : arg_types_{{CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
+                          CelonisAnyValUtil::column_type_to_type_desc(
+                                  TypeDescriptor::from_logical_type(TYPE_VARCHAR))}},
+              return_type_(
+                      CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))) {
         // Initialize the struct type descriptor properly
         auto struct_desc = TypeDescriptor::from_logical_type(TYPE_STRUCT);
         struct_desc.children = {celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),
@@ -98,7 +102,7 @@ protected:
                                    "unmapped_edge_model_vertex_id",
                                    "unmapped_edge_model_type",
                                    "unmapped_edge_vertex_label"};
-        return_type_ = struct_desc;
+        return_type_ = CelonisAnyValUtil::column_type_to_type_desc(struct_desc);
     }
 
     void SetUp() override {}
@@ -129,8 +133,10 @@ private:
     static const ResultMap PARALLEL_MODEL_RESULTS;
     static const ResultMap LOOP_MODEL_RESULTS;
 
-    FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR = celonis::array_type(TYPE_VARCHAR);
-    FunctionContext::TypeDesc TYPEDESC_ARRAY_BIGINT = celonis::array_type(TYPE_BIGINT);
+    FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR =
+            CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_VARCHAR));
+    FunctionContext::TypeDesc TYPEDESC_ARRAY_BIGINT =
+            CelonisAnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT));
 
     class Evaluator {
     public:
@@ -278,6 +284,43 @@ private:
         const StructColumn* st = down_cast<const StructColumn*>(result.get());
         Evaluator evaluator(*st, expected, return_type_);
         evaluator.evaluate();
+    }
+
+    void RunAndExpectError(const VariantRows& variant_rows, const std::string& bpmn_model_description_json,
+                           const std::optional<TStatusCode::type> optional_expected_status = std::nullopt,
+                           const std::optional<std::string> optional_expected_error_message = std::nullopt) {
+        auto variants = build_variant_column(variant_rows);
+        auto model_column =
+                ColumnHelper::create_const_column<TYPE_VARCHAR>(bpmn_model_description_json, variant_rows.size());
+
+        Columns columns;
+        columns.push_back(variants);
+        columns.push_back(model_column);
+
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types_), return_type_));
+        ctx->set_constant_columns(columns);
+
+        DeferOp close_fragment_local(
+                [&ctx] { CelonisAlignModelV2::align_model_v2_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL); });
+        ASSERT_OK(CelonisAlignModelV2::align_model_v2_prepare(ctx.get(),
+                                                              FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+        DeferOp close_thread_local(
+                [&ctx] { CelonisAlignModelV2::align_model_v2_close(ctx.get(), FunctionContext::THREAD_LOCAL); });
+        ASSERT_OK(CelonisAlignModelV2::align_model_v2_prepare(ctx.get(),
+                                                              FunctionContext::FunctionStateScope::THREAD_LOCAL));
+
+        const auto status{CelonisAlignModelV2::align_model_v2(ctx.get(), columns)};
+
+        ASSERT_FALSE(status.ok());
+
+        if (optional_expected_status.has_value()) {
+            ASSERT_EQ(optional_expected_status.value(), status.status().code());
+        }
+
+        if (optional_expected_error_message.has_value()) {
+            const auto error_msg{status.status().message()};
+            ASSERT_TRUE(error_msg.find(optional_expected_error_message.value()) != std::string_view::npos);
+        }
     }
 
     std::vector<FunctionContext::TypeDesc> arg_types_;
@@ -1049,6 +1092,63 @@ TEST_F(CelonisAlignModelV2Test, Concurrency) {
     for (auto& t : threads) {
         t.join();
     }
+}
+
+/// https://celonis.atlassian.net/browse/PMT-3003
+[[nodiscard]] std::string make_unsound_model_from_PMT_3003() {
+    using enum ::celonis::accelerator::BpmnModelDescription_BpmnNode_BpmnNodeType;
+    auto json_model_creator{JsonModelCreator<::celonis::accelerator::BpmnModelDescription>{}};
+    json_model_creator.add_node(0, BpmnModelDescription_BpmnNode_BpmnNodeType_START);
+    json_model_creator.add_node(1, BpmnModelDescription_BpmnNode_BpmnNodeType_END);
+    json_model_creator.add_node(2, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "A");
+    json_model_creator.add_node(3, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "B");
+    json_model_creator.add_node(4, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "C");
+    json_model_creator.add_node(5, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "D");
+    json_model_creator.add_node(6, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "E");
+    json_model_creator.add_node(7, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "F");
+    json_model_creator.add_node(8, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "G");
+    json_model_creator.add_node(9, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "H");
+    json_model_creator.add_node(10, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "I");
+    json_model_creator.add_node(11, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE);
+    json_model_creator.add_node(12, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE);
+    json_model_creator.add_node(13, BpmnModelDescription_BpmnNode_BpmnNodeType_PARALLEL);
+    json_model_creator.add_node(14, BpmnModelDescription_BpmnNode_BpmnNodeType_PARALLEL);
+    json_model_creator.add_node(15, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE);
+    json_model_creator.add_node(16, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE);
+    json_model_creator.add_node(17, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE);
+    json_model_creator.add_node(18, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE);
+    json_model_creator.add_edge(0, 4);
+    json_model_creator.add_edge(2, 16);
+    json_model_creator.add_edge(3, 9);
+    json_model_creator.add_edge(4, 14);
+    json_model_creator.add_edge(5, 11);
+    json_model_creator.add_edge(6, 13);
+    json_model_creator.add_edge(7, 1);
+    json_model_creator.add_edge(9, 5);
+    json_model_creator.add_edge(10, 18);
+    json_model_creator.add_edge(11, 12);
+    json_model_creator.add_edge(11, 17);
+    json_model_creator.add_edge(12, 15);
+    json_model_creator.add_edge(13, 3);
+    json_model_creator.add_edge(14, 6);
+    json_model_creator.add_edge(14, 8);
+    json_model_creator.add_edge(15, 2);
+    json_model_creator.add_edge(15, 16);
+    json_model_creator.add_edge(16, 7);
+    json_model_creator.add_edge(17, 10);
+    json_model_creator.add_edge(17, 18);
+    json_model_creator.add_edge(18, 12);
+    json_model_creator.add_edge(8, 12); // [8, 13] would be correct
+    return json_model_creator.build();
+}
+
+TEST_F(CelonisAlignModelV2Test, PMT3003_UnsoundModelShouldNotCrashTheBE) {
+    // GIVEN
+    const auto unsound_bpmn_json_string{make_unsound_model_from_PMT_3003()};
+
+    // WHEN - THEN
+    RunAndExpectError({}, unsound_bpmn_json_string, TStatusCode::INVALID_ARGUMENT,
+                      "CPML invalid argument error during CREATE_ALIGNMENT execution");
 }
 
 } // namespace starrocks

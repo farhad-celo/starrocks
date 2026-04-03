@@ -4,10 +4,12 @@
 
 #include <google/protobuf/util/json_util.h>
 
+#include <cpml/exception.h>
 #include <ctl/assert.h>
 
 #include "common/status.h"
 #include "exprs/celonis/result_table.h"
+#include "exprs/celonis/utils/exception_remapping.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/cube/ccmm/ccmm_manager.h"
@@ -125,11 +127,13 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
       starrocks::celonis::bpmn_model_description::from_proto(bpmn_model_description),
       settings};
 
-  common::execution_context context;
-  auto tables = align_model(context);
-  result_table_ = std::move(tables.at("align_model"));
-
-  return Status::OK();
+  return starrocks::celonis::execute_and_return_status(
+      [&] {
+        common::execution_context context{};
+        auto tables{align_model(context)};
+        result_table_ = std::move(tables.at("align_model"));
+      },
+      get_user_visible_operator_name(settings.get_version()));
 }
 
 }  // namespace celonis::accelerator::operators::process::align_model
