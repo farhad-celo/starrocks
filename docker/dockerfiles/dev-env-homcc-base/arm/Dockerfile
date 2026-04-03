@@ -6,6 +6,9 @@ RUN apt update && apt install -y ./homcc_arm.deb
 COPY hosts /etc/homcc/hosts
 ENV HOMCC_DOCKER_CONTAINER=sr-dev
 
+# Install dependencies for StarRocks E2E tests
+RUN apt-get update && apt-get install -y pip mysql-client
+
 # Some more convenient dev tooling
 RUN apt install -y lldb ninja-build clang-format htop
 

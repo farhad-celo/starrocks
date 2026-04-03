@@ -9,11 +9,15 @@ ENV HOMCC_DOCKER_CONTAINER=sr-dev
 # Create .gdbinit to make breakpoints work
 COPY .gdbinit /root/.gdbinit
 
-# Install OpenJDK
-RUN apt-get install -y --no-install-recommends openjdk-17-jre-headless
-
-# Some more convenient dev tooling
-RUN apt-get install -y lldb ninja-build clang-format htop
+# Install OpenJDK, pip, and some convenient dev tooling
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
+    pip \
+    mysql-client \
+    lldb \
+    ninja-build \
+    clang-format \
+    htop
 
 # Set up ccache
 ENV CCACHE_PREFIX=homcc
