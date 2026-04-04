@@ -203,6 +203,9 @@ void AggregatorParams::init() {
                     agg_fn_types[i].is_asc_order = fn.aggregate_fn.is_asc_order;
                     agg_fn_types[i].nulls_first = fn.aggregate_fn.nulls_first;
                 }
+                if (fn.name.function_name == "multi_array_agg") {
+                    agg_fn_types[i].multi_array_agg_column_serialization_size = fn.aggregate_fn.multi_array_agg_column_serialization_size.empty() ? std::vector<int16_t>(agg_fn_types[i].arg_typedescs.size(), 0) : fn.aggregate_fn.multi_array_agg_column_serialization_size;
+                }
             } else if (celonis_is_returning_multiple_rows(fn.name.function_name)) {
                 // Aggregation functions that produce multiple rows will output zero rows when their input is empty.
                 agg_fn_types[i].is_nullable = false;
@@ -511,6 +514,9 @@ Status Aggregator::prepare(RuntimeState* state, ObjectPool* pool, RuntimeProfile
         _agg_fn_ctxs[i] =
                 FunctionContext::create_context(state, _mem_pool.get(), return_type, arg_types, agg_fn_type.is_distinct,
                                                 agg_fn_type.is_asc_order, agg_fn_type.nulls_first);
+        if (!agg_fn_type.multi_array_agg_column_serialization_size.empty()) {
+            _agg_fn_ctxs[i]->set_multi_array_agg_column_serialization_size(agg_fn_type.multi_array_agg_column_serialization_size);
+        }
         if (state->query_options().__isset.group_concat_max_len) {
             _agg_fn_ctxs[i]->set_group_concat_max_len(state->query_options().group_concat_max_len);
         }
@@ -550,7 +556,7 @@ Status Aggregator::_create_aggregate_function(starrocks::RuntimeState* state, co
     }
 
     // check whether it's _merge/_union combinator if it contains agg state type
-    auto& func_name = fn.name.function_name;
+    std::string func_name = fn.name.function_name;
     if (fn.__isset.agg_state_desc) {
         if (arg_types.size() != 1) {
             return Status::InternalError(strings::Substitute("Invalid agg function plan: $0 with (arg type $1)",
@@ -597,6 +603,9 @@ Status Aggregator::_create_aggregate_function(starrocks::RuntimeState* state, co
             TypeDescriptor serde_type = TypeDescriptor::from_thrift(fn.aggregate_fn.intermediate_type);
             DCHECK_LE(1, fn.arg_types.size());
             TypeDescriptor arg_type = arg_types[0];
+            if (func_name == "multi_array_agg" && serde_type.is_string_type()) {
+                func_name = "multi_array_agg_v2";
+            }
             auto* func = get_aggregate_function(func_name, return_type, arg_types, is_result_nullable, fn.binary_type,
                                                 state->func_version());
             if (func == nullptr) {

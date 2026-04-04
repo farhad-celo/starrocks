@@ -108,11 +108,13 @@ public:
     std::vector<bool> get_is_asc_order() { return _is_asc_order; }
     std::vector<bool> get_nulls_first() { return _nulls_first; }
     bool get_is_distinct() { return _is_distinct; }
+    const std::vector<int16_t>& get_multi_array_agg_column_serialization_size() { return _multi_array_agg_column_serialization_size; }
     // for tests
     void set_is_asc_order(const std::vector<bool>& order) { _is_asc_order = order; }
     void set_nulls_first(const std::vector<bool>& nulls) { _nulls_first = nulls; }
     void set_runtime_state(RuntimeState* const state) { _state = state; }
     void set_is_distinct(bool is_distinct) { _is_distinct = is_distinct; }
+    void set_multi_array_agg_column_serialization_size(const std::vector<int16_t>& sizes) { _multi_array_agg_column_serialization_size = sizes; }
 
     // Returns _constant_columns size
     int get_num_constant_columns() const;
@@ -139,6 +141,7 @@ public:
     // on it. This context has additional debugging validation enabled.
     static FunctionContext* create_test_context();
     static FunctionContext* create_test_context(std::vector<TypeDesc>&& arg_types, const TypeDesc& return_type);
+    static FunctionContext* create_test_context(MemPool* mem_pool, std::vector<TypeDesc>&& arg_types, const TypeDesc& return_type);
 
     /// Returns a new FunctionContext with the same constant args, fragment-local state, and
     /// debug flag as this FunctionContext. The caller is responsible for calling delete on
@@ -226,6 +229,7 @@ private:
 
     std::vector<bool> _is_asc_order;
     std::vector<bool> _nulls_first;
+    std::vector<int16_t> _multi_array_agg_column_serialization_size;
     bool _is_distinct = false;
     ssize_t group_concat_max_len = 1024;
     ssize_t _max_array_length = 0;

@@ -76,6 +76,14 @@ FunctionContext* FunctionContext::create_test_context(std::vector<TypeDesc>&& ar
     return context;
 }
 
+FunctionContext* FunctionContext::create_test_context(MemPool* mem_pool, std::vector<TypeDesc>&& arg_types, const TypeDesc& return_type) {
+    FunctionContext* context = FunctionContext::create_test_context();
+    context->_arg_types = std::move(arg_types);
+    context->_return_type = return_type;
+    context->_mem_pool = mem_pool;
+    return context;
+}
+
 FunctionContext::FunctionContext() = default;
 FunctionContext::~FunctionContext() = default;
 

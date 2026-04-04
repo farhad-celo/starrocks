@@ -2938,4 +2938,105 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_multiple_long_agg_cols) {
     config::multi_array_agg_serialization_threshold = multi_array_agg_serialization_threshold;
 }
 
+TEST_F(CelonisAggregateTest, test_multi_array_agg_v2) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+
+    auto return_type =
+            CelonisAnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    MemPool mem_pool;
+    std::unique_ptr<FunctionContext> local_ctx(
+            FunctionContext::create_test_context(&mem_pool, std::move(arg_types), return_type));
+    std::vector<bool> is_asc_order{false};
+    std::vector<bool> nulls_first{true};
+    local_ctx->set_is_asc_order(is_asc_order);
+    local_ctx->set_nulls_first(nulls_first);
+    local_ctx->set_runtime_state(runtime_state.get());
+    local_ctx->set_multi_array_agg_column_serialization_size({0, 0, 0});
+
+    const AggregateFunction* array_agg_func =
+            get_aggregate_function("multi_array_agg_v2", TYPE_VARCHAR, TYPE_STRUCT, false);
+    auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+
+    auto char_type = TypeDescriptor::create_varchar_type(30);
+    ColumnPtr char_column_1 = ColumnHelper::create_column(char_type, true);
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("A");
+    char_column_1->append_datum("B");
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("C");
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("D");
+    char_column_1->append_datum("E");
+    char_column_1->append_datum(Datum());
+    char_column_1->append_datum("F");
+    char_column_1->append_datum("G");
+
+    ColumnPtr char_column_2 = ColumnHelper::create_column(char_type, true);
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("a");
+    char_column_2->append_datum("b");
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("c");
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("d");
+    char_column_2->append_datum("e");
+    char_column_2->append_datum(Datum());
+    char_column_2->append_datum("f");
+    char_column_2->append_datum("g");
+
+    auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
+    ColumnPtr int_column = ColumnHelper::create_column(int_type, true);
+    int_column->append_datum(Datum());
+    int_column->append_datum(1);
+    int_column->append_datum(9);
+    int_column->append_datum(2);
+    int_column->append_datum(3);
+    int_column->append_datum(8);
+    int_column->append_datum(4);
+    int_column->append_datum(10);
+    int_column->append_datum(5);
+    int_column->append_datum(6);
+    int_column->append_datum(7);
+
+    std::vector<const Column*> raw_columns;
+    std::vector<ColumnPtr> columns;
+    columns.push_back(char_column_1);
+    columns.push_back(char_column_2);
+    columns.push_back(int_column);
+    raw_columns.resize(3);
+    raw_columns[0] = char_column_1.get();
+    raw_columns[1] = char_column_2.get();
+    raw_columns[2] = int_column.get();
+
+    // test update
+    array_agg_func->update_batch_single_state(local_ctx.get(), int_column->size(), raw_columns.data(), state->state());
+
+    ColumnPtr serialized_col = ColumnHelper::create_column(TypeDescriptor(LogicalType::TYPE_VARBINARY), true);
+    array_agg_func->serialize_to_column(local_ctx.get(), state->state(), serialized_col.get());
+
+    state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+    array_agg_func->merge_batch_single_state(local_ctx.get(), state->state(), serialized_col.get(), 0,
+                                             serialized_col->size());
+    ColumnPtr res_col = ColumnHelper::create_column(logical_types_to_struct_type({TYPE_VARCHAR, TYPE_VARCHAR}), true);
+    array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
+    EXPECT_EQ(res_col->debug_string(),
+              "[{col0:[NULL,'E','B',NULL,'G','F',NULL,'D','C',NULL,'A'],col1:[NULL,'e','b',NULL,'g','f',NULL,'d'"
+              ",'c',NULL,'a']}]");
+
+    state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+    serialized_col->resize(0);
+    array_agg_func->convert_to_serialize_format(local_ctx.get(), columns, int_column->size(), &serialized_col);
+    array_agg_func->merge_batch_single_state(local_ctx.get(), state->state(), serialized_col.get(), 0,
+                                             serialized_col->size());
+    res_col->resize(0);
+    array_agg_func->finalize_to_column(local_ctx.get(), state->state(), res_col.get());
+    EXPECT_EQ(res_col->debug_string(),
+              "[{col0:[NULL,'E','B',NULL,'G','F',NULL,'D','C',NULL,'A'],col1:[NULL,'e','b',NULL,'g','f',NULL,'d'"
+              ",'c',NULL,'a']}]");
+}
+
 } // namespace starrocks

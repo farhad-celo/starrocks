@@ -139,6 +139,7 @@ struct AggFunctionTypes {
     // hold order-by info
     std::vector<bool> is_asc_order;
     std::vector<bool> nulls_first;
+    std::vector<int16_t> multi_array_agg_column_serialization_size;
 
     bool is_distinct = false;
     bool is_always_nullable_result = false;
