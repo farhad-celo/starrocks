@@ -491,4 +491,41 @@ TEST(JSONToModelCreatorTest, TestingPARALLELMODELsCreationWithIncorrectJSON) {
             celonis::details::transform_to_bpmn_graph(celonis::details::transform_to_proto_bpmn(json_model).value()));
 }
 
+/// https://celonis.atlassian.net/browse/PMT-3003
+[[nodiscard]] celonis::bpmn_model_description make_unsound_model_from_PMT_3003() {
+    using enum ::celonis::accelerator::BpmnModelDescription_BpmnNode_BpmnNodeType;
+    const std::vector<NodeType> nodes{{0, BpmnModelDescription_BpmnNode_BpmnNodeType_START, ""},
+                                      {1, BpmnModelDescription_BpmnNode_BpmnNodeType_END, ""},
+                                      {2, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "A"},
+                                      {3, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "B"},
+                                      {4, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "C"},
+                                      {5, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "D"},
+                                      {6, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "E"},
+                                      {7, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "F"},
+                                      {8, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "G"},
+                                      {9, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "H"},
+                                      {10, BpmnModelDescription_BpmnNode_BpmnNodeType_TASK, "I"},
+                                      {11, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE, ""},
+                                      {12, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE, ""},
+                                      {13, BpmnModelDescription_BpmnNode_BpmnNodeType_PARALLEL, ""},
+                                      {14, BpmnModelDescription_BpmnNode_BpmnNodeType_PARALLEL, ""},
+                                      {15, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE, ""},
+                                      {16, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE, ""},
+                                      {17, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE, ""},
+                                      {18, BpmnModelDescription_BpmnNode_BpmnNodeType_EXCLUSIVE_CHOICE, ""}};
+    const std::vector<EdgeType> edges{
+            {0, 4},   {2, 16},  {3, 9},   {4, 14},  {5, 11},  {6, 13}, {7, 1},  {9, 5},
+            {10, 18}, {11, 12}, {11, 17}, {12, 15}, {13, 3},  {14, 6}, {14, 8}, {15, 2},
+            {15, 16}, {16, 7},  {17, 10}, {17, 18}, {18, 12}, {8, 13} /* [8, 12] would be correct here */};
+    return celonis::bpmn_model_description{create_model_description(nodes, edges)};
+}
+
+TEST(JSONToModelCreatorTest, PMT3003_UnsoundModelTransformation) {
+    // GIVEN
+    const auto unsound_bpmn_proto{make_unsound_model_from_PMT_3003()};
+
+    // WHEN - THEN (N.B.: In the future we might throw in the CPML; in that case, we should revisit the SR code paths)
+    ASSERT_NO_THROW(celonis::details::transform_to_bpmn_graph(unsound_bpmn_proto));
+}
+
 } // namespace starrocks

@@ -98,6 +98,8 @@ std::pair<cpml::model::bpmn_graph, bpmn_to_string_t> convert_from_proto_and_crea
                                        ctl::cast<cpml::model::bpmn::vertex_id_type>(proto_edge.to())};
     });
 
+    // N.B.: This does not do the full set of BPMN correctness checks. Just because we return a BPMN model here does not
+    // mean that it is actually correct/valid.
     return {cpml::model::bpmn_graph::constraint_checked_bpmn_graph(vertices, std::move(edges)),
             std::move(bpmn_to_string)};
 }
