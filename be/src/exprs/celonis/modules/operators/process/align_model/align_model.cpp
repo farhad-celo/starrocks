@@ -418,22 +418,17 @@ replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_gra
         return std::nullopt;
       }};
 
-  const auto optional_error_state{sr_glue_code::non_throwing_tbb_parallel_for(
-      tbb::blocked_range<size_t>{0, alignments.size()},
-      [&replay_results, &bpmn_graphs, &alignments = std::as_const(alignments),
-       &replay_result_fn = std::as_const(replay_result_fn)](const auto& range) {
-        const auto& bpmn_graph{bpmn_graphs.local()};
-        for (size_t index{range.begin()}; index < range.end(); ++index) {
-          const auto& aligned_variant{alignments.at(index)};
-          replay_results.at(index) = replay_result_fn(bpmn_graph, aligned_variant);
-        }
-      })};
-
-  if (optional_error_state.has_value()) {
-    throw common::internal_exception{
-        "ALIGN_MODEL - Error within parallel replay: {} (a total of {} errors within loop).",
-        optional_error_state->error_msg, optional_error_state->number_of_errors};
-  }
+  sr_glue_code::non_throwing_tbb_parallel_for(tbb::blocked_range<size_t>{0, alignments.size()},
+                                              [&replay_results, &bpmn_graphs, &alignments = std::as_const(alignments),
+                                               &replay_result_fn = std::as_const(replay_result_fn)](const auto& range) {
+                                                const auto& bpmn_graph{bpmn_graphs.local()};
+                                                for (size_t index{range.begin()}; index < range.end(); ++index) {
+                                                  const auto& aligned_variant{alignments.at(index)};
+                                                  replay_results.at(index) =
+                                                      replay_result_fn(bpmn_graph, aligned_variant);
+                                                }
+                                              })
+      .log_and_rethrow_if_has_error("ALIGN_MODEL - Error within parallel replay");
 
   return replay_results;
 }

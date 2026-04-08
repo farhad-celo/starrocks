@@ -243,7 +243,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
 
   // Create the data columns for the 3 tables and the corresponding join vectors:
   // Activity(1) -> (N) Alignment (1) -> (N) Association (N) -> (1) Edge Class
-  const auto optional_error_state{sr_glue_code::non_throwing_tbb_parallel_for_each(
+  sr_glue_code::non_throwing_tbb_parallel_for_each(
       blocks,
       // It is safe to fill blocks of the `storage` data in parallel
       [&alignment_model_vertex_id, &alignment_vertex_label, &alignment_move_type, &alignment_deviation_category,
@@ -347,13 +347,8 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                   });
             },
             activity_column->get_column_pointers(context), case_id_column, *case_to_trace_ptrs, activity_to_case_join);
-      })};
-
-  if (optional_error_state.has_value()) {
-    throw common::internal_exception{
-        "ALIGN_MODEL - Error within parallel inflation: {} (a total of {} errors within loop).",
-        optional_error_state->error_msg, optional_error_state->number_of_errors};
-  }
+      })
+      .log_and_rethrow_if_has_error("ALIGN_MODEL - Error within parallel inflation");
 
   // Make table group
   memory::table_group_t tables{};

@@ -1,60 +1,56 @@
 #pragma once
 
-#include <mutex>
-#include <optional>
-#include <string>
+#include <exception>
+#include <glog/logging.h>
 
 #include <tbb/parallel_for.h>
 
 #include <ctl/assert.h>
+#include <ctl/mutex.h>
 
 namespace sr_glue_code {
 
-namespace details {
-
-class tbb_error_propagation_helper {
+class tbb_error_state {
  public:
-  tbb_error_propagation_helper() = default;
+  tbb_error_state() = default;
 
-  [[nodiscard]] bool has_error() const {
-    std::shared_lock lock{mtx_};
-    return optional_error_msg_.has_value();
-  }
+  [[nodiscard]] bool has_error() const { return bool{optional_error_}; }
 
-  void set_error(const std::string_view error_msg) {
-    std::unique_lock lock{mtx_};
+  void set_error(const std::exception_ptr error) {
     // N.B.: For now we only keep track of the first error message
-    if (!optional_error_msg_.has_value()) {
-      optional_error_msg_ = error_msg;
+    if (!optional_error_) {
+      optional_error_ = error;
     }
     ++number_of_errors_;
   }
 
-  [[nodiscard]] const std::string& error_message() const {
-    std::shared_lock lock{mtx_};
-    debug_assert(has_error());
-    return optional_error_msg_.value();
+  [[noreturn]] void rethrow_error() const {
+    debug_assert(has_error() && number_of_errors_ > 0);
+    std::rethrow_exception(optional_error_);
+  }
+
+  void rethrow_if_has_error() const {
+    if (has_error()) {
+      rethrow_error();
+    }
+  }
+
+  void log_and_rethrow_if_has_error(const std::string_view context_msg) const {
+    if (has_error()) {
+      LOG(ERROR) << fmt::format("{} (a total of {} errors)", context_msg, number_of_errors());
+      rethrow_error();
+    }
   }
 
   [[nodiscard]] int number_of_errors() const {
-    std::shared_lock lock{mtx_};
+    debug_assert(has_error() ? number_of_errors_ > 0 : number_of_errors_ == 0);
     return number_of_errors_;
   }
 
  private:
-  mutable std::shared_mutex mtx_{};
-  std::optional<std::string> optional_error_msg_{std::nullopt};
+  std::exception_ptr optional_error_{};
   int number_of_errors_{0};
 };
-
-}  // namespace details
-
-struct error_state {
-  std::string error_msg{};
-  int number_of_errors{0};
-};
-
-using optional_error_state_t = std::optional<error_state>;
 
 /**
  * @brief We noticed that in SR a thrown exception within a TBB loop can lead to crashes. That is, for some reason it
@@ -69,47 +65,34 @@ using optional_error_state_t = std::optional<error_state>;
  * https://www.intel.com/content/www/us/en/docs/onetbb/developer-guide-api-reference/2022-0/exceptions-and-cancellation.html
  */
 template <typename TBB_RANGE, typename TBB_LOOP_BODY>
-[[nodiscard]] optional_error_state_t non_throwing_tbb_parallel_for(const TBB_RANGE& range, const TBB_LOOP_BODY& body) {
-  details::tbb_error_propagation_helper error_propagation_helper{};
+[[nodiscard]] tbb_error_state non_throwing_tbb_parallel_for(const TBB_RANGE& range, const TBB_LOOP_BODY& body) {
+  ctl::owning_mutex<tbb_error_state> protected_optional_error_state{};
   tbb::parallel_for(range, [&](const auto& r) {
     try {
       body(r);
-    } catch (const std::exception& ex) {
-      error_propagation_helper.set_error(ex.what());
     } catch (...) {
-      error_propagation_helper.set_error("Unknown error");
+      protected_optional_error_state.lock_mutable(
+          [&](tbb_error_state& error_state) { error_state.set_error(std::current_exception()); });
     }
   });
 
-  if (error_propagation_helper.has_error()) [[unlikely]] {
-    return std::make_optional<error_state>(error_propagation_helper.error_message(),
-                                           error_propagation_helper.number_of_errors());
-  }
-
-  return std::nullopt;
+  return std::move(protected_optional_error_state).extract_unlocked();
 }
 
 /** Same as above but for parallel_for_each */
 template <typename TBB_RANGE, typename TBB_LOOP_BODY>
-[[nodiscard]] optional_error_state_t non_throwing_tbb_parallel_for_each(const TBB_RANGE& range,
-                                                                        const TBB_LOOP_BODY& body) {
-  details::tbb_error_propagation_helper error_propagation_helper{};
+[[nodiscard]] tbb_error_state non_throwing_tbb_parallel_for_each(const TBB_RANGE& range, const TBB_LOOP_BODY& body) {
+  ctl::owning_mutex<tbb_error_state> protected_optional_error_state{};
   tbb::parallel_for_each(range, [&](const auto& r) {
     try {
       body(r);
-    } catch (const std::exception& ex) {
-      error_propagation_helper.set_error(ex.what());
     } catch (...) {
-      error_propagation_helper.set_error("Unknown error");
+      protected_optional_error_state.lock_mutable(
+          [&](tbb_error_state& error_state) { error_state.set_error(std::current_exception()); });
     }
   });
 
-  if (error_propagation_helper.has_error()) [[unlikely]] {
-    return std::make_optional<error_state>(error_propagation_helper.error_message(),
-                                           error_propagation_helper.number_of_errors());
-  }
-
-  return std::nullopt;
+  return std::move(protected_optional_error_state).extract_unlocked();
 }
 
 }  // namespace sr_glue_code
