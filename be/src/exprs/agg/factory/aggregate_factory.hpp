@@ -67,6 +67,7 @@
 #include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/celonis/agg/inductive_miner.h"
 #include "exprs/celonis/agg/kmeans.h"
+#include "exprs/celonis/agg/linear_interpolate.h"
 #include "exprs/celonis/agg/linear_regression.h"
 #include "exprs/celonis/agg/moving_count_distinct.h"
 #include "exprs/celonis/agg/moving_median.h"
@@ -239,6 +240,9 @@ public:
     static AggregateFunctionPtr MakeHllRawAggregateFunction();
 
     // Celonis functions
+    template <LogicalType>
+    static AggregateFunctionPtr MakeCelonisLinearInterpolateFunction();
+
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisMovingMedianWindowFunction();
 
@@ -527,6 +531,11 @@ AggregateFunctionPtr AggregateFactory::MakeThetaSketchAggregateFunction() {
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeHllRawAggregateFunction() {
     return std::make_shared<HllNdvAggregateFunction<LT, true>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisLinearInterpolateFunction() {
+    return std::make_shared<CelonisLinearInterpolateWindowFunction<LT>>();
 }
 
 template <LogicalType LT>

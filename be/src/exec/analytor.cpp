@@ -182,7 +182,11 @@ Status Analytor::prepare(RuntimeState* state, ObjectPool* pool, RuntimeProfile* 
             _agg_expr_ctxs[i].emplace_back(ctx);
         }
 
-        if (fn.name.function_name == "ntile") {
+        // CELONIS_LINEAR_INTERPOLATE requires looking ahead to the next non-null
+        // value to calculate the interpolation slope. Materializing ensures an
+        // entire partition is available before processing the first row.
+        if (fn.name.function_name == "ntile" ||
+            fn.name.function_name == "celonis_linear_interpolate") {
             _need_partition_materializing = true;
         }
 
