@@ -1496,10 +1496,15 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             for (int i = 0; i < collectors.size(); i++) {
                 saveDictExpr(collectors.get(i), scalarOperator.getChild(i));
             }
-            if (scalarOperator instanceof CallOperator && collectors.stream()
-                    .filter(c -> !c.isConstantRef()).distinct().count() == 1) {
-                CallOperator call = scalarOperator.cast();
-                logUnsupportedFunctionMetric(call.getFnName());
+            if (!collectors.contains(VARIABLES)) {
+                List<ScalarOperator> nonConstants = collectors.stream().filter(c -> !c.equals(CONSTANTS)).toList();
+                if (nonConstants.size() == 1 && nonConstants.get(0).getType().isStringType()) {
+                    if (scalarOperator instanceof CallOperator call) {
+                        logUnsupportedFunctionMetric(call.getFnName());
+                    } else {
+                        logUnsupportedScalarOperatorMetric(scalarOperator.getOpType().toString());
+                    }
+                }
             }
             return VARIABLES;
         }
@@ -1682,6 +1687,11 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
         private void logUnsupportedFunctionMetric(String fn) {
             CelonisMetrics.increaseCounter("lco_unsupported_fn", "lco unsupported fn", new MetricLabel("function", fn));
+        }
+
+        private void logUnsupportedScalarOperatorMetric(String op) {
+            CelonisMetrics.increaseCounter("lco_unsupported_scalar_op", "lco unsupported scalar op",
+                    new MetricLabel("scalar_op", op));
         }
     }
 
