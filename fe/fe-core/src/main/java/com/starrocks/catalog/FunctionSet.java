@@ -590,7 +590,6 @@ public class FunctionSet {
     public static final String CELONIS_LIKE = "celonis_like";
 
     // Celonis window functions:
-    public static final String CELONIS_LINEAR_INTERPOLATE = "celonis_linear_interpolate";
     public static final String CELONIS_MOVING_TRIMMED_MEAN = "celonis_moving_trimmed_mean";
     public static final String CELONIS_MOVING_COUNT_DISTINCT = "celonis_moving_count_distinct";
     public static final String CELONIS_MOVING_MEDIAN = "celonis_moving_median";
@@ -832,7 +831,6 @@ public class FunctionSet {
             .add(FunctionSet.LAST_VALUE)
             .add(FunctionSet.FIRST_VALUE_REWRITE)
             .add(FunctionSet.SESSION_NUMBER)
-            .add(FunctionSet.CELONIS_LINEAR_INTERPOLATE)
             .add(FunctionSet.CELONIS_MOVING_TRIMMED_MEAN)
             .add(FunctionSet.CELONIS_MOVING_COUNT_DISTINCT)
             .add(FunctionSet.CELONIS_MOVING_MEDIAN)
@@ -1474,12 +1472,6 @@ public class FunctionSet {
                 false, false, false));
 
         // Celonis window functions:
-        // celonis_linear_interpolate
-        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_LINEAR_INTERPOLATE,
-                    Lists.newArrayList(Type.BIGINT), Type.DOUBLE, Type.VARBINARY));
-        addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_LINEAR_INTERPOLATE,
-                    Lists.newArrayList(Type.DOUBLE), Type.DOUBLE, Type.VARBINARY));
-
         // celonis_moving_trimmed_mean
         addBuiltin(AggregateFunction.createAnalyticBuiltin(CELONIS_MOVING_TRIMMED_MEAN,
                     Lists.newArrayList(Type.BIGINT), Type.DOUBLE, Type.VARBINARY));

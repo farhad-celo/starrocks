@@ -123,7 +123,6 @@ public class AnalyticExpr extends Expr {
     public static String HLL_UNION_AGG = "HLL_UNION_AGG";
 
     // Celonis window functions:
-    public static String CELONIS_LINEAR_INTERPOLATE = "CELONIS_LINEAR_INTERPOLATE";
     public static String CELONIS_MOVING_TRIMMED_MEAN = "CELONIS_MOVING_TRIMMED_MEAN";
     public static String CELONIS_MOVING_COUNT_DISTINCT = "CELONIS_MOVING_COUNT_DISTINCT";
     public static String CELONIS_MOVING_MEDIAN = "CELONIS_MOVING_MEDIAN";
@@ -324,14 +323,6 @@ public class AnalyticExpr extends Expr {
         }
 
         return fn.functionName().equalsIgnoreCase(ROWNUMBER);
-    }
-
-    public static boolean isCelonisLinearInterpolateFn(Function fn) {
-        if (!isAnalyticFn(fn)) {
-            return false;
-        }
-
-        return fn.functionName().equalsIgnoreCase(CELONIS_LINEAR_INTERPOLATE);
     }
 
     public static boolean isApproxTopKFn(Function fn) {

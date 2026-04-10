@@ -157,9 +157,6 @@ public class WindowTransformer {
                     "Unexpected order by clause for approx_top_k()");
             Preconditions.checkState(windowFrame == null, "Unexpected window set for approx_top_k()");
             windowFrame = AnalyticWindow.DEFAULT_UNBOUNDED_WINDOW;
-        } else if (AnalyticExpr.isCelonisLinearInterpolateFn(callExpr.getFn())) {
-            Preconditions.checkState(windowFrame == null, "Unexpected window set for celonis_linear_interpolate()");
-            windowFrame = AnalyticWindow.DEFAULT_ROWS_WINDOW;
         }
 
         // Reverse the ordering and window for windows ending with UNBOUNDED FOLLOWING,
