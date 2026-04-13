@@ -74,6 +74,11 @@ void AggregateFuncResolver::register_window() {
 }
 
 void AggregateFuncResolver::register_celonis_window() {
+    // linear_interpolate
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_DOUBLE>("celonis_linear_interpolate", true,
+                                                            AggregateFactory::MakeCelonisLinearInterpolateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_DOUBLE>("celonis_linear_interpolate", true,
+                                                            AggregateFactory::MakeCelonisLinearInterpolateFunction<TYPE_DOUBLE>());
     // moving_trimmed_mean
     add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_DOUBLE>("celonis_moving_trimmed_mean", true,
                                                             AggregateFactory::MakeCelonisMovingTrimmedMeanWindowFunction<TYPE_BIGINT>());
