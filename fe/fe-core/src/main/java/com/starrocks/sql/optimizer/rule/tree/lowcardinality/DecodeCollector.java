@@ -442,14 +442,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     }
 
     private void logDecodeMetric(Operator op) {
-        List<String> labels = decodeMetricLabels.get(op);
-        if (labels == null) {
-            labels = List.of(op.getOpType().toString());
-        } else {
-            labels = labels.stream().map(s -> op.getOpType().toString() + "_" + s).toList();
-        }
-
-        labels.forEach(label -> {
+        CelonisMetrics.increaseCounter("lco_decode", "decode by reason",
+                new MetricLabel("op", op.getOpType().toString()));
+        List<String> labels = decodeMetricLabels.getOrDefault(op, Collections.emptyList());
+        labels.stream().map(s -> op.getOpType().toString() + "_" + s).forEach(label -> {
             CelonisMetrics.increaseCounter("lco_decode", "decode by reason", new MetricLabel("op", label));
         });
     }
