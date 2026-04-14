@@ -444,6 +444,7 @@ public class CelonisExpressionStatisticsCalculator {
         double distinctValue = Math.min(columnStatistic.getDistinctValuesCount(), rowCount);
         double averageRowSize = columnStatistic.getAverageRowSize();
         double nullsFraction = 0;
+        ConstantOperator defaultValue = null;
 
         double averageRowSizeTotal = 0.0;
         double averageRowSizeCount = 0.0;
@@ -489,7 +490,7 @@ public class CelonisExpressionStatisticsCalculator {
                 return null;
             }
 
-            ConstantOperator defaultValue = (ConstantOperator) children.get(3);
+            defaultValue = (ConstantOperator) children.get(3);
             int countDistinctMappedToNonNullValues = countDistinctMappedToNonNullValues(deduplicatedValuesMap, defaultValue);
 
             if (defaultValue.isNull()) {
@@ -524,6 +525,8 @@ public class CelonisExpressionStatisticsCalculator {
         }
 
         nullsFraction = Math.min(1.0, nullsFraction);
+        final var histogram = projectHistogramThroughRemapValues(columnStatistic, deduplicatedValuesMap, defaultValue,
+                nullsFraction);
 
         return ColumnStatistic.builder()
                 .setMinValue(minValue)
@@ -531,7 +534,78 @@ public class CelonisExpressionStatisticsCalculator {
                 .setNullsFraction(nullsFraction)
                 .setAverageRowSize(averageRowSize)
                 .setDistinctValuesCount(distinctValue)
+                .setHistogram(histogram)
                 .build();
+    }
+
+    private static Histogram projectHistogramThroughRemapValues(ColumnStatistic inputColumnStatistic,
+                                                                Map<ConstantOperator, ConstantOperator> valuesMap,
+                                                                ConstantOperator defaultValue,
+                                                                double outputNullsFraction) {
+        final var inputHistogram = inputColumnStatistic.getHistogram();
+        if (inputHistogram == null || inputHistogram.getMCV() == null) {
+            return null;
+        }
+
+        final var inputMcvs = inputHistogram.getMCV();
+        final var projectedMcvs = new HashMap<String, Long>();
+
+        for (final var mappedPair : valuesMap.entrySet()) {
+            final var mappedFrom = mappedPair.getKey();
+            final var mappedTo = mappedPair.getValue();
+
+            // NULL is not modeled via MCVs.
+            if (mappedTo.isNull()) {
+                continue;
+            }
+
+            // Map NULL input to MCV.
+            if (mappedFrom.isNull()) {
+                // Histograms do not carry NULL as an MCV key, so estimate this part from null fraction.
+                final var keyOpt = toMcvKey(mappedTo);
+                keyOpt.ifPresent(key -> projectedMcvs.merge(key,
+                        (long) (inputHistogram.getTotalRows() * inputColumnStatistic.getNullsFraction()), Long::sum));
+                continue;
+            }
+
+            // Map old MCV to new MCV.
+            final var mappedFromKeyOpt = toMcvKey(mappedFrom);
+            mappedFromKeyOpt.ifPresent(mappedFromKey -> {
+                final var mappedFromRowCount = inputMcvs.get(mappedFromKey);
+                if (mappedFromRowCount != null && mappedFromRowCount > 0) {
+                    final var mappedToKeyOpt = toMcvKey(mappedTo);
+                    mappedToKeyOpt.ifPresent(mappedToKey -> projectedMcvs.merge(mappedToKey, mappedFromRowCount, Long::sum));
+                }
+            });
+
+        }
+
+        // Map everything else (inferred by non-null rows + existing mapped MCVs) to the default value.
+        if (defaultValue != null && !defaultValue.isNull()) {
+            final long unmappedMcvRows = inputMcvs.keySet().stream() //
+                    .filter(mcvKey -> !projectedMcvs.containsKey(mcvKey)) //
+                    .mapToLong(inputMcvs::get) //
+                    .sum(); //
+            final long nonNullRows = (long) (inputHistogram.getTotalRows() * (1.0 - outputNullsFraction));
+            final long knownFromMcvRows = projectedMcvs.values().stream().mapToLong(Long::longValue).sum();
+            final long unmappedNonMcvRows = nonNullRows - knownFromMcvRows;
+
+            final var defaultRows = unmappedMcvRows + unmappedNonMcvRows;
+
+            if (defaultRows > 0) {
+                final var keyOpt = toMcvKey(defaultValue);
+                keyOpt.ifPresent((key) -> projectedMcvs.merge(key, defaultRows, Long::sum));
+            }
+        }
+
+        if (projectedMcvs.isEmpty()) {
+            return null;
+        }
+        return new Histogram(List.of(), projectedMcvs);
+    }
+
+    private static Optional<String> toMcvKey(ConstantOperator operator) {
+        return operator.castTo(Type.VARCHAR).map(ConstantOperator::toString);
     }
 
     private static ColumnStatistic multiaryExpressionCalculate(CallOperator callOperator,

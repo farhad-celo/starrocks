@@ -1079,6 +1079,52 @@ public class CelonisExpressionStatisticsCalculatorTest {
         assertEquals(1010, columnStatistic.getMaxValue(), 0.001);
         assertEquals(2, columnStatistic.getDistinctValuesCount(), 0.001);
         assertEquals(0.984, columnStatistic.getNullsFraction(), 0.001);
+
+        // GIVEN
+        // Remap values MCV propagation with non-null default value.
+        final var stringCol = new ColumnRefOperator(1, Type.VARCHAR, "str", true);
+        final var stringStatistics = Statistics.builder()
+                .addColumnStatistic(stringCol,
+                        ColumnStatistic.builder() //
+                                .setMinValue(NEGATIVE_INFINITY) //
+                                .setMaxValue(POSITIVE_INFINITY) //
+                                .setNullsFraction(0.1) //
+                                .setDistinctValuesCount(100) //
+                                .setAverageRowSize(Type.VARCHAR.getTypeSize()) //
+                                .setHistogram(new Histogram(List.of(), //
+                                        Map.of("manuell", 300L, //
+                                        "maschinell", 200L, //
+                                        "orangensaft", 30L, //
+                                        "legacy", 150L))) //
+                                .build()) //
+                .setOutputRowCount(1000) //
+                .build();
+
+        final var manuell = ConstantOperator.createVarchar("manuell");
+        final var maschinell = ConstantOperator.createVarchar("maschinell");
+        final var orangensaft = ConstantOperator.createVarchar("orangensaft");
+        final var other = ConstantOperator.createVarchar("other");
+        final var nullVarchar = ConstantOperator.createNull(Type.VARCHAR);
+
+        remapValuesCall = new CallOperator(function, Type.VARCHAR,
+                Lists.newArrayList(
+                        stringCol,
+                        new ArrayOperator(Type.VARCHAR, true, Lists.newArrayList(manuell, maschinell, orangensaft, nullVarchar)),
+                        new ArrayOperator(Type.VARCHAR, true, Lists.newArrayList(manuell, maschinell, maschinell, nullVarchar)),
+                        other
+                ));
+
+        // WHEN
+        columnStatistic = ExpressionStatisticCalculator.calculate(remapValuesCall, stringStatistics);
+
+        // THEN
+        assertEquals(0.1, columnStatistic.getNullsFraction(), 0.001);
+        assertNotNull(columnStatistic.getHistogram());
+        assertThat(columnStatistic.getHistogram().getMCV()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                        "manuell", 300L, //
+                        "maschinell", 200L + 30L, //
+                        "other", 262L) // rest of row count inferred from MCVs
+        );
     }
 
     @Test
