@@ -17,6 +17,7 @@ package com.starrocks.sql.optimizer.rule.transformation;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.starrocks.analysis.BinaryType;
+import com.starrocks.metric.celonis.CelonisRuleUsageMetrics;
 import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.OptimizerContext;
@@ -111,6 +112,21 @@ import static com.starrocks.sql.optimizer.operator.OpRuleBit.OP_SPLIT_WINDOW_SKE
 
 public class SplitWindowSkewToUnionRule extends TransformationRule {
     private static final SplitWindowSkewToUnionRule INSTANCE = new SplitWindowSkewToUnionRule();
+    private static final String RULE_NAME = "split_window_skew_to_union_rule";
+    private static final String RULE_CATEGORY = "celonis_skew_rules";
+
+    public enum TriggerReason { SKEWED_NULL, SKEWED_MCV }
+
+    public enum NoTriggerReason {
+        NOT_SKEWED,
+        MULTIPLE_SKEWED,
+        NO_PARTITION_COLUMN,
+        NO_ORDER_BY_COLUMN,
+        MULTIPLE_PARTITION_COLUMNS,
+    }
+
+    public static final CelonisRuleUsageMetrics<TriggerReason, NoTriggerReason>
+            RULE_USAGE_METRICS = new CelonisRuleUsageMetrics<>(RULE_NAME, RULE_CATEGORY);
 
     private SplitWindowSkewToUnionRule() {
         super(RuleType.TF_SPLIT_WINDOW_SKEW, Pattern.create(OperatorType.LOGICAL_WINDOW));
@@ -128,6 +144,14 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
             }
 
             List<ScalarOperator> partitionExprs = lwo.getPartitionExpressions();
+
+            if (partitionExprs == null || partitionExprs.isEmpty()) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_PARTITION_COLUMN);
+            } else if (partitionExprs.size() > 1) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MULTIPLE_PARTITION_COLUMNS);
+            } else if (lwo.getOrderByElements() == null || lwo.getOrderByElements().isEmpty()) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_ORDER_BY_COLUMN);
+            }
 
             // Rule only applies if there is exactly one partition expression,
             // and that expression is a direct ColumnReference (not a function or expression).
@@ -167,6 +191,9 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
 
         //todo (m.bogusz) in theory we could have multiple skewed values, but for now we only handle one
         if (skewedInfos.size() != 1) {
+            RULE_USAGE_METRICS.notTriggered(skewedInfos.isEmpty()
+                    ? NoTriggerReason.NOT_SKEWED
+                    : NoTriggerReason.MULTIPLE_SKEWED);
             return Collections.emptyList();
         }
 
@@ -178,9 +205,11 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
         PredicateOperator unskewedPredicate;
 
         if (skewedValue.isNull()) {
+            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_NULL);
             skewedPredicate = new IsNullPredicateOperator(skewedColumn);
             unskewedPredicate = new IsNullPredicateOperator(true, skewedColumn);
         } else {
+            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_MCV);
             skewedPredicate = new BinaryPredicateOperator(BinaryType.EQ, skewedColumn, skewedValue);
             // In the unskewed branch, we need to include NULL values if the skewed value is NOT NULL.
             // Since standard SQL inequality (col != value) filters out NULLs, we must explicitly add 'OR col IS NULL'.
