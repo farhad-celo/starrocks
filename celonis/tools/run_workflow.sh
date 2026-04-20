@@ -77,18 +77,20 @@ wait_for_workflow_to_finish() {
   echo "workflow_url=${last_workflow_url}" >> $GITHUB_OUTPUT
   echo ""
 
-  conclusion=null
+  # GitHub returns conclusion: null while running; jq -r '.conclusion' prints empty string, not the word "null".
+  # Poll until status is "completed" (do not compare conclusion to "null").
+  conclusion=
   status=
 
-  while [[ "${conclusion}" == "null" && "${status}" != "completed" ]]
+  while [[ "${status}" != "completed" ]]
   do
     lets_wait
 
     workflow=$(api "runs/$last_workflow_id")
-    conclusion=$(echo "${workflow}" | jq -r '.conclusion')
+    conclusion=$(echo "${workflow}" | jq -r 'if .conclusion == null then "" else .conclusion end')
     status=$(echo "${workflow}" | jq -r '.status')
 
-    echo "Checking conclusion [${conclusion}]"
+    echo "Checking conclusion [${conclusion:-<pending>}]"
     echo "Checking status [${status}]"
     echo "conclusion=${conclusion}" >> $GITHUB_OUTPUT
   done
@@ -153,8 +155,6 @@ trigger_workflow_and_wait() {
     wait_for_workflow_to_finish "$run_id"
   done
 }
-
-
 
 main() {
   INPUT_OWNER="$1"

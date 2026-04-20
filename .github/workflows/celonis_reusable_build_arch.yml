@@ -1,0 +1,97 @@
+# Per-architecture Starrocks build (release or ASan).
+name: Reusable image build (single arch)
+
+on:
+  workflow_call:
+    inputs:
+      variant:
+        description: 'release (push artifacts + fe/be) or asan (local allin1 only)'
+        type: string
+        required: true
+      runs_on_json:
+        description: 'JSON array of runs-on labels'
+        type: string
+        required: true
+      test_branch:
+        type: string
+        required: true
+      image_tag:
+        description: 'Full per-arch image tag (e.g. base-arm, base-asan-x86)'
+        type: string
+        required: true
+      test_image_tag:
+        description: 'Base tag without per-arch suffix'
+        type: string
+        required: true
+      builder_image:
+        type: string
+        required: true
+    outputs:
+      test_branch:
+        value: ${{ jobs.build.outputs.test_branch }}
+      artifact_image_tag:
+        value: ${{ jobs.build.outputs.artifact_image_tag }}
+      test_image_tag:
+        value: ${{ jobs.build.outputs.test_image_tag }}
+      allin1_image:
+        value: ${{ jobs.build.outputs.allin1_image }}
+
+jobs:
+  build:
+    runs-on: ${{ fromJSON(inputs.runs_on_json) }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+      GITHUB_USERNAME: ${{ github.repository }}
+      BUILDER: ${{ inputs.builder_image }}
+      image_tag: ${{ inputs.image_tag }}
+      test_branch: ${{ inputs.test_branch }}
+    outputs:
+      test_branch: ${{ inputs.test_branch }}
+      artifact_image_tag: ${{ inputs.image_tag }}
+      test_image_tag: ${{ inputs.test_image_tag }}
+      allin1_image: ${{ inputs.image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.test_branch }}
+
+      - name: Build artifact image
+        id: build-artifact
+        uses: ./.github/actions/build-artifact
+        with:
+          dev_env_image: ${{ env.BUILDER }}
+          image_tag: ${{ env.image_tag }}
+          to_push: ${{ inputs.variant == 'release' && 'true' || 'false' }}
+          is_asan_mode: ${{ inputs.variant == 'asan' && 'yes' || 'no' }}
+
+      - name: Build and push allin1 image (release)
+        if: inputs.variant == 'release'
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          pull_artifact: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Build and push fe-be (release)
+        if: inputs.variant == 'release'
+        uses: ./.github/actions/build-fe-be
+        with:
+          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          to_push: 'true'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Build allin1 image (asan)
+        if: inputs.variant == 'asan'
+        uses: ./.github/actions/build-allin1
+        with:
+          artifact_image: starrocks-artifacts:${{ env.image_tag }}
+          image_tag: ${{ env.image_tag }}
+          pull_artifact: 'false'
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

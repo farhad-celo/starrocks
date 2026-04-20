@@ -21,7 +21,11 @@ env:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   sync-and-rebase-upstream:
@@ -29,6 +33,8 @@ jobs:
     outputs:
       test_branch: ${{steps.rebase.outputs.test_branch || inputs.branch_to_test}}
       test_image_tag: ${{ steps.rebase.outputs.test_branch || steps.image_tag_output.outputs.test_image_tag }}
+      pr_base_branch: ${{ steps.rebase.outputs.pr_base_branch }}
+      synced_celo_branch: ${{ steps.rebase.outputs.synced_celo_branch }}
     steps:
       - name: Output image tag
         if: ${{inputs.branch_to_test != ''}}
@@ -38,7 +44,6 @@ jobs:
           echo "The branch to test is: ${branch}"
           if [[ -n "${{inputs.image_to_build}}" ]]; then
             image_tag="${{inputs.image_to_build}}_$(date +%Y%m%d%H%M%S)"
-            # Check if the tag contains only valid characters
             if ! [[ "$image_tag" =~ ^[a-zA-Z0-9._-]+$ ]]; then
               echo "Invalid image tag: must contain only lowercase and uppercase letters, digits, underscores (_), periods (.), and dashes (-)."
               exit 1
@@ -55,14 +60,12 @@ jobs:
       - name: Checkout repository
         if: ${{inputs.branch_to_test == ''}}
         uses: actions/checkout@v4
-        # we need to ref a branch which is not the default one or ${LATEST_UPSTREAM_BRANCH} to make rebase work.
         with:
           ref: branch-3.0-c0d5082c-celo
       - name: Remote add upstream
         if: ${{inputs.branch_to_test == ''}}
         run: |
           git remote add upstream https://github.com/starrocks/starrocks.git
-        # skip error of remote upstream already exists
         continue-on-error: true
       - name: Fetch upstream and push
         if: ${{inputs.branch_to_test == ''}}
@@ -73,24 +76,16 @@ jobs:
         id: rebase
         if: ${{inputs.branch_to_test == ''}}
         run: |
-          # Need this to avoid issue of "Committer identity unknown"
           git config user.email "celostar-starrocks@noreply.github.com"
           git config user.name "celostar-starrocks"
-
           echo "start to rebase ..."
-
-          # get the latest commit
           git fetch
           git checkout ${LATEST_UPSTREAM_BRANCH}
           latest_commit=$(git rev-parse --short=8 HEAD)
           echo "the latest commit is ${latest_commit}"
-
-          # create the new default branch
           newdefaultbranch=${LATEST_UPSTREAM_BRANCH}-${latest_commit}-celo
           echo "The new default branch is: ${newdefaultbranch}"
           echo "newdefaultbranch=$newdefaultbranch" >> "$GITHUB_ENV"
-
-          # check if the branch exists
           if git show-ref --verify --quiet refs/heads/${newdefaultbranch}; then
               echo "branch '${newdefaultbranch}' already exists. Checking out..."
               git checkout ${newdefaultbranch}
@@ -99,14 +94,10 @@ jobs:
               git checkout -b ${newdefaultbranch}
               git push --set-upstream origin ${newdefaultbranch}
           fi
-
-          # get the current default branch
           default_branch=${{ github.ref_name }}
           echo "the current default branch is ${default_branch}"
-
           retries=5
           count=0
-
           run_rebase() {
             git checkout ${default_branch} && \
             timestamp=$(date +'%Y-%m-%dT%H-%M-%S') && \
@@ -114,7 +105,6 @@ jobs:
             git checkout -b $testbranch && \
             git rebase ${newdefaultbranch}
           }
-
           until [ $count -ge $retries ]
           do
             echo "Attempt $((count+1))"
@@ -123,16 +113,55 @@ jobs:
             echo "Rebase failed, retrying in 5 seconds..."
             sleep 5
           done
-
           if [ $count -eq $retries ]; then
             echo "Command failed after $retries attempts"
             exit 1
           fi
-
           git push --set-upstream origin $testbranch
           echo "test_branch=$testbranch" >> "$GITHUB_ENV"
           echo "test_branch=$testbranch" >> "$GITHUB_OUTPUT"
+          echo "pr_base_branch=${default_branch}" >> "$GITHUB_OUTPUT"
+          echo "synced_celo_branch=${newdefaultbranch}" >> "$GITHUB_OUTPUT"
 
+      - name: Range-diff (rebase patch series)
+        if: ${{ inputs.branch_to_test == '' }}
+        shell: bash
+        env:
+          PR_BASE: ${{ steps.rebase.outputs.pr_base_branch }}
+          HEAD_BRANCH: ${{ env.test_branch }}
+          NEW_DEFAULT: ${{ env.newdefaultbranch }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HEAD_BRANCH:-}" || -z "${PR_BASE:-}" || -z "${NEW_DEFAULT:-}" ]]; then
+            echo "Skip range-diff: missing PR_BASE, HEAD_BRANCH, or NEW_DEFAULT."
+            exit 0
+          fi
+          git fetch origin "${HEAD_BRANCH}" --quiet 2>/dev/null || true
+          git checkout "${HEAD_BRANCH}"
+          MB=$(git merge-base "${NEW_DEFAULT}" "${PR_BASE}") || true
+          if [[ -z "${MB}" ]]; then
+            echo "::warning::Range-diff skipped: no merge-base between ${NEW_DEFAULT} and ${PR_BASE}"
+            exit 0
+          fi
+          RANGE_DIFF_OUT=$(git range-diff "${MB}..${PR_BASE}" "${NEW_DEFAULT}..HEAD" 2>&1) || true
+          if echo "${RANGE_DIFF_OUT}" | grep -q '[^[:space:]]'; then
+            echo "::error title=Range-diff mismatch::Patch series differs after rebase (onto ${NEW_DEFAULT}). See job summary for full output."
+            echo -e "\033[31m[Range-diff] differences detected (onto ${NEW_DEFAULT})\033[0m" >&2
+            {
+              echo "### 🔴 **Range-diff: patch series differs** (onto \`${NEW_DEFAULT}\`)"
+              echo ""
+              echo '```text'
+              echo "${RANGE_DIFF_OUT}"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo -e "\033[32m[Range-diff] no differences reported (onto ${NEW_DEFAULT})\033[0m" >&2
+            {
+              echo "### ✅ Range-diff: no differences (onto \`${NEW_DEFAULT}\`)"
+              echo ""
+              echo "_`git range-diff` produced no output — patch series matches._"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Sum up
         if: ${{inputs.branch_to_test == ''}}
@@ -145,7 +174,6 @@ jobs:
 
   presubmit-test:
     runs-on: [runs-on,runner=64cpu-linux-x64, image=ubuntu22-full-x64, disk=large, "run-id=${{ github.run_id }}"]
-    # No need to run presubmit test on existing branch as the pull request of the branch will trigger it.
     if: inputs.branch_to_test == ''
     needs: sync-and-rebase-upstream
     env:
@@ -156,115 +184,50 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{env.test_branch}}
-
       - name: Pull dev env image
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
           docker pull ${{ env.BUILDER }}
-
       - name: Test
         uses: ./.github/actions/presubmit-test
         with:
           builder: ${{ env.BUILDER }}
 
   build-arm:
-    runs-on: [ runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}" ]
     needs: sync-and-rebase-upstream
-    env:
-      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-arm
+    uses: ./.github/workflows/celonis_reusable_build_arch.yml
+    secrets: inherit
+    with:
+      variant: release
+      runs_on_json: '["runs-on","runner=64cpu-linux-arm64","image=ubuntu24-full-arm64","disk=large","run-id=${{ github.run_id }}"]'
       test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
-    outputs:
-      test_branch: ${{ env.test_branch }}
-      artifact_image_tag: ${{ env.image_tag }}
+      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-arm
       test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
-      allin1_image: ${{ env.image_tag }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{env.test_branch}}
-
-      - name: Build artifact image
-        id: build-artifact
-        uses: ./.github/actions/build-artifact
-        with:
-          dev_env_image: ${{ env.BUILDER }}
-          image_tag: ${{ env.image_tag }}
-          to_push: 'true'
-
-      - name: Build and push allin1 image
-        uses: ./.github/actions/build-allin1
-        with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
-          image_tag: ${image_tag}
-          pull_artifact: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Build and push fe-be
-        uses: ./.github/actions/build-fe-be
-        with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
-          image_tag: ${{ env.image_tag }}
-          to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
 
   build-x86:
-    runs-on: [ runs-on, runner=64cpu-linux-x64, image=ubuntu24-full-x64, disk=large, "run-id=${{ github.run_id }}" ]
     needs: sync-and-rebase-upstream
-    env:
-      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-x86
+    uses: ./.github/workflows/celonis_reusable_build_arch.yml
+    secrets: inherit
+    with:
+      variant: release
+      runs_on_json: '["runs-on","runner=64cpu-linux-x64","image=ubuntu24-full-x64","disk=large","run-id=${{ github.run_id }}"]'
       test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
-    outputs:
-      test_branch: ${{ env.test_branch }}
-      artifact_image_tag: ${{ env.image_tag }}
+      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-x86
       test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
-      allin1_image: ${{ env.image_tag }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{env.test_branch}}
-
-      - name: Build artifact image
-        id: build-artifact
-        uses: ./.github/actions/build-artifact
-        with:
-          dev_env_image: ${{ env.BUILDER }}
-          image_tag: ${{ env.image_tag }}
-          to_push: 'true'
-
-      - name: Build and push allin1 image
-        uses: ./.github/actions/build-allin1
-        with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
-          image_tag: ${image_tag}
-          pull_artifact: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Build and push fe-be
-        uses: ./.github/actions/build-fe-be
-        with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
-          image_tag: ${{ env.image_tag }}
-          to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
 
   build-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     needs: [build-arm, build-x86]
     env:
+      test_branch: ${{ needs.build-x86.outputs.test_branch }}
       arm_image_tag: ${{ needs.build-arm.outputs.allin1_image }}
       x86_image_tag: ${{ needs.build-x86.outputs.allin1_image }}
       allin1_image_tag: ${{ needs.build-x86.outputs.test_image_tag }}
       fe_be_image_tag: ${{ needs.build-x86.outputs.test_image_tag }}
     outputs:
-      test_branch: ${{ needs.build-allin1-x86.outputs.test_branch }}
+      test_branch: ${{ needs.build-x86.outputs.test_branch }}
       allin1_image_tag: ${{ env.allin1_image_tag }}
       fe_be_image_tag: ${{ env.fe_be_image_tag }}
     steps:
@@ -276,63 +239,50 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{env.test_branch}}
+          ref: ${{ env.test_branch }}
       - name: Build and push allin1 manifest
         uses: ./.github/actions/build-mul-arch-manifest
         with:
-          arm_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${arm_image_tag}"
-          x86_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${x86_image_tag}"
-          mul_arch_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${allin1_image_tag}"
-      - name: Build and push fe-be manifest
-        shell: bash
-        run: |
-          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
-          export DOCKER_CLI_EXPERIMENTAL=enabled
-
-          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-be:${fe_be_image_tag}"
-          arm_tag="ghcr.io/celonis/celostar/starrocks-be:${arm_image_tag}"
-          x86_tag="ghcr.io/celonis/celostar/starrocks-be:${x86_image_tag}"
-
-          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
-
-          docker manifest push "$mul_arch_tag"
-          
-          mul_arch_tag="ghcr.io/celonis/celostar/starrocks-fe:${fe_be_image_tag}"
-          arm_tag="ghcr.io/celonis/celostar/starrocks-be:${arm_image_tag}"
-          x86_tag="ghcr.io/celonis/celostar/starrocks-be:${x86_image_tag}"
-
-          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
-
-          docker manifest push "$mul_arch_tag"
-
+          arm_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.arm_image_tag }}
+          x86_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.x86_image_tag }}
+          mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.allin1_image_tag }}
+      - name: Build and push starrocks-be manifest (GHCR)
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: ghcr.io/celonis/celostar/starrocks-be:${{ env.arm_image_tag }}
+          x86_image_tag: ghcr.io/celonis/celostar/starrocks-be:${{ env.x86_image_tag }}
+          mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-be:${{ env.fe_be_image_tag }}
+      - name: Build and push starrocks-fe manifest (GHCR)
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.arm_image_tag }}
+          x86_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.x86_image_tag }}
+          mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.fe_be_image_tag }}
       - name: Configure prod AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-central-1
-
       - name: prod Amazon ECR login
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
       - name: Build and push fe-be manifest to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         uses: ./.github/actions/build-mul-arch-manifest
         with:
-          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${arm_image_tag}"
-          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${x86_image_tag}"
-          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${fe_be_image_tag}"
-
+          arm_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ env.arm_image_tag }}
+          x86_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ env.x86_image_tag }}
+          mul_arch_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ env.fe_be_image_tag }}
       - name: Build and push fe manifest to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         uses: ./.github/actions/build-mul-arch-manifest
         with:
-          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${arm_image_tag}"
-          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${x86_image_tag}"
-          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${fe_be_image_tag}"
+          arm_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ env.arm_image_tag }}
+          x86_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ env.x86_image_tag }}
+          mul_arch_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ env.fe_be_image_tag }}
 
   celostar-presubmit-test:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
@@ -342,7 +292,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Run celostar presubmit test
         id: run-test
         uses: ./.github/actions/trigger-celostar-test
@@ -351,7 +300,6 @@ jobs:
           repo: celostar
           workflow_file: "presubmit-test.yml"
           payload: '{\"event_type\":\"trigger_presubmit_test\",\"client_payload\":{\"image_tag\":\"${test_image_tag}\"}}'
-
       - name: Summarize the result
         if: always() && steps.run-test.outcome != 'skipped'
         run: |
@@ -363,19 +311,21 @@ jobs:
   e2e-tests:
     runs-on: [runs-on,runner=1cpu-linux-x64, image=ubuntu22-full-x64, "run-id=${{ github.run_id }}"]
     needs: build-manifest
+    outputs:
+      workflow_url: ${{ steps.run-test.outputs.workflow_url }}
     env:
       test_image_tag: ${{ needs.build-manifest.outputs.fe_be_image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Run celostar e2e test
+        continue-on-error: true
         id: run-test
         uses: ./.github/actions/trigger-celostar-test
         with:
           owner: celonis
           repo: celostar
-          workflow_file: "e2e.yml"
+          workflow_file: "e2e-test-suite-azure.yml"
           payload: >
             { 
               \"event_type\":\"trigger_e2e_test_suite_on_azure\",
@@ -384,7 +334,6 @@ jobs:
                 \"starrocks_image_tag\":\"${test_image_tag}\",
                 \"gateway_image_tag\":\"branch\"}
             }
-
       - name: Summarize the result
         if: always() && steps.run-test.outcome != 'skipped'
         run: |
@@ -393,77 +342,108 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
 
-  build-asan-arm:
-    runs-on: [ runs-on, runner=64cpu-linux-arm64, image=ubuntu24-full-arm64, disk=large, "run-id=${{ github.run_id }}" ]
-    needs: sync-and-rebase-upstream
-    env:
-      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-asan-arm
-      test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
-    outputs:
-      test_branch: ${{ env.test_branch }}
-      artifact_image_tag: ${{ env.image_tag }}
-      test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
-      allin1_image: ${{ env.image_tag }}
+  create-rebase-pr:
+    runs-on: [runs-on, runner=1cpu-linux-x64, image=ubuntu22-full-x64, "run-id=${{ github.run_id }}"]
+    if: ${{ github.event_name == 'schedule' || inputs.branch_to_test == '' }}
+    needs:
+      - e2e-tests
+      - sync-and-rebase-upstream
+      - celostar-compliance-test
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{env.test_branch}}
+      - name: Create pull request
+        id: create_pr
+        env:
+          GH_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          HEAD_BRANCH: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
+          BASE_BRANCH: ${{ needs.sync-and-rebase-upstream.outputs.pr_base_branch }}
+          SYNCED_CELO: ${{ needs.sync-and-rebase-upstream.outputs.synced_celo_branch }}
+          E2E_URL: ${{ needs.e2e-tests.outputs.workflow_url }}
+          COMPLIANCE_URL: ${{ needs.celostar-compliance-test.outputs.workflow_url }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HEAD_BRANCH}" || -z "${BASE_BRANCH}" ]]; then
+            echo "Skipping PR: missing head or base (manual image-only run or incomplete sync outputs)."
+            exit 0
+          fi
+          REPO="${{ github.repository }}"
+          API="https://api.github.com/repos/${REPO}/pulls"
+          TITLE="Integration rebase: ${HEAD_BRANCH} → ${SYNCED_CELO}"
+          BODY_FILE=$(mktemp)
+          {
+            echo "Automated PR after **Integration Test on AKS** (E2E on Azure)."
+            echo ""
+            echo "- **Head (rebased test branch):** \`${HEAD_BRANCH}\`"
+            echo "- **Base:** \`${BASE_BRANCH}\`"
+            echo "- **Upstream-aligned celo branch:** \`${SYNCED_CELO}\`"
+            echo "- **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            if [[ -n "${E2E_URL:-}" ]]; then
+              echo "- **Celostar E2E run:** ${E2E_URL}"
+            fi
+            if [[ -n "${COMPLIANCE_URL:-}" ]]; then
+              echo "- **Celostar compliance test run:** ${COMPLIANCE_URL}"
+            fi
+          } > "$BODY_FILE"
+          BODY_JSON=$(jq -Rs . < "$BODY_FILE")
+          rm -f "$BODY_FILE"
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg head "$HEAD_BRANCH" \
+            --arg base "$SYNCED_CELO" \
+            --argjson body "$BODY_JSON" \
+            '{title: $title, head: $head, base: $base, body: $body}')
+          HTTP=$(curl -sS -o /tmp/pr_resp.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d "$PAYLOAD" \
+            "$API") || true
+          if [[ "$HTTP" == "201" ]]; then
+            PR_URL=$(jq -r '.html_url // empty' /tmp/pr_resp.json)
+            echo "Created PR: ${PR_URL}"
+            echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"
+          elif [[ "$HTTP" == "422" ]]; then
+            echo "PR not created (422 — branch may already have an open PR or not be ahead of base). Response:"
+            cat /tmp/pr_resp.json
+            exit 0
+          else
+            echo "Failed to create PR (HTTP ${HTTP}):"
+            cat /tmp/pr_resp.json
+            exit 1
+          fi
+      - name: PR link summary
+        if: success() && steps.create_pr.outputs.pr_url != ''
+        run: |
+          echo "Created rebase PR: ${{ steps.create_pr.outputs.pr_url }}" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build artifact image
-        id: build-artifact
-        uses: ./.github/actions/build-artifact
-        with:
-          dev_env_image: ${{ env.BUILDER }}
-          image_tag: ${{ env.image_tag }}
-          to_push: 'false'
-          is_asan_mode: 'yes'
-
-      - name: Build and push allin1 image
-        uses: ./.github/actions/build-allin1
-        with:
-          artifact_image: starrocks-artifacts:${{ env.image_tag }}
-          image_tag: ${{ env.image_tag }}
-          pull_artifact: 'false'
+  build-asan-arm:
+    needs: sync-and-rebase-upstream
+    uses: ./.github/workflows/celonis_reusable_build_arch.yml
+    secrets: inherit
+    with:
+      variant: asan
+      runs_on_json: '["runs-on","runner=64cpu-linux-arm64","image=ubuntu24-full-arm64","disk=large","run-id=${{ github.run_id }}"]'
+      test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
+      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-asan-arm
+      test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
 
   build-asan-x86:
-    runs-on: [ runs-on, runner=64cpu-linux-x64, image=ubuntu24-full-x64, disk=large, "run-id=${{ github.run_id }}" ]
     needs: sync-and-rebase-upstream
-    env:
-      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-asan-x86
+    uses: ./.github/workflows/celonis_reusable_build_arch.yml
+    secrets: inherit
+    with:
+      variant: asan
+      runs_on_json: '["runs-on","runner=64cpu-linux-x64","image=ubuntu24-full-x64","disk=large","run-id=${{ github.run_id }}"]'
       test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
-    outputs:
-      test_branch: ${{ env.test_branch }}
-      artifact_image_tag: ${{ env.image_tag }}
+      image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-asan-x86
       test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
-      allin1_image: ${{ env.image_tag }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{env.test_branch}}
-
-      - name: Build artifact image
-        id: build-artifact
-        uses: ./.github/actions/build-artifact
-        with:
-          dev_env_image: ${{ env.BUILDER }}
-          image_tag: ${{ env.image_tag }}
-          to_push: 'false'
-
-      - name: Build and push allin1 image
-        uses: ./.github/actions/build-allin1
-        with:
-          artifact_image: starrocks-artifacts:${{ env.image_tag }}
-          image_tag: ${{ env.image_tag }}
-          pull_artifact: 'false'
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
 
   build-asan-manifest:
     runs-on: [ runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}" ]
     needs: [ build-asan-arm, build-asan-x86 ]
     env:
+      test_branch: ${{ needs.build-asan-x86.outputs.test_branch }}
       arm_image_tag: ${{ needs.build-asan-arm.outputs.allin1_image }}
       x86_image_tag: ${{ needs.build-asan-x86.outputs.allin1_image }}
       allin1_image_tag: ${{ needs.build-asan-x86.outputs.test_image_tag }}-asan
@@ -479,14 +459,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{env.test_branch}}
+          ref: ${{ env.test_branch }}
       - name: Build and push allin1 manifest
         uses: ./.github/actions/build-mul-arch-manifest
         with:
           arm_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${{ env.arm_image_tag }}"
           x86_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${{ env.x86_image_tag }}"
           mul_arch_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${{ env.allin1_image_tag }}"
-
 
   celostar-compliance-test:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
@@ -496,16 +475,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Run celostar compliance test
         id: run-test
+        continue-on-error: true
         uses: ./.github/actions/trigger-celostar-test
         with:
           owner: celonis
           repo: celostar
           workflow_file: "compliance-test.yml"
           payload: '{\"event_type\":\"trigger_compliance_test\",\"client_payload\":{\"image_tag\":\"${test_image_tag}\"}}'
-
       - name: Summarize the result
         if: always() && steps.run-test.outcome != 'skipped'
         run: |
