@@ -94,10 +94,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-<<<<<<< HEAD
-import static com.starrocks.analysis.BinaryType.EQ_FOR_NULL;
-=======
->>>>>>> 84e2ee59db ([Enhancement] Enabling dictification for eq_for_null (#71625))
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
 
