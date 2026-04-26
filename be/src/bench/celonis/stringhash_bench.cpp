@@ -13,6 +13,7 @@
 
 namespace starrocks {
 
+// BLAKE2
 /*
 2025-03-01T22:17:16+00:00
 Running ./be/build_Release/src/bench/celonis/output/stringhash_bench
@@ -42,6 +43,38 @@ BM_StringHash/100000/80    32945756 ns     32942979 ns           21 RowInvRate=3
 BM_StringHash/1000/160       481645 ns       481614 ns         1447 RowInvRate=481.614ns
 BM_StringHash/10000/160     4802145 ns      4801827 ns          146 RowInvRate=480.183ns
 BM_StringHash/100000/160   48091774 ns     48089409 ns           15 RowInvRate=480.894ns
+*/
+
+// OpenSSL
+/*
+2026-04-24T23:44:39+00:00
+Running ./be/build_Release/src/bench/celonis/output/stringhash_bench
+Run on (32 X 3243.36 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x16)
+  L1 Instruction 32 KiB (x16)
+  L2 Unified 512 KiB (x16)
+  L3 Unified 32768 KiB (x2)
+Load Average: 5.67, 2.14, 1.56
+// Number of rows / Average string length
+-----------------------------------------------------------------------------------
+Benchmark                         Time             CPU   Iterations UserCounters...
+-----------------------------------------------------------------------------------
+BM_StringHash/1000/10        244938 ns       244950 ns         2858 RowInvRate=244.95ns
+BM_StringHash/10000/10      2448799 ns      2448707 ns          286 RowInvRate=244.871ns
+BM_StringHash/100000/10    24407568 ns     24407221 ns           29 RowInvRate=244.072ns
+BM_StringHash/1000/20        245367 ns       245365 ns         2852 RowInvRate=245.365ns
+BM_StringHash/10000/20      2455035 ns      2454899 ns          285 RowInvRate=245.49ns
+BM_StringHash/100000/20    24581069 ns     24579992 ns           29 RowInvRate=245.8ns
+BM_StringHash/1000/40        248266 ns       248253 ns         2819 RowInvRate=248.253ns
+BM_StringHash/10000/40      2479812 ns      2479705 ns          282 RowInvRate=247.97ns
+BM_StringHash/100000/40    24736413 ns     24736279 ns           28 RowInvRate=247.363ns
+BM_StringHash/1000/80        369964 ns       369935 ns         1893 RowInvRate=369.935ns
+BM_StringHash/10000/80      3684807 ns      3684609 ns          190 RowInvRate=368.461ns
+BM_StringHash/100000/80    36774202 ns     36772388 ns           19 RowInvRate=367.724ns
+BM_StringHash/1000/160       522055 ns       521989 ns         1338 RowInvRate=521.989ns
+BM_StringHash/10000/160     5203765 ns      5203548 ns          135 RowInvRate=520.355ns
+BM_StringHash/100000/160   52023684 ns     52020526 ns           13 RowInvRate=520.205ns
 */
 
 class RandomStringGenerator {
