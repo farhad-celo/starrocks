@@ -557,11 +557,17 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
     @Override
     public DecodeInfo visitPhysicalCTEProduce(OptExpression optExpression, DecodeInfo context) {
+        if (!sessionVariable.isEnableCTELowCardinalityOptimize()) {
+            return context.createDecodeInfo();
+        }
         return context.createOutputInfo();
     }
 
     @Override
     public DecodeInfo visitPhysicalCTEConsume(OptExpression optExpression, DecodeInfo context) {
+        if (!sessionVariable.isEnableCTELowCardinalityOptimize()) {
+            return context.createDecodeInfo();
+        }
         PhysicalCTEConsumeOperator consume = optExpression.getOp().cast();
         context = cteDecodeInfo.get(consume.getCteId());
         Preconditions.checkNotNull(context);

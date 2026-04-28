@@ -393,6 +393,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
                     "enable_low_cardinality_optimize_for_union_all";
     public static final String ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE = "array_agg_low_cardinality_optimize";
     public static final String MULTI_ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE = "multi_array_agg_low_cardinality_optimize";
+    public static final String CTE_LOW_CARDINALITY_OPTIMIZE = "cte_low_cardinality_optimize";
     public static final String ENABLE_MULTI_ARRAY_AGG_V2 = "enable_multi_array_agg_v2";
     public static final String ENABLE_MULTI_ARRAY_AGG_V2_DICT_COMPACTION = "enable_multi_array_agg_v2_dict_compaction";
     public static final String CBO_USE_NTH_EXEC_PLAN = "cbo_use_nth_exec_plan";
@@ -1621,6 +1622,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VarAttr(name = MULTI_ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE)
     private boolean enableMultiArrayAggLowCardinalityOptimize = true;
 
+    @VarAttr(name = CTE_LOW_CARDINALITY_OPTIMIZE)
+    private boolean enableCTELowCardinalityOptimize = false;
+
     @VariableMgr.VarAttr(name = ENABLE_MULTI_ARRAY_AGG_V2)
     private boolean enableMultiArrayAggV2 = false;
 
@@ -2071,6 +2075,13 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
         this.enableMultiArrayAggLowCardinalityOptimize = enableMultiArrayAggLowCardinalityOptimize;
     }
 
+    public boolean isEnableCTELowCardinalityOptimize() {
+        return enableCTELowCardinalityOptimize;
+    }
+
+    public void setEnableEnalbeCTELowCardinalityOptimize(boolean enableCTELowCardinalityOptimize) {
+        this.enableCTELowCardinalityOptimize = enableCTELowCardinalityOptimize;
+    }
     public boolean isEnableMultiArrayAggV2() {
         return enableMultiArrayAggV2;
     }

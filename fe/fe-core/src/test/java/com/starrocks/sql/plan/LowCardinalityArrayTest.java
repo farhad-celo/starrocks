@@ -149,6 +149,7 @@ public class LowCardinalityArrayTest extends PlanTestBase {
         FeConstants.USE_MOCK_DICT_MANAGER = true;
         connectContext.getSessionVariable().setSqlMode(2);
         connectContext.getSessionVariable().setEnableLowCardinalityOptimize(true);
+        connectContext.getSessionVariable().setEnableEnalbeCTELowCardinalityOptimize(true);
         connectContext.getSessionVariable().setCboCteReuse(false);
         connectContext.getSessionVariable().setUseLowCardinalityOptimizeV2(true);
     }
@@ -157,6 +158,7 @@ public class LowCardinalityArrayTest extends PlanTestBase {
     public static void afterClass() {
         connectContext.getSessionVariable().setSqlMode(0);
         connectContext.getSessionVariable().setEnableLowCardinalityOptimize(false);
+        connectContext.getSessionVariable().setEnableEnalbeCTELowCardinalityOptimize(false);
         connectContext.getSessionVariable().setUseLowCardinalityOptimizeV2(false);
     }
 
