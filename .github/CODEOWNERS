@@ -6,6 +6,7 @@
 /.github/ @jxWho @mingmxu @pavan-kalyan @hagonzal
 /.github/CODEOWNERS @jkim650 @hagonzal @zhangyaqi1989 @jxWho @mingmxu @pavan-kalyan @lxynov
 /sonar-project.properties @jxWho @mingmxu @pavan-kalyan
+**/catalog-info.yaml @jxWho @mingmxu @pavan-kalyan @hagonzal @celonis/celostar
 
 # Build Infrastructure
 /.devcontainer/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal @lxynov

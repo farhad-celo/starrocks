@@ -11,6 +11,7 @@ on:
       - 'celonis/tools/**'
       - 'celonis/docker/**'
       - 'docker/**'
+      - '**/catalog-info.yaml'
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 
