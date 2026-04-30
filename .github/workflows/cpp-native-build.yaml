@@ -1,0 +1,64 @@
+name: Celostar-Starrocks BE Native Build
+on:
+  workflow_dispatch:
+    inputs:
+      component-name:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      relative-source-location:
+        required: true
+        type: string
+      release-branch:
+        required: true
+        type: string
+      github-token:
+        required: true
+        type: string
+
+env:
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
+
+run-name: Build ${{ inputs.component-name }} - ${{ inputs.version }}
+jobs:
+  native-compile:
+    name: Build ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: 64cpu-linux-x64,volume=150g
+          - arch: arm64
+            runner: 64cpu-linux-arm64,volume=150g
+
+  runs-on: ["runs-on", "runner=${{ matrix.runner }}"]
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.release-branch }}
+        path: source_release
+        token: ${{ inputs.github-token }}
+
+    - name: Native Compilation
+      shell: bash
+      working-directory: source_release
+      run: |
+        echo "Compiling ${{ inputs.component-name }} for ${{ matrix.arch }}..."
+        cd ${{ inputs.relative-source-location }}
+
+    - name: pull dev env image
+      run: |
+        echo ${{ inputs.github-token }} | docker login ghcr.io -u ${{ github.repository }}
+        docker pull ${{ env.BUILDER }}
+
+    - name: Build artifact image
+      id: build-artifact
+      uses: ./.github/actions/build-artifact
+      with:
+        dev_env_image: ${{ env.BUILDER }}
+        image_tag: ${{ env.image_tag }}
+        to_push: 'true'
