@@ -1,0 +1,25 @@
+-- name: test_celonis_object_link_propagate_filters
+CREATE TABLE t (
+    id INT,
+    adj_matrix ARRAY<ARRAY<BIGINT>>,
+    start_nodes ARRAY<BIGINT>
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES (
+    "replication_num" = "1"
+);
+-- result:
+-- !result
+INSERT INTO t (id, adj_matrix, start_nodes) VALUES
+    (1, [[1, 2], [3], [], [6], [2, 5], [6], []], [0, 4]);
+-- result:
+-- !result
+SELECT array_agg(f.node) FROM t, celonis_object_link_propagate_filters(t.adj_matrix, t.start_nodes) f(node);
+-- result:
+[0,1,2,3,4,5,6]
+-- !result
+SELECT array_agg(f.node) FROM t, celonis_object_link_propagate_filters(t.adj_matrix, t.start_nodes, 1) f(node);
+-- result:
+[0,1,2,4,5]
+-- !result

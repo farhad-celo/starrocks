@@ -230,6 +230,7 @@ set(EXEC_FILES
         ./exprs/celonis/string_functions_test.cpp
         ./exprs/celonis/table_function/count_edges_test.cpp
         ./exprs/celonis/table_function/generate_range_test.cpp
+        ./exprs/celonis/table_function/object_link_propagate_filters_test.cpp
         ./exprs/celonis/tbb_test.cpp
         ./exprs/celonis/time_functions_test.cpp
         ./exprs/celonis/timeunits_between_calendar_test.cpp

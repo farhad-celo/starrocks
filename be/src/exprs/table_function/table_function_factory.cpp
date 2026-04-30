@@ -19,6 +19,7 @@
 #include "column/column.h"
 #include "column/type_traits.h"
 #include "exprs/celonis/table_function/count_edges.h"
+#include "exprs/celonis/table_function/object_link_propagate_filters.h"
 #include "exprs/celonis/table_function/generate_range.h"
 #include "exprs/table_function/generate_series.h"
 #include "exprs/table_function/json_each.h"
@@ -156,6 +157,8 @@ void TableFunctionResolver::add_celonis_function_mapping() {
                          std::make_shared<CelonisGenerateRange<TYPE_BIGINT, TYPE_BIGINT>>());
     add_function_mapping("celonis_generate_range", {TYPE_VARCHAR, TYPE_DATETIME, TYPE_DATETIME}, {TYPE_DATETIME},
                          std::make_shared<CelonisGenerateRange<TYPE_DATETIME, TYPE_VARCHAR>>());
+    add_function_mapping("celonis_object_link_propagate_filters", {TYPE_ARRAY, TYPE_ARRAY}, {TYPE_BIGINT}, std::make_shared<CelonisObjectLinkPropagateFilters>());
+    add_function_mapping("celonis_object_link_propagate_filters", {TYPE_ARRAY, TYPE_ARRAY, TYPE_BIGINT}, {TYPE_BIGINT}, std::make_shared<CelonisObjectLinkPropagateFilters>());
 }
 
 const TableFunction* get_table_function(const std::string& name, const std::vector<LogicalType>& arg_type,

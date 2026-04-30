@@ -188,6 +188,7 @@ set(CELONIS_FILES
   celonis/stringhash.cpp
   celonis/string_functions.cpp
   celonis/table_function/count_edges.cpp
+  celonis/table_function/object_link_propagate_filters.cpp
   celonis/time_functions.cpp
   celonis/to_double.cpp
   celonis/transpose_array_of_struct.cpp

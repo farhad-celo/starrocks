@@ -34,6 +34,16 @@ public class AnalyzeLateralTest {
     }
 
     @Test
+    public void testObjectLinkPropagateFilters() {
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_propagate_filters([[1,2,3],[],[],[4],[]],[1]));");
+    }
+
+    @Test
+    public void testObjectLinkPropagateFiltersWithHopLimit() {
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_propagate_filters([[1,2,3],[],[],[4],[]],[1],1));");
+    }
+
+    @Test
     public void testUnnest() {
         analyzeSuccess("select * from tarray cross join unnest(v3)");
         analyzeSuccess("select * from tarray cross join lateral unnest(v3)");
