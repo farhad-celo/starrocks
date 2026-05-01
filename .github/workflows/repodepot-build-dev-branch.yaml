@@ -1,0 +1,50 @@
+name: '[RepoDepot] Build Dev Branch'
+run-name: '[RepoDepot] Build Dev Branch: ${{ github.ref_name }}'
+
+# Ignored paths are defined in:
+# https://docs.google.com/document/d/1y3qW9s3M3iqbDmjGnomKGsx3vBZFxcJbeq7Z659op8c/edit?tab=t.0
+# must not be adjusted without proper review and approval from devtools team.
+on:
+  push:
+      branches:
+      - branch-3.5-cc-85c3ad89-celo
+      paths-ignore: []
+
+  workflow_dispatch:
+    inputs:
+      service-name:
+        type: choice
+        description: Component to Build
+        required: true
+        options:
+          - celostar-be
+          - celostar-fe
+          - '~~ALL~~'
+
+permissions:
+  actions: read
+  contents: write
+  id-token: write
+  packages: write
+  pull-requests: write
+
+jobs:
+  on-push:
+    name: Build Branch on Push
+    if: vars.REPO_DEPOT_DEV_BRANCH_BUILDS_ENABLED == 'true' && github.event_name == 'push'
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      target-release: DEV
+      repo-depot-version: stable
+      service-names-as-csv: 'celostar-be,celostar-fe'
+
+  on-dispatch:
+    name: Build Branch on Dispatch
+    if: github.event_name == 'workflow_dispatch'
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      target-release: DEV
+      repo-depot-version: stable
+      service-names-as-csv: ${{ inputs.service-name == '~~ALL~~' && 'celostar-be,celostar-fe' || inputs.service-name }}

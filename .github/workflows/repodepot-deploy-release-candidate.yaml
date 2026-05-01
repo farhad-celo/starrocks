@@ -1,0 +1,71 @@
+name: '[RepoDepot] Deploy Release Candidate'
+run-name: >-
+  Deploying `${{ inputs.service-name || github.event.client_payload.service_name }}` with `${{ inputs.release-candidate || github.event.client_payload.build_name }}` to
+  ${{ inputs.target-env != 'none' && inputs.target-env != '' && format(' `{0}`', inputs.target-env) || '' }}
+  ${{ inputs.target-realm != 'none' && inputs.target-realm != '' && format(' `{0}`', inputs.target-realm) || '' }}
+  ${{ inputs.additional-realms != '' && format(' `{0}`', inputs.additional-realms) || '' }}
+  ${{ github.event.client_payload.build_name != '' && '`develop`' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      service-name:
+        type: choice
+        description: Service to Release
+        required: true
+        options:
+          - celostar-be
+          - celostar-fe
+      release-candidate:
+        description: Release Candidate
+        type: string
+        required: true
+      target-env:
+        type: choice
+        description: Environment
+        required: true
+        options:
+          - none
+          - staging
+          - prod
+      target-realm:
+        type: choice
+        description: Realm
+        required: true
+        options:
+          - none
+          - alpha
+          - beta
+      additional-realms:
+        type: string
+        description: Additional realms to deploy (ca-1, eu-1, mercedes-benz, etc)
+        required: false
+
+  repository_dispatch:
+    types: [repodepot_dev_build_complete]
+
+jobs:
+  run:
+    name: Deploy Release
+    if: github.event_name == 'workflow_dispatch'
+    uses: celonis/repo-depot/.github/workflows/reusable-deploy-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      release-candidate: ${{ inputs.release-candidate }}
+      target-env: ${{ inputs.target-env }}
+      target-realm: ${{ inputs.target-realm }}
+      additional-realms: ${{ inputs.additional-realms }}
+      repo-depot-version: stable
+      service-names-as-csv: ${{ inputs.service-name }}
+
+  run-deploy-develop:
+    name: Deploy to Develop
+    if: github.event_name == 'repository_dispatch' && vars.REPO_DEPOT_AUTO_DEPLOY_DEVELOP_ENABLED == 'true'
+    uses: celonis/repo-depot/.github/workflows/reusable-deploy-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      release-candidate: ${{ github.event.client_payload.build_name }}
+      target-env: none
+      target-realm: develop
+      repo-depot-version: stable
+      service-names-as-csv: ${{ github.event.client_payload.service_name }}

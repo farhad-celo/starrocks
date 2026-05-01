@@ -1,0 +1,34 @@
+name: '[RepoDepot] Run E2E Tests'
+run-name: >-
+  Running e2e tests for `${{ inputs.component-name }}` revision `${{ inputs.image-tag }}` on `${{ inputs.deployment-stage }}`
+
+on:
+  workflow_dispatch:
+    inputs:
+      component-name:
+        type: choice
+        description: Component Name
+        required: true
+        options:
+          - celostar-be
+          - celostar-fe
+      image-tag:
+        description: ECR Image Tag (e.g. 20250113-152710_RC00)
+        type: string
+        required: true
+      deployment-stage:
+        type: string
+        description: Deployment Stage
+        required: true
+        default: staging
+
+jobs:
+  run:
+    name: Run E2E Tests
+    uses: celonis/repo-depot/.github/workflows/reusable-run-e2e-tests.yaml@stable
+    secrets: inherit
+    with:
+      component-name: ${{ inputs.component-name }}
+      image-tag: ${{ inputs.image-tag }}
+      deployment-stage: ${{ inputs.deployment-stage }}
+      repo-depot-version: stable

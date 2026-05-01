@@ -1,0 +1,73 @@
+name: '[RepoDepot] Create Release Candidate'
+
+# Ideally we'd have less complex logic here but `env` does not seem to work here so there isn't a
+# place to define this for reuse.
+run-name: >-
+  Create RC from ${{ github.event_name == 'push' && 'EXISTING' || (github.event_name == 'schedule' && 'NEW' || inputs.target-release) }}
+  branch${{ (github.event_name == 'push' && 'EXISTING' || inputs.target-release) == 'EXISTING' && format(' `{0}`', github.event_name == 'push' && github.ref_name || inputs.custom-release) || '' }}
+
+on:
+
+  workflow_dispatch:
+    inputs:
+      service-name:
+        type: choice
+        description: Service to Release
+        required: true
+        options:
+          - '~~ALL~~'
+          - celostar-be
+          - celostar-fe
+
+      target-release:
+        type: choice
+        description: Release Branch
+        required: true
+        options:
+          - NEW
+          - EXISTING
+
+      custom-release:
+        type: string
+        description: Existing Release Name
+        required: false
+  push:
+    # Match old and new release branch names, 'release/DATE-TIME' and 'release/DATE-TIME/SERVICE_NAME'
+    branches:
+      - 'release/[0-9]*-[0-9]*'
+      - 'release/[0-9]*-[0-9]*/**'
+    paths-ignore:
+      - '.github/**'
+      - '**/pom.xml'
+      - 'pyproject.toml'
+
+permissions:
+  actions: read
+  contents: write
+  id-token: write
+  packages: write
+  pull-requests: write
+
+jobs:
+  on-dispatch:
+    name: On Dispatch
+    if: github.event_name == 'workflow_dispatch'
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      target-release: ${{ inputs.target-release }}
+      custom-release: ${{ inputs.custom-release }}
+      repo-depot-version: stable
+      service-names-as-csv: ${{ inputs.service-name == '~~ALL~~' && 'celostar-be,celostar-fe' || inputs.service-name }}
+
+  on-push:
+    name: On Push
+    if: github.event_name == 'push' && vars.REPO_DEPOT_DISABLE_AUTO_RC_ON_MERGE != 'true'
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      target-release: EXISTING
+      custom-release: ${{ github.ref_name }}
+      repo-depot-version: stable
+      service-names-as-csv: 'celostar-be,celostar-fe'
+      release-branch-with-service-name: ${{ github.ref_name }}
