@@ -25,10 +25,10 @@ on:
 jobs:
   run:
     name: Run E2E Tests
-    uses: celonis/repo-depot/.github/workflows/reusable-run-e2e-tests.yaml@stable
+    uses: celonis/repo-depot/.github/workflows/reusable-run-e2e-tests.yaml@monorepo-deliver-workflows-custom
     secrets: inherit
     with:
       component-name: ${{ inputs.component-name }}
       image-tag: ${{ inputs.image-tag }}
       deployment-stage: ${{ inputs.deployment-stage }}
-      repo-depot-version: stable
+      repo-depot-version: monorepo-deliver-workflows-custom

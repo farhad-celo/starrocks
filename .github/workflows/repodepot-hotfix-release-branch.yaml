@@ -15,10 +15,10 @@ jobs:
     name: Run
     # Only run when triggered by a PR comment starting with `/hotfix-release`
     if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/hotfix-release')
-    uses: celonis/repo-depot/.github/workflows/reusable-hotfix-release-branch.yaml@stable
+    uses: celonis/repo-depot/.github/workflows/reusable-hotfix-release-branch.yaml@monorepo-deliver-workflows-custom
     secrets: inherit
     with:
       pr-number: ${{ github.event.issue.number }}
       pr-hotfix-comment-id: ${{ github.event.comment.id }}
       pr-hotfix-command: ${{ github.event.comment.body }}
-      repo-depot-version: stable
+      repo-depot-version: monorepo-deliver-workflows-custom
