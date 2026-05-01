@@ -1,5 +1,5 @@
-name: Integration Test on AKS
-run-name: Integration Test - ${{inputs.branch_to_test || 'sync and rebase upstream'}}
+name: Rebase and Test on Azure
+run-name: Rebase and Test - ${{inputs.branch_to_test || 'sync and rebase upstream'}}
 
 on:
   schedule:
@@ -319,7 +319,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Run celostar e2e test
-        continue-on-error: true
         id: run-test
         uses: ./.github/actions/trigger-celostar-test
         with:
@@ -344,7 +343,8 @@ jobs:
 
   create-rebase-pr:
     runs-on: [runs-on, runner=1cpu-linux-x64, image=ubuntu22-full-x64, "run-id=${{ github.run_id }}"]
-    if: ${{ github.event_name == 'schedule' || inputs.branch_to_test == '' }}
+    # Run even when e2e-tests (or other needs) fail so the rebase PR is still created; workflow still shows E2E failure.
+    if: ${{ always() && (github.event_name == 'schedule' || inputs.branch_to_test == '') }}
     needs:
       - e2e-tests
       - sync-and-rebase-upstream
