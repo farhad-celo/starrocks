@@ -57,6 +57,9 @@ outputs:
     description: 'JSON metadata output from the docker image creation'
     value: ${{ steps.create-image.outputs.metadata }}
 
+env:
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
+
 runs:
   using: composite
 
@@ -64,34 +67,33 @@ runs:
   #
   # Repo Depot has already logged in to ECR and GHCR.
   steps:
-    - name: Build
-      id: build
+
+    - name: pull dev env image
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       run: |
-        # Do some building
-
-        # Set the resulting status.
-        echo "status=false" >> GITHUB_OUTPUT
-
-    - name: Test
-      id: test
-      shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: |
-        # Do some testing
-
-        # Set the resulting status.
-        echo "status=false" >> GITHUB_OUTPUT
+        echo ${{ inputs.github-token }} | docker login ghcr.io -u ${{ github.repository }}
+        docker pull ${{ env.BUILDER }}
+        
+        echo ${{ inputs.working-directory }}
 
     - name: Set up Docker
       uses: docker/setup-buildx-action@v3
 
-    # TODO: Customize this action as needed
-    - name: Create Docker Image
-      id: create-image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ inputs.image-registry }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
+    - name: Build artifact docker image
+      shell: bash
+      run: |
+        git branch
+
+        build_type="Release"
+        echo "Build type is ${build_type}"
+        
+        dd_agent_version="1.56.3"
+
+        # Build image and always remove intermediate containers.
+        DOCKER_BUILDKIT=1 docker build --no-cache --force-rm=true \
+          --build-arg RELEASE_VERSION=${{inputs.image_tag}} \
+          --build-arg builder=${{env.BUILDER}} \
+          --build-arg BUILD_TYPE=${build_type} \
+          -f docker/dockerfiles/artifacts/artifact.Dockerfile \
+          -t starrocks-artifacts:${{inputs.image_tag}} .
+
