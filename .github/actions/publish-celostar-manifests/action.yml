@@ -1,0 +1,81 @@
+name: Publish Celostar multi-arch image manifests
+description: >-
+  Creates and pushes manifest lists for starrocks-be, starrocks-fe (ECR + GHCR)
+  and starrocks-allin1 (GHCR) from per-arch tags.
+
+inputs:
+  tag_arm:
+    description: Image tag for the arm64 single-arch image (tag only, not full ref).
+    required: true
+  tag_x86:
+    description: Image tag for the amd64 single-arch image.
+    required: true
+  tag_combined:
+    description: Multi-arch manifest tag (allin1 + FE + BE use this on GHCR; FE/BE on ECR).
+    required: true
+  aws_access_key_id:
+    required: true
+  aws_secret_access_key:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: GHCR login
+      shell: bash
+      run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_USERNAME}" --password-stdin
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: eu-central-1
+
+    - name: Amazon ECR login
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: ECR — starrocks-be manifest
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      uses: ./.github/actions/build-mul-arch-manifest
+      with:
+        arm_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.tag_arm }}
+        x86_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.tag_x86 }}
+        mul_arch_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.tag_combined }}
+
+    - name: ECR — starrocks-fe manifest
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      uses: ./.github/actions/build-mul-arch-manifest
+      with:
+        arm_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.tag_arm }}
+        x86_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.tag_x86 }}
+        mul_arch_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.tag_combined }}
+
+    - name: GHCR — starrocks-allin1 manifest
+      uses: ./.github/actions/build-mul-arch-manifest
+      with:
+        arm_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_arm }}
+        x86_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_x86 }}
+        mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_combined }}
+
+    - name: GHCR — starrocks-be + starrocks-fe manifests
+      shell: bash
+      env:
+        TAG_ARM: ${{ inputs.tag_arm }}
+        TAG_X86: ${{ inputs.tag_x86 }}
+        TAG_MULTI: ${{ inputs.tag_combined }}
+      run: |
+        set -euo pipefail
+        export DOCKER_CLI_EXPERIMENTAL=enabled
+        echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_USERNAME}" --password-stdin
+
+        for image in starrocks-be starrocks-fe; do
+          mul_arch_tag="ghcr.io/celonis/celostar/${image}:${TAG_MULTI}"
+          arm_tag="ghcr.io/celonis/celostar/${image}:${TAG_ARM}"
+          x86_tag="ghcr.io/celonis/celostar/${image}:${TAG_X86}"
+          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
+          docker manifest push "$mul_arch_tag"
+        done

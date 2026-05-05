@@ -57,43 +57,54 @@ outputs:
     description: 'JSON metadata output from the docker image creation'
     value: ${{ steps.create-image.outputs.metadata }}
 
-env:
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
-
 runs:
   using: composite
 
-  # The following steps are a framework for how this could work, not how it must work.
-  #
-  # Repo Depot has already logged in to ECR and GHCR.
+  # Delegates the image build to .github/workflows/cpp-native-build.yaml (workflow_dispatch).
+  # Requires gh (GitHub CLI) on the runner and a token with actions:write to trigger workflows.
   steps:
 
-    - name: pull dev env image
+    - name: Run cpp-native-build workflow
+      id: build
       shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        WORKFLOW_REF: ${{ github.head_ref || github.ref_name }}
+        INPUT_COMPONENT_NAME: ${{ inputs.component-name }}
+        INPUT_IMAGE_TAG: ${{ inputs.image-tag }}
+        INPUT_RELATIVE_SOURCE: ${{ inputs.relative-source-location }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_IMAGE_REGISTRY: ${{ inputs.image-registry }}
+        INPUT_IMAGE_NAME: ${{ inputs.image-name }}
       run: |
-        echo ${{ inputs.github-token }} | docker login ghcr.io -u ${{ github.repository }}
-        docker pull ${{ env.BUILDER }}
-        
-        echo ${{ inputs.working-directory }}
+        set -euo pipefail
+        rel="${INPUT_RELATIVE_SOURCE:-.}"
+        gh workflow run cpp-native-build.yaml -R celonis/celostar-starrocks \
+          --ref "${WORKFLOW_REF}" \
+          -f "component-name=${INPUT_COMPONENT_NAME}" \
+          -f "version=${INPUT_IMAGE_TAG}" \
+          -f "relative-source-location=${rel}" \
+          -f "release-branch=${WORKFLOW_REF}" \
+          -f "github-token=${INPUT_GITHUB_TOKEN}" \
+          -f "image-registry=${INPUT_IMAGE_REGISTRY}" \
+          -f "image-name=${INPUT_IMAGE_NAME}" \
+          -f "image-tag=${INPUT_IMAGE_TAG}"
+        # Brief wait then resolve the newest run for this workflow (dispatch is asynchronous).
+        sleep 8
+        run_id="$(gh run list --workflow=cpp-native-build.yaml --branch "${WORKFLOW_REF}" -R celonis/celostar-starrocks --limit 1 --json databaseId --jq '.[0].databaseId')"
+        if [ -z "${run_id}" ] || [ "${run_id}" = "null" ]; then
+          echo "Failed to resolve workflow run id after dispatch" >&2
+          exit 1
+        fi
+        gh run watch "${run_id}" --exit-status
+        echo "status=true" >> "${GITHUB_OUTPUT}"
 
-    - name: Set up Docker
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build artifact docker image
+    - name: Test status (covered by cpp-native-build)
+      id: test
       shell: bash
-      run: |
-        git branch
+      run: echo "status=true" >> "${GITHUB_OUTPUT}"
 
-        build_type="Release"
-        echo "Build type is ${build_type}"
-        
-        dd_agent_version="1.56.3"
-
-        # Build image and always remove intermediate containers.
-        DOCKER_BUILDKIT=1 docker build --no-cache --force-rm=true \
-          --build-arg RELEASE_VERSION=${{inputs.image_tag}} \
-          --build-arg builder=${{env.BUILDER}} \
-          --build-arg BUILD_TYPE=${build_type} \
-          -f docker/dockerfiles/artifacts/artifact.Dockerfile \
-          -t starrocks-artifacts:${{inputs.image_tag}} .
-
+    - name: Image metadata placeholder
+      id: create-image
+      shell: bash
+      run: echo "metadata={}" >> "${GITHUB_OUTPUT}"
