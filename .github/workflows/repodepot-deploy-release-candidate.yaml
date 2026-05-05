@@ -48,24 +48,24 @@ jobs:
   run:
     name: Deploy Release
     if: github.event_name == 'workflow_dispatch'
-    uses: celonis/repo-depot/.github/workflows/reusable-deploy-release-candidate.yaml@monorepo-deliver-workflows-custom
+    uses: celonis/repo-depot/.github/workflows/reusable-deploy-release-candidate.yaml@stable
     secrets: inherit
     with:
       release-candidate: ${{ inputs.release-candidate }}
       target-env: ${{ inputs.target-env }}
       target-realm: ${{ inputs.target-realm }}
       additional-realms: ${{ inputs.additional-realms }}
-      repo-depot-version: monorepo-deliver-workflows-custom
+      repo-depot-version: stable
       service-names-as-csv: ${{ inputs.service-name }}
 
   run-deploy-develop:
     name: Deploy to Develop
     if: github.event_name == 'repository_dispatch' && vars.REPO_DEPOT_AUTO_DEPLOY_DEVELOP_ENABLED == 'true'
-    uses: celonis/repo-depot/.github/workflows/reusable-deploy-release-candidate.yaml@monorepo-deliver-workflows-custom
+    uses: celonis/repo-depot/.github/workflows/reusable-deploy-release-candidate.yaml@stable
     secrets: inherit
     with:
       release-candidate: ${{ github.event.client_payload.build_name }}
       target-env: none
       target-realm: develop
-      repo-depot-version: monorepo-deliver-workflows-custom
+      repo-depot-version: stable
       service-names-as-csv: ${{ github.event.client_payload.service_name }}

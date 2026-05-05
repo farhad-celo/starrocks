@@ -52,22 +52,22 @@ jobs:
   on-dispatch:
     name: On Dispatch
     if: github.event_name == 'workflow_dispatch'
-    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@monorepo-deliver-workflows-custom
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
     secrets: inherit
     with:
       target-release: ${{ inputs.target-release }}
       custom-release: ${{ inputs.custom-release }}
-      repo-depot-version: monorepo-deliver-workflows-custom
+      repo-depot-version: stable
       service-names-as-csv: ${{ inputs.service-name == '~~ALL~~' && 'celostar-be,celostar-fe' || inputs.service-name }}
 
   on-push:
     name: On Push
     if: github.event_name == 'push' && vars.REPO_DEPOT_DISABLE_AUTO_RC_ON_MERGE != 'true'
-    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@monorepo-deliver-workflows-custom
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
     secrets: inherit
     with:
       target-release: EXISTING
       custom-release: ${{ github.ref_name }}
-      repo-depot-version: monorepo-deliver-workflows-custom
+      repo-depot-version: stable
       service-names-as-csv: 'celostar-be,celostar-fe'
       release-branch-with-service-name: ${{ github.ref_name }}
