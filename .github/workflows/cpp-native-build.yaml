@@ -40,7 +40,7 @@ on:
         type: string
 
 env:
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
   GITHUB_USERNAME: ${{ github.repository }}
 

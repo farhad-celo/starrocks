@@ -1,4 +1,4 @@
-FROM ghcr.io/celonis/celostar/starrocks-dev-env:3.5-94085107-amd
+FROM ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d-amd
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
