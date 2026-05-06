@@ -63,6 +63,11 @@ runs:
   # Delegates the image build to .github/workflows/cpp-native-build.yaml (workflow_dispatch).
   # Requires gh (GitHub CLI) on the runner and a token with actions:write to trigger workflows.
   steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        repository: 'celonis/celostar-starrocks'
+
 
     - name: Run cpp-native-build workflow
       id: build
