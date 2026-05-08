@@ -9,8 +9,8 @@
 **/catalog-info.yaml @jxWho @mingmxu @pavan-kalyan @hagonzal @celonis/celostar
 
 # Build Infrastructure
-/.devcontainer/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal @lxynov
-/docker/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal @lxynov
+/.devcontainer/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal @lxynov @stefan-delorenzo
+/docker/ @jxWho @jkim650 @mingmxu @OliLay @martinr0x @pavan-kalyan @hagonzal @lxynov @stefan-delorenzo
 /thirdparty/ @jxWho @jkim650 @hagonzal
 /thirdparty/build-celonis-libraries.sh @jxWho @WeberNick @hagonzal
 /thirdparty/build-thirdparty-celonis.sh @jxWho @WeberNick @hagonzal
@@ -19,18 +19,18 @@
 /.dockerignore @jxWho @jkim650 @mingmxu @pavan-kalyan @hagonzal
 
 # Source code and binaries
-/be/ @jkim650 @hagonzal @zhangyaqi1989 @lxynov @OliLay @martinr0x @farhad-celo
-/be/src/exprs/celonis/cpml_utils/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov
-/be/src/exprs/celonis/modules/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov
+/be/ @jkim650 @hagonzal @zhangyaqi1989 @lxynov @OliLay @martinr0x @farhad-celo @wmann-celonis @spirsch @stefan-delorenzo
+/be/src/exprs/celonis/cpml_utils/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov @wmann-celonis @spirsch @stefan-delorenzo
+/be/src/exprs/celonis/modules/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov @wmann-celonis @spirsch @stefan-delorenzo
 /bin/ @jkim650 @hagonzal @zhangyaqi1989
-/fe/ @jkim650 @hagonzal @zhangyaqi1989 @OliLay @martinr0x @lxynov @farhad-celo
+/fe/ @jkim650 @hagonzal @zhangyaqi1989 @OliLay @martinr0x @lxynov @farhad-celo @wmann-celonis @spirsch @stefan-delorenzo
 
 # Misc
 /celonis/ @jxWho @jkim650 @mingmxu @pavan-kalyan
 /celonis/tools/dev-env.sh @jxWho @jkim650 @mingmxu @WeberNick
 /celostar-docs/ @mingmxu
 /gensrc/ @jkim650 @hagonzal @zhangyaqi1989
-/test/ @jxWho @mingmxu @pavan-kalyan @hagonzal @martinr0x @OliLay @zhangyaqi1989
+/test/ @jxWho @mingmxu @pavan-kalyan @hagonzal @martinr0x @OliLay @zhangyaqi1989 @wmann-celonis @spirsch @stefan-delorenzo
 /mkdocs.yaml @mingmxu
 /run-be-ut.sh @jkim650 @hagonzal @zhangyaqi1989 @jxWho
 
