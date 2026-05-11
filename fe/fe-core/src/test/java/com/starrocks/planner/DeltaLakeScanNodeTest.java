@@ -155,6 +155,8 @@ public class DeltaLakeScanNodeTest {
         String catalog = "delta_cat";
         CloudConfiguration cc = CloudConfigurationFactory.buildCloudConfigurationForStorage(new HashMap<>());
         new Expectations() {{
+            table.getCloudConfiguration();
+            result = null;
             GlobalStateMgr.getCurrentState().getConnectorMgr().getConnector(catalog);
             result = connector;
             connector.getMetadata().getCloudConfiguration();
