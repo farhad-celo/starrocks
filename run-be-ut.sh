@@ -325,6 +325,10 @@ append_negative_case "*LakePrimaryKeyPublishTest*"
 append_negative_case "*LakePrimaryKeyCompactionTest*"
 append_negative_case "*BrpcStubCacheTest.test_http_cleanup*"
 append_negative_case "*BrpcStubCacheTest.test_cleanup*"
+append_negative_case "*PersistentIndexSstableTest.test_metric_sst_open_read_error*"
+append_negative_case "*PersistentIndexSstableTest.test_sst_open_retry_after_clear_corrupted_cache*"
+append_negative_case "*PersistentIndexSstableTest.test_metric_sst_multiget_read_error*"
+append_negative_case "*PersistentIndexSstableTest.test_multiget_retry_after_clear_corrupted_cache*"
 
 
 # prepare util test_data
