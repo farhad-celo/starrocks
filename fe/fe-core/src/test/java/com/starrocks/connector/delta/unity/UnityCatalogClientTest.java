@@ -37,6 +37,8 @@ import mockit.Mocked;
 import mockit.Verifications;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.List;
 
@@ -208,5 +210,70 @@ public class UnityCatalogClientTest {
 
         UnityCatalogClient client = new UnityCatalogClient(ws);
         Assertions.assertEquals("eu-central-1", client.getMetastoreSummary().getRegion());
+    }
+
+    @ParameterizedTest(name = "[{index}] ''{0}'' -> ''{1}''")
+    @CsvSource({
+            // space in each position of the three-part name
+            "cat.schema.Store Name,         cat.schema.Store%20Name",
+            "cat.my schema.orders,          cat.my%20schema.orders",
+            "my cat.schema.tbl,             my%20cat.schema.tbl",
+            // plain ASCII must survive unchanged
+            "main.sales.orders,             main.sales.orders",
+            // literal '+' -> '%2B', not '%20'
+            "cat.schema.a+b,                cat.schema.a%2Bb",
+            // literal '%' -> '%25'
+            "cat.schema.100%_report,        cat.schema.100%25_report",
+            // spaces in both schema and table name
+            "cat.my schema.Store Mapping,   cat.my%20schema.Store%20Mapping",
+    })
+    public void testGetTableEncodesFullName(String input, String expectedEncoded,
+                                            @Mocked WorkspaceClient ws,
+                                            @Mocked TablesAPI tables) {
+        TableInfo info = new TableInfo();
+        new Expectations() {
+            {
+                ws.tables();
+                result = tables;
+                tables.get(anyString);
+                result = info;
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws);
+        Assertions.assertSame(info, client.getTable(input));
+
+        new Verifications() {
+            {
+                tables.get(expectedEncoded);
+            }
+        };
+    }
+
+    @ParameterizedTest(name = "[{index}] ''{0}'' -> ''{1}''")
+    @CsvSource({
+            "cat.schema.Store Name, cat.schema.Store%20Name",
+            "cat.schema.a+b,        cat.schema.a%2Bb",
+    })
+    public void testTableExistsEncodesFullName(String input, String expectedEncoded,
+                                               @Mocked WorkspaceClient ws,
+                                               @Mocked TablesAPI tables) {
+        new Expectations() {
+            {
+                ws.tables();
+                result = tables;
+                tables.get(anyString);
+                result = new TableInfo();
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws);
+        Assertions.assertTrue(client.tableExists(input));
+
+        new Verifications() {
+            {
+                tables.get(expectedEncoded);
+            }
+        };
     }
 }

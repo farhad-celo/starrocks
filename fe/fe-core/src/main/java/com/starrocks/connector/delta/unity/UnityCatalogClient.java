@@ -31,6 +31,8 @@ import com.starrocks.connector.exception.StarRocksConnectorException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -104,7 +106,7 @@ public class UnityCatalogClient implements UnityCatalogApi {
     @Override
     public TableInfo getTable(String fullName) {
         try {
-            return workspace.tables().get(fullName);
+            return workspace.tables().get(encodeFullName(fullName));
         } catch (DatabricksException e) {
             throw wrap("getTable(" + fullName + ")", e);
         }
@@ -113,7 +115,7 @@ public class UnityCatalogClient implements UnityCatalogApi {
     @Override
     public boolean tableExists(String fullName) {
         try {
-            workspace.tables().get(fullName);
+            workspace.tables().get(encodeFullName(fullName));
             return true;
         } catch (NotFound e) {
             return false;
@@ -156,5 +158,19 @@ public class UnityCatalogClient implements UnityCatalogApi {
     private static StarRocksConnectorException wrap(String context, DatabricksException e) {
         LOG.warn("Unity Catalog request {} failed: {}", context, e.getMessage());
         return new StarRocksConnectorException("Unity Catalog %s failed: %s", context, e.getMessage());
+    }
+
+    private static String encodeFullName(String fullName) {
+        String[] parts = fullName.split("\\.", -1);
+        StringBuilder sb = new StringBuilder(fullName.length() + 16);
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                sb.append('.');
+            }
+            // URLEncoder is form-encoded (' ' -> '+'); swap '+' for '%20' so the output is
+            // valid as a URL *path* segment, not just a query value.
+            sb.append(URLEncoder.encode(parts[i], StandardCharsets.UTF_8).replace("+", "%20"));
+        }
+        return sb.toString();
     }
 }
