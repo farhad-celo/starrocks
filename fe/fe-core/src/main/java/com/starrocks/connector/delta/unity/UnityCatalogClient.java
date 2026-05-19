@@ -27,12 +27,11 @@ import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.TableInfo;
 import com.databricks.sdk.service.catalog.TableOperation;
 import com.google.common.collect.ImmutableList;
+import com.google.common.net.PercentEscaper;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -54,6 +53,7 @@ import java.util.Objects;
 public class UnityCatalogClient implements UnityCatalogApi {
     private static final Logger LOG = LogManager.getLogger(UnityCatalogClient.class);
     private static final String READ_OPERATION = "READ";
+    private static final PercentEscaper FULL_NAME_ESCAPER = new PercentEscaper("-_.*", false);
 
     private final WorkspaceClient workspace;
 
@@ -161,16 +161,6 @@ public class UnityCatalogClient implements UnityCatalogApi {
     }
 
     private static String encodeFullName(String fullName) {
-        String[] parts = fullName.split("\\.", -1);
-        StringBuilder sb = new StringBuilder(fullName.length() + 16);
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) {
-                sb.append('.');
-            }
-            // URLEncoder is form-encoded (' ' -> '+'); swap '+' for '%20' so the output is
-            // valid as a URL *path* segment, not just a query value.
-            sb.append(URLEncoder.encode(parts[i], StandardCharsets.UTF_8).replace("+", "%20"));
-        }
-        return sb.toString();
+        return FULL_NAME_ESCAPER.escape(fullName);
     }
 }
