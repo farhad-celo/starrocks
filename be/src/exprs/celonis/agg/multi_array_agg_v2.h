@@ -131,7 +131,7 @@ public:
         while (pos < end) {
             size_t row_size = _compute_row_size(ctx, pos, num_fields, nbm);
             if (pos + row_size > end) {
-                ctx->set_error("multi_array_agg_v2: corrupted serialized data in merge", false);
+                _emit_corruption_error(ctx, "merge", slice, pos, row_size, num_fields, nbm);
                 return;
             }
             auto* node =
@@ -157,6 +157,7 @@ public:
         }
 
         auto* bin = ColumnHelper::get_binary_column(to);
+        if (_would_overflow_intermediate(ctx, bin, total_size, "serialize_to_column")) return;
         auto& bytes = bin->get_bytes();
         size_t old_size = bytes.size();
         bytes.resize(old_size + total_size);
@@ -171,6 +172,9 @@ public:
         bin->get_offset().push_back(bytes.size());
         if (to->is_nullable()) {
             down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
+        }
+        if (UNLIKELY(ctx->get_multi_array_agg_v2_debug_level() > 0)) {
+            _verify_slice_roundtrip(ctx, bin, bin->get_offset().size() - 2, num_fields, nbm, "serialize_to_column");
         }
     }
 
@@ -266,14 +270,16 @@ public:
         size_t nbm = (num_fields + 7) / 8;
 
         for (size_t row = 0; row < chunk_size; ++row) {
-            uint32_t row_size = static_cast<uint32_t>(nbm);
+            size_t row_size = nbm;
             for (size_t i = 0; i < num_fields; ++i) {
                 if (!_is_null(src[i].get(), row)) {
                     auto [dc, ar] = _unwrap(src[i].get(), row);
                     int serialization_size = ctx->get_multi_array_agg_column_serialization_size()[i];
-                    row_size += serialization_size == 0 ? dc->serialize_size(ar) : serialization_size;
+                    row_size +=
+                            serialization_size == 0 ? dc->serialize_size(ar) : static_cast<size_t>(serialization_size);
                 }
             }
+            if (_would_overflow_intermediate(ctx, bin, row_size, "convert_to_serialize_format")) return;
 
             size_t old_size = bytes.size();
             bytes.resize(old_size + row_size);
@@ -299,6 +305,11 @@ public:
             }
 
             offsets.push_back(bytes.size());
+            if (UNLIKELY(ctx->get_multi_array_agg_v2_debug_level() > 0)) {
+                if (_verify_slice_roundtrip(ctx, bin, offsets.size() - 2, num_fields, nbm,
+                                            "convert_to_serialize_format"))
+                    return;
+            }
         }
 
         if (dst->get()->is_nullable()) {
@@ -317,6 +328,68 @@ public:
     std::string get_name() const override { return "multi_array_agg_v2"; }
 
 private:
+    // Pre-flight check that the intermediate BinaryColumn won't overflow uint32_t offsets.
+    static bool _would_overflow_intermediate(FunctionContext* ctx, const BinaryColumn* bin, size_t add,
+                                             const char* origin) {
+        size_t cur = bin->get_bytes().size();
+        size_t limit = static_cast<size_t>(Column::MAX_CAPACITY_LIMIT);
+        if (add >= limit || cur + add >= limit) {
+            ctx->set_error(
+                    fmt::format(
+                            "multi_array_agg_v2: intermediate VARBINARY exceeds 4 GiB in {} (current={}, adding={})",
+                            origin, cur, add)
+                            .c_str(),
+                    false);
+            return true;
+        }
+        return false;
+    }
+
+    // Debug: render up to max bytes of slice as comma-separated decimal codes.
+    static std::string _slice_bytes_as_codes(const Slice& slice, size_t max_bytes) {
+        size_t dump = std::min<size_t>(max_bytes, slice.size);
+        std::string out;
+        auto* data = reinterpret_cast<const uint8_t*>(slice.data);
+        for (size_t i = 0; i < dump; ++i) {
+            if (i != 0) out.push_back(',');
+            out += std::to_string(static_cast<unsigned>(data[i]));
+        }
+        return out;
+    }
+
+    // Emit "corrupted serialized data" error; verbose when debug_level > 0.
+    static void _emit_corruption_error(FunctionContext* ctx, const char* origin, const Slice& slice, const uint8_t* pos,
+                                       size_t row_size, size_t num_fields, size_t nbm) {
+        if (UNLIKELY(ctx->get_multi_array_agg_v2_debug_level() > 0)) {
+            size_t off = static_cast<size_t>(pos - reinterpret_cast<const uint8_t*>(slice.data));
+            ctx->set_error(fmt::format("multi_array_agg_v2: corrupted serialized data in {} (num_fields={}, nbm={}, "
+                                       "slice.size={}, pos_offset={}, row_size={}, pos+row_size={}, bytes=[{}])",
+                                       origin, num_fields, nbm, slice.size, off, row_size, off + row_size,
+                                       _slice_bytes_as_codes(slice, 500))
+                                   .c_str(),
+                           false);
+        } else {
+            ctx->set_error(fmt::format("multi_array_agg_v2: corrupted serialized data in {}", origin).c_str(), false);
+        }
+    }
+
+    // Debug: walk the row just appended via bin->get_slice() — same path merge() uses.
+    static bool _verify_slice_roundtrip(FunctionContext* ctx, const BinaryColumn* bin, size_t row_idx,
+                                        size_t num_fields, size_t nbm, const char* origin) {
+        Slice slice = bin->get_slice(row_idx);
+        const uint8_t* pos = reinterpret_cast<const uint8_t*>(slice.data);
+        const uint8_t* end = pos + slice.size;
+        while (pos < end) {
+            size_t row_size = _compute_row_size(ctx, pos, num_fields, nbm);
+            if (pos + row_size > end) {
+                _emit_corruption_error(ctx, origin, slice, pos, row_size, num_fields, nbm);
+                return true;
+            }
+            pos += row_size;
+        }
+        return false;
+    }
+
     // Compute the byte size of a serialized row by scanning its null bitmap and fields.
     // Does not deserialize — just advances a pointer past each field.
     static size_t _compute_row_size(FunctionContext* ctx, const uint8_t* data, size_t num_fields, size_t nbm) {

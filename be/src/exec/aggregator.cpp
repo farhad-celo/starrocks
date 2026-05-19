@@ -517,6 +517,10 @@ Status Aggregator::prepare(RuntimeState* state, ObjectPool* pool, RuntimeProfile
         if (!agg_fn_type.multi_array_agg_column_serialization_size.empty()) {
             _agg_fn_ctxs[i]->set_multi_array_agg_column_serialization_size(agg_fn_type.multi_array_agg_column_serialization_size);
         }
+        if (state->query_options().__isset.multi_array_agg_v2_debug_level &&
+            state->query_options().multi_array_agg_v2_debug_level > 0) {
+            _agg_fn_ctxs[i]->set_multi_array_agg_v2_debug_level(state->query_options().multi_array_agg_v2_debug_level);
+        }
         if (state->query_options().__isset.group_concat_max_len) {
             _agg_fn_ctxs[i]->set_group_concat_max_len(state->query_options().group_concat_max_len);
         }

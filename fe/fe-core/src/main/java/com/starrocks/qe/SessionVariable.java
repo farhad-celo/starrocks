@@ -396,6 +396,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String CTE_LOW_CARDINALITY_OPTIMIZE = "cte_low_cardinality_optimize";
     public static final String ENABLE_MULTI_ARRAY_AGG_V2 = "enable_multi_array_agg_v2";
     public static final String ENABLE_MULTI_ARRAY_AGG_V2_DICT_COMPACTION = "enable_multi_array_agg_v2_dict_compaction";
+    public static final String MULTI_ARRAY_AGG_V2_DEBUG_LEVEL = "multi_array_agg_v2_debug_level";
     public static final String CBO_USE_NTH_EXEC_PLAN = "cbo_use_nth_exec_plan";
     public static final String CBO_CTE_REUSE = "cbo_cte_reuse";
     public static final String CBO_CTE_REUSE_RATE = "cbo_cte_reuse_rate";
@@ -1631,6 +1632,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VariableMgr.VarAttr(name = ENABLE_MULTI_ARRAY_AGG_V2_DICT_COMPACTION)
     private boolean enableMultiArrayAggV2DictCompaction = false;
 
+    @VariableMgr.VarAttr(name = MULTI_ARRAY_AGG_V2_DEBUG_LEVEL)
+    private int multiArrayAggV2DebugLevel = 0;
+
     @VariableMgr.VarAttr(name = ENABLE_OPTIMIZER_REWRITE_GROUPINGSETS_TO_UNION_ALL)
     private boolean enableRewriteGroupingSetsToUnionAll = false;
 
@@ -2096,6 +2100,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableMultiArrayAggV2DictCompaction(boolean enableMultiArrayAggV2DictCompaction) {
         this.enableMultiArrayAggV2DictCompaction = enableMultiArrayAggV2DictCompaction;
+    }
+
+    public int getMultiArrayAggV2DebugLevel() {
+        return this.multiArrayAggV2DebugLevel;
+    }
+
+    void setMultiArrayAggV2DebugLevel(int multiArrayAggV2DebugLevel) {
+        this.multiArrayAggV2DebugLevel = multiArrayAggV2DebugLevel;
     }
 
     @VarAttr(name = ENABLE_REWRITE_BITMAP_UNION_TO_BITMAP_AGG)
@@ -5630,6 +5642,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
         tResult.setTransmission_encode_level(transmissionEncodeLevel);
         tResult.setGroup_concat_max_len(groupConcatMaxLen);
         tResult.setMax_array_length(maxArrayLength);
+        tResult.setMulti_array_agg_v2_debug_level(multiArrayAggV2DebugLevel);
         tResult.setRpc_http_min_size(rpcHttpMinSize);
         tResult.setInterleaving_group_size(interleavingGroupSize);
 

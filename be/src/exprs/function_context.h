@@ -109,12 +109,14 @@ public:
     std::vector<bool> get_nulls_first() { return _nulls_first; }
     bool get_is_distinct() { return _is_distinct; }
     const std::vector<int16_t>& get_multi_array_agg_column_serialization_size() { return _multi_array_agg_column_serialization_size; }
+    int get_multi_array_agg_v2_debug_level() const { return _multi_array_agg_v2_debug_level; }
     // for tests
     void set_is_asc_order(const std::vector<bool>& order) { _is_asc_order = order; }
     void set_nulls_first(const std::vector<bool>& nulls) { _nulls_first = nulls; }
     void set_runtime_state(RuntimeState* const state) { _state = state; }
     void set_is_distinct(bool is_distinct) { _is_distinct = is_distinct; }
     void set_multi_array_agg_column_serialization_size(const std::vector<int16_t>& sizes) { _multi_array_agg_column_serialization_size = sizes; }
+    void set_multi_array_agg_v2_debug_level(int debug_level) { _multi_array_agg_v2_debug_level = debug_level; }
 
     // Returns _constant_columns size
     int get_num_constant_columns() const;
@@ -230,6 +232,7 @@ private:
     std::vector<bool> _is_asc_order;
     std::vector<bool> _nulls_first;
     std::vector<int16_t> _multi_array_agg_column_serialization_size;
+    int _multi_array_agg_v2_debug_level = 0;
     bool _is_distinct = false;
     ssize_t group_concat_max_len = 1024;
     ssize_t _max_array_length = 0;

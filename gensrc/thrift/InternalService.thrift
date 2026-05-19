@@ -356,6 +356,9 @@ struct TQueryOptions {
   // Maximum number of elements in an array produced by an array function. The query fails once an
   // array exceeds it. Only array_agg enforces it so far. <=0 disables the limit. Default 0.
   218: optional i64 max_array_length = 0;
+
+  // CELONIS
+  10001: optional i64 multi_array_agg_v2_debug_level;
 }
 
 // A scan range plus the parameters needed to execute that scan.
