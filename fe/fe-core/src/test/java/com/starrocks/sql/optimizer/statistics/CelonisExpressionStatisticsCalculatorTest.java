@@ -1137,6 +1137,55 @@ public class CelonisExpressionStatisticsCalculatorTest {
         testCelonisRemapValuesUsingFunction(FunctionSet.CELONIS_REMAP_VALUES_CONST);
     }
 
+    @Test
+    public void testCelonisRemapValuesWithIdentityDefault() {
+        // GIVEN
+        final var stringCol = new ColumnRefOperator(1, Type.VARCHAR, "str", true);
+        final var statistics = Statistics.builder()
+                .addColumnStatistic(stringCol,
+                        ColumnStatistic.builder() //
+                                .setMinValue(NEGATIVE_INFINITY) //
+                                .setMaxValue(POSITIVE_INFINITY) //
+                                .setNullsFraction(0.1) //
+                                .setDistinctValuesCount(100) //
+                                .setAverageRowSize(Type.VARCHAR.getTypeSize()) //
+                                .build()) //
+                .setOutputRowCount(1000) //
+                .build();
+
+        final var toBeReplaced1 = ConstantOperator.createVarchar("to_be_replaced1");
+        final var toBeReplaced2 = ConstantOperator.createVarchar("to_be_replaced2");
+        final var replaced1 = ConstantOperator.createVarchar("replaced1");
+        final var replaced2 = ConstantOperator.createVarchar("replaced2");
+
+        final var baselineRemap = new CallOperator(FunctionSet.CELONIS_REMAP_VALUES, Type.VARCHAR,
+                Lists.newArrayList(
+                        stringCol,
+                        new ArrayOperator(Type.VARCHAR, true, Lists.newArrayList(toBeReplaced1, toBeReplaced2)),
+                        new ArrayOperator(Type.VARCHAR, true, Lists.newArrayList(replaced1, replaced2))
+                ));
+
+        final var remapWithIdentityDefault = new CallOperator(FunctionSet.CELONIS_REMAP_VALUES, Type.VARCHAR,
+                Lists.newArrayList(
+                        stringCol,
+                        new ArrayOperator(Type.VARCHAR, true, Lists.newArrayList(toBeReplaced1, toBeReplaced2)),
+                        new ArrayOperator(Type.VARCHAR, true, Lists.newArrayList(replaced1, replaced2)),
+                        stringCol
+                ));
+
+        // WHEN
+        final var baselineStats = ExpressionStatisticCalculator.calculate(baselineRemap, statistics);
+        final var identityDefaultStats = ExpressionStatisticCalculator.calculate(remapWithIdentityDefault, statistics);
+
+        // THEN
+        assertThat(identityDefaultStats.isUnknown()).isFalse();
+        assertEquals(baselineStats.getMinValue(), identityDefaultStats.getMinValue(), 0.001);
+        assertEquals(baselineStats.getMaxValue(), identityDefaultStats.getMaxValue(), 0.001);
+        assertEquals(baselineStats.getNullsFraction(), identityDefaultStats.getNullsFraction(), 0.001);
+        assertEquals(baselineStats.getDistinctValuesCount(), identityDefaultStats.getDistinctValuesCount(), 0.001);
+        assertEquals(baselineStats.getAverageRowSize(), identityDefaultStats.getAverageRowSize(), 0.001);
+    }
+
     private static class NullSkewTestScenario {
         private final ColumnRefOperator stringColumnRefOperator = new ColumnRefOperator(0, Type.VARCHAR, "str", true);
         private final Statistics statistics;

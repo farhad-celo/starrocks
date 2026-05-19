@@ -434,31 +434,30 @@ public class CelonisExpressionStatisticsCalculator {
     private static ColumnStatistic celonisRemapValuesCalculate(List<ScalarOperator> children,
                                                                List<ColumnStatistic> childrenColumnStatistics,
                                                                Statistics inputStatistics, double rowCount) {
-        ColumnStatistic columnStatistic = childrenColumnStatistics.get(0);
-        if (columnStatistic.isUnknown()) {
+        final var inputColumnStatistic = childrenColumnStatistics.get(0);
+        if (inputColumnStatistic.isUnknown()) {
             return null;
         }
 
         double minValue = POSITIVE_INFINITY;
         double maxValue = NEGATIVE_INFINITY;
-        double distinctValue = Math.min(columnStatistic.getDistinctValuesCount(), rowCount);
-        double averageRowSize = columnStatistic.getAverageRowSize();
+        double distinctValue = Math.min(inputColumnStatistic.getDistinctValuesCount(), rowCount);
+        double averageRowSize = inputColumnStatistic.getAverageRowSize();
         double nullsFraction = 0;
         ConstantOperator defaultValue = null;
 
         double averageRowSizeTotal = 0.0;
         double averageRowSizeCount = 0.0;
-        double columnNonNullsFraction = 1 - columnStatistic.getNullsFraction();
+        double columnNonNullsFraction = 1 - inputColumnStatistic.getNullsFraction();
         boolean isNullMappedToNonNull = false;
         boolean isNullMappedToNull = false;
 
-        Map<ConstantOperator, ConstantOperator> deduplicatedValuesMap = deduplicateMappedValues(children, columnStatistic,
-                inputStatistics);
+        final var deduplicatedValuesMap = deduplicateMappedValues(children, inputColumnStatistic, inputStatistics);
         if (deduplicatedValuesMap == null) {
             return null;
         }
 
-        for (Map.Entry<ConstantOperator, ConstantOperator> mappedPair : deduplicatedValuesMap.entrySet()) {
+        for (final var mappedPair : deduplicatedValuesMap.entrySet()) {
             ConstantOperator mappedFrom = mappedPair.getKey();
             ConstantOperator mappedTo = mappedPair.getValue();
 
@@ -486,51 +485,59 @@ public class CelonisExpressionStatisticsCalculator {
         }
 
         if (children.size() == 4) {
-            if (!(children.get(3) instanceof ConstantOperator)) {
+            final var inputExpression = children.get(0);
+            final var defaultExpression = children.get(3);
+
+            if (getChildForCastOperator(inputExpression).equals(getChildForCastOperator(defaultExpression))) {
+                // Input equals default, we can use the input stats.
+                minValue = Math.min(minValue, inputColumnStatistic.getMinValue());
+                maxValue = Math.max(maxValue, inputColumnStatistic.getMaxValue());
+            } else if (defaultExpression instanceof ConstantOperator constantDefaultExpression) {
+                defaultValue = constantDefaultExpression;
+                int countDistinctMappedToNonNullValues = countDistinctMappedToNonNullValues(deduplicatedValuesMap,
+                        defaultValue);
+
+                if (defaultValue.isNull()) {
+                    double nonNullMappedValues = deduplicatedValuesMap.size();
+                    if (isNullMappedToNonNull || isNullMappedToNull) {
+                        nonNullMappedValues -= 1;
+                    }
+                    nullsFraction += distinctValue != 0 ?
+                            columnNonNullsFraction * Math.max(0, distinctValue - nonNullMappedValues) / distinctValue : 0;
+                    distinctValue = Math.min(distinctValue, countDistinctMappedToNonNullValues);
+                } else {
+                    ColumnStatistic defaultValueStatistic = childrenColumnStatistics.get(3);
+                    minValue = Math.min(minValue, defaultValueStatistic.getMinValue());
+                    maxValue = Math.max(maxValue, defaultValueStatistic.getMaxValue());
+                    distinctValue = Math.min(distinctValue, countDistinctMappedToNonNullValues);
+                    averageRowSizeTotal += defaultValueStatistic.getAverageRowSize();
+                    ++averageRowSizeCount;
+                    isNullMappedToNonNull = true;
+                }
+
+                averageRowSize = averageRowSizeCount == 0 ? 0 : averageRowSizeTotal / averageRowSizeCount;
+            } else {
                 return null;
             }
-
-            defaultValue = (ConstantOperator) children.get(3);
-            int countDistinctMappedToNonNullValues = countDistinctMappedToNonNullValues(deduplicatedValuesMap, defaultValue);
-
-            if (defaultValue.isNull()) {
-                double nonNullMappedValues = deduplicatedValuesMap.size();
-                if (isNullMappedToNonNull || isNullMappedToNull) {
-                    nonNullMappedValues -= 1;
-                }
-                nullsFraction += distinctValue != 0 ?
-                        columnNonNullsFraction * Math.max(0, distinctValue - nonNullMappedValues) / distinctValue : 0;
-                distinctValue = Math.min(distinctValue, countDistinctMappedToNonNullValues);
-            } else {
-                ColumnStatistic defaultValueStatistic = childrenColumnStatistics.get(3);
-                minValue = Math.min(minValue, defaultValueStatistic.getMinValue());
-                maxValue = Math.max(maxValue, defaultValueStatistic.getMaxValue());
-                distinctValue = Math.min(distinctValue, countDistinctMappedToNonNullValues);
-                averageRowSizeTotal += defaultValueStatistic.getAverageRowSize();
-                ++averageRowSizeCount;
-                isNullMappedToNonNull = true;
-            }
-
-            averageRowSize = averageRowSizeCount == 0 ? 0 : averageRowSizeTotal / averageRowSizeCount;
         } else {
-            minValue = Math.min(minValue, columnStatistic.getMinValue());
-            maxValue = Math.max(maxValue, columnStatistic.getMaxValue());
+            minValue = Math.min(minValue, inputColumnStatistic.getMinValue());
+            maxValue = Math.max(maxValue, inputColumnStatistic.getMaxValue());
         }
 
         // Nulls from the input columns are preserved only if nulls are not explicitly mapped to another constant, or if they
         // are explicitly mapped to null.
         boolean preserveNulls = isNullMappedToNull || !isNullMappedToNonNull;
         if (preserveNulls) {
-            nullsFraction += columnStatistic.getNullsFraction();
+            nullsFraction += inputColumnStatistic.getNullsFraction();
         }
 
         nullsFraction = Math.min(1.0, nullsFraction);
-        final var histogram = projectHistogramThroughRemapValues(columnStatistic, deduplicatedValuesMap, defaultValue,
+        final var histogram = projectHistogramThroughRemapValues(inputColumnStatistic, deduplicatedValuesMap, defaultValue,
                 nullsFraction);
 
         return ColumnStatistic.builder()
-                .setMinValue(minValue)
-                .setMaxValue(maxValue)
+                .setMinValue(minValue == POSITIVE_INFINITY ? NEGATIVE_INFINITY : minValue) // Avoid unset min
+                .setMaxValue(maxValue  == NEGATIVE_INFINITY ? POSITIVE_INFINITY : maxValue) // Avoid unset max
                 .setNullsFraction(nullsFraction)
                 .setAverageRowSize(averageRowSize)
                 .setDistinctValuesCount(distinctValue)
