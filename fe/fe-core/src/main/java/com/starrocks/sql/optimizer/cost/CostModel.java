@@ -55,6 +55,7 @@ import com.starrocks.sql.optimizer.operator.physical.PhysicalTopNOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalWindowOperator;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
+import com.starrocks.sql.optimizer.rule.transformation.GroupByCountDistinctDataSkewEliminateRule;
 import com.starrocks.sql.optimizer.skew.DataSkew;
 import com.starrocks.sql.optimizer.skew.DataSkewInfo;
 import com.starrocks.sql.optimizer.statistics.ColumnStatistic;
@@ -71,6 +72,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.starrocks.sql.optimizer.rule.transformation.GroupByCountDistinctDataSkewEliminateRule.NoTriggerReason.INACCURATE_ROW_COUNT;
+import static com.starrocks.sql.optimizer.rule.transformation.GroupByCountDistinctDataSkewEliminateRule.NoTriggerReason.NO_SKEW;
+import static com.starrocks.sql.optimizer.rule.transformation.GroupByCountDistinctDataSkewEliminateRule.TriggerReason.DATA_SKEW;
+import static com.starrocks.sql.optimizer.rule.transformation.GroupByCountDistinctDataSkewEliminateRule.TriggerReason.LOW_CARDINALITY;
 import static com.starrocks.sql.optimizer.statistics.StatisticsEstimateCoefficient.EXECUTE_COST_PENALTY;
 
 public class CostModel {
@@ -321,6 +326,7 @@ public class CostModel {
             }
 
             if (inputStatistics.isTableRowCountMayInaccurate()) {
+                GroupByCountDistinctDataSkewEliminateRule.RULE_USAGE_METRICS.notTriggered(INACCURATE_ROW_COUNT);
                 return 1.5;
             }
 
@@ -336,16 +342,22 @@ public class CostModel {
             if (isGroupBySkewed(groupByStatistics, inputStatistics)) {
                 if (enableForceGroupBySkewEliminateWhenSkewed) {
                     skewInfo.setGroupBySkewDetected(true);
+
+                    GroupByCountDistinctDataSkewEliminateRule.RULE_USAGE_METRICS.triggered(DATA_SKEW);
                     return 0.0;
                 }
+                GroupByCountDistinctDataSkewEliminateRule.RULE_USAGE_METRICS.triggered(DATA_SKEW);
                 return 0.2;
             }
 
             // Checking for the cardinality of the group by columns.
             if (isGroupByLowCardinality(groupByStatistics, inputStatistics, skewInfo.getSkewColumnRef())) {
+                GroupByCountDistinctDataSkewEliminateRule.RULE_USAGE_METRICS.triggered(LOW_CARDINALITY);
                 return 0.5;
             }
 
+
+            GroupByCountDistinctDataSkewEliminateRule.RULE_USAGE_METRICS.notTriggered(NO_SKEW);
             return 1.5;
         }
 

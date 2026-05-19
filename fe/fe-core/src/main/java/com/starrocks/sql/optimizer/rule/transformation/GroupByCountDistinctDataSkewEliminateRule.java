@@ -21,6 +21,7 @@ import com.starrocks.analysis.Expr;
 import com.starrocks.catalog.Function;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.Type;
+import com.starrocks.metric.celonis.CelonisRuleUsageMetrics;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.OptimizerContext;
 import com.starrocks.sql.optimizer.operator.AggType;
@@ -45,6 +46,15 @@ import java.util.List;
 import java.util.Map;
 
 public class GroupByCountDistinctDataSkewEliminateRule extends TransformationRule {
+    private static final String RULE_NAME = "group_by_count_distinct_skew_elimination";
+    private static final String RULE_CATEGORY = "celonis_skew_rules";
+
+    public enum TriggerReason { COUNT_DISTINCT_WITH_SKEW_HINT, DATA_SKEW, LOW_CARDINALITY }
+    public enum NoTriggerReason { NO_SKEW, INACCURATE_ROW_COUNT }
+
+    public static final CelonisRuleUsageMetrics<TriggerReason, NoTriggerReason>
+            RULE_USAGE_METRICS = new CelonisRuleUsageMetrics<>(RULE_NAME, RULE_CATEGORY);
+
     private GroupByCountDistinctDataSkewEliminateRule() {
         super(RuleType.TF_GROUP_BY_COUNT_DISTINCT_DATA_SKEW_ELIMINATE_RULE, Pattern.create(OperatorType.LOGICAL_AGGR,
                 OperatorType.PATTERN_LEAF));
@@ -57,8 +67,14 @@ public class GroupByCountDistinctDataSkewEliminateRule extends TransformationRul
         final var isCountDistinct = aggOp.checkGroupByCountDistinct();
         final var isDistinctColumnBucketizationEnabled = context.getSessionVariable().isEnableDistinctColumnBucketization();
 
-        return isCountDistinctAndHasSkewHint || (isCountDistinct && isDistinctColumnBucketizationEnabled);
+        if (isCountDistinctAndHasSkewHint) {
+            RULE_USAGE_METRICS.triggered(TriggerReason.COUNT_DISTINCT_WITH_SKEW_HINT);
+            return true;
+        }
+
+        return isCountDistinct && isDistinctColumnBucketizationEnabled;
     }
+
 
     private static final GroupByCountDistinctDataSkewEliminateRule INSTANCE =
             new GroupByCountDistinctDataSkewEliminateRule();

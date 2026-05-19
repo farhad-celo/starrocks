@@ -26,6 +26,7 @@ import com.starrocks.catalog.TableFunction;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.Pair;
 import com.starrocks.connector.exception.StarRocksConnectorException;
+import com.starrocks.metric.celonis.CelonisRuleUsageMetrics;
 import com.starrocks.sql.common.ErrorType;
 import com.starrocks.sql.common.StarRocksPlannerException;
 import com.starrocks.sql.optimizer.JoinHelper;
@@ -87,6 +88,16 @@ import java.util.stream.Collectors;
  */
 
 public class SkewJoinOptimizeRule extends TransformationRule {
+
+    private static final String RULE_NAME = "skew_join_optimization";
+    private static final String RULE_CATEGORY = "celonis_skew_rules";
+
+    private enum TriggerReason { SKEWED_NULL, SKEWED_MCV }
+
+    private enum NoTriggerReason { NOT_SKEWED, MISSING_STATS }
+
+    private static final CelonisRuleUsageMetrics<TriggerReason, NoTriggerReason> RULE_USAGE_METRICS =
+            new CelonisRuleUsageMetrics<>(RULE_NAME, RULE_CATEGORY);
 
     private static final String RAND_COL = "rand_col";
 
@@ -155,6 +166,7 @@ public class SkewJoinOptimizeRule extends TransformationRule {
         }
         Statistics leftChildStats = input.inputAt(0).getStatistics();
         if (leftChildStats == null) {
+            RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
             return false;
         }
         final var mcvLimit = context.getSessionVariable().getSkewJoinOptimizeUseMCVCount();
@@ -191,10 +203,13 @@ public class SkewJoinOptimizeRule extends TransformationRule {
 
             // Handle NULL-only skew case: when MCV is empty but NULL fraction indicates skew
             List<ScalarOperator> skewValues;
+            TriggerReason reason;
             if (skewInfo.type() == DataSkew.SkewType.SKEWED_NULL) {
+                reason = TriggerReason.SKEWED_NULL;
                 // Create a special NULL skew value for NULL-only skew cases
                 skewValues = Lists.newArrayList(ConstantOperator.createNull(skewJoinColumn.getType()));
             } else if (skewInfo.type() == DataSkew.SkewType.SKEWED_MCV) {
+                reason = TriggerReason.SKEWED_MCV;
                 // Use MCV-based skew values
                 skewValues = skewInfo.maybeMcvs().get()
                         .stream() //
@@ -232,8 +247,10 @@ public class SkewJoinOptimizeRule extends TransformationRule {
 
             joinOperator.setSkewColumn(skewJoinColumn);
             joinOperator.setSkewValues(skewValues);
+            RULE_USAGE_METRICS.triggered(reason);
             return true;
         }
+        RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NOT_SKEWED);
         return false;
     }
 
