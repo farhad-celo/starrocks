@@ -94,7 +94,7 @@ public class SkewJoinOptimizeRule extends TransformationRule {
 
     private enum TriggerReason { SKEWED_NULL, SKEWED_MCV }
 
-    private enum NoTriggerReason { NOT_SKEWED, MISSING_STATS }
+    private enum NoTriggerReason { NOT_SKEWED, MISSING_STATS, INACCURATE_ROW_COUNT, NO_MCV, NO_HISTOGRAM }
 
     private static final CelonisRuleUsageMetrics<TriggerReason, NoTriggerReason> RULE_USAGE_METRICS =
             new CelonisRuleUsageMetrics<>(RULE_NAME, RULE_CATEGORY);
@@ -182,13 +182,19 @@ public class SkewJoinOptimizeRule extends TransformationRule {
         }
 
         List<PredicateSkewInfo> skewedPredicates = new ArrayList<>();
+        DataSkew.AdditionalInfo additionalSkewInfo = DataSkew.AdditionalInfo.NONE;
         for (BinaryPredicateOperator equalConj : equalConjs) {
             var columnOpt = getLeftSideColumn(equalConj, leftOutputColumns);
             var skewInfoOpt = getSkewInfoForPredicate(equalConj, leftOutputColumns, leftChildStats, skewThresholds);
             if (columnOpt.isEmpty() || skewInfoOpt.isEmpty()) {
                 continue;
             }
-            if (!skewInfoOpt.get().isSkewed()) {
+            final var skewInfo = skewInfoOpt.get();
+            if (!skewInfo.isSkewed()) {
+                if (skewInfo.additionalInfo() != DataSkew.AdditionalInfo.NONE) {
+                    additionalSkewInfo = skewInfo.additionalInfo();
+                }
+                reportNotTriggered(additionalSkewInfo);
                 return false;
             }
             final var leftCol = (ColumnRefOperator) equalConj.getChild(0);
@@ -250,8 +256,19 @@ public class SkewJoinOptimizeRule extends TransformationRule {
             RULE_USAGE_METRICS.triggered(reason);
             return true;
         }
-        RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NOT_SKEWED);
+
+        reportNotTriggered(additionalSkewInfo);
         return false;
+    }
+
+    private static void reportNotTriggered(DataSkew.AdditionalInfo additionalSkewInfo) {
+        switch (additionalSkewInfo) {
+            case NONE -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NOT_SKEWED);
+            case INACCURATE_ROW_COUNT -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.INACCURATE_ROW_COUNT);
+            case UNKNOWN_STATS -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
+            case NO_MCV -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_MCV);
+            case NO_HISTOGRAM -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_HISTOGRAM);
+        }
     }
 
     @Override

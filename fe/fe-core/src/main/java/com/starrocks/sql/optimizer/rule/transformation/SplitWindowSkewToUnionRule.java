@@ -123,6 +123,12 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
         NO_PARTITION_COLUMN,
         NO_ORDER_BY_COLUMN,
         MULTIPLE_PARTITION_COLUMNS,
+        MISSING_STATS,
+        MCV_CAST_FAILED,
+        NON_COLUMN_REF_PARTITION_EXPRESSION,
+        INACCURATE_ROW_COUNT,
+        NO_MCV,
+        NO_HISTOGRAM,
     }
 
     public static final CelonisRuleUsageMetrics<TriggerReason, NoTriggerReason>
@@ -191,9 +197,11 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
 
         //todo (m.bogusz) in theory we could have multiple skewed values, but for now we only handle one
         if (skewedInfos.size() != 1) {
-            RULE_USAGE_METRICS.notTriggered(skewedInfos.isEmpty()
-                    ? NoTriggerReason.NOT_SKEWED
-                    : NoTriggerReason.MULTIPLE_SKEWED);
+            // Other not skewed reasons are handled in `findSkewedPartition`
+            if (skewedInfos.size() > 1) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MULTIPLE_SKEWED);
+            }
+
             return Collections.emptyList();
         }
 
@@ -415,30 +423,47 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
 
     private List<SkewedInfo> findSkewedPartition(List<ScalarOperator> partitionExprs, Statistics statistics) {
         if (statistics == null) {
+            RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
             return Collections.emptyList();
         }
         var op = partitionExprs.get(0);
         if (op instanceof ColumnRefOperator col) {
             if (!statistics.getColumnStatistics().containsKey(col)) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
                 return Collections.emptyList();
             }
 
             ColumnStatistic colStat = statistics.getColumnStatistic(col);
             var skewInfo = DataSkew.getColumnSkewInfo(statistics, colStat, DataSkew.Thresholds.withMcvLimit(1));
             if (skewInfo.isSkewed()) {
-
                 if (skewInfo.type() == DataSkew.SkewType.SKEWED_NULL) {
                     return List.of(new SkewedInfo(col, ConstantOperator.createNull(col.getType())));
                 }
 
-                return skewInfo.maybeMcvs().stream() //
+                final var skewedPartitions = skewInfo.maybeMcvs().stream() //
                         .flatMap(Collection::stream) //
                         .map(mcv -> ConstantOperator.createVarchar(mcv.first).castTo(col.getType())) //
                         .filter(Optional::isPresent) //
                         .map(value -> new SkewedInfo(col, value.get())) //
                         .toList();
+
+                if (skewedPartitions.isEmpty()) {
+                    RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MCV_CAST_FAILED);
+                }
+                return skewedPartitions;
             }
+
+            switch (skewInfo.additionalInfo()) {
+                case NONE -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NOT_SKEWED);
+                case INACCURATE_ROW_COUNT -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.INACCURATE_ROW_COUNT);
+                case UNKNOWN_STATS -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
+                case NO_MCV -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_MCV);
+                case NO_HISTOGRAM -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_HISTOGRAM);
+            }
+        } else {
+            RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NON_COLUMN_REF_PARTITION_EXPRESSION);
         }
+
         return Collections.emptyList();
     }
 }
