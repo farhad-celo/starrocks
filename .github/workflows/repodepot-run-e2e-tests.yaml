@@ -1,6 +1,6 @@
 name: '[RepoDepot] Run E2E Tests'
 run-name: >-
-  Running e2e tests for `${{ inputs.component-name }}` revision `${{ inputs.image-tag }}` on `${{ inputs.deployment-stage }}`
+  Running e2e tests on `${{ inputs.destination }}` (revision `${{ inputs.image-tag }}`) for `${{ inputs.component-name }}`
 
 on:
   workflow_dispatch:
@@ -16,11 +16,12 @@ on:
         description: ECR Image Tag (e.g. 20250113-152710_RC00)
         type: string
         required: true
-      deployment-stage:
+      destination:
         type: string
-        description: Deployment Stage
+        description: >-
+          cfg destination the tests execute against, formatted as
+          `{clusterName}--{namespace}` (e.g. `develop-main-c059b72--develop`).
         required: true
-        default: staging
 
 jobs:
   run:
@@ -30,5 +31,5 @@ jobs:
     with:
       component-name: ${{ inputs.component-name }}
       image-tag: ${{ inputs.image-tag }}
-      deployment-stage: ${{ inputs.deployment-stage }}
+      destination: ${{ inputs.destination }}
       repo-depot-version: stable

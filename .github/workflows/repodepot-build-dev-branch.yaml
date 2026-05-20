@@ -7,7 +7,7 @@ run-name: '[RepoDepot] Build Dev Branch: ${{ github.ref_name }}'
 on:
   push:
       branches:
-      - branch-3.5-cc-85c3ad89-celo
+      - branch-3.5-cc-2548aa3d-celo
       paths-ignore: []
 
   workflow_dispatch:
