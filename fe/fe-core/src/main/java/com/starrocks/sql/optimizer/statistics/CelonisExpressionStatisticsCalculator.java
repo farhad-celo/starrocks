@@ -191,8 +191,10 @@ public class CelonisExpressionStatisticsCalculator {
         final var projectedMcvs = new HashMap<String, Long>();
         // Project the NULL MCV
         if (hashFunction.computeNull() != null) {
-            projectedMcvs.put(hashFunction.computeNull().toString(),
-                    (long) (rowCount * columnStatistic.getNullsFraction()));
+            final var projectedNullRowCount = (long) (rowCount * columnStatistic.getNullsFraction());
+            if (projectedNullRowCount > 0) {
+                projectedMcvs.put(hashFunction.computeNull().toString(), projectedNullRowCount);
+            }
         }
 
         if (histogram != null) {
