@@ -175,6 +175,9 @@ void ProductAggregateFunction<LT, T, ResultLT, ResultType>::update(FunctionConte
 template <LogicalType LT, typename T, LogicalType ResultLT, typename ResultType>
 void ProductAggregateFunction<LT, T, ResultLT, ResultType>::merge(FunctionContext* ctx, const Column* column,
                                                                   AggDataPtr __restrict state, size_t row_num) const {
+    if (column->is_nullable() && column->is_null(row_num)) {
+        return;
+    }
     const Column* data_column{ColumnHelper::get_data_column(column)};
 
     const auto& struct_column{down_cast<const StructColumn&>(*data_column)};

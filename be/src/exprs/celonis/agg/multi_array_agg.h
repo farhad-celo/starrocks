@@ -264,6 +264,9 @@ public:
 
     // struct and array elements aren't be null, as they consist from several columns
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
+        if (column->is_nullable() && column->is_null(row_num)) {
+            return;
+        }
         auto& input_columns = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column))->fields();
         for (auto i = 0; i < input_columns.size(); ++i) {
             auto array_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns[i].get()));
@@ -272,6 +275,8 @@ public:
                                      offsets[row_num + 1] - offsets[row_num]);
         }
     }
+
+    bool support_nullable_immediate_input() const override { return true; }
 
     // serialize each state->column to a [nullable] array in a [nullable] struct
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {

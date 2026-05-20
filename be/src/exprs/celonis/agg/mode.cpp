@@ -1,5 +1,6 @@
 #include "mode.h"
 
+#include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/celonis/serialization_utils.h"
 #include "runtime/mem_pool.h"
@@ -103,7 +104,11 @@ void CelonisModeAggregateFunction<LT>::update(FunctionContext* const ctx, const 
 template <LogicalType LT>
 void CelonisModeAggregateFunction<LT>::merge(FunctionContext* const ctx, const Column* column,
                                              AggDataPtr __restrict state, const size_t row_num) const {
-    const auto& serialized_input_column_to_merge{down_cast<const BinaryColumn&>(*column)};
+    if (column->is_nullable() && column->is_null(row_num)) {
+        return;
+    }
+    const auto* data_column = ColumnHelper::get_data_column(column);
+    const auto& serialized_input_column_to_merge{down_cast<const BinaryColumn&>(*data_column)};
     const auto slice{serialized_input_column_to_merge.get_slice(row_num)};
     this->data(state).deserialize_from_src_and_merge(ctx, slice);
 }

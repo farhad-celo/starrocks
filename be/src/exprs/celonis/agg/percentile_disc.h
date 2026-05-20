@@ -115,6 +115,15 @@ class CelonisPercentileDiscAggregateFunction final : public PercentileContDiscAg
     using ResultCppType = RunTimeCppType<ResultLT>;
     using ResultColumnType = RunTimeColumnType<ResultLT>;
 
+    void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
+        if (column->is_nullable() && column->is_null(row_num)) {
+            return;
+        }
+        PercentileContDiscAggregateFunction<LT>::merge(ctx, ColumnHelper::get_data_column(column), state, row_num);
+    }
+
+    bool support_nullable_immediate_input() const override { return true; }
+
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         typename PercentileStateTypes<LT>::ItemType local_vec{this->data(state).items};
         pdqsort(local_vec.begin(), local_vec.end());

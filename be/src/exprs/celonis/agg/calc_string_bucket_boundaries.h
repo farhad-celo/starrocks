@@ -173,13 +173,15 @@ public:
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
         // merge internal state with column[row_num]
         // the column type is binary
-        const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
-        if (input_column->is_null(row_num)) {
+        if (column->is_nullable() && column->is_null(row_num)) {
             return;
         }
+        const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
         Slice slice = input_column->get_slice(row_num);
         this->data(state).deserialize_and_merge((const uint8_t*)slice.data, slice.size);
     }
+
+    bool support_nullable_immediate_input() const override { return true; }
 
     void serialize_to_column(FunctionContext* ctx __attribute__((unused)), ConstAggDataPtr __restrict state,
                              Column* to) const override {

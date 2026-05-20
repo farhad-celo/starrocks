@@ -188,6 +188,8 @@ public:
         this->data(state).deserialize_and_merge((const uint8_t*)src.data);
     }
 
+    bool support_nullable_immediate_input() const override { return true; }
+
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         const auto& state_impl = this->data(state);
         auto size = state_impl.serialized_size();

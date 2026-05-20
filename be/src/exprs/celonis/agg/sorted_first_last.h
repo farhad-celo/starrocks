@@ -329,6 +329,8 @@ public:
         this->data(state).deserialize_and_merge(ctx, (const uint8_t*)slice.data, slice.size);
     }
 
+    bool support_nullable_immediate_input() const override { return true; }
+
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         auto& state_impl = this->data(state);
         BinaryColumn* binary_column = nullptr;

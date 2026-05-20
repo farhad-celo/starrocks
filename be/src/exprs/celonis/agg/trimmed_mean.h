@@ -128,9 +128,14 @@ public:
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
-        DCHECK(column->is_binary());
+        if (column->is_nullable() && column->is_null(row_num)) {
+            return;
+        }
 
-        const Slice slice = column->get(row_num).get_slice();
+        const auto* data_column = ColumnHelper::get_data_column(column);
+        DCHECK(data_column->is_binary());
+
+        const Slice slice = data_column->get(row_num).get_slice();
         size_t items_size = *reinterpret_cast<const size_t*>(slice.data);
         auto data_ptr = slice.data + sizeof(size_t);
 
@@ -139,6 +144,8 @@ public:
         items.resize(old_size + items_size);
         memcpy(items.data() + old_size, data_ptr, items_size * sizeof(InputCppType));
     }
+
+    bool support_nullable_immediate_input() const override { return true; }
 
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         auto* column = down_cast<BinaryColumn*>(to);

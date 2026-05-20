@@ -184,6 +184,8 @@ public:
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override;
 
+    bool support_nullable_immediate_input() const override { return true; }
+
     void serialize_to_column(FunctionContext* ctx __attribute__((unused)), ConstAggDataPtr __restrict state,
                              Column* to) const override;
 

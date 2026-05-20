@@ -144,6 +144,8 @@ public:
         }
     }
 
+    bool support_nullable_immediate_input() const override { return true; }
+
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         auto& s = this->data(const_cast<AggDataPtr>(state));
 

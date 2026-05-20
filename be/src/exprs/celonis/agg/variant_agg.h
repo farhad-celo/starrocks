@@ -4,6 +4,7 @@
 #include "column/const_column.h"
 #include "column/datum.h"
 #include "column/hash_set.h"
+#include "column/column_helper.h"
 #include "exprs/agg/aggregate.h"
 #include "exprs/function_context.h"
 #include "variant.h"
@@ -73,13 +74,19 @@ public:
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const final {
         // merge internal state with column[row_num]
         // the column type is binary
-        DCHECK(column->is_binary());
-        const auto* input_column = down_cast<const BinaryColumn*>(column);
+        if (column->is_nullable() && column->is_null(row_num)) {
+            return;
+        }
+        const auto* data_column = ColumnHelper::get_data_column(column);
+        DCHECK(data_column->is_binary());
+        const auto* input_column = down_cast<const BinaryColumn*>(data_column);
         Slice slice = input_column->get_slice(row_num);
         size_t mem_usage = 0;
         mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size);
         ctx->add_mem_usage(mem_usage);
     }
+
+    bool support_nullable_immediate_input() const final { return true; }
 
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const final {
         // append our serialized state to column "to"

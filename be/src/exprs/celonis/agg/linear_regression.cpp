@@ -121,6 +121,9 @@ void LinearRegressionAggregateFunction::update(FunctionContext* ctx, const Colum
 
 void LinearRegressionAggregateFunction::merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state,
                                               size_t row_num) const {
+    if (column->is_nullable() && column->is_null(row_num)) {
+        return;
+    }
     auto& input_columns = down_cast<const StructColumn*>(ColumnHelper::get_data_column(column))->fields();
     auto& state_impl = this->data(state);
     auto x_column = down_cast<const ArrayColumn*>(ColumnHelper::get_data_column(input_columns.at(0).get()));
