@@ -1,4 +1,4 @@
-name: Celostar-Starrocks BE Native Build
+name: Celostar-Starrocks FE Native Build
 on:
   workflow_dispatch:
     inputs:
@@ -34,7 +34,7 @@ on:
         default: false
         type: boolean
       branch:
-        description: Optional git branch to checkout before building the BE image (passed to build-fe-be).
+        description: Optional git branch to checkout before building the FE image (passed to build-fe).
         required: false
         default: ''
         type: string
@@ -44,11 +44,10 @@ env:
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
   GITHUB_USERNAME: ${{ github.repository }}
 
-run-name: Build ${{ inputs.component-name }} - ${{ inputs.version }}
+run-name: Build FE ${{ inputs.component-name }} - ${{ inputs.version }}
 jobs:
-  # Ubuntu Release per arch (tags: {image-tag}-arm / {image-tag}-x86), same pattern as celonis_release build-arm / build-x86
   build-ubuntu:
-    name: Ubuntu Release (${{ matrix.image_suffix }})
+    name: Ubuntu Release FE (${{ matrix.image_suffix }})
     strategy:
       fail-fast: false
       matrix:
@@ -72,7 +71,7 @@ jobs:
       - name: Native Compilation (component path)
         shell: bash
         run: |
-          echo "Compiling ${{ inputs.component-name }} for ${{ matrix.arch }}..."
+          echo "Compiling FE ${{ inputs.component-name }} for ${{ matrix.arch }}..."
           cd "${{ inputs.relative-source-location }}"
 
       - name: Build artifact image
@@ -83,18 +82,8 @@ jobs:
           image_tag: ${{ inputs.image-tag }}-${{ matrix.image_suffix }}
           to_push: 'true'
 
-      - name: Build and push allin1 image
-        uses: ./.github/actions/build-allin1
-        with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-${{ matrix.image_suffix }}
-          image_tag: ${{ inputs.image-tag }}-${{ matrix.image_suffix }}
-          pull_artifact: 'false'
-          for_dic: ${{ inputs.for_dic }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Build and push fe-be
-        uses: ./.github/actions/build-fe-be
+      - name: Build and push FE image
+        uses: ./.github/actions/build-fe
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-${{ matrix.image_suffix }}
           image_tag: ${{ inputs.image-tag }}-${{ matrix.image_suffix }}
@@ -103,9 +92,8 @@ jobs:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-  # Debian 12 runtime images reuse the Ubuntu-built artifacts (celonis_release build-debian12-*)
   build-debian12:
-    name: Debian 12 (${{ matrix.image_suffix }})
+    name: Debian 12 FE (${{ matrix.image_suffix }})
     needs: [build-ubuntu]
     strategy:
       fail-fast: false
@@ -127,19 +115,8 @@ jobs:
           ref: ${{ inputs.release-branch }}
           token: ${{ inputs.github-token || secrets.GITHUB_TOKEN }}
 
-      - name: Build and push allin1 image (Debian12)
-        uses: ./.github/actions/build-allin1
-        with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-${{ matrix.image_suffix }}
-          image_tag: ${{ inputs.image-tag }}-debian12-${{ matrix.image_suffix }}
-          pull_artifact: 'true'
-          for_dic: ${{ inputs.for_dic }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          allin1_dockerfile: 'docker/dockerfiles/allin1/allin1-debian12.Dockerfile'
-
-      - name: Build and push fe-be (Debian12)
-        uses: ./.github/actions/build-fe-be
+      - name: Build and push FE image (Debian12)
+        uses: ./.github/actions/build-fe
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-${{ matrix.image_suffix }}
           image_tag: ${{ inputs.image-tag }}-debian12-${{ matrix.image_suffix }}
@@ -148,11 +125,9 @@ jobs:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           fe_dockerfile: 'docker/dockerfiles/fe/fe-debian12.Dockerfile'
-          be_dockerfile: 'docker/dockerfiles/be/be-debian12.Dockerfile'
 
-  # ASAN builds (celonis_release build-asan-arm / build-asan-x86) — ubuntu22 images for sanitizer toolchain compatibility
   build-asan:
-    name: ASAN (${{ matrix.asan_suffix }})
+    name: ASAN FE (${{ matrix.asan_suffix }})
     strategy:
       fail-fast: false
       matrix:
@@ -181,18 +156,8 @@ jobs:
           is_asan_mode: 'yes'
           to_push: 'true'
 
-      - name: Build and push ASAN allin1 image
-        uses: ./.github/actions/build-allin1
-        with:
-          artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-asan-${{ matrix.asan_suffix }}
-          image_tag: ${{ inputs.image-tag }}-asan-${{ matrix.asan_suffix }}
-          pull_artifact: 'false'
-          for_dic: ${{ inputs.for_dic }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Build and push ASAN fe-be
-        uses: ./.github/actions/build-fe-be
+      - name: Build and push ASAN FE image
+        uses: ./.github/actions/build-fe
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-asan-${{ matrix.asan_suffix }}
           image_tag: ${{ inputs.image-tag }}-asan-${{ matrix.asan_suffix }}
@@ -214,6 +179,9 @@ jobs:
           tag_arm: ${{ inputs.image-tag }}-arm
           tag_x86: ${{ inputs.image-tag }}-x86
           tag_combined: ${{ inputs.image-tag }}
+          publish_be: 'false'
+          publish_fe: 'true'
+          publish_allin1: 'false'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
@@ -230,6 +198,9 @@ jobs:
           tag_arm: ${{ inputs.image-tag }}-debian12-arm
           tag_x86: ${{ inputs.image-tag }}-debian12-x86
           tag_combined: ${{ inputs.image-tag }}-debian12
+          publish_be: 'false'
+          publish_fe: 'true'
+          publish_allin1: 'false'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
@@ -246,5 +217,8 @@ jobs:
           tag_arm: ${{ inputs.image-tag }}-asan-arm64
           tag_x86: ${{ inputs.image-tag }}-asan-amd64
           tag_combined: ${{ inputs.image-tag }}-asan
+          publish_be: 'false'
+          publish_fe: 'true'
+          publish_allin1: 'false'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

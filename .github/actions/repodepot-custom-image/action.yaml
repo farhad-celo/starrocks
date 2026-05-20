@@ -60,7 +60,7 @@ outputs:
 runs:
   using: composite
 
-  # Delegates the image build to .github/workflows/cpp-native-build.yaml (workflow_dispatch).
+  # Delegates image builds to be-native-build.yaml (BE) and fe-native-build.yaml (FE).
   # Requires gh (GitHub CLI) on the runner and a token with actions:write to trigger workflows.
   steps:
     - name: Checkout
@@ -68,43 +68,120 @@ runs:
       with:
         repository: 'celonis/celostar-starrocks'
 
-
-    - name: Run cpp-native-build workflow
-      id: build
+    - name: Dispatch be-native-build (celostar-be)
+      id: dispatch-be-native-build
+      if: inputs.component-name == 'celostar-be' || inputs.component-name == '~ALL~' || inputs.component-name == '~~ALL~~'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
+        WORKFLOW_FILE: be-native-build.yaml
+        GH_REPO: celonis/celostar-starrocks
         WORKFLOW_REF: ${{ github.head_ref || github.ref_name }}
-        INPUT_COMPONENT_NAME: ${{ inputs.component-name }}
-        INPUT_IMAGE_TAG: ${{ inputs.image-tag }}
-        INPUT_RELATIVE_SOURCE: ${{ inputs.relative-source-location }}
-        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
-        INPUT_IMAGE_REGISTRY: ${{ inputs.image-registry }}
-        INPUT_IMAGE_NAME: ${{ inputs.image-name }}
       run: |
         set -euo pipefail
-        rel="${INPUT_RELATIVE_SOURCE:-.}"
-        gh workflow run cpp-native-build.yaml -R celonis/celostar-starrocks \
+        rel="${{ inputs.relative-source-location }}"
+        rel="${rel:-.}"
+
+        gh workflow run "$WORKFLOW_FILE" \
+          --repo "$GH_REPO" \
           --ref "${WORKFLOW_REF}" \
-          -f "component-name=${INPUT_COMPONENT_NAME}" \
-          -f "version=${INPUT_IMAGE_TAG}" \
-          -f "relative-source-location=${rel}" \
-          -f "release-branch=${WORKFLOW_REF}" \
-          -f "github-token=${INPUT_GITHUB_TOKEN}" \
-          -f "image-registry=${INPUT_IMAGE_REGISTRY}" \
-          -f "image-name=${INPUT_IMAGE_NAME}" \
-          -f "image-tag=${INPUT_IMAGE_TAG}"
-        # Brief wait then resolve the newest run for this workflow (dispatch is asynchronous).
-        sleep 8
-        run_id="$(gh run list --workflow=cpp-native-build.yaml --branch "${WORKFLOW_REF}" -R celonis/celostar-starrocks --limit 1 --json databaseId --jq '.[0].databaseId')"
-        if [ -z "${run_id}" ] || [ "${run_id}" = "null" ]; then
-          echo "Failed to resolve workflow run id after dispatch" >&2
+          -f component-name="${{ inputs.component-name }}" \
+          -f version="${{ inputs.image-tag }}" \
+          -f relative-source-location="${rel}" \
+          -f release-branch="${WORKFLOW_REF}" \
+          -f github-token="${{ inputs.github-token }}" \
+          -f image-registry="${{ inputs.image-registry }}" \
+          -f image-name="${{ inputs.image-name }}" \
+          -f image-tag="${{ inputs.image-tag }}"
+
+        sleep 5
+
+        RUN_ID=$(gh run list --repo "$GH_REPO" --workflow "$WORKFLOW_FILE" --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId')
+
+        if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
+          echo "::error::Could not find the triggered Run ID. Check if $WORKFLOW_FILE exists on ${WORKFLOW_REF}."
           exit 1
         fi
-        gh run watch "${run_id}" --exit-status
-        echo "status=true" >> "${GITHUB_OUTPUT}"
 
-    - name: Test status (covered by cpp-native-build)
+        timeout 45m gh run watch "$RUN_ID" --repo "$GH_REPO" -i 5 --exit-status
+
+    - name: Dispatch fe-native-build (celostar-fe)
+      id: dispatch-fe-native-build
+      if: inputs.component-name == 'celostar-fe' || inputs.component-name == '~ALL~' || inputs.component-name == '~~ALL~~'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        WORKFLOW_FILE: fe-native-build.yaml
+        GH_REPO: celonis/celostar-starrocks
+        WORKFLOW_REF: ${{ github.head_ref || github.ref_name }}
+      run: |
+        set -euo pipefail
+        rel="${{ inputs.relative-source-location }}"
+        rel="${rel:-.}"
+
+        gh workflow run "$WORKFLOW_FILE" \
+          --repo "$GH_REPO" \
+          --ref "${WORKFLOW_REF}" \
+          -f component-name="${{ inputs.component-name }}" \
+          -f version="${{ inputs.image-tag }}" \
+          -f relative-source-location="${rel}" \
+          -f release-branch="${WORKFLOW_REF}" \
+          -f github-token="${{ inputs.github-token }}" \
+          -f image-registry="${{ inputs.image-registry }}" \
+          -f image-name="${{ inputs.image-name }}" \
+          -f image-tag="${{ inputs.image-tag }}"
+
+        sleep 5
+
+        RUN_ID=$(gh run list --repo "$GH_REPO" --workflow "$WORKFLOW_FILE" --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId')
+
+        if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
+          echo "::error::Could not find the triggered Run ID. Check if $WORKFLOW_FILE exists on ${WORKFLOW_REF}."
+          exit 1
+        fi
+
+        timeout 45m gh run watch "$RUN_ID" --repo "$GH_REPO" -i 5 --exit-status
+
+    - name: Set build status
+      id: build
+      if: always()
+      shell: bash
+      env:
+        COMPONENT: ${{ inputs.component-name }}
+        BE_RESULT: ${{ steps.dispatch-be-native-build.result }}
+        FE_RESULT: ${{ steps.dispatch-fe-native-build.result }}
+      run: |
+        set -euo pipefail
+        status=true
+
+        case "${COMPONENT}" in
+          celostar-be)
+            if [[ "${BE_RESULT}" != "success" ]]; then
+              status=false
+            fi
+            ;;
+          celostar-fe)
+            if [[ "${FE_RESULT}" != "success" ]]; then
+              status=false
+            fi
+            ;;
+          '~ALL~'|'~~ALL~~')
+            if [[ "${BE_RESULT}" != "success" || "${FE_RESULT}" != "success" ]]; then
+              status=false
+            fi
+            ;;
+          *)
+            echo "::error::Unsupported component-name: ${COMPONENT}" >&2
+            status=false
+            ;;
+        esac
+
+        echo "status=${status}" >> "${GITHUB_OUTPUT}"
+        if [[ "${status}" != "true" ]]; then
+          exit 1
+        fi
+
+    - name: Test status (covered by native-build workflows)
       id: test
       shell: bash
       run: echo "status=true" >> "${GITHUB_OUTPUT}"

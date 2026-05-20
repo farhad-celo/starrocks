@@ -17,6 +17,18 @@ inputs:
     required: true
   aws_secret_access_key:
     required: true
+  publish_be:
+    description: Publish starrocks-be multi-arch manifests (ECR + GHCR).
+    required: false
+    default: 'true'
+  publish_fe:
+    description: Publish starrocks-fe multi-arch manifests (ECR + GHCR).
+    required: false
+    default: 'true'
+  publish_allin1:
+    description: Publish starrocks-allin1 multi-arch manifest (GHCR).
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -37,6 +49,7 @@ runs:
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: ECR — starrocks-be manifest
+      if: ${{ inputs.publish_be == 'true' }}
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
       uses: ./.github/actions/build-mul-arch-manifest
@@ -46,6 +59,7 @@ runs:
         mul_arch_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.tag_combined }}
 
     - name: ECR — starrocks-fe manifest
+      if: ${{ inputs.publish_fe == 'true' }}
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
       uses: ./.github/actions/build-mul-arch-manifest
@@ -55,6 +69,7 @@ runs:
         mul_arch_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.tag_combined }}
 
     - name: GHCR — starrocks-allin1 manifest
+      if: ${{ inputs.publish_allin1 == 'true' }}
       uses: ./.github/actions/build-mul-arch-manifest
       with:
         arm_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_arm }}
@@ -62,17 +77,28 @@ runs:
         mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_combined }}
 
     - name: GHCR — starrocks-be + starrocks-fe manifests
+      if: ${{ inputs.publish_be == 'true' || inputs.publish_fe == 'true' }}
       shell: bash
       env:
         TAG_ARM: ${{ inputs.tag_arm }}
         TAG_X86: ${{ inputs.tag_x86 }}
         TAG_MULTI: ${{ inputs.tag_combined }}
+        PUBLISH_BE: ${{ inputs.publish_be }}
+        PUBLISH_FE: ${{ inputs.publish_fe }}
       run: |
         set -euo pipefail
         export DOCKER_CLI_EXPERIMENTAL=enabled
         echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_USERNAME}" --password-stdin
 
-        for image in starrocks-be starrocks-fe; do
+        images=()
+        if [[ "${PUBLISH_BE}" == "true" ]]; then
+          images+=(starrocks-be)
+        fi
+        if [[ "${PUBLISH_FE}" == "true" ]]; then
+          images+=(starrocks-fe)
+        fi
+
+        for image in "${images[@]}"; do
           mul_arch_tag="ghcr.io/celonis/celostar/${image}:${TAG_MULTI}"
           arm_tag="ghcr.io/celonis/celostar/${image}:${TAG_ARM}"
           x86_tag="ghcr.io/celonis/celostar/${image}:${TAG_X86}"

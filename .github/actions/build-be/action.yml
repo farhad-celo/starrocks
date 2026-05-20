@@ -1,0 +1,66 @@
+name: Build and push BE image
+
+inputs:
+  artifact_image:
+    required: true
+  image_tag:
+    required: true
+  branch:
+    required: false
+  to_push:
+    required: false
+    default: 'true'
+    description: "whether to push the images to remote"
+  aws_access_key_id:
+    required: false
+    description: "aws access key id"
+  aws_secret_access_key:
+    required: false
+    description: "aws access key"
+  be_dockerfile:
+    required: false
+    default: 'docker/dockerfiles/be/be-ubuntu.Dockerfile'
+    description: "path to BE Dockerfile"
+
+runs:
+  using: composite
+  steps:
+    - name: Docker login to GHCR
+      shell: bash
+      run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_USERNAME}" --password-stdin
+
+    - name: Configure AWS credentials
+      if: ${{ inputs.to_push == 'true' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: eu-central-1
+
+    - name: Login to Amazon ECR
+      if: ${{ inputs.to_push == 'true' }}
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and push BE image
+      shell: bash
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        IMAGE_TAG=${{ inputs.image_tag }}
+        ARTIFACT_IMAGE=${{ inputs.artifact_image }}
+
+        if [ -n "${{ inputs.branch }}" ]; then
+          echo "Switching to branch ${{ inputs.branch }}"
+          git checkout ${{ inputs.branch }}
+        fi
+
+        docker build --no-cache \
+          --build-arg RUN_AS_USER=starrocks \
+          --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
+          -f ${{ inputs.be_dockerfile }} \
+          -t ghcr.io/celonis/celostar/starrocks-be:$IMAGE_TAG \
+          -t ${ECR_REGISTRY}/celostar/starrocks-be:$IMAGE_TAG .
+
+        docker push ghcr.io/celonis/celostar/starrocks-be:$IMAGE_TAG
+        docker push ${ECR_REGISTRY}/celostar/starrocks-be:$IMAGE_TAG
