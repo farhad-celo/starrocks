@@ -35,6 +35,9 @@ inputs:
   is-dev-build:
     description: Boolean indicating if the build is a development build
     required: true
+  release-branch:
+    description: The release branch associated with this release
+    required: false
   relative-source-location:
     description: The relative source location of a component (e.g. service, job, library, etc) in the GitHub repository.
     required: false
@@ -67,10 +70,12 @@ runs:
       uses: actions/checkout@v4
       with:
         repository: 'celonis/celostar-starrocks'
+        ref: ${{ inputs.release-branch }}
+        fetch-depth: 0
 
     - name: Dispatch be-native-build (celostar-be)
       id: dispatch-be-native-build
-      if: inputs.component-name == 'celostar-be' || inputs.component-name == '~ALL~' || inputs.component-name == '~~ALL~~'
+      if: inputs.component-name == 'celostar-be' || inputs.component-name == '~ALL~'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
@@ -103,11 +108,11 @@ runs:
           exit 1
         fi
 
-        timeout 45m gh run watch "$RUN_ID" --repo "$GH_REPO" -i 5 --exit-status
+        gh run watch "$RUN_ID" --repo "$GH_REPO" -i 300 --exit-status
 
     - name: Dispatch fe-native-build (celostar-fe)
       id: dispatch-fe-native-build
-      if: inputs.component-name == 'celostar-fe' || inputs.component-name == '~ALL~' || inputs.component-name == '~~ALL~~'
+      if: inputs.component-name == 'celostar-fe' || inputs.component-name == '~ALL~' 
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
@@ -140,53 +145,4 @@ runs:
           exit 1
         fi
 
-        timeout 45m gh run watch "$RUN_ID" --repo "$GH_REPO" -i 5 --exit-status
-
-    - name: Set build status
-      id: build
-      if: always()
-      shell: bash
-      env:
-        COMPONENT: ${{ inputs.component-name }}
-        BE_RESULT: ${{ steps.dispatch-be-native-build.result }}
-        FE_RESULT: ${{ steps.dispatch-fe-native-build.result }}
-      run: |
-        set -euo pipefail
-        status=true
-
-        case "${COMPONENT}" in
-          celostar-be)
-            if [[ "${BE_RESULT}" != "success" ]]; then
-              status=false
-            fi
-            ;;
-          celostar-fe)
-            if [[ "${FE_RESULT}" != "success" ]]; then
-              status=false
-            fi
-            ;;
-          '~ALL~'|'~~ALL~~')
-            if [[ "${BE_RESULT}" != "success" || "${FE_RESULT}" != "success" ]]; then
-              status=false
-            fi
-            ;;
-          *)
-            echo "::error::Unsupported component-name: ${COMPONENT}" >&2
-            status=false
-            ;;
-        esac
-
-        echo "status=${status}" >> "${GITHUB_OUTPUT}"
-        if [[ "${status}" != "true" ]]; then
-          exit 1
-        fi
-
-    - name: Test status (covered by native-build workflows)
-      id: test
-      shell: bash
-      run: echo "status=true" >> "${GITHUB_OUTPUT}"
-
-    - name: Image metadata placeholder
-      id: create-image
-      shell: bash
-      run: echo "metadata={}" >> "${GITHUB_OUTPUT}"
+        gh run watch "$RUN_ID" --repo "$GH_REPO" -i 300 --exit-status
