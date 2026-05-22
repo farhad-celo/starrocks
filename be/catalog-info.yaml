@@ -13,7 +13,7 @@ metadata:
     backstage.io/code-coverage: scm-only
     backstage.io/techdocs-entity: system:celostar
     repo-depot.celonis.dev/project-type: CUSTOM
-    repo-depot.celonis.dev/image-name: celostar-starrocks/be
+    repo-depot.celonis.dev/image-name: celostar-starrocks/celostar-be
     repo-depot.celonis.dev/dply-release-approval-team: Celostar
     repo-depot.celonis.dev/workflow-runner-release: runner=64cpu-linux-arm64,image=ubuntu24-full-arm64,volume=150g
   links:
