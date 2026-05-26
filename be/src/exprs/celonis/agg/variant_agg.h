@@ -1,10 +1,10 @@
 #pragma once
 
 #include "column/binary_column.h"
+#include "column/column_helper.h"
 #include "column/const_column.h"
 #include "column/datum.h"
 #include "column/hash_set.h"
-#include "column/column_helper.h"
 #include "exprs/agg/aggregate.h"
 #include "exprs/function_context.h"
 #include "variant.h"
