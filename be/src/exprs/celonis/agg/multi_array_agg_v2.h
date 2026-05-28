@@ -22,35 +22,29 @@
 #include "column/struct_column.h"
 #include "exec/sorting/sorting.h"
 #include "exprs/agg/aggregate.h"
+#include "exprs/agg/aggregate_state_allocator.h"
 #include "exprs/function_context.h"
 #include "exprs/function_helper.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
+#include "util/raw_container.h"
 
 namespace starrocks {
 
-// Arena-allocated linked list node. Each node holds exactly one serialized row.
-// Allocated from FunctionContext::mem_pool(), freed in bulk via MemPool::free_all().
-struct ArenaNode {
-    ArenaNode* next;
-    char data[0]; // flexible array member — one serialized row
-};
-
-// Per-group state: linked list of arena-allocated row nodes.
+// Per-group state: a single contiguous vector of bytes holding all serialized rows.
 struct MultiArrayAggV2AggregateState {
-    ArenaNode* head = nullptr;
+    using ContainerT = raw::RawVector<uint8_t, AggregateStateAllocator<uint8_t>>;
+    ContainerT buffer;
 };
 
-// MULTI_ARRAY_AGG V2: arena-allocated linked list, one row per node.
+// MULTI_ARRAY_AGG V2: contiguous byte vector allocation, one row packed after another.
 //
 // Serialization format:
 //   Row format: [null_bitmap (ceil(N/8) bytes)][non-null field values...]
 //   Dict-encoded fields use compact fixed-width encoding (1/2/3 bytes per value).
 //   Non-dict fields use Column::serialize().
 //
-// Intermediate type: VARBINARY blob per group.
-//
-// per-group storage uses a linked list of arena-allocated nodes
+// Intermediate type: a VARBINARY blob per group.
 class MultiArrayAggV2AggregateFunction final
         : public AggregateFunctionBatchHelper<MultiArrayAggV2AggregateState, MultiArrayAggV2AggregateFunction> {
 public:
@@ -59,8 +53,7 @@ public:
     }
 
     void destroy(FunctionContext* ctx, AggDataPtr __restrict ptr) const override {
-        // No subtract: lets peak_agg_state_memory_usage() reflect true peak.
-        // Arena nodes freed in bulk by MemPool::free_all().
+        this->data(ptr).~MultiArrayAggV2AggregateState();
     }
 
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
@@ -80,11 +73,11 @@ public:
             }
         }
 
-        // Allocate node from arena
-        auto* node = reinterpret_cast<ArenaNode*>(ctx->mem_pool()->allocate_aligned(sizeof(ArenaNode) + row_size, 8));
-        node->next = s.head;
+        size_t old_size = s.buffer.size();
+        s.buffer.resize(old_size + row_size);
+        uint8_t* dst = s.buffer.data() + old_size;
 
-        uint8_t* bitmap = reinterpret_cast<uint8_t*>(node->data);
+        uint8_t* bitmap = dst;
         memset(bitmap, 0, nbm);
         uint8_t* pos = bitmap + nbm;
 
@@ -104,8 +97,6 @@ public:
                 }
             }
         }
-
-        s.head = node;
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
@@ -122,62 +113,50 @@ public:
 
         if (slice.size == 0) return;
 
-        size_t num_fields = ctx->get_arg_types().size();
-        size_t nbm = (num_fields + 7) / 8;
-
-        // Split blob into individual row nodes
-        const uint8_t* pos = reinterpret_cast<const uint8_t*>(slice.data);
-        const uint8_t* end = pos + slice.size;
-        while (pos < end) {
-            size_t row_size = _compute_row_size(ctx, pos, num_fields, nbm);
-            if (pos + row_size > end) {
-                _emit_corruption_error(ctx, "merge", slice, pos, row_size, num_fields, nbm);
-                return;
+        if (UNLIKELY(ctx->get_multi_array_agg_v2_debug_level() > 0)) {
+            // Perform validation on incoming buffer structure before appending
+            size_t num_fields = ctx->get_arg_types().size();
+            size_t nbm = (num_fields + 7) / 8;
+            const uint8_t* pos = reinterpret_cast<const uint8_t*>(slice.data);
+            const uint8_t* end = pos + slice.size;
+            while (pos < end) {
+                size_t row_size = _compute_row_size(ctx, pos, num_fields, nbm, end);
+                if (end - pos < row_size) {
+                    _emit_corruption_error(ctx, "merge", slice, pos, row_size, num_fields, nbm);
+                    return;
+                }
+                pos += row_size;
             }
-            auto* node =
-                    reinterpret_cast<ArenaNode*>(ctx->mem_pool()->allocate_aligned(sizeof(ArenaNode) + row_size, 8));
-            node->next = s.head;
-            memcpy(node->data, pos, row_size);
-
-            s.head = node;
-            pos += row_size;
         }
-    }
 
-    bool support_nullable_immediate_input() const override { return true; }
+        const size_t old_size = s.buffer.size();
+        s.buffer.resize(old_size + slice.size);
+        uint8_t* dst_ptr = s.buffer.data() + old_size;
+        memcpy(dst_ptr, slice.data, slice.size);
+    }
 
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         auto& s = this->data(const_cast<AggDataPtr>(state));
 
-        size_t num_fields = ctx->get_arg_types().size();
-        size_t nbm = (num_fields + 7) / 8;
-
-        // Compute total data size by traversing the linked list
-        size_t total_size = 0;
-        for (ArenaNode* n = s.head; n; n = n->next) {
-            total_size += _compute_row_size(ctx, reinterpret_cast<const uint8_t*>(n->data), num_fields, nbm);
-        }
-
         auto* bin = ColumnHelper::get_binary_column(to);
-        if (_would_overflow_intermediate(ctx, bin, total_size, "serialize_to_column")) return;
-        auto& bytes = bin->get_bytes();
-        size_t old_size = bytes.size();
-        bytes.resize(old_size + total_size);
-        uint8_t* dst = bytes.data() + old_size;
+        if (UNLIKELY(_would_overflow_intermediate(ctx, bin, s.buffer.size(), "serialize_to_column"))) return;
 
-        for (ArenaNode* n = s.head; n; n = n->next) {
-            size_t row_size = _compute_row_size(ctx, reinterpret_cast<const uint8_t*>(n->data), num_fields, nbm);
-            memcpy(dst, n->data, row_size);
-            dst += row_size;
-        }
+        auto& bytes = bin->get_bytes();
+        const size_t old_size = bytes.size();
+        bytes.resize(bytes.size() + s.buffer.size());
+        uint8_t* dst_ptr = bytes.data() + old_size;
+        memcpy(dst_ptr, s.buffer.data(), s.buffer.size());
 
         bin->get_offset().push_back(bytes.size());
         if (to->is_nullable()) {
             down_cast<NullableColumn*>(to)->null_column_data().emplace_back(0);
         }
         if (UNLIKELY(ctx->get_multi_array_agg_v2_debug_level() > 0)) {
+            size_t num_fields = ctx->get_arg_types().size();
+            size_t nbm = (num_fields + 7) / 8;
             _verify_slice_roundtrip(ctx, bin, bin->get_offset().size() - 2, num_fields, nbm, "serialize_to_column");
         }
+        s.buffer = MultiArrayAggV2AggregateState::ContainerT();
     }
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
@@ -187,24 +166,7 @@ public:
         size_t num_order_by = ctx->get_is_asc_order().size();
         size_t num_agg_cols = num_fields - num_order_by;
 
-        // Compute total data size by traversing the linked list
-        size_t total_size = 0;
-        for (ArenaNode* n = s.head; n; n = n->next) {
-            total_size += _compute_row_size(ctx, reinterpret_cast<const uint8_t*>(n->data), num_fields, nbm);
-        }
-
-        // Flatten linked list into contiguous buffer for _deserialize_buffer()
-        std::string flat;
-        flat.resize(total_size);
-        char* dst = flat.data();
-        for (ArenaNode* n = s.head; n; n = n->next) {
-            size_t row_size = _compute_row_size(ctx, reinterpret_cast<const uint8_t*>(n->data), num_fields, nbm);
-            memcpy(dst, n->data, row_size);
-            dst += row_size;
-        }
-
-        // Deserialize rows from buffer
-        MutableColumns tmp = _deserialize_buffer(ctx, flat, num_fields, nbm);
+        MutableColumns tmp = _deserialize_buffer(ctx, s.buffer, num_fields, nbm);
         uint32_t count = tmp.empty() ? 0 : static_cast<uint32_t>(tmp[0]->size());
 
         // Apply ORDER BY sorting
@@ -260,6 +222,7 @@ public:
         if (UNLIKELY(_check_overflow(*to, ctx))) {
             return;
         }
+        s.buffer = MultiArrayAggV2AggregateState::ContainerT();
     }
 
     void convert_to_serialize_format(FunctionContext* ctx, const Columns& src, size_t chunk_size,
@@ -281,10 +244,10 @@ public:
                             serialization_size == 0 ? dc->serialize_size(ar) : static_cast<size_t>(serialization_size);
                 }
             }
-            if (_would_overflow_intermediate(ctx, bin, row_size, "convert_to_serialize_format")) return;
+            if (UNLIKELY(_would_overflow_intermediate(ctx, bin, row_size, "convert_to_serialize_format"))) return;
 
-            size_t old_size = bytes.size();
-            bytes.resize(old_size + row_size);
+            const size_t old_size = bytes.size();
+            bytes.resize(bytes.size() + row_size);
             uint8_t* dst_ptr = bytes.data() + old_size;
 
             memset(dst_ptr, 0, nbm);
@@ -307,24 +270,20 @@ public:
             }
 
             offsets.push_back(bytes.size());
+            if (dst->get()->is_nullable()) {
+                down_cast<NullableColumn*>(dst->get())->null_column_data().emplace_back(0);
+            }
             if (UNLIKELY(ctx->get_multi_array_agg_v2_debug_level() > 0)) {
                 if (_verify_slice_roundtrip(ctx, bin, offsets.size() - 2, num_fields, nbm,
                                             "convert_to_serialize_format"))
                     return;
             }
         }
-
-        if (dst->get()->is_nullable()) {
-            for (size_t i = 0; i < chunk_size; i++) {
-                down_cast<NullableColumn*>(dst->get())->null_column_data().emplace_back(0);
-            }
-        }
     }
 
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const override {
         auto& s = this->data(state);
-        s.head = nullptr;
-        // Arena nodes leaked until MemPool::free_all() — bounded by streaming batch size
+        s.buffer = MultiArrayAggV2AggregateState::ContainerT();
     }
 
     std::string get_name() const override { return "multi_array_agg_v2"; }
@@ -382,8 +341,8 @@ private:
         const uint8_t* pos = reinterpret_cast<const uint8_t*>(slice.data);
         const uint8_t* end = pos + slice.size;
         while (pos < end) {
-            size_t row_size = _compute_row_size(ctx, pos, num_fields, nbm);
-            if (pos + row_size > end) {
+            size_t row_size = _compute_row_size(ctx, pos, num_fields, nbm, end);
+            if (end - pos < row_size) {
                 _emit_corruption_error(ctx, origin, slice, pos, row_size, num_fields, nbm);
                 return true;
             }
@@ -394,7 +353,12 @@ private:
 
     // Compute the byte size of a serialized row by scanning its null bitmap and fields.
     // Does not deserialize — just advances a pointer past each field.
-    static size_t _compute_row_size(FunctionContext* ctx, const uint8_t* data, size_t num_fields, size_t nbm) {
+    // This function is for only for debug mode.
+    static size_t _compute_row_size(FunctionContext* ctx, const uint8_t* data, size_t num_fields, size_t nbm,
+                                    const uint8_t* end) {
+        if (end - data < nbm) {
+            return (end - data) + 1;
+        }
         const uint8_t* bitmap = data;
         const uint8_t* pos = data + nbm;
 
@@ -405,7 +369,7 @@ private:
                 if (serialization_size > 0) {
                     pos += serialization_size;
                 } else {
-                    pos += _serialized_field_size(pos, ctx->get_arg_type(i)->type);
+                    pos += _serialized_field_size(pos, ctx->get_arg_type(i)->type, end);
                 }
             }
         }
@@ -414,7 +378,7 @@ private:
 
     // Determine byte size of a non-dict serialized field from the serialized bytes.
     // Fixed-length types: sizeof(T). Variable-length types: [uint32_t len][data].
-    static size_t _serialized_field_size(const uint8_t* pos, LogicalType type) {
+    static size_t _serialized_field_size(const uint8_t* pos, LogicalType type, const uint8_t* end) {
         switch (type) {
         case TYPE_BOOLEAN:
         case TYPE_TINYINT:
@@ -443,6 +407,9 @@ private:
         case TYPE_JSON:
         default: {
             // All non-fixed-width types use [uint32_t len][data] serialization format.
+            if (UNLIKELY(end - pos < sizeof(uint32_t))) {
+                return end - pos + 1;
+            }
             uint32_t len;
             memcpy(&len, pos, sizeof(uint32_t));
             return sizeof(uint32_t) + len;
@@ -450,17 +417,28 @@ private:
         }
     }
 
-    static MutableColumns _deserialize_buffer(FunctionContext* ctx, const std::string& buffer, size_t num_fields,
-                                              size_t nbm) {
-        MutableColumns cols;
-        cols.reserve(num_fields);
-        for (size_t i = 0; i < num_fields; ++i) {
-            cols.emplace_back(ColumnHelper::create_column(*ctx->get_arg_type(i), true));
+    static MutableColumns _deserialize_buffer(FunctionContext* ctx,
+                                              const MultiArrayAggV2AggregateState::ContainerT& buffer,
+                                              size_t num_fields, size_t nbm) {
+        auto make_cols = [&]() {
+            MutableColumns cols;
+            cols.reserve(num_fields);
+            for (size_t i = 0; i < num_fields; ++i) {
+                cols.emplace_back(ColumnHelper::create_column(*ctx->get_arg_type(i), true));
+            }
+            return cols;
+        };
+        MutableColumns cols = make_cols();
+        if (buffer.empty()) {
+            return cols;
         }
-
         const uint8_t* pos = reinterpret_cast<const uint8_t*>(buffer.data());
         const uint8_t* end = pos + buffer.size();
         while (pos < end) {
+            if (UNLIKELY(end - pos < nbm)) {
+                _emit_corruption_error(ctx, "finalize", {buffer.data(), buffer.size()}, pos, 0, num_fields, nbm);
+                return make_cols();
+            }
             const uint8_t* bitmap = pos;
             pos += nbm;
 
@@ -470,17 +448,33 @@ private:
                 if (is_null) {
                     nullable->append_nulls(1);
                 } else {
-                    nullable->null_column_data().emplace_back(0);
                     int serialization_size = ctx->get_multi_array_agg_column_serialization_size()[i];
                     if (serialization_size != 0) {
+                        if (UNLIKELY(end - pos < serialization_size)) {
+                            _emit_corruption_error(ctx, "finalize", {buffer.data(), buffer.size()}, pos, 0, num_fields,
+                                                   nbm);
+                            return make_cols();
+                        }
+                        nullable->null_column_data().emplace_back(0);
                         int32_t value = _deserialize_fixed_length(pos, serialization_size);
                         static_cast<Int32Column*>(nullable->data_column().get())->append(value);
                         pos += serialization_size;
                     } else {
+                        size_t field_size = _serialized_field_size(pos, ctx->get_arg_type(i)->type, end);
+                        if (UNLIKELY(end - pos < field_size)) {
+                            _emit_corruption_error(ctx, "finalize", {buffer.data(), buffer.size()}, pos, 0, num_fields,
+                                                   nbm);
+                            return make_cols();
+                        }
+                        nullable->null_column_data().emplace_back(0);
                         pos = nullable->data_column()->deserialize_and_append(pos);
                     }
                 }
             }
+        }
+        if (pos != end) {
+            _emit_corruption_error(ctx, "finalize", {buffer.data(), buffer.size()}, pos, 0, num_fields, nbm);
+            return make_cols();
         }
         return cols;
     }

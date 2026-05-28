@@ -11,6 +11,7 @@
 #include "column/fixed_length_column.h"
 #include "column/vectorized_fwd.h"
 #include "exprs/agg/aggregate_factory.h"
+#include "exprs/agg/aggregate_state_allocator.h"
 #include "exprs/celonis/agg/factory_calendar.h"
 #include "exprs/celonis/agg/linear_regression.h"
 #include "exprs/celonis/agg/multi_array_agg.h"
@@ -20,6 +21,7 @@
 #include "exprs/function_context.h"
 #include "gutil/strings/strcat.h"
 #include "runtime/mem_pool.h"
+#include "runtime/memory/counting_allocator.h"
 #include "testutil/function_utils.h"
 
 namespace starrocks {
@@ -35,9 +37,16 @@ public:
     void SetUp() override {
         utils = new FunctionUtils();
         ctx = utils->get_fn_ctx();
+        _allocator = std::make_unique<CountingAllocatorWithHook>();
+        _alloc_setter = std::make_unique<ThreadLocalAggregateStateAllocatorSetter>(_allocator.get());
     }
 
-    void TearDown() override { delete utils; }
+    void TearDown() override {
+        delete utils;
+        tls_agg_state_allocator = nullptr;
+        _alloc_setter.reset();
+        _allocator.reset();
+    }
 
     bool parse_model(const std::string& model, double& intercept, double& slope) {
         std::istringstream iss(model);
@@ -72,6 +81,8 @@ public:
 private:
     FunctionUtils* utils{};
     FunctionContext* ctx{};
+    std::unique_ptr<CountingAllocatorWithHook> _allocator;
+    std::unique_ptr<ThreadLocalAggregateStateAllocatorSetter> _alloc_setter;
 };
 
 class ManagedAggrState {
