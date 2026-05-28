@@ -5,6 +5,8 @@
 #include <deque>
 #include <limits>
 #include <ranges>
+#include <utility>
+#include <vector>
 
 #include "../util.h"
 
@@ -18,6 +20,7 @@ namespace starrocks {
 std::pair<Columns, UInt32Column::Ptr> CelonisObjectLinkPropagateFilters::process(RuntimeState* runtime_state,
                                                                                  TableFunctionState* base_state) const {
     auto* state = down_cast<MyState*>(base_state);
+
     // If an error status is already set (e.g., from a previous call exceeding row limit), return early.
     if (!state->status().ok()) {
         return {};
@@ -34,6 +37,7 @@ std::pair<Columns, UInt32Column::Ptr> CelonisObjectLinkPropagateFilters::process
     // ==========================================
     if (!state->is_bfs_done) {
         auto& visited = state->visited;
+        auto& visited_edges = state->visited_edges;
         const auto outer_unnest_array_data = prepare_array_input(state->get_columns().at(0).get());
         const auto graph_unnest_array_data = prepare_array_input(outer_unnest_array_data.elements);
         const auto offsets_column = graph_unnest_array_data.offsets;
@@ -92,6 +96,7 @@ std::pair<Columns, UInt32Column::Ptr> CelonisObjectLinkPropagateFilters::process
                                 "CELONIS_OBJECT_LINK_PROPAGATE_FILTERS: Invalid neighbor_id {}", neighbor_id)));
                         return {};
                     }
+                    visited_edges.emplace_back(curr_node_id, neighbor_id);
                     if (!visited.test_set(neighbor_id)) {
                         node_id_queue.push_back(neighbor_id);
                     }
@@ -101,40 +106,44 @@ std::pair<Columns, UInt32Column::Ptr> CelonisObjectLinkPropagateFilters::process
         }
 
         state->is_bfs_done = true;
-        state->current_bit_pos = state->visited.find_first();
+        state->current_edge_pos = 0; // Reset chunking pointer for the edges
     }
 
     // ==========================================
     // PHASE 2: YIELD (Output up to chunk size)
     // ==========================================
-    auto res_node_id_column = OutputColumnType::create();
+    auto res_source_node_column = OutputColumnType::create();
+    auto res_target_node_column = OutputColumnType::create();
     auto res_offsets_column = OffsetColumnType::create();
-    for (; state->current_bit_pos != boost::dynamic_bitset<>::npos &&
-           res_node_id_column->size() < runtime_state->chunk_size();
-         state->current_bit_pos = state->visited.find_next(state->current_bit_pos)) {
-        res_node_id_column->append(state->current_bit_pos);
+
+    auto& edges = state->visited_edges;
+
+    for (; state->current_edge_pos < edges.size() && res_source_node_column->size() < runtime_state->chunk_size();
+         state->current_edge_pos++) {
+        res_source_node_column->append(edges[state->current_edge_pos].first);
+        res_target_node_column->append(edges[state->current_edge_pos].second);
     }
+
     // The first element of the offsets column has to be 0.
     res_offsets_column->append(0);
-    // Set the offset marker for this particular chunk.
-    // This must be appended on every call to map the current output block to the input row,
-    // even if we haven't finished yielding all elements for it yet.
-    res_offsets_column->append(res_node_id_column->size());
+    // Determine offset by how many edges we just populated into the chunk
+    res_offsets_column->append(res_source_node_column->size());
 
     // ==========================================
     // PHASE 3: STATE UPDATE
     // ==========================================
-    if (state->current_bit_pos == boost::dynamic_bitset<>::npos) {
+    if (state->current_edge_pos == state->visited_edges.size()) {
         // Tell StarRocks we fully consumed this input row.
         state->set_processed_rows(1);
         // Reset our state variables so the next input chunk can be processed fresh.
         state->is_bfs_done = false;
         state->visited.reset();
+        state->visited_edges.clear();
     } else {
         // Tell StarRocks we consumed ZERO input rows, so it calls this function
         // again immediately with the exact same input context.
         state->set_processed_rows(0);
     }
-    return {Columns{res_node_id_column}, std::move(res_offsets_column)};
+    return {Columns{res_source_node_column, res_target_node_column}, std::move(res_offsets_column)};
 }
 } // namespace starrocks

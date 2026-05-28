@@ -15,11 +15,28 @@ INSERT INTO t (id, adj_matrix, start_nodes) VALUES
     (1, [[1, 2], [3], [], [6], [2, 5], [6], []], [0, 4]);
 -- result:
 -- !result
-SELECT array_agg(f.node) FROM t, celonis_object_link_propagate_filters(t.adj_matrix, t.start_nodes) f(node);
+
+-- Test without Hop Limit
+SELECT f.source_node, f.target_node
+FROM t, celonis_object_link_propagate_filters(t.adj_matrix, t.start_nodes) f(source_node, target_node)
+ORDER BY f.source_node, f.target_node;
 -- result:
-[0,1,2,3,4,5,6]
+0	1
+0	2
+1	3
+3	6
+4	2
+4	5
+5	6
 -- !result
-SELECT array_agg(f.node) FROM t, celonis_object_link_propagate_filters(t.adj_matrix, t.start_nodes, 1) f(node);
+
+-- Test with Hop Limit = 1
+SELECT f.source_node, f.target_node
+FROM t, celonis_object_link_propagate_filters(t.adj_matrix, t.start_nodes, 1) f(source_node, target_node)
+ORDER BY f.source_node, f.target_node;
 -- result:
-[0,1,2,4,5]
+0	1
+0	2
+4	2
+4	5
 -- !result

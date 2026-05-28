@@ -177,14 +177,14 @@ public class TableFunction extends Function {
         functionSet.addBuiltin(generateRangeFunction);
 
         TableFunction objectLinkPropagateFilters = new TableFunction(new FunctionName("celonis_object_link_propagate_filters"),
-                Lists.newArrayList("celonis_object_link_propagate_filters"),
+                Lists.newArrayList("source_node_col", "target_node_col"),
                 Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.ARRAY_BIGINT),
-                Lists.newArrayList(Type.BIGINT));
+                Lists.newArrayList(Type.BIGINT, Type.BIGINT));
         functionSet.addBuiltin(objectLinkPropagateFilters);
         objectLinkPropagateFilters = new TableFunction(new FunctionName("celonis_object_link_propagate_filters"),
-                Lists.newArrayList("celonis_object_link_propagate_filters"),
+                Lists.newArrayList("source_node_col", "target_node_col"),
                 Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.ARRAY_BIGINT, Type.BIGINT),
-                Lists.newArrayList(Type.BIGINT));
+                Lists.newArrayList(Type.BIGINT, Type.BIGINT));
         functionSet.addBuiltin(objectLinkPropagateFilters);
     }
 

@@ -125,7 +125,8 @@ protected:
 TEST_F(CelonisObjectLinkPropagateFiltersTest, small) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1, 2}, {3}, {}, {6}, {2, 5}, {6}, {}}, {0, 4});
     const auto [result_columns, offset] = Run(table_state, function.get());
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L, 3L, 4L, 5L, 6L});
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 0L, 4L, 4L, 1L, 5L, 3L}); // Start Nodes
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{1L, 2L, 2L, 5L, 3L, 6L, 6L}); // End Nodes
     Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 7});
     EXPECT_OK(function->close(nullptr, table_state));
 }
@@ -133,8 +134,9 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, small) {
 TEST_F(CelonisObjectLinkPropagateFiltersTest, small_hop_limit) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1, 2}, {3}, {}, {6}, {2, 5}, {6}, {}}, {0, 4}, 1L);
     const auto [result_columns, offset] = Run(table_state, function.get());
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L, 4L, 5L});
-    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 5});
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 0L, 4L, 4L}); // Start Nodes
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{1L, 2L, 2L, 5L}); // End Nodes
+    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 4});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -142,8 +144,9 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, small_hop_limit) {
 TEST_F(CelonisObjectLinkPropagateFiltersTest, linear) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1}, {2}, {3}, {}}, {0});
     const auto [result_columns, offset] = Run(table_state, function.get());
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L, 3L});
-    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 4});
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L}); // Start Nodes
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{1L, 2L, 3L}); // End Nodes
+    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 3});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -151,8 +154,9 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, linear) {
 TEST_F(CelonisObjectLinkPropagateFiltersTest, linear_hop_limit) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1}, {2}, {3}, {}}, {0, 1}, 1L);
     const auto [result_columns, offset] = Run(table_state, function.get());
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L});
-    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 3});
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L}); // Start Nodes
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{1L, 2L}); // End Nodes
+    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 2});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -160,7 +164,8 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, linear_hop_limit) {
 TEST_F(CelonisObjectLinkPropagateFiltersTest, cycle) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1}, {2}, {0}}, {0});
     const auto [result_columns, offset] = Run(table_state, function.get());
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L});
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L}); // Start Nodes
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{1L, 2L, 0L}); // End Nodes
     Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 3});
     EXPECT_OK(function->close(nullptr, table_state));
 }
@@ -169,8 +174,9 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, cycle) {
 TEST_F(CelonisObjectLinkPropagateFiltersTest, star_graph) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1, 2, 3}, {}, {}, {}}, {0});
     const auto [result_columns, offset] = Run(table_state, function.get());
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L, 3L});
-    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 4});
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 0L, 0L}); // Start Nodes
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{1L, 2L, 3L}); // End Nodes
+    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 3});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -178,8 +184,10 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, star_graph) {
 TEST_F(CelonisObjectLinkPropagateFiltersTest, start_at_sink) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1, 2}, {3}, {}, {6}, {2, 5}, {6}, {}}, {6});
     const auto [result_columns, offset] = Run(table_state, function.get());
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{6L});
-    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 1});
+    // Since node 6 has no neighbors, 0 edges are traversed
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{});
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{});
+    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 0});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -188,6 +196,7 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, empty) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({}, {});
     const auto [result_columns, offset] = Run(table_state, function.get());
     Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{});
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{});
     Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 0});
     EXPECT_OK(function->close(nullptr, table_state));
 }
@@ -209,11 +218,19 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, large_binary_tree) {
             },
             {0});
     const auto [result_columns, offset] = Run(table_state, function.get());
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L,  1L,  2L,  3L,  4L,  5L,  6L,  7L,  8L,  9L,  10L, 11L, 12L,
-                                                        13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L,
-                                                        26L, 27L, 28L, 29L, 30L, 31L, 32L, 33L, 34L, 35L, 36L, 37L, 38L,
-                                                        39L, 40L, 41L, 42L, 43L, 44L, 45L, 46L, 47L, 48L, 49L});
-    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 50});
+
+    Evaluate<TYPE_BIGINT>(
+            result_columns[0],
+            DatumArray{0L,  0L,  1L,  1L,  2L,  2L,  3L,  3L,  4L,  4L,  5L,  5L,  6L,  6L,  7L,  7L,  8L,
+                       8L,  9L,  9L,  10L, 10L, 11L, 11L, 12L, 12L, 13L, 13L, 14L, 14L, 15L, 15L, 16L, 16L,
+                       17L, 17L, 18L, 18L, 19L, 19L, 20L, 20L, 21L, 21L, 22L, 22L, 23L, 23L, 24L}); // Start Nodes
+
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{1L,  2L,  3L,  4L,  5L,  6L,  7L,  8L,  9L,  10L, 11L, 12L, 13L,
+                                                        14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L, 25L, 26L,
+                                                        27L, 28L, 29L, 30L, 31L, 32L, 33L, 34L, 35L, 36L, 37L, 38L, 39L,
+                                                        40L, 41L, 42L, 43L, 44L, 45L, 46L, 47L, 48L, 49L}); // End Nodes
+
+    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 49});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -235,11 +252,12 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, large_binary_tree_hop_limit_2) {
             {0},
             2); // Hop limit of 2
     const auto [result_columns, offset] = Run(table_state, function.get());
-    // Hop 0: 0
-    // Hop 1: 1, 2
-    // Hop 2: 3, 4, 5, 6
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 1L, 2L, 3L, 4L, 5L, 6L});
-    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 7});
+    // Hop 0: (0,1), (0,2)
+    // Hop 1: (1,3), (1,4), (2,5), (2,6)
+    // Limits ends tree expansion here
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 0L, 1L, 1L, 2L, 2L}); // Start Nodes
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{1L, 2L, 3L, 4L, 5L, 6L}); // End Nodes
+    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 6});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -255,15 +273,14 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, large_random) {
             },
             {0, 3}); // Start propagation from nodes 0 and 3
     const auto [result_columns, offset] = Run(table_state, function.get());
-    /* * Reachability Trace:
-     * From 0: 0 -> 5 -> 19 -> 30 -> 42
-     * 0 -> 12 -> 25 -> 30 (merge)
-     * From 3: 3 -> 8 -> 15 -> 22 -> 3 (cycle)
-     * * Unreached nodes: 1, 2 (isolated component), 4 (self-loop),
-     * 10, 11, 49 (isolated tree), 33, 34, 35, 36 (isolated star), etc.
+    /* * Reachability Trace (Edges):
+     * Hop 0: (0, 5), (0, 12), (3, 8)
+     * Hop 1: (5, 19), (12, 25), (8, 15)
+     * Hop 2: (19, 30), (25, 30), (15, 22)
+     * Hop 3: (30, 42), (22, 3)
      */
-    // Only 11 distinct nodes should be reached and returned
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 3L, 5L, 8L, 12L, 15L, 19L, 22L, 25L, 30L, 42L});
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 0L, 3L, 5L, 12L, 8L, 19L, 25L, 15L, 30L, 22L});
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{5L, 12L, 8L, 19L, 25L, 15L, 30L, 30L, 22L, 42L, 3L});
     Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 11});
     EXPECT_OK(function->close(nullptr, table_state));
 }
@@ -281,17 +298,10 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, large_random_hop_limit_2) {
             {0, 3},
             2); // Hop limit of 2
     const auto [result_columns, offset] = Run(table_state, function.get());
-    /* * Reachability Trace (Limit = 2):
-     * Hop 0: 0, 3
-     * Hop 1: 5, 12 (from 0), 8 (from 3)
-     * Hop 2: 19 (from 5), 25 (from 12), 15 (from 8)
-     * --- Cutoff ---
-     * Hop 3 (unreached): 30 (from 19, 25), 22 (from 15)
-     * Hop 4 (unreached): 42 (from 30), 3 (cycle from 22)
-     */
-    // Only 8 distinct nodes should be reached within 2 hops
-    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 3L, 5L, 8L, 12L, 15L, 19L, 25L});
-    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 8});
+    // Cut off after hop 1 expands
+    Evaluate<TYPE_BIGINT>(result_columns[0], DatumArray{0L, 0L, 3L, 5L, 12L, 8L});
+    Evaluate<TYPE_BIGINT>(result_columns[1], DatumArray{5L, 12L, 8L, 19L, 25L, 15L});
+    Evaluate<TYPE_UNSIGNED_INT>(offset, DatumArray{0, 6});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -313,8 +323,6 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, large_random_chunked) {
     // Set a very small chunk size to force multiple process calls
     rt_state_->set_chunk_size(4);
 
-    // Using the same graph structure as large_random
-    // Reachable nodes from {0, 3} are: {0, 3, 5, 8, 12, 15, 19, 22, 25, 30, 42} (Total 11)
     const auto [table_state, function] = Prepare<TYPE_BIGINT>(
             {
                     {5, 12},  {2}, {1},  {8},          {4}, {19}, {}, {}, {15}, {},   // Nodes 0 - 9
@@ -325,29 +333,30 @@ TEST_F(CelonisObjectLinkPropagateFiltersTest, large_random_chunked) {
             },
             {0, 3});
 
-    // Call 1: Should return first 4 nodes
+    // Call 1: Should return first 4 edges
     {
         auto [results, offset] = function->process(rt_state_.get(), table_state);
-        Evaluate<TYPE_BIGINT>(results[0], DatumArray{0L, 3L, 5L, 8L});
-        // The offset column for TableFunctions typically maps input rows to output ranges.
-        // Since we have one logical "set" of inputs being expanded:
+        Evaluate<TYPE_BIGINT>(results[0], DatumArray{0L, 0L, 3L, 5L});
+        Evaluate<TYPE_BIGINT>(results[1], DatumArray{5L, 12L, 8L, 19L});
         EXPECT_EQ(offset->size(), 2);
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 4);
     }
 
-    // Call 2: Should return next 4 nodes
+    // Call 2: Should return next 4 edges
     {
         auto [results, offset] = function->process(rt_state_.get(), table_state);
-        Evaluate<TYPE_BIGINT>(results[0], DatumArray{12L, 15L, 19L, 22L});
+        Evaluate<TYPE_BIGINT>(results[0], DatumArray{12L, 8L, 19L, 25L});
+        Evaluate<TYPE_BIGINT>(results[1], DatumArray{25L, 15L, 30L, 30L});
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 4);
     }
 
-    // Call 3: Should return remaining 3 nodes and finish
+    // Call 3: Should return remaining 3 edges and finish
     {
         auto [results, offset] = function->process(rt_state_.get(), table_state);
-        Evaluate<TYPE_BIGINT>(results[0], DatumArray{25L, 30L, 42L});
+        Evaluate<TYPE_BIGINT>(results[0], DatumArray{15L, 30L, 22L});
+        Evaluate<TYPE_BIGINT>(results[1], DatumArray{22L, 42L, 3L});
         EXPECT_EQ(offset->get(0).get_uint32(), 0);
         EXPECT_EQ(offset->get(1).get_uint32(), 3);
     }
