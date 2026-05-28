@@ -66,13 +66,6 @@ runs:
   # Delegates image builds to be-native-build.yaml (BE) and fe-native-build.yaml (FE).
   # Requires gh (GitHub CLI) on the runner and a token with actions:write to trigger workflows.
   steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        repository: 'celonis/celostar-starrocks'
-        ref: ${{ inputs.release-branch }}
-        fetch-depth: 0
-
     - name: Dispatch be-native-build (celostar-be)
       id: dispatch-be-native-build
       if: inputs.component-name == 'celostar-be' || inputs.component-name == '~ALL~'
