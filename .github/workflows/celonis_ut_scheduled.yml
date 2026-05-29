@@ -1,0 +1,338 @@
+name: "Celonis Unit Test and SonarQube Daily"
+
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  # To manually trigger the workflow. For debugging purpose.
+  workflow_dispatch:
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+env:
+  RELEASE_VERSION: fe-test
+  GITHUB_USERNAME: ${{ github.repository }}
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+
+jobs:
+  setup:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    outputs:
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+    steps:
+      - run: echo "builder_image=${{ env.BUILDER }}" >> $GITHUB_OUTPUT
+
+  fe-amd-test:
+    runs-on: [runs-on, runner=64cpu-linux-x64, "run-id=${{ github.run_id }}"]
+    needs: setup
+    container:
+      image: ${{ needs.setup.outputs.builder_image }}
+      credentials:
+        username: ${{ github.repository }}
+        password: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: FE unit tests
+        uses: ./.github/actions/fe-unit-tests
+
+  fe-arm-test:
+    runs-on: [runs-on, runner=64cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: setup
+    container:
+      image: ${{ needs.setup.outputs.builder_image }}
+      credentials:
+        username: ${{ github.repository }}
+        password: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: FE unit tests
+        uses: ./.github/actions/fe-unit-tests
+
+  fe-sonarQube-scan:
+    runs-on: [runs-on, runner=64cpu-linux-x64, "run-id=${{ github.run_id }}"]
+    needs: setup
+    container:
+      image: ${{ needs.setup.outputs.builder_image }}
+      credentials:
+        username: ${{ github.repository }}
+        password: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: FE Build and Test with JaCoCo
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          STARROCKS_HOME: ${{ github.workspace }}
+        run: |
+          export FE_UT_PARALLEL=10
+
+          cd fe
+          mvn clean install -DskipTests
+          mvn test org.jacoco:jacoco-maven-plugin:report  -DfailIfNoTests=false -DtrimStackTrace=false \
+             -Dtest='*,!com.starrocks.sql.dump.QueryDumpRegressionTest,!com.starrocks.sql.dump.QueryDumpCaseRewriter,!com.starrocks.planner.**,!LakePublishBatchTest.testBatchPublishReplicationTransaction,!LakePublishBatchTest.testTransfromSingleToBatch'
+
+      - name: Output FE Coverage Summary
+        if: always()
+        shell: bash
+        env:
+          STARROCKS_HOME: ${{ github.workspace }}
+        run: |
+          echo "## FE (Java) Code Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          JACOCO_XML="${STARROCKS_HOME}/fe/fe-core/target/site/jacoco/jacoco.xml"
+          if [ ! -f "$JACOCO_XML" ]; then
+            echo "> **Warning:** JaCoCo report not found at \`$JACOCO_XML\`" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          python3 - "$JACOCO_XML" >> $GITHUB_STEP_SUMMARY << 'PYEOF'
+          import xml.etree.ElementTree as ET, sys
+          tree = ET.parse(sys.argv[1])
+          root = tree.getroot()
+          counters = {}
+          for c in root.findall('counter'):
+              counters[c.get('type')] = (int(c.get('missed')), int(c.get('covered')))
+
+          print("| Metric | Covered | Missed | Total | Coverage |")
+          print("|--------|--------:|-------:|------:|---------:|")
+          for metric in ['INSTRUCTION', 'BRANCH', 'LINE', 'METHOD', 'CLASS']:
+              if metric in counters:
+                  missed, covered = counters[metric]
+                  total = missed + covered
+                  pct = (covered / total * 100) if total > 0 else 0
+                  icon = ":white_check_mark:" if pct >= 60 else ":warning:" if pct >= 40 else ":x:"
+                  print(f"| {icon} {metric.capitalize()} | {covered:,} | {missed:,} | {total:,} | **{pct:.1f}%** |")
+          PYEOF
+
+      - name: Upload FE SonarQube artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fe-sonar-artifacts
+          path: |
+            fe/fe-core/target/site/jacoco/jacoco.xml
+            fe/fe-core/target/classes/
+          retention-days: 1
+
+  be-sonarQube-scan:
+    runs-on: [runs-on, runner=64cpu-linux-x64, "run-id=${{ github.run_id }}", disk=large]
+    needs: setup
+    container:
+      image: ${{ needs.setup.outputs.builder_image }}
+      credentials:
+        username: ${{ github.repository }}
+        password: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+      - name: Set up Python 3.8 for gcovr
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.8
+      - name: install gcovr 5.0
+        run: |
+          apt-get update
+          apt-get install -y libxml2-dev libxslt1-dev zlib1g-dev gcc python3-dev
+
+          pip install gcovr==5.0 # 5.1 is not supported
+      - name: Install Build Wrapper
+        uses: SonarSource/sonarqube-scan-action/install-build-wrapper@v6
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Check Container Resources
+        run: |
+          echo "--- Total RAM available to container ---"
+          free -h
+          echo "--- Cgroup Memory Limit ---"
+          cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || cat /sys/fs/cgroup/memory.max
+      - name: Set up envs
+        shell: bash
+        run: |
+          # Define the home directory
+          export STARROCKS_HOME=$(pwd)
+          export CMAKE_BUILD_TYPE=Release
+          export CMAKE_BUILD_DIR=${STARROCKS_HOME}/be/ut_build_${CMAKE_BUILD_TYPE}
+          export SONARQUBE_OUTPUT=${STARROCKS_HOME}/sonarqube_output
+
+          echo "STARROCKS_HOME=${STARROCKS_HOME}" >> $GITHUB_ENV
+          echo "CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" >> $GITHUB_ENV
+          echo "CMAKE_BUILD_DIR=${CMAKE_BUILD_DIR}" >> $GITHUB_ENV
+          echo "SONARQUBE_OUTPUT=${SONARQUBE_OUTPUT}" >> $GITHUB_ENV
+
+      - name: Run Build Wrapper
+        shell: bash
+        run: |
+          # Source environment scripts if they exist
+          [ -f ./env.sh ] && . ./env.sh
+
+          # Create build and output directories
+          cd ${STARROCKS_HOME}/be
+          mkdir -p ${CMAKE_BUILD_DIR}
+          cd ${CMAKE_BUILD_DIR}
+          mkdir -p ${SONARQUBE_OUTPUT}
+
+          # Wrap the build process to capture compilation metadata
+          # Use -j10 to prevent Out-Of-Memory (OOM) errors on standard runners
+          build-wrapper-linux-x86-64 --out-dir ${SONARQUBE_OUTPUT} sh -c '
+          cmake -G "Unix Makefiles" \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DWITH_GCOV=ON \
+                -DMAKE_TEST=ON \
+                -DCOMPRESS_DEBUG_SECTIONS=OFF \
+                -DCMAKE_CXX_FLAGS="-g1 -fdebug-types-section -fPIC" \
+                -DCMAKE_C_FLAGS="-g1 -fdebug-types-section -fPIC" \
+                -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld -Wl,--compress-debug-sections=none -Wl,--strip-debug" \
+                .. && \
+          make -j10 starrocks_test'
+
+      - name: Run Tests
+        shell: bash
+        continue-on-error: true
+        run: |
+          source ${STARROCKS_HOME}/bin/common.sh
+
+          # Add thirdparty libraries (including TBB) to the library path
+          export LD_LIBRARY_PATH=/var/local/thirdparty/installed/lib:$LD_LIBRARY_PATH
+
+          jvm_arch="amd64"
+          if [ "$JAVA_HOME" = "" ]; then
+            echo "[WARNING] JAVA_HOME env not set. Functions or features that requires jni will not work at all."
+            export LD_LIBRARY_PATH=$STARROCKS_HOME/lib:$LD_LIBRARY_PATH
+          else
+            java_version=$(jdk_version)
+            if [[ $java_version -gt 8 ]]; then
+              export LD_LIBRARY_PATH=$JAVA_HOME/lib/server:$JAVA_HOME/lib:$LD_LIBRARY_PATH
+              # JAVA_HOME is jdk
+            elif [[ -d "$JAVA_HOME/jre"  ]]; then
+              export LD_LIBRARY_PATH=$JAVA_HOME/jre/lib/$jvm_arch/server:$JAVA_HOME/jre/lib/$jvm_arch:$LD_LIBRARY_PATH
+            # JAVA_HOME is jre
+            else
+              export LD_LIBRARY_PATH=$JAVA_HOME/lib/$jvm_arch/server:$JAVA_HOME/lib/$jvm_arch:$LD_LIBRARY_PATH
+            fi
+          fi
+
+          # Execute tests to generate .gcda coverage data files
+          cd ${CMAKE_BUILD_DIR}/test
+          ./starrocks_test || echo "Some tests failed, proceeding to collect remaining coverage..."
+
+      - name: Collect coverage into one XML report
+        run: |
+          cd ${STARROCKS_HOME}
+          # -r . : Set the project root
+          # --object-directory : Point to where .gcda files are located
+          # --filter : Only include relevant source code, excluding third-party libs
+          # --sonarqube : Generate Sonar-compatible XML format
+          gcovr -r ${STARROCKS_HOME} \
+                --object-directory ${CMAKE_BUILD_DIR} \
+                --filter 'be/src/' \
+                --sonarqube coverage.xml
+      - name: Output BE Coverage Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## BE (C++) Code Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          COVERAGE_XML="${STARROCKS_HOME}/coverage.xml"
+          if [ ! -f "$COVERAGE_XML" ]; then
+            echo "> **Warning:** Coverage report not found at \`$COVERAGE_XML\`" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          python3 - "$COVERAGE_XML" >> $GITHUB_STEP_SUMMARY << 'PYEOF'
+          import xml.etree.ElementTree as ET, sys
+
+          tree = ET.parse(sys.argv[1])
+          root = tree.getroot()
+
+          total_lines = 0
+          covered_lines = 0
+          total_branches = 0
+          covered_branches = 0
+          file_count = 0
+
+          for f in root.findall('.//file'):
+              file_count += 1
+              for line in f.findall('lineToCover'):
+                  total_lines += 1
+                  if line.get('covered') == 'true':
+                      covered_lines += 1
+                  branch_total = line.get('branchesToCover')
+                  branch_covered = line.get('coveredBranches')
+                  if branch_total is not None:
+                      total_branches += int(branch_total)
+                      covered_branches += int(branch_covered) if branch_covered else 0
+
+          line_pct = (covered_lines / total_lines * 100) if total_lines > 0 else 0
+          branch_pct = (covered_branches / total_branches * 100) if total_branches > 0 else 0
+
+          def icon(pct):
+              if pct >= 60: return ":white_check_mark:"
+              if pct >= 40: return ":warning:"
+              return ":x:"
+
+          print("| Metric | Covered | Total | Coverage |")
+          print("|--------|--------:|------:|---------:|")
+          print(f"| {icon(line_pct)} Lines | {covered_lines:,} | {total_lines:,} | **{line_pct:.1f}%** |")
+          if total_branches > 0:
+              print(f"| {icon(branch_pct)} Branches | {covered_branches:,} | {total_branches:,} | **{branch_pct:.1f}%** |")
+          print(f"| Files analyzed | {file_count:,} | | |")
+          PYEOF
+
+      - name: Upload BE SonarQube artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: be-sonar-artifacts
+          path: |
+            ${{ env.SONARQUBE_OUTPUT }}/
+            coverage.xml
+          retention-days: 1
+
+      - name: Download FE artifacts
+        if: always()
+        id: download-fe
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: fe-sonar-artifacts
+          path: fe-sonar-artifacts
+
+      - name: SonarQube Scan
+        if: always()
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.branch.name=${{ github.ref_name }}
+            -Dsonar.projectKey=celonis_celostar-starrocks
+            -Dsonar.organization=celonis
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.sources=fe/fe-core/src/main/java,be/src
+            -Dsonar.java.binaries=fe-sonar-artifacts/classes
+            -Dsonar.coverage.jacoco.xmlReportPaths=fe-sonar-artifacts/site/jacoco/jacoco.xml
+            -Dsonar.cfamily.compile-commands=${{ env.SONARQUBE_OUTPUT }}/compile_commands.json
+            -Dsonar.coverageReportPaths=coverage.xml
+            -Dsonar.inclusions=fe/fe-core/src/main/java/**/*.java,be/src/common/**/*.cpp,be/src/common/**/*.h,be/src/util/**/*.cpp,be/src/util/**/*.h
