@@ -197,6 +197,7 @@ jobs:
           build-wrapper-linux-x86-64 --out-dir ${SONARQUBE_OUTPUT} sh -c '
           cmake -G "Unix Makefiles" \
                 -DCMAKE_BUILD_TYPE=Release \
+                -DSTARROCKS_JIT_ENABLE=ON \
                 -DWITH_GCOV=ON \
                 -DMAKE_TEST=ON \
                 -DCOMPRESS_DEBUG_SECTIONS=OFF \
