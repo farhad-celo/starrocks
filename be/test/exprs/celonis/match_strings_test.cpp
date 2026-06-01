@@ -164,6 +164,33 @@ TEST_F(CelonisMatchStringsTest, const_match_strings_normal_case_6) {
     EXPECT_EQ("ASP, BSP, CSP, DSP", result->get(3).get_slice());
 }
 
+TEST_F(CelonisMatchStringsTest, const_match_strings_utf8_code_point_distance) {
+    Prepare();
+    string_column_->append_datum("\xC3\xA4\xC3\xB6\xC3\xBC");
+    const auto result = RunConstantMatch(DatumArray{"\xC3\xA4\xC3\xB6\xC3\xBC"
+                                                    "xxx",
+                                                    "\xCF\x84\xCF\x84"
+                                                    "\xC3\xA4\xC3\xB6\xC3\xBC"},
+                                         2L, "-")
+                                .value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ(
+            "\xCF\x84\xCF\x84"
+            "\xC3\xA4\xC3\xB6\xC3\xBC"
+            "-"
+            "\xC3\xA4\xC3\xB6\xC3\xBC"
+            "xxx",
+            result->get(0).get_slice());
+}
+
+TEST_F(CelonisMatchStringsTest, const_match_strings_malformed_utf8_is_opaque) {
+    Prepare();
+    string_column_->append_datum("\xC3");
+    const auto result = RunConstantMatch(DatumArray{"?", "\xC3", "\xC3\xA4"}, 3L, "-").value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ("\xC3", result->get(0).get_slice());
+}
+
 TEST_F(CelonisMatchStringsTest, null_input_string_and_const_match_strings) {
     Prepare();
     string_column_->append_datum("Shirt");
@@ -223,6 +250,43 @@ TEST_F(CelonisMatchStringsTest, non_const_match_strings_normal_case) {
     EXPECT_EQ("T-Shirt#Sweatpants", result->get(0).get_slice());
     EXPECT_EQ("", result->get(1).get_slice());
     EXPECT_EQ("T-Shirt;Sweatpants", result->get(2).get_slice());
+}
+
+TEST_F(CelonisMatchStringsTest, non_const_match_strings_utf8_code_point_distance) {
+    Prepare();
+    AddRow("\xC3\xA4\xC3\xB6\xC3\xBC",
+           DatumArray{"\xC3\xA4\xC3\xB6\xC3\xBC"
+                      "xxx",
+                      "\xCF\x84\xCF\x84"
+                      "\xC3\xA4\xC3\xB6\xC3\xBC"},
+           2L, "-");
+    const auto result = Run().value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ(
+            "\xCF\x84\xCF\x84"
+            "\xC3\xA4\xC3\xB6\xC3\xBC"
+            "-"
+            "\xC3\xA4\xC3\xB6\xC3\xBC"
+            "xxx",
+            result->get(0).get_slice());
+}
+
+TEST_F(CelonisMatchStringsTest, non_const_match_strings_malformed_utf8_is_opaque) {
+    Prepare();
+    AddRow("A"
+           "\xFF",
+           DatumArray{"A?",
+                      "A"
+                      "\xFF"},
+           2L, "-");
+    const auto result = Run().value();
+    ASSERT_EQ(string_column_->size(), result->size());
+    EXPECT_EQ(
+            "A"
+            "\xFF"
+            "-"
+            "A?",
+            result->get(0).get_slice());
 }
 
 TEST_F(CelonisMatchStringsTest, non_const_match_strings_zero_top_k) {

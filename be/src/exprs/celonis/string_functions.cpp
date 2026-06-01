@@ -1,11 +1,15 @@
 #include "exprs/celonis/string_functions.h"
 
+#include <algorithm>
 #include <boost/locale/utf.hpp>
 #include <charconv>
 #include <iostream>
+#include <numeric>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "column/binary_column.h"
 #include "column/column_builder.h"
@@ -1006,7 +1010,30 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_to_double(FunctionContext* co
     return res.build(all_const);
 }
 
-static int edit_distance(const std::string& str1, const std::string& str2) {
+static StatusOr<std::vector<char32_t>> decode_utf8_code_points(std::string_view str) {
+    static constexpr char32_t INVALID_UTF8_TOKEN_BASE = 0x110000;
+    std::vector<char32_t> code_points;
+    if (str.empty()) {
+        return code_points;
+    }
+    code_points.reserve(str.size());
+    const char* itr = str.data();
+    const char* end = str.data() + str.size();
+    while (itr < end) {
+        const char* next = itr;
+        const auto decoded = boost::locale::utf::utf_traits<char>::decode(next, end);
+        if (decoded == boost::locale::utf::illegal || decoded == boost::locale::utf::incomplete) {
+            code_points.push_back(INVALID_UTF8_TOKEN_BASE + static_cast<unsigned char>(*itr));
+            ++itr;
+        } else {
+            code_points.push_back(static_cast<char32_t>(decoded));
+            itr = next;
+        }
+    }
+    return code_points;
+}
+
+static int edit_distance(const std::vector<char32_t>& str1, const std::vector<char32_t>& str2) {
     const int len1 = str1.size();
     const int len2 = str2.size();
     std::vector<int> prev_row(len2 + 1);
@@ -1026,10 +1053,25 @@ static int edit_distance(const std::string& str1, const std::string& str2) {
     return prev_row[len2];
 }
 
+struct DecodedMatchString {
+    std::string value;
+    std::vector<char32_t> code_points;
+};
+
+static Status append_match_string(const std::string& match_str, HashSet<std::string>* seen_match_strings,
+                                  std::vector<DecodedMatchString>* match_strings) {
+    if (!seen_match_strings->insert(match_str).second) {
+        return Status::OK();
+    }
+    ASSIGN_OR_RETURN(auto code_points, decode_utf8_code_points(match_str));
+    match_strings->push_back({match_str, std::move(code_points)});
+    return Status::OK();
+}
+
 struct CelonisMatchStringsState {
     CelonisMatchStringsState() {}
 
-    HashSet<std::string> match_strings;
+    std::vector<DecodedMatchString> match_strings;
     bool null_match_array = false;
     int64_t top_k = 1;
     std::string separator = ", ";
@@ -1069,13 +1111,14 @@ Status CelonisStringFunctions::match_strings_prepare(FunctionContext* context,
         state->null_match_array = true;
         return Status::OK();
     }
+    HashSet<std::string> seen_match_strings;
     auto match_string_array = match_strings_column->get(0).get_array();
     for (const auto& match_string : match_string_array) {
         if (match_string.is_null()) {
             continue;
         }
         const std::string match_str = match_string.get_slice().to_string();
-        state->match_strings.insert(match_str);
+        RETURN_IF_ERROR(append_match_string(match_str, &seen_match_strings, &state->match_strings));
     }
     return Status::OK();
 }
@@ -1089,14 +1132,17 @@ Status CelonisStringFunctions::match_strings_close(FunctionContext* context,
     return Status::OK();
 }
 
-std::string get_match_strings_result(const std::string& input_string, const HashSet<std::string>& match_strings,
-                                     int64_t top_k, const std::string& separator) {
-    HashSet<char> char_set(input_string.begin(), input_string.end());
-    const std::string chars(char_set.begin(), char_set.end());
+StatusOr<std::string> get_match_strings_result(const std::string& input_string,
+                                               const std::vector<DecodedMatchString>& match_strings, int64_t top_k,
+                                               const std::string& separator) {
+    ASSIGN_OR_RETURN(auto input_code_points, decode_utf8_code_points(input_string));
+    HashSet<char32_t> code_point_set(input_code_points.begin(), input_code_points.end());
     std::vector<std::pair<int, std::string>> pairs;
     for (const auto& match_string : match_strings) {
-        if (match_string.find_first_of(chars) != std::string::npos) {
-            pairs.emplace_back(edit_distance(input_string, match_string), match_string);
+        const auto& match_code_points = match_string.code_points;
+        if (std::any_of(match_code_points.begin(), match_code_points.end(),
+                        [&](char32_t code_point) { return code_point_set.find(code_point) != code_point_set.end(); })) {
+            pairs.emplace_back(edit_distance(input_code_points, match_code_points), match_string.value);
         }
     }
     top_k = std::min(top_k, static_cast<int64_t>(pairs.size()));
@@ -1137,20 +1183,23 @@ StatusOr<ColumnPtr> CelonisStringFunctions::match_strings_non_constant([[maybe_u
         const std::string input_string = input_string_viewer.value(row).to_string();
         int64_t top_k = top_k_viewer.is_null(row) ? 1 : top_k_viewer.value(row);
         const std::string separator = separator_viewer.is_null(row) ? ", " : separator_viewer.value(row).to_string();
+        if (top_k <= 0) {
+            return Status::InvalidArgument("CELONIS_MATCH_STRINGS: top_k must be positive.");
+        }
         const auto start = offsets[row];
         const auto end = offsets[row + 1];
-        HashSet<std::string> match_string_set;
+        HashSet<std::string> seen_match_strings;
+        seen_match_strings.reserve(end - start);
+        std::vector<DecodedMatchString> match_string_set;
         match_string_set.reserve(end - start);
         for (auto i = start; i < end; ++i) {
             if (match_string_data.null_elements != nullptr && (*match_string_data.null_elements)[i] != 0) {
                 continue;
             }
-            match_string_set.insert(match_strings[i].to_string());
+            RETURN_IF_ERROR(append_match_string(match_strings[i].to_string(), &seen_match_strings, &match_string_set));
         }
-        if (top_k <= 0) {
-            return Status::InvalidArgument("CELONIS_MATCH_STRINGS: top_k must be positive.");
-        }
-        result.append(get_match_strings_result(input_string, match_string_set, top_k, separator));
+        ASSIGN_OR_RETURN(auto match_result, get_match_strings_result(input_string, match_string_set, top_k, separator));
+        result.append(match_result);
     }
     return result.build(all_const);
 }
@@ -1175,8 +1224,8 @@ StatusOr<ColumnPtr> CelonisStringFunctions::match_strings_constant([[maybe_unuse
         auto input_slice = input_string_viewer.value(row);
         auto it = cache.find(input_slice);
         if (it == cache.end()) {
-            const auto match_result =
-                    get_match_strings_result(input_slice.to_string(), state->match_strings, top_k, separator);
+            ASSIGN_OR_RETURN(auto match_result,
+                             get_match_strings_result(input_slice.to_string(), state->match_strings, top_k, separator));
             cache.insert({input_slice, match_result});
             result.append(match_result);
         } else {
