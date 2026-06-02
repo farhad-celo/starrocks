@@ -21,7 +21,17 @@ import com.starrocks.analysis.LargeIntLiteral;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.util.DateUtils;
+import com.starrocks.qe.ConnectContext;
+import com.starrocks.sql.optimizer.ExpressionContext;
+import com.starrocks.sql.optimizer.Group;
+import com.starrocks.sql.optimizer.GroupExpression;
+import com.starrocks.sql.optimizer.OptimizerContext;
+import com.starrocks.sql.optimizer.OptimizerFactory;
 import com.starrocks.sql.optimizer.Utils;
+import com.starrocks.sql.optimizer.base.ColumnRefFactory;
+import com.starrocks.sql.optimizer.base.ColumnRefSet;
+import com.starrocks.sql.optimizer.base.LogicalProperty;
+import com.starrocks.sql.optimizer.operator.logical.LogicalWindowOperator;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CaseWhenOperator;
@@ -40,6 +50,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -2114,6 +2125,132 @@ public class ExpressionStatisticsCalculatorTest {
         Assertions.assertEquals(2, mcv.size());
         Assertions.assertEquals(50L + 70L, mcv.get("2024-03-01 00:00:00"));
         Assertions.assertEquals(30L, mcv.get("2024-04-01 00:00:00"));
+    }
+
+    @Test
+    public void testWindowPreserveStatsEnabled() {
+        ColumnRefOperator inputCol = new ColumnRefOperator(100, Type.INT, "inputCol", true);
+        ColumnRefOperator lagCol = new ColumnRefOperator(101, Type.INT, "lagCol", true);
+
+        Histogram inputHistogram = new Histogram(Lists.newArrayList(),
+                Map.of("42", 5000L, "7", 3000L));
+        ColumnStatistic inputStat = ColumnStatistic.builder()
+                .setMinValue(0)
+                .setMaxValue(100)
+                .setNullsFraction(0.25)
+                .setAverageRowSize(4)
+                .setDistinctValuesCount(50)
+                .setHistogram(inputHistogram)
+                .build();
+
+        Statistics.Builder childBuilder = Statistics.builder();
+        childBuilder.setOutputRowCount(10000);
+        childBuilder.addColumnStatistic(inputCol, inputStat);
+
+        Group childGroup = new Group(0);
+        childGroup.setStatistics(childBuilder.build());
+        childGroup.setLogicalProperty(new LogicalProperty(new ColumnRefSet(Lists.newArrayList(inputCol))));
+
+        CallOperator lagCall = new CallOperator("lag", Type.INT,
+                Lists.newArrayList(inputCol, ConstantOperator.createInt(1)));
+
+        Map<ColumnRefOperator, CallOperator> windowCall = new HashMap<>();
+        windowCall.put(lagCol, lagCall);
+
+        LogicalWindowOperator windowOp = new LogicalWindowOperator.Builder()
+                .setWindowCall(windowCall)
+                .setPartitionExpressions(Lists.newArrayList())
+                .setOrderByElements(Lists.newArrayList())
+                .setEnforceSortColumns(Lists.newArrayList())
+                .build();
+
+        Group parentGroup = new Group(1);
+        parentGroup.setLogicalProperty(new LogicalProperty(
+                new ColumnRefSet(Lists.newArrayList(inputCol, lagCol))));
+        GroupExpression groupExpression = new GroupExpression(windowOp, Lists.newArrayList(childGroup));
+        groupExpression.setGroup(parentGroup);
+        ExpressionContext expressionContext = new ExpressionContext(groupExpression);
+
+        ColumnRefFactory columnRefFactory = new ColumnRefFactory();
+        ConnectContext connectContext = new ConnectContext();
+        connectContext.setThreadLocalInfo();
+        OptimizerContext optimizerContext = OptimizerFactory.mockContext(connectContext, columnRefFactory);
+        connectContext.getSessionVariable().setPreserveStatsAfterWindow(true);
+
+        StatisticsCalculator calculator = new StatisticsCalculator(expressionContext, columnRefFactory, optimizerContext);
+        calculator.estimatorStats();
+
+        ColumnStatistic lagStat = expressionContext.getStatistics().getColumnStatistic(lagCol);
+        Assertions.assertFalse(lagStat.isUnknown(), "Expected non-unknown stats when preserve flag is enabled");
+        Assertions.assertEquals(inputStat.getMinValue(), lagStat.getMinValue(), 0.001);
+        Assertions.assertEquals(inputStat.getMaxValue(), lagStat.getMaxValue(), 0.001);
+        Assertions.assertEquals(inputStat.getNullsFraction(), lagStat.getNullsFraction(), 0.001);
+        Assertions.assertEquals(inputStat.getDistinctValuesCount(), lagStat.getDistinctValuesCount(), 0.001);
+        Assertions.assertNotNull(lagStat.getHistogram(), "Histogram should be propagated");
+        Assertions.assertEquals(5000L, lagStat.getHistogram().getMCV().get("42"));
+        Assertions.assertEquals(3000L, lagStat.getHistogram().getMCV().get("7"));
+        Assertions.assertEquals(10000, expressionContext.getStatistics().getOutputRowCount(), 0.001);
+    }
+
+    @Test
+    public void testWindowPreserveStatsDisabled() {
+        ColumnRefOperator inputCol = new ColumnRefOperator(200, Type.INT, "inputCol2", true);
+        ColumnRefOperator lagCol = new ColumnRefOperator(201, Type.INT, "lagCol2", true);
+
+        Histogram inputHistogram = new Histogram(Lists.newArrayList(),
+                Map.of("42", 5000L, "7", 3000L));
+        ColumnStatistic inputStat = ColumnStatistic.builder()
+                .setMinValue(0)
+                .setMaxValue(100)
+                .setNullsFraction(0.25)
+                .setAverageRowSize(4)
+                .setDistinctValuesCount(50)
+                .setHistogram(inputHistogram)
+                .build();
+
+        Statistics.Builder childBuilder = Statistics.builder();
+        childBuilder.setOutputRowCount(10000);
+        childBuilder.addColumnStatistic(inputCol, inputStat);
+
+        Group childGroup = new Group(0);
+        childGroup.setStatistics(childBuilder.build());
+        childGroup.setLogicalProperty(new LogicalProperty(new ColumnRefSet(Lists.newArrayList(inputCol))));
+
+        CallOperator lagCall = new CallOperator("lag", Type.INT,
+                Lists.newArrayList(inputCol, ConstantOperator.createInt(1)));
+
+        Map<ColumnRefOperator, CallOperator> windowCall = new HashMap<>();
+        windowCall.put(lagCol, lagCall);
+
+        LogicalWindowOperator windowOp = new LogicalWindowOperator.Builder()
+                .setWindowCall(windowCall)
+                .setPartitionExpressions(Lists.newArrayList())
+                .setOrderByElements(Lists.newArrayList())
+                .setEnforceSortColumns(Lists.newArrayList())
+                .build();
+
+        Group parentGroup = new Group(1);
+        parentGroup.setLogicalProperty(new LogicalProperty(
+                new ColumnRefSet(Lists.newArrayList(inputCol, lagCol))));
+        GroupExpression groupExpression = new GroupExpression(windowOp, Lists.newArrayList(childGroup));
+        groupExpression.setGroup(parentGroup);
+        ExpressionContext expressionContext = new ExpressionContext(groupExpression);
+
+        ColumnRefFactory columnRefFactory = new ColumnRefFactory();
+        ConnectContext connectContext = new ConnectContext();
+        connectContext.setThreadLocalInfo();
+        OptimizerContext optimizerContext = OptimizerFactory.mockContext(connectContext, columnRefFactory);
+        connectContext.getSessionVariable().setPreserveStatsAfterWindow(false);
+
+        StatisticsCalculator calculator = new StatisticsCalculator(expressionContext, columnRefFactory, optimizerContext);
+        calculator.estimatorStats();
+
+        ColumnStatistic lagStat = expressionContext.getStatistics().getColumnStatistic(lagCol);
+        Assertions.assertTrue(lagStat.isUnknown(), "Expected unknown stats when preserve flag is disabled");
+        // Unknown stats should NOT carry the input's nullsFraction or histogram
+        Assertions.assertNotEquals(0.25, lagStat.getNullsFraction(), 0.001);
+        Assertions.assertNull(lagStat.getHistogram(), "Histogram should not be propagated when flag is disabled");
+
     }
 
     @Test

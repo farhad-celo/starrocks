@@ -431,6 +431,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String CBO_USE_HISTOGRAM_EVALUDATE_LIST_PARTITION = "cbo_use_histogram_evaluate_list_partition";
     public static final String ENABLE_OPTIMIZER_REWRITE_GROUPINGSETS_TO_UNION_ALL =
             "enable_rewrite_groupingsets_to_union_all";
+    public static final String PRESERVE_STATS_AFTER_WINDOW = "preserve_stats_after_window";
     public static final String ENABLE_PARTITION_LEVEL_CARDINALITY_ESTIMATION =
             "enable_partition_level_cardinality_estimation";
     public static final String ENABLE_OPTIMIZER_SKEW_JOIN_V1 =
@@ -1637,6 +1638,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VariableMgr.VarAttr(name = ENABLE_OPTIMIZER_REWRITE_GROUPINGSETS_TO_UNION_ALL)
     private boolean enableRewriteGroupingSetsToUnionAll = false;
+
+    @VariableMgr.VarAttr(name = PRESERVE_STATS_AFTER_WINDOW)
+    private boolean preserveStatsAfterWindow = true;
 
     @VariableMgr.VarAttr(name = ENABLE_PARTITION_LEVEL_CARDINALITY_ESTIMATION, flag = VariableMgr.INVISIBLE)
     private boolean enablePartitionLevelCardinalityEstimation = true;
@@ -4296,6 +4300,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableRewriteGroupingSetsToUnionAll(boolean enableRewriteGroupingSetsToUnionAll) {
         this.enableRewriteGroupingSetsToUnionAll = enableRewriteGroupingSetsToUnionAll;
+    }
+
+    public boolean isPreserveStatsAfterWindow() {
+        return preserveStatsAfterWindow;
+    }
+
+    public void setPreserveStatsAfterWindow(boolean preserveStatsAfterWindow) {
+        this.preserveStatsAfterWindow = preserveStatsAfterWindow;
     }
 
     public boolean isEnablePartitionLevelCardinalityEstimation() {

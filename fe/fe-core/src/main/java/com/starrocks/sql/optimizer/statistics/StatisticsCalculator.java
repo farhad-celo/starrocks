@@ -1993,8 +1993,20 @@ public class StatisticsCalculator extends OperatorVisitor<Void, ExpressionContex
         Statistics inputStatistics = context.getChildStatistics(0);
         builder.addColumnStatistics(inputStatistics.getColumnStatistics());
 
-        analyticCall.forEach((key, value) -> builder.addColumnStatistic(
-                key, estimateWindowCall(value, inputStatistics, partitionExpressions)));
+        boolean preserveStats = optimizerContext.getSessionVariable().isPreserveStatsAfterWindow();
+
+        analyticCall.forEach((key, value) -> {
+            ColumnStatistic computed = estimateWindowCall(value, inputStatistics, partitionExpressions);
+            if (preserveStats && computed.isUnknown() && !value.getChildren().isEmpty()) {
+                // When preserve_stats_after_window is enabled, propagate input child statistics
+                // through window functions instead of returning unknown.
+                ColumnStatistic childStat = ExpressionStatisticCalculator.calculate(
+                        value.getChild(0), inputStatistics);
+                builder.addColumnStatistic(key, childStat);
+            } else {
+                builder.addColumnStatistic(key, computed);
+            }
+        });
 
         builder.setOutputRowCount(inputStatistics.getOutputRowCount());
 
