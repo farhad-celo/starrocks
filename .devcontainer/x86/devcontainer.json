@@ -2,13 +2,13 @@
     "name": "sr-dev-homcc",
     "containerUser": "root",
     "remoteUser": "root",
-    "workspaceMount": "source=${localWorkspaceFolder},target=/root/celostar-starrocks,type=bind",
-    "workspaceFolder": "/root/celostar-starrocks",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/celostar-starrocks,type=bind",
+    "workspaceFolder": "/workspaces/celostar-starrocks",
     "build": {
         "dockerfile": "../../docker/dockerfiles/dev-env-homcc-base/x86/Dockerfile",
         "context": "../../docker/dockerfiles/dev-env-homcc-base/x86"
     },
-    "postCreateCommand": "cp .devcontainer/CMakePresets.json be/CMakePresets.json && pip install -r test/requirements.txt",
+    "postCreateCommand": "cp .devcontainer/CMakePresets.json be/CMakePresets.json",
     "containerEnv": {
         // This is covered by the CMake presets already but still useful to have in case you want to execute build.sh
         "STARROCKS_GCC_HOME": "/usr/",
@@ -16,7 +16,7 @@
         "STARROCKS_LINKER": "lld",
         "CMAKE_GENERATOR": "ninja",
         "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
-        "STARROCKS_HOME": "/root/celostar-starrocks",
+        "STARROCKS_HOME": "/workspaces/celostar-starrocks",
         "UDF_RUNTIME_DIR": "lib/udf-runtime"
     },
     "customizations": {
