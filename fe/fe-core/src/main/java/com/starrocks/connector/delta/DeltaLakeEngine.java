@@ -52,6 +52,16 @@ public class DeltaLakeEngine extends DefaultEngine {
         this.bypassMetaCache = bypassMetaCache;
     }
 
+    public Configuration getHadoopConf() {
+        return hadoopConf;
+    }
+
+    // True when this engine was built from a per-table (vended-credentials) Configuration; mirrors
+    // the bypassMetaCache flag, which is set exactly when usePerTableConfig is true.
+    public boolean isPerTableConfig() {
+        return bypassMetaCache;
+    }
+
     @Override
     public JsonHandler getJsonHandler() {
         return (properties.isEnableDeltaLakeJsonMetaCache() && !bypassMetaCache)

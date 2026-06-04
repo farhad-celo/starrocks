@@ -176,6 +176,9 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         if (usePerTableConfig) {
             effectiveConfiguration = new Configuration(hdfsConfiguration);
             tableCloudConfiguration.applyToConfiguration(effectiveConfiguration);
+            // Keep the cloud FS cache on for this per-table copy so the throwaway-UGI scope's
+            // closeAllForUGI can reclaim the S3AFileSystem instances every vended read builds.
+            DeltaVendedFsScope.enableFilesystemCache(effectiveConfiguration);
         }
         // When per-table vended credentials are active, the catalog-level json/checkpoint
         // caches must be bypassed: their CacheLoaders close over the credential-less
@@ -185,8 +188,17 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         SnapshotImpl snapshot;
 
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "DeltaLake.getSnapshot")) {
-            Table deltaTable = Table.forPath(deltaLakeEngine, path);
-            snapshot = (SnapshotImpl) deltaTable.getLatestSnapshot(deltaLakeEngine);
+            if (usePerTableConfig) {
+                // Vended credentials: run the kernel log replay under a throwaway, per-load UGI so the
+                // S3AFileSystem instances it builds are reclaimed via closeAllForUGI when the load
+                // returns, instead of leaking one uncached filesystem (and its threads) per metadata file.
+                snapshot = DeltaVendedFsScope.runScoped(
+                        DeltaVendedFsScope.scopeNameFor(catalogName, dbName, tableName),
+                        () -> (SnapshotImpl) Table.forPath(deltaLakeEngine, path).getLatestSnapshot(deltaLakeEngine));
+            } else {
+                Table deltaTable = Table.forPath(deltaLakeEngine, path);
+                snapshot = (SnapshotImpl) deltaTable.getLatestSnapshot(deltaLakeEngine);
+            }
         } catch (TableNotFoundException e) {
             LOG.error("Failed to find Delta table for {}.{}.{}, {}. caused by : {}", catalogName, dbName, tableName,
                     e.getMessage(), e.getCause());
@@ -221,6 +233,27 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
 
         ScanBuilder scanBuilder = deltaLakeTable.getDeltaSnapshot().getScanBuilder(deltaEngine);
         Scan scan = scanBuilder.build();
+        try {
+            // Mirror the getLatestSnapshot scoping: scan-file listing reuses the same engine and
+            // would otherwise leak an uncached S3AFileSystem under vended credentials.
+            if (deltaEngine instanceof DeltaLakeEngine && ((DeltaLakeEngine) deltaEngine).isPerTableConfig()) {
+                DeltaVendedFsScope.runScoped(
+                        DeltaVendedFsScope.scopeNameFor(catalogName, dbName, tableName),
+                        () -> collectPartitionKeys(scan, deltaEngine, partitionColumnNames, partitionKeys));
+            } else {
+                collectPartitionKeys(scan, deltaEngine, partitionColumnNames, partitionKeys);
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get partition keys for table {}.{}.{}", catalogName, dbName, tableName, e);
+            throw new StarRocksConnectorException(String.format("Failed to get partition keys for table %s.%s.%s",
+                    catalogName, dbName, tableName), e);
+        }
+
+        return partitionKeys;
+    }
+
+    private Void collectPartitionKeys(Scan scan, Engine deltaEngine, List<String> partitionColumnNames,
+                                      List<String> partitionKeys) throws IOException {
         try (CloseableIterator<FilteredColumnarBatch> scanFilesAsBatches = scan.getScanFiles(deltaEngine)) {
             while (scanFilesAsBatches.hasNext()) {
                 FilteredColumnarBatch scanFileBatch = scanFilesAsBatches.next();
@@ -237,13 +270,8 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
                     }
                 }
             }
-        } catch (Exception e) {
-            LOG.error("Failed to get partition keys for table {}.{}.{}", catalogName, dbName, tableName, e);
-            throw new StarRocksConnectorException(String.format("Failed to get partition keys for table %s.%s.%s",
-                    catalogName, dbName, tableName), e);
         }
-
-        return partitionKeys;
+        return null;
     }
 
     @Override

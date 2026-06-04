@@ -284,6 +284,19 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
     }
 
     private RemoteFileInfoSource buildRemoteInfoSource(Table table, ScalarOperator operator, boolean enableCollectColumnStats) {
+        DeltaLakeTable deltaLakeTable = (DeltaLakeTable) table;
+        Engine engine = deltaLakeTable.getDeltaEngine();
+        if (engine instanceof DeltaLakeEngine && ((DeltaLakeEngine) engine).isPerTableConfig()) {
+            // Vended credentials: this source is consumed lazily during scan-range scheduling, so the
+            // getScanFiles filesystem access happens after this method returns. ScopedRemoteFileInfoSource
+            // binds a throwaway-UGI scope to the source's lifetime so the filesystems it builds are reclaimed
+            // on close instead of leaking one per credential rotation under the long-lived login UGI.
+            return ScopedRemoteFileInfoSource.open(
+                    DeltaVendedFsScope.scopeNameFor(catalogName, deltaLakeTable.getCatalogDBName(),
+                            deltaLakeTable.getCatalogTableName()),
+                    () -> buildFileScanTaskIterator(table, operator, enableCollectColumnStats));
+        }
+
         CloseableIterator<Pair<FileScanTask, DeltaLakeAddFileStatsSerDe>> iterator =
                 buildFileScanTaskIterator(table, operator, enableCollectColumnStats);
         return new RemoteFileInfoSource() {
@@ -340,17 +353,38 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
         String traceLabel = enableCollectColumnStats ? "DELTA_LAKE.updateDeltaLakeFileStats" :
                 "DELTA_LAKE.updateDeltaLakeCardinality";
 
-        try (CloseableIterator<Pair<FileScanTask, DeltaLakeAddFileStatsSerDe>> iterator =
-                buildFileScanTaskIterator(table, operator, enableCollectColumnStats)) {
-            while (iterator.hasNext()) {
-                Pair<FileScanTask, DeltaLakeAddFileStatsSerDe> pair = iterator.next();
-                files.add(pair.first);
-                try (Timer ignored = Tracers.watchScope(EXTERNAL, traceLabel)) {
-                    statisticProvider.updateFileStats(deltaLakeTable, key, pair.first, pair.second,
-                            nonPartitionPrimitiveColumns, partitionPrimitiveColumns);
+        DeltaVendedFsScope.ScopedAction<Void> drain = () -> {
+            try (CloseableIterator<Pair<FileScanTask, DeltaLakeAddFileStatsSerDe>> iterator =
+                    buildFileScanTaskIterator(table, operator, enableCollectColumnStats)) {
+                while (iterator.hasNext()) {
+                    Pair<FileScanTask, DeltaLakeAddFileStatsSerDe> pair = iterator.next();
+                    files.add(pair.first);
+                    try (Timer ignored = Tracers.watchScope(EXTERNAL, traceLabel)) {
+                        statisticProvider.updateFileStats(deltaLakeTable, key, pair.first, pair.second,
+                                nonPartitionPrimitiveColumns, partitionPrimitiveColumns);
+                    }
                 }
             }
+            return null;
+        };
+
+        // Vended credentials: drain the listing under a throwaway-UGI scope so closeAllForUGI reclaims
+        // the S3AFileSystem instances it builds. The drain is fully synchronous here, so a single
+        // runScoped suffices (the incremental path in buildRemoteInfoSource needs the lifecycle Handle).
+        Engine engine = deltaLakeTable.getDeltaEngine();
+        try {
+            if (engine instanceof DeltaLakeEngine && ((DeltaLakeEngine) engine).isPerTableConfig()) {
+                DeltaVendedFsScope.runScoped(
+                        DeltaVendedFsScope.scopeNameFor(catalogName, deltaLakeTable.getCatalogDBName(),
+                                deltaLakeTable.getCatalogTableName()), drain);
+            } else {
+                drain.run();
+            }
         } catch (IOException e) {
+            throw new StarRocksConnectorException("Failed to iter deltalake file scan iterator", e);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
             throw new StarRocksConnectorException("Failed to iter deltalake file scan iterator", e);
         }
         splitTasks.put(key, files);
