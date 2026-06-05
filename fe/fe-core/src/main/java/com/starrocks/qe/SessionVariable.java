@@ -1627,7 +1627,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     private boolean enableMultiArrayAggLowCardinalityOptimize = true;
 
     @VarAttr(name = CTE_LOW_CARDINALITY_OPTIMIZE)
-    private boolean enableCTELowCardinalityOptimize = false;
+    private boolean enableCTELowCardinalityOptimize = true;
 
     @VariableMgr.VarAttr(name = ENABLE_MULTI_ARRAY_AGG_V2)
     private boolean enableMultiArrayAggV2 = false;
