@@ -38,6 +38,7 @@ public class VariableVarConverters {
         PartialUpdateModeConverter partialUpdateModeConverter = new PartialUpdateModeConverter();
         CONVERTERS.put(SessionVariable.PARTIAL_UPDATE_MODE, partialUpdateModeConverter);
         CONVERTERS.put(SessionVariable.INSERT_MAX_FILTER_RATIO, new InsertMaxFilterRatioConverter());
+        CONVERTERS.put(SessionVariable.MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH, new MultiArrayAggMaxArrayLengthConverter());
     }
 
     public static String convert(String varName, String value) throws DdlException {
@@ -82,6 +83,27 @@ public class VariableVarConverters {
             } catch (NumberFormatException e) {
                 ErrorReport.reportDdlException(
                         ErrorCode.ERR_INVALID_VALUE, SessionVariable.INSERT_MAX_FILTER_RATIO, value, "between 0.0 and 1.0");
+            }
+            return value;
+        }
+    }
+
+    // Check whether the session variable `multi_array_agg_max_array_length` falls into [0, 2^32]. 0 means "not enabled" -- in
+    // this case the cluster-level config `array_agg_size_limit` is used. 2^32 is the upper bound. It matches the
+    // Column::MAX_CAPACITY_LIMIT value in BE. Setting a value larger than it doesn't make sense.
+    public static class MultiArrayAggMaxArrayLengthConverter implements VariableVarConverterI {
+        public static final long MAX_VALUE = 4294967296L;
+        @Override
+        public String convert(String value) throws DdlException {
+            try {
+                long parsed = Long.parseLong(value);
+                if (parsed < 0 || parsed > MAX_VALUE) {
+                    ErrorReport.reportDdlException(ErrorCode.ERR_INVALID_VALUE, SessionVariable.MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH,
+                            value, "between 0 and 4294967296");
+                }
+            } catch (NumberFormatException e) {
+                ErrorReport.reportDdlException(ErrorCode.ERR_INVALID_VALUE, SessionVariable.MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH,
+                        value, "between 0 and 4294967296");
             }
             return value;
         }

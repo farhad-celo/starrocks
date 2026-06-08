@@ -359,6 +359,7 @@ struct TQueryOptions {
 
   // CELONIS
   10001: optional i64 multi_array_agg_v2_debug_level;
+  10002: optional i64 multi_array_agg_max_array_length;
 }
 
 // A scan range plus the parameters needed to execute that scan.

@@ -110,6 +110,8 @@ public:
     bool get_is_distinct() { return _is_distinct; }
     const std::vector<int16_t>& get_multi_array_agg_column_serialization_size() { return _multi_array_agg_column_serialization_size; }
     int get_multi_array_agg_v2_debug_level() const { return _multi_array_agg_v2_debug_level; }
+    int64_t get_multi_array_agg_max_array_length() const { return _multi_array_agg_max_array_length; }
+    void set_multi_array_agg_max_array_length(int64_t len) { _multi_array_agg_max_array_length = len; }
     // for tests
     void set_is_asc_order(const std::vector<bool>& order) { _is_asc_order = order; }
     void set_nulls_first(const std::vector<bool>& nulls) { _nulls_first = nulls; }
@@ -236,6 +238,8 @@ private:
     bool _is_distinct = false;
     ssize_t group_concat_max_len = 1024;
     ssize_t _max_array_length = 0;
+    // 2^32. Default value for testing purpose. During runtime, it's always set by Aggregator::prepare
+    int64_t _multi_array_agg_max_array_length = 4294967296;
 
     // used for ngram bloom filter to speed up some function
     std::unique_ptr<NgramBloomFilterState> _ngramState;

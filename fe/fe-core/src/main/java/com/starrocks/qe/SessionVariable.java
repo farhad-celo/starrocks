@@ -399,6 +399,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String MULTI_ARRAY_AGG_V2_DEBUG_LEVEL = "multi_array_agg_v2_debug_level";
     public static final String ENABLE_SHORTENED_VARIANT_LOW_CARDINALITY_OPTIMIZE =
                     "enable_shortened_variant_low_cardinality_optimize";
+    public static final String MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH = "multi_array_agg_max_array_length";
     public static final String CBO_USE_NTH_EXEC_PLAN = "cbo_use_nth_exec_plan";
     public static final String CBO_CTE_REUSE = "cbo_cte_reuse";
     public static final String CBO_CTE_REUSE_RATE = "cbo_cte_reuse_rate";
@@ -1640,6 +1641,11 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VariableMgr.VarAttr(name = ENABLE_SHORTENED_VARIANT_LOW_CARDINALITY_OPTIMIZE)
     private boolean enableShortenedVariantLowCardinalityOptimize = false;
+    // Per-session override for the maximum number of elements that multi_array_agg (v1 and v2) is
+    // allowed to accumulate per group. 0 means "not set" -- in that case the cluster-level config
+    // `array_agg_size_limit` (BE) is used instead. Valid range is [0, 2^32].
+    @VariableMgr.VarAttr(name = MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH)
+    private long multiArrayAggMaxArrayLength = 0;
 
     @VariableMgr.VarAttr(name = ENABLE_OPTIMIZER_REWRITE_GROUPINGSETS_TO_UNION_ALL)
     private boolean enableRewriteGroupingSetsToUnionAll = false;
@@ -2125,6 +2131,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableShortenedVariantLowCardinalityOptimize(boolean enableShortenedVariantLowCardinalityOptimize) {
         this.enableShortenedVariantLowCardinalityOptimize = enableShortenedVariantLowCardinalityOptimize;
+    }
+
+    public long getMultiArrayAggMaxArrayLength() {
+        return multiArrayAggMaxArrayLength;
+    }
+
+    public void setMultiArrayAggMaxArrayLength(long multiArrayAggMaxArrayLength) {
+        this.multiArrayAggMaxArrayLength = multiArrayAggMaxArrayLength;
     }
 
     @VarAttr(name = ENABLE_REWRITE_BITMAP_UNION_TO_BITMAP_AGG)
@@ -5668,6 +5682,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
         tResult.setGroup_concat_max_len(groupConcatMaxLen);
         tResult.setMax_array_length(maxArrayLength);
         tResult.setMulti_array_agg_v2_debug_level(multiArrayAggV2DebugLevel);
+        if (multiArrayAggMaxArrayLength > 0) {
+            tResult.setMulti_array_agg_max_array_length(multiArrayAggMaxArrayLength);
+        }
         tResult.setRpc_http_min_size(rpcHttpMinSize);
         tResult.setInterleaving_group_size(interleavingGroupSize);
 

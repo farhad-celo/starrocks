@@ -3050,4 +3050,93 @@ TEST_F(CelonisAggregateTest, test_multi_array_agg_v2) {
               ",'c',NULL,'a']}]");
 }
 
+// Verify the per-session max-array-length override fails the query for V1.
+TEST_F(CelonisAggregateTest, test_multi_array_agg_session_size_limit) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR}));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    local_ctx->set_is_asc_order({false});
+    local_ctx->set_nulls_first({true});
+    local_ctx->set_runtime_state(runtime_state.get());
+
+    // Limit each aggregated array to 2 elements.
+    local_ctx->set_multi_array_agg_max_array_length(2);
+
+    const AggregateFunction* array_agg_func =
+            get_aggregate_function("multi_array_agg", TYPE_VARCHAR, TYPE_STRUCT, false);
+    auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+
+    auto char_type = TypeDescriptor::create_varchar_type(30);
+    ColumnPtr char_column = ColumnHelper::create_column(char_type, true);
+    char_column->append_datum("a");
+    char_column->append_datum("b");
+    char_column->append_datum("c");
+    char_column->append_datum("d");
+    char_column->append_datum("e");
+
+    auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
+    ColumnPtr int_column = ColumnHelper::create_column(int_type, true);
+    int_column->append_datum(5);
+    int_column->append_datum(4);
+    int_column->append_datum(3);
+    int_column->append_datum(2);
+    int_column->append_datum(1);
+
+    std::vector<const Column*> raw_columns{char_column.get(), int_column.get()};
+
+    ASSERT_FALSE(local_ctx->has_error());
+    array_agg_func->update_batch_single_state(local_ctx.get(), char_column->size(), raw_columns.data(), state->state());
+    ASSERT_TRUE(local_ctx->has_error());
+    EXPECT_NE(nullptr, ::strstr(local_ctx->error_msg(), "size limit (2) of multi_array_agg is reached"));
+}
+
+// Verify the per-session max-array-length override fails the query for V2.
+TEST_F(CelonisAggregateTest, test_multi_array_agg_v2_session_size_limit) {
+    std::vector<FunctionContext::TypeDesc> arg_types = {
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+            CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_INT))};
+
+    auto return_type = CelonisAnyValUtil::column_type_to_type_desc(logical_types_to_struct_type({TYPE_VARCHAR}));
+    std::unique_ptr<RuntimeState> runtime_state = std::make_unique<RuntimeState>();
+    std::unique_ptr<FunctionContext> local_ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+    local_ctx->set_is_asc_order({false});
+    local_ctx->set_nulls_first({true});
+    local_ctx->set_runtime_state(runtime_state.get());
+    local_ctx->set_multi_array_agg_column_serialization_size({0, 0});
+
+    // Limit each aggregated array to 2 elements.
+    local_ctx->set_multi_array_agg_max_array_length(2);
+
+    const AggregateFunction* array_agg_func =
+            get_aggregate_function("multi_array_agg_v2", TYPE_VARCHAR, TYPE_STRUCT, false);
+    auto state = ManagedAggrState::create(local_ctx.get(), array_agg_func);
+
+    auto char_type = TypeDescriptor::create_varchar_type(30);
+    ColumnPtr char_column = ColumnHelper::create_column(char_type, true);
+    char_column->append_datum("a");
+    char_column->append_datum("b");
+    char_column->append_datum("c");
+    char_column->append_datum("d");
+    char_column->append_datum("e");
+
+    auto int_type = TypeDescriptor::from_logical_type(LogicalType::TYPE_INT);
+    ColumnPtr int_column = ColumnHelper::create_column(int_type, true);
+    int_column->append_datum(5);
+    int_column->append_datum(4);
+    int_column->append_datum(3);
+    int_column->append_datum(2);
+    int_column->append_datum(1);
+
+    std::vector<const Column*> raw_columns{char_column.get(), int_column.get()};
+
+    ASSERT_FALSE(local_ctx->has_error());
+    array_agg_func->update_batch_single_state(local_ctx.get(), char_column->size(), raw_columns.data(), state->state());
+    ASSERT_TRUE(local_ctx->has_error());
+    EXPECT_NE(nullptr, ::strstr(local_ctx->error_msg(), "size limit (2) of multi_array_agg_v2 is reached"));
+}
+
 } // namespace starrocks

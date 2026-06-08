@@ -35,6 +35,7 @@ namespace starrocks {
 struct MultiArrayAggV2AggregateState {
     using ContainerT = raw::RawVector<uint8_t, AggregateStateAllocator<uint8_t>>;
     ContainerT buffer;
+    uint64_t num_rows = 0;
 };
 
 // MULTI_ARRAY_AGG V2: contiguous byte vector allocation, one row packed after another.
@@ -59,6 +60,9 @@ public:
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
                 size_t row_num) const override {
         auto& s = this->data(state);
+        if (UNLIKELY(_check_size_limit(ctx, s.num_rows))) {
+            return;
+        }
         size_t num_fields = ctx->get_arg_types().size();
         size_t nbm = (num_fields + 7) / 8;
 
@@ -97,6 +101,7 @@ public:
                 }
             }
         }
+        s.num_rows += 1;
     }
 
     void merge(FunctionContext* ctx, const Column* column, AggDataPtr __restrict state, size_t row_num) const override {
@@ -111,14 +116,30 @@ public:
             slice = down_cast<const BinaryColumn*>(column)->get_slice(row_num);
         }
 
-        if (slice.size == 0) return;
+        if (UNLIKELY(slice.size < sizeof(uint64_t))) {
+            ctx->set_error(fmt::format("multi_array_agg_v2: corrupted serialized data in merge "
+                                       "(slice.size={} smaller than row-count prefix)",
+                                       slice.size)
+                                   .c_str(),
+                           false);
+            return;
+        }
+
+        uint64_t added_rows;
+        memcpy(&added_rows, slice.data, sizeof(uint64_t));
+
+        s.num_rows += added_rows;
+        if (UNLIKELY(_check_size_limit(ctx, s.num_rows))) {
+            return;
+        }
 
         if (UNLIKELY(ctx->get_multi_array_agg_v2_debug_level() > 0)) {
             // Perform validation on incoming buffer structure before appending
             size_t num_fields = ctx->get_arg_types().size();
             size_t nbm = (num_fields + 7) / 8;
-            const uint8_t* pos = reinterpret_cast<const uint8_t*>(slice.data);
-            const uint8_t* end = pos + slice.size;
+            const uint8_t* pos = reinterpret_cast<const uint8_t*>(slice.data) + sizeof(uint64_t);
+            const uint8_t* end = reinterpret_cast<const uint8_t*>(slice.data) + slice.size;
+            uint64_t walked = 0;
             while (pos < end) {
                 size_t row_size = _compute_row_size(ctx, pos, num_fields, nbm, end);
                 if (end - pos < row_size) {
@@ -126,26 +147,41 @@ public:
                     return;
                 }
                 pos += row_size;
+                ++walked;
+            }
+            if (UNLIKELY(walked != added_rows)) {
+                ctx->set_error(fmt::format("multi_array_agg_v2: corrupted serialized data in merge "
+                                           "(prefix={} but parsed {} rows)",
+                                           added_rows, walked)
+                                       .c_str(),
+                               false);
+                return;
             }
         }
 
+        const size_t payload_size = slice.size - sizeof(uint64_t);
         const size_t old_size = s.buffer.size();
-        s.buffer.resize(old_size + slice.size);
+        s.buffer.resize(old_size + payload_size);
         uint8_t* dst_ptr = s.buffer.data() + old_size;
-        memcpy(dst_ptr, slice.data, slice.size);
+        memcpy(dst_ptr, slice.data + sizeof(uint64_t), payload_size);
     }
 
+    // Serialization format: [uint64_t row_count][packed serialized rows]
     void serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         auto& s = this->data(const_cast<AggDataPtr>(state));
 
         auto* bin = ColumnHelper::get_binary_column(to);
-        if (UNLIKELY(_would_overflow_intermediate(ctx, bin, s.buffer.size(), "serialize_to_column"))) return;
+        if (UNLIKELY(_would_overflow_intermediate(ctx, bin, sizeof(uint64_t) + s.buffer.size(),
+                                                  "serialize_to_column"))) {
+            return;
+        }
 
         auto& bytes = bin->get_bytes();
         const size_t old_size = bytes.size();
-        bytes.resize(bytes.size() + s.buffer.size());
+        bytes.resize(old_size + sizeof(uint64_t) + s.buffer.size());
         uint8_t* dst_ptr = bytes.data() + old_size;
-        memcpy(dst_ptr, s.buffer.data(), s.buffer.size());
+        memcpy(dst_ptr, &s.num_rows, sizeof(uint64_t));
+        memcpy(dst_ptr + sizeof(uint64_t), s.buffer.data(), s.buffer.size());
 
         bin->get_offset().push_back(bytes.size());
         if (to->is_nullable()) {
@@ -156,6 +192,7 @@ public:
             size_t nbm = (num_fields + 7) / 8;
             _verify_slice_roundtrip(ctx, bin, bin->get_offset().size() - 2, num_fields, nbm, "serialize_to_column");
         }
+        s.num_rows = 0;
         s.buffer = MultiArrayAggV2AggregateState::ContainerT();
     }
 
@@ -234,7 +271,9 @@ public:
         size_t num_fields = src.size();
         size_t nbm = (num_fields + 7) / 8;
 
+        const uint64_t one = 1;
         for (size_t row = 0; row < chunk_size; ++row) {
+            // Wire format per output row: [uint64_t row_count = 1][serialized row].
             size_t row_size = nbm;
             for (size_t i = 0; i < num_fields; ++i) {
                 if (!_is_null(src[i].get(), row)) {
@@ -244,11 +283,17 @@ public:
                             serialization_size == 0 ? dc->serialize_size(ar) : static_cast<size_t>(serialization_size);
                 }
             }
-            if (UNLIKELY(_would_overflow_intermediate(ctx, bin, row_size, "convert_to_serialize_format"))) return;
+            if (UNLIKELY(_would_overflow_intermediate(ctx, bin, sizeof(uint64_t) + row_size,
+                                                      "convert_to_serialize_format"))) {
+                return;
+            }
 
             const size_t old_size = bytes.size();
-            bytes.resize(bytes.size() + row_size);
+            bytes.resize(old_size + sizeof(uint64_t) + row_size);
             uint8_t* dst_ptr = bytes.data() + old_size;
+
+            memcpy(dst_ptr, &one, sizeof(uint64_t));
+            dst_ptr += sizeof(uint64_t);
 
             memset(dst_ptr, 0, nbm);
             uint8_t* bitmap = dst_ptr;
@@ -284,11 +329,23 @@ public:
     void reset(FunctionContext* ctx, const Columns& args, AggDataPtr __restrict state) const override {
         auto& s = this->data(state);
         s.buffer = MultiArrayAggV2AggregateState::ContainerT();
+        s.num_rows = 0;
     }
 
     std::string get_name() const override { return "multi_array_agg_v2"; }
 
 private:
+    // Returns true (and sets an error) when the accumulated row count has reached the configured limit.
+    static bool _check_size_limit(FunctionContext* ctx, int64_t num_rows) {
+        if (UNLIKELY(num_rows >= ctx->get_multi_array_agg_max_array_length())) {
+            ctx->set_error(("size limit (" + std::to_string(ctx->get_multi_array_agg_max_array_length()) +
+                            ") of multi_array_agg_v2 is reached")
+                                   .c_str());
+            return true;
+        }
+        return false;
+    }
+
     // Pre-flight check that the intermediate BinaryColumn won't overflow uint32_t offsets.
     static bool _would_overflow_intermediate(FunctionContext* ctx, const BinaryColumn* bin, size_t add,
                                              const char* origin) {
@@ -335,11 +392,24 @@ private:
     }
 
     // Debug: walk the row just appended via bin->get_slice() — same path merge() uses.
+    // The slice begins with a uint64_t row-count prefix (see merge()), so we skip it before
+    // walking and verify that the payload parses to exactly that many rows.
     static bool _verify_slice_roundtrip(FunctionContext* ctx, const BinaryColumn* bin, size_t row_idx,
                                         size_t num_fields, size_t nbm, const char* origin) {
         Slice slice = bin->get_slice(row_idx);
-        const uint8_t* pos = reinterpret_cast<const uint8_t*>(slice.data);
-        const uint8_t* end = pos + slice.size;
+        if (UNLIKELY(slice.size < sizeof(uint64_t))) {
+            ctx->set_error(fmt::format("multi_array_agg_v2: corrupted serialized data in {} "
+                                       "(slice.size={} smaller than row-count prefix)",
+                                       origin, slice.size)
+                                   .c_str(),
+                           false);
+            return true;
+        }
+        uint64_t expected_rows;
+        memcpy(&expected_rows, slice.data, sizeof(uint64_t));
+        const uint8_t* pos = reinterpret_cast<const uint8_t*>(slice.data) + sizeof(uint64_t);
+        const uint8_t* end = reinterpret_cast<const uint8_t*>(slice.data) + slice.size;
+        uint64_t walked = 0;
         while (pos < end) {
             size_t row_size = _compute_row_size(ctx, pos, num_fields, nbm, end);
             if (end - pos < row_size) {
@@ -347,6 +417,15 @@ private:
                 return true;
             }
             pos += row_size;
+            ++walked;
+        }
+        if (UNLIKELY(walked != expected_rows)) {
+            ctx->set_error(fmt::format("multi_array_agg_v2: corrupted serialized data in {} "
+                                       "(prefix={} but parsed {} rows)",
+                                       origin, expected_rows, walked)
+                                   .c_str(),
+                           false);
+            return true;
         }
         return false;
     }

@@ -220,6 +220,8 @@ private:
 public:
     void create(FunctionContext* ctx, AggDataPtr __restrict ptr) const override {
         auto* state = new (ptr) MultiArrayAggAggregateState;
+        // FunctionContext::_multi_array_agg_max_array_length is set in aggregator.cpp
+        state->size_limit = ctx->get_multi_array_agg_max_array_length();
         DCHECK(state->data_columns.empty());
     }
 
