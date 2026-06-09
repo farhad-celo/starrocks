@@ -24,7 +24,7 @@ env:
   ASAN_BUILD_TYPE: ASAN
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
   GITHUB_USERNAME: ${{ github.repository }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
 
 jobs:
   resolve-branch:

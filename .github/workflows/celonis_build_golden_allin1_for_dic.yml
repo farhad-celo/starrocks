@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
   image_tag: "${{inputs.image_tag}}-dic"

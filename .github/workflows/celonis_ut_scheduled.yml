@@ -15,13 +15,13 @@ env:
   RELEASE_VERSION: fe-test
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
 
 jobs:
   setup:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     outputs:
-      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
     steps:
       - run: echo "builder_image=${{ env.BUILDER }}" >> $GITHUB_OUTPUT
 

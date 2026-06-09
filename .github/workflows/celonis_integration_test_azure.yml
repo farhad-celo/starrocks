@@ -15,7 +15,7 @@ on:
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.5-cc
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
   GITHUB_USERNAME: ${{ github.repository }}
   GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
 
@@ -203,7 +203,7 @@ jobs:
       test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
       image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-arm
       test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
-      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
 
   build-x86:
     needs: sync-and-rebase-upstream
@@ -215,7 +215,7 @@ jobs:
       test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
       image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-x86
       test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
-      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
 
   build-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
@@ -425,7 +425,7 @@ jobs:
       test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
       image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-asan-arm
       test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
-      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
 
   build-asan-x86:
     needs: sync-and-rebase-upstream
@@ -437,7 +437,7 @@ jobs:
       test_branch: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
       image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}-asan-x86
       test_image_tag: ${{ needs.sync-and-rebase-upstream.outputs.test_image_tag }}
-      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
 
   build-asan-manifest:
     runs-on: [ runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}" ]

@@ -1,4 +1,4 @@
-FROM ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-2548aa3d-arm
+FROM ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9-arm
 
 # Setup homcc
 RUN wget https://github.com/celonis/homcc/releases/download/v1.0.2/homcc_arm.deb
