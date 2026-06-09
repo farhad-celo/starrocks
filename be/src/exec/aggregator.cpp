@@ -51,6 +51,27 @@ static const std::string AGG_STATE_UNION_SUFFIX = "_union";
 static const std::string AGG_STATE_MERGE_SUFFIX = "_merge";
 static const std::string FUNCTION_COUNT = "count";
 
+bool celonis_is_returning_multiple_rows(const std::string& function_name) {
+    return function_name == "celonis_enumerate_node_paths" ||
+           function_name == "celonis_enumerate_transitive_edges";
+}
+
+template <bool UseIntermediateAsOutput>
+bool AggFunctionTypes::is_result_nullable() const {
+    if constexpr (UseIntermediateAsOutput) {
+        // If using intermediate results as output, no output will be generated and only the input will be serialized.
+        // Therefore, only judge whether the input is nullable to decide whether to serialize null data.
+        return has_nullable_child;
+    } else {
+        // `is_nullable` means whether the output MAY be nullable. It will be false only when the output is always non-nullable.
+        // Therefore, we need to decide whether the output is really nullable case by case:
+        // 1. Same as input: `has_nullable_child` = `has_nullable_child && is_nullable(true)`.
+        // 2. Always non-nullable: `false` = `has_nullable_child && is_nullable(false)`, eg. count, count distinct, and bitmap_union_int.
+        // 3. Always nullable: `is_always_nullable_result`.
+        return (has_nullable_child && is_nullable) || is_always_nullable_result;
+    }
+}
+
 bool AggFunctionTypes::use_nullable_fn(bool use_intermediate_as_output) const {
     // The non-nullable version functions assume that both the input and output are non-nullable, while the nullable version
     // functions support nullable input or nullable output, which will judge whether the input and output are nullable.
@@ -181,8 +202,8 @@ void AggregatorParams::init() {
                     agg_fn_types[i].is_asc_order = fn.aggregate_fn.is_asc_order;
                     agg_fn_types[i].nulls_first = fn.aggregate_fn.nulls_first;
                 }
-            } else if (fn.name.function_name == "celonis_enumerate_transitive_edges" ||
-                       fn.name.function_name == "celonis_enumerate_node_paths") {
+            } else if (celonis_is_returning_multiple_rows(fn.name.function_name)) {
+                // Aggregation functions that produce multiple rows will output zero rows when their input is empty.
                 agg_fn_types[i].is_nullable = false;
             }
         }
@@ -911,11 +932,6 @@ Status Aggregator::_evaluate_const_columns(int i) {
     }
     _agg_fn_ctxs[i]->set_constant_columns(const_columns);
     return Status::OK();
-}
-
-bool celonis_is_returning_multiple_rows(const std::string& function_name) {
-    return function_name == "celonis_enumerate_node_paths" ||
-           function_name == "celonis_enumerate_transitive_edges";
 }
 
 Status Aggregator::convert_to_chunk_no_groupby(ChunkPtr* chunk) {
