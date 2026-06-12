@@ -38,8 +38,8 @@ on:
         required: false
         default: ''
         type: string
-      celostar-tag:
-        description: Celostar format tag (pr<pr-number>-<version>) passed through to the manifest publisher.
+      celostar-docker-tag:
+        description: Celostar Docker tag (pr<pr-number>-<version>) passed through to the manifest publisher.
         required: false
         default: ''
         type: string
@@ -189,6 +189,7 @@ jobs:
           publish_allin1: 'false'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          celostar_docker_tag: ${{ inputs.celostar-docker-tag }}
 
   build-and-push-debian12-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
@@ -208,8 +209,7 @@ jobs:
           publish_allin1: 'false'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          add_celostar_tag: 'true'
-          celostar_tag: ${{ inputs.celostar-tag }}
+          celostar_docker_tag: ${{ inputs.celostar-docker-tag }}-debian12
 
   build-and-push-asan-manifest:
     runs-on: [runs-on, runner=1cpu-linux-x64, "run-id=${{ github.run_id }}"]
@@ -229,5 +229,4 @@ jobs:
           publish_allin1: 'false'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          add_celostar_tag: 'true'
-          celostar_tag: ${{ inputs.celostar-tag }}
+          celostar_docker_tag: ${{ inputs.celostar-docker-tag }}-asan

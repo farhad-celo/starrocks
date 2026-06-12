@@ -13,13 +13,10 @@ inputs:
   tag_combined:
     description: Multi-arch manifest tag (allin1 + FE + BE use this on GHCR; FE/BE on ECR).
     required: true
-  add_celostar_tag:
-    description: Repo-depot doesn't allow custom release name, enable this will add an extra Celostar format tag
-    required: false
-    default: 'false'
-  celostar_tag:
+  celostar_docker_tag:
     description: >-
-      The extra Celostar format tag (e.g. pr<pr-number>-<version>) to push when add_celostar_tag is true.
+      The extra Celostar format tag (e.g. pr<pr-number>-<version>) to push.
+      Leave empty to skip publishing a Celostar alias.
       Generated upstream (repodepot-custom-image) and passed through the native build workflows.
     required: false
     default: ''
@@ -68,6 +65,14 @@ runs:
         x86_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_x86 }}
         mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_combined }}
 
+    - name: GHCR — starrocks-allin1 Celostar manifest
+      if: ${{ inputs.publish_allin1 == 'true' && inputs.celostar_docker_tag != '' }}
+      uses: ./.github/actions/build-mul-arch-manifest
+      with:
+        arm_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_arm }}
+        x86_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_x86 }}
+        mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.celostar_docker_tag }}
+
     - name: ECR + GHCR — starrocks-be + starrocks-fe manifests
       if: ${{ inputs.publish_be == 'true' || inputs.publish_fe == 'true' }}
       shell: bash
@@ -78,8 +83,7 @@ runs:
         TAG_MULTI: ${{ inputs.tag_combined }}
         PUBLISH_BE: ${{ inputs.publish_be }}
         PUBLISH_FE: ${{ inputs.publish_fe }}
-        ADD_CELOSTAR_TAG: ${{ inputs.add_celostar_tag }}
-        CELOSTAR_TAG: ${{ inputs.celostar_tag }}
+        CELOSTAR_DOCKER_TAG: ${{ inputs.celostar_docker_tag }}
       run: |
         set -euo pipefail
         export DOCKER_CLI_EXPERIMENTAL=enabled
@@ -99,12 +103,8 @@ runs:
           "ghcr.io/celonis/celostar"
         )
 
-        if [[ "${ADD_CELOSTAR_TAG}" == "true" ]]; then
-          if [[ -z "${CELOSTAR_TAG}" ]]; then
-            echo "::error::add_celostar_tag is true but celostar_tag input is empty."
-            exit 1
-          fi
-          echo "Celostar tag: ${CELOSTAR_TAG}"
+        if [[ -n "${CELOSTAR_DOCKER_TAG}" ]]; then
+          echo "Celostar Docker tag: ${CELOSTAR_DOCKER_TAG}"
         fi
 
         for registry in "${registries[@]}"; do
@@ -115,10 +115,10 @@ runs:
             docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
             docker manifest push "$mul_arch_tag"
 
-            if [[ "${ADD_CELOSTAR_TAG}" == "true" ]]; then
-              celostar_image_tag="${registry}/${image}:${CELOSTAR_TAG}"
-              docker manifest create "$celostar_image_tag" --amend "$arm_tag" --amend "$x86_tag"
-              docker manifest push "$celostar_image_tag"
+            if [[ -n "${CELOSTAR_DOCKER_TAG}" ]]; then
+              celostar_docker_image_tag="${registry}/${image}:${CELOSTAR_DOCKER_TAG}"
+              docker manifest create "$celostar_docker_image_tag" --amend "$arm_tag" --amend "$x86_tag"
+              docker manifest push "$celostar_docker_image_tag"
             fi
           done
         done
