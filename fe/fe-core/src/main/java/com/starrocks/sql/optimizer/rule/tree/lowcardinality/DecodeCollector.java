@@ -177,8 +177,9 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.ARRAY_REMOVE);
 
     public static final Set<String> CELONIS_LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
-            FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_SHORTENED_VARIANT);
-
+            FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_SHORTENED_VARIANT, FunctionSet.CELONIS_ARRAY_FIRST,
+            FunctionSet.CELONIS_ARRAY_LAST, FunctionSet.CELONIS_ARRAY_LAG, FunctionSet.CELONIS_ARRAY_LEAD,
+            FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT);
 
     static {
         LOW_CARD_ARRAY_FUNCTIONS.addAll(CELONIS_LOW_CARD_ARRAY_FUNCTIONS);
