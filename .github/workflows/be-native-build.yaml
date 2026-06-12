@@ -38,6 +38,11 @@ on:
         required: false
         default: ''
         type: string
+      celostar-tag:
+        description: Celostar format tag (pr<pr-number>-<version>) passed through to the manifest publisher.
+        required: false
+        default: ''
+        type: string
 
 env:
   BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
@@ -237,6 +242,8 @@ jobs:
           publish_allin1: 'true'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          add_celostar_tag: 'true'
+          celostar_tag: ${{ inputs.celostar-tag }}
 
   build-and-push-asan-manifest:
     runs-on: [runs-on, runner=1cpu-linux-x64, "run-id=${{ github.run_id }}"]
@@ -256,3 +263,5 @@ jobs:
           publish_allin1: 'true'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          add_celostar_tag: 'true'
+          celostar_tag: ${{ inputs.celostar-tag }}

@@ -13,9 +13,21 @@ inputs:
   tag_combined:
     description: Multi-arch manifest tag (allin1 + FE + BE use this on GHCR; FE/BE on ECR).
     required: true
+  add_celostar_tag:
+    description: Repo-depot doesn't allow custom release name, enable this will add an extra Celostar format tag
+    required: false
+    default: 'false'
+  celostar_tag:
+    description: >-
+      The extra Celostar format tag (e.g. pr<pr-number>-<version>) to push when add_celostar_tag is true.
+      Generated upstream (repodepot-custom-image) and passed through the native build workflows.
+    required: false
+    default: ''
   aws_access_key_id:
+    description: AWS access key ID
     required: true
   aws_secret_access_key:
+    description: AWS secret access key
     required: true
   publish_be:
     description: Publish starrocks-be multi-arch manifests (ECR + GHCR).
@@ -48,26 +60,6 @@ runs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    - name: ECR — starrocks-be manifest
-      if: ${{ inputs.publish_be == 'true' }}
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      uses: ./.github/actions/build-mul-arch-manifest
-      with:
-        arm_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.tag_arm }}
-        x86_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.tag_x86 }}
-        mul_arch_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-be:${{ inputs.tag_combined }}
-
-    - name: ECR — starrocks-fe manifest
-      if: ${{ inputs.publish_fe == 'true' }}
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      uses: ./.github/actions/build-mul-arch-manifest
-      with:
-        arm_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.tag_arm }}
-        x86_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.tag_x86 }}
-        mul_arch_image_tag: ${{ env.ECR_REGISTRY }}/celostar/starrocks-fe:${{ inputs.tag_combined }}
-
     - name: GHCR — starrocks-allin1 manifest
       if: ${{ inputs.publish_allin1 == 'true' }}
       uses: ./.github/actions/build-mul-arch-manifest
@@ -76,15 +68,18 @@ runs:
         x86_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_x86 }}
         mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_combined }}
 
-    - name: GHCR — starrocks-be + starrocks-fe manifests
+    - name: ECR + GHCR — starrocks-be + starrocks-fe manifests
       if: ${{ inputs.publish_be == 'true' || inputs.publish_fe == 'true' }}
       shell: bash
       env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         TAG_ARM: ${{ inputs.tag_arm }}
         TAG_X86: ${{ inputs.tag_x86 }}
         TAG_MULTI: ${{ inputs.tag_combined }}
         PUBLISH_BE: ${{ inputs.publish_be }}
         PUBLISH_FE: ${{ inputs.publish_fe }}
+        ADD_CELOSTAR_TAG: ${{ inputs.add_celostar_tag }}
+        CELOSTAR_TAG: ${{ inputs.celostar_tag }}
       run: |
         set -euo pipefail
         export DOCKER_CLI_EXPERIMENTAL=enabled
@@ -98,10 +93,32 @@ runs:
           images+=(starrocks-fe)
         fi
 
-        for image in "${images[@]}"; do
-          mul_arch_tag="ghcr.io/celonis/celostar/${image}:${TAG_MULTI}"
-          arm_tag="ghcr.io/celonis/celostar/${image}:${TAG_ARM}"
-          x86_tag="ghcr.io/celonis/celostar/${image}:${TAG_X86}"
-          docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
-          docker manifest push "$mul_arch_tag"
+        # Registry prefixes (the "<registry>/<image>" part, minus the tag).
+        registries=(
+          "${ECR_REGISTRY}/celostar"
+          "ghcr.io/celonis/celostar"
+        )
+
+        if [[ "${ADD_CELOSTAR_TAG}" == "true" ]]; then
+          if [[ -z "${CELOSTAR_TAG}" ]]; then
+            echo "::error::add_celostar_tag is true but celostar_tag input is empty."
+            exit 1
+          fi
+          echo "Celostar tag: ${CELOSTAR_TAG}"
+        fi
+
+        for registry in "${registries[@]}"; do
+          for image in "${images[@]}"; do
+            mul_arch_tag="${registry}/${image}:${TAG_MULTI}"
+            arm_tag="${registry}/${image}:${TAG_ARM}"
+            x86_tag="${registry}/${image}:${TAG_X86}"
+            docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
+            docker manifest push "$mul_arch_tag"
+
+            if [[ "${ADD_CELOSTAR_TAG}" == "true" ]]; then
+              celostar_image_tag="${registry}/${image}:${CELOSTAR_TAG}"
+              docker manifest create "$celostar_image_tag" --amend "$arm_tag" --amend "$x86_tag"
+              docker manifest push "$celostar_image_tag"
+            fi
+          done
         done

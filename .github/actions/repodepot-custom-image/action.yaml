@@ -60,12 +60,45 @@ outputs:
     description: 'JSON metadata output from the docker image creation'
     value: ${{ steps.create-image.outputs.metadata }}
 
+  celostar-tag:
+    description: 'Celostar format tag (pr<pr-number>-<version>) derived from the default branch and release branch.'
+    value: ${{ steps.celostar-tag.outputs.celostar-tag }}
+
 runs:
   using: composite
 
   # Delegates image builds to be-native-build.yaml (BE) and fe-native-build.yaml (FE).
   # Requires gh (GitHub CLI) on the runner and a token with actions:write to trigger workflows.
   steps:
+    - name: Generate Celostar tag
+      id: celostar-tag
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        GH_REPO: celonis/celostar-starrocks
+        RELEASE_BRANCH: ${{ inputs.release-branch }}
+      run: |
+        set -euo pipefail
+        # 1. Fetch the default branch (format: branch-<version>-celo)
+        DEFAULT_BRANCH=$(gh repo view "$GH_REPO" --json defaultBranchRef --jq '.defaultBranchRef.name')
+        echo "Default branch: $DEFAULT_BRANCH"
+        # Extract the <version> wildcard from branch-<version>-celo
+        VERSION=$(sed -E 's/^branch-(.*)-celo$/\1/' <<< "$DEFAULT_BRANCH")
+        echo "Version: $VERSION"
+        # 2. Find the PR number associated with the release branch
+        PR_NUMBER=$(gh pr list --repo "$GH_REPO" --head "$RELEASE_BRANCH" --state all \
+          --json number,updatedAt --jq 'sort_by(.updatedAt) | reverse | .[0].number')
+        echo "PR number: $PR_NUMBER"
+        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" == "null" ]; then
+          echo "::error::Could not find a PR for release branch '${RELEASE_BRANCH}' in ${GH_REPO}."
+          exit 1
+        fi
+        # 3. Construct the tag: pr<pr#>-<version>
+        CELOSTAR_TAG="pr${PR_NUMBER}-${VERSION}"
+        echo "Celostar tag: $CELOSTAR_TAG"
+        echo "celostar-tag=${CELOSTAR_TAG}" >> "$GITHUB_OUTPUT"
+        echo "### Celostar tag: \`${CELOSTAR_TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+
     - name: Dispatch be-native-build (celostar-be)
       id: dispatch-be-native-build
       if: inputs.component-name == 'celostar-be' || inputs.component-name == '~ALL~'
@@ -75,6 +108,7 @@ runs:
         WORKFLOW_FILE: be-native-build.yaml
         GH_REPO: celonis/celostar-starrocks
         WORKFLOW_REF: ${{ github.head_ref || github.ref_name }}
+        CELOSTAR_TAG: ${{ steps.celostar-tag.outputs.celostar-tag }}
       run: |
         set -euo pipefail
         rel="${{ inputs.relative-source-location }}"
@@ -90,7 +124,8 @@ runs:
           -f github-token="${{ inputs.github-token }}" \
           -f image-registry="${{ inputs.image-registry }}" \
           -f image-name="${{ inputs.image-name }}" \
-          -f image-tag="${{ inputs.image-tag }}"
+          -f image-tag="${{ inputs.image-tag }}" \
+          -f celostar-tag="${CELOSTAR_TAG}"
 
         sleep 5
 
@@ -112,6 +147,7 @@ runs:
         WORKFLOW_FILE: fe-native-build.yaml
         GH_REPO: celonis/celostar-starrocks
         WORKFLOW_REF: ${{ github.head_ref || github.ref_name }}
+        CELOSTAR_TAG: ${{ steps.celostar-tag.outputs.celostar-tag }}
       run: |
         set -euo pipefail
         rel="${{ inputs.relative-source-location }}"
@@ -127,7 +163,8 @@ runs:
           -f github-token="${{ inputs.github-token }}" \
           -f image-registry="${{ inputs.image-registry }}" \
           -f image-name="${{ inputs.image-name }}" \
-          -f image-tag="${{ inputs.image-tag }}"
+          -f image-tag="${{ inputs.image-tag }}" \
+          -f celostar-tag="${CELOSTAR_TAG}"
 
         sleep 5
 
