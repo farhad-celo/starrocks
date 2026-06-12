@@ -85,12 +85,26 @@ runs:
         # Extract the <version> wildcard from branch-<version>-celo
         VERSION=$(sed -E 's/^branch-(.*)-celo$/\1/' <<< "$DEFAULT_BRANCH")
         echo "Version: $VERSION"
-        # 2. Find the PR number associated with the release branch
-        PR_NUMBER=$(gh pr list --repo "$GH_REPO" --head "$RELEASE_BRANCH" --state all \
-          --json number,updatedAt --jq 'sort_by(.updatedAt) | reverse | .[0].number')
+        # 2. Find the latest PR number associated with the release branch commit
+        if [ -z "${RELEASE_BRANCH}" ]; then
+          echo "::error::release-branch input is required to derive the Celostar tag."
+          exit 1
+        fi
+
+        if ! COMMIT_SHA=$(gh api "repos/${GH_REPO}/commits/${RELEASE_BRANCH}" --jq '.sha'); then
+          echo "::error::Could not resolve release branch '${RELEASE_BRANCH}' in ${GH_REPO}."
+          exit 1
+        fi
+        echo "Release branch commit: $COMMIT_SHA"
+
+        if ! PR_NUMBER=$(gh api "repos/${GH_REPO}/commits/${COMMIT_SHA}/pulls" \
+          --jq 'map(.number) | max // empty'); then
+          echo "::error::Could not list PRs associated with commit '${COMMIT_SHA}' in ${GH_REPO}."
+          exit 1
+        fi
         echo "PR number: $PR_NUMBER"
         if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" == "null" ]; then
-          echo "::error::Could not find a PR for release branch '${RELEASE_BRANCH}' in ${GH_REPO}."
+          echo "::error::Could not find a PR associated with commit '${COMMIT_SHA}' from release branch '${RELEASE_BRANCH}' in ${GH_REPO}."
           exit 1
         fi
         # 3. Construct the tag: pr<pr#>-<version>
