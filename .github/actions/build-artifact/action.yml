@@ -5,6 +5,10 @@ inputs:
     required: true
   image_tag:
     required: true
+  release_version:
+    description: "Version string to embed into StarRocks artifacts. Defaults to image_tag."
+    required: false
+    default: ''
   is_asan_mode:
     description: "Whether to build in ASAN mode"
     required: false
@@ -41,11 +45,17 @@ runs:
         fi
         echo "Build type is ${build_type}"
         
+        release_version="${{ inputs.release_version }}"
+        if [ -z "${release_version}" ]; then
+          release_version="${{ inputs.image_tag }}"
+        fi
+        echo "Release version is ${release_version}"
+
         dd_agent_version="1.56.3"
 
         # Build image and always remove intermediate containers.
         DOCKER_BUILDKIT=1 docker build --no-cache --force-rm=true \
-          --build-arg RELEASE_VERSION=${{inputs.image_tag}} \
+          --build-arg RELEASE_VERSION="${release_version}" \
           --build-arg builder=${{inputs.dev_env_image}} \
           --build-arg BUILD_TYPE=${build_type} \
           --build-arg DD_AGENT_VERSION=${dd_agent_version} \

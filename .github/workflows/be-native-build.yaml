@@ -86,6 +86,7 @@ jobs:
         with:
           dev_env_image: ${{ env.BUILDER }}
           image_tag: ${{ inputs.image-tag }}-${{ matrix.image_suffix }}
+          release_version: ${{ inputs.celostar-docker-tag }}
           to_push: 'true'
 
       - name: Build and push allin1 image
@@ -182,6 +183,7 @@ jobs:
         with:
           dev_env_image: ${{ env.BUILDER }}
           image_tag: ${{ inputs.image-tag }}-asan-${{ matrix.asan_suffix }}
+          release_version: ${{ inputs.celostar-docker-tag && format('{0}-asan', inputs.celostar-docker-tag) || '' }}
           is_asan_mode: 'yes'
           to_push: 'true'
 
