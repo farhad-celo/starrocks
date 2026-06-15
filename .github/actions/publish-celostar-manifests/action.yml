@@ -114,11 +114,5 @@ runs:
             x86_tag="${registry}/${image}:${TAG_X86}"
             docker manifest create "$mul_arch_tag" --amend "$arm_tag" --amend "$x86_tag"
             docker manifest push "$mul_arch_tag"
-
-            if [[ -n "${CELOSTAR_DOCKER_TAG}" ]]; then
-              celostar_docker_image_tag="${registry}/${image}:${CELOSTAR_DOCKER_TAG}"
-              docker manifest create "$celostar_docker_image_tag" --amend "$arm_tag" --amend "$x86_tag"
-              docker manifest push "$celostar_docker_image_tag"
-            fi
           done
         done

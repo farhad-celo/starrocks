@@ -133,7 +133,7 @@ runs:
         CELOSTAR_DOCKER_TAG="${TAG_PREFIX}$(printf '%02d' "$NEXT_RC")"
         echo "Celostar Docker tag: $CELOSTAR_DOCKER_TAG"
         echo "celostar-docker-tag=${CELOSTAR_DOCKER_TAG}" >> "$GITHUB_OUTPUT"
-        echo "### Celostar Docker tag: \`${CELOSTAR_DOCKER_TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "### Celostar Docker tag: \`${CELOSTAR_DOCKER_TAG}\`, it's only used inside StarRocks SQL for now" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Dispatch be-native-build (celostar-be)
       id: dispatch-be-native-build
