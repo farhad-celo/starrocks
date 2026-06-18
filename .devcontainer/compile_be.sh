@@ -37,4 +37,4 @@ else
 fi
 
 log "Start compilation"
-docker exec "${container_id}" bash -lc 'cd /root/celostar-starrocks/be && cmake --preset $1 && cmake --build --preset $1' -- "${preset}"
+docker exec "${container_id}" bash -lc 'cd /workspaces/celostar-starrocks/be && cmake --preset $1 && cmake --build --preset $1' -- "${preset}"

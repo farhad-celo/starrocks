@@ -44,7 +44,7 @@ You can run
 ```
 to be able to execute any commands in the shell that is created.
 
-The path that was set as workspace is available under `/root/celostar-starrocks`.
+The path that was set as workspace is available under `/workspaces/celostar-starrocks`.
 
 ### Starting dev-container
 If you want to build and start a dev container and want to have the freedom to connect to it and stop it however you like, you can do so with `build_and_start_dev_container.sh`.

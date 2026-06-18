@@ -44,4 +44,4 @@ else
 fi
 
 log "Start compilation"
-docker exec "${container_id}" bash -lc 'cd /root/celostar-starrocks && BUILD_TYPE="$1" ./build.sh $2 -j "$3"' -- "${build_type}" "${options}" "${jobs}"
+docker exec "${container_id}" bash -lc 'cd /workspaces/celostar-starrocks && BUILD_TYPE="$1" ./build.sh $2 -j "$3"' -- "${build_type}" "${options}" "${jobs}"
