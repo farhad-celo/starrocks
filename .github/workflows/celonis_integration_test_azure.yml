@@ -324,10 +324,10 @@ jobs:
         with:
           owner: celonis
           repo: celostar
-          workflow_file: "e2e-test-suite-azure.yml"
+          workflow_file: "e2e-test-suite-azure-v2.yml"
           payload: >
             { 
-              \"event_type\":\"trigger_e2e_test_suite_on_azure\",
+              \"event_type\":\"trigger_e2e_test_suite_on_azure_v2\",
               \"client_payload\": {
                 \"e2e_job_name\":\"${test_image_tag}\",
                 \"starrocks_image_tag\":\"${test_image_tag}\",
