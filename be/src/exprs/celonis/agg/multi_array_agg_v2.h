@@ -28,6 +28,7 @@
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
 #include "util/raw_container.h"
+#include "util/uid_util.h"
 
 namespace starrocks {
 
@@ -198,6 +199,7 @@ public:
 
     void finalize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state, Column* to) const override {
         auto& s = this->data(const_cast<AggDataPtr>(state));
+        _maybe_warn(ctx, s.num_rows);
         size_t num_fields = ctx->get_arg_types().size();
         size_t nbm = (num_fields + 7) / 8;
         size_t num_order_by = ctx->get_is_asc_order().size();
@@ -344,6 +346,15 @@ private:
             return true;
         }
         return false;
+    }
+
+    // Log a warning message if the number of rows reaches or exceeds warn_limit
+    static void _maybe_warn(FunctionContext* ctx, int64_t num_rows) {
+        int64_t warn_limit = ctx->get_multi_array_agg_warn_array_length();
+        if (UNLIKELY(warn_limit > 0 && num_rows >= warn_limit)) {
+            LOG(WARNING) << "MULTI_ARRAY_AGG_V2 (" << print_id(ctx->state()->query_id()) << "): warn limit ("
+                         << warn_limit << ") is reached, total " << num_rows << " rows";
+        }
     }
 
     // Pre-flight check that the intermediate BinaryColumn won't overflow uint32_t offsets.

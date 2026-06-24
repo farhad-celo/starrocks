@@ -509,6 +509,11 @@ Status Aggregator::prepare(RuntimeState* state, ObjectPool* pool, RuntimeProfile
                                               ? state->query_options().multi_array_agg_max_array_length
                                               : config::array_agg_size_limit;
         _agg_fn_ctxs[i]->set_multi_array_agg_max_array_length(mag_max_array_length);
+        // 0 means "not set" -- no warning is emitted.
+        int64_t mag_warn_array_length = state->query_options().__isset.multi_array_agg_warn_array_length
+                                                ? state->query_options().multi_array_agg_warn_array_length
+                                                : 0;
+        _agg_fn_ctxs[i]->set_multi_array_agg_warn_array_length(mag_warn_array_length);
         if (state->query_options().__isset.group_concat_max_len) {
             _agg_fn_ctxs[i]->set_group_concat_max_len(state->query_options().group_concat_max_len);
         }

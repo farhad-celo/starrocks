@@ -26,6 +26,7 @@
 #include "runtime/runtime_state.h"
 #include "types/logical_type.h"
 #include "util/defer_op.h"
+#include "util/uid_util.h"
 
 namespace starrocks {
 
@@ -82,6 +83,18 @@ struct MultiArrayAggAggregateState {
 
     bool size_limit_reached() const {
         return (!data_columns.empty() && data_columns[0]->size() > size_limit) || num_serialized_rows > size_limit;
+    }
+
+    // Log a warning message if the number of rows reaches or exceeds warn_limit
+    void maybe_warn(FunctionContext* ctx) const {
+        if (warn_limit <= 0) {
+            return;
+        }
+        int64_t num_rows = !data_columns.empty() ? static_cast<int64_t>(data_columns[0]->size()) : num_serialized_rows;
+        if (UNLIKELY(num_rows >= warn_limit)) {
+            LOG(WARNING) << "MULTI_ARRAY_AGG (" << print_id(ctx->state()->query_id()) << "): warn limit (" << warn_limit
+                         << ") is reached, total " << num_rows << " rows";
+        }
     }
 
     void deserialize_data(Columns& columns) {
@@ -179,6 +192,8 @@ struct MultiArrayAggAggregateState {
     // If number of rows <= serialization_threshold, serialized_data is used to manage the data.
     Columns data_columns;
     int64_t size_limit;
+    // 0 means disabled
+    int64_t warn_limit = 0;
     int32_t serialization_threshold;
     std::vector<uint8> serialized_data;
     int32_t num_serialized_rows = 0;
@@ -220,8 +235,10 @@ private:
 public:
     void create(FunctionContext* ctx, AggDataPtr __restrict ptr) const override {
         auto* state = new (ptr) MultiArrayAggAggregateState;
-        // FunctionContext::_multi_array_agg_max_array_length is set in aggregator.cpp
+        // FunctionContext::{_multi_array_agg_max_array_length, _multi_array_agg_warn_array_length} are set in
+        // aggregator.cpp
         state->size_limit = ctx->get_multi_array_agg_max_array_length();
+        state->warn_limit = ctx->get_multi_array_agg_warn_array_length();
         DCHECK(state->data_columns.empty());
     }
 
@@ -342,6 +359,7 @@ public:
                                    .c_str());
             return;
         }
+        state_impl.maybe_warn(ctx);
         // should check overflow before append, otherwise will generate invalid result.
         if (UNLIKELY(state_impl.check_overflow(ctx))) {
             return;

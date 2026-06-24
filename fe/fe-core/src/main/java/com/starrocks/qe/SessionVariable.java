@@ -400,6 +400,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String ENABLE_SHORTENED_VARIANT_LOW_CARDINALITY_OPTIMIZE =
                     "enable_shortened_variant_low_cardinality_optimize";
     public static final String MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH = "multi_array_agg_max_array_length";
+    public static final String MULTI_ARRAY_AGG_WARN_ARRAY_LENGTH = "multi_array_agg_warn_array_length";
     public static final String CBO_USE_NTH_EXEC_PLAN = "cbo_use_nth_exec_plan";
     public static final String CBO_CTE_REUSE = "cbo_cte_reuse";
     public static final String CBO_CTE_REUSE_RATE = "cbo_cte_reuse_rate";
@@ -1646,6 +1647,15 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     // `array_agg_size_limit` (BE) is used instead. Valid range is [0, 2^32].
     @VariableMgr.VarAttr(name = MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH)
     private long multiArrayAggMaxArrayLength = 0;
+    // Per-session soft threshold for the number of elements that multi_array_agg (v1 and v2) may
+    // accumulate per group. Reaching (>=) this threshold emits a warning to the BE log. 0 means "not set"
+    // (no warning). Valid range is [0, 2^32].
+    //
+    // Note: the BE logs one warning per aggregation group whose array reaches the threshold; it is
+    // NOT rate-limited or capped. A low threshold may produce a  large volume of log lines. Set this to
+    // a high value so the warning stays rare.
+    @VariableMgr.VarAttr(name = MULTI_ARRAY_AGG_WARN_ARRAY_LENGTH)
+    private long multiArrayAggWarnArrayLength = 0;
 
     @VariableMgr.VarAttr(name = ENABLE_OPTIMIZER_REWRITE_GROUPINGSETS_TO_UNION_ALL)
     private boolean enableRewriteGroupingSetsToUnionAll = false;
@@ -2139,6 +2149,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setMultiArrayAggMaxArrayLength(long multiArrayAggMaxArrayLength) {
         this.multiArrayAggMaxArrayLength = multiArrayAggMaxArrayLength;
+    }
+
+    public long getMultiArrayAggWarnArrayLength() {
+        return multiArrayAggWarnArrayLength;
+    }
+
+    public void setMultiArrayAggWarnArrayLength(long multiArrayAggWarnArrayLength) {
+        this.multiArrayAggWarnArrayLength = multiArrayAggWarnArrayLength;
     }
 
     @VarAttr(name = ENABLE_REWRITE_BITMAP_UNION_TO_BITMAP_AGG)
@@ -5684,6 +5702,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
         tResult.setMulti_array_agg_v2_debug_level(multiArrayAggV2DebugLevel);
         if (multiArrayAggMaxArrayLength > 0) {
             tResult.setMulti_array_agg_max_array_length(multiArrayAggMaxArrayLength);
+        }
+        if (multiArrayAggWarnArrayLength > 0) {
+            tResult.setMulti_array_agg_warn_array_length(multiArrayAggWarnArrayLength);
         }
         tResult.setRpc_http_min_size(rpcHttpMinSize);
         tResult.setInterleaving_group_size(interleavingGroupSize);
