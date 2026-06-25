@@ -12,5 +12,6 @@ runs:
       shell: bash
       run: |
         echo "Start to run FE UT"
-        export FE_UT_PARALLEL=6
+        export FE_UT_PARALLEL="${FE_UT_PARALLEL:-3}"
+        echo "FE_UT_PARALLEL=${FE_UT_PARALLEL}"
         ./run-fe-ut.sh
