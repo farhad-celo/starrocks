@@ -19,8 +19,9 @@
 #include "column/column.h"
 #include "column/type_traits.h"
 #include "exprs/celonis/table_function/count_edges.h"
-#include "exprs/celonis/table_function/object_link_propagate_filters.h"
 #include "exprs/celonis/table_function/generate_range.h"
+#include "exprs/celonis/table_function/object_link_extract_paths.h"
+#include "exprs/celonis/table_function/object_link_propagate_filters.h"
 #include "exprs/table_function/generate_series.h"
 #include "exprs/table_function/json_each.h"
 #include "exprs/table_function/list_rowsets.h"
@@ -159,6 +160,9 @@ void TableFunctionResolver::add_celonis_function_mapping() {
                          std::make_shared<CelonisGenerateRange<TYPE_DATETIME, TYPE_VARCHAR>>());
     add_function_mapping("celonis_object_link_propagate_filters", {TYPE_ARRAY, TYPE_ARRAY}, {TYPE_BIGINT, TYPE_BIGINT}, std::make_shared<CelonisObjectLinkPropagateFilters>());
     add_function_mapping("celonis_object_link_propagate_filters", {TYPE_ARRAY, TYPE_ARRAY, TYPE_BIGINT}, {TYPE_BIGINT, TYPE_BIGINT}, std::make_shared<CelonisObjectLinkPropagateFilters>());
+
+    // celonis_object_link_extract_paths(<adjacency_matrix>, <start nodes>, <end nodes>, <constraint edges>, <configuration string>)
+    add_function_mapping("celonis_object_link_extract_paths", {TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_VARCHAR}, {TYPE_ARRAY}, std::make_shared<CelonisObjectLinkExtractPaths>());
 }
 
 const TableFunction* get_table_function(const std::string& name, const std::vector<LogicalType>& arg_type,

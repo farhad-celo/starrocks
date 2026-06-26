@@ -1,0 +1,71 @@
+-- name: test_celonis_object_link_extract_paths
+CREATE TABLE t_paths (
+    id INT,
+    adj_matrix ARRAY<ARRAY<BIGINT>>,
+    start_nodes ARRAY<BIGINT>,
+    end_nodes ARRAY<BIGINT>,
+    constraints ARRAY<ARRAY<BIGINT>>
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+INSERT INTO t_paths (id, adj_matrix, start_nodes, end_nodes, constraints) VALUES
+    (1, [[1, 2], [2], [3], []], [0, 1], [3], [[0, 1], [0], [0], []]),
+    (2, [[1], [2], [0, 3], []], [0], [3], [[0], [0], [0, 0], []]);
+
+-- Test 1
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, NULL, NULL) f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+
+-- Test 2
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, t_paths.start_nodes, t_paths.end_nodes, NULL, NULL) f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+
+-- Test 3
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, t_paths.constraints, NULL) f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+
+-- Test 4
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, NULL, 'N:EQ:4') f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+
+-- Test 5
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, NULL, 'N:LE:3') f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+
+-- Test 6
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, t_paths.start_nodes, t_paths.end_nodes, NULL, NULL) f(path)
+WHERE id = 2
+ORDER BY id, f.path;
+
+-- Test 7
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, t_paths.start_nodes, t_paths.end_nodes, NULL, 'W:LT:8') f(path)
+WHERE id = 2
+ORDER BY id, f.path;
+
+-- Test 8
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, NULL, 'N:BW:3:4') f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+
+-- Test 9
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, NULL, 'N:GT:3') f(path)
+WHERE id = 1
+ORDER BY id, f.path;

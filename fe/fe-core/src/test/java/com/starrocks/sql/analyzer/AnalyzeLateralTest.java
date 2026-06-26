@@ -44,6 +44,18 @@ public class AnalyzeLateralTest {
     }
 
     @Test
+    public void testObjectLinkExtractPaths() {
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths([[1,2,3],[],[],[]], " +
+                "[1], [], NULL, NULL));");
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths([[1,2,3],[],[],[]]," +
+                "[1], [2], NULL, NULL));");
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths([[1,2,3],[],[],[]], " +
+                "[1], [2], [[0,1,0],[],[],[]], NULL));");
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths([[1,2,3],[],[],[]], " +
+                "[1], [2], [[0,1,0],[],[],[]], 'N:LE:5'));");
+    }
+
+    @Test
     public void testUnnest() {
         analyzeSuccess("select * from tarray cross join unnest(v3)");
         analyzeSuccess("select * from tarray cross join lateral unnest(v3)");

@@ -186,6 +186,14 @@ public class TableFunction extends Function {
                 Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.ARRAY_BIGINT, Type.BIGINT),
                 Lists.newArrayList(Type.BIGINT, Type.BIGINT));
         functionSet.addBuiltin(objectLinkPropagateFilters);
+
+        TableFunction objectLinkExtractPaths;
+        objectLinkExtractPaths = new TableFunction(new FunctionName("celonis_object_link_extract_paths"),
+                Lists.newArrayList("path_col"),
+                Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.ARRAY_BIGINT, Type.ARRAY_BIGINT,
+                        new ArrayType(Type.ARRAY_BIGINT), Type.VARCHAR),
+                Lists.newArrayList(Type.ARRAY_BIGINT));
+        functionSet.addBuiltin(objectLinkExtractPaths);
     }
 
     public List<Type> getTableFnReturnTypes() {
