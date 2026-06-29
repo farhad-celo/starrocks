@@ -210,7 +210,8 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
             throw new SemanticException("Failed to get latest snapshot for %s.%s.%s, %s. caused by : %s",
                     catalogName, dbName, tableName, e.getMessage(), e.getCause());
         }
-        return new DeltaLakeSnapshot(dbName, tableName, deltaLakeEngine, snapshot, createTime, path);
+        long version = snapshot.getVersion(deltaLakeEngine);
+        return new DeltaLakeSnapshot(dbName, tableName, deltaLakeEngine, snapshot, createTime, version, path);
     }
 
     @Override

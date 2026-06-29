@@ -40,4 +40,8 @@ public interface BasicTable {
     long getCreateTime();
 
     long getLastCheckTime();
+
+    default long getVersion() {
+        return -1L;
+    }
 }

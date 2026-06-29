@@ -49,6 +49,7 @@ public class DeltaLakeTable extends Table {
     private String tableLocation;
     private Engine deltaEngine;
     private CloudConfiguration cloudConfiguration;
+    private long version = -1L;
 
     public static final String PARTITION_NULL_VALUE = "null";
 
@@ -59,6 +60,13 @@ public class DeltaLakeTable extends Table {
     public DeltaLakeTable(long id, String catalogName, String dbName, String tableName, List<Column> schema,
                           List<String> partitionNames, SnapshotImpl deltaSnapshot, String tableLocation,
                           Engine deltaEngine, long createTime) {
+        this(id, catalogName, dbName, tableName, schema, partitionNames, deltaSnapshot, tableLocation,
+                deltaEngine, createTime, -1L);
+    }
+
+    public DeltaLakeTable(long id, String catalogName, String dbName, String tableName, List<Column> schema,
+                          List<String> partitionNames, SnapshotImpl deltaSnapshot, String tableLocation,
+                          Engine deltaEngine, long createTime, long version) {
         super(id, tableName, TableType.DELTALAKE, schema);
         this.catalogName = catalogName;
         this.dbName = dbName;
@@ -68,6 +76,7 @@ public class DeltaLakeTable extends Table {
         this.tableLocation = tableLocation;
         this.deltaEngine = deltaEngine;
         this.createTime = createTime;
+        this.version = version;
     }
 
     @Override
@@ -118,6 +127,11 @@ public class DeltaLakeTable extends Table {
     @Override
     public long getCreateTime() {
         return createTime;
+    }
+
+    @Override
+    public long getVersion() {
+        return version;
     }
 
     @Override

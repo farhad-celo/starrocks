@@ -630,7 +630,7 @@ public class ShowExecutor {
                         if (table.isNativeTableOrMaterializedView() || table.getType() == Table.TableType.OLAP_EXTERNAL) {
                             InformationSchemaDataSource.genNormalTableInfo(table, info);
                         } else {
-                            InformationSchemaDataSource.genDefaultConfigInfo(info);
+                            InformationSchemaDataSource.genDefaultConfigInfo(table, info);
                         }
 
                         List<String> row = Lists.newArrayList();

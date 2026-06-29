@@ -100,7 +100,11 @@ public class UnityMetastore implements IMetastore {
      * the {@link CachingUnityCatalogClient} decorator is bypassed (cache disabled or TTL=0).
      */
     public MetastoreTable toMetastoreTable(String dbName, String tableName, TableInfo info) {
-        long createTime = info.getCreatedAt() != null ? info.getCreatedAt() : 0L;
+        // Unity Catalog returns created_at as epoch milliseconds, but StarRocks table
+        // timestamps surfaced via information_schema / SHOW TABLE STATUS are epoch seconds
+        // (see Table.createTime and DateUtils.formatTimestampInSeconds). Convert to seconds
+        // so downstream formatting does not produce far-future dates.
+        long createTime = info.getCreatedAt() != null ? info.getCreatedAt() / 1000L : 0L;
         return new MetastoreTable(dbName, tableName, info.getStorageLocation(), createTime);
     }
 

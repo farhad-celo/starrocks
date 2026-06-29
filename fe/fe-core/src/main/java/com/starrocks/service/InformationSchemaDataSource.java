@@ -639,7 +639,7 @@ public class InformationSchemaDataSource {
                         // VIEW (use default)
                         // BROKER (use default)
                         // EXTERNAL TABLE (use default)
-                        genDefaultConfigInfo(info);
+                        genDefaultConfigInfo(table, info);
                     }
                     infos.add(info);
                 } finally {
@@ -817,11 +817,15 @@ public class InformationSchemaDataSource {
         return info;
     }
 
-    public static TTableInfo genDefaultConfigInfo(TTableInfo info) {
+    public static TTableInfo genDefaultConfigInfo(BasicTable table, TTableInfo info) {
         info.setTable_rows(DEFAULT_EMPTY_NUM);
         info.setAvg_row_length(DEFAULT_EMPTY_NUM);
         info.setData_length(DEFAULT_EMPTY_NUM);
         info.setUpdate_time(DEFAULT_EMPTY_NUM);
+        long version = table.getVersion();
+        if (version >= 0) {
+            info.setVersion(version);
+        }
         return info;
     }
 }

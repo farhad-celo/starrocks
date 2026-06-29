@@ -109,7 +109,8 @@ public class UnityMetastoreTest {
 
     @Test
     public void testGetMetastoreTableReturnsPlainMetastoreTable(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123").setCreatedAt(1_700_000_000_000L);
+        TableInfo info = deltaTable("abc-123")
+                .setCreatedAt(1_700_000_000_000L);
 
         new Expectations() {
             {
@@ -121,7 +122,24 @@ public class UnityMetastoreTest {
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
         MetastoreTable mt = metastore.getMetastoreTable("sales", "orders");
         Assertions.assertEquals("s3://bucket/prefix/orders", mt.getTableLocation());
-        Assertions.assertEquals(1_700_000_000_000L, mt.getCreateTime());
+        // Unity Catalog reports millis; MetastoreTable stores seconds.
+        Assertions.assertEquals(1_700_000_000L, mt.getCreateTime());
+    }
+
+    @Test
+    public void testGetMetastoreTableHandlesMissingTimestamps(@Mocked UnityCatalogClient client) {
+        TableInfo info = deltaTable("abc-123");
+
+        new Expectations() {
+            {
+                client.getTable("main.sales.orders");
+                result = info;
+            }
+        };
+
+        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
+        MetastoreTable mt = metastore.getMetastoreTable("sales", "orders");
+        Assertions.assertEquals(0L, mt.getCreateTime());
     }
 
     @Test

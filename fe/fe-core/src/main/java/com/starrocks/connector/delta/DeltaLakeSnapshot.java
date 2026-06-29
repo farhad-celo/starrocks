@@ -22,15 +22,22 @@ public class DeltaLakeSnapshot {
     private final DeltaLakeEngine deltaLakeEngine;
     private final SnapshotImpl snapshot;
     private final long createTime;
+    private final long version;
     private final String path;
 
     public DeltaLakeSnapshot(String dbName, String tableName, DeltaLakeEngine engine, SnapshotImpl snapshot,
                              long createTime, String path) {
+        this(dbName, tableName, engine, snapshot, createTime, -1L, path);
+    }
+
+    public DeltaLakeSnapshot(String dbName, String tableName, DeltaLakeEngine engine, SnapshotImpl snapshot,
+                             long createTime, long version, String path) {
         this.dbName = dbName;
         this.tableName = tableName;
         this.deltaLakeEngine = engine;
         this.snapshot = snapshot;
         this.createTime = createTime;
+        this.version = version;
         this.path = path;
     }
 
@@ -52,6 +59,10 @@ public class DeltaLakeSnapshot {
 
     public long getCreateTime() {
         return createTime;
+    }
+
+    public long getVersion() {
+        return version;
     }
 
     public String getPath() {

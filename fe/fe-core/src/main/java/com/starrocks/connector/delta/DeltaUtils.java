@@ -83,7 +83,8 @@ public class DeltaUtils {
         }
 
         return new DeltaLakeTable(CONNECTOR_ID_GENERATOR.getNextId().asInt(), catalog, dbName, tblName, fullSchema,
-                loadPartitionColumnNames(snapshotImpl), snapshotImpl, path, deltaLakeEngine, snapshot.getCreateTime());
+                loadPartitionColumnNames(snapshotImpl), snapshotImpl, path, deltaLakeEngine,
+                snapshot.getCreateTime(), snapshot.getVersion());
     }
 
     public static List<String> loadPartitionColumnNames(SnapshotImpl snapshot) {
