@@ -34,6 +34,8 @@ import com.starrocks.connector.statistics.ConnectorTableColumnKey;
 import com.starrocks.connector.statistics.ConnectorTableColumnStats;
 import com.starrocks.connector.statistics.StatisticsUtils;
 import com.starrocks.memory.MemoryTrackable;
+import com.starrocks.metric.celonis.CelonisMetrics;
+import com.starrocks.metric.MetricLabel;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
@@ -339,8 +341,8 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
     @Override
     public ColumnStatistic getColumnStatistic(Table table, String column) {
         Preconditions.checkState(table != null);
-
         // get Statistics Table column info, just return default column statistics
+        CelonisMetrics.increaseCounter("statistics_fetch_total", "Total statistics fetch requests by optimizer", new MetricLabel("type", "column_statistic_single"));
         if (StatisticUtils.statisticTableBlackListCheck(table.getId())) {
             return ColumnStatistic.unknown();
         }
@@ -357,6 +359,7 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                 realResult = result.get();
                 return realResult.orElseGet(ColumnStatistic::unknown);
             } else {
+                CelonisMetrics.increaseCounter("statistics_fetches_not_ready_total","No. of times where statistics not ready in time", new MetricLabel("type", "column_statistic_single"));
                 return ColumnStatistic.unknown();
             }
         } catch (Exception e) {
@@ -372,6 +375,7 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
     @Override
     public List<ColumnStatistic> getColumnStatistics(Table table, List<String> columns) {
         Preconditions.checkState(table != null);
+        CelonisMetrics.increaseCounter("statistics_fetch_total", "Total statistics fetch requests by optimizer", new MetricLabel("type", "column_statistics"));
 
         // get Statistics Table column info, just return default column statistics
         if (StatisticUtils.statisticTableBlackListCheck(table.getId())) {
@@ -409,6 +413,7 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                 }
                 return columnStatistics;
             } else {
+                CelonisMetrics.increaseCounter("statistics_fetches_not_ready_total","No. of times where statistics not ready in time", new MetricLabel("type", "column_statistics"));
                 return getDefaultColumnStatisticList(columns);
             }
         } catch (Exception e) {
