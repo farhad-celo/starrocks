@@ -16,6 +16,8 @@ metadata:
     repo-depot.celonis.dev/image-name: celostar/starrocks-fe
     repo-depot.celonis.dev/dply-release-approval-team: Celostar
     repo-depot.celonis.dev/workflow-runner-release: runner=64cpu-linux-arm64,image=ubuntu24-full-arm64,disk=large
+    repo-depot.com/release-schedule-cron-time-spec-utc: '30 16 * * 1'
+    repo-depot.com/release-manager-opsgenie-schedule-id: 5d6fef26-8404-489f-bd1e-b2b7df6e2ec4
   links:
     - title: Celostar JIRA
       url: https://celonis.atlassian.net/jira/software/c/projects/CELOSTAR/boards/925
