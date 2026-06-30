@@ -174,7 +174,7 @@ jobs:
             -Dsonar.organization=celonis
             -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.sources=fe/fe-core/src/main/java
-            -Dsonar.inclusions=fe/fe-core/src/main/java/**/celonis/**/*.java
+            -Dsonar.inclusions=fe/fe-core/src/main/java/**/*.java
             -Dsonar.java.binaries=fe/fe-core/target/classes
             -Dsonar.java.libraries=fe/fe-core/target/dependency/*.jar
             -Dsonar.coverage.jacoco.xmlReportPaths=fe/fe-core/target/site/jacoco/jacoco.xml
@@ -333,7 +333,8 @@ jobs:
           fi
           gcovr -r ${STARROCKS_HOME} \
                 --object-directory ${CMAKE_BUILD_DIR} \
-                --filter 'be/src/.*' \
+                --filter 'be/src/exprs/celonis/.*' \
+                --exclude 'be/src/exprs/celonis/modules/.*' \
                 --sonarqube coverage.xml
       - name: Output BE Coverage Summary
         if: always()
@@ -430,10 +431,10 @@ jobs:
             -Dsonar.projectKey=celonis_celostar-starrocks-be
             -Dsonar.organization=celonis
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=be/src
+            -Dsonar.sources=be/src/exprs/celonis
             -Dsonar.cfamily.compile-commands=sonarqube_output/compile_commands.json
             -Dsonar.coverageReportPaths=coverage.xml
-            -Dsonar.inclusions=be/src/**/celonis/**/*.cpp,be/src/**/celonis/**/*.cc,be/src/**/celonis/**/*.cxx,be/src/**/celonis/**/*.h,be/src/**/celonis/**/*.hpp
+            -Dsonar.exclusions=be/src/exprs/celonis/modules/**
 
       - name: Upload BE SonarQube artifacts
         if: always()
