@@ -343,8 +343,8 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
         Preconditions.checkState(table != null);
         // get Statistics Table column info, just return default column statistics
         CelonisMetrics.increaseCounter(
-            "statistics_fetch_total", 
-            "Total statistics fetch requests by optimizer", 
+                "statistics_fetch_total", 
+                "Total statistics fetch requests by optimizer", 
             new MetricLabel("type", "column_statistic_single"));
         if (StatisticUtils.statisticTableBlackListCheck(table.getId())) {
             return ColumnStatistic.unknown();
@@ -363,8 +363,8 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                 return realResult.orElseGet(ColumnStatistic::unknown);
             } else {
                 CelonisMetrics.increaseCounter(
-                    "statistics_fetches_not_ready_total",
-                    "No. of times where statistics not ready in time", 
+                        "statistics_fetches_not_ready_total",
+                        "No. of times where statistics not ready in time", 
                     new MetricLabel("type", "column_statistic_single"));
                 return ColumnStatistic.unknown();
             }
@@ -382,8 +382,8 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
     public List<ColumnStatistic> getColumnStatistics(Table table, List<String> columns) {
         Preconditions.checkState(table != null);
         CelonisMetrics.increaseCounter(
-            "statistics_fetch_total", 
-            "Total statistics fetch requests by optimizer", 
+                "statistics_fetch_total", 
+                "Total statistics fetch requests by optimizer", 
             new MetricLabel("type", "column_statistics"));
 
         // get Statistics Table column info, just return default column statistics
@@ -423,8 +423,8 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                 return columnStatistics;
             } else {
                 CelonisMetrics.increaseCounter(
-                    "statistics_fetches_not_ready_total",
-                    "No. of times where statistics not ready in time", 
+                        "statistics_fetches_not_ready_total",
+                        "No. of times where statistics not ready in time", 
                     new MetricLabel("type", "column_statistics"));
                 return getDefaultColumnStatisticList(columns);
             }
