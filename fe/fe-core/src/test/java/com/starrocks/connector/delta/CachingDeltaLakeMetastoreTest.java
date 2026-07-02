@@ -112,6 +112,29 @@ public class CachingDeltaLakeMetastoreTest {
     }
 
     @Test
+    public void testGetDbUnknownSchemaReturnsNull() {
+        // A delegate that reports an unknown schema as null (e.g. Unity Catalog) must not leak
+        // Guava's InvalidCacheLoadException through the LoadingCache; getDb returns null instead.
+        DeltaLakeMetastore nullDbMetastore = new HMSBackedDeltaMetastore("delta0",
+                new HiveMetastore(client, "delta0", MetastoreType.HMS), new Configuration(),
+                new DeltaLakeCatalogProperties(Maps.newHashMap())) {
+            @Override
+            public Database getDb(String dbName) {
+                return null;
+            }
+        };
+        CachingDeltaLakeMetastore cachingDeltaLakeMetastore =
+                CachingDeltaLakeMetastore.createCatalogLevelInstance(nullDbMetastore, executor, expireAfterWriteSec,
+                        refreshAfterWriteSec, 100);
+
+        Assertions.assertNull(cachingDeltaLakeMetastore.getDb("not-exist"));
+
+        CachingDeltaLakeMetastore queryLevelCache =
+                CachingDeltaLakeMetastore.createQueryLevelInstance(cachingDeltaLakeMetastore, 100);
+        Assertions.assertNull(queryLevelCache.getDb("not-exist"));
+    }
+
+    @Test
     public void testGetTable() {
         new MockUp<CachingDeltaLakeMetastore>() {
             @mockit.Mock

@@ -122,7 +122,15 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
 
     @Override
     public Database getDb(String dbName) {
-        return get(databaseCache, dbName);
+        try {
+            return get(databaseCache, dbName);
+        } catch (CacheLoader.InvalidCacheLoadException e) {
+            // A null from loadDb (e.g. Unity Catalog reporting an unknown schema) violates the
+            // LoadingCache non-null contract and surfaces as InvalidCacheLoadException. Translate
+            // it back to the "database does not exist" null contract so callers report a clean
+            // unknown-database error instead of the raw Guava cache exception.
+            return null;
+        }
     }
 
     @Override

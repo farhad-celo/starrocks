@@ -23,6 +23,7 @@ import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.TableInfo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.starrocks.catalog.Database;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
@@ -87,6 +88,71 @@ public class UnityMetastoreTest {
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
         List<String> dbs = metastore.getAllDatabaseNames();
         Assertions.assertEquals(ImmutableList.of("sales", "marketing"), dbs);
+    }
+
+    @Test
+    public void testGetDbReturnsDatabaseCaseInsensitively(@Mocked UnityCatalogClient client) {
+        SchemaInfo sales = new SchemaInfo().setName("sales").setStorageLocation("s3://bucket/sales");
+
+        new Expectations() {
+            {
+                client.listSchemas("main");
+                result = ImmutableList.of(sales);
+            }
+        };
+
+        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
+        // Caller passes a differently-cased name; lookup must still resolve.
+        Database db = metastore.getDb("SALES");
+        Assertions.assertNotNull(db);
+        Assertions.assertEquals("SALES", db.getFullName());
+        Assertions.assertEquals("s3://bucket/sales", db.getLocation());
+    }
+
+    @Test
+    public void testGetDbDefaultsBlankLocationWhenSchemaHasNone(@Mocked UnityCatalogClient client) {
+        SchemaInfo sales = new SchemaInfo().setName("sales");
+
+        new Expectations() {
+            {
+                client.listSchemas("main");
+                result = ImmutableList.of(sales);
+            }
+        };
+
+        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
+        Database db = metastore.getDb("sales");
+        Assertions.assertEquals("", db.getLocation());
+    }
+
+    @Test
+    public void testGetDbReturnsNullWhenDatabaseMissing(@Mocked UnityCatalogClient client) {
+        SchemaInfo sales = new SchemaInfo().setName("sales");
+
+        new Expectations() {
+            {
+                client.listSchemas("main");
+                result = ImmutableList.of(sales);
+            }
+        };
+
+        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
+        // A missing database returns null (the connector's "does not exist" contract); the
+        // caching layer translates that into a clean unknown-database error for the user.
+        Assertions.assertNull(metastore.getDb("missing"));
+    }
+
+    @Test
+    public void testGetDbReturnsNullWhenCatalogHasNoSchemas(@Mocked UnityCatalogClient client) {
+        new Expectations() {
+            {
+                client.listSchemas("main");
+                result = ImmutableList.of();
+            }
+        };
+
+        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
+        Assertions.assertNull(metastore.getDb("sales"));
     }
 
     @Test
