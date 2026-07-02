@@ -97,7 +97,6 @@ ${license}
 #include "exprs/celonis/match_activities.h"
 #include "exprs/celonis/match_process.h"
 #include "exprs/celonis/math_functions.h"
-#include "exprs/celonis/mo_bpmn_graph.h"
 #include "exprs/celonis/multi_in.h"
 #include "exprs/celonis/patindex.h"
 #include "exprs/celonis/peek_merged_sorted_arrays.h"

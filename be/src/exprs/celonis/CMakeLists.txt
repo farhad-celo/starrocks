@@ -46,14 +46,11 @@ add_main_source(operators/process/align_model)
 add_main_source(operators/process/align_model/v1)
 add_main_source(operators/process/align_model/v2)
 list(APPEND SOURCES
-        modules/operators/mo/mo_bpmn_graph_helper.cpp
-        modules/operators/mo/mo_bpmn_graph_operator.cpp
         modules/operators/process/bpmn/bpmn_from_proto.cpp
         modules/operators/process/bpmn/bpmn_graph_to_tables.cpp
         modules/operators/process/bpmn/replay_types.cpp
         modules/operators/process/bpmn/replay_utils.cpp
 )
-add_main_source(operators/process/inductive_miner)
 
 # modularization split
 add_module("concurrency")

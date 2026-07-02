@@ -173,7 +173,6 @@ set(CELONIS_FILES
   celonis/match_pattern_util.cpp
   celonis/match_process.cpp
   celonis/math_functions.cpp
-  celonis/mo_bpmn_graph.cpp
   celonis/multi_in.cpp
   celonis/patindex.cpp
   celonis/peek_merged_sorted_arrays.cpp
