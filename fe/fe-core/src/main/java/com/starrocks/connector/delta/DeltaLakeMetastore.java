@@ -180,11 +180,7 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
             // closeAllForUGI can reclaim the S3AFileSystem instances every vended read builds.
             DeltaVendedFsScope.enableFilesystemCache(effectiveConfiguration);
         }
-        // When per-table vended credentials are active, the catalog-level json/checkpoint
-        // caches must be bypassed: their CacheLoaders close over the credential-less
-        // hdfsConfiguration and would ignore the table-scoped config we just built.
-        DeltaLakeEngine deltaLakeEngine = DeltaLakeEngine.create(effectiveConfiguration, properties,
-                checkpointCache, jsonCache, usePerTableConfig);
+        DeltaLakeEngine deltaLakeEngine = createDeltaLakeEngine(effectiveConfiguration, usePerTableConfig);
         SnapshotImpl snapshot;
 
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "DeltaLake.getSnapshot")) {
@@ -212,6 +208,10 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         }
         long version = snapshot.getVersion(deltaLakeEngine);
         return new DeltaLakeSnapshot(dbName, tableName, deltaLakeEngine, snapshot, createTime, version, path);
+    }
+
+    protected DeltaLakeEngine createDeltaLakeEngine(Configuration effectiveConfiguration, boolean usePerTableConfig) {
+        return DeltaLakeEngine.create(effectiveConfiguration, properties, checkpointCache, jsonCache, usePerTableConfig);
     }
 
     @Override

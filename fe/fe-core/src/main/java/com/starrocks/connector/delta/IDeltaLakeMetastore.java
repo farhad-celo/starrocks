@@ -31,8 +31,8 @@ public interface IDeltaLakeMetastore extends IMetastore, MemoryTrackable {
     /**
      * Returns {@code true} when the operator has opted out of the catalog-level snapshot cache
      * for this metastore. {@link CachingDeltaLakeMetastore#getTable} consults this and falls
-     * straight through to {@link #getTable} on the delegate, so a fresh snapshot (and fresh
-     * credentials) is loaded for every query.
+     * straight through to {@link #getTable} on the delegate, so a fresh snapshot is loaded for
+     * every query.
      */
     default boolean isSnapshotCacheBypassed() {
         return false;
@@ -53,9 +53,9 @@ public interface IDeltaLakeMetastore extends IMetastore, MemoryTrackable {
     /**
      * Drop any per-table state the implementation holds for {@code (dbName, tableName)}.
      * Invoked from {@link CachingDeltaLakeMetastore#refreshTable} so that {@code REFRESH
-     * EXTERNAL TABLE} also flushes downstream caches (e.g. Unity Catalog vended credentials,
-     * Unity client {@code TableInfo} entries). The default is a no-op for backends that do
-     * not maintain their own per-table cache.
+     * EXTERNAL TABLE} also flushes downstream metadata caches (e.g. Unity client
+     * {@code TableInfo} entries). The default is a no-op for backends that do not maintain
+     * their own per-table cache.
      */
     default void refreshTable(String dbName, String tableName) {
     }

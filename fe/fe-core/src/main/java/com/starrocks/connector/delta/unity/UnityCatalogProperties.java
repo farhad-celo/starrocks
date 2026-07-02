@@ -16,8 +16,10 @@ package com.starrocks.connector.delta.unity;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.hash.Hashing;
 import com.starrocks.sql.analyzer.SemanticException;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 
@@ -34,10 +36,12 @@ public class UnityCatalogProperties {
     // latency on cold start, restricted token scope, OSS UC deployments that do not
     // expose the endpoint, etc.).
     public static final String UNITY_CATALOG_AWS_REGION = "unity.catalog.aws.region";
-    // Client-side cache in front of the UC REST client. Shared TTL across schema/table metadata
-    // and credentials; credentials additionally honor the server-side expiration_time minus a
-    // safety margin.
+    // Client-side metadata cache in front of the UC REST client. Credentials use the same TTL
+    // and additionally honor the server-side expiration_time minus a safety margin.
     public static final String UNITY_CACHE_ENABLED = "unity.catalog.cache.enabled";
+    // Unity-specific Delta caches: the catalog-level latest-snapshot cache plus the shared
+    // checkpoint/JSON metadata file cache. This is intentionally separate from TableInfo caching.
+    public static final String UNITY_DELTA_CACHE_ENABLED = "unity.catalog.delta-cache.enabled";
     public static final String UNITY_CACHE_TTL_SEC = "unity.catalog.cache.ttl-sec";
     public static final String UNITY_CACHE_CREDENTIALS_SAFETY_MARGIN_SEC =
             "unity.catalog.cache.credentials.safety-margin-sec";
@@ -52,7 +56,7 @@ public class UnityCatalogProperties {
     public static final String AUTH_TYPE_OAUTH_M2M = "oauth-m2m";
 
     private static final long DEFAULT_CACHE_TTL_SEC = 60L;
-    private static final long DEFAULT_CREDENTIALS_SAFETY_MARGIN_SEC = 600L;
+    private static final long DEFAULT_CREDENTIALS_SAFETY_MARGIN_SEC = 1200L;
 
     /** Mode used to authenticate against the Unity Catalog REST API. */
     public enum AuthType {
@@ -70,11 +74,15 @@ public class UnityCatalogProperties {
     private final long requestTimeoutMs;
     private final int maxRetries;
     private final boolean cacheEnabled;
+    private final boolean deltaCacheEnabled;
     private final long cacheTtlSec;
     private final long credentialsSafetyMarginSec;
     // null when the operator did not specify an override -- callers fall back to the
     // inferred region from Unity Catalog's metastore_summary endpoint.
     private final String awsRegionOverride;
+
+    // Lazily computed, memoized fingerprint of the Unity principal; see getPrincipalScope().
+    private volatile String principalScope;
 
     public UnityCatalogProperties(Map<String, String> properties) {
         String hostValue = properties.get(UNITY_CATALOG_HOST);
@@ -105,6 +113,8 @@ public class UnityCatalogProperties {
 
         String cacheEnabledRaw = properties.getOrDefault(UNITY_CACHE_ENABLED, "true");
         this.cacheEnabled = Boolean.parseBoolean(cacheEnabledRaw);
+        String deltaCacheEnabledRaw = properties.getOrDefault(UNITY_DELTA_CACHE_ENABLED, "true");
+        this.deltaCacheEnabled = Boolean.parseBoolean(deltaCacheEnabledRaw);
         this.cacheTtlSec = parseLong(properties, UNITY_CACHE_TTL_SEC, DEFAULT_CACHE_TTL_SEC);
         Preconditions.checkArgument(this.cacheTtlSec >= 0,
                 "%s must be >= 0", UNITY_CACHE_TTL_SEC);
@@ -157,7 +167,11 @@ public class UnityCatalogProperties {
         return cacheEnabled;
     }
 
-    /** TTL applied to every Guava cache that sits in front of the UC REST client. */
+    public boolean isDeltaCacheEnabled() {
+        return deltaCacheEnabled;
+    }
+
+    /** TTL applied to UC metadata caches and, when positive, the credential cache. */
     public long getCacheTtlSec() {
         return cacheTtlSec;
     }
@@ -175,6 +189,26 @@ public class UnityCatalogProperties {
      */
     public String getAwsRegionOverride() {
         return awsRegionOverride;
+    }
+
+    /**
+     * Fingerprint of the Unity principal, used to partition the shared Delta metadata
+     * cache so entries cannot cross a credential boundary. Keyed on {@code (host, authType, identity)}
+     * -- the PAT token or the OAuth {@code clientId} -- hashed so no secret lands in a cache key. The
+     * UC catalog name is excluded because Unity's vend authority is principal-scoped, not per-catalog.
+     */
+    public String getPrincipalScope() {
+        String scope = principalScope;
+        if (scope == null) {
+            String identity = authType == AuthType.PAT ? Strings.nullToEmpty(token)
+                    : Strings.nullToEmpty(clientId);
+            scope = Hashing.sha256()
+                    .hashString(host + "\u0000" + authType.name() + "\u0000" + identity,
+                            StandardCharsets.UTF_8)
+                    .toString();
+            principalScope = scope;
+        }
+        return scope;
     }
 
     private static AuthType parseAuthType(String raw) {

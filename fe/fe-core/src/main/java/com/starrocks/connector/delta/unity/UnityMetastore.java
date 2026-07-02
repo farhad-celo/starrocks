@@ -97,7 +97,7 @@ public class UnityMetastore implements IMetastore {
      * Build a {@link MetastoreTable} from an already-fetched {@link TableInfo}, without making
      * a fresh REST call. Used by {@link UnityBackedDeltaMetastore#getTable} so that one logical
      * table load only triggers a single {@link UnityCatalogApi#getTable} round-trip even when
-     * the {@link CachingUnityCatalogClient} decorator is bypassed (cache disabled or TTL=0).
+     * Unity metadata caching is disabled or TTL=0.
      */
     public MetastoreTable toMetastoreTable(String dbName, String tableName, TableInfo info) {
         // Unity Catalog returns created_at as epoch milliseconds, but StarRocks table
@@ -207,12 +207,9 @@ public class UnityMetastore implements IMetastore {
     }
 
     /**
-     * Drop any cached client-side state for {@code (dbName, tableName)}. Called from
+     * Drop any cached client-side metadata for {@code (dbName, tableName)}. Called from
      * {@link UnityBackedDeltaMetastore#refreshTable(String, String)} so a manual {@code REFRESH
-     * EXTERNAL TABLE} also flushes the {@link CachingUnityCatalogClient} {@code TableInfo} and
-     * vended-credentials entries. The default {@link UnityCatalogApi#invalidate(String)}
-     * implementation is a no-op for the direct REST client, so this is harmless when no caching
-     * decorator is in front of it.
+     * EXTERNAL TABLE} also flushes the {@link CachingUnityCatalogClient} {@code TableInfo} entry.
      */
     public void invalidateTable(String dbName, String tableName) {
         client.invalidate(fullName(dbName, tableName));

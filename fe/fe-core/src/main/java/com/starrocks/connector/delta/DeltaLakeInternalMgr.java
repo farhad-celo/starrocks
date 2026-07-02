@@ -88,9 +88,7 @@ public class DeltaLakeInternalMgr {
     public IDeltaLakeMetastore createUnityBackedDeltaLakeMetastore() {
         Preconditions.checkNotNull(unityCatalogProperties, "unityCatalogProperties must be set when metastore type is UNITY");
         UnityCatalogApi client = new UnityCatalogClient(unityCatalogProperties);
-        if (unityCatalogProperties.isCacheEnabled()) {
-            client = new CachingUnityCatalogClient(client, unityCatalogProperties);
-        }
+        client = new CachingUnityCatalogClient(client, unityCatalogProperties);
         UnityMetastore unityMetastore = new UnityMetastore(client, unityCatalogProperties);
         UnityBackedDeltaMetastore unityBackedDeltaMetastore = new UnityBackedDeltaMetastore(
                 catalogName,
@@ -106,12 +104,10 @@ public class DeltaLakeInternalMgr {
                     new ThreadFactoryBuilder().setNameFormat("deltalake-metastore-refresh-%d").build());
             Executor executor = new ReentrantExecutor(refreshHiveMetastoreExecutor, hmsConf.getCacheRefreshThreadMaxNum());
             // When vended credentials are active, the cached snapshot embeds the per-table
-            // cloud credentials inside its DeltaLakeEngine. To make sure we never hand a stale
-            // credential to a query, clamp the snapshot cache TTL/refresh to the Unity client
-            // cache TTL: that cache already guarantees credentials are evicted well inside the
-            // server-side expiration_time minus safety_margin window. Operators that disable
-            // the Unity client cache (or set its TTL=0) take the bypass path in
-            // UnityBackedDeltaMetastore#isSnapshotCacheBypassed() and never reach this branch.
+            // cloud credentials inside its DeltaLakeEngine. Bound the snapshot cache TTL to
+            // the Unity metadata cache TTL so a cached snapshot's baked-in credentials cannot
+            // outlive the credential cache entry that minted them. unity.catalog.delta-cache.enabled
+            // is independent and only governs the shared JSON/checkpoint cache.
             long snapshotTtlSec = hmsConf.getCacheTtlSec();
             long snapshotRefreshSec = hmsConf.getCacheRefreshIntervalSec();
             if (unityCatalogProperties.isVendedCredentialsEnabled()
@@ -162,5 +158,9 @@ public class DeltaLakeInternalMgr {
 
     public MetastoreType getMetastoreType() {
         return metastoreType;
+    }
+
+    public boolean supportsBackgroundRefreshDeltaLakeMetadata() {
+        return metastoreType != MetastoreType.UNITY;
     }
 }

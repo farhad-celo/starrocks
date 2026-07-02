@@ -108,8 +108,9 @@ public class UnityCatalogPropertiesTest {
                 "unity.catalog.name", "main");
         UnityCatalogProperties p = new UnityCatalogProperties(props);
         Assertions.assertTrue(p.isCacheEnabled(), "cache should default to enabled");
+        Assertions.assertTrue(p.isDeltaCacheEnabled(), "delta cache should default to enabled");
         Assertions.assertEquals(60L, p.getCacheTtlSec());
-        Assertions.assertEquals(600L, p.getCredentialsSafetyMarginSec());
+        Assertions.assertEquals(1200L, p.getCredentialsSafetyMarginSec());
     }
 
     @Test
@@ -119,11 +120,13 @@ public class UnityCatalogPropertiesTest {
                 .put("unity.catalog.token", "dapiXYZ")
                 .put("unity.catalog.name", "main")
                 .put("unity.catalog.cache.enabled", "false")
+                .put("unity.catalog.delta-cache.enabled", "false")
                 .put("unity.catalog.cache.ttl-sec", "300")
                 .put("unity.catalog.cache.credentials.safety-margin-sec", "30")
                 .build();
         UnityCatalogProperties p = new UnityCatalogProperties(props);
         Assertions.assertFalse(p.isCacheEnabled());
+        Assertions.assertFalse(p.isDeltaCacheEnabled());
         Assertions.assertEquals(300L, p.getCacheTtlSec());
         Assertions.assertEquals(30L, p.getCredentialsSafetyMarginSec());
     }
@@ -274,6 +277,97 @@ public class UnityCatalogPropertiesTest {
                 .put("unity.catalog.client-id", "abc-client")
                 .build();
         Assertions.assertThrows(IllegalArgumentException.class, () -> new UnityCatalogProperties(props));
+    }
+
+    private static String scopeOf(Map<String, String> props) {
+        return new UnityCatalogProperties(props).getPrincipalScope();
+    }
+
+    @Test
+    public void testPrincipalScopeStableAcrossCatalogNamesForSamePrincipal() {
+        Map<String, String> a = ImmutableMap.of(
+                "unity.catalog.host", "https://ws.cloud.databricks.com",
+                "unity.catalog.token", "dapiSAME",
+                "unity.catalog.name", "main");
+        Map<String, String> b = ImmutableMap.of(
+                "unity.catalog.host", "https://ws.cloud.databricks.com",
+                "unity.catalog.token", "dapiSAME",
+                "unity.catalog.name", "other");
+        Assertions.assertEquals(scopeOf(a), scopeOf(b),
+                "same principal at same host must share a scope regardless of UC catalog name");
+    }
+
+    @Test
+    public void testPrincipalScopeDiffersByToken() {
+        Map<String, String> a = ImmutableMap.of(
+                "unity.catalog.host", "https://ws.cloud.databricks.com",
+                "unity.catalog.token", "dapiA",
+                "unity.catalog.name", "main");
+        Map<String, String> b = ImmutableMap.of(
+                "unity.catalog.host", "https://ws.cloud.databricks.com",
+                "unity.catalog.token", "dapiB",
+                "unity.catalog.name", "main");
+        Assertions.assertNotEquals(scopeOf(a), scopeOf(b));
+    }
+
+    @Test
+    public void testPrincipalScopeDiffersByHost() {
+        Map<String, String> a = ImmutableMap.of(
+                "unity.catalog.host", "https://ws-a.cloud.databricks.com",
+                "unity.catalog.token", "dapiSAME",
+                "unity.catalog.name", "main");
+        Map<String, String> b = ImmutableMap.of(
+                "unity.catalog.host", "https://ws-b.cloud.databricks.com",
+                "unity.catalog.token", "dapiSAME",
+                "unity.catalog.name", "main");
+        Assertions.assertNotEquals(scopeOf(a), scopeOf(b));
+    }
+
+    @Test
+    public void testPrincipalScopeDiffersBetweenPatAndOAuth() {
+        Map<String, String> pat = ImmutableMap.of(
+                "unity.catalog.host", "https://ws.cloud.databricks.com",
+                "unity.catalog.token", "shared-identity",
+                "unity.catalog.name", "main");
+        Map<String, String> oauth = ImmutableMap.<String, String>builder()
+                .put("unity.catalog.host", "https://ws.cloud.databricks.com")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.auth.type", "oauth-m2m")
+                .put("unity.catalog.client-id", "shared-identity")
+                .put("unity.catalog.client-secret", "secret")
+                .build();
+        Assertions.assertNotEquals(scopeOf(pat), scopeOf(oauth),
+                "auth type is part of the fingerprint so a PAT and an OAuth id cannot collide");
+    }
+
+    @Test
+    public void testPrincipalScopeIgnoresOAuthSecretRotation() {
+        Map<String, String> a = ImmutableMap.<String, String>builder()
+                .put("unity.catalog.host", "https://ws.cloud.databricks.com")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.auth.type", "oauth-m2m")
+                .put("unity.catalog.client-id", "abc-client")
+                .put("unity.catalog.client-secret", "secret-v1")
+                .build();
+        Map<String, String> b = ImmutableMap.<String, String>builder()
+                .put("unity.catalog.host", "https://ws.cloud.databricks.com")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.auth.type", "oauth-m2m")
+                .put("unity.catalog.client-id", "abc-client")
+                .put("unity.catalog.client-secret", "secret-v2")
+                .build();
+        Assertions.assertEquals(scopeOf(a), scopeOf(b),
+                "the OAuth client id identifies the principal; a rotated secret is the same principal");
+    }
+
+    @Test
+    public void testPrincipalScopeDoesNotEmbedSecrets() {
+        String scope = scopeOf(ImmutableMap.of(
+                "unity.catalog.host", "https://ws.cloud.databricks.com",
+                "unity.catalog.token", "dapiSUPERSECRET",
+                "unity.catalog.name", "main"));
+        Assertions.assertFalse(scope.contains("dapiSUPERSECRET"),
+                "the scope must hash secret material rather than carry it in the clear");
     }
 
     @Test

@@ -30,7 +30,7 @@ import java.util.function.LongSupplier;
 
 /**
  * Decorator that sits in front of a {@link UnityCatalogApi} delegate (normally
- * {@link UnityCatalogClient}) and caches every read-path response with a shared TTL.
+ * {@link UnityCatalogClient}) and caches Unity REST read-path responses.
  *
  * <p>Four independent Guava caches back the interface:
  * <ul>
@@ -40,10 +40,12 @@ import java.util.function.LongSupplier;
  *   <li>{@link GenerateTemporaryTableCredentialResponse} per (table-id, operation).</li>
  * </ul>
  *
- * <p>Credentials are cached with the same {@code expireAfterWrite} TTL as the metadata, but every
- * cache hit additionally checks the UC-server-side {@code expirationTime} minus a configurable
- * safety margin, and re-vends if the lease is about to expire. This keeps stale credentials from
- * being handed out even when the TTL is configured longer than a typical UC lease.</p>
+ * <p>Metadata caches honor {@code unity.catalog.cache.enabled}. Credentials ignore that metadata
+ * freshness setting, but still honor {@code unity.catalog.cache.ttl-sec}: a zero TTL disables
+ * retention for credentials too. Every credential hit checks the UC-server-side
+ * {@code expirationTime} minus a configurable safety margin, and re-vends if the lease is about to
+ * expire. This keeps stale credentials from being handed out even when the TTL is configured longer
+ * than a typical UC lease.</p>
  *
  * <p>{@link #getMetastoreSummary()} is intentionally not cached here -- {@link UnityMetastore}
  * memoizes the metastore region on the catalog handle (see {@code resolveAwsRegion}).</p>
@@ -76,19 +78,25 @@ public class CachingUnityCatalogClient implements UnityCatalogApi {
         this.clockMillis = Objects.requireNonNull(clockMillis, "clockMillis");
 
         long ttlSec = properties.getCacheTtlSec();
-        this.schemasCache = newCache(ticker, ttlSec);
-        this.tablesCache = newCache(ticker, ttlSec);
-        this.tableInfoCache = newCache(ticker, ttlSec);
-        this.credentialsCache = newCache(ticker, ttlSec);
+        this.schemasCache = newMetadataCache(ticker, ttlSec, properties.isCacheEnabled());
+        this.tablesCache = newMetadataCache(ticker, ttlSec, properties.isCacheEnabled());
+        this.tableInfoCache = newMetadataCache(ticker, ttlSec, properties.isCacheEnabled());
+        this.credentialsCache = newCredentialsCache(ticker, ttlSec);
     }
 
-    private static <K, V> Cache<K, V> newCache(Ticker ticker, long ttlSec) {
+    private static <K, V> Cache<K, V> newMetadataCache(Ticker ticker, long ttlSec, boolean enabled) {
+        return newTtlCache(ticker, ttlSec, enabled);
+    }
+
+    private static <K, V> Cache<K, V> newCredentialsCache(Ticker ticker, long ttlSec) {
+        return newTtlCache(ticker, ttlSec, true);
+    }
+
+    private static <K, V> Cache<K, V> newTtlCache(Ticker ticker, long ttlSec, boolean enabled) {
         CacheBuilder<Object, Object> builder = CacheBuilder.newBuilder().ticker(ticker);
-        if (ttlSec > 0) {
+        if (enabled && ttlSec > 0) {
             builder.expireAfterWrite(ttlSec, TimeUnit.SECONDS);
         } else {
-            // ttlSec == 0 means "do not cache": zero-duration expireAfterWrite evicts entries
-            // before a second caller can read them, effectively bypassing the cache.
             builder.expireAfterWrite(0, TimeUnit.NANOSECONDS);
         }
         return builder.build();
@@ -150,7 +158,7 @@ public class CachingUnityCatalogClient implements UnityCatalogApi {
         }
         GenerateTemporaryTableCredentialResponse fresh =
                 delegate.getTemporaryTableCredentials(tableId, operation);
-        if (fresh != null) {
+        if (fresh != null && !isNearExpiry(fresh)) {
             credentialsCache.put(key, fresh);
         }
         return fresh;
@@ -159,26 +167,20 @@ public class CachingUnityCatalogClient implements UnityCatalogApi {
     private boolean isNearExpiry(GenerateTemporaryTableCredentialResponse creds) {
         Long expirationTime = creds.getExpirationTime();
         if (expirationTime == null) {
-            // UC did not tell us when these creds expire; safest to treat every hit as fresh --
-            // the TTL on the cache entry still bounds reuse to cacheTtlSec.
-            return false;
+            // Without a server-side expiration floor, there is no safe cache-hit window.
+            return true;
         }
         return expirationTime - credentialsSafetyMarginMs <= clockMillis.getAsLong();
     }
 
     /**
-     * Drop every cached entry referencing {@code fullName} (table info + any credentials for its
-     * table id). Called from {@code REFRESH EXTERNAL TABLE} via
-     * {@link UnityMetastore#invalidateTable(String, String)}.
+     * Drop cached metadata for {@code fullName}. Called from {@code REFRESH EXTERNAL TABLE} via
+     * {@link UnityMetastore#invalidateTable(String, String)}. Credentials are keyed by stable
+     * table id and operation, and remain cached until their own TTL/expiration policy re-vends.
      */
     @Override
     public void invalidate(String fullName) {
-        TableInfo cached = tableInfoCache.getIfPresent(fullName);
         tableInfoCache.invalidate(fullName);
-        if (cached != null && cached.getTableId() != null) {
-            String tableId = cached.getTableId();
-            credentialsCache.asMap().keySet().removeIf(k -> tableId.equals(k.tableId));
-        }
     }
 
     private static RuntimeException unwrap(ExecutionException e) {

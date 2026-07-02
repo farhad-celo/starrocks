@@ -58,7 +58,7 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
      * per-query cache exists for intra-query snapshot stability and dedup; it is rebuilt for
      * every query and lives only for that query's lifetime, so it is always safe to use even
      * when the inner catalog-level metastore opted out of cross-query caching (e.g. UC
-     * vended creds with the UC client cache disabled or TTL=0). The catalog-level layer
+     * metadata caching disabled or TTL=0). The catalog-level layer
      * leaves this {@code false} so it continues to honor the underlying delegate's bypass.
      */
     private final boolean perQueryInstance;
@@ -145,8 +145,8 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
     @Override
     public DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName) {
         // Hop into the inner CachingDeltaLakeMetastore's snapshot cache when it is safe to
-        // share. If the inner layer has opted out (e.g. UC vended creds with the UC client
-        // cache disabled or TTL=0), fall through to its uncached getLatestSnapshot so this
+        // share. If the inner layer has opted out (e.g. UC metadata caching disabled or
+        // TTL=0), fall through to its uncached getLatestSnapshot so this
         // loader call does not repopulate the cache the inner layer is trying to keep empty.
         if (delegate instanceof CachingDeltaLakeMetastore && !delegate.isSnapshotCacheBypassed()) {
             return ((CachingDeltaLakeMetastore) delegate).getCachedSnapshot(DatabaseTableName.of(dbName, tableName));
@@ -226,11 +226,10 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
         DatabaseTableName databaseTableName = DatabaseTableName.of(dbName, tblName);
         tableNameLockMap.putIfAbsent(databaseTableName, dbName + "_" + tblName + "_lock");
         synchronized (tableNameLockMap.get(databaseTableName)) {
-            // Drop the delegate's per-table state (e.g. UnityBacked vended-credential cache and
-            // CachingUnityCatalogClient TableInfo + credentials entries) BEFORE reloading the
-            // snapshot. Otherwise the reload below would re-populate the snapshot cache from
-            // stale upstream metadata and the manual REFRESH would be a no-op for callers that
-            // wanted to invalidate vended credentials.
+            // Drop the delegate's per-table metadata state BEFORE reloading the snapshot.
+            // Otherwise the reload below would re-populate the snapshot cache from stale
+            // upstream metadata and the manual REFRESH would be a no-op for callers that
+            // wanted fresh table metadata.
             delegate.refreshTable(dbName, tblName);
 
             DeltaLakeSnapshot newSnapshot;

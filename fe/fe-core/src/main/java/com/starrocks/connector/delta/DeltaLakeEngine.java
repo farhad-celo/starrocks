@@ -33,11 +33,7 @@ public class DeltaLakeEngine extends DefaultEngine {
     private final LoadingCache<Pair<DeltaLakeFileStatus, StructType>, List<ColumnarBatch>> checkpointCache;
     // Cache for json metadata, key is file path, value is list of JsonNode
     private final LoadingCache<DeltaLakeFileStatus, List<JsonNode>> jsonCache;
-    // When true, skip the catalog-level json/checkpoint caches and read directly with this
-    // engine's hadoopConf. Required when per-table vended credentials are in use; the cache
-    // loaders close over the catalog-level Configuration (no vended creds) and would otherwise
-    // bypass the per-table credentials. Also prevents cross-tenant leaks of short-lived creds
-    // between tables that happen to point at the same metadata file path.
+    // When true, skip the json/checkpoint caches and read directly with this engine's hadoopConf.
     private final boolean bypassMetaCache;
 
     protected DeltaLakeEngine(Configuration hadoopConf, DeltaLakeCatalogProperties properties,

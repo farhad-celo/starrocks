@@ -34,10 +34,16 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CachingUnityCatalogClientTest {
 
     private static UnityCatalogProperties propsWith(long ttlSec, long credentialsSafetyMarginSec) {
+        return propsWith(ttlSec, credentialsSafetyMarginSec, true);
+    }
+
+    private static UnityCatalogProperties propsWith(long ttlSec, long credentialsSafetyMarginSec,
+                                                    boolean metadataCacheEnabled) {
         return new UnityCatalogProperties(ImmutableMap.of(
                 "unity.catalog.host", "https://example.cloud.databricks.com",
                 "unity.catalog.token", "dapiTEST",
                 "unity.catalog.name", "main",
+                "unity.catalog.cache.enabled", Boolean.toString(metadataCacheEnabled),
                 "unity.catalog.cache.ttl-sec", Long.toString(ttlSec),
                 "unity.catalog.cache.credentials.safety-margin-sec", Long.toString(credentialsSafetyMarginSec)));
     }
@@ -227,21 +233,22 @@ public class CachingUnityCatalogClientTest {
     }
 
     @Test
-    public void testCredentialsWithoutExpirationTimeStayCached(@Mocked UnityCatalogApi delegate) {
-        GenerateTemporaryTableCredentialResponse creds = new GenerateTemporaryTableCredentialResponse();
+    public void testCredentialsWithoutExpirationTimeAreNotCached(@Mocked UnityCatalogApi delegate) {
+        GenerateTemporaryTableCredentialResponse first = new GenerateTemporaryTableCredentialResponse();
+        GenerateTemporaryTableCredentialResponse second = new GenerateTemporaryTableCredentialResponse();
 
         new Expectations() {
             {
                 delegate.getTemporaryTableCredentials("abc-123", "READ");
-                result = creds;
-                times = 1;
+                returns(first, second);
+                times = 2;
             }
         };
 
         CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
                 new AdvanceableTicker(), new AtomicLong());
-        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(first, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(second, client.getTemporaryTableCredentials("abc-123", "READ"));
     }
 
     @Test
@@ -266,7 +273,30 @@ public class CachingUnityCatalogClientTest {
     }
 
     @Test
-    public void testInvalidateClearsTableInfoAndCredentials(@Mocked UnityCatalogApi delegate) {
+    public void testTtlExpiryReloadsCredentialEntry(@Mocked UnityCatalogApi delegate) {
+        GenerateTemporaryTableCredentialResponse first = new GenerateTemporaryTableCredentialResponse()
+                .setExpirationTime(Long.MAX_VALUE);
+        GenerateTemporaryTableCredentialResponse second = new GenerateTemporaryTableCredentialResponse()
+                .setExpirationTime(Long.MAX_VALUE);
+
+        new Expectations() {
+            {
+                delegate.getTemporaryTableCredentials("abc-123", "READ");
+                returns(first, second);
+                times = 2;
+            }
+        };
+
+        AdvanceableTicker ticker = new AdvanceableTicker();
+        CachingUnityCatalogClient client = newClient(delegate, propsWith(2, 60), ticker, new AtomicLong());
+
+        Assertions.assertSame(first, client.getTemporaryTableCredentials("abc-123", "READ"));
+        ticker.advance(3, TimeUnit.SECONDS);
+        Assertions.assertSame(second, client.getTemporaryTableCredentials("abc-123", "READ"));
+    }
+
+    @Test
+    public void testInvalidateClearsTableInfoButKeepsCredentials(@Mocked UnityCatalogApi delegate) {
         TableInfo info = new TableInfo()
                 .setFullName("main.sales.orders")
                 .setTableId("abc-123")
@@ -283,7 +313,7 @@ public class CachingUnityCatalogClientTest {
                 times = 2;
                 delegate.getTemporaryTableCredentials("abc-123", "READ");
                 result = creds;
-                times = 2;
+                times = 1;
             }
         };
 
@@ -295,7 +325,7 @@ public class CachingUnityCatalogClientTest {
         client.invalidate("main.sales.orders");
 
         client.getTable("main.sales.orders");
-        client.getTemporaryTableCredentials("abc-123", "READ");
+        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
     }
 
     @Test
@@ -329,7 +359,7 @@ public class CachingUnityCatalogClientTest {
     }
 
     @Test
-    public void testInvalidateClearsCredentialsForEveryOperation(@Mocked UnityCatalogApi delegate) {
+    public void testInvalidateKeepsCredentialsForEveryOperation(@Mocked UnityCatalogApi delegate) {
         TableInfo info = new TableInfo()
                 .setFullName("main.sales.orders")
                 .setTableId("abc-123")
@@ -346,14 +376,12 @@ public class CachingUnityCatalogClientTest {
                 delegate.getTable("main.sales.orders");
                 result = info;
                 times = 1;
-                // After invalidate, each operation's entry must be re-vended -> two calls
-                // total per operation across the test.
                 delegate.getTemporaryTableCredentials("abc-123", "READ");
                 result = readCreds;
-                times = 2;
+                times = 1;
                 delegate.getTemporaryTableCredentials("abc-123", "READ_WRITE");
                 result = writeCreds;
-                times = 2;
+                times = 1;
             }
         };
 
@@ -365,18 +393,25 @@ public class CachingUnityCatalogClientTest {
 
         client.invalidate("main.sales.orders");
 
-        client.getTemporaryTableCredentials("abc-123", "READ");
-        client.getTemporaryTableCredentials("abc-123", "READ_WRITE");
+        Assertions.assertSame(readCreds, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(writeCreds, client.getTemporaryTableCredentials("abc-123", "READ_WRITE"));
     }
 
     @Test
-    public void testZeroTtlBypassesCache(@Mocked UnityCatalogApi delegate) {
+    public void testZeroTtlBypassesMetadataAndCredentialsCache(@Mocked UnityCatalogApi delegate) {
         SchemaInfo s = new SchemaInfo().setName("sales");
+        GenerateTemporaryTableCredentialResponse firstCreds = new GenerateTemporaryTableCredentialResponse()
+                .setExpirationTime(Long.MAX_VALUE);
+        GenerateTemporaryTableCredentialResponse secondCreds = new GenerateTemporaryTableCredentialResponse()
+                .setExpirationTime(Long.MAX_VALUE);
 
         new Expectations() {
             {
                 delegate.listSchemas("main");
                 result = ImmutableList.of(s);
+                times = 2;
+                delegate.getTemporaryTableCredentials("abc-123", "READ");
+                returns(firstCreds, secondCreds);
                 times = 2;
             }
         };
@@ -385,6 +420,37 @@ public class CachingUnityCatalogClientTest {
                 new AdvanceableTicker(), new AtomicLong());
         client.listSchemas("main");
         client.listSchemas("main");
+        Assertions.assertSame(firstCreds, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(secondCreds, client.getTemporaryTableCredentials("abc-123", "READ"));
+    }
+
+    @Test
+    public void testDisabledMetadataCacheStillCachesCredentials(@Mocked UnityCatalogApi delegate) {
+        TableInfo info = new TableInfo()
+                .setFullName("main.sales.orders")
+                .setTableId("abc-123")
+                .setDataSourceFormat(DataSourceFormat.DELTA)
+                .setStorageLocation("s3://bucket/orders");
+        GenerateTemporaryTableCredentialResponse creds = new GenerateTemporaryTableCredentialResponse()
+                .setExpirationTime(Long.MAX_VALUE);
+
+        new Expectations() {
+            {
+                delegate.getTable("main.sales.orders");
+                result = info;
+                times = 2;
+                delegate.getTemporaryTableCredentials("abc-123", "READ");
+                result = creds;
+                times = 1;
+            }
+        };
+
+        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60, false),
+                new AdvanceableTicker(), new AtomicLong());
+        client.getTable("main.sales.orders");
+        client.getTable("main.sales.orders");
+        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
     }
 
     @Test

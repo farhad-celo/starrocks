@@ -78,10 +78,18 @@ public class DeltaLakeConnector implements Connector {
     public void shutdown() {
         internalMgr.shutdown();
         metadataFactory.metastoreCacheInvalidateCache();
-        GlobalStateMgr.getCurrentState().getConnectorTableMetadataProcessor().unRegisterCacheUpdateProcessor(catalogNameType);
+        if (internalMgr.supportsBackgroundRefreshDeltaLakeMetadata()) {
+            GlobalStateMgr.getCurrentState().getConnectorTableMetadataProcessor()
+                    .unRegisterCacheUpdateProcessor(catalogNameType);
+        }
     }
 
     public void onCreate() {
+        if (!internalMgr.supportsBackgroundRefreshDeltaLakeMetadata()) {
+            LOG.info("Skipping background metadata refresh registration for Unity-backed Delta Lake catalog {}",
+                    catalogName);
+            return;
+        }
         Optional<DeltaLakeCacheUpdateProcessor> updateProcessor = metadataFactory.getCacheUpdateProcessor();
         updateProcessor.ifPresent(processor -> GlobalStateMgr.getCurrentState().getConnectorTableMetadataProcessor()
                         .registerCacheUpdateProcessor(catalogNameType, updateProcessor.get()));

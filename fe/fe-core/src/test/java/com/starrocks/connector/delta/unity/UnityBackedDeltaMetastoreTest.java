@@ -19,8 +19,11 @@ import com.databricks.sdk.service.catalog.DataSourceFormat;
 import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialResponse;
 import com.databricks.sdk.service.catalog.TableInfo;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.starrocks.connector.delta.DeltaLakeCatalogProperties;
+import com.starrocks.connector.delta.DeltaLakeFileStatus;
+import com.starrocks.connector.delta.DeltaLakeJsonHandler;
 import com.starrocks.connector.delta.DeltaLakeSnapshot;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.metastore.MetastoreTable;
@@ -28,13 +31,23 @@ import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.credential.CloudType;
 import com.starrocks.credential.aws.AwsCloudConfiguration;
 import mockit.Expectations;
+import mockit.Mock;
+import mockit.MockUp;
 import mockit.Mocked;
 import mockit.Verifications;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 public class UnityBackedDeltaMetastoreTest {
+
+    @BeforeEach
+    void resetSharedCache() {
+        UnityDeltaLakeMetaCache.resetForTest();
+    }
 
     private static UnityCatalogProperties propsWithVendedCredentials() {
         return new UnityCatalogProperties(ImmutableMap.of(
@@ -146,7 +159,7 @@ public class UnityBackedDeltaMetastoreTest {
         new Expectations() {
             {
                 // The whole point of the dedup: one logical UBDM#getTable -> one UC TableInfo
-                // fetch and one credential vend, even when the client cache is bypassed.
+                // fetch and one credential vend, even when metadata caching is bypassed.
                 client.getTable("main.sales.orders");
                 result = info;
                 times = 1;
@@ -246,5 +259,71 @@ public class UnityBackedDeltaMetastoreTest {
                 () -> backed.resolveTableCloudConfiguration("sales", "orders"));
         Assertions.assertTrue(ex.getMessage().contains("main.sales.orders"),
                 "exception message must include the failing table name; was: " + ex.getMessage());
+    }
+
+    @Test
+    public void testUnityBackedMetastoresShareDeltaMetaCache(@Mocked UnityCatalogClient client) {
+        UnityCatalogProperties props = propsWithVendedCredentials();
+        UnityBackedDeltaMetastore first = newUnityBacked(new UnityMetastore(client, props), props);
+        UnityBackedDeltaMetastore second = newUnityBacked(new UnityMetastore(client, props), props);
+
+        Assertions.assertSame(first.getUnityMetaCache(), second.getUnityMetaCache(),
+                "Unity-backed Delta catalogs must share one FE-level JSON/checkpoint cache");
+    }
+
+    @Test
+    public void testInvalidateAllDoesNotClearSharedDeltaMetaCache(@Mocked UnityCatalogClient client) {
+        UnityCatalogProperties props = propsWithVendedCredentials();
+        UnityBackedDeltaMetastore backed = newUnityBacked(new UnityMetastore(client, props), props);
+        UnityDeltaLakeMetaCache cache = backed.getUnityMetaCache();
+        DeltaLakeFileStatus status = DeltaLakeFileStatus.of(
+                io.delta.kernel.utils.FileStatus.of("s3://bucket/shared-unity-cache-test.json", 123, 456));
+
+        String scope = props.getPrincipalScope();
+        cache.getJsonCache(scope, new Configuration(false)).put(status, Lists.newArrayList());
+        backed.invalidateAll();
+
+        Assertions.assertTrue(cache.containsJson(scope, status),
+                "Invalidating one Unity catalog must not clear the process-wide Unity metadata cache");
+        Assertions.assertTrue(backed.estimateCount().get("unityJsonCache") >= 1);
+        Assertions.assertTrue(backed.getSamples().stream()
+                .anyMatch(sample -> sample.second >= 1 && !sample.first.isEmpty()));
+    }
+
+    @Test
+    public void testSharedMetaCacheIsolatesEntriesByPrincipalScope() {
+        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
+        DeltaLakeFileStatus status = DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(
+                "s3://bucket/principal-scope-isolation-" + System.nanoTime() + ".json", 1, 2));
+
+        cache.getJsonCache("principal-a", new Configuration(false)).put(status, Lists.newArrayList());
+
+        Assertions.assertTrue(cache.containsJson("principal-a", status),
+                "the populating principal must see its own cached entry");
+        Assertions.assertFalse(cache.containsJson("principal-b", status),
+                "a different principal must never be served a cache entry it did not populate");
+    }
+
+    @Test
+    public void testSharedMetaCacheLoaderUsesScopedConfiguration() throws Exception {
+        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
+        DeltaLakeFileStatus status = DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(
+                "s3://bucket/scoped-config-" + System.nanoTime() + ".json", 123, 456));
+        Configuration scoped = new Configuration(false);
+        scoped.set("unity.test.scoped-conf", "expected");
+        AtomicReference<String> seen = new AtomicReference<>();
+
+        new MockUp<DeltaLakeJsonHandler>() {
+            @Mock
+            public java.util.List<com.fasterxml.jackson.databind.JsonNode> readJsonFile(String filePath,
+                                                                                       Configuration hadoopConf) {
+                seen.set(hadoopConf.get("unity.test.scoped-conf"));
+                return Lists.newArrayList();
+            }
+        };
+
+        cache.getJsonCache("test-principal-scope", scoped).get(status);
+
+        Assertions.assertEquals("expected", seen.get());
     }
 }

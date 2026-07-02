@@ -17,7 +17,9 @@ package com.starrocks.connector.delta.unity;
 import com.databricks.sdk.service.catalog.TableInfo;
 import com.google.common.annotations.VisibleForTesting;
 import com.starrocks.catalog.DeltaLakeTable;
+import com.starrocks.common.Pair;
 import com.starrocks.connector.delta.DeltaLakeCatalogProperties;
+import com.starrocks.connector.delta.DeltaLakeEngine;
 import com.starrocks.connector.delta.DeltaLakeMetastore;
 import com.starrocks.connector.delta.DeltaLakeSnapshot;
 import com.starrocks.connector.delta.DeltaUtils;
@@ -25,11 +27,14 @@ import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
 import org.apache.hadoop.conf.Configuration;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * {@link DeltaLakeMetastore} variant whose {@code IMetastore} delegate is a
- * {@link UnityMetastore}. The parent class continues to handle Delta Kernel snapshot loading,
- * partition-key extraction, and checkpoint/JSON caching; this class only re-attaches per-table
- * vended cloud credentials to the {@link DeltaLakeTable} that the planner sees.
+ * {@link UnityMetastore}. Unity-specific snapshot loading uses a process-wide checkpoint/JSON
+ * cache, while this class also re-attaches per-table vended cloud credentials to the
+ * {@link DeltaLakeTable} that the planner sees.
  *
  * <p>Per-table caching of {@code TableInfo} and vended {@code TemporaryTableCredentials} is the
  * job of {@link CachingUnityCatalogClient}, not this class. We resolve through
@@ -39,6 +44,7 @@ import org.apache.hadoop.conf.Configuration;
 public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
     private final UnityMetastore unityMetastore;
     private final UnityCatalogProperties unityProperties;
+    private final UnityDeltaLakeMetaCache unityMetaCache;
 
     public UnityBackedDeltaMetastore(String catalogName,
                                      UnityMetastore delegate,
@@ -48,6 +54,7 @@ public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
         super(catalogName, delegate, hdfsConfiguration, deltaLakeCatalogProperties);
         this.unityMetastore = delegate;
         this.unityProperties = unityProperties;
+        this.unityMetaCache = UnityDeltaLakeMetaCache.getSharedInstance();
     }
 
     @VisibleForTesting
@@ -85,32 +92,75 @@ public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
     }
 
     @Override
+    protected DeltaLakeEngine createDeltaLakeEngine(Configuration effectiveConfiguration, boolean usePerTableConfig) {
+        if (isDeltaCacheEnabled()) {
+            // Per-table credentials bind into each scoped view's loader and entries are pinned to
+            // this catalog's principal scope, so the shared cache is safe regardless of usePerTableConfig.
+            return unityMetaCache.createEngine(unityProperties.getPrincipalScope(),
+                    effectiveConfiguration, properties);
+        }
+        // delta-cache.enabled=false means the operator opted out of Delta caching entirely:
+        // honor that by forcing bypass on the inherited per-catalog caches as well, even when
+        // the caller did not request it. The catalog-level snapshot cache is independently
+        // disabled via isSnapshotCacheBypassed().
+        return super.createDeltaLakeEngine(effectiveConfiguration, true);
+    }
+
+    @Override
+    public void invalidateAll() {
+        if (!isDeltaCacheEnabled()) {
+            super.invalidateAll();
+        }
+        // The Unity cache is shared across all Unity catalogs in this FE; one catalog shutdown
+        // must not evict siblings.
+    }
+
+    @Override
+    public Map<String, Long> estimateCount() {
+        return isDeltaCacheEnabled() ? unityMetaCache.estimateCount() : super.estimateCount();
+    }
+
+    @Override
+    public List<Pair<List<Object>, Long>> getSamples() {
+        return isDeltaCacheEnabled() ? unityMetaCache.getSamples() : super.getSamples();
+    }
+
+    @Override
     public boolean isVendedCredentialsEnabled() {
         return unityProperties != null && unityProperties.isVendedCredentialsEnabled();
     }
 
     /**
-     * Bypass the catalog-level snapshot cache when vended credentials are active and the
-     * Unity client cache is effectively off (disabled or TTL=0). When the client cache is
-     * configured, the snapshot cache TTL is clamped (in {@code DeltaLakeInternalMgr}) to the
-     * Unity cache TTL so a cached snapshot's baked-in credentials never outlive the cache
-     * entry; in that mode we keep the snapshot cache in play.
+     * The latest-snapshot pointer is Unity metadata, so it follows the same on/off and TTL
+     * rules as the UC REST cache: bypass whenever {@code unity.catalog.cache.enabled} is
+     * {@code false} or {@code unity.catalog.cache.ttl-sec} is {@code 0}. The
+     * {@code unity.catalog.delta-cache.enabled} flag is independent and only governs the
+     * shared FE-wide JSON/checkpoint metadata-file cache.
      */
     @Override
     public boolean isSnapshotCacheBypassed() {
-        if (!isVendedCredentialsEnabled()) {
+        if (unityProperties == null) {
             return false;
         }
-        return unityProperties == null || !unityProperties.isCacheEnabled() || unityProperties.getCacheTtlSec() == 0L;
+        return !unityProperties.isCacheEnabled() || unityProperties.getCacheTtlSec() == 0L;
+    }
+
+    private boolean isDeltaCacheEnabled() {
+        return unityProperties != null && unityProperties.isDeltaCacheEnabled();
     }
 
     /**
-     * Drop the Unity client's cached {@code TableInfo} and vended-credentials entries for this
-     * table. Called from {@link com.starrocks.connector.delta.CachingDeltaLakeMetastore#refreshTable}
-     * which handles {@code REFRESH EXTERNAL TABLE}.
+     * Drop the Unity client's cached {@code TableInfo} entry for this table. Called from
+     * {@link com.starrocks.connector.delta.CachingDeltaLakeMetastore#refreshTable} which handles
+     * {@code REFRESH EXTERNAL TABLE}.
      */
     @Override
     public void refreshTable(String dbName, String tableName) {
         unityMetastore.invalidateTable(dbName, tableName);
+    }
+
+    @VisibleForTesting
+    public UnityDeltaLakeMetaCache getUnityMetaCache() {
+        return unityMetaCache;
     }
 }

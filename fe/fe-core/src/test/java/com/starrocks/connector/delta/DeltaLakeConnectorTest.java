@@ -24,7 +24,6 @@ import com.starrocks.connector.MetastoreType;
 import com.starrocks.connector.delta.unity.CachingUnityCatalogClient;
 import com.starrocks.connector.delta.unity.UnityBackedDeltaMetastore;
 import com.starrocks.connector.delta.unity.UnityCatalogApi;
-import com.starrocks.connector.delta.unity.UnityCatalogClient;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -112,7 +111,7 @@ public class DeltaLakeConnectorTest {
     }
 
     @Test
-    public void testUnityCatalogCachingClientBypassedWhenDisabled() {
+    public void testUnityCatalogCachingClientStillWiredWhenMetadataCacheDisabled() {
         Map<String, String> properties = ImmutableMap.<String, String>builder()
                 .put("type", "deltalake")
                 .put("hive.metastore.type", "unity")
@@ -122,9 +121,8 @@ public class DeltaLakeConnectorTest {
                 .put("unity.catalog.cache.enabled", "false")
                 .build();
         UnityCatalogApi client = extractUnityClient(properties);
-        Assertions.assertInstanceOf(UnityCatalogClient.class, client,
-                "when the cache is disabled the raw REST client must be handed to UnityMetastore");
-        Assertions.assertFalse(client instanceof CachingUnityCatalogClient);
+        Assertions.assertInstanceOf(CachingUnityCatalogClient.class, client,
+                "metadata cache disablement must not bypass the credentials cache decorator");
     }
 
     @Test
@@ -140,11 +138,11 @@ public class DeltaLakeConnectorTest {
         Assertions.assertTrue(unity.isVendedCredentialsEnabled(),
                 "vended credentials default to true for Unity Catalog");
         Assertions.assertFalse(unity.isSnapshotCacheBypassed(),
-                "with the unity client cache active the snapshot cache must be reused");
+                "with the unity metadata cache active the snapshot cache must be reused");
     }
 
     @Test
-    public void testUnitySnapshotCacheBypassedWhenUnityClientCacheDisabled() throws Exception {
+    public void testUnitySnapshotCacheBypassedWhenUnityCacheDisabled() throws Exception {
         Map<String, String> properties = ImmutableMap.<String, String>builder()
                 .put("type", "deltalake")
                 .put("hive.metastore.type", "unity")
@@ -156,11 +154,12 @@ public class DeltaLakeConnectorTest {
         UnityBackedDeltaMetastore unity = extractUnityBackedMetastore(properties);
         Assertions.assertTrue(unity.isVendedCredentialsEnabled());
         Assertions.assertTrue(unity.isSnapshotCacheBypassed(),
-                "disabling the unity client cache must force snapshot bypass to keep credentials fresh");
+                "unity.catalog.cache.enabled=false must bypass the snapshot cache too, "
+                        + "since the snapshot is Unity metadata");
     }
 
     @Test
-    public void testUnitySnapshotCacheBypassedWhenUnityClientCacheTtlIsZero() throws Exception {
+    public void testUnitySnapshotCacheBypassedWhenUnityCacheTtlIsZero() throws Exception {
         Map<String, String> properties = ImmutableMap.<String, String>builder()
                 .put("type", "deltalake")
                 .put("hive.metastore.type", "unity")
@@ -171,7 +170,23 @@ public class DeltaLakeConnectorTest {
                 .build();
         UnityBackedDeltaMetastore unity = extractUnityBackedMetastore(properties);
         Assertions.assertTrue(unity.isSnapshotCacheBypassed(),
-                "ttl-sec=0 means no client-side cache lifetime, so the snapshot cache must bypass too");
+                "ttl-sec=0 must bypass cached snapshots, matching the UC REST cache rule");
+    }
+
+    @Test
+    public void testUnitySnapshotCacheNotBypassedWhenUnityDeltaCacheDisabled() throws Exception {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("type", "deltalake")
+                .put("hive.metastore.type", "unity")
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.delta-cache.enabled", "false")
+                .build();
+        UnityBackedDeltaMetastore unity = extractUnityBackedMetastore(properties);
+        Assertions.assertFalse(unity.isSnapshotCacheBypassed(),
+                "unity.catalog.delta-cache.enabled only governs the JSON/checkpoint cache; "
+                        + "the snapshot cache must stay on under the default cache.enabled=true");
     }
 
     @Test
@@ -183,11 +198,37 @@ public class DeltaLakeConnectorTest {
                 .put("unity.catalog.token", "dapiTEST")
                 .put("unity.catalog.name", "main")
                 .put("unity.catalog.vended-credentials-enabled", "false")
-                .put("unity.catalog.cache.enabled", "false")
                 .build();
         UnityBackedDeltaMetastore unity = extractUnityBackedMetastore(properties);
         Assertions.assertFalse(unity.isVendedCredentialsEnabled());
-        Assertions.assertFalse(unity.isSnapshotCacheBypassed());
+        Assertions.assertFalse(unity.isSnapshotCacheBypassed(),
+                "vending status has no bearing on the snapshot bypass; "
+                        + "with default cache.enabled=true the snapshot cache stays on");
+    }
+
+    @Test
+    public void testUnityCatalogDoesNotSupportBackgroundRefresh() {
+        Map<String, String> props = ImmutableMap.<String, String>builder()
+                .put("type", "deltalake")
+                .put("hive.metastore.type", "unity")
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .build();
+        DeltaLakeInternalMgr mgr = new DeltaLakeInternalMgr("unity_bg_test", props, new HdfsEnvironment());
+        Assertions.assertFalse(mgr.supportsBackgroundRefreshDeltaLakeMetadata(),
+                "Unity catalog must not be registered with the background refresh daemon");
+    }
+
+    @Test
+    public void testHmsCatalogSupportsBackgroundRefresh() {
+        Map<String, String> props = ImmutableMap.of(
+                "type", "deltalake",
+                "hive.metastore.type", "hive",
+                "hive.metastore.uris", "thrift://localhost:9083");
+        DeltaLakeInternalMgr mgr = new DeltaLakeInternalMgr("hms_bg_test", props, new HdfsEnvironment());
+        Assertions.assertTrue(mgr.supportsBackgroundRefreshDeltaLakeMetadata(),
+                "HMS-backed Delta catalog must still be registered with the background refresh daemon");
     }
 
     private static UnityBackedDeltaMetastore extractUnityBackedMetastore(Map<String, String> properties) {
