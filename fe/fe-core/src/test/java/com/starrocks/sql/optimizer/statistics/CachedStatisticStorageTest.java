@@ -25,6 +25,7 @@ import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Table;
 import com.starrocks.common.Config;
 import com.starrocks.common.DdlException;
+import com.starrocks.common.FeConstants;
 import com.starrocks.common.jmockit.Deencapsulation;
 import com.starrocks.connector.statistics.ConnectorColumnStatsCacheLoader;
 import com.starrocks.connector.statistics.ConnectorTableColumnKey;
@@ -609,6 +610,30 @@ public class CachedStatisticStorageTest {
     }
 
     @Test
+    public void testColumnStatsCacheLoaderAsyncLoad() throws Exception {
+        boolean orig = FeConstants.enableUnitStatistics;
+        FeConstants.enableUnitStatistics = false;
+        try {
+            new MockUp<StatisticExecutor>() {
+                @Mock
+                public List<TStatisticData> queryStatisticSync(ConnectContext ctx,
+                        Long dbId, Long tableId, List<String> cols) {
+                    return ImmutableList.of();
+                }
+            };
+
+            CachedStatisticStorage storage = new CachedStatisticStorage();
+            Executor exec = Deencapsulation.getField(storage, "statsCacheRefresherExecutor");
+            ColumnBasicStatsCacheLoader loader = new ColumnBasicStatsCacheLoader();
+
+            Assertions.assertTrue(
+                    loader.asyncLoad(new ColumnStatsCacheKey(1L, "c"), exec).get().isEmpty());
+        } finally {
+            FeConstants.enableUnitStatistics = orig;
+        }
+    }
+
+    @Test
     @Timeout(5)
     public void testWaitForStatsFutureDisabled() {
         // GIVEN
@@ -947,19 +972,32 @@ public class CachedStatisticStorageTest {
             Config.enable_sync_statistics_load = originalEnabled;
             Config.sync_statistics_load_timeout_ms = originalTimeout;
         }
+    }
 
     @Test
-    public void testAsyncLoadMetricCounter() throws Exception {
+    public void testGetHistogramStatisticsNotReady() {
+        new MockUp<StatisticUtils>() {
+            @Mock
+            public boolean checkStatisticTableStateNormal() { 
+                return true; }
+            @Mock
+            public boolean statisticTableBlackListCheck(long tableId) { 
+                return false; }
+        };
+
         CachedStatisticStorage storage = new CachedStatisticStorage();
-        Executor executor = Deencapsulation.getField(storage, "statsCacheRefresherExecutor");
+        Deencapsulation.setField(storage, "histogramCache",
+                Caffeine.newBuilder().buildAsync(
+                        (ColumnStatsCacheKey key, Executor e) -> new CompletableFuture<>()));
 
-        ColumnBasicStatsCacheLoader loader = new ColumnBasicStatsCacheLoader();
-        ColumnStatsCacheKey cacheKey = new ColumnStatsCacheKey(1L, "test_column");
+        Database db = connectContext.getGlobalStateMgr().getLocalMetastore().getDb("test");
+        OlapTable table = (OlapTable) GlobalStateMgr.getCurrentState().getLocalMetastore()
+                .getTable(db.getFullName(), "t0");
 
-        CompletableFuture<Optional<ColumnStatistic>> future = loader.asyncLoad(cacheKey, executor);
-        Optional<ColumnStatistic> result = future.get();
-    
-        Assertions.assertNotNull(result);
+        Map<String, Histogram> result =
+                storage.getHistogramStatistics(table, ImmutableList.of("v1"));
+
+        Assertions.assertTrue(result.isEmpty());
     }
 
     @Test

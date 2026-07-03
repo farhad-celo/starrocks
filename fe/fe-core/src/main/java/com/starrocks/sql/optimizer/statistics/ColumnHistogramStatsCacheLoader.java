@@ -23,6 +23,8 @@ import com.starrocks.catalog.Type;
 import com.starrocks.common.AnalysisException;
 import com.starrocks.common.ErrorCode;
 import com.starrocks.common.ErrorReport;
+import com.starrocks.metric.MetricLabel;
+import com.starrocks.metric.celonis.CelonisMetrics;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.common.MetaUtils;
@@ -44,6 +46,10 @@ import java.util.concurrent.Executor;
 
 public class ColumnHistogramStatsCacheLoader implements AsyncCacheLoader<ColumnStatsCacheKey, Optional<Histogram>> {
     private static final Logger LOG = LogManager.getLogger(ColumnBasicStatsCacheLoader.class);
+    private static final String METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL = 
+            "statistics_fetches_round_trip_total";
+    private static final String METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL_DESCRIPTION = 
+            "Total statistics fetch-round-trips from backend (cache miss)";
     private final StatisticExecutor statisticExecutor = new StatisticExecutor();
 
     @Override
@@ -51,6 +57,10 @@ public class ColumnHistogramStatsCacheLoader implements AsyncCacheLoader<ColumnS
     CompletableFuture<Optional<Histogram>> asyncLoad(@NonNull ColumnStatsCacheKey cacheKey,
                                                      @NonNull Executor executor) {
         return CompletableFuture.supplyAsync(() -> {
+            CelonisMetrics.increaseCounter(
+                    METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL,
+                    METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL_DESCRIPTION,
+                    new MetricLabel("type", "histogram_statistics"));
             try {
                 ConnectContext connectContext = StatisticUtils.buildConnectContext();
                 connectContext.setThreadLocalInfo();
@@ -85,7 +95,10 @@ public class ColumnHistogramStatsCacheLoader implements AsyncCacheLoader<ColumnS
                 columns.add(key.column);
                 result.put(key, Optional.empty());
             }
-
+            CelonisMetrics.increaseCounter(
+                    METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL,
+                    METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL_DESCRIPTION,
+                    new MetricLabel("type", "histogram_statistics_bulk"));
             try {
                 ConnectContext connectContext = StatisticUtils.buildConnectContext();
                 connectContext.setThreadLocalInfo();
