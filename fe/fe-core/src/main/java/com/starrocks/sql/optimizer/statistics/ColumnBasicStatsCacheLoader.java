@@ -54,7 +54,7 @@ import static com.starrocks.sql.optimizer.statistics.ColumnStatistic.DEFAULT_COL
 public class ColumnBasicStatsCacheLoader implements AsyncCacheLoader<ColumnStatsCacheKey, Optional<ColumnStatistic>> {
     private static final Logger LOG = LogManager.getLogger(ColumnBasicStatsCacheLoader.class);
     private static final String METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL = 
-            "statistics_fetchesRoundTrip_total";
+            "statistics_fetches_tound_trip_total";
     private static final String METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL_DESCRIPTION = 
             "Total statistics fetch-round-trips from backend (cache miss)";
     private final StatisticExecutor statisticExecutor = new StatisticExecutor();

@@ -68,7 +68,7 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
             "statistics_fetches_not_ready_total";
 
     private static final String METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL_DESCRIPTION = 
-            "No. of times where statistics not ready in time for each lookup";
+            "No. of times where statistics were not ready in time for each lookup";
 
     private final Executor statsCacheRefresherExecutor =
             ThreadPoolManager.newDaemonFixedThreadPoolWithUnboundedQueue(Config.statistic_cache_thread_pool_size,
@@ -596,6 +596,10 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                 }
                 return histogramStats;
             } else {
+                CelonisMetrics.increaseCounter(
+                        METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL,
+                        METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL_DESCRIPTION, 
+                    new MetricLabel("type", "histogram_statistics"));
                 return Maps.newHashMap();
             }
         } catch (Exception e) {
