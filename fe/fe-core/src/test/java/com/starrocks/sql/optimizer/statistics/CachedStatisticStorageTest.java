@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
@@ -946,6 +947,19 @@ public class CachedStatisticStorageTest {
             Config.enable_sync_statistics_load = originalEnabled;
             Config.sync_statistics_load_timeout_ms = originalTimeout;
         }
+
+    @Test
+    public void testAsyncLoadMetricCounter() throws Exception {
+        CachedStatisticStorage storage = new CachedStatisticStorage();
+        Executor executor = Deencapsulation.getField(storage, "statsCacheRefresherExecutor");
+
+        ColumnBasicStatsCacheLoader loader = new ColumnBasicStatsCacheLoader();
+        ColumnStatsCacheKey cacheKey = new ColumnStatsCacheKey(1L, "test_column");
+
+        CompletableFuture<Optional<ColumnStatistic>> future = loader.asyncLoad(cacheKey, executor);
+        Optional<ColumnStatistic> result = future.get();
+    
+        Assertions.assertNotNull(result);
     }
 
     @Test
