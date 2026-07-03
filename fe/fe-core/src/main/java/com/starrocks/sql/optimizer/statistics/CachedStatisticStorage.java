@@ -64,6 +64,12 @@ import static com.starrocks.metric.MetricRepo.SYNC_STATS_LOAD_BUDGET_EXHAUSTED_T
 public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable {
     private static final Logger LOG = LogManager.getLogger(CachedStatisticStorage.class);
 
+    private static final String METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL = 
+            "statistics_fetches_not_ready_total";
+
+    private static final String METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL_DESCRIPTION = 
+            "No. of times where statistics not ready in time for each lookup";
+
     private final Executor statsCacheRefresherExecutor =
             ThreadPoolManager.newDaemonFixedThreadPoolWithUnboundedQueue(Config.statistic_cache_thread_pool_size,
                     "stats-cache-refresher", true);
@@ -342,10 +348,6 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
     public ColumnStatistic getColumnStatistic(Table table, String column) {
         Preconditions.checkState(table != null);
         // get Statistics Table column info, just return default column statistics
-        CelonisMetrics.increaseCounter(
-                "statistics_fetch_total", 
-                "Total statistics fetch requests by optimizer", 
-            new MetricLabel("type", "column_statistic_single"));
         if (StatisticUtils.statisticTableBlackListCheck(table.getId())) {
             return ColumnStatistic.unknown();
         }
@@ -363,8 +365,8 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                 return realResult.orElseGet(ColumnStatistic::unknown);
             } else {
                 CelonisMetrics.increaseCounter(
-                        "statistics_fetches_not_ready_total",
-                        "No. of times where statistics not ready in time", 
+                        METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL,
+                        METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL_DESCRIPTION, 
                     new MetricLabel("type", "column_statistic_single"));
                 return ColumnStatistic.unknown();
             }
@@ -381,11 +383,6 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
     @Override
     public List<ColumnStatistic> getColumnStatistics(Table table, List<String> columns) {
         Preconditions.checkState(table != null);
-        CelonisMetrics.increaseCounter(
-                "statistics_fetch_total", 
-                "Total statistics fetch requests by optimizer", 
-            new MetricLabel("type", "column_statistics"));
-
         // get Statistics Table column info, just return default column statistics
         if (StatisticUtils.statisticTableBlackListCheck(table.getId())) {
             return getDefaultColumnStatisticList(columns);
@@ -423,8 +420,8 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                 return columnStatistics;
             } else {
                 CelonisMetrics.increaseCounter(
-                        "statistics_fetches_not_ready_total",
-                        "No. of times where statistics not ready in time", 
+                        METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL,
+                        METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL_DESCRIPTION,
                     new MetricLabel("type", "column_statistics"));
                 return getDefaultColumnStatisticList(columns);
             }

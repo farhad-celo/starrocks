@@ -26,6 +26,8 @@ import com.starrocks.common.ErrorCode;
 import com.starrocks.common.ErrorReport;
 import com.starrocks.common.FeConstants;
 import com.starrocks.common.util.DateUtils;
+import com.starrocks.metric.MetricLabel;
+import com.starrocks.metric.celonis.CelonisMetrics;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.common.MetaUtils;
@@ -51,6 +53,10 @@ import static com.starrocks.sql.optimizer.statistics.ColumnStatistic.DEFAULT_COL
 
 public class ColumnBasicStatsCacheLoader implements AsyncCacheLoader<ColumnStatsCacheKey, Optional<ColumnStatistic>> {
     private static final Logger LOG = LogManager.getLogger(ColumnBasicStatsCacheLoader.class);
+    private static final String METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL = 
+            "statistics_fetchesRoundTrip_total";
+    private static final String METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL_DESCRIPTION = 
+            "Total statistics fetch-round-trips from backend (cache miss)";
     private final StatisticExecutor statisticExecutor = new StatisticExecutor();
 
     @Override
@@ -60,6 +66,10 @@ public class ColumnBasicStatsCacheLoader implements AsyncCacheLoader<ColumnStats
             if (FeConstants.enableUnitStatistics) {
                 return Optional.empty();
             }
+            CelonisMetrics.increaseCounter(
+                    METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL,
+                    METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL_DESCRIPTION,
+                    new MetricLabel("type", "column_statistics_single"));
             try {
                 ConnectContext connectContext = StatisticUtils.buildConnectContext();
                 connectContext.setThreadLocalInfo();
@@ -92,6 +102,10 @@ public class ColumnBasicStatsCacheLoader implements AsyncCacheLoader<ColumnStats
                 }
                 return result;
             }
+            CelonisMetrics.increaseCounter(
+                    METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL,
+                    METRIC_STATISTICS_FETCHES_ROUND_TRIP_TOTAL_DESCRIPTION,
+                    new MetricLabel("type", "column_statistics_bulk"));
 
             Map<ColumnStatsCacheKey, Optional<ColumnStatistic>> result = new HashMap<>();
             // There may be no statistics for the column in BE
