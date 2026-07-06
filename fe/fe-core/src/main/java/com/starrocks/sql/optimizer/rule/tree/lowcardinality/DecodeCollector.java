@@ -616,15 +616,19 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             for (ColumnRefOperator key : preAggCall.keySet()) {
                 CallOperator agg = preAggCall.get(key);
                 if (!LOW_CARD_LOCAL_AGG_FUNCTIONS.contains(agg.getFnName())) {
-                    decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
-                            .add(agg.getFnName());
+                    if (agg.getUsedColumns().isIntersect(context.outputStringColumns)) {
+                        decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
+                                .add(agg.getFnName());
+                    }
                     disableColumns.union(agg.getUsedColumns());
                     disableColumns.union(key);
                     continue;
                 }
                 if (agg.getChildren().size() != 1 || !agg.getChildren().get(0).isColumnRef()) {
-                    decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
-                            .add(agg.getFnName());
+                    if (agg.getUsedColumns().isIntersect(context.outputStringColumns)) {
+                        decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
+                                .add(agg.getFnName());
+                    }
                     disableColumns.union(agg.getUsedColumns());
                     disableColumns.union(key);
                 }
