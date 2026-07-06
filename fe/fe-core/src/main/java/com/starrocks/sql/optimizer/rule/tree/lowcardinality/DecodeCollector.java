@@ -936,7 +936,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return Arrays.asList(agg.getFunction().getArgs()).subList(0, numOutputs).stream()
                     .anyMatch(Type::isStringType);
         }
-        return agg.getChildren().size() == 1 && agg.getChildren().get(0).isColumnRef();
+        return agg.getChildren().size() == 1 && agg.getChildren().get(0).isColumnRef()
+                && supportColumns.containsAll(agg.getUsedColumns());
     }
 
     @Override
@@ -957,6 +958,13 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                         .add(agg.getFnName());
                 disableColumns.union(agg.getUsedColumns());
                 disableColumns.union(key);
+            } else if (isFirstStage && FunctionSet.ARRAY_AGG.equals(agg.getFnName()) &&
+                    agg.getArguments().get(0).isColumnRef() && !agg.getArguments().get(0).getType().isStringType()) {
+                disableColumns.union((ColumnRefOperator) agg.getArguments().get(0));
+            } else if (isFirstStage && FunctionSet.MULTI_ARRAY_AGG.equals(agg.getFnName())) {
+                agg.getArguments().subList(0, ((StructType) agg.getFunction().getReturnType()).getFields().size())
+                        .stream().filter(c -> c.isColumnRef() && !c.getType().isStringType())
+                        .forEach(c ->  disableColumns.union((ColumnRefOperator) c));
             }
         }
 
@@ -973,28 +981,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 continue;
             }
             CallOperator value = aggregate.getAggregations().get(key);
-            if (FunctionSet.ARRAY_AGG.equals(value.getFnName())) {
-                if (!value.getChild(0).isColumnRef() ||
-                        !info.inputStringColumns.contains(value.getChild(0).cast())) {
-                    continue;
-                }
-            } else if (FunctionSet.MULTI_ARRAY_AGG.equals(value.getFnName())) {
-                if (value.getChild(0).isColumnRef() && key.getId() ==
-                        ((ColumnRefOperator) value.getChild(0)).getId()) {
-                    if (getFieldUseStringRefMap(key) == null) {
-                        continue;
-                    }
-                } else {
-                    int numOutputs = ((StructType) value.getFunction().getReturnType()).getFields().size();
-                    if (value.getChildren().subList(0, numOutputs).stream()
-                            .allMatch(c -> !c.isColumnRef() ||
-                                    !info.inputStringColumns.contains(c.cast()))) {
-                        continue;
-                    }
-                }
-            } else if (!info.inputStringColumns.containsAll(value.getUsedColumns())) {
-                continue;
-            }
             // aggregate ref -> aggregate expr
             stringAggregateExpressions.computeIfAbsent(key.getId(), x -> Lists.newArrayList()).add(value);
             AggregateFunction aggFn = (AggregateFunction) value.getFunction();
@@ -1002,6 +988,15 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 final Map<String, ColumnRefOperator> fieldsData;
                 if (FunctionSet.ANY_VALUE.equals(aggFn.functionName())) {
                     fieldsData = structManager.getFieldStringRefMap(value.getArguments().get(0));
+                } else if (FunctionSet.MULTI_ARRAY_AGG.equals(aggFn.functionName())) {
+                    fieldsData = Maps.newHashMap();
+                    StructType structType = (StructType) aggFn.getReturnType();
+                    for (int i = 0; i < structType.getFields().size(); i++) {
+                        if (value.getArguments().get(i).isColumnRef()
+                                && info.inputStringColumns.contains(value.getArguments().get(i).cast())) {
+                            fieldsData.put("col" + (i + 1), value.getArguments().get(i).cast());
+                        }
+                    }
                 } else {
                     throw new UnsupportedOperationException(
                             String.format("Unsupported function: %s with Struct Type", aggFn.functionName()));
@@ -1011,32 +1006,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             }
             if (supportLowCardinality(aggFn.getReturnType())) {
                 info.outputStringColumns.union(key.getId());
-                AggregateFunction aggFn = (AggregateFunction) value.getFunction();
-                if ((aggFn.getIntermediateTypeOrReturnType().isStructType() || aggFn.getReturnType().isStructType())
-                        && !structRefToFieldUseStringRef.containsKey(key.getId())) {
-                    final Map<String, ColumnRefOperator> fieldsData;
-                    if (FunctionSet.ARRAY_AGG.equals(aggFn.functionName())
-                            || FunctionSet.MULTI_ARRAY_AGG.equals(aggFn.functionName())) {
-                        fieldsData = Maps.newHashMap();
-                        if (aggFn.getIntermediateTypeOrReturnType().isStructType()) {
-                            StructType structType = (StructType) aggFn.getIntermediateTypeOrReturnType();
-                            Preconditions.checkState(structType.getFields().size() == value.getArguments().size());
-                        }
-                        for (int i = 0; i < value.getArguments().size(); i++) {
-                            if (value.getArguments().get(i).isColumnRef()
-                                    && info.inputStringColumns.contains(value.getArguments().get(i).cast())) {
-                                fieldsData.put("col" + (i + 1), value.getArguments().get(i).cast());
-                            }
-                        }
-                    } else if (FunctionSet.ANY_VALUE.equals(aggFn.functionName())) {
-                        fieldsData = getFieldUseStringRefMap(value.getArguments().get(0));
-                    } else {
-                        throw new UnsupportedOperationException(
-                                String.format("Unsupported function: %s with Struct Type", aggFn.functionName()));
-                    }
-                    Preconditions.checkNotNull(fieldsData);
-                    structOpToFieldUseStringRef.put(value, fieldsData);
-                }
                 setDefineExpr(key, value, 1);
             }
             final boolean isFinalStage = aggregate.getType().isGlobal() ||
