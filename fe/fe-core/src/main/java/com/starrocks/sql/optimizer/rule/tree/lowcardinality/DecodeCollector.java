@@ -35,6 +35,10 @@ import com.starrocks.common.FeConstants;
 import com.starrocks.common.Pair;
 import com.starrocks.common.util.UnionFind;
 import com.starrocks.connector.hive.HiveStorageFormat;
+import com.starrocks.metric.LongCounterMetric;
+import com.starrocks.metric.Metric;
+import com.starrocks.metric.MetricLabel;
+import com.starrocks.metric.MetricRepo;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.optimizer.OptExpression;
@@ -94,6 +98,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -120,6 +125,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     // and used as window function.
     public static final Set<String> LOW_CARD_WINDOW_FUNCTIONS = Sets.newHashSet(FunctionSet.LAG, FunctionSet.LEAD,
             FunctionSet.FIRST_VALUE, FunctionSet.LAST_VALUE);
+
+    private static final ConcurrentHashMap<String, LongCounterMetric> COUNTERS = new ConcurrentHashMap<>();
 
     static {
         LOW_CARD_WINDOW_FUNCTIONS.addAll(LOW_CARD_AGGREGATE_FUNCTIONS);
@@ -191,6 +198,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     private final ColumnRefSet scanColumnRefSet = new ColumnRefSet();
 
     private final StructManager structManager;
+
+    private final Map<Operator, List<String>> decodeMetricLabels = Maps.newIdentityHashMap();
 
     // check if there is a blocking node in plan
     private boolean canBlockingOutput = false;
@@ -389,6 +398,9 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                                 .union(info.inputStringColumns);
                     });
                 }
+                if (!info.decodeStringColumns.isEmpty()) {
+                    logDecodeMetric(operator);
+                }
             }
         }
         structManager.finalize(context.allStringColumns);
@@ -414,6 +426,22 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             result.addAll(getColumnRefs(child));
         }
         return result;
+    }
+
+    private void logDecodeMetric(Operator op) {
+        List<String> labels = decodeMetricLabels.get(op);
+        if (labels == null) {
+            labels = List.of(op.getOpType().toString());
+        } else {
+            labels = labels.stream().map(s -> op.getOpType().toString() + "_" + s).toList();
+        }
+        labels.stream().map(label -> COUNTERS.computeIfAbsent(label, k -> {
+            LongCounterMetric metric = new LongCounterMetric("lco_decode", Metric.MetricUnit.NOUNIT,
+                    "decode by reason");
+            metric.addLabel(new MetricLabel("op", label));
+            MetricRepo.addMetric(metric);
+            return metric;
+        })).forEach(metric -> metric.increase(1L));
     }
 
     private boolean checkDependOnExpr(int cid, Collection<Integer> checkList) {
@@ -572,11 +600,15 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             for (ColumnRefOperator key : preAggCall.keySet()) {
                 CallOperator agg = preAggCall.get(key);
                 if (!LOW_CARD_LOCAL_AGG_FUNCTIONS.contains(agg.getFnName())) {
+                    decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
+                            .add(agg.getFnName());
                     disableColumns.union(agg.getUsedColumns());
                     disableColumns.union(key);
                     continue;
                 }
                 if (agg.getChildren().size() != 1 || !agg.getChildren().get(0).isColumnRef()) {
+                    decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
+                            .add(agg.getFnName());
                     disableColumns.union(agg.getUsedColumns());
                     disableColumns.union(key);
                 }
