@@ -906,11 +906,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             final boolean isFirstStage = !agg.getArguments().isEmpty() &&
                     (!(agg.getArguments().get(0) instanceof ColumnRefOperator ref) || ref.getId() != key.getId());
             if (!shouldProcessAggFunction(agg, info, isFirstStage)) {
+                decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
+                        .add(agg.getFnName());
                 disableColumns.union(agg.getUsedColumns());
                 disableColumns.union(key);
-            } else if (isFirstStage && FunctionSet.ARRAY_AGG.equals(agg.getFnName()) &&
-                    agg.getArguments().get(0).isColumnRef() && !agg.getArguments().get(0).getType().isStringType()) {
-                disableColumns.union((ColumnRefOperator) agg.getArguments().get(0));
             }
         }
 

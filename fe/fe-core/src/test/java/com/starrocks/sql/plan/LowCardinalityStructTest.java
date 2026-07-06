@@ -544,8 +544,8 @@ public class LowCardinalityStructTest extends PlanTestBase {
                 "  |  \n" +
                 "  6:AGGREGATE (merge finalize)\n" +
                 "  |  aggregate: array_agg[([9: array_agg, struct<col1 array<int(11)>, col2 array<int(11)>, " +
-                "col3 array<int(11)>>, true]); args: INT,INT,INT; result: ARRAY<INT>; args nullable: true; " +
-                "result nullable: true]"), plan);
+                "col3 array<int(11)>>, true]); args: INT,INT,INT; result: ARRAY<INT>; args nullable: true;" +
+                " result nullable: true]"), plan);
     }
 
     @Test
