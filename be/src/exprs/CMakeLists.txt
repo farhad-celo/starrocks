@@ -19,7 +19,6 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_DIR}/src/exprs")
 
 set(EXPR_FILES
   agg/data_sketch/ds_theta.cpp
-  agg/factory_calendar.cpp
   agg/factory/aggregate_factory.cpp
   agg/factory/aggregate_resolver_approx.cpp
   agg/factory/aggregate_resolver_avg.cpp
@@ -133,6 +132,10 @@ add_custom_command(
 add_library(celonis_calendars_protos ${PROTO_GENERATED_SRCS} ${PROTO_GENERATED_HDRS})
 
 set(CELONIS_FILES
+  celonis/agg/factory_calendar.cpp
+  celonis/agg/inductive_miner.cpp
+  celonis/agg/variant_agg.cpp
+  celonis/agg/variant_stats.cpp
   celonis/align_model.cpp
   celonis/array_functions.cpp
   celonis/calc_throughput.cpp
@@ -140,7 +143,6 @@ set(CELONIS_FILES
   celonis/greatest_least.cpp
   celonis/in.cpp
   celonis/index_activity.cpp
-  celonis/inductive_miner.cpp
   celonis/like.cpp
   celonis/match_activities.cpp
   celonis/match_process.cpp
@@ -154,8 +156,6 @@ set(CELONIS_FILES
   celonis/table_function/count_edges.cpp
   celonis/time_functions.cpp
   celonis/util.cpp
-  celonis/variant_agg.cpp
-  celonis/variant_stats.cpp
 )
 
 add_library(Exprs ${EXPR_FILES} ${CELONIS_FILES})

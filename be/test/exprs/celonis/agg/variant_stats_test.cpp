@@ -11,7 +11,7 @@
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/anyval_util.h"
 #include "exprs/arithmetic_operation.h"
-#include "exprs/celonis/variant_stats.h"
+#include "exprs/celonis/agg/variant_stats.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"

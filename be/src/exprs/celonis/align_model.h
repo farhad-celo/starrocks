@@ -1,7 +1,6 @@
 #pragma once
 
 #include "exprs/celonis/modules/operators/process/align_model/align_model_helper.h"
-#include "exprs/celonis/variant_agg.h"
 #include "exprs/function_context.h"
 #include "exprs/function_helper.h"
 

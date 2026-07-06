@@ -1,4 +1,4 @@
-#include "exprs/celonis/variant_agg.h"
+#include "variant_agg.h"
 
 #include "column/array_column.h"
 #include "column/binary_column.h"

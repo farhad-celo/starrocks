@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "exprs/celonis/result_table.h"
-#include "exprs/celonis/variant.h"
+#include "exprs/celonis/agg/variant.h"
 
 using starrocks::celonis::ResultTable;
 

@@ -7,7 +7,6 @@
 #include "column/struct_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/celonis/align_model.h"
-#include "exprs/celonis/variant_stats.h"
 #include "runtime/mem_pool.h"
 #include "testutil/assert.h"
 #include "testutil/function_utils.h"

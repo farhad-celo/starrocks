@@ -24,25 +24,16 @@
 namespace starrocks {
 
 void AggregateFuncResolver::register_celonis() {
-    add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_inductive_miner");
-    add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
-    add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_DOUBLE, PercentileState<TYPE_BIGINT>>(
-            "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_BIGINT>());
-    add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, PercentileState<TYPE_DOUBLE>>(
-            "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_DOUBLE>());
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_ARRAY>(
+            "celonis_calc_bucket_count_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_ARRAY>(
+            "celonis_calc_bucket_count_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_DOUBLE>());
+    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_ARRAY>(
+            "celonis_calc_bucket_count_boundaries", false,
+            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_DATETIME>());
 
-    add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_BIGINT, CelonisModeState<TYPE_BIGINT>>(
-            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_BIGINT>());
-    add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, CelonisModeState<TYPE_DOUBLE>>(
-            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_DOUBLE>());
-    add_aggregate_mapping_variadic<TYPE_DATETIME, TYPE_DATETIME, CelonisModeState<TYPE_DATETIME>>(
-            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_DATETIME>());
-    add_aggregate_mapping_variadic<TYPE_VARCHAR, TYPE_VARCHAR, CelonisModeState<TYPE_VARCHAR>>(
-            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_VARCHAR>());
-    add_general_mapping_notnull("celonis_sorted_first", false,
-                                AggregateFactory::MakeCelonisSortedFirstAggregateFunction());
-    add_general_mapping_notnull("celonis_sorted_last", false,
-                                AggregateFactory::MakeCelonisSortedLastAggregateFunction());
     add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_STRUCT>(
             "celonis_histogram_boundaries", false,
             AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_BIGINT>());
@@ -55,15 +46,32 @@ void AggregateFuncResolver::register_celonis() {
     add_aggregate_mapping_notnull<TYPE_VARCHAR, TYPE_STRUCT>(
             "celonis_histogram_boundaries", false,
             AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_VARCHAR>());
-    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_ARRAY>(
-            "celonis_calc_bucket_count_boundaries", false,
-            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_BIGINT>());
-    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_ARRAY>(
-            "celonis_calc_bucket_count_boundaries", false,
-            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_DOUBLE>());
-    add_aggregate_mapping_notnull<TYPE_DATETIME, TYPE_ARRAY>(
-            "celonis_calc_bucket_count_boundaries", false,
-            AggregateFactory::MakeCelonisCalcBucketBoundariesAggregateFunction<TYPE_DATETIME>());
+
+    add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_inductive_miner");
+
+    add_general_mapping_notnull("celonis_make_factory_calendar", false,
+                                AggregateFactory::MakeCelonisMakeFactoryCalendarAggregateFunction());
+
+    add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_BIGINT, CelonisModeState<TYPE_BIGINT>>(
+            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, CelonisModeState<TYPE_DOUBLE>>(
+            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_DOUBLE>());
+    add_aggregate_mapping_variadic<TYPE_DATETIME, TYPE_DATETIME, CelonisModeState<TYPE_DATETIME>>(
+            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_DATETIME>());
+    add_aggregate_mapping_variadic<TYPE_VARCHAR, TYPE_VARCHAR, CelonisModeState<TYPE_VARCHAR>>(
+            "celonis_mode", false, AggregateFactory::MakeCelonisModeAggregateFunction<TYPE_VARCHAR>());
+
+    add_general_mapping_notnull("celonis_sorted_first", false,
+                                AggregateFactory::MakeCelonisSortedFirstAggregateFunction());
+    add_general_mapping_notnull("celonis_sorted_last", false,
+                                AggregateFactory::MakeCelonisSortedLastAggregateFunction());
+
+    add_aggregate_mapping_variadic<TYPE_BIGINT, TYPE_DOUBLE, PercentileState<TYPE_BIGINT>>(
+            "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_variadic<TYPE_DOUBLE, TYPE_DOUBLE, PercentileState<TYPE_DOUBLE>>(
+            "celonis_trimmed_mean", false, AggregateFactory::MakeCelonisTrimmedMeanAggregateFunction<TYPE_DOUBLE>());
+
+    add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
 }
 
 struct PercentileDiscDispatcher {
@@ -140,7 +148,6 @@ void AggregateFuncResolver::register_others() {
 
     add_general_mapping<AnyValueSemiState>("any_value", false, AggregateFactory::MakeAnyValueSemiAggregateFunction());
     add_general_mapping_notnull("array_agg2", false, AggregateFactory::MakeArrayAggAggregateFunctionV2());
-    add_general_mapping_notnull("celonis_make_factory_calendar", false, AggregateFactory::MakeCelonisMakeFactoryCalendarAggregateFunction());
     add_general_mapping_notnull("group_concat2", false, AggregateFactory::MakeGroupConcatAggregateFunctionV2());
 
     add_general_mapping_notnull("dict_merge", false, AggregateFactory::MakeDictMergeAggregateFunction());

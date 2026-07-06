@@ -1,7 +1,7 @@
 #pragma once
 
 #include "exprs/celonis/modules/operators/process/inductive_miner/inductive_miner_helper.h"
-#include "exprs/celonis/variant_agg.h"
+#include "variant_agg.h"
 
 namespace starrocks {
 

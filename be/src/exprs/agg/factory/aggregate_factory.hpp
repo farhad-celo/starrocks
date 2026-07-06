@@ -34,7 +34,6 @@
 #include "exprs/agg/ds_hll_count_distinct.h"
 #include "exprs/agg/ds_theta_count_distinct.h"
 #include "exprs/agg/exchange_perf.h"
-#include "exprs/agg/factory_calendar.h"
 #include "exprs/agg/group_concat.h"
 #include "exprs/agg/histogram.h"
 #include "exprs/agg/hll_ndv.h"
@@ -55,13 +54,14 @@
 #include "exprs/agg/variance.h"
 #include "exprs/agg/window.h"
 #include "exprs/agg/window_funnel.h"
-#include "exprs/celonis/calc_bucket_boundaries.h"
-#include "exprs/celonis/histogram_boundaries.h"
-#include "exprs/celonis/inductive_miner.h"
+#include "exprs/celonis/agg/calc_bucket_boundaries.h"
+#include "exprs/celonis/agg/factory_calendar.h"
+#include "exprs/celonis/agg/histogram_boundaries.h"
+#include "exprs/celonis/agg/inductive_miner.h"
 #include "exprs/celonis/mode_agg.h"
-#include "exprs/celonis/sorted_first_last.h"
-#include "exprs/celonis/trimmed_mean.h"
-#include "exprs/celonis/variant_stats.h"
+#include "exprs/celonis/agg/sorted_first_last.h"
+#include "exprs/celonis/agg/trimmed_mean.h"
+#include "exprs/celonis/agg/variant_stats.h"
 #include "types/logical_type.h"
 #include "types/logical_type_infra.h"
 #include "udf/java/java_function_fwd.h"
@@ -119,10 +119,6 @@ public:
     template <AggExchangePerfType PerfType>
     static AggregateFunctionPtr MakeExchangePerfAggregateFunction() {
         return std::make_shared<ExchangePerfAggregateFunction<PerfType>>();
-    }
-
-    static AggregateFunctionPtr MakeCelonisMakeFactoryCalendarAggregateFunction() {
-        return std::make_shared<FactoryCalendarAggregateFunction>();
     }
 
     static AggregateFunctionPtr MakeArrayAggAggregateFunctionV2() {
@@ -219,6 +215,8 @@ public:
     static AggregateFunctionPtr MakeCelonisHistogramBoundariesAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisInductiveMinerAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisMakeFactoryCalendarAggregateFunction();
 
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisModeAggregateFunction();

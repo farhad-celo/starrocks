@@ -3,7 +3,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_DIR}/src/exprs/celonis")
 set(CMAKE_CXX_STANDARD 20)
 
 set(SOURCES
-        variant.cpp
+        agg/variant.cpp
         )
 
 set(HEADERS

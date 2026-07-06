@@ -3,7 +3,7 @@
 #include <chrono>
 
 #include "exprs/celonis/result_table.h"
-#include "exprs/celonis/variant.h"
+#include "exprs/celonis/agg/variant.h"
 #include "modules/common/execution_context.h"
 #include "modules/cube/execution/tracking/stop_token.h"
 #include "modules/operators/process/inductive_miner/directly_follows_graph.h"

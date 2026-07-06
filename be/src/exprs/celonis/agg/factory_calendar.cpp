@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "exprs/agg/factory_calendar.h"
+#include "factory_calendar.h"
 #include "modules/query/calendars.pb.h"
 #include <google/protobuf/util/json_util.h>
 

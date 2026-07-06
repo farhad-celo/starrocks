@@ -2,7 +2,7 @@
 
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/sorted_first_last.h"
+#include "exprs/celonis/agg/sorted_first_last.h"
 #include "runtime/mem_pool.h"
 
 namespace starrocks {

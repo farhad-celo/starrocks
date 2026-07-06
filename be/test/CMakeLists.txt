@@ -142,16 +142,21 @@ set(EXEC_FILES
         ./exprs/case_expr_test.cpp
         ./exprs/cast_expr_test.cpp
         ./exprs/unary_function_test.cpp
+        ./exprs/celonis/agg/aggregate_test.cpp
+        ./exprs/celonis/agg/calc_bucket_boundaries_test.cpp
+        ./exprs/celonis/agg/histogram_boundaries_test.cpp
+        ./exprs/celonis/agg/inductive_miner_test.cpp
+        ./exprs/celonis/agg/sorted_first_last_test.cpp
+        ./exprs/celonis/agg/trimmed_mean_test.cpp
+        ./exprs/celonis/agg/variant_agg_test.cpp
+        ./exprs/celonis/agg/variant_stats_test.cpp
         ./exprs/celonis/align_model_test.cpp
         ./exprs/celonis/array_functions_test.cpp
-        ./exprs/celonis/calc_bucket_boundaries_test.cpp
         ./exprs/celonis/calc_throughput_test.cpp
         ./exprs/celonis/conformance_test.cpp
         ./exprs/celonis/greatest_least_test.cpp
-        ./exprs/celonis/histogram_boundaries_test.cpp
         ./exprs/celonis/in_test.cpp
         ./exprs/celonis/index_activity_test.cpp
-        ./exprs/celonis/inductive_miner_test.cpp
         ./exprs/celonis/like_test.cpp
         ./exprs/celonis/match_activities_test.cpp
         ./exprs/celonis/match_process_test.cpp
@@ -160,16 +165,12 @@ set(EXEC_FILES
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
         ./exprs/celonis/serialization_utils_test.cpp
         ./exprs/celonis/shortened_variant_test.cpp
-        ./exprs/celonis/sorted_first_last_test.cpp
         ./exprs/celonis/source_target_test.cpp
         ./exprs/celonis/string_function_test.cpp
         ./exprs/celonis/table_function/count_edges_test.cpp
         ./exprs/celonis/table_function/generate_range_test.cpp
         ./exprs/celonis/time_functions_test.cpp
-        ./exprs/celonis/trimmed_mean_test.cpp
         ./exprs/celonis/util.cpp
-        ./exprs/celonis/variant_agg_test.cpp
-        ./exprs/celonis/variant_stats_test.cpp
         ./exprs/decimal_cast_expr_decimal_test.cpp
         ./exprs/decimal_cast_expr_integer_test.cpp
         ./exprs/decimal_cast_expr_float_test.cpp

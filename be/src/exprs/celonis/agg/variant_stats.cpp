@@ -1,4 +1,4 @@
-#include "exprs/celonis/variant_stats.h"
+#include "variant_stats.h"
 
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"

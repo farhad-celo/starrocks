@@ -5,7 +5,7 @@
 #include "column/array_column.h"
 #include "column/column_builder.h"
 #include "exprs/agg/aggregate_factory.h"
-#include "exprs/celonis/variant_stats.h"
+#include "exprs/celonis/agg/variant_stats.h"
 #include "runtime/mem_pool.h"
 #include "runtime/time_types.h"
 #include "testutil/function_utils.h"

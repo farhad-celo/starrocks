@@ -3,7 +3,7 @@
 #include <variant>
 
 #ifdef CELOSTAR
-#include "exprs/celonis/variant.h"
+#include "exprs/celonis/agg/variant.h"
 #endif
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/int_types.h"

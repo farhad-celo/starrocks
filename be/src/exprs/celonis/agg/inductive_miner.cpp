@@ -1,4 +1,4 @@
-#include "exprs/celonis/inductive_miner.h"
+#include "inductive_miner.h"
 
 #include <algorithm>
 #include <execution>
@@ -6,11 +6,10 @@
 #include "column/column_helper.h"
 #include "exprs/celonis/modules/operators/process/inductive_miner/inductive_miner_helper.h"
 #include "exprs/celonis/result_table.h"
-#include "exprs/celonis/variant.h"
-#include "exprs/celonis/variant_agg.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
+#include "variant.h"
 
 using celonis::accelerator::operators::process::InductiveMinerHelper;
 using cel_int_t = int64_t;

@@ -1,14 +1,14 @@
 #include <algorithm>
 #include <gtest/gtest.h>
 
+#include "../util.h"
 #include "column/struct_column.h"
 #include "column/type_traits.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/anyval_util.h"
-#include "exprs/celonis/histogram_boundaries.h"
+#include "exprs/celonis/agg/histogram_boundaries.h"
 #include "exprs/function_context.h"
 #include "runtime/mem_pool.h"
-#include "util.h"
 
 namespace starrocks {
 

@@ -8,7 +8,7 @@
 #include "column/fixed_length_column.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
-#include "exprs/celonis/variant_stats.h"
+#include "exprs/celonis/agg/variant_stats.h"
 #include "runtime/mem_pool.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"

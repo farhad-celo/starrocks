@@ -1,7 +1,7 @@
 #include <gmock/gmock-matchers.h>
 #include <gtest/gtest.h>
 
-#include "exprs/celonis/variant.h"
+#include "exprs/celonis/agg/variant.h"
 #include "modules/common/execution_context.h"
 #include "modules/operators/process/inductive_miner/directly_follows_graph.h"
 #include "modules/operators/process/inductive_miner/inductive_miner.h"

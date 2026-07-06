@@ -1,10 +1,10 @@
 #pragma once
 
 #include "column/hash_set.h"
-#include "exprs/celonis/variant.h"
-#include "exprs/celonis/variant_agg.h"
 #include "exprs/function_context.h"
 #include "rapidjson/document.h"
+#include "variant.h"
+#include "variant_agg.h"
 
 namespace starrocks {
 

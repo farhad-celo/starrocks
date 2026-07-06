@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef CELOSTAR
-#include "exprs/celonis/variant.h"
+#include "exprs/celonis/agg/variant.h"
 #endif
 #include "modules/cube/execution/tracking/stop_token.h"
 #include "modules/operators/process/inductive_miner/directly_follows_graph_fwd.h"
