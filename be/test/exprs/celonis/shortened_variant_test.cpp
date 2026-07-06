@@ -31,9 +31,9 @@ TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_has_cycle) {
     auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
     max_cycle_length_column->append_datum(2L);
 
-    const auto result_sources =
-            CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array_column, max_cycle_length_column})
-                    .value();
+    const auto result_sources = CelonisShortenedVariant<TYPE_VARCHAR>::celonis_shortened_variant(
+                                        nullptr, {array_column, max_cycle_length_column})
+                                        .value();
     ASSERT_EQ(5, result_sources->size());
     auto first_row = result_sources->get(0).get_array();
     EXPECT_EQ(4, first_row.size());
@@ -73,9 +73,9 @@ TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_null_arrays) {
     array_column->append_datum(DatumArray{"b", Datum(), "b", Datum(), "b"});
     auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
     max_cycle_length_column->append_datum(2L);
-    const auto result_sources =
-            CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array_column, max_cycle_length_column})
-                    .value();
+    const auto result_sources = CelonisShortenedVariant<TYPE_VARCHAR>::celonis_shortened_variant(
+                                        nullptr, {array_column, max_cycle_length_column})
+                                        .value();
     ASSERT_EQ(4, result_sources->size());
     auto first_row = result_sources->get(0).get_array();
     EXPECT_EQ(0, first_row.size());
@@ -100,9 +100,9 @@ TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_longer_cycle) {
     auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
     max_cycle_length_column->append_datum(3L);
 
-    const auto result_sources =
-            CelonisShortenedVariant::celonis_shortened_variant(nullptr, {array_column, max_cycle_length_column})
-                    .value();
+    const auto result_sources = CelonisShortenedVariant<TYPE_VARCHAR>::celonis_shortened_variant(
+                                        nullptr, {array_column, max_cycle_length_column})
+                                        .value();
     ASSERT_EQ(1, result_sources->size());
     auto first_row = result_sources->get(0).get_array();
     EXPECT_EQ(6, first_row.size());
@@ -113,4 +113,100 @@ TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_longer_cycle) {
     EXPECT_EQ("c", first_row[4].get_slice());
     EXPECT_EQ("c", first_row[5].get_slice());
 }
+
+TEST_F(CelonisShortenedVariantTest, array_celonis_shortened_int_has_cycle) {
+    auto array_column = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    // Input data:
+    array_column->append_datum(DatumArray{1, 2, 2, 2, 3});
+    array_column->append_datum(DatumArray{1, 2});
+    array_column->append_datum(DatumArray{2, 2});
+    array_column->append_datum(DatumArray{2});
+    array_column->append_datum(DatumArray{2, 2, 2, 1, 4, 4});
+
+    auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
+    max_cycle_length_column->append_datum(2L);
+
+    const auto result_sources = CelonisShortenedVariant<TYPE_INT>::celonis_shortened_variant(
+                                        nullptr, {array_column, max_cycle_length_column})
+                                        .value();
+    ASSERT_EQ(5, result_sources->size());
+    auto first_row = result_sources->get(0).get_array();
+    EXPECT_EQ(4, first_row.size());
+    EXPECT_EQ(1, first_row[0].get_int32());
+    EXPECT_EQ(2, first_row[1].get_int32());
+    EXPECT_EQ(2, first_row[2].get_int32());
+    EXPECT_EQ(3, first_row[3].get_int32());
+
+    auto second_row = result_sources->get(1).get_array();
+    EXPECT_EQ(2, second_row.size());
+    EXPECT_EQ(1, second_row[0].get_int32());
+    EXPECT_EQ(2, second_row[1].get_int32());
+
+    auto third_row = result_sources->get(2).get_array();
+    EXPECT_EQ(2, third_row.size());
+    EXPECT_EQ(2, third_row[0].get_int32());
+    EXPECT_EQ(2, third_row[1].get_int32());
+
+    auto fourth_row = result_sources->get(3).get_array();
+    EXPECT_EQ(1, fourth_row.size());
+    EXPECT_EQ(2, fourth_row[0].get_int32());
+
+    auto fifth_row = result_sources->get(4).get_array();
+    EXPECT_EQ(5, fifth_row.size());
+    EXPECT_EQ(2, fifth_row[0].get_int32());
+    EXPECT_EQ(2, fifth_row[1].get_int32());
+    EXPECT_EQ(1, fifth_row[2].get_int32());
+    EXPECT_EQ(4, fifth_row[3].get_int32());
+    EXPECT_EQ(4, fifth_row[4].get_int32());
+}
+
+TEST_F(CelonisShortenedVariantTest, int_array_celonis_shortened_null_arrays) {
+    auto array_column = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+    array_column->append_datum(DatumArray{Datum()});
+    array_column->append_datum(Datum());
+    array_column->append_datum(DatumArray{Datum(), 2, Datum(), 2, 2});
+    array_column->append_datum(DatumArray{2, Datum(), 2, Datum(), 2});
+    auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
+    max_cycle_length_column->append_datum(2L);
+    const auto result_sources = CelonisShortenedVariant<TYPE_INT>::celonis_shortened_variant(
+                                        nullptr, {array_column, max_cycle_length_column})
+                                        .value();
+    ASSERT_EQ(4, result_sources->size());
+    auto first_row = result_sources->get(0).get_array();
+    EXPECT_EQ(0, first_row.size());
+
+    EXPECT_TRUE(result_sources->get(1).is_null());
+
+    auto third_row = result_sources->get(2).get_array();
+    EXPECT_EQ(2, third_row.size());
+    EXPECT_EQ(2, third_row[0].get_int32());
+    EXPECT_EQ(2, third_row[1].get_int32());
+
+    auto fourth_row = result_sources->get(3).get_array();
+    EXPECT_EQ(2, fourth_row.size());
+    EXPECT_EQ(2, fourth_row[0].get_int32());
+    EXPECT_EQ(2, fourth_row[1].get_int32());
+}
+
+TEST_F(CelonisShortenedVariantTest, int_array_celonis_shortened_longer_cycle) {
+    auto array_column = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    // Input data:
+    array_column->append_datum(DatumArray{2, 2, 2, 2, 3, 3, 3});
+    auto max_cycle_length_column = ColumnHelper::create_column(TypeDescriptor(TYPE_BIGINT), false, true, 0);
+    max_cycle_length_column->append_datum(3L);
+
+    const auto result_sources = CelonisShortenedVariant<TYPE_INT>::celonis_shortened_variant(
+                                        nullptr, {array_column, max_cycle_length_column})
+                                        .value();
+    ASSERT_EQ(1, result_sources->size());
+    auto first_row = result_sources->get(0).get_array();
+    EXPECT_EQ(6, first_row.size());
+    EXPECT_EQ(2, first_row[0].get_int32());
+    EXPECT_EQ(2, first_row[1].get_int32());
+    EXPECT_EQ(2, first_row[2].get_int32());
+    EXPECT_EQ(3, first_row[3].get_int32());
+    EXPECT_EQ(3, first_row[4].get_int32());
+    EXPECT_EQ(3, first_row[5].get_int32());
+}
+
 } // namespace starrocks

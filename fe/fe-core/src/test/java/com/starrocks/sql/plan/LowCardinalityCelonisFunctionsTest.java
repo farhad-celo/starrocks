@@ -44,6 +44,20 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 );
                 """);
 
+        starRocksAssert.withTable("""
+                CREATE TABLE TestActivityTimestampTable (
+                    KEY_COL          INTEGER NOT NULL,
+                    ACTIVITIES       ARRAY<VARCHAR(40)>,
+                    TIMESTAMPS       ARRAY<BIGINT>)
+                ENGINE=OLAP
+                DUPLICATE KEY(`KEY_COL`)
+                COMMENT "OLAP"
+                DISTRIBUTED by HASH(`KEY_COL`) BUCKETS 1
+                PROPERTIES (
+                    "replication_num" = "1",
+                    "in_memory" = "false"
+                );
+                """);
 
         FeConstants.USE_MOCK_DICT_MANAGER = true;
         connectContext.getSessionVariable().setSqlMode(2);
@@ -162,5 +176,17 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 "VARBINARY; args nullable: true; result nullable: true]\n" +
                 "  |  cardinality: 1\n" +
                 "  |  "), plan);
+    }
+
+    @Test
+    public void testShortenedVariant() throws Exception {
+        String sql = """
+            SELECT /*+ SET_VAR(enable_shortened_variant_low_cardinality_optimize, "true") */
+                CELONIS_SHORTENED_VARIANT(ACTIVITIES, 3)
+            FROM TestActivityTimestampTable
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains(
+                "DictDecode(5: ACTIVITIES, [<place-holder>], celonis_shortened_variant(5: ACTIVITIES, 3))"), plan);
     }
 }

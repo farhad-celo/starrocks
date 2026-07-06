@@ -177,7 +177,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.ARRAY_REMOVE);
 
     public static final Set<String> CELONIS_LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
-            FunctionSet.CELONIS_ARRAY_COUNT);
+            FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_SHORTENED_VARIANT);
+
 
     static {
         LOW_CARD_ARRAY_FUNCTIONS.addAll(CELONIS_LOW_CARD_ARRAY_FUNCTIONS);
@@ -1342,7 +1343,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return;
         }
         DictExpressionCollector dictExpressionCollector = new DictExpressionCollector(info.outputStringColumns,
-                structManager);
+                structManager, sessionVariable);
         predicates.forEach(dictExpressionCollector::collect);
 
         info.outputStringColumns.getStream().forEach(c -> {
@@ -1374,7 +1375,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 continue;
             }
 
-            DictExpressionCollector dictExpressionCollector = new DictExpressionCollector(decodeInput, structManager);
+            DictExpressionCollector dictExpressionCollector = new DictExpressionCollector(
+                    decodeInput, structManager, sessionVariable);
 
             ScalarOperator value = operator.getProjection().getColumnRefMap().get(key);
             dictExpressionCollector.collect(value);
@@ -1441,11 +1443,15 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
         private final StructManager structManager;
 
-        public DictExpressionCollector(ColumnRefSet allDictColumnRefs,
-                                       StructManager structManager) {
+        private final SessionVariable sessionVariable;
+
+        public DictExpressionCollector(
+                ColumnRefSet allDictColumnRefs, StructManager structManager, SessionVariable sessionVariable) {
             this.allDictColumnRefs = allDictColumnRefs;
             this.structManager = structManager;
+            this.sessionVariable = sessionVariable;
         }
+
 
         public void collect(ScalarOperator scalarOperator) {
             ScalarOperator dictColumn = scalarOperator.accept(this, null);
@@ -1570,6 +1576,11 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
         @Override
         public ScalarOperator visitCall(CallOperator call, Void context) {
+            if (FunctionSet.CELONIS_SHORTENED_VARIANT.equals(call.getFnName())
+                    && !sessionVariable.isEnableShortenedVariantLowCardinalityOptimize()) {
+                // TODO(farhad-celo): For backward compatibility. It can be removed after 1 release.
+                return forbidden(visitChildren(call, context), call);
+            }
             if (FunctionSet.nonDeterministicFunctions.contains(call.getFnName())) {
                 return VARIABLES;
             }
