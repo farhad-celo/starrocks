@@ -955,8 +955,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             final boolean isFirstStage = !agg.getArguments().isEmpty() &&
                     (!(agg.getArguments().get(0) instanceof ColumnRefOperator ref) || ref.getId() != key.getId());
             if (!shouldProcessAggFunction(agg, info, isFirstStage)) {
-                decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
-                        .add(agg.getFnName());
+                if (agg.getUsedColumns().isIntersect(context.outputStringColumns)) {
+                    decodeMetricLabels.computeIfAbsent(optExpression.getOp(), k -> Lists.newArrayList())
+                            .add(agg.getFnName());
+                }
                 disableColumns.union(agg.getUsedColumns());
                 disableColumns.union(key);
             } else if (isFirstStage && FunctionSet.ARRAY_AGG.equals(agg.getFnName()) &&
@@ -1006,7 +1008,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 structManager.setFieldMapping(value, fieldsData);
             }
             if (supportLowCardinality(aggFn.getReturnType())) {
-                info.outputStringColumns.union(key.getId());
                 setDefineExpr(key, value, 1);
             }
             final boolean isFinalStage = aggregate.getType().isGlobal() ||

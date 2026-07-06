@@ -354,7 +354,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
                         && ((AggregateFunction) aggFn.getFunction()).getIntermediateType().isBinaryType()
                         && session.isEnableMultiArrayAggV2DictCompaction()) {
                     AggregateFunction aggregateFunction = (AggregateFunction) aggFn.getFunction();
-                    Map<String, ColumnRefOperator> fieldsMap = context.getFieldUseStringRefMap(aggRef);
+                    Map<String, ColumnRefOperator> fieldsMap = context.structManager.getFieldStringRefMap(aggRef);
                     Preconditions.checkNotNull(fieldsMap);
                     List<Short> serializationByteSizes = Lists.newArrayList();
                     for (int i = 0; i < aggregateFunction.getNumArgs(); ++i) {

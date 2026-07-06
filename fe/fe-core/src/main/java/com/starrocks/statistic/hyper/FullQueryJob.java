@@ -64,18 +64,6 @@ public class FullQueryJob extends HyperQueryJob {
             for (ColumnStats columnStat : normalColumns) {
                 normalSQL.add(buildSingleColumnSQL(partition, columnStat));
             }
-            for (ColumnStats columnStat : columnStats) {
-                VelocityContext context = HyperStatisticSQLs.buildBaseContext(db, table, partition, columnStat);
-                context.put("dataSize", columnStat.getFullDataSize());
-                context.put("countNullFunction", columnStat.getFullNullCount());
-                context.put("hllFunction", columnStat.getNDV());
-                context.put("maxFunction", columnStat.getMax());
-                context.put("minFunction", columnStat.getMin());
-                context.put("collectionSizeFunction", columnStat.getCollectionSize());
-                context.put("laterals", columnStat.getLateralJoin());
-                String sql = HyperStatisticSQLs.build(context, HyperStatisticSQLs.BATCH_FULL_STATISTIC_TEMPLATE);
-                metaSQL.add(sql);
-            }
         }
 
         // batch normal columns by parts and join with UNION ALL

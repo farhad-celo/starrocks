@@ -210,7 +210,7 @@ public class HyperJobTest extends DistributedEnvPlanTestBase {
     private SampleQueryJob getSampleQueryJob(List<String> cols) {
         Pair<List<String>, List<Type>> pair = initWideColumn(cols);
         return HyperQueryJob.createSampleQueryJobs(1L, connectContext, db, wideTable, pair.first,
-                        pair.second, List.of(widePid), 1, wideSampler, false).stream()
+                        pair.second, List.of(widePid), 1, wideSampler, false, Map.of()).stream()
                 .filter(SampleQueryJob.class::isInstance)
                 .map(SampleQueryJob.class::cast)
                 .findFirst()
@@ -220,7 +220,7 @@ public class HyperJobTest extends DistributedEnvPlanTestBase {
     private FullQueryJob getFullQueryJob(List<String> cols) {
         Pair<List<String>, List<Type>> pair = initWideColumn(cols);
         return HyperQueryJob.createFullQueryJobs(1L, connectContext, db, wideTable, pair.first,
-                        pair.second, List.of(widePid), 1, false).stream()
+                        pair.second, List.of(widePid), 1, false, Map.of()).stream()
                 .filter(FullQueryJob.class::isInstance)
                 .map(FullQueryJob.class::cast)
                 .findFirst()
@@ -258,7 +258,7 @@ public class HyperJobTest extends DistributedEnvPlanTestBase {
         }
         try {
             List<HyperQueryJob> jobs = HyperQueryJob.createFullQueryJobs(1L, connectContext, db, table, pair.first,
-                    pair.second, List.of(pid), 1, false);
+                    pair.second, List.of(pid), 1, false, Map.of());
             ConstQueryJob constQueryJob = jobs.stream()
                     .filter(ConstQueryJob.class::isInstance)
                     .map(ConstQueryJob.class::cast)
