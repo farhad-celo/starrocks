@@ -123,6 +123,8 @@ public class AggregateFunction extends Function {
 
     private boolean isDistinct = false;
 
+    private List<Short> multiArrayAggColumnSerializationSize;
+
     public void setIsDistinct(boolean isDistinct) {
         this.isDistinct = isDistinct;
     }
@@ -223,6 +225,9 @@ public class AggregateFunction extends Function {
         nullsFirst = other.nullsFirst;
         isDistinct = other.isDistinct;
         isolationType = other.isolationType;
+        multiArrayAggColumnSerializationSize = (other.multiArrayAggColumnSerializationSize == null)
+                ? null
+                : Lists.newArrayList(other.multiArrayAggColumnSerializationSize);
     }
 
     /**
@@ -361,6 +366,10 @@ public class AggregateFunction extends Function {
         return intermediateType == null ? getReturnType() : intermediateType;
     }
 
+    public void setMultiArrayAggColumnSerializationSize(List<Short> byteSizes) {
+        this.multiArrayAggColumnSerializationSize = byteSizes;
+    }
+
     @Override
     public String toSql(boolean ifNotExists) {
         StringBuilder sb = new StringBuilder("CREATE AGGREGATE FUNCTION ");
@@ -389,7 +398,8 @@ public class AggregateFunction extends Function {
                 isAnalyticFn == agg.isAnalyticFn && isAggregateFn == agg.isAggregateFn &&
                 returnsNonNullOnEmpty == agg.returnsNonNullOnEmpty && Objects.equals(symbolName, agg.symbolName)
                 && isDistinct == agg.isDistinct && Objects.equals(nullsFirst, agg.getNullsFirst()) &&
-                Objects.equals(isAscOrder, agg.getIsAscOrder()) && isolationType == agg.isolationType
+                Objects.equals(isAscOrder, agg.getIsAscOrder()) && isolationType == agg.isolationType &&
+                Objects.equals(multiArrayAggColumnSerializationSize, agg.multiArrayAggColumnSerializationSize)
                 && super.equals(obj);
     }
 
@@ -408,6 +418,9 @@ public class AggregateFunction extends Function {
         }
         if (nullsFirst != null && !nullsFirst.isEmpty()) {
             aggFn.setNulls_first(nullsFirst);
+        }
+        if (multiArrayAggColumnSerializationSize != null && !multiArrayAggColumnSerializationSize.isEmpty()) {
+            aggFn.setMulti_array_agg_column_serialization_size(multiArrayAggColumnSerializationSize);
         }
         aggFn.setIs_distinct(isDistinct);
         fn.setIsolated(isolationType);

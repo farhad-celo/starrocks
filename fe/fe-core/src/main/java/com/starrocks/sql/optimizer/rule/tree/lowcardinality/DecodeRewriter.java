@@ -19,12 +19,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.starrocks.analysis.Expr;
+import com.starrocks.catalog.AggregateFunction;
 import com.starrocks.catalog.Column;
 import com.starrocks.catalog.Function;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.TableFunction;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.Pair;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.OptExpressionVisitor;
 import com.starrocks.sql.optimizer.base.ColumnRefFactory;
@@ -79,9 +81,12 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
 
     private final DecodeContext context;
 
-    public DecodeRewriter(ColumnRefFactory factory, DecodeContext context) {
+    private final SessionVariable session;
+
+    public DecodeRewriter(ColumnRefFactory factory, DecodeContext context, SessionVariable session) {
         this.factory = factory;
         this.context = context;
+        this.session = session;
     }
 
     // For structs, we only return the encoded fields collected by DecodeCollector.
@@ -345,6 +350,21 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
                 ColumnRefOperator newAggRef = context.stringRefToDictRefMap.get(aggRef);
                 aggregations.put(newAggRef, context.stringExprToDictExprMap.get(aggFn).cast());
                 inputStringRefs.union(aggRef.getId());
+                if (aggFn.getFnName().equals(FunctionSet.MULTI_ARRAY_AGG)
+                        && ((AggregateFunction) aggFn.getFunction()).getIntermediateType().isBinaryType()
+                        && session.isEnableMultiArrayAggV2DictCompaction()) {
+                    AggregateFunction aggregateFunction = (AggregateFunction) aggFn.getFunction();
+                    Map<String, ColumnRefOperator> fieldsMap = context.getFieldUseStringRefMap(aggRef);
+                    Preconditions.checkNotNull(fieldsMap);
+                    List<Short> serializationByteSizes = Lists.newArrayList();
+                    for (int i = 0; i < aggregateFunction.getNumArgs(); ++i) {
+                        ColumnRefOperator useStringRef = fieldsMap.get("col" + (i + 1));
+                        serializationByteSizes.add(useStringRef == null ? 0 :
+                                context.unionDictionaryManager.getSerializationSizeForDictifiedField(useStringRef));
+                    }
+                    ((AggregateFunction) (aggregations.get(newAggRef).getFunction()))
+                            .setMultiArrayAggColumnSerializationSize(serializationByteSizes);
+                }
             } else {
                 aggregations.put(aggRef, context.stringExprToDictExprMap.get(aggFn).cast());
             }

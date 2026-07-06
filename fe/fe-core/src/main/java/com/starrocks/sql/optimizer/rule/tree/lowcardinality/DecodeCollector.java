@@ -996,18 +996,20 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             if (supportLowCardinality(aggFn.getReturnType())) {
                 info.outputStringColumns.union(key.getId());
                 AggregateFunction aggFn = (AggregateFunction) value.getFunction();
-                if (aggFn.getIntermediateTypeOrReturnType().isStructType()
+                if ((aggFn.getIntermediateTypeOrReturnType().isStructType() || aggFn.getReturnType().isStructType())
                         && !structRefToFieldUseStringRef.containsKey(key.getId())) {
                     final Map<String, ColumnRefOperator> fieldsData;
                     if (FunctionSet.ARRAY_AGG.equals(aggFn.functionName())
                             || FunctionSet.MULTI_ARRAY_AGG.equals(aggFn.functionName())) {
                         fieldsData = Maps.newHashMap();
-                        StructType structType = (StructType) aggFn.getIntermediateTypeOrReturnType();
-                        Preconditions.checkState(structType.getFields().size() == value.getArguments().size());
+                        if (aggFn.getIntermediateTypeOrReturnType().isStructType()) {
+                            StructType structType = (StructType) aggFn.getIntermediateTypeOrReturnType();
+                            Preconditions.checkState(structType.getFields().size() == value.getArguments().size());
+                        }
                         for (int i = 0; i < value.getArguments().size(); i++) {
                             if (value.getArguments().get(i).isColumnRef()
                                     && info.inputStringColumns.contains(value.getArguments().get(i).cast())) {
-                                fieldsData.put(structType.getField(i).getName(), value.getArguments().get(i).cast());
+                                fieldsData.put("col" + (i + 1), value.getArguments().get(i).cast());
                             }
                         }
                     } else if (FunctionSet.ANY_VALUE.equals(aggFn.functionName())) {

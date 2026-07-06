@@ -393,6 +393,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
                     "enable_low_cardinality_optimize_for_union_all";
     public static final String ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE = "array_agg_low_cardinality_optimize";
     public static final String MULTI_ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE = "multi_array_agg_low_cardinality_optimize";
+    public static final String ENABLE_MULTI_ARRAY_AGG_V2 = "enable_multi_array_agg_v2";
+    public static final String ENABLE_MULTI_ARRAY_AGG_V2_DICT_COMPACTION = "enable_multi_array_agg_v2_dict_compaction";
     public static final String CBO_USE_NTH_EXEC_PLAN = "cbo_use_nth_exec_plan";
     public static final String CBO_CTE_REUSE = "cbo_cte_reuse";
     public static final String CBO_CTE_REUSE_RATE = "cbo_cte_reuse_rate";
@@ -1619,6 +1621,12 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VarAttr(name = MULTI_ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE)
     private boolean enableMultiArrayAggLowCardinalityOptimize = true;
 
+    @VariableMgr.VarAttr(name = ENABLE_MULTI_ARRAY_AGG_V2)
+    private boolean enableMultiArrayAggV2 = false;
+
+    @VariableMgr.VarAttr(name = ENABLE_MULTI_ARRAY_AGG_V2_DICT_COMPACTION)
+    private boolean enableMultiArrayAggV2DictCompaction = false;
+
     @VariableMgr.VarAttr(name = ENABLE_OPTIMIZER_REWRITE_GROUPINGSETS_TO_UNION_ALL)
     private boolean enableRewriteGroupingSetsToUnionAll = false;
 
@@ -2061,6 +2069,22 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableMultiArrayAggLowCardinalityOptimize(boolean enableMultiArrayAggLowCardinalityOptimize) {
         this.enableMultiArrayAggLowCardinalityOptimize = enableMultiArrayAggLowCardinalityOptimize;
+    }
+
+    public boolean isEnableMultiArrayAggV2() {
+        return enableMultiArrayAggV2;
+    }
+
+    public void setEnableMultiArrayAggV2(boolean enableMultiArrayAggV2) {
+        this.enableMultiArrayAggV2 = enableMultiArrayAggV2;
+    }
+
+    public boolean isEnableMultiArrayAggV2DictCompaction() {
+        return enableMultiArrayAggV2DictCompaction;
+    }
+
+    public void setEnableMultiArrayAggV2DictCompaction(boolean enableMultiArrayAggV2DictCompaction) {
+        this.enableMultiArrayAggV2DictCompaction = enableMultiArrayAggV2DictCompaction;
     }
 
     @VarAttr(name = ENABLE_REWRITE_BITMAP_UNION_TO_BITMAP_AGG)

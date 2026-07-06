@@ -866,11 +866,15 @@ public class FunctionAnalyzer {
                 argsTypes[i] = argumentTypes[i] == Type.NULL ? Type.BOOLEAN : argumentTypes[i];
             }
             fn.setArgsType(argsTypes); // as accepting various types
-            ArrayList<Type> structTypes = new ArrayList<>(argsTypes.length);
-            for (Type t : argsTypes) {
-                structTypes.add(new ArrayType(t));
+            if (session.getSessionVariable().isEnableMultiArrayAggV2()) {
+                ((AggregateFunction) fn).setIntermediateType(Type.VARBINARY);
+            } else {
+                ArrayList<Type> structTypes = new ArrayList<>(argsTypes.length);
+                for (Type t : argsTypes) {
+                    structTypes.add(new ArrayType(t));
+                }
+                ((AggregateFunction) fn).setIntermediateType(new StructType(structTypes));
             }
-            ((AggregateFunction) fn).setIntermediateType(new StructType(structTypes));
             ((AggregateFunction) fn).setIsAscOrder(isAscOrder);
             ((AggregateFunction) fn).setNullsFirst(nullsFirst);
             var numColumns = node.getChildren().size() - isAscOrder.size();

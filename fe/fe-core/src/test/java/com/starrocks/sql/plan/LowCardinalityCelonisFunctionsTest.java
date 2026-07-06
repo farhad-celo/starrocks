@@ -67,7 +67,7 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
     @Test
     public void testMultiArrayAggString1Stage() throws Exception {
         String sql = """
-                SELECT /*+ SET_VAR(new_planner_agg_stage='1') */
+                SELECT /*+ SET_VAR(new_planner_agg_stage='1', enable_multi_array_agg_v2='false') */
                 MULTI_ARRAY_AGG(VARCHAR_COL, INTEGER_COL ORDER BY VARCHAR_COL, INTEGER_COL)
                 FROM T
                 """;
@@ -90,7 +90,7 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
     @Test
     public void testMultiArrayAggString2Stage() throws Exception {
         String sql = """
-                SELECT /*+ SET_VAR(new_planner_agg_stage='2') */
+                SELECT /*+ SET_VAR(new_planner_agg_stage='2', enable_multi_array_agg_v2='false') */
                 MULTI_ARRAY_AGG(VARCHAR_COL, VARCHAR_COL2 ORDER BY VARCHAR_COL, INTEGER_COL)
                 FROM T
                 """;
@@ -109,5 +109,58 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 "col2 array<int(11)>, col3 array<int(11)>, col4 array<int(11)>>, true]); args: INT,INT,INT,INT; " +
                 "result: struct<col1 array<int(11)>, col2 array<int(11)>>; args nullable: true; " +
                 "result nullable: true]"), plan);
+    }
+
+
+    @Test
+    public void testMultiArrayAggV2String1Stage() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR(new_planner_agg_stage='1', enable_multi_array_agg_v2='true') */
+                MULTI_ARRAY_AGG(VARCHAR_COL, INTEGER_COL ORDER BY VARCHAR_COL, INTEGER_COL)
+                FROM T
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("2:Project\n" +
+                "  |  output columns:\n" +
+                "  |  6 <-> named_struct[('col1', DictDecode(7: VARCHAR_COL, [<place-holder>], " +
+                "8: multi_array_agg.col1[true]), 'col2', 8: multi_array_agg.col2[true]); args: VARCHAR,INVALID_TYPE," +
+                "VARCHAR,INVALID_TYPE; result: struct<col1 array<varchar(25)>, col2 array<int(11)>>; args nullable:" +
+                " true; result nullable: true]\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  1:AGGREGATE (update finalize)\n" +
+                "  |  aggregate: multi_array_agg[([7: VARCHAR_COL, INT, true], [5: INTEGER_COL, INT, true], " +
+                "[7: VARCHAR_COL, INT, true], [5: INTEGER_COL, INT, true]); args: INT,INT,INT,INT; result: " +
+                "struct<col1 array<int(11)>, col2 array<int(11)>>; args nullable: true; result nullable: true]\n" +
+                "  |  cardinality: 1"), plan);
+    }
+
+    @Test
+    public void testMultiArrayAggV2String2Stage() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR(new_planner_agg_stage='2', enable_multi_array_agg_v2='true') */
+                MULTI_ARRAY_AGG(VARCHAR_COL, VARCHAR_COL2 ORDER BY VARCHAR_COL, INTEGER_COL)
+                FROM T
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  4:Project\n" +
+                "  |  output columns:\n" +
+                "  |  6 <-> named_struct[('col1', DictDecode(7: VARCHAR_COL, [<place-holder>], " +
+                "9: multi_array_agg.col1[true]), 'col2', DictDecode(8: VARCHAR_COL2, [<place-holder>], " +
+                "9: multi_array_agg.col2[true])); args: VARCHAR,INVALID_TYPE,VARCHAR,INVALID_TYPE; result: " +
+                "struct<col1 array<varchar(25)>, col2 array<varchar(25)>>; args nullable: true; " +
+                "result nullable: true]\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  3:AGGREGATE (merge finalize)\n" +
+                "  |  aggregate: multi_array_agg[([9: multi_array_agg, VARBINARY, true]); args: INT,INT,INT,INT; " +
+                "result: struct<col1 array<int(11)>, col2 array<int(11)>>; args nullable: true; " +
+                "result nullable: true]"), plan);
+        Assertions.assertTrue(plan.contains("  1:AGGREGATE (update serialize)\n" +
+                "  |  aggregate: multi_array_agg[([7: VARCHAR_COL, INT, true], [8: VARCHAR_COL2, INT, true], " +
+                "[7: VARCHAR_COL, INT, true], [5: INTEGER_COL, INT, true]); args: INT,INT,INT,INT; result: " +
+                "VARBINARY; args nullable: true; result nullable: true]\n" +
+                "  |  cardinality: 1\n" +
+                "  |  "), plan);
     }
 }

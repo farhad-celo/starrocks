@@ -610,6 +610,7 @@ class DecodeContext {
                 );
                 default -> new TypeInfo(
                         getDictifiedType(fn.getIntermediateType()), getDictifiedType(fn.getReturnType()));
+            };
 
             AggregateFunction newFn = (AggregateFunction) fn.copy();
             newFn.setArgsType(argTypes.toArray(Type[]::new));

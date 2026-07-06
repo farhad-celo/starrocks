@@ -226,4 +226,13 @@ public class UnionDictionaryManager {
     public Set<Integer> getGeneratedDictionaryIds() {
         return generatedDictionaryIds;
     }
+
+    // This function returns the number of bytes needed to serialize a dictified field. It returns 1 if dictionary size
+    // is < 256, 2 if it is < 2 ^ 16, 3 if it is less than 2 ^ 24, and 4 otherwise.
+    public short getSerializationSizeForDictifiedField(ColumnRefOperator stringRef) {
+        Integer id = getSourceDictionaryColumnId(stringRef.getId());
+        Preconditions.checkState(id != null && globalDicts.containsKey(id));
+        int dictSize = globalDicts.get(id).getDictSize();
+        return (short) (dictSize < (1 << 8) ? 1 : dictSize < (1 << 16) ? 2 : dictSize < (1 << 24) ? 3 : 4);
+    }
 }
