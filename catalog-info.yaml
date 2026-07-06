@@ -9,9 +9,12 @@ metadata:
   annotations:
     github.com/project-slug: celonis/celostar-starrocks
     argocd/app-selector: app=celostar-starrocks
-    sonarqube.org/project-key: celonis_celostar-starrocks
+    backstage.io/techdocs-ref: dir:/docs
+    sonarqube.org/project-key: celonis_celostar-starrocks-be
     backstage.io/code-coverage: scm-only
     backstage.io/techdocs-entity: system:celostar
+    prr-slo.celonis.dev/alerts_slack_channel: celostar-oncall
+    prr-slo.celonis.dev/opsgenie_handle: Celostar
   links:
     - title: Celostar JIRA
       url: https://celonis.atlassian.net/jira/software/c/projects/CELOSTAR/boards/925
