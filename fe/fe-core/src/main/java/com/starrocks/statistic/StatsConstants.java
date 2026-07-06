@@ -119,6 +119,9 @@ public class StatsConstants {
     public static final String SAMPLE_ONCE_TIMES = "sample_once_times";
     public static final String SAMPLE_SCHEDULE_TIMES = "sample_schedule_times";
 
+    public static final String UNNEST_VIRTUAL_STATISTICS = "unnest_virtual_statistics";
+
+
     public enum AnalyzeType {
         SAMPLE,
         FULL,

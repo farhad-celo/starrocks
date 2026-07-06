@@ -58,6 +58,7 @@ import com.starrocks.sql.ast.UserIdentity;
 import com.starrocks.sql.common.ErrorType;
 import com.starrocks.sql.common.StarRocksPlannerException;
 import com.starrocks.sql.optimizer.statistics.StatisticsEstimateCoefficient;
+import com.starrocks.statistic.virtual.VirtualStatistic;
 import com.starrocks.thrift.TResultSinkType;
 import com.starrocks.transaction.InsertOverwriteJobStats;
 import com.starrocks.transaction.TransactionState;
@@ -612,7 +613,13 @@ public class StatisticUtils {
     }
 
     public static Type getQueryStatisticsColumnType(Table table, String column) {
-        String[] parts = column.split("\\.");
+        String actualColumnName = column;
+        Optional<VirtualStatistic> virtualStatistic = VirtualStatistic.fromColumnName(column);
+        if (virtualStatistic.isPresent()) {
+            actualColumnName = virtualStatistic.get().getBaseColumn(column);
+        }
+
+        String[] parts = actualColumnName.split("\\.");
         Preconditions.checkState(parts.length >= 1);
         Column base = table.getColumn(parts[0]);
         if (base == null) {
@@ -630,6 +637,10 @@ public class StatisticUtils {
                     return field.getType();
                 }
             }
+        }
+
+        if (virtualStatistic.isPresent()) {
+            return virtualStatistic.get().getVirtualExpressionType(baseColumnType);
         }
         return baseColumnType;
     }

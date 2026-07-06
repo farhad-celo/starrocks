@@ -89,6 +89,8 @@ public class AnalyzeStmtAnalyzer {
             StatsConstants.HISTOGRAM_SAMPLE_RATIO,
             StatsConstants.INIT_SAMPLE_STATS_JOB,
 
+            StatsConstants.UNNEST_VIRTUAL_STATISTICS,
+
             //Deprecated , just not throw exception
             StatsConstants.PRO_SAMPLE_RATIO,
             StatsConstants.PROP_UPDATE_INTERVAL_SEC_KEY,

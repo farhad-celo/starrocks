@@ -46,6 +46,9 @@ import com.starrocks.connector.TableVersionRange;
 import com.starrocks.connector.iceberg.IcebergMORParams;
 import com.starrocks.connector.statistics.ConnectorTableColumnStats;
 import com.starrocks.connector.statistics.StatisticsUtils;
+import com.starrocks.metric.LongCounterMetric;
+import com.starrocks.metric.Metric;
+import com.starrocks.metric.MetricRepo;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
@@ -155,6 +158,7 @@ import com.starrocks.sql.optimizer.operator.stream.PhysicalStreamScanOperator;
 import com.starrocks.sql.optimizer.rule.transformation.ListPartitionPruner;
 import com.starrocks.statistic.StatisticUtils;
 import com.starrocks.statistic.columns.PredicateColumnsMgr;
+import com.starrocks.statistic.virtual.VirtualStatistic;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -174,6 +178,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static com.starrocks.sql.optimizer.statistics.ColumnStatistic.buildFrom;
@@ -193,6 +198,10 @@ public class StatisticsCalculator extends OperatorVisitor<Void, ExpressionContex
     private final ExpressionContext expressionContext;
     private final ColumnRefFactory columnRefFactory;
     private final OptimizerContext optimizerContext;
+
+    private static final ConcurrentHashMap<String, LongCounterMetric> COUNTERS = new ConcurrentHashMap<>();
+    private static final String UNNEST_PROPAGATION_SUCCESS_STAT_KEY = "celonis_virtual_unnest_statistic_propagation_success";
+    private static final String UNNEST_PROPAGATION_STAT_KEY = "celonis_virtual_unnest_statistic_propagation_total";
 
     public StatisticsCalculator(ExpressionContext expressionContext,
                                 ColumnRefFactory columnRefFactory,
@@ -1622,17 +1631,91 @@ public class StatisticsCalculator extends OperatorVisitor<Void, ExpressionContex
     @Override
     public Void visitLogicalTableFunction(LogicalTableFunctionOperator node, ExpressionContext context) {
         return computeTableFunctionNode(context, node.getOutputColRefs(), node.getFn().functionName(),
-                node.getFnParamColumnProject().stream().map(x -> x.first).collect(Collectors.toList()));
+                node.getFnParamColumnProject().stream().map(x -> x.first).collect(Collectors.toList()),
+                node.getFnResultColRefs());
     }
 
     @Override
     public Void visitPhysicalTableFunction(PhysicalTableFunctionOperator node, ExpressionContext context) {
         return computeTableFunctionNode(context, node.getOutputColRefs(), node.getFn().functionName(),
-                node.getFnParamColumnRefs());
+                node.getFnParamColumnRefs(), node.getFnResultColRefs());
+    }
+
+    private Optional<Operator> findScanOperator(ExpressionContext context) {
+        final var operator = context.getChildOperator(0);
+        if (operator instanceof LogicalScanOperator || operator instanceof PhysicalScanOperator) {
+            return Optional.of(operator);
+        }
+
+        // There may be a projection operator between the unnest and the scan (e.g. in case of an EXCHANGE).
+        if (context.getExpression() != null) {
+            final var childExpr = context.getExpression().getInputs().get(0);
+            return findScanOperatorInTree(childExpr);
+        }
+
+        return Optional.empty();
+    }
+
+    private static final List<Class<? extends Operator>> ALLOWED_UNNEST_PROPAGATION_TYPES = List.of(LogicalScanOperator.class,
+            PhysicalScanOperator.class, LogicalProjectOperator.class, PhysicalProjectOperator.class);
+    private Optional<Operator> findScanOperatorInTree(OptExpression expr) {
+        Operator op = expr.getOp();
+        if (op instanceof LogicalScanOperator || op instanceof PhysicalScanOperator) {
+            return Optional.of(op);
+        }
+
+        // Only allow propagation through certain operator types to make sure we only apply stats when they're really
+        // based on the virtual stat.
+        final var eligibleChilds = expr.getInputs().stream() //
+                .filter(childExpr -> ALLOWED_UNNEST_PROPAGATION_TYPES.stream() //
+                        .anyMatch(eligibleClass -> eligibleClass.isInstance(childExpr.getOp()))) //
+                .toList();
+
+        for (final var child : eligibleChilds) {
+            Optional<Operator> result = findScanOperatorInTree(child);
+            if (result.isPresent()) {
+                return result;
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<ColumnStatistic> loadUnnestStatistics(Operator scanOperator, ColumnRefOperator columnRef) {
+        Table table = null;
+        if (scanOperator instanceof LogicalScanOperator) {
+            table = ((LogicalScanOperator) scanOperator).getTable();
+        } else if (scanOperator instanceof PhysicalScanOperator) {
+            table = ((PhysicalScanOperator) scanOperator).getTable();
+        }
+
+        if (table == null) {
+            LOG.warn("Unnest statistics: Failed to load unnest statistics as no scan operator could be found.");
+            return Optional.empty();
+        }
+
+        try {
+            String virtualColumnName = VirtualStatistic.UNNEST.getVirtualColumnName(columnRef.getName());
+
+            final var stat = GlobalStateMgr.getCurrentState() //
+                    .getStatisticStorage() //
+                    .getColumnStatistic(table, virtualColumnName);
+
+            if (stat.isUnknown()) {
+                return Optional.empty();
+            }
+
+            return Optional.of(stat);
+        } catch (Exception e) {
+            LOG.warn("Unnest statistics: Failed to load unnest statistics: {}", e.getMessage());
+        }
+
+        return Optional.empty();
     }
 
     private Void computeTableFunctionNode(ExpressionContext context, List<ColumnRefOperator> outputColumns,
-                                          String funcName, List<ColumnRefOperator> fnParamColumnRefs) {
+                                          String funcName, List<ColumnRefOperator> fnParamColumnRefs,
+                                          List<ColumnRefOperator> fnResultColRefs) {
         Statistics.Builder builder = Statistics.builder();
 
         Statistics inputStatistics = context.getChildStatistics(0);
@@ -1649,13 +1732,35 @@ public class StatisticsCalculator extends OperatorVisitor<Void, ExpressionContex
 
         if (funcName.equalsIgnoreCase("unnest")) {
             double maxRows = rowCount;
-            for (ColumnRefOperator column : fnParamColumnRefs) {
-                ColumnStatistic columnStatistic = inputStatistics.getColumnStatistic(column);
+
+            for (ColumnRefOperator inputColumn : fnParamColumnRefs) {
+                ColumnStatistic columnStatistic = inputStatistics.getColumnStatistic(inputColumn);
                 if (columnStatistic != null) {
                     double collectionSize = columnStatistic.getCollectionSize();
                     if (collectionSize >= 1 && collectionSize * rowCount >= maxRows) {
                         maxRows = collectionSize * rowCount;
                     }
+                }
+            }
+
+            // Build mapping from output column to input column based on position
+            Map<ColumnRefOperator, ColumnRefOperator> outputToInputMapping = Maps.newHashMap();
+            for (int i = 0; i < fnResultColRefs.size() && i < fnParamColumnRefs.size(); i++) {
+                outputToInputMapping.put(fnResultColRefs.get(i), fnParamColumnRefs.get(i));
+            }
+
+            final var scanOperatorOpt = findScanOperator(context);
+            for (final var outputColumn : outputColumns) {
+                ColumnRefOperator inputColumn = outputToInputMapping.get(outputColumn);
+
+                logUnnestStatisticsPropagationTotal();
+                // Apply UNNEST virtual statistics to corresponding output column
+                if (VirtualStatistic.UNNEST.isQueryingEnabled() && inputColumn != null && scanOperatorOpt.isPresent()) {
+                    final var virtualStat = loadUnnestStatistics(scanOperatorOpt.get(), inputColumn);
+                    virtualStat.ifPresent(columnStatistic -> {
+                        logUnnestStatisticsPropagationSuccess();
+                        builder.addColumnStatistic(outputColumn, columnStatistic);
+                    });
                 }
             }
             rowCount = maxRows;
@@ -1665,6 +1770,24 @@ public class StatisticsCalculator extends OperatorVisitor<Void, ExpressionContex
 
         context.setStatistics(builder.build());
         return visitOperator(context.getOp(), context);
+    }
+
+    private static void logUnnestStatisticsPropagationSuccess() {
+        COUNTERS.computeIfAbsent(UNNEST_PROPAGATION_SUCCESS_STAT_KEY, k -> {
+            LongCounterMetric metric = new LongCounterMetric(UNNEST_PROPAGATION_SUCCESS_STAT_KEY, Metric.MetricUnit.NOUNIT,
+                    "Amount of successful unnest column propagations");
+            MetricRepo.addMetric(metric);
+            return metric;
+        }).increase(1L);
+    }
+
+    private static void logUnnestStatisticsPropagationTotal() {
+        COUNTERS.computeIfAbsent(UNNEST_PROPAGATION_STAT_KEY, k -> {
+            LongCounterMetric metric = new LongCounterMetric(UNNEST_PROPAGATION_STAT_KEY, Metric.MetricUnit.NOUNIT,
+                    "Amount of potential total unnest column propagations");
+            MetricRepo.addMetric(metric);
+            return metric;
+        }).increase(1L);
     }
 
     public Statistics estimateInnerJoinStatistics(Statistics statistics, List<BinaryPredicateOperator> eqOnPredicates) {
