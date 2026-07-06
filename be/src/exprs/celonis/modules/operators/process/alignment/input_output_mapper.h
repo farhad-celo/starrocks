@@ -1,6 +1,9 @@
 #pragma once
 
 #include <limits>
+#ifdef CELOSTAR
+#include <span>
+#endif
 #include <string>
 #include <unordered_map>
 #include <vector>

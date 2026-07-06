@@ -9,18 +9,22 @@
 #include "align_model.h"
 #include "align_model_statistics.h"
 #include "modules/common/execution_context.h"
+#ifndef CELOSTAR
 #include "modules/common/hash_cache_key.h"
 #include "modules/common/shared_types.h"
 #include "modules/cube/event_table_config.h"
 #include "modules/cube/event_table_config_manager.h"
 #include "modules/cube/execution/tracking/operator_tracker.h"
 #include "modules/cube/query_scope.h"
+#endif
 #include "modules/memory/column.h"
 #include "modules/memory/table.h"
 #include "modules/memory/table_group.h"
 #include "modules/memory/tracking/static_array_with_context_tracking.h"
 #include "modules/operators/aggregation/string_aggregation.h"
+#ifndef CELOSTAR
 #include "modules/operators/framework/cached_operator_fwd.h"
+#endif
 #include "modules/operators/process/alignment/rl_align_configs.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/query/operators.pb.h"
@@ -30,6 +34,7 @@ namespace celonis::accelerator::operators::process::align_model {
 
 namespace {
 constexpr size_t CREATE_TABLE_GRAIN_SIZE{100'000};
+#ifndef CELOSTAR
 void sanitize_activity_table(const memory::column_t& activity_column, const std::string_view operator_name,
                              const cube::query_scope& scope, const common::execution_context& context) {
   // ensure that the columns actually belongs to an activity table
@@ -64,8 +69,10 @@ void sanitize_align_model_inputs(const memory::column_t& activity_column, const 
                                 activity_column->get_user_visible_name(context)};
   }
 }
+#endif
 }  // namespace
 
+#ifndef CELOSTAR
 align_model_table_group_node::align_model_table_group_node(cube::query_scope& scope,
                                                            const TableGroupNode_AlignModelTableGroupNode& node)
     : scope_{scope}, node_{node}, registry_{scope.get_align_model_registry()} {
@@ -98,19 +105,31 @@ std::string align_model_table_group_node::make_pruned_variant_cache_key(const me
   return fmt::format("$${}-{}-{}$$", get_user_visible_operator_name(), activity_column->get_user_visible_name(context),
                      ordered_model_node_names);
 }
+#endif
 
+#ifdef CELOSTAR
+memory::table_group_t create_align_model_tables::operate(const common::execution_context& context) {
+#else
 memory::table_group_t create_align_model_tables::operator()([[maybe_unused]] cube::cube_data_model& data_model,
                                                             const memory::management::swap_info& sinfo,
                                                             const common::execution_context& context) {
+#endif
   align_model_statistics stats{};
   auto align_model_op_context{context.create_sub_context("create_align_model_tables::operator()", {})};
+#ifndef CELOSTAR
   auto cache_key{align_model_table_group_node::make_table_group_cache_key(activity_column_, model_description_,
                                                                           align_model_op_context)};
+#endif
 
   const auto [bpmn_graph, bpmn_to_string]{
       bpmn::convert_from_proto_and_create_string_map(model_description_, activity_column_, align_model_op_context)};
   const auto model_with_mapping{bpmn_to_petri_net(bpmn_graph)};
 
+#ifdef CELOSTAR
+  const auto variants{aggregation::compute_variant_row_ids(
+      {.table_one_side = case_table_.get(), .column_n_side = activity_column_, .projection = activity_to_case_join_},
+      context)};
+#else
   const auto* const activity_table{activity_column_->get_owner()};
   auto* const case_table{
       scope_.get_event_table_config_manager().get_event_table_config(activity_table, context)->case_table.get()};
@@ -123,17 +142,24 @@ memory::table_group_t create_align_model_tables::operator()([[maybe_unused]] cub
       scope_.get_variant_trace_cache_manager(), align_model_op_context)};
 
   const operator_input_columns_t input_columns{activity_column_, case_table->get_column_header(0)};
+#endif
 
   constexpr size_t ALIGN_MODEL_GRAIN_SIZE{1u << 15};
   constexpr int NUM_A_STAR_ITERATIONS{5'000};
 
   // TODO(j.kruska): CPL 8890 Clean all these different cache keys up
+#ifdef CELOSTAR
+  align_model::align_model_config config{
+      ALIGN_MODEL_GRAIN_SIZE, "CACHE_KEY_PRUNED_VARIANTS", variant_trace_cache_manager_,
+      alignment::make_small_rl_align_config(), NUM_A_STAR_ITERATIONS};
+#else
   align_model::align_model_config config{
       ALIGN_MODEL_GRAIN_SIZE,
       fmt::format("$${}$$PRUNED_VARIANTS$$", align_model_table_group_node::make_pruned_variant_cache_key(
                                                  activity_column_, model_description_, align_model_op_context)),
       std::addressof(scope_.get_variant_trace_cache_manager()), alignment::make_small_rl_align_config(),
       NUM_A_STAR_ITERATIONS};
+#endif
   // per variant alignments and replay results
   // while the sub-spans/datadog traces contain this timing information, tracing is not always enabled
   common::timer alignment_timer{};
@@ -147,6 +173,10 @@ memory::table_group_t create_align_model_tables::operator()([[maybe_unused]] cub
   replay_timer.stop();
   stats.time_variant_replay = replay_timer.duration_us().count();
 
+#ifdef CELOSTAR
+  return  create_tables(alignments, replay_results, bpmn_to_string, variants, activity_column_, case_column_,
+                        activity_to_case_join_, align_model_op_context, CREATE_TABLE_GRAIN_SIZE);
+#else
   cube::registration_options options{
       .sinfo = sinfo, .cache_key = cache_key, .scope = scope_, .schema_info = data_model.get_schema_info()};
 
@@ -163,8 +193,10 @@ memory::table_group_t create_align_model_tables::operator()([[maybe_unused]] cub
     data_model.get_tables().add_table(table);
   }
   return tables;
+#endif
 }
 
+#ifndef CELOSTAR
 memory::table_group_t align_model_table_group_node::do_execute(cube::execution::tracking::operator_tracker& tracker,
                                                                cube::operator_executor& executor,
                                                                common::execution_context& operator_context) const {
@@ -189,5 +221,6 @@ memory::table_group_t align_model_table_group_node::do_execute(cube::execution::
       make_table_group_cache_key(activity_column, model, operator_context),
       create_align_model_tables{scope_, activity_column, case_column, model, add_telemetry_counter}, operator_context);
 }
+#endif
 
 }  // namespace celonis::accelerator::operators::process::align_model

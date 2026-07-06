@@ -1,7 +1,9 @@
 #pragma once
 
 #include "modules/common/int_types.h"
+#ifndef CELOSTAR
 #include "modules/cube/execution/tracking/operator_tracker_fwd.h"
+#endif
 #include "rl_align_configs.h"
 
 namespace celonis::accelerator::operators::process::alignment {
@@ -22,8 +24,10 @@ struct alignment_statistics {
 
   std::vector<constraints_config> constraints{};
 
+#ifndef CELOSTAR
   void log_to_operator_statistics(
       const cube::execution::tracking::add_telemetry_counter_fn& add_telemetry_counter) const;
+#endif
 };
 
 }  // namespace celonis::accelerator::operators::process::alignment

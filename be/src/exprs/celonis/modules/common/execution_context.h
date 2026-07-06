@@ -7,7 +7,6 @@
 
 #include <fmt/format.h>
 
-#ifndef CELOSTAR
 #include "ctl/memory/memory_tracking_strategy.h"
 #include "ctl/mutex.h"
 #include "modules/common/tracing/span.h"
@@ -17,6 +16,7 @@
 #include "modules/memory/table_fwd.h"
 #include "modules/memory/warnings.h"
 
+#ifndef CELOSTAR
 namespace celonis::accelerator {
 // forward declare for "modules/query/communication.pb.h"
 class CommunicationRequest_ExecutionContext;
@@ -35,9 +35,6 @@ class execution_context {
    */
   execution_context() noexcept;
 
-#ifdef CELOSTAR
-  execution_context create_sub_context(const std::string& operation_name, const std::string& tags) const noexcept;
-#else
   /**
    * This constructor creates a context which manages a root span.
    * The creation of the root span results in a new empty trace.
@@ -52,6 +49,7 @@ class execution_context {
   explicit execution_context(const std::string& operation_name,
                              ctl::abstract_strategy_t memory_tracking_strategy = nullptr) noexcept;
 
+#ifndef CELOSTAR
   /**
    * If the remote context contains a valid span context this constructor creates a context which manages a sub span of
    * the remote span.
@@ -66,6 +64,7 @@ class execution_context {
    */
   execution_context(const std::string& operation_name, const CommunicationRequest_ExecutionContext& remote_context,
                     ctl::abstract_strategy_t memory_tracking_strategy = nullptr) noexcept;
+#endif
 
   // move-constructor only needed for creating sub context, custom implementation required because mutex is not movable
   execution_context(execution_context&& other_context) noexcept;
@@ -180,7 +179,6 @@ class execution_context {
   ctl::owning_mutex<ctl::checked_shared_ptr<cube::table_to_user_visible_name_mapping>>
       table_to_user_visible_name_mapping_;
   ctl::owning_mutex<ctl::checked_shared_ptr<cube::extended_tables>> extended_tables_;
-#endif
 };
 
 }  // namespace celonis::accelerator::common

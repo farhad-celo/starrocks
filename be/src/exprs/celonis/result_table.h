@@ -9,10 +9,10 @@ namespace celonis {
 
 class ResultColumnBase {
 public:
-    ResultColumnBase(const std::string& name, size_t size) : name_(name), size_(size) {}
+    ResultColumnBase(std::string_view name, size_t size) : name_(name), size_(size) {}
     virtual ~ResultColumnBase() = default;
 
-    const std::string& name() { return name_; }
+    const std::string& name() const { return name_; }
     size_t size() const { return size_; }
 
 private:
@@ -23,7 +23,7 @@ private:
 template <typename TYPE>
 class ResultColumn : public ResultColumnBase {
 public:
-    ResultColumn(const std::string& name, size_t size) : ResultColumnBase(name, size) {
+    ResultColumn(std::string_view name, size_t size) : ResultColumnBase(name, size) {
         buffer_ = std::make_unique<TYPE[]>(size);
     }
 
@@ -38,7 +38,7 @@ private:
 template <typename TYPE>
 class NullableResultColumn : public ResultColumn<TYPE> {
 public:
-    NullableResultColumn(const std::string& name, size_t size) : ResultColumn<TYPE>(name, size) {
+    NullableResultColumn(std::string_view name, size_t size) : ResultColumn<TYPE>(name, size) {
         null_ = std::make_unique<bool[]>(size);
     }
 
@@ -51,19 +51,30 @@ private:
 
 class ResultTable {
 public:
-    ResultTable(const std::string& name, size_t size) : name_(name), size_(size) {}
+    ResultTable(std::string_view name, size_t size) : name_(name), size_(size) {}
 
     template <typename TYPE>
-    TYPE* AddColumn(const std::string& column_name) {
-        auto column = new TYPE(column_name, size_);
+    ResultColumn<TYPE>& AddColumn(std::string_view column_name) {
+        auto column = new ResultColumn<TYPE>(column_name, size_);
         columns_.emplace(std::make_pair(column_name, column));
-        return column;
+        return *column;
     }
 
-    const ResultColumnBase* column(const std::string& column_name) const {
-        auto it = columns_.find(column_name);
-        if (it == columns_.end()) return nullptr;
-        return it->second.get();
+    template <typename TYPE>
+    NullableResultColumn<TYPE>& AddNullableColumn(std::string_view column_name) {
+        auto column = new NullableResultColumn<TYPE>(column_name, size_);
+        columns_.emplace(std::make_pair(column_name, column));
+        return *column;
+    }
+
+    template<typename TYPE>
+    ResultColumn<TYPE>& column(std::string_view column_name) const {
+        return *dynamic_cast<ResultColumn<TYPE>*>(column(std::string(column_name)));
+    };
+
+    template<typename TYPE>
+    NullableResultColumn<TYPE>& nullable_column(std::string_view column_name) const {
+        return *dynamic_cast<NullableResultColumn<TYPE>*>(column(std::string(column_name)));
     };
 
     const std::map<std::string, std::unique_ptr<ResultColumnBase>>& columns() const { return columns_; };
@@ -71,10 +82,18 @@ public:
     size_t size() const { return size_; }
 
 private:
+    ResultColumnBase* column(const std::string& column_name) const {
+        auto it = columns_.find(column_name);
+        if (it == columns_.end()) return nullptr;
+        return it->second.get();
+    };
+
     std::map<std::string, std::unique_ptr<ResultColumnBase>> columns_;
     const std::string name_;
     size_t size_;
 };
+
+using ResultTableMap = std::map<std::string, std::unique_ptr<starrocks::celonis::ResultTable>>;
 
 } // namespace celonis
 } // namespace starrocks

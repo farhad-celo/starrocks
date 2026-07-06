@@ -192,11 +192,7 @@ void add_edge(size_t from, size_t to, size_t multiplicity, directly_follows_grap
   dfg[descriptor_and_success.first].count += multiplicity;
 }
 
-#ifdef CELOSTAR
-void filter_dfg_count_map(phmap::flat_hash_map<size_t, size_t>& map, const dfg_filter_config& filter_config) {
-#else
 void filter_dfg_count_map(ska::bytell_hash_map<size_t, size_t>& map, const dfg_filter_config& filter_config) {
-#endif
   // Find maximum cardinality.
   size_t max_count{0};
   for (const auto& pair : map) {

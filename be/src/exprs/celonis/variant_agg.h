@@ -10,8 +10,6 @@ namespace starrocks {
 
 class VariantAggregateState {
 public:
-    using SliceHashMap = phmap::flat_hash_map<SliceWithHash, int32_t, HashOnSliceWithHash, EqualOnSliceWithHash>;
-
     VariantAggregateState() = default;
 
     ~VariantAggregateState() = default;
@@ -55,7 +53,7 @@ public:
 
 protected:
     FunctionContext* ctx_;
-    const VariantAggregateState::SliceHashMap& activity_map_;
+    const SliceHashMap& activity_map_;
     const VariantHashMap& variant_map_;
 };
 

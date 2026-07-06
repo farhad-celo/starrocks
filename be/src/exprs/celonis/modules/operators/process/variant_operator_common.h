@@ -11,7 +11,9 @@
 #include "ctl/conversion.h"
 #include "ctl/dynamic_bitset.h"
 #include "modules/common/shared_types.h"
+#ifndef CELOSTAR
 #include "modules/cube/event_table_config.h"
+#endif
 #include "modules/memory/column.h"
 #include "modules/memory/table.h"
 
@@ -154,6 +156,7 @@ struct sort_mappers_result {
         string_sizes(std::move(string_sizes)) {}
 };
 
+#ifndef CELOSTAR
 inline sort_mappers_result sort_and_string_mappers(common::execution_context& context,
                                                    const memory::column_t& activity_column,
                                                    const std::string_view delimiter = ", ") {
@@ -222,6 +225,7 @@ inline void verify_is_consistent(const cube::event_table_config* event_config, c
         operator_name, event_config->event_table->get_user_visible_name(context)};
   }
 }
+#endif
 
 template <typename SORT_HANDLE>
 // Note: clang-tidy complains that sort_agg_group_map and pointers_sa should point to const which is not correct.

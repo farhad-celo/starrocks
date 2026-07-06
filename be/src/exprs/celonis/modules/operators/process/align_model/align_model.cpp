@@ -7,25 +7,42 @@
 #include <tbb/enumerable_thread_specific.h>
 
 #include "align_model_statistics.h"
+#ifdef CELOSTAR
+#include "exprs/celonis/result_table.h"
+#endif
 #include "modules/common/for_each_group.h"
+#ifndef CELOSTAR
 #include "modules/common/hash_cache_key.h"
+#endif
 #include "modules/common/timer.h"
 #include "modules/cube/align_model_table_config.h"
+#ifndef CELOSTAR
 #include "modules/cube/event_table_config.h"
 #include "modules/cube/event_table_config_manager.h"
 #include "modules/cube/query_scope.h"
 #include "modules/cube/table_registry/input_dependencies.h"
+#endif
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/table.h"
 #include "modules/memory/table_group.h"
 #include "modules/operators/aggregation/string_aggregation.h"
 #include "modules/operators/framework/cached_operator_fwd.h"
 #include "modules/operators/process/align_model/replay_aligned_variant.h"
+#ifdef CELOSTAR
+#include "modules/operators/process/alignment/alignment_statistics.h"
+#else
 #include "modules/operators/process/alignment/alignment_operator.h"
+#endif
 #include "modules/operators/process/alignment/log_aligner.h"
 #include "modules/operators/process/alignment/rl_align_configs.h"
 #include "modules/operators/process/bpmn/bpmn_graph.h"
 #include "modules/operators/process/bpmn/bpmn_to_pn.h"
+#ifdef CELOSTAR
+#include "utils/nullable_pql_value.h"
+
+using starrocks::celonis::ResultColumn;
+using starrocks::celonis::ResultTable;
+#endif
 
 namespace celonis::accelerator::operators::process::align_model {
 
@@ -299,6 +316,7 @@ struct enum_to_buffer_mapper {
   const buffer_lookup_t& buffer_lookup;
 };
 
+#ifndef CELOSTAR
 /**
  * Creates a string buffer for 'strings'. Also adds the NULL_STRING to string the buffer.
  * Returns the generated buffer and a set containing string views into the buffer for looking up
@@ -361,6 +379,7 @@ struct enum_to_buffer_mapper {
       },
       context);
 }
+#endif
 
 using dict_to_decorated_t = std::unordered_map<cel_string_t, bpmn::vertex_name_decorator>;
 
@@ -466,11 +485,16 @@ struct decorated_dict_result {
 }
 
 struct table_sizes {
+#ifdef CELOSTAR
+  size_t variant_table_size;
+#else
   size_t alignment_table_size;
   size_t association_table_size;
   size_t edge_class_table_size;
+#endif
 };
 
+#ifndef CELOSTAR
 struct align_model_table_data {
   ctl::static_array<cel_int_t> alignment_bpmn_vertex_ids;
   memory::null_flags_t alignment_bpmn_vertex_id_nulls;
@@ -642,15 +666,20 @@ struct align_model_table_data {
   map.emplace(INTERNAL_EDGE_CLASS_TABLE_NAME, edge_class_table);
   return std::make_shared<memory::table_group>(std::string{TABLE_GROUP_NAME}, std::move(map));
 }
+#endif
 
 struct parallel_block {
   // input range
   row_id offset_in;
   row_id size_in;
   // output ranges
+#ifdef CELOSTAR
+  row_id offset_variant;
+#else
   row_id offset_alignment;
   row_id offset_association;
   row_id offset_edge_class;
+#endif
 };
 
 struct parallel_block_info final : table_sizes {
@@ -694,6 +723,9 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
                 if (case_table_row == VALUE_NOT_FOUND) {
                   return;
                 }
+#ifdef CELOSTAR
+                local_block.variant_table_size++;
+#else
                 const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
 
                 const auto& alignment_for_case{alignments.at(variant_trace_id)};
@@ -703,6 +735,7 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
                 local_block.association_table_size += replay_result_for_case.num_rows();
 
                 local_block.edge_class_table_size += replay_result_for_case.num_edge_components();
+#endif
               });
             });
 
@@ -716,18 +749,30 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
         std::vector<parallel_block> result(flattened_blocks.size());
 
         table_sizes accumulated_table_sizes{
+#ifdef CELOSTAR
+            .variant_table_size = 0 };
+#else
             .alignment_table_size = 0, .association_table_size = 0, .edge_class_table_size = 0};
+#endif
         auto output_it{begin(result)};
         for (const auto& block_info : flattened_blocks) {
           *output_it++ =
               parallel_block{.offset_in = block_info.first,
                              .size_in = block_info.last - block_info.first,
+#ifdef CELOSTAR
+                             .offset_variant = ctl::cast<row_id>(accumulated_table_sizes.variant_table_size)};
+#else
                              .offset_alignment = ctl::cast<row_id>(accumulated_table_sizes.alignment_table_size),
                              .offset_association = ctl::cast<row_id>(accumulated_table_sizes.association_table_size),
                              .offset_edge_class = ctl::cast<row_id>(accumulated_table_sizes.edge_class_table_size)};
+#endif
+#ifdef CELOSTAR
+          accumulated_table_sizes.variant_table_size += block_info.variant_table_size;
+#else
           accumulated_table_sizes.alignment_table_size += block_info.alignment_table_size;
           accumulated_table_sizes.association_table_size += block_info.association_table_size;
           accumulated_table_sizes.edge_class_table_size += block_info.edge_class_table_size;
+#endif
         }
 
         return std::pair{result, accumulated_table_sizes};
@@ -740,13 +785,45 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                               const memory::column_ptrs_t& case_to_trace_ptrs,
                               const bpmn::bpmn_to_string_t& bpmn_to_string, const memory::column_t& activity_column,
                               const memory::column_ptrs_abstract& case_id_column,
+#ifdef CELOSTAR
+                              size_t grain_size,
+#else
                               const cube::registration_options& options, size_t grain_size,
                               cube::input_dependencies& dependencies, const operator_input_columns_t& input_columns,
+#endif
                               common::execution_context& context) {
   // #lizard forgives
   const auto& [blocks, table_sizes]{get_blocks(alignments, replay_results, activity_to_case_join, case_to_trace_ptrs,
                                                case_id_column, grain_size, context)};
   // create arrays for column storage
+#ifdef CELOSTAR
+  const auto& variant_table_size = table_sizes.variant_table_size;
+
+  auto alignment_table = std::make_unique<ResultTable>(INTERNAL_ALIGNMENT_TABLE_NAME, variant_table_size);
+  auto& alignment_variant = alignment_table->AddColumn<std::vector<std::string>>("variant");
+  auto& alignment_model_vertex_id = alignment_table->AddColumn<utils::nullable_vec_t<cel_int_t>>("model_vertex_id");
+  auto& alignment_vertex_label = alignment_table->AddColumn<std::vector<std::string>>("vertex_label");
+  auto& alignment_move_type = alignment_table->AddColumn<std::vector<std::string>>("move_type");
+  auto& alignment_activity_index = alignment_table->AddColumn<std::vector<row_id>>("activity_index");
+
+  auto association_table = std::make_unique<ResultTable>(INTERNAL_ASSOCIATION_TABLE_NAME, variant_table_size);
+  auto& association_variant = association_table->AddColumn<std::vector<std::string>>("variant");
+  auto& association_edge_class = association_table->AddColumn<std::vector<row_id>>("edge_class");
+  auto& association_alignment_index = association_table->AddColumn<std::vector<row_id>>("alignment_index");
+
+  auto edge_class_table = std::make_unique<ResultTable>(INTERNAL_EDGE_CLASS_TABLE_NAME, variant_table_size);
+  auto& edge_class_variant = edge_class_table->AddColumn<std::vector<std::string>>("variant");
+  auto& edge_class_id = edge_class_table->AddColumn<std::vector<row_id>>("id");
+  auto& edge_class_type = edge_class_table->AddColumn<std::vector<std::string>>("type");
+
+  // maps petri net label ids to strings to create alignment_labels - uses either the string dictionary (e.g. for
+  // unmapped activities) or the bpmn model
+  auto alignment_label_buffer_with_lookup{
+      create_merged_buffer_for_alignment_labels(bpmn_to_string, *activity_column->get_string_dict(context), context)};
+  const petri_net_label_id_to_string_mapper petri_net_to_string_mapper{
+      bpmn_to_string, *activity_column->get_string_dict(context),
+      alignment_label_buffer_with_lookup.undecorated_to_decorated_buffer};
+#else
   const auto& [alignment_table_size, association_table_size, edge_class_table_size]{table_sizes};
   auto storages{create_column_and_join_arrays(alignment_table_size, association_table_size, edge_class_table_size,
                                               bpmn_to_string, activity_column, context)};
@@ -764,18 +841,29 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
   // maps from edge_type to the edge_class string buffer
   const enum_to_buffer_mapper<edge_type, &edge_type_to_string> edge_type_to_buffer{
       std::get<11>(storages).buffer_lookup};
+#endif
 
   // Create the data columns for the 3 tables and the corresponding join vectors:
   // Activity(1) -> (N) Alignment (1) -> (N) Association (N) -> (1) Edge Class
   tbb::parallel_for_each(
       blocks,
       // It is safe to fill blocks of the `storage` data in parallel
+#ifdef CELOSTAR
+      [&alignment_variant, &alignment_model_vertex_id, &alignment_vertex_label, &alignment_move_type,
+       &alignment_activity_index, &association_variant, &association_edge_class, &association_alignment_index,
+       &edge_class_variant, &edge_class_id, &edge_class_type, &activity_column,
+       &case_id_column = std::as_const(case_id_column), &case_to_trace_ptrs = std::as_const(case_to_trace_ptrs),
+       &activity_to_case_join = std::as_const(activity_to_case_join), &alignments = std::as_const(alignments),
+       &replay_results = std::as_const(replay_results),
+       &petri_net_to_string_mapper = std::as_const(petri_net_to_string_mapper)](const parallel_block& block) {
+#else
       [&storages, &case_id_column = std::as_const(case_id_column),
        &case_to_trace_ptrs = std::as_const(case_to_trace_ptrs),
        &activity_to_case_join = std::as_const(activity_to_case_join), &alignments = std::as_const(alignments),
        &replay_results = std::as_const(replay_results), &edge_type_to_buffer = std::as_const(edge_type_to_buffer),
        &petri_net_to_string_mapper = std::as_const(petri_net_to_string_mapper),
        &alignment_move_to_buffer = std::as_const(alignment_move_to_buffer)](const parallel_block& block) {
+#endif
         memory::cast_execute_column_pointers(
             [&](auto tup) {
               const auto case_accessor{std::get<0>(tup).get_const_accessor()};
@@ -785,9 +873,13 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
               const auto case_to_trace_accessor{std::get<1>(tup).get_const_accessor()};
               const auto& activity_to_case_join_vec{std::get<2>(tup)};
 
+#ifdef CELOSTAR
+              auto current_variant_row{block.offset_variant};
+#else
               auto current_alignment_row{block.offset_alignment};
               auto current_association_row{block.offset_association};
               auto current_edge_class_row{block.offset_edge_class};
+#endif
 
               common::for_each_group(
                   block.offset_in, block.offset_in + block.size_in, case_accessor, [&](auto interval) {
@@ -802,17 +894,40 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                       return;
                     }
 
+#ifndef CELOSTAR
                     auto& [inflated_alignment_bpmn_vertex_id, inflated_alignment_bpmn_vertex_id_nulls,
                            inflated_alignment_activity_label, alignment_activity_label_buffer_with_lookup,
                            inflated_moves, alignment_move_buffer_with_lookup, alignment_to_activity_join,
                            association_to_alignment_join, association_to_edge_class_join, edge_class_id,
                            inflated_edge_classes, edge_class_buffer_with_lookup]{storages};
+#endif
 
                     const auto variant_trace_id{case_to_trace_accessor.at(case_table_row)};
                     const auto& alignment_for_case{alignments.at(variant_trace_id)};
                     const replay_result_type& replay_result_for_case{replay_results.at(variant_trace_id)};
 
+#ifdef CELOSTAR
+                    std::vector<std::string> variant;
+                    variant.reserve(interval.end() - interval.begin());
+                    for (auto activity_index = interval.begin(); activity_index < interval.end(); activity_index++) {
+                      variant.push_back(activity_column->get_string_value(activity_index));
+                    }
+                    alignment_variant[current_variant_row] = variant;
+                    association_variant[current_variant_row] = variant;
+                    edge_class_variant[current_variant_row] = variant;
+#endif
+
                     // 1. Fill the association table
+#ifdef CELOSTAR
+                    association_edge_class[current_variant_row].reserve(replay_result_for_case.num_rows());
+                    association_alignment_index[current_variant_row].reserve(replay_result_for_case.num_rows());
+                    for (row_id id = 0; id < replay_result_for_case.components().size(); id++) {
+                      for (auto vertex_id : replay_result_for_case.components()[id].edges_as_vertices) {
+                        association_edge_class[current_variant_row].push_back(id);
+                        association_alignment_index[current_variant_row].push_back(vertex_id);
+                      }
+                    }
+#else
                     for (row_id current_edge_class_id{current_edge_class_row};
                          const replay_component& component : replay_result_for_case.components()) {
                       // represent edges by joining to the correct row in the alignment table, for each vertex in the
@@ -833,8 +948,19 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                       // update the output size
                       current_association_row += ctl::cast<row_id>(component.size());
                     }
+#endif
 
                     // 2. Add the component types to the edge class table data
+#ifdef CELOSTAR
+                    auto edge_class_size = replay_result_for_case.components().size();
+                    edge_class_id[current_variant_row].reserve(edge_class_size);
+                    edge_class_type[current_variant_row].reserve(edge_class_size);
+                    for (int id = 0; id < edge_class_size; id++) {
+                      edge_class_id[current_variant_row].push_back(id);
+                      edge_class_type[current_variant_row].emplace_back(
+                          edge_type_to_string(replay_result_for_case.components()[id].component_type));
+                    }
+#else
                     std::ranges::transform(replay_result_for_case.components(),
                                            std::next(std::begin(inflated_edge_classes), current_edge_class_row),
                                            edge_type_to_buffer, &replay_component::component_type);
@@ -843,9 +969,32 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                                         current_edge_class_row + replay_result_for_case.num_edge_components()),
                               current_edge_class_row);
                     current_edge_class_row += ctl::cast<row_id>(replay_result_for_case.num_edge_components());
+#endif
 
                     // 3. Fill ALIGNMENT table column data and join to Activity table
                     // copy the alignment (ids/move types) for each case into the arrays
+#ifdef CELOSTAR
+                    auto alignment_size = alignment_for_case.size();
+                    alignment_model_vertex_id[current_variant_row].reserve(alignment_size);
+                    alignment_vertex_label[current_variant_row].reserve(alignment_size);
+                    alignment_move_type[current_variant_row].reserve(alignment_size);
+                    alignment_activity_index[current_variant_row].reserve(alignment_size);
+                    for (size_t offset{0}; offset != alignment_size; ++offset) {
+                      const auto& move{alignment_for_case.at(offset)};
+                      alignment_vertex_label[current_variant_row].emplace_back(petri_net_to_string_mapper(move));
+                      alignment_move_type[current_variant_row].emplace_back(alignment_move_to_string(move.move_type));
+                      if (move.move_on_model) {
+                        alignment_model_vertex_id[current_variant_row].push_back(move.move_on_model.value());
+                      } else {
+                        alignment_model_vertex_id[current_variant_row].emplace_back();
+                      }
+                    }
+                    for (auto index : replay_result_for_case.alignment_to_timestamp()) {
+                      alignment_activity_index[current_variant_row].push_back(index);
+                    }
+
+                    current_variant_row++;
+#else
                     for (size_t offset{0}; offset != alignment_for_case.size(); ++offset) {
                       const auto& move{alignment_for_case.at(offset)};
                       const auto index{current_alignment_row + offset};
@@ -869,11 +1018,21 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                         });
 
                     current_alignment_row += ctl::cast<row_id>(alignment_for_case.size());
+#endif
                   });
             },
             case_id_column, *case_to_trace_ptrs, activity_to_case_join);
       });
 
+#ifdef CELOSTAR
+  // Make table group
+  memory::table_group_t tables{};
+  tables.emplace(INTERNAL_ALIGNMENT_TABLE_NAME, std::move(alignment_table));
+  tables.emplace(INTERNAL_ASSOCIATION_TABLE_NAME, std::move(association_table));
+  tables.emplace(INTERNAL_EDGE_CLASS_TABLE_NAME, std::move(edge_class_table));
+
+  return tables;
+#else
   align_model_table_data table_data{std::move(std::get<0>(storages)),  std::move(std::get<1>(storages)),
                                     std::move(std::get<2>(storages)),  std::move(std::get<3>(storages).buffer),
                                     std::move(std::get<4>(storages)),  std::move(std::get<5>(storages).buffer),
@@ -883,6 +1042,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
 
   return create_tables_and_add_columns(std::move(table_data), activity_column, options, dependencies, input_columns,
                                        context);
+#endif
 }
 
 }  // anonymous namespace
@@ -961,6 +1121,18 @@ replay_results_t replay_aligned_variants(const bpmn::bpmn_graph& bpmn_graph, con
   return replay_results;
 }
 
+#ifdef CELOSTAR
+memory::table_group_t create_tables(const alignments_t& alignments, const replay_results_t& replay_results,
+                                    const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
+                                    const memory::column_t& activity_column, const memory::column_t& case_id_column,
+                                    const memory::join_projection_vector_t& activity_to_case_join,
+                                    const common::execution_context& context, size_t grain_size) {
+  auto create_tables_context{context.create_sub_context("create_tables", {})};
+  return inflate(alignments, replay_results, activity_to_case_join, variants->get_case_to_trace_col_ptrs().value(),
+                 bpmn_to_string, activity_column, case_id_column->get_column_pointers(context), grain_size,
+                 create_tables_context);
+}
+#else
 memory::table_group_t create_tables(const alignments_t& alignments, const replay_results_t& replay_results,
                                     const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
                                     const memory::column_t& activity_column, const memory::column_t& case_id_column,
@@ -973,5 +1145,6 @@ memory::table_group_t create_tables(const alignments_t& alignments, const replay
                  bpmn_to_string, activity_column, case_id_column->get_column_pointers(context), options, grain_size,
                  dependencies, input_columns, create_tables_context);
 }
+#endif
 
 }  // namespace celonis::accelerator::operators::process::align_model

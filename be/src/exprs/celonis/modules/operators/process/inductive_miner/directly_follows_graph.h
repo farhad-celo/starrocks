@@ -3,15 +3,11 @@
 #include <unordered_map>
 #include <vector>
 
-#ifndef CELOSTAR
 #include <bytell_hash_map.hpp>
-#endif
 
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/shared_types.h"
-#ifdef CELOSTAR
-#include "util/phmap/phmap.h"
-#else
+#ifndef CELOSTAR
 #include "modules/cube/filter_bitset_fwd.h"
 #include "modules/memory/column_fwd.h"
 #endif
@@ -50,11 +46,7 @@ struct dfg_pre_aggregation {
   }
 
   std::vector<activity_counters> activity_statistics;
-#ifdef CELOSTAR
-  phmap::flat_hash_map<edge_pair, size_t, edge_pair_hash> edge_statistics;
-#else
   ska::bytell_hash_map<edge_pair, size_t, edge_pair_hash> edge_statistics;
-#endif
   dfg_log_properties log_properties{};
 };
 
@@ -83,13 +75,8 @@ directly_follows_graph initialize_dfg(const splittable_eventlog& eventlog_data,
  * @param map
  * @param filter_config
  */
-#ifdef CELOSTAR
-void filter_dfg_count_map(phmap::flat_hash_map<size_t, size_t>& map,
-                          const dfg_filter_config& filter_config = dfg_filter_config());
-#else
 void filter_dfg_count_map(ska::bytell_hash_map<size_t, size_t>& map,
                           const dfg_filter_config& filter_config = dfg_filter_config());
-#endif
 
 /**
  * This function may be used to remove noise out of the successions of a directly-

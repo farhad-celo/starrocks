@@ -15,16 +15,16 @@ using cel_int_t = int64_t;
 namespace starrocks {
 namespace {
 
-VariantAggregateState::SliceHashMap increment_id(const VariantAggregateState::SliceHashMap& input_activity_map) {
-    VariantAggregateState::SliceHashMap activity_map;
+SliceHashMap increment_id(const SliceHashMap& input_activity_map) {
+    SliceHashMap activity_map;
     for (auto it = input_activity_map.begin(); it != input_activity_map.end(); it++) {
         activity_map.insert(std::pair<SliceWithHash, int32_t>(it->first, it->second + 1));
     }
     return activity_map;
 }
 
-starrocks::VariantHashMap increment_id(const starrocks::VariantHashMap& input_variant_map) {
-    starrocks::VariantHashMap variant_map;
+VariantHashMap increment_id(const VariantHashMap& input_variant_map) {
+    VariantHashMap variant_map;
     for (auto it = input_variant_map.begin(); it != input_variant_map.end(); it++) {
         Variant variant = it->first;
         for (auto& id : variant.data) {
@@ -37,9 +37,9 @@ starrocks::VariantHashMap increment_id(const starrocks::VariantHashMap& input_va
 
 } // namespace
 
-std::string InductiveMinerFinalizer::json_string(const VariantAggregateState::SliceHashMap& activity_map,
+std::string InductiveMinerFinalizer::json_string(const SliceHashMap& activity_map,
                                                  const celonis::ResultTable& vertex_table,
-                                                 const ResultTable& edge_table) {
+                                                 const celonis::ResultTable& edge_table) {
     rapidjson::Document d;
     rapidjson::Document::AllocatorType& allocator = d.GetAllocator();
     d.SetObject();
@@ -54,9 +54,8 @@ std::string InductiveMinerFinalizer::json_string(const VariantAggregateState::Sl
     }
 
     rapidjson::Value vertex_properties(rapidjson::kArrayType);
-    auto& process_tree_type =
-            *dynamic_cast<const celonis::ResultColumn<cel_int_t>*>(vertex_table.column("process_tree_type"));
-    auto& activity = *dynamic_cast<const celonis::NullableResultColumn<cel_int_t>*>(vertex_table.column("activity"));
+    const auto& process_tree_type = vertex_table.column<cel_int_t>("process_tree_type");
+    const auto& activity = vertex_table.nullable_column<cel_int_t>("activity");
     for (int i = 0; i < vertex_table.size(); i++) {
         rapidjson::Value obj(rapidjson::kObjectType);
         obj.AddMember("process_tree_type", process_tree_type[i], allocator);
@@ -72,8 +71,8 @@ std::string InductiveMinerFinalizer::json_string(const VariantAggregateState::Sl
     d.AddMember("vertex_properties", vertex_properties, allocator);
 
     rapidjson::Value edge_properties(rapidjson::kArrayType);
-    auto& edge_source_id = *dynamic_cast<const celonis::ResultColumn<cel_int_t>*>(edge_table.column("edge_source_id"));
-    auto& edge_target_id = *dynamic_cast<const celonis::ResultColumn<cel_int_t>*>(edge_table.column("edge_target_id"));
+    const auto& edge_source_id = edge_table.column<cel_int_t>("edge_source_id");
+    const auto& edge_target_id = edge_table.column<cel_int_t>("edge_target_id");
     for (int i = 0; i < edge_table.size(); i++) {
         rapidjson::Value obj(rapidjson::kObjectType);
         obj.AddMember("edge_source_id", edge_source_id[i], allocator);

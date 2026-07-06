@@ -1,26 +1,17 @@
 #include "execution_context.h"
 
-#ifndef CELOSTAR
 #include <chrono>
 
 #include "log/log.h"
 #include "modules/common/exceptions.h"
 #include "modules/cube/extended_tables.h"
 #include "modules/memory/table.h"
+#ifndef CELOSTAR
 #include "modules/query/communication.pb.h"
 #endif
 
 namespace celonis::accelerator::common {
 
-#ifdef CELOSTAR
-// TODO(j.kim): Add a proper context and a trace.
-execution_context::execution_context() noexcept {}
-
-execution_context execution_context::create_sub_context(const std::string& operation_name,
-                                                        const std::string& tags) const noexcept {
-    return execution_context();
-}
-#else
 execution_context::execution_context() noexcept
     : span_{std::make_shared<tracing::span>()},
       table_to_user_visible_name_mapping_{std::make_shared<cube::table_to_user_visible_name_mapping>()},
@@ -33,6 +24,7 @@ execution_context::execution_context(const std::string& operation_name,
       table_to_user_visible_name_mapping_{std::make_shared<cube::table_to_user_visible_name_mapping>()},
       extended_tables_{std::make_shared<cube::extended_tables>()} {}
 
+#ifndef CELOSTAR
 execution_context::execution_context(const std::string& operation_name,
                                      const CommunicationRequest_ExecutionContext& remote_context,
                                      ctl::abstract_strategy_t memory_tracking_strategy) noexcept
@@ -42,6 +34,7 @@ execution_context::execution_context(const std::string& operation_name,
       memory_tracking_strategy_{std::move(memory_tracking_strategy)},
       table_to_user_visible_name_mapping_{std::make_shared<cube::table_to_user_visible_name_mapping>()},
       extended_tables_{std::make_shared<cube::extended_tables>()} {}
+#endif
 
 execution_context::execution_context(tracing::span&& managed_span, const execution_context* parent) noexcept
     : parent_{parent},
@@ -170,6 +163,5 @@ execution_context::~execution_context() {
     parent_->merge_warnings(std::move(warnings_));
   }
 }
-#endif
 
 }  // namespace celonis::accelerator::common

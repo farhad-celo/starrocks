@@ -1,5 +1,6 @@
 #pragma once
 
+#include "column/hash_set.h"
 #include "rapidjson/document.h"
 #include "util/phmap/phmap.h"
 
@@ -34,6 +35,7 @@ struct HashOnVariant {
     std::size_t operator()(const Variant& x) const { return x.hash; }
 };
 
+using SliceHashMap = phmap::flat_hash_map<SliceWithHash, int32_t, HashOnSliceWithHash, EqualOnSliceWithHash>;
 using VariantHashMap = phmap::flat_hash_map<Variant, int32_t, HashOnVariant, EqualOnVariant>;
 
 } // namespace starrocks

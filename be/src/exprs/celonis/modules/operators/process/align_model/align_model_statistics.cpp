@@ -1,5 +1,6 @@
 #include "align_model_statistics.h"
 
+#ifndef CELOSTAR
 #include "modules/cube/execution/tracking/operator_tracker.h"
 
 namespace celonis::accelerator::operators::process::align_model {
@@ -18,3 +19,4 @@ void align_model_statistics::log_to_operator_statistics(
   add_telemetry_counter("time_inflation", time_inflation);
 }
 }  // namespace celonis::accelerator::operators::process::align_model
+#endif

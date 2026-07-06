@@ -6,7 +6,9 @@
 #include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/operators/process/alignment/alignment_statistics.h"
 #include "modules/operators/process/alignment/gap_filler.h"
+#ifndef CELOSTAR
 #include "modules/operators/process/alignment/log_alignment_result.h"
+#endif
 #include "modules/operators/process/alignment/petri_net_information.h"
 #include "modules/operators/process/alignment/rl_statistics/statistics_base.h"
 #include "modules/operators/process/alignment/rl_statistics/top_constraints.h"

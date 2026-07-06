@@ -116,6 +116,7 @@ if(STARROCKS_JIT_ENABLE)
 endif()
 
 set(CELONIS_FILES
+  celonis/align_model.cpp
   celonis/array_functions.cpp
   celonis/calc_throughput.cpp
   celonis/conformance.cpp

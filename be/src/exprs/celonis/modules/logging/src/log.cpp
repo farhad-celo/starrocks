@@ -13,17 +13,6 @@
 
 namespace celonis::accelerator::log {
 
-#ifdef CELOSTAR
-void info(const std::string& s) { LOG(INFO) << s; }
-
-void warn(const std::string& s) { LOG(WARNING) << s; }
-
-void debug(const std::string& s) { VLOG(1) << s; }
-
-void error(const std::string& s) { LOG(ERROR) << s; }
-
-void flush() { google::FlushLogFiles(google::INFO); }
-#else
 namespace {
 format::json::json_object_t merge_message_and_details(const std::string& message,
                                                       const format::json::json_object_t& details = {}) {
@@ -54,6 +43,25 @@ void debug(const std::string& s) { jdebug(s); }
 
 void error(const std::string& s) { jerror(s); }
 
+#ifdef CELOSTAR
+void jinfo(const std::string& message, const format::json::json_object_t& details) {
+    LOG(INFO) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
+}
+
+void jwarn(const std::string& message, const format::json::json_object_t& details) {
+    LOG(WARNING) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
+}
+
+void jdebug(const std::string& message, const format::json::json_object_t& details) {
+    VLOG(1) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
+}
+
+void jerror(const std::string& message, const format::json::json_object_t& details) {
+    LOG(ERROR) << to_json_string_without_enclosing_braces(merge_message_and_details(message, details));
+}
+
+void flush() { google::FlushLogFiles(google::INFO); }
+#else
 void jinfo(const std::string& message, const format::json::json_object_t& details) {
   logging::factories::logger()->info(
       to_json_string_without_enclosing_braces(merge_message_and_details(message, details)));

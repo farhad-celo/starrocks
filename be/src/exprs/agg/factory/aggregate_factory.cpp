@@ -74,6 +74,10 @@ AggregateFunctionPtr AggregateFactory::MakeHllUnionCountAggregateFunction() {
     return std::make_shared<HllUnionCountAggregateFunction>();
 }
 
+AggregateFunctionPtr AggregateFactory::MakeCelonisAlignModelAggregateFunction() {
+    return std::make_shared<AlignModelAggregateFunction>();
+}
+
 AggregateFunctionPtr AggregateFactory::MakeCelonisInductiveMinerAggregateFunction() {
     return std::make_shared<InductiveMinerAggregateFunction>();
 }

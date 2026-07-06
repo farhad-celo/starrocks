@@ -20,7 +20,9 @@
 #include "modules/common/trace_types.h"
 #include "modules/cube/variant_trace_cache_manager.h"
 #include "modules/cube/variant_trace_utils.h"
+#ifndef CELOSTAR
 #include "modules/memory/builders/cache_column_from_dictionary.h"
+#endif
 #include "modules/memory/column.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/table.h"
@@ -128,6 +130,7 @@ struct buffer_sizes_and_offsets_type {
         slot_trace_buffer_offset{std::move(slot_trace_buffer_offset)} {}
 };
 
+#ifndef CELOSTAR
 /**
  * Struct to represent each unique agg_group_id during sorting
  */
@@ -143,6 +146,7 @@ struct sort_agg_group_handle {
       : length{length}, orig_id{orig_pos}, trace_pointer{trace_pointer} {}
   sort_agg_group_handle() = default;
 };
+#endif
 
 template <typename OPERATOR_ACCESSOR, typename PROJECTION_TYPE, class STRING_COL_PTR_T, class STRING_PTR_AC_TYPE>
 void handle_aggregation_group(
@@ -321,6 +325,7 @@ trace_buffer_sizes_and_offsets_type compute_trace_buffer_sizes_and_offsets(auto&
   return {trace_buffer_size, std::move(slot_trace_buffer_offset)};
 }
 
+#ifndef CELOSTAR
 /**
  * Compute buffer sizes for traces and strings. Additionally, compute the offsets into these buffer for each
  * slot's (only for 'thread_local_front') data.
@@ -380,6 +385,7 @@ buffer_sizes_and_offsets_type compute_buffer_sizes_and_offsets(
   return buffer_sizes_and_offsets_type(string_buffer_offset, std::move(slot_string_buffer_offset), trace_buffer_offset,
                                        std::move(slot_trace_buffer_offset));
 }
+#endif
 
 /**
  * Fills the trace buffer and the variant id map, that maps from the agg_group_id(== variant_id) of a variant to
@@ -419,6 +425,7 @@ void fill_trace_buffers_and_id_map(
   });
 }
 
+#ifndef CELOSTAR
 /**
  * For each unique variant, fills the trace and string buffers. Additionally, fills the 'to_sort' array
  * that is used to sort the variant strings so as to build the string dictionary for the output column.
@@ -726,6 +733,7 @@ struct exec_execute_fill_output {
     return raw_column_pointers;
   }
 };
+#endif
 
 template <typename OPERATOR_ACCESSOR, typename PROJECTION_TYPE>
 std::vector<ctl::half_open_interval<row_id>> generate_group_aligned_blocks(const OPERATOR_ACCESSOR& accessor,
@@ -758,12 +766,14 @@ std::vector<ctl::half_open_interval<row_id>> generate_group_aligned_blocks(const
   return blocks;
 }
 
+#ifndef CELOSTAR
 struct pu_string_agg_result {
   memory::raw_column_ptrs_t output_column_pointers;
   ctl::static_array<cel_string_t> pointers_sa;
   ctl::static_array<char> string_buffer_sa;
   row_id dict_size;
 };
+#endif
 
 struct variant_op_result {
   memory::raw_column_ptrs_t output_column_pointers;
@@ -790,6 +800,7 @@ struct variant_op_result {
           std::move(group_id_to_trace_id), 1};
 }
 
+#ifndef CELOSTAR
 [[nodiscard]] pu_string_agg_result create_empty_string_agg_result(const common::execution_context& context) {
   auto out_col_ptrs{memory::create_raw_column_pointer<memory::col_ptr_8_t>(0, memory::zero_init_t{true}, context)};
 
@@ -804,6 +815,7 @@ struct variant_op_result {
 
   return {std::move(out_col_ptrs), std::move(pointers_sa), std::move(string_buffer_sa), 1};
 }
+#endif
 
 class variant_accessor {
  public:
@@ -849,6 +861,7 @@ class variant_accessor {
     return string_ptrs_ac[current_row] == 0 ? SKIP_ROW : current_row;
   }
 
+#ifndef CELOSTAR
   [[nodiscard]] static variant_op_result compute_empty_result(const common::execution_context& context) {
     auto row_id_result{create_empty_variant_row_id_result(context)};
     auto string_agg_result{create_empty_string_agg_result(context)};
@@ -918,6 +931,7 @@ class variant_accessor {
         std::move(output_column_pointers),  std::move(pointers_sa),   std::move(string_buffer_sa), std::move(traces),
         std::move(trace_cache_data_sorted), std::move(trace_lengths), aggregation_domain_size};
   }
+#endif
 };
 
 [[nodiscard]] variant_row_id_result compute_empty_result_row_ids(const common::execution_context& context) {
@@ -975,6 +989,7 @@ template <typename THREAD_LOCAL_TYPE>
                                aggregation_domain_size};
 }
 
+#ifndef CELOSTAR
 class pu_string_agg_accessor {
  public:
   using result_type = pu_string_agg_result;
@@ -1118,6 +1133,7 @@ class pu_string_agg_accessor {
   const ctl::static_array<row_id>& group_aligned_permutation_;
   const cube::filter_bitset_t& accepted_rows_;
 };
+#endif
 
 /**
  * A small helper class to abstract the column information needed for the different variant computations
@@ -1127,6 +1143,7 @@ template <bool HAS_COLUMN>
 struct column_info {
   row_id row_count;
 };
+#ifndef CELOSTAR
 template <>
 struct column_info<true> {
   row_id row_count;
@@ -1135,6 +1152,7 @@ struct column_info<true> {
 template <typename... MAYBE_COLUMN>
 requires(std::is_convertible_v<MAYBE_COLUMN&&, const memory::column_t&>&&...) &&
     (sizeof...(MAYBE_COLUMN) < 2) column_info(row_id, MAYBE_COLUMN&&...)->column_info<(sizeof...(MAYBE_COLUMN) > 0)>;
+#endif
 
 /**
  * Compute string aggregation using a parallel algorithm (used by VARIANT and PU_STRING_AGG)
@@ -1190,11 +1208,15 @@ struct exec_parallel_string_aggregation {
   requires std::is_integral_v<std::remove_reference_t<decltype(std::declval<ACCESSOR>()[row_id{}])>>
   decltype(auto) operator()(const ACCESSOR& string_col_ptrs_ac) {
     if (output_row_count == 0) {
+#ifndef CELOSTAR
       if constexpr (COMPUTE_STRINGS) {
         return accessor.compute_empty_result(context);
       } else {
+#endif
         return compute_empty_result_row_ids(context);
+#ifndef CELOSTAR
       }
+#endif
     }
 
     using string_col_ptr_t = std::remove_reference_t<decltype(std::declval<const ACCESSOR&>()[row_id{}])>;
@@ -1253,6 +1275,7 @@ struct exec_parallel_string_aggregation {
     // clean up - no longer needed
     thread_slot_local_to_slot_local_maps.clear();
 
+#ifndef CELOSTAR
     // in this case, we only want only row ids
     if constexpr (COMPUTE_STRINGS) {
       auto string_sort_taint_maps{process::sort_and_string_mappers(context, string_column.column, delimiter)};
@@ -1268,12 +1291,15 @@ struct exec_parallel_string_aggregation {
           buffer_sizes_and_offsets, id_offset, thread_local_front_keep, result_per_group.data(),
           project_group_id_to_group_table.data(), delimiter, string_column.column, context, grain_size);
     } else {
+#endif
       auto trace_buffer_sizes_and_offsets{compute_trace_buffer_sizes_and_offsets(thread_local_front_keep, context)};
 
       return compute_final_result_row_ids(aggregation_domain_size, output_row_count, trace_buffer_sizes_and_offsets,
                                           id_offset, thread_local_front_keep, result_per_group.data(),
                                           project_group_id_to_group_table.data(), context, grain_size);
+#ifndef CELOSTAR
     }
+#endif
   }
 };
 
@@ -1286,6 +1312,7 @@ template <typename PROJECTION_TYPE>
 using exec_parallel_string_aggregation_internal_t =
     exec_parallel_string_aggregation<variant_accessor, PROJECTION_TYPE, false>;
 
+#ifndef CELOSTAR
 ctl::static_array<row_id> compute_group_aligned_permutation(
     const memory::management::checked_vector_t<row_id>& permutation, size_t group_count,
     const projection_vector_t& projection, const common::execution_context& context) {
@@ -1328,9 +1355,11 @@ using column_ptr_variant_type = std::variant<memory::details::const_column_ptrs_
                                              memory::details::const_column_ptrs_accessor<memory::col_ptr_16_t>,
                                              memory::details::const_column_ptrs_accessor<memory::col_ptr_32_t>,
                                              memory::details::const_column_ptrs_accessor<memory::col_ptr_64_t>>;
+#endif
 
 }  // namespace
 
+#ifndef CELOSTAR
 memory::builders::result_column_builder_t execute_variant_operator(
     common::execution_context& context, const std::string& cache_key,
     cube::variant_trace_cache_manager& variant_trace_cache_manager_instance, memory::table* case_table,
@@ -1434,6 +1463,7 @@ compute_orderby_fetcher_and_order_directions(const OrderByExpressions& order_by_
 
   return {std::move(builder).build(), order_directions};
 }
+#endif
 
 namespace {
 
@@ -1445,12 +1475,14 @@ template <typename ACCESSOR>
     row_id num_case_rows, const memory::join_projection_vector_t& projection_vector, const ACCESSOR& activity_column,
     cube::variant_trace_cache_manager& variant_trace_cache_manager_instance, size_t grain_size) {
   auto compute_variants_context{context.create_sub_context("compute_variant_row_ids_impl", {})};
+#ifndef CELOSTAR
   // Before computing it, first check if entry already exists
   if (auto variant_trace_cache_entry{variant_trace_cache_manager_instance.retrieve_variant_cache_col_ptrs(cache_key)};
       variant_trace_cache_entry != nullptr) {
     // Return existing cache entry
     return variant_trace_cache_entry;
   }
+#endif
 
   variant_accessor accessor{};
 
@@ -1467,12 +1499,19 @@ template <typename ACCESSOR>
 
   auto variant_trace_result{memory::cast_execute_projection_vector(exec_func, projection_vector)};
 
+#ifdef CELOSTAR
+  return cube::make_non_cached_variant_entries_with_group_mapping(
+      std::move(variant_trace_result.trace_ptrs), std::move(variant_trace_result.trace_buffer_data),
+      std::move(variant_trace_result.trace_lengths), std::move(variant_trace_result.group_id_to_trace_id))
+      .underlying();
+#else
   variant_trace_cache_manager_instance.create_and_store_variant_cache_col_ptrs(
       cache_key, activity_table_name, std::move(variant_trace_result.trace_ptrs),
       std::move(variant_trace_result.trace_buffer_data), std::move(variant_trace_result.trace_lengths),
       std::move(variant_trace_result.group_id_to_trace_id));
 
   return variant_trace_cache_manager_instance.retrieve_variant_cache_col_ptrs(cache_key);
+#endif
 }
 
 template <typename VALUES_ACCESSOR>
@@ -1584,6 +1623,19 @@ memory::cache::variant_entries_t generalized_variant_row_ids_computation(  //
       values->get_column_pointers(context));
 }
 
+#ifdef CELOSTAR
+memory::cache::variant_trace_cache_t compute_variant_row_ids(
+    const memory::table_to_column_projection& table_to_column_projection,
+    const common::execution_context& context, const size_t grain_size) {
+  const auto& case_table{table_to_column_projection.table_one_side};
+  const auto& activity_column{table_to_column_projection.column_n_side};
+  const auto& projection_vector{table_to_column_projection.projection};
+
+  return generalized_variant_row_ids_computation(
+      std::nullopt, {.value = projection_vector, .optional_group_id_domain = case_table->get_rows()}, activity_column,
+      context, grain_size).underlying();
+}
+#else
 memory::cache::variant_trace_cache_t compute_variant_row_ids(
     const memory::table_to_column_projection& table_to_column_projection,
     cube::variant_trace_cache_manager& variant_trace_cache_manager_instance, const common::execution_context& context,
@@ -1599,6 +1651,7 @@ memory::cache::variant_trace_cache_t compute_variant_row_ids(
              grain_size)
       .underlying();
 }
+#endif
 
 [[nodiscard]] memory::cache::variant_trace_cache_t compute_variant_row_ids(
     common::execution_context& context, const std::string& cache_key, const std::string& activity_table_name,
@@ -1609,6 +1662,7 @@ memory::cache::variant_trace_cache_t compute_variant_row_ids(
                                       activity_column, variant_trace_cache_manager_instance, grain_size);
 }
 
+#ifndef CELOSTAR
 variant_row_id_result compute_variant_row_ids(common::execution_context& context, row_id num_case_rows,
                                               const memory::join_projection_vector_t& projection_vector,
                                               const ctl::shared_static_array<row_id>& activity_column,
@@ -1628,5 +1682,6 @@ variant_row_id_result compute_variant_row_ids(common::execution_context& context
 
   return memory::cast_execute_projection_vector(exec_func, projection_vector);
 }
+#endif
 
 }  // namespace celonis::accelerator::operators::aggregation

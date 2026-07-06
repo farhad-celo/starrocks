@@ -548,14 +548,14 @@ process_tree_ref convert_to_tables(const process_tree& pt) {
   const table_sizes sizes{pt};
 
   auto vertex_table = std::make_unique<ResultTable>("vertex_properties", sizes.node_size());
-  auto vertex_pt_types = vertex_table->AddColumn<ResultColumn<cel_int_t>>("process_tree_type");
-  auto vertex_activities = vertex_table->AddColumn<NullableResultColumn<cel_int_t>>("activity");
+  auto& vertex_pt_types = vertex_table->AddColumn<cel_int_t>("process_tree_type");
+  auto& vertex_activities = vertex_table->AddNullableColumn<cel_int_t>("activity");
 
   auto edge_table = std::make_unique<ResultTable>("edge_properties", sizes.edge_size());
-  auto edge_source_ids = edge_table->AddColumn<ResultColumn<cel_int_t>>("edge_source_id");
-  auto edge_target_ids = edge_table->AddColumn<ResultColumn<cel_int_t>>("edge_target_id");
+  auto& edge_source_ids = edge_table->AddColumn<cel_int_t>("edge_source_id");
+  auto& edge_target_ids = edge_table->AddColumn<cel_int_t>("edge_target_id");
 
-  fill_tables(*vertex_pt_types, *vertex_activities, *edge_source_ids, *edge_target_ids, pt);
+  fill_tables(vertex_pt_types, vertex_activities, edge_source_ids, edge_target_ids, pt);
 
   return process_tree_ref(std::move(vertex_table), std::move(edge_table));
 }

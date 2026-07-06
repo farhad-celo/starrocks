@@ -6,25 +6,34 @@
 #include "modules/common/execution_context_fwd.h"
 #include "modules/common/owned_column_ptr_data.h"
 #include "modules/common/trace_types.h"
+#ifndef CELOSTAR
 #include "modules/common/window_utils.h"
 #include "modules/cube/cross_table_filters.h"
 #include "modules/cube/execution/common_table_computations.h"
 #include "modules/cube/filter_bitset_fwd.h"
 #include "modules/cube/query_scope.h"
+#endif
 #include "modules/cube/variant_trace_cache_manager_fwd.h"
+#ifndef CELOSTAR
 #include "modules/memory/builders/result_column_builder_fwd.h"
+#endif
 #include "modules/memory/cache/variant_trace_cache_fwd.h"
 #include "modules/memory/column_fwd.h"
+#ifndef CELOSTAR
 #include "modules/memory/column_lookup.h"
+#endif
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table_fwd.h"
 #include "modules/memory/table_to_column_projection.h"
+#ifndef CELOSTAR
 #include "modules/operators/aggregation/projection.h"
+#endif
 #include "modules/operators/process/variant_constants.h"
 
 namespace celonis::accelerator::operators::aggregation {
 
+#ifndef CELOSTAR
 [[nodiscard]] memory::builders::result_column_builder_t execute_variant_operator(
     common::execution_context& context, const std::string& cache_key,
     cube::variant_trace_cache_manager& variant_trace_cache_manager_instance, memory::table* case_table,
@@ -60,6 +69,7 @@ compute_orderby_fetcher_and_order_directions(const OrderByExpressions& order_by_
 /** Only exposed for testing (verify cache entries exist) */
 [[nodiscard]] std::string make_generalized_variant_row_ids_computation_cache_key(const memory::column_t& values,
                                                                                  const std::string& mapping_cache_key);
+#endif
 
 struct caching_meta_data final {
   // A cache key for the group IDs. Could be e.g., some source table name of the group IDs (e.g., the case table)
@@ -107,10 +117,16 @@ struct group_id_mapping_and_group_id_domain final {
     size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);
 
 // Deprecated: Use the more general interface above 'generalized_variant_row_ids_computation'
+#ifdef CELOSTAR
+[[nodiscard]] memory::cache::variant_trace_cache_t compute_variant_row_ids(
+        const memory::table_to_column_projection& table_to_column_projection,
+        const common::execution_context& context, size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);
+#else
 [[nodiscard]] memory::cache::variant_trace_cache_t compute_variant_row_ids(
     const memory::table_to_column_projection& table_to_column_projection,
     cube::variant_trace_cache_manager& variant_trace_cache_manager_instance, const common::execution_context& context,
     size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);
+#endif
 
 [[nodiscard]] memory::cache::variant_trace_cache_t compute_variant_row_ids(
     common::execution_context& context, const std::string& cache_key, const std::string& activity_table_name,
@@ -127,9 +143,11 @@ struct variant_row_id_result {
   row_id num_unique_variants;
 };
 
+#ifndef CELOSTAR
 [[nodiscard]] variant_row_id_result compute_variant_row_ids(
     common::execution_context& context, row_id num_case_rows, const memory::join_projection_vector_t& projection_vector,
     const ctl::shared_static_array<row_id>& activity_column,
     size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE);
+#endif
 
 }  // namespace celonis::accelerator::operators::aggregation

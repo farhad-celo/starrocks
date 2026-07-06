@@ -1,5 +1,6 @@
 #include "alignment_statistics.h"
 
+#ifndef CELOSTAR
 #include "modules/cube/execution/tracking/operator_statistics.h"
 
 namespace celonis::accelerator::operators::process::alignment {
@@ -34,3 +35,4 @@ void alignment_statistics::log_to_operator_statistics(
 }
 
 }  // namespace celonis::accelerator::operators::process::alignment
+#endif

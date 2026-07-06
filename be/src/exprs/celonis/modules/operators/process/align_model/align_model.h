@@ -6,16 +6,20 @@
 #include <vector>
 
 #include "align_model_statistics.h"
+#ifndef CELOSTAR
 #include "modules/cube/query_scope_fwd.h"
 #include "modules/cube/table_registry/input_dependencies.h"
 #include "modules/cube/table_registry/table_registry.h"
+#endif
 #include "modules/cube/variant_trace_cache_manager.h"
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/row_id.h"
 #include "modules/memory/table_fwd.h"
 #include "modules/memory/table_group.h"
+#ifndef CELOSTAR
 #include "modules/operators/framework/cached_operator_fwd.h"
+#endif
 #include "modules/operators/process/alignment/petri_net/petri_net.h"
 #include "modules/operators/process/alignment/petri_net/petri_net_entities.h"
 #include "modules/operators/process/alignment/rl_align_configs.h"
@@ -207,8 +211,12 @@ memory::table_group_t create_tables(const alignments_t& alignments, const replay
                                     const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
                                     const memory::column_t& activity_column, const memory::column_t& case_id_column,
                                     const memory::join_projection_vector_t& activity_to_case_join,
+#ifdef CELOSTAR
+                                    const common::execution_context& context, size_t grain_size);
+#else
                                     const cube::registration_options& options, const common::execution_context& context,
                                     size_t grain_size, cube::input_dependencies& dependencies,
                                     const operator_input_columns_t& input_columns);
+#endif
 
 }  // namespace celonis::accelerator::operators::process::align_model

@@ -13,8 +13,8 @@ public:
     std::string finalize() override;
 
 private:
-    std::string json_string(const VariantAggregateState::SliceHashMap& activity_map,
-                            const celonis::ResultTable& vertex_table, const ResultTable& edge_table);
+    std::string json_string(const SliceHashMap& activity_map,
+                            const celonis::ResultTable& vertex_table, const celonis::ResultTable& edge_table);
 };
 
 // Extends VariantAggregateFunction and runs the inductive miner algorithm.

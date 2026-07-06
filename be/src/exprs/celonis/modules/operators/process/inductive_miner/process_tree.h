@@ -11,9 +11,7 @@
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/cube/execution/tracking/stop_token_fwd.h"
-#ifndef CELOSTAR
 #include "modules/memory/column_fwd.h"
-#endif
 #include "modules/memory/row_id.h"
 #ifndef CELOSTAR
 #include "modules/memory/table_fwd.h"

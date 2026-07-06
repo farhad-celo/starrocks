@@ -54,6 +54,7 @@
 #include "exprs/agg/variance.h"
 #include "exprs/agg/window.h"
 #include "exprs/agg/window_funnel.h"
+#include "exprs/celonis/align_model.h"
 #include "exprs/celonis/inductive_miner.h"
 #include "exprs/celonis/variant_stats.h"
 #include "types/logical_type.h"
@@ -200,6 +201,8 @@ public:
 
     template <LogicalType T>
     static AggregateFunctionPtr MakeHllRawAggregateFunction();
+
+    static AggregateFunctionPtr MakeCelonisAlignModelAggregateFunction();
 
     static AggregateFunctionPtr MakeCelonisInductiveMinerAggregateFunction();
 

@@ -305,6 +305,7 @@ public class FunctionSet {
     public static final String MANN_WHITNEY_U_TEST = "mann_whitney_u_test";
 
     // Aggregate celonis functions
+    public static final String CELONIS_ALIGN_MODEL = "celonis_align_model";
     public static final String CELONIS_INDUCTIVE_MINER = "celonis_inductive_miner";
     public static final String CELONIS_VARIANT_STATS = "celonis_variant_stats";
 
@@ -623,6 +624,7 @@ public class FunctionSet {
 
     public static final Set<String> celonisAlwaysReturnNonNullableFunctions =
             ImmutableSet.<String>builder()
+                    .add(FunctionSet.CELONIS_ALIGN_MODEL)
                     .add(FunctionSet.CELONIS_INDUCTIVE_MINER)
                     .add(FunctionSet.CELONIS_VARIANT_STATS)
                     .build();
@@ -1072,6 +1074,10 @@ public class FunctionSet {
     }
 
     private void initCelonisAggregateBuiltins() {
+        // celonis_align_model
+        addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_ALIGN_MODEL,
+                Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT, Type.VARCHAR), Type.VARCHAR, Type.VARCHAR,
+                false, false, false));
         // celonis_inductive_miner
         addBuiltin(AggregateFunction.createBuiltin(FunctionSet.CELONIS_INDUCTIVE_MINER,
                 Lists.newArrayList(Type.ARRAY_VARCHAR, Type.BIGINT, Type.DOUBLE), Type.VARCHAR, Type.VARCHAR,
