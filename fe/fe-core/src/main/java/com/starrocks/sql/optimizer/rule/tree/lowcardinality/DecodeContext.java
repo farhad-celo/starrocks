@@ -599,12 +599,18 @@ class DecodeContext {
             record TypeInfo(Type intermediateType, Type returnType) {}
             TypeInfo typeInfo = switch (fn.functionName()) {
                 case FunctionSet.ARRAY_AGG -> new TypeInfo(
-                            new StructType(argTypes.stream().map(t -> (Type) new ArrayType(t)).toList()),
-                            new ArrayType(argTypes.get(0)));
+                        new StructType(argTypes.stream().map(t -> (Type) new ArrayType(t)).toList()),
+                        new ArrayType(argTypes.get(0)));
                 case FunctionSet.ANY_VALUE -> new TypeInfo(argTypes.get(0), argTypes.get(0));
+                case FunctionSet.MULTI_ARRAY_AGG -> new TypeInfo(
+                        fn.getIntermediateType().isBinaryType() ? Type.VARBINARY :
+                                new StructType(argTypes.stream().map(t -> (Type) new ArrayType(t)).toList()),
+                        new StructType(argTypes.stream().limit(argTypes.size() - fn.getIsAscOrder().size())
+                                .map(t -> (Type) new ArrayType(t)).toList())
+                );
                 default -> new TypeInfo(
                         getDictifiedType(fn.getIntermediateType()), getDictifiedType(fn.getReturnType()));
-            };
+
             AggregateFunction newFn = (AggregateFunction) fn.copy();
             newFn.setArgsType(argTypes.toArray(Type[]::new));
             newFn.setIntermediateType(typeInfo.intermediateType);

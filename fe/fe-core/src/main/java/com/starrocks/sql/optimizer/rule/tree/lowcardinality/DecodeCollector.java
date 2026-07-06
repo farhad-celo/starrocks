@@ -92,6 +92,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.TestOnly;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -120,6 +121,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.MULTI_DISTINCT_COUNT, FunctionSet.MAX, FunctionSet.MIN, FunctionSet.APPROX_COUNT_DISTINCT,
             FunctionSet.ANY_VALUE, FunctionSet.ARRAY_AGG);
 
+    public static final Set<String> CELONIS_LOW_CARD_AGGREGATE_FUNCTIONS = Sets.newHashSet(FunctionSet.MULTI_ARRAY_AGG);
+
     //TODO(by satanson): it seems that we can support more windows functions in future, at present, we only support
     // LAG/LEAD/FIRST_VALUE/LAST_VALUE and the aggregations functions which can adopt low cardinality optimization
     // and used as window function.
@@ -129,6 +132,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     private static final ConcurrentHashMap<String, LongCounterMetric> COUNTERS = new ConcurrentHashMap<>();
 
     static {
+        LOW_CARD_AGGREGATE_FUNCTIONS.addAll(CELONIS_LOW_CARD_AGGREGATE_FUNCTIONS);
         LOW_CARD_WINDOW_FUNCTIONS.addAll(LOW_CARD_AGGREGATE_FUNCTIONS);
     }
     public static final Set<String> LOW_CARD_LOCAL_AGG_FUNCTIONS = Sets.newHashSet(FunctionSet.COUNT,
@@ -455,6 +459,12 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         if (define instanceof CallOperator && FunctionSet.ARRAY_AGG.equals(((CallOperator) define).getFnName())) {
             return define.getChild(0).isColumnRef() &&
                     checkDependOnExpr(((ColumnRefOperator) define.getChild(0)).getId(), checkList);
+        }
+        if (define instanceof CallOperator callOperator
+                && FunctionSet.MULTI_ARRAY_AGG.equals(callOperator.getFnName())) {
+            int numOutputs = ((StructType) (callOperator.getFunction().getReturnType())).getFields().size();
+            return define.getChildren().subList(0, numOutputs).stream().anyMatch(
+                    c -> c.isColumnRef() && checkDependOnExpr(((ColumnRefOperator) c).getId(), checkList));
         }
         if (define.getType().isStructType()) {
             Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(define);
@@ -872,8 +882,15 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         final boolean enableArrayAgg = sessionVariable.isEnableArrayAggLowCardinalityOptimize()
                 && sessionVariable.isEnableArrayLowCardinalityOptimize()
                 && sessionVariable.isEnableStructLowCardinalityOptimize();
+        final boolean enableMultiArrayAgg = sessionVariable.isEnableMultiArrayAggLowCardinalityOptimize()
+                && sessionVariable.isEnableArrayLowCardinalityOptimize()
+                && sessionVariable.isEnableStructLowCardinalityOptimize();
         final boolean isArrayAgg = FunctionSet.ARRAY_AGG.equals(agg.getFnName());
+        final boolean isMultiArrayAgg = FunctionSet.MULTI_ARRAY_AGG.equals(agg.getFnName());
         if (isArrayAgg && !enableArrayAgg) {
+            return false;
+        }
+        if (isMultiArrayAgg && !enableMultiArrayAgg) {
             return false;
         }
         if (!LOW_CARD_AGGREGATE_FUNCTIONS.contains(agg.getFnName())) {
@@ -888,8 +905,16 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return agg.getChildren().stream().allMatch(c -> c.isColumnRef() || c.isConstantRef())
                     && supportColumns.containsAny(candidateColumns);
         }
-        return agg.getChildren().size() == 1 && agg.getChildren().get(0).isColumnRef()
-                && supportColumns.containsAll(agg.getUsedColumns());
+        if (isMultiArrayAgg) {
+            // dictify multi_array_agg only when at least one output column can be dictified.
+            if (!agg.getChildren().stream().allMatch(c -> c.isColumnRef() || c.isConstantRef())) {
+                return false;
+            }
+            int numOutputs = ((StructType) agg.getFunction().getReturnType()).getFields().size();
+            return Arrays.asList(agg.getFunction().getArgs()).subList(0, numOutputs).stream()
+                    .anyMatch(Type::isStringType);
+        }
+        return agg.getChildren().size() == 1 && agg.getChildren().get(0).isColumnRef();
     }
 
     @Override
@@ -926,6 +951,28 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 continue;
             }
             CallOperator value = aggregate.getAggregations().get(key);
+            if (FunctionSet.ARRAY_AGG.equals(value.getFnName())) {
+                if (!value.getChild(0).isColumnRef() ||
+                        !info.inputStringColumns.contains(value.getChild(0).cast())) {
+                    continue;
+                }
+            } else if (FunctionSet.MULTI_ARRAY_AGG.equals(value.getFnName())) {
+                if (value.getChild(0).isColumnRef() && key.getId() ==
+                        ((ColumnRefOperator) value.getChild(0)).getId()) {
+                    if (getFieldUseStringRefMap(key) == null) {
+                        continue;
+                    }
+                } else {
+                    int numOutputs = ((StructType) value.getFunction().getReturnType()).getFields().size();
+                    if (value.getChildren().subList(0, numOutputs).stream()
+                            .allMatch(c -> !c.isColumnRef() ||
+                                    !info.inputStringColumns.contains(c.cast()))) {
+                        continue;
+                    }
+                }
+            } else if (!info.inputStringColumns.containsAll(value.getUsedColumns())) {
+                continue;
+            }
             // aggregate ref -> aggregate expr
             stringAggregateExpressions.computeIfAbsent(key.getId(), x -> Lists.newArrayList()).add(value);
             AggregateFunction aggFn = (AggregateFunction) value.getFunction();
@@ -941,6 +988,31 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 structManager.setFieldMapping(value, fieldsData);
             }
             if (supportLowCardinality(aggFn.getReturnType())) {
+                info.outputStringColumns.union(key.getId());
+                AggregateFunction aggFn = (AggregateFunction) value.getFunction();
+                if (aggFn.getIntermediateTypeOrReturnType().isStructType()
+                        && !structRefToFieldUseStringRef.containsKey(key.getId())) {
+                    final Map<String, ColumnRefOperator> fieldsData;
+                    if (FunctionSet.ARRAY_AGG.equals(aggFn.functionName())
+                            || FunctionSet.MULTI_ARRAY_AGG.equals(aggFn.functionName())) {
+                        fieldsData = Maps.newHashMap();
+                        StructType structType = (StructType) aggFn.getIntermediateTypeOrReturnType();
+                        Preconditions.checkState(structType.getFields().size() == value.getArguments().size());
+                        for (int i = 0; i < value.getArguments().size(); i++) {
+                            if (value.getArguments().get(i).isColumnRef()
+                                    && info.inputStringColumns.contains(value.getArguments().get(i).cast())) {
+                                fieldsData.put(structType.getField(i).getName(), value.getArguments().get(i).cast());
+                            }
+                        }
+                    } else if (FunctionSet.ANY_VALUE.equals(aggFn.functionName())) {
+                        fieldsData = getFieldUseStringRefMap(value.getArguments().get(0));
+                    } else {
+                        throw new UnsupportedOperationException(
+                                String.format("Unsupported function: %s with Struct Type", aggFn.functionName()));
+                    }
+                    Preconditions.checkNotNull(fieldsData);
+                    structOpToFieldUseStringRef.put(value, fieldsData);
+                }
                 setDefineExpr(key, value, 1);
             }
             final boolean isFinalStage = aggregate.getType().isGlobal() ||
