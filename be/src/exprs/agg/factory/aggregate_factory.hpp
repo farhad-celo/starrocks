@@ -54,6 +54,7 @@
 #include "exprs/agg/variance.h"
 #include "exprs/agg/window.h"
 #include "exprs/agg/window_funnel.h"
+#include "exprs/celonis/agg/abc_model.h"
 #include "exprs/celonis/agg/calc_bucket_boundaries.h"
 #include "exprs/celonis/agg/enumerate_node_paths.h"
 #include "exprs/celonis/agg/factory_calendar.h"
@@ -213,6 +214,9 @@ public:
     static AggregateFunctionPtr MakeHllRawAggregateFunction();
 
     // Celonis functions
+    template <LogicalType LT>
+    static AggregateFunctionPtr MakeCelonisBuildAbcModelAggregateFunction();
+
     template <LogicalType LT>
     static AggregateFunctionPtr MakeCelonisCalcBucketBoundariesAggregateFunction();
 
@@ -460,6 +464,11 @@ AggregateFunctionPtr AggregateFactory::MakeThetaSketchAggregateFunction() {
 template <LogicalType LT>
 AggregateFunctionPtr AggregateFactory::MakeHllRawAggregateFunction() {
     return std::make_shared<HllNdvAggregateFunction<LT, true>>();
+}
+
+template <LogicalType LT>
+AggregateFunctionPtr AggregateFactory::MakeCelonisBuildAbcModelAggregateFunction() {
+    return std::make_shared<CelonisAbcModelAggregationFunction<LT>>();
 }
 
 template <LogicalType LT>

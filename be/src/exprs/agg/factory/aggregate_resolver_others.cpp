@@ -50,6 +50,13 @@ void AggregateFuncResolver::register_celonis() {
             "celonis_histogram_boundaries", false,
             AggregateFactory::MakeCelonisHistogramBoundariesAggregateFunction<TYPE_VARCHAR>());
 
+    add_aggregate_mapping_notnull<TYPE_BIGINT, TYPE_VARCHAR>(
+            "celonis_build_abc_model", false,
+            AggregateFactory::MakeCelonisBuildAbcModelAggregateFunction<TYPE_BIGINT>());
+    add_aggregate_mapping_notnull<TYPE_DOUBLE, TYPE_VARCHAR>(
+            "celonis_build_abc_model", false,
+            AggregateFactory::MakeCelonisBuildAbcModelAggregateFunction<TYPE_DOUBLE>());
+
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_inductive_miner");
 
     add_general_mapping_notnull("celonis_build_linear_regression_model", false,
