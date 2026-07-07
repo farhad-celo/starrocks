@@ -37,7 +37,7 @@ jobs:
       - run: echo "Setting dev env image"
 
   presubmit-test:
-    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,disk=large,"run-id=${{ github.run_id }}"]
+    runs-on: [runs-on,runner=64cpu-linux-x64,image=ubuntu22-full-x64,volume=200g,"run-id=${{ github.run_id }}",ssh=true]
     needs: setup
     steps:
       - name: Checkout repository
