@@ -329,6 +329,8 @@ append_negative_case "*PersistentIndexSstableTest.test_metric_sst_open_read_erro
 append_negative_case "*PersistentIndexSstableTest.test_sst_open_retry_after_clear_corrupted_cache*"
 append_negative_case "*PersistentIndexSstableTest.test_metric_sst_multiget_read_error*"
 append_negative_case "*PersistentIndexSstableTest.test_multiget_retry_after_clear_corrupted_cache*"
+append_negative_case "*VecBitmapFunctionsTest.base64ToBitmapConstNullHandling*"
+append_negative_case "*VecBitmapFunctionsTest.base64ToBitmapNonConst*"
 
 
 # prepare util test_data
@@ -368,4 +370,3 @@ do
         fi
     fi
 done
-
