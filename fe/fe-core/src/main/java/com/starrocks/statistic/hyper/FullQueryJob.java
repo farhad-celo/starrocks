@@ -82,6 +82,7 @@ public class FullQueryJob extends HyperQueryJob {
         ctx.put("maxFunction", columnStat.getMax());
         ctx.put("minFunction", columnStat.getMin());
         ctx.put("collectionSizeFunction", columnStat.getCollectionSize());
+        ctx.put("laterals", columnStat.getLateralJoin());
         return HyperStatisticSQLs.build(ctx, HyperStatisticSQLs.BATCH_FULL_STATISTIC_TEMPLATE);
     }
 }
