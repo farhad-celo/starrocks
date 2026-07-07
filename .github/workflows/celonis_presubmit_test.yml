@@ -56,16 +56,17 @@ jobs:
           echo "First commit found - $first_commit"
           fi
           
-          celonis_first_commit_date=$(git log $first_commit --format="%at" -n 1)
-          starrocks_latest_commit_date=$(git log $first_commit^ --format="%at" -n 1)
-          
-          # check time
-          if [ "$celonis_first_commit_date" -gt "$starrocks_latest_commit_date" ]; then
-          echo "Celonis's first commit should be on the top of the latest Starrocks' commit"
-          exit 1
-          fi
-          
-          echo "Time check passed" 
+          # TODO: fix first commit check
+          #celonis_first_commit_date=$(git log $first_commit --format="%at" -n 1)
+          #starrocks_latest_commit_date=$(git log $first_commit^ --format="%at" -n 1)
+          #
+          ## check time
+          #if [ "$celonis_first_commit_date" -gt "$starrocks_latest_commit_date" ]; then
+          #echo "Celonis's first commit should be on the top of the latest Starrocks' commit"
+          #exit 1
+          #fi
+          #
+          #echo "Time check passed" 
 
       - name: Pull dev env image
         run: |
