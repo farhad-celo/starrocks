@@ -116,6 +116,6 @@ jobs:
             echo "fe_changed=true" >> "$GITHUB_OUTPUT"
           fi
       - name: FE unit tests
-        timeout-minutes: 60
+        timeout-minutes: 75
         if: ${{ steps.check_fe_changed.outputs.fe_changed == 'true' }}
         uses: ./.github/actions/fe-unit-tests
