@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # default config -c
-config="./x86/devcontainer.json"
+config=""
 # default workspace_folder -w
 workspace_folder=$(realpath ../)
 
@@ -26,6 +26,11 @@ trap 'log "Stopping docker container"; docker stop "${container_id}" >/dev/null 
 
 log "Starting docker container"
 
-container_id=$(./build_and_start_dev_container.sh -c "${config}" -w "${workspace_folder}")
+if [[ $config != "" ]]; then
+  container_id=$(./build_and_start_dev_container.sh -c "${config}" -w "${workspace_folder}")
+else
+  # use the default -c of the ./build_and_start_dev_container.sh
+  container_id=$(./build_and_start_dev_container.sh -w "${workspace_folder}")
+fi
 
 docker exec -it ${container_id} /bin/bash
