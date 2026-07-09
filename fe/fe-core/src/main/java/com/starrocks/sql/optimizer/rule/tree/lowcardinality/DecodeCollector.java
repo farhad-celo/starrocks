@@ -119,7 +119,11 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.MULTI_DISTINCT_COUNT, FunctionSet.MAX, FunctionSet.MIN, FunctionSet.APPROX_COUNT_DISTINCT,
             FunctionSet.ANY_VALUE, FunctionSet.ARRAY_AGG);
 
-    public static final Set<String> CELONIS_LOW_CARD_AGGREGATE_FUNCTIONS = Sets.newHashSet(FunctionSet.MULTI_ARRAY_AGG);
+    public static final Set<String> CELONIS_LOW_CARD_AGGREGATE_FUNCTIONS = Sets.newHashSet(FunctionSet.MULTI_ARRAY_AGG,
+            FunctionSet.CELONIS_SORTED_FIRST, FunctionSet.CELONIS_SORTED_LAST);
+
+    public static final Set<String> MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS = Sets.newHashSet(FunctionSet.ARRAY_AGG,
+            FunctionSet.CELONIS_SORTED_FIRST, FunctionSet.CELONIS_SORTED_LAST);
 
     //TODO(by satanson): it seems that we can support more windows functions in future, at present, we only support
     // LAG/LEAD/FIRST_VALUE/LAST_VALUE and the aggregations functions which can adopt low cardinality optimization
@@ -469,7 +473,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return false;
         }
         ScalarOperator define = stringRefToDefineExprMap.get(cid);
-        if (define instanceof CallOperator && FunctionSet.ARRAY_AGG.equals(((CallOperator) define).getFnName())) {
+        if (define instanceof CallOperator &&
+                MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(((CallOperator) define).getFnName())) {
             return define.getChild(0).isColumnRef() &&
                     checkDependOnExpr(((ColumnRefOperator) define.getChild(0)).getId(), checkList);
         }
@@ -910,6 +915,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 && sessionVariable.isEnableStructLowCardinalityOptimize();
         final boolean isArrayAgg = FunctionSet.ARRAY_AGG.equals(agg.getFnName());
         final boolean isMultiArrayAgg = FunctionSet.MULTI_ARRAY_AGG.equals(agg.getFnName());
+        final boolean isMultiInputSingleOutputAgg = MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(agg.getFnName());
         if (isArrayAgg && !enableArrayAgg) {
             return false;
         }
@@ -919,9 +925,9 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         if (!LOW_CARD_AGGREGATE_FUNCTIONS.contains(agg.getFnName())) {
             return false;
         }
-        if (isArrayAgg) {
+        if (isMultiInputSingleOutputAgg) {
             ColumnRefSet candidateColumns = agg.getUsedColumns();
-            if (isFirstStage && agg.getArguments().get(0).isColumnRef()
+            if (isArrayAgg && isFirstStage && agg.getArguments().get(0).isColumnRef()
                     && !agg.getArguments().get(0).getType().isStringType()) {
                 candidateColumns.except(List.of(agg.getArguments().get(0).cast()));
             }

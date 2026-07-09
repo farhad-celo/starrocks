@@ -53,6 +53,7 @@ import java.util.stream.Collectors;
 
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_ARRAY_FUNCTIONS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_STRUCT_FUNCTIONS;
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.supportLowCardinality;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeUtil.getDictifiedType;
 
@@ -139,7 +140,8 @@ class DecodeContext {
                     && fieldsUseRefMap.containsKey(subfieldOperator.getFieldNames().get(0)));
             return getUseStringRef(fieldsUseRefMap.get(subfieldOperator.getFieldNames().get(0)));
         }
-        if (operator instanceof CallOperator && FunctionSet.ARRAY_AGG.equals(((CallOperator) operator).getFnName())) {
+        if (operator instanceof CallOperator
+                && MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(((CallOperator) operator).getFnName())) {
             return getUseStringRef(operator.getChild(0));
         }
         List<ColumnRefOperator> columnRefs = Lists.newArrayList();
@@ -606,6 +608,9 @@ class DecodeContext {
                                 new StructType(argTypes.stream().map(t -> (Type) new ArrayType(t)).toList()),
                         new StructType(argTypes.stream().limit(argTypes.size() - fn.getIsAscOrder().size())
                                 .map(t -> (Type) new ArrayType(t)).toList())
+                );
+                case FunctionSet.CELONIS_SORTED_FIRST, FunctionSet.CELONIS_SORTED_LAST -> new TypeInfo(
+                        Type.VARBINARY, argTypes.get(0)
                 );
                 default -> new TypeInfo(
                         getDictifiedType(fn.getIntermediateType()), getDictifiedType(fn.getReturnType()));

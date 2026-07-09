@@ -14,8 +14,11 @@
 
 package com.starrocks.sql.plan;
 
+import com.starrocks.catalog.ColumnId;
 import com.starrocks.common.FeConstants;
+import com.starrocks.sql.optimizer.statistics.IDictManager;
 import com.starrocks.utframe.StarRocksAssert;
+import mockit.Expectations;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -188,5 +191,47 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
         String plan = getVerboseExplain(sql);
         Assertions.assertTrue(plan.contains(
                 "DictDecode(5: ACTIVITIES, [<place-holder>], celonis_shortened_variant(5: ACTIVITIES, 3))"), plan);
+    }
+
+    @Test
+    public void testSortedFirstLast() throws Exception {
+        String sql = """
+            SELECT /*+ SET_VAR(new_planner_agg_stage='2', enable_multi_array_agg_v2='true') */
+                CELONIS_SORTED_FIRST(ARRAY_VARCHAR_COL ORDER BY VARCHAR_COL, VARCHAR_COL2),
+                CELONIS_SORTED_LAST(INTEGER_COL ORDER BY VARCHAR_COL, INTEGER_COL)
+            FROM T
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("Global Dict Exprs:\n" +
+                "    11: DictDefine(10: ARRAY_VARCHAR_COL, [<place-holder>])\n" +
+                "\n" +
+                "  4:Decode\n" +
+                "  |  <dict id 11> : <string id 6>\n" +
+                "  |  cardinality: 1\n" +
+                "  |  \n" +
+                "  3:AGGREGATE (merge finalize)\n" +
+                "  |  aggregate: celonis_sorted_first[([11: celonis_sorted_first, VARBINARY, true]); " +
+                "args: INVALID_TYPE,INT,INT; result: ARRAY<INT>; args nullable: true; result nullable: true], " +
+                "celonis_sorted_last[([7: celonis_sorted_last, VARBINARY, true]); args: INT,INT,INT; result: INT; " +
+                "args nullable: true; result nullable: true]"), plan);
+    }
+
+    @Test
+    public void testSortedFirstLastNonLowCardInput() throws Exception {
+        String sql = """
+            SELECT /*+ SET_VAR(new_planner_agg_stage='2', enable_multi_array_agg_v2='true') */
+                CELONIS_SORTED_FIRST(VARCHAR_COL2 ORDER BY VARCHAR_COL)
+            FROM T
+                """;
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("VARCHAR_COL2"), anyLong);
+                result = false;
+            }
+        };
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("celonis_sorted_first[([3: VARCHAR_COL2, VARCHAR, true], " +
+                "[7: VARCHAR_COL, INT, true])"), plan);
     }
 }
