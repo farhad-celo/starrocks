@@ -30,6 +30,8 @@ public:
 
     DEFINE_VECTORIZED_FN(timestamp_millis);
 
+    DEFINE_VECTORIZED_FN(timestamp_to_millis_precision);
+
     /**
      * @param: [entry_index, calendar_specification, calendar_id_column]
      * @paramType: [INT, ARRAY_VARCHAR, VARCHAR]

@@ -141,6 +141,21 @@ TEST_F(CelonisTimeFunctionsTest, timestamp_millis) {
     EXPECT_EQ(result->get(6).get_timestamp(), TimestampValue::create(1599, 12, 31, 0, 0, 0, 0));
 }
 
+TEST_F(CelonisTimeFunctionsTest, timestamp_to_millis_precision) {
+    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+    timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0, 123456));
+    timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0, 999));
+    timestamps->append_datum(kNullDatum);
+    timestamps->append_datum(TimestampValue::create(1969, 12, 31, 23, 59, 59, 999999));
+
+    const auto result = CelonisTimeFunctions::timestamp_to_millis_precision(nullptr, {timestamps}).value();
+    ASSERT_EQ(timestamps->size(), result->size());
+    EXPECT_EQ(result->get(0).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0, 123000));
+    EXPECT_EQ(result->get(1).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    EXPECT_TRUE(result->get(2).is_null());
+    EXPECT_EQ(result->get(3).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0));
+}
+
 TEST_F(CelonisTimeFunctionsTest, date_between) {
     auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
     auto begin_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
