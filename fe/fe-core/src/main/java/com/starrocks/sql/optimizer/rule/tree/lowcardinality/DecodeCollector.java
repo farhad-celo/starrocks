@@ -1511,6 +1511,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                         logUnsupportedScalarOperatorMetric(scalarOperator.getOpType().toString(), isArray);
                     }
                 }
+            } else if (scalarOperator instanceof CallOperator call
+                    && IntStream.range(0, collectors.size()).anyMatch(
+                            i -> !collectors.get(i).isConstant() && call.getChild(i).getType().isStringArrayType())) {
+                logUnsupportedArrayFunctionWithExtraArgs(call.getFnName());
             }
             return VARIABLES;
         }
@@ -1709,6 +1713,12 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         private void logUnsupportedScalarOperatorMetric(String op, boolean isArray) {
             CelonisMetrics.increaseCounter("lco_unsupported_scalar_op", "lco unsupported scalar op",
                     new MetricLabel("scalar_op", op), new MetricLabel("is_array", Boolean.toString(isArray)));
+        }
+
+        private void logUnsupportedArrayFunctionWithExtraArgs(String fn) {
+            CelonisMetrics.increaseCounter("lco_unsupported_array_fn_with_extra_args",
+                    "lco unsupported array fn with extra args",
+                    new MetricLabel("function", fn));
         }
     }
 
