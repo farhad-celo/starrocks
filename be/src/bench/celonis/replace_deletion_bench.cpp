@@ -4,7 +4,6 @@
 #include <random>
 
 #include "column/column_helper.h"
-#include "exprs/anyval_util.h"
 #include "exprs/function_context.h"
 #include "exprs/string_functions.h"
 #include "runtime/types.h"
@@ -82,11 +81,10 @@ static void do_bench(benchmark::State& state) {
     int pattern_length = state.range(2);
     int pattern_count = state.range(3);
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     // Generate a pattern to remove
@@ -135,7 +133,7 @@ static void do_bench(benchmark::State& state) {
             input_column->append_datum(input_str.data());
         }
 
-        StringFunctions::replace_prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL);
+        ASSERT_OK(StringFunctions::replace_prepare(ctx.get(), FunctionContext::FRAGMENT_LOCAL));
         ctx->set_constant_columns({nullptr, pattern_column, replacement_column});
 
         Columns columns;
@@ -147,7 +145,7 @@ static void do_bench(benchmark::State& state) {
         EXPECT_TRUE(StringFunctions::replace(ctx.get(), columns).ok());
         state.PauseTiming();
 
-        StringFunctions::replace_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL);
+        ASSERT_OK(StringFunctions::replace_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL));
         state.ResumeTiming();
     }
     state.counters["RowInvRate"] =

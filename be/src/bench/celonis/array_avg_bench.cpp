@@ -37,9 +37,8 @@ static void BM_ArrayAvg(benchmark::State& state) {
     int num_rows = state.range(0);
     int array_length = state.range(1);
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DOUBLE)))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_DOUBLE));
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DOUBLE))};
+    auto return_type = TypeDescriptor(TYPE_DOUBLE);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     std::random_device rd;

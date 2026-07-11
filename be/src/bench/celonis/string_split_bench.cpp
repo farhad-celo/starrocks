@@ -4,7 +4,6 @@
 #include <random>
 
 #include "column/column_helper.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/string_functions.h"
 #include "exprs/function_context.h"
 #include "runtime/types.h"
@@ -107,11 +106,10 @@ static void do_bench(benchmark::State& state) {
     int64_t split_index = state.range(3);
     int num_groups = state.range(4);
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR));
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR),
+                                                        TypeDescriptor::from_logical_type(TYPE_BIGINT)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_VARCHAR);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     // Use delimiters from the suggested characters

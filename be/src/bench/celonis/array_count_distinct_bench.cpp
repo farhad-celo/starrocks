@@ -58,8 +58,8 @@ static void BM_ArrayCountDistinctVarchar(benchmark::State& state) {
     int array_length = state.range(2);
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BIGINT));
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))};
+    auto return_type = TypeDescriptor(TYPE_BIGINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     std::random_device rd;

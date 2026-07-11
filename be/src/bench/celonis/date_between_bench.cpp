@@ -4,7 +4,6 @@
 #include <random>
 
 #include "column/column_helper.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/time_functions.h"
 #include "exprs/function_context.h"
 #include "runtime/types.h"
@@ -58,11 +57,10 @@ static void BM_DateBetween(benchmark::State& state) {
     date::init_date_cache(); // This is needed for using TimestampValue
     int num_rows = state.range(0);
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DATETIME)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DATETIME)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_DATETIME))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT));
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_DATETIME),
+                                                        TypeDescriptor::from_logical_type(TYPE_DATETIME),
+                                                        TypeDescriptor::from_logical_type(TYPE_DATETIME)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_BIGINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     int total_rows = 0;

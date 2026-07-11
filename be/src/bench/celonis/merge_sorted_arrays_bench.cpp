@@ -66,13 +66,12 @@ static void BM_MergeSortedArraysVARCHAR(benchmark::State& state) {
     }
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)))};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)));
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)),
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)),
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT)),
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_INT))};
+    auto return_type = TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     TimestampValue timestamp;

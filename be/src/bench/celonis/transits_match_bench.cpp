@@ -5,7 +5,6 @@
 
 #include "column/column_helper.h"
 #include "column/datum_tuple.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/transits_match.h"
 #include "exprs/function_context.h"
 #include "gutil/strings/strcat.h"
@@ -102,22 +101,16 @@ TypeDescriptor get_return_type(const TypeDescriptor& left_key_struct_type,
 
 std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& left_key_struct_type,
                                          const TypeDescriptor& right_key_struct_type) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {AnyValUtil::column_type_to_type_desc(left_key_struct_type),
-                                                        AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-                                                        AnyValUtil::column_type_to_type_desc(right_key_struct_type),
-                                                        AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-                                                        AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR),
-                                                        AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_VARCHAR)};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(get_return_type(left_key_struct_type, right_key_struct_type));
+    std::vector<FunctionContext::TypeDesc> arg_types = {left_key_struct_type, TYPE_ARRAY_VARCHAR, right_key_struct_type,
+                                                        TYPE_ARRAY_VARCHAR,   TYPE_ARRAY_VARCHAR, TYPE_ARRAY_VARCHAR};
+    auto return_type = get_return_type(left_key_struct_type, right_key_struct_type);
     return std::unique_ptr<FunctionContext>(FunctionContext::create_test_context(std::move(arg_types), return_type));
 }
 
 void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays, const std::optional<DatumArray>& left_match,
             const std::optional<std::vector<DatumArray>>& right_keys_arrays,
-            const std::optional<DatumArray>& right_match, const ColumnPtr& left_primary_keys_column,
-            const ColumnPtr& left_match_column, const ColumnPtr& right_primary_keys_column,
-            const ColumnPtr& right_match_column) {
+            const std::optional<DatumArray>& right_match, ColumnPtr& left_primary_keys_column,
+            ColumnPtr& left_match_column, ColumnPtr& right_primary_keys_column, ColumnPtr& right_match_column) {
     auto& left_fields =
             down_cast<StructColumn*>(ColumnHelper::get_data_column(left_primary_keys_column.get()))->fields_column();
     auto left_null_column = down_cast<NullableColumn*>(left_primary_keys_column.get());
@@ -155,10 +148,9 @@ void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays, cons
 void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays, const std::optional<DatumArray>& left_match,
             const std::optional<std::vector<DatumArray>>& right_keys_arrays,
             const std::optional<DatumArray>& right_match, const std::optional<DatumArray>& left_manual,
-            const std::optional<DatumArray>& right_manual, const ColumnPtr& left_primary_keys_column,
-            const ColumnPtr& left_match_column, const ColumnPtr& right_primary_keys_column,
-            const ColumnPtr& right_match_column, const ColumnPtr& left_manual_column,
-            const ColumnPtr& right_manual_column) {
+            const std::optional<DatumArray>& right_manual, ColumnPtr& left_primary_keys_column,
+            ColumnPtr& left_match_column, ColumnPtr& right_primary_keys_column, ColumnPtr& right_match_column,
+            ColumnPtr& left_manual_column, ColumnPtr& right_manual_column) {
     AddRow(left_keys_arrays, left_match, right_keys_arrays, right_match, left_primary_keys_column, left_match_column,
            right_primary_keys_column, right_match_column);
     if (left_manual.has_value()) {

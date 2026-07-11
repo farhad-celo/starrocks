@@ -68,11 +68,9 @@ static void bench(benchmark::State& state, ScalarFunction scalar_function) {
         input_array.emplace_back(Slice(values[j]));
     }
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT))};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)));
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)),
+                                                        TypeDescriptor::from_logical_type(TYPE_BIGINT)};
+    auto return_type = TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR));
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     int total_rows = 0;

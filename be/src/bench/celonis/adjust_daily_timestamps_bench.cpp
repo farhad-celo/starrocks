@@ -4,7 +4,6 @@
 #include <random>
 
 #include "column/column_helper.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/adjust_daily_timestamps.h"
 #include "exprs/function_context.h"
 #include "runtime/types.h"
@@ -115,15 +114,14 @@ static void BM_AdjustDailyTimestamps_WithSorting(benchmark::State& state) {
     int num_cases = state.range(0);
     int avg_activities_per_case = state.range(1); // Average activities per case
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                                                        TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                                                        TypeDescriptor::from_logical_type(TYPE_ARRAY)};
 
     FunctionContext::TypeDesc return_type;
     return_type.type = TYPE_STRUCT;
-    return_type.children = {AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-                            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
+    return_type.children = {TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
     return_type.field_names = {"adjusted_timestamps", "reordering"};
 
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
@@ -156,14 +154,13 @@ static void BM_AdjustDailyTimestamps_WithoutSorting(benchmark::State& state) {
     int num_cases = state.range(0);
     int avg_activities_per_case = state.range(1); // Average activities per case
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                                                        TypeDescriptor::from_logical_type(TYPE_ARRAY)};
 
     FunctionContext::TypeDesc return_type;
     return_type.type = TYPE_STRUCT;
-    return_type.children = {AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
-                            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY))};
+    return_type.children = {TypeDescriptor::from_logical_type(TYPE_ARRAY),
+                            TypeDescriptor::from_logical_type(TYPE_ARRAY)};
     return_type.field_names = {"adjusted_timestamps", "reordering"};
 
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));

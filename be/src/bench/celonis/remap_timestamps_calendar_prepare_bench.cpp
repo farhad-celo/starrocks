@@ -60,12 +60,10 @@ static void run_benchmark(benchmark::State& state, const CreateCalendar& create_
         calendar_ids.push_back("calendar_" + std::to_string(i));
     }
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_DATETIME)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_VARCHAR)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BIGINT));
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor(TYPE_DATETIME), TypeDescriptor(TYPE_VARCHAR),
+                                                        TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)),
+                                                        TypeDescriptor(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor(TYPE_BIGINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     celonis::accelerator::Calendar calendar_proto = create_calendar(calendar_ids, rng);

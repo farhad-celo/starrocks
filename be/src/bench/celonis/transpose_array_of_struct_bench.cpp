@@ -4,7 +4,6 @@
 #include <random>
 
 #include "column/datum_tuple.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/transpose_array_of_struct.h"
 #include "exprs/function_context.h"
 #include "gutil/strings/strcat.h"
@@ -72,13 +71,12 @@ TypeDescriptor get_return_type(const std::vector<LogicalType>& logical_types) {
 }
 
 std::unique_ptr<FunctionContext> get_ctx(const std::vector<LogicalType>& field_logical_types) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(to_array_of_struct_type(field_logical_types))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(get_return_type(field_logical_types));
+    std::vector<FunctionContext::TypeDesc> arg_types = {to_array_of_struct_type(field_logical_types)};
+    auto return_type = get_return_type(field_logical_types);
     return std::unique_ptr<FunctionContext>(FunctionContext::create_test_context(std::move(arg_types), return_type));
 }
 
-void AddRow(const std::vector<std::optional<DatumStruct>>& data, const ColumnPtr& array_of_struct_column) {
+void AddRow(const std::vector<std::optional<DatumStruct>>& data, ColumnPtr& array_of_struct_column) {
     DatumArray array;
     for (auto i = 0; i < data.size(); ++i) {
         if (data[i].has_value()) {

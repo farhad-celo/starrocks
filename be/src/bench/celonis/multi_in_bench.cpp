@@ -5,7 +5,6 @@
 
 #include "column/column_helper.h"
 #include "column/struct_column.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/multi_in.h"
 #include "exprs/function_context.h"
 #include "runtime/types.h"
@@ -76,10 +75,9 @@ static void do_multi_in_bench(benchmark::State& state) {
     // The function takes two struct arguments:
     // 1. Input struct: contains the fields to match against
     // 2. Match struct: contains arrays of potential matches (must be constant)
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_STRUCT))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(TYPE_STRUCT),
+                                                        TypeDescriptor::from_logical_type(TYPE_STRUCT)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_BOOLEAN);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     int total_rows = 0;
@@ -97,7 +95,7 @@ static void do_multi_in_bench(benchmark::State& state) {
             }
             input_fields.push_back(field_column);
         }
-        auto input_struct_col = StructColumn(input_fields).create(input_fields);
+        ColumnPtr input_struct_col = StructColumn::create(input_fields);
 
         // Create match struct columns (the arrays to match in - must be constant)
         Columns match_fields;
@@ -115,7 +113,7 @@ static void do_multi_in_bench(benchmark::State& state) {
             field_array_column->append_datum(match_array);
             match_fields.push_back(field_array_column);
         }
-        auto match_struct_col = StructColumn(match_fields).create(match_fields);
+        ColumnPtr match_struct_col = StructColumn::create(match_fields);
 
         ctx->set_constant_columns({nullptr, match_struct_col});
         state.ResumeTiming();

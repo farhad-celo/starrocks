@@ -4,7 +4,6 @@
 #include <random>
 
 #include "column/column_helper.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/trim.h"
 #include "exprs/function_context.h"
 
@@ -375,8 +374,8 @@ static void do_bench(benchmark::State& state, TrimCharsType trim_chars_type) {
     const int trim_char_length = state.range(2);
     const int percentage_trimmed_words = state.range(3);
 
-    auto arg_types = {AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type{AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+    auto arg_types = {TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type{TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
     std::unique_ptr<FunctionContext> ctx(
             FunctionContext::create_test_context(std::move(arg_types), std::move(return_type)));
 
@@ -384,8 +383,8 @@ static void do_bench(benchmark::State& state, TrimCharsType trim_chars_type) {
     for (size_t i{0}; i < trim_char_length; ++i) {
         trim_chars += unique_trim_chars[i % unique_trim_chars.size()];
     }
-    const auto input_column{generate_input_column(num_rows, avg_word_length, trim_chars, percentage_trimmed_words)};
-    auto trim_char_column{ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true)};
+    const auto input_column = generate_input_column(num_rows, avg_word_length, trim_chars, percentage_trimmed_words);
+    ColumnPtr trim_char_column = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
 
     switch (trim_chars_type) {
     case CONSTANT: {

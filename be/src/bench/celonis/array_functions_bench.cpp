@@ -77,10 +77,9 @@ static void BM_DedupSortedByVARCHAR(benchmark::State& state) {
     }
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME)))};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)));
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)),
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME))};
+    auto return_type = TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR));
 
     int total_rows = 0;
     for (auto _ : state) {
@@ -121,8 +120,8 @@ static void BM_ArrayBoolOr(benchmark::State& state) {
     int array_length = state.range(2);
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BOOLEAN)))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BOOLEAN));
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_BOOLEAN))};
+    auto return_type = TypeDescriptor(TYPE_BOOLEAN);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     std::random_device rd;
@@ -158,8 +157,8 @@ static void BM_ArrayCountVarchar(benchmark::State& state) {
     int array_length = state.range(2);
 
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_BIGINT));
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))};
+    auto return_type = TypeDescriptor(TYPE_BIGINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     std::random_device rd;

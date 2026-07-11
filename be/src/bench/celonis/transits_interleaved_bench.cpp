@@ -5,7 +5,6 @@
 
 #include "column/column_helper.h"
 #include "column/datum_tuple.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/transits_interleaved.h"
 #include "exprs/function_context.h"
 #include "gutil/strings/strcat.h"
@@ -91,14 +90,10 @@ TypeDescriptor get_return_type(const TypeDescriptor& left_key_struct_type,
 
 std::unique_ptr<FunctionContext> get_ctx(const TypeDescriptor& left_key_struct_type,
                                          const TypeDescriptor& right_key_struct_type) {
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(left_key_struct_type),
-            AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_DATETIME),
-            AnyValUtil::column_type_to_type_desc(right_key_struct_type),
-            AnyValUtil::column_type_to_type_desc(TYPE_ARRAY_DATETIME),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN))};
-    auto return_type =
-            AnyValUtil::column_type_to_type_desc(get_return_type(left_key_struct_type, right_key_struct_type));
+    std::vector<FunctionContext::TypeDesc> arg_types = {left_key_struct_type, TYPE_ARRAY_DATETIME,
+                                                        right_key_struct_type, TYPE_ARRAY_DATETIME,
+                                                        TypeDescriptor::from_logical_type(TYPE_BOOLEAN)};
+    auto return_type = get_return_type(left_key_struct_type, right_key_struct_type);
     return std::unique_ptr<FunctionContext>(FunctionContext::create_test_context(std::move(arg_types), return_type));
 }
 
@@ -106,10 +101,9 @@ void AddRow(const std::optional<std::vector<DatumArray>>& left_keys_arrays,
             const std::optional<DatumArray>& left_timestamps, const std::optional<DatumArray>& left_sortings,
             const std::optional<std::vector<DatumArray>>& right_keys_arrays,
             const std::optional<DatumArray>& right_timestamps, const std::optional<DatumArray>& right_sortings,
-            std::optional<bool> first_last_only, const ColumnPtr& left_primary_keys_column,
-            const ColumnPtr& left_timestamps_column, const ColumnPtr& left_sortings_column,
-            const ColumnPtr& right_primary_keys_column, const ColumnPtr& right_timestamps_column,
-            const ColumnPtr& right_sortings_column, const ColumnPtr& first_last_only_column) {
+            std::optional<bool> first_last_only, ColumnPtr& left_primary_keys_column, ColumnPtr& left_timestamps_column,
+            ColumnPtr& left_sortings_column, ColumnPtr& right_primary_keys_column, ColumnPtr& right_timestamps_column,
+            ColumnPtr& right_sortings_column, ColumnPtr& first_last_only_column) {
     auto& left_fields =
             down_cast<StructColumn*>(ColumnHelper::get_data_column(left_primary_keys_column.get()))->fields_column();
     auto left_null_column = down_cast<NullableColumn*>(left_primary_keys_column.get());

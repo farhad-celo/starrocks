@@ -5,7 +5,6 @@
 
 #include "column/column_helper.h"
 #include "column/datum_tuple.h"
-#include "exprs/anyval_util.h"
 #include "exprs/celonis/abc_model.h"
 #include "exprs/function_context.h"
 #include "runtime/types.h"
@@ -83,11 +82,10 @@ static void do_bench_abc_model(benchmark::State& state) {
         }
     }
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(LT)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT)),
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BIGINT));
+    std::vector<FunctionContext::TypeDesc> arg_types = {TypeDescriptor::from_logical_type(LT),
+                                                        TypeDescriptor::from_logical_type(TYPE_BIGINT),
+                                                        TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
+    auto return_type = TypeDescriptor::from_logical_type(TYPE_BIGINT);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     // Generate value distribution

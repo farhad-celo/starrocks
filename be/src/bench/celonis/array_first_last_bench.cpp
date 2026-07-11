@@ -58,8 +58,8 @@ static void bench(benchmark::State& state, ScalarFunction scalar_function) {
         strings.emplace_back("value" + std::to_string(j));
     }
     std::vector<FunctionContext::TypeDesc> arg_types = {
-            AnyValUtil::column_type_to_type_desc(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)))};
-    auto return_type = AnyValUtil::column_type_to_type_desc(TypeDescriptor(TYPE_VARCHAR));
+            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR))};
+    auto return_type = TypeDescriptor(TYPE_VARCHAR);
     std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
 
     int total_rows = 0;
