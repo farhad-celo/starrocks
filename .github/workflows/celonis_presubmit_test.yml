@@ -69,8 +69,10 @@ jobs:
           #echo "Time check passed" 
 
       - name: Pull dev env image
+        env:
+          GHCR_TOKEN: ${{ github.token }}
         run: |
-          echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker pull ${{ needs.setup.outputs.builder_image }}
 
       - name: Presubmit test
@@ -85,8 +87,8 @@ jobs:
     container:
       image: ${{ needs.setup.outputs.builder_image }}
       credentials:
-        username: ${{ github.repository }}
-        password: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

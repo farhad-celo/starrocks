@@ -30,6 +30,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
   pull-requests: read
 
 env:
@@ -53,8 +54,8 @@ jobs:
     container:
       image: ${{ needs.setup.outputs.builder_image }}
       credentials:
-        username: ${{ github.repository }}
-        password: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -176,8 +177,8 @@ jobs:
     container:
       image: ${{ needs.setup.outputs.builder_image }}
       credentials:
-        username: ${{ github.repository }}
-        password: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
