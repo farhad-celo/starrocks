@@ -12,26 +12,27 @@
 #include "exprs/celonis/utils/exception_remapping.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types_fwd.h"
-#include "modules/cube/ccmm/ccmm_manager.h"
 #include "modules/cube/variant_trace_cache_manager.h"
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table.h"
 #include "modules/operators/process/align_model/align_model_table_group_node_settings.h"
 #include "modules/operators/process/align_model/create_align_model_tables.h"
 #include "modules/query/operators.pb.h"
-#include "rapidjson/document.h"
 #include "utils/builders/column_builder.h"
 #include "utils/nullable_pql_value.h"
 
 namespace celonis::accelerator::operators::process::align_model {
 
+// TODO(n.weber): CPL-10401 - Deprecated for removal
+constexpr const char* ACTIVITY_COLUMN_KEY{"ACTIVITY"};
+// TODO(n.weber): CPL-10401 - This should only be 'ID' in the future
+constexpr const char* OBJECT_ID_COLUMN_KEY{"OBJECT_ID"};
+
 struct eventlog_params {
   std::string case_table_name{"CASE_TABLE"};
   std::string activity_table_name{"ACTIVITY_TABLE"};
-  std::string case_col_name{cube::ccmm::OBJECT_ID_COLUMN_KEY};
-  std::string activity_col_name{cube::ccmm::ACTIVITY_COLUMN_KEY};
-  std::string timestamp_col_name{cube::ccmm::TIMESTAMP_COLUMN_KEY};
-  bool is_default_eventlog{true};
+  std::string case_col_name{OBJECT_ID_COLUMN_KEY};
+  std::string activity_col_name{ACTIVITY_COLUMN_KEY};
 };
 
 align_model_version to_saola_version(AlignModelHelper::celostar_align_model_version v) {
@@ -109,7 +110,7 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
 
   const auto id_column{column_builder<cel_int_t>{}
                            .owner(case_table.get())
-                           .name(cube::ccmm::OBJECT_ID_COLUMN_KEY)
+                           .name(OBJECT_ID_COLUMN_KEY)
                            .data(unique_object_ids)
                            .cache_key(fmt::format("{}.{}", params.case_table_name, params.case_col_name))
                            .build()};

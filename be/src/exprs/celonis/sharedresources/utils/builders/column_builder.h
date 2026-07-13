@@ -3,9 +3,6 @@
 #include <bytell_hash_map.hpp>
 #include <limits>
 #include <memory>
-#include <numeric>
-#include <type_traits>
-#include <unordered_map>
 
 #include "modules/common/buffer_types.h"
 #include "modules/common/execution_context.h"
@@ -25,15 +22,6 @@ public:
     column_builder& owner(memory::table* new_owner) {
         owner_ = new_owner;
         return *this;
-    }
-
-    column_builder& size(int32_t size) { return column_builder::size(static_cast<int64_t>(size)); }
-
-    column_builder& size(int64_t size) {
-        if (size < 0) {
-            throw std::runtime_error{"Size is negative."};
-        }
-        return column_builder::size(static_cast<size_t>(size));
     }
 
     column_builder& size(const size_t size) {
@@ -66,11 +54,6 @@ public:
         return data_size_;
     }
 
-    template <typename... TS>
-    column_builder& data(TS... input) {
-        return data(utils::nullable_vec_t<T>{input...});
-    }
-
     /**
    * @brief sets both data and null flags.
    */
@@ -84,66 +67,9 @@ public:
         return *this;
     }
 
-    column_builder& data(const std::vector<T>& input) {
-        size(input.size());
-        for (size_t i = 0; i < input.size(); ++i) {
-            data_array_[i] = input[i];
-            null_flags_->set(i, false);
-        }
-        data_set_ = true;
-        return *this;
-    }
-
-    /**
-   * Generates the column data using a functor. The size needs to be specified in advance. Both the data *and* the
-   * null flags can be initialized with this function.
-   *
-   * @param f A function with a single argument (the row index) which should return a type that is convertible
-   *        to a nullable_pql_value<T>.
-   */
-    template <typename FUNCTOR>
-    column_builder& generate_data(FUNCTOR f) {
-        if (data_set_) {
-            throw std::runtime_error{"Column data is already set."};
-        }
-        if (!size_set_) {
-            throw std::runtime_error{"Size needs to be set for data to be generated."};
-        }
-
-        for (row_id i = 0; i < data_size_; ++i) {
-            // Not using {}-init to allow narrowing conversion (for now, as it affects a lot of tests)
-            utils::nullable_pql_value<T> value(f(i));
-            data_array_[i] = value.get_or_default();
-            null_flags_->set(i, value.is_null());
-        }
-        data_set_ = true;
-        return *this;
-    }
-
     column_builder& name(std::string new_name) {
         col_name_ = new_name;
         col_id_ = std::move(new_name);
-        return *this;
-    }
-
-    column_builder& id(std::string new_id) {
-        if (col_name_ == new_id) {
-            throw std::runtime_error{
-                    "The ID is automatically set with name(). If you need to specify them individually, use "
-                    "name_only() "
-                    "and id_only()."};
-        }
-        col_id_ = std::move(new_id);
-        return *this;
-    }
-
-    column_builder& name_only(std::string name) {
-        col_name_ = std::move(name);
-        return *this;
-    }
-
-    column_builder& id_only(std::string id) {
-        col_id_ = std::move(id);
         return *this;
     }
 
@@ -152,46 +78,12 @@ public:
         return *this;
     }
 
-    column_builder& processing_state(const memory::column_processing_state& state) {
-        state_ = state;
-        state_modified_ = true;
-        return *this;
-    }
-
-    column_builder& default_processing_state() {
-        state_modified_ = false;
-        return processing_state(memory::column_processing_state());
-    }
-
     memory::column_t build() {
         memory::column_t result = memory::builders::temp_column_builder(memory::col_name{col_name_},
                                                                         memory::col_id{col_id_}, owner_, cache_key_)
                                           .create_from_data<T>(static_cast<row_id>(data_size_), std::move(data_array_),
                                                                null_flags_, state_);
         reset();
-        return result;
-    }
-
-    memory::column_t build_dictified() {
-        memory::column_t result{build()};
-        std::ignore = result->get_dict(common::execution_context{}); // force dictification
-        return result;
-    }
-
-    memory::column_t build_and_add_to_owner() {
-        if (owner_ == nullptr) {
-            throw std::runtime_error{"owner is not set."};
-        }
-        auto result{owner_->add_column(memory::col_name{col_name_}, memory::col_id{col_id_},
-                                       memory::col_cache_key{cache_key_}, std::move(data_array_), null_flags_, state_,
-                                       memory::MAX_TABLE_ROW_LIMIT)};
-        reset();
-        return result;
-    }
-
-    memory::column_t build_dictified_and_add_to_owner() {
-        memory::column_t result{build_and_add_to_owner()};
-        std::ignore = result->get_dict(common::execution_context{}); // force dictification
         return result;
     }
 
@@ -226,15 +118,6 @@ public:
         return *this;
     }
 
-    column_builder& size(int32_t size) { return column_builder::size(static_cast<int64_t>(size)); }
-
-    column_builder& size(int64_t size) {
-        if (size < 0) {
-            throw std::runtime_error{"Negative size not supported."};
-        }
-        return column_builder::size(static_cast<size_t>(size));
-    }
-
     column_builder& size(const size_t size) {
         if (size > static_cast<size_t>(std::numeric_limits<row_id>::max())) {
             throw std::runtime_error{"Size is too large."};
@@ -256,11 +139,6 @@ public:
         return *this;
     }
 
-    template <typename... TS>
-    column_builder& data(TS... input) {
-        return data(utils::nullable_vec_t<cel_string_t>{input...});
-    }
-
     column_builder& data(const utils::nullable_vec_t<cel_string_t>& input) {
         size(input.size());
         for (size_t i = 0; i < input.size(); ++i) {
@@ -274,85 +152,15 @@ public:
         return *this;
     }
 
-    column_builder& data(const std::vector<std::string>& input) {
-        size(input.size());
-        for (size_t i = 0; i < input.size(); ++i) {
-            data_array_[i] = input[i];
-            null_flags_->set(i, false);
-        }
-        data_set_ = true;
-        return *this;
-    }
-
-    /**
-   * Generates the column data using a functor. The size needs to be specified in advance. Both the data *and* the
-   * null flags can be initialized with this function.
-   *
-   * @param f A function with a single argument (the row index) which should return a type that is convertible
-   *        to a nullable_pql_value<T>.
-   */
-    template <typename FUNCTOR>
-    column_builder& generate_data(FUNCTOR f) {
-        if (data_set_) {
-            throw std::runtime_error{"Column data is already set."};
-        }
-        if (!size_set_) {
-            throw std::runtime_error{"Size needs to be set for data to be generated."};
-        }
-
-        for (row_id i = 0; i < data_size_; ++i) {
-            // Not using {}-init to allow narrowing conversion (for now, as it affects a lot of tests)
-            utils::nullable_pql_value<cel_string_t> value(f(i));
-            null_flags_->set(i, value.is_null());
-            if (!value.is_null()) {
-                data_array_[i] = value.get_or_throw();
-            }
-        }
-        data_set_ = true;
-        return *this;
-    }
-
     column_builder& name(std::string new_name) {
         col_name_ = new_name;
         col_id_ = std::move(new_name);
         return *this;
     }
 
-    column_builder& id(std::string new_id) {
-        if (col_name_ == new_id) {
-            throw std::runtime_error{
-                    "The ID is automatically set with name(). If you need to specify them individually, use "
-                    "name_only() "
-                    "and id_only()."};
-        }
-        col_id_ = std::move(new_id);
-        return *this;
-    }
-
-    column_builder& name_only(std::string name) {
-        col_name_ = std::move(name);
-        return *this;
-    }
-
-    column_builder& id_only(std::string id) {
-        col_id_ = std::move(id);
-        return *this;
-    }
-
     column_builder& cache_key(const std::string& new_cache_key) {
         cache_key_ = new_cache_key;
         return *this;
-    }
-
-    column_builder& processing_state(memory::column_processing_state state) {
-        state_ = std::move(state);
-        state_modified_ = true;
-        return *this;
-    }
-
-    column_builder& default_processing_state() {
-        state_modified_ = false;
-        return processing_state(memory::column_processing_state());
     }
 
     memory::column_t build() {
@@ -370,33 +178,6 @@ public:
                                                  static_cast<row_id>(buf_result.string_buf.size()),
                                                  std::move(buf_result.string_buf), null_flags_, state_)};
         reset();
-        return result;
-    }
-
-    memory::column_t build_dictified() {
-        memory::column_t result{build()};
-        std::ignore = result->get_dict(common::execution_context{}); // force dictification
-        return result;
-    }
-
-    memory::column_t build_and_add_to_owner() {
-        if (owner_ == nullptr) {
-            throw std::runtime_error{"owner is not set."};
-        }
-
-        auto buf_result{create_string_buffer()};
-
-        auto result{owner_->add_string_column(memory::col_name(col_name_), memory::col_id(col_id_),
-                                              memory::col_cache_key{cache_key_}, std::move(buf_result.ptrs),
-                                              std::move(buf_result.string_buf), null_flags_,
-                                              memory::MAX_TABLE_ROW_LIMIT)};
-        reset();
-        return result;
-    }
-
-    memory::column_t build_dictified_and_add_to_owner() {
-        memory::column_t result{build_and_add_to_owner()};
-        std::ignore = result->get_dict(common::execution_context{}); // force dictification
         return result;
     }
 

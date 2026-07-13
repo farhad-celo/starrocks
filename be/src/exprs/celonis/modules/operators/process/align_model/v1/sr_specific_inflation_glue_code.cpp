@@ -9,9 +9,11 @@
 #include <tbb/enumerable_thread_specific.h>
 
 #include <cpml/model/bpmn_graph.h>
+#include <ctl/algorithm.h>
+#include <ctl/interval.h>
 
 #include "exprs/celonis/result_table.h"
-#include "modules/common/for_each_group.h"
+#include "modules/common/case_aligned_range.h"
 #include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/table_group.h"
@@ -144,7 +146,7 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
               local_block = {};
               local_block.first = std::distance(case_accessor.get(), range.begin);
               local_block.last = std::distance(case_accessor.get(), range.end);
-              common::for_each_group(local_block.first, local_block.last, case_accessor, [&](auto interval) {
+              ctl::deprecated::for_each_group(local_block.first, local_block.last, case_accessor, [&](auto interval) {
                 const auto activity_table_case_id_col_row{
                     interval.begin()};  // this is from the activity but the variant trace
                 // cache stores col_ptrs at the case table level
@@ -194,8 +196,7 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
 using variant_idx_to_row_t = std::vector<row_id>;
 template <typename ACTIVITY_ACCESSOR>
 [[nodiscard]] variant_idx_to_row_t compute_variant_idx_to_case_idx_map(
-    const legacy_embedded_ctl::half_open_interval<row_id> interval_for_case,
-    const ACTIVITY_ACCESSOR& activity_accessor) {
+    const ctl::half_open_interval<row_id> interval_for_case, const ACTIVITY_ACCESSOR& activity_accessor) {
   // we filter nulls from the variant, therefore to get the right event to join to we need to map the variant idx to
   // the case idx.
   variant_idx_to_row_t variant_idx_to_log_idx{};
@@ -266,7 +267,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
 
               auto current_variant_row{block.offset_variant};
 
-              common::for_each_group(
+              ctl::deprecated::for_each_group(
                   block.offset_in, block.offset_in + block.size_in, case_accessor, [&](auto interval) {
                     const auto activity_table_case_id_col_row{interval.begin()};
                     // the above is from the activity table but the variant trace

@@ -4,7 +4,6 @@
 #ifndef CELOSTAR
 #include "modules/io/file_utils.h"
 #endif
-#include "modules/memory/management/memory_manager.h"
 #include "modules/memory/table.h"
 
 namespace celonis::accelerator::memory::management {
@@ -38,14 +37,6 @@ bool data_handler::swap_file_exists(const std::string& swap_file, const swap_inf
 #else
   return io::file_exists(swap_file, sinfo);
 #endif
-}
-
-void data_handler::add_swap_invocation_to_operator_statistics(const std::shared_ptr<memory_manager>& manager,
-                                                              const std::string& key,
-                                                              const std::chrono::milliseconds runtime) {
-  if (manager != nullptr) {
-    manager->add_invocation_to_operator_statistics(key, runtime);
-  }
 }
 
 }  // namespace celonis::accelerator::memory::management

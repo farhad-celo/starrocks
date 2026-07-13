@@ -12,7 +12,6 @@
 
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/management/data_handler_fwd.h"
-#include "modules/memory/management/memory_manager_fwd.h"
 
 namespace celonis::accelerator::memory::management {
 

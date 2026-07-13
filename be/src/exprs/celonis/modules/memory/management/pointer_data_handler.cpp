@@ -231,8 +231,6 @@ std::shared_ptr<pointer_data_handler<T>> pointer_data_handler<T>::create_data_ha
     const legacy_embedded_ctl::shared_static_array<POINTER_T>& ptr,
     const legacy_embedded_ctl::shared_static_array<STORAGE_T>& buffer, const std::string& swap_file,
     pointer_data_handler_swap_type type, swap_info sinfo, const std::string& description) {
-  sinfo.memory_manager().reset();
-
   std::shared_ptr<pointer_data_handler> pointer_data(
       new pointer_data_handler(ptr, buffer, sinfo, swap_file, type, description));
   return pointer_data;

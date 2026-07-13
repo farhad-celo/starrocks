@@ -5,11 +5,9 @@
 #include <string>
 
 #include "modules/common/int_types.h"
-#include "modules/cube/execution/tracking/operator_statistics.h"
 #ifndef CELOSTAR
 #include "modules/io/storage_manager_fwd.h"
 #endif
-#include "modules/memory/management/memory_manager_fwd.h"
 
 namespace celonis::accelerator::memory::management {
 
@@ -53,8 +51,6 @@ class swap_info {
    */
   [[nodiscard]] const io::storage_manager& storage_manager() const;
 #endif
-  [[nodiscard]] const std::shared_ptr<management::memory_manager>& memory_manager() const noexcept;
-  [[nodiscard]] std::shared_ptr<management::memory_manager>& memory_manager() noexcept;
   [[nodiscard]] const std::string& base_directory() const noexcept;
   [[nodiscard]] const std::string& encryption_key() const noexcept;
   [[nodiscard]] std::string& encryption_key() noexcept;
@@ -80,7 +76,6 @@ class swap_info {
 #ifndef CELOSTAR
   const io::storage_manager* swap_storage_manager{nullptr};
 #endif
-  std::shared_ptr<management::memory_manager> manager{nullptr};
   std::string swap_encryption_key{};
 };
 
@@ -93,10 +88,6 @@ inline bool swap_info::is_persistent() const noexcept { return persistence_state
 inline bool swap_info::is_non_persistent() const noexcept {
   return persistence_state() == persistence_status::NON_PERSISTENT;
 }
-
-inline const std::shared_ptr<management::memory_manager>& swap_info::memory_manager() const noexcept { return manager; }
-
-inline std::shared_ptr<management::memory_manager>& swap_info::memory_manager() noexcept { return manager; }
 
 inline const std::string& swap_info::base_directory() const noexcept { return swap_base_directory; }
 

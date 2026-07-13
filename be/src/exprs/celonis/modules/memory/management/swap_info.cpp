@@ -4,7 +4,6 @@
 #ifndef CELOSTAR
 #include "modules/io/storage_manager.h"
 #endif
-#include "modules/memory/management/memory_manager.h"
 
 namespace celonis::accelerator::memory::management {
 

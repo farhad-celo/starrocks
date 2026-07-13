@@ -13,7 +13,6 @@
 #include "modules/common/timer.h"
 #include "modules/memory/management/data_handler_fwd.h"
 #include "modules/memory/management/load_status.h"
-#include "modules/memory/management/memory_manager_fwd.h"
 #include "modules/memory/management/swap_info.h"
 #include "modules/memory/table_fwd.h"
 #include "modules/memory/types.h"
@@ -93,9 +92,5 @@ class data_handler {
   virtual ~data_handler() = default;
 
   static bool swap_file_exists(const std::string& swap_file, const swap_info& sinfo);
-
- protected:
-  static void add_swap_invocation_to_operator_statistics(const std::shared_ptr<memory_manager>& manager,
-                                                         const std::string& key, std::chrono::milliseconds runtime);
 };
 }  // namespace celonis::accelerator::memory::management

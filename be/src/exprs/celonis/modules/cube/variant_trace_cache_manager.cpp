@@ -12,7 +12,6 @@
 #include "log/log.h"
 #include "modules/cube/variant_trace_utils.h"
 #include "modules/memory/cache/variant_trace_cache.h"
-#include "modules/memory/management/memory_manager.h"
 #include "modules/memory/management/pointer_data_handler.h"
 
 namespace celonis::accelerator::cube {
