@@ -129,6 +129,9 @@ TEST_F(CelonisTimeFunctionsTest, timestamp_millis) {
     col->append_datum(61123L);           // 1970-01-01 00:01:01.123 UTC
     col->append_datum(172800000L);       // 1970-01-03 00:00:00
     col->append_datum(-11676182400000L); // 1599-12-31 00:00:00
+    col->append_datum(-1L);              // 1969-12-31 23:59:59.999 UTC
+    col->append_datum(-999L);            // 1969-12-31 23:59:59.001 UTC
+    col->append_datum(-1001L);           // 1969-12-31 23:59:58.999 UTC
 
     const auto result = CelonisTimeFunctions::timestamp_millis(nullptr, {col}).value();
     ASSERT_EQ(result->size(), col->size());
@@ -139,6 +142,9 @@ TEST_F(CelonisTimeFunctionsTest, timestamp_millis) {
     EXPECT_EQ(result->get(4).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 1, 1, 123000));
     EXPECT_EQ(result->get(5).get_timestamp(), TimestampValue::create(1970, 1, 3, 0, 0, 0));
     EXPECT_EQ(result->get(6).get_timestamp(), TimestampValue::create(1599, 12, 31, 0, 0, 0, 0));
+    EXPECT_EQ(result->get(7).get_timestamp(), TimestampValue::create(1969, 12, 31, 23, 59, 59, 999000));
+    EXPECT_EQ(result->get(8).get_timestamp(), TimestampValue::create(1969, 12, 31, 23, 59, 59, 1000));
+    EXPECT_EQ(result->get(9).get_timestamp(), TimestampValue::create(1969, 12, 31, 23, 59, 58, 999000));
 }
 
 TEST_F(CelonisTimeFunctionsTest, timestamp_to_millis_precision) {

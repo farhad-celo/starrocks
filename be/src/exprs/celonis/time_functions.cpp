@@ -65,6 +65,8 @@ static const int64_t NUM_MILLISECONDS_PER_DAY = 86400000L;
 
 static const int64_t NUM_MILLISECONDS_PER_WEEK = NUM_MILLISECONDS_PER_DAY * NUM_DAYS_PER_WEEK;
 
+static const int64_t NUM_MILLISECONDS_PER_SECOND = 1000L;
+
 static const int64_t NUM_MICROSECONDS_PER_MILLISECONDS = 1000L;
 
 // SR places an upper limit of 1M of STRING. We use 900K which is less than 1M.
@@ -92,10 +94,14 @@ bool is_timestamp_in_valid_range(int64_t unix_millis) {
 }
 
 TimestampValue timestamp_from_unix_millis(int64_t unix_millis) {
-    int64_t seconds = unix_millis / 1000;
-    int64_t microseconds = (unix_millis % 1000) * 1000;
+    int64_t seconds = unix_millis / NUM_MILLISECONDS_PER_SECOND;
+    int64_t milliseconds = unix_millis % NUM_MILLISECONDS_PER_SECOND;
+    if (milliseconds < 0) {
+        --seconds;
+        milliseconds += NUM_MILLISECONDS_PER_SECOND;
+    }
     TimestampValue timestamp;
-    timestamp.from_unix_second(seconds, microseconds);
+    timestamp.from_unix_second(seconds, milliseconds * NUM_MICROSECONDS_PER_MILLISECONDS);
     return timestamp;
 }
 
