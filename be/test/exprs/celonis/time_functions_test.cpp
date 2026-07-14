@@ -162,6 +162,29 @@ TEST_F(CelonisTimeFunctionsTest, timestamp_to_millis_precision) {
     EXPECT_EQ(result->get(3).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0));
 }
 
+TEST_F(CelonisTimeFunctionsTest, normalize_timestamp) {
+    auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), true);
+    timestamps->append_datum(TimestampValue::create(1399, 12, 31, 23, 59, 59, 999999));
+    timestamps->append_datum(TimestampValue::create(1400, 1, 1, 0, 0, 0));
+    timestamps->append_datum(TimestampValue::create(1970, 1, 1, 0, 0, 0, 123456));
+    timestamps->append_datum(TimestampValue::create(1969, 12, 31, 23, 59, 59, 999999));
+    timestamps->append_datum(TimestampValue::create(1969, 12, 31, 23, 59, 59, 999000));
+    timestamps->append_datum(TimestampValue::create(9999, 12, 31, 23, 59, 59, 999999));
+    timestamps->append_datum(TimestampValue::create(10000, 1, 1, 0, 0, 0));
+    timestamps->append_datum(kNullDatum);
+
+    const auto result = CelonisTimeFunctions::normalize_timestamp(nullptr, {timestamps}).value();
+    ASSERT_EQ(result->size(), timestamps->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_EQ(result->get(1).get_timestamp(), TimestampValue::create(1400, 1, 1, 0, 0, 0));
+    EXPECT_EQ(result->get(2).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0, 123000));
+    EXPECT_EQ(result->get(3).get_timestamp(), TimestampValue::create(1970, 1, 1, 0, 0, 0));
+    EXPECT_EQ(result->get(4).get_timestamp(), TimestampValue::create(1969, 12, 31, 23, 59, 59, 999000));
+    EXPECT_EQ(result->get(5).get_timestamp(), TimestampValue::create(9999, 12, 31, 23, 59, 59, 999000));
+    EXPECT_TRUE(result->get(6).is_null());
+    EXPECT_TRUE(result->get(7).is_null());
+}
+
 TEST_F(CelonisTimeFunctionsTest, date_between) {
     auto timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);
     auto begin_timestamps = ColumnHelper::create_column(TypeDescriptor(TYPE_DATETIME), false);

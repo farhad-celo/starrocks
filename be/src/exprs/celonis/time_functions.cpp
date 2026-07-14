@@ -1551,6 +1551,27 @@ StatusOr<ColumnPtr> CelonisTimeFunctions::timestamp_to_millis_precision([[maybe_
     return result.build(all_const);
 }
 
+StatusOr<ColumnPtr> CelonisTimeFunctions::normalize_timestamp([[maybe_unused]] FunctionContext* context,
+                                                              const Columns& columns) {
+    DCHECK_EQ(columns.size(), 1);
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    ColumnViewer timestamp_viewer = ColumnViewer<TYPE_DATETIME>(columns[0]);
+    ColumnBuilder<TYPE_DATETIME> result(num_rows);
+    for (auto row = 0; row < num_rows; ++row) {
+        if (timestamp_viewer.is_null(row)) {
+            result.append_null();
+            continue;
+        }
+        const auto timestamp = timestamp_viewer.value(row);
+        if (!is_timestamp_in_valid_range(timestamp)) {
+            result.append_null();
+            continue;
+        }
+        result.append(timestamp_from_unix_millis(remap_timestamp_ms(timestamp)));
+    }
+    return result.build(all_const);
+}
+
 StatusOr<ColumnPtr> remap_timestamps_calendar_const([[maybe_unused]] FunctionContext* context,
                                                     const starrocks::Columns& columns,
                                                     const CalendarState* calendar_state) {
