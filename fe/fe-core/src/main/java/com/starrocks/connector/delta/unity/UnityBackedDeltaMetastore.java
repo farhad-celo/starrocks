@@ -94,15 +94,13 @@ public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
     @Override
     protected DeltaLakeEngine createDeltaLakeEngine(Configuration effectiveConfiguration, boolean usePerTableConfig) {
         if (isDeltaCacheEnabled()) {
-            // Per-table credentials bind into each scoped view's loader and entries are pinned to
-            // this catalog's principal scope, so the shared cache is safe regardless of usePerTableConfig.
+            // usePerTableConfig marks vended credentials: the shared cache's loaders must then read under
+            // a per-load UGI so a stale/cross-table SAS lease can't be reused from Hadoop's FS cache.
             return unityMetaCache.createEngine(unityProperties.getPrincipalScope(),
-                    effectiveConfiguration, properties);
+                    effectiveConfiguration, properties, usePerTableConfig);
         }
-        // delta-cache.enabled=false means the operator opted out of Delta caching entirely:
-        // honor that by forcing bypass on the inherited per-catalog caches as well, even when
-        // the caller did not request it. The catalog-level snapshot cache is independently
-        // disabled via isSnapshotCacheBypassed().
+        // delta-cache.enabled=false: operator opted out of Delta caching, so bypass the inherited
+        // per-catalog caches too. The catalog-level snapshot cache is disabled via isSnapshotCacheBypassed().
         return super.createDeltaLakeEngine(effectiveConfiguration, true);
     }
 

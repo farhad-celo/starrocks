@@ -22,12 +22,9 @@ import io.delta.kernel.utils.CloseableIterator;
 
 /**
  * A {@link RemoteFileInfoSource} for vended-credential Delta tables whose scan-file listing is consumed
- * lazily during scan-range scheduling, after the building method has returned.
- *
- * <p>It binds a throwaway-UGI {@link DeltaVendedFsScope} to the source's lifetime: the eager iterator
- * build and every later pull run under that scope, and {@link DeltaVendedFsScope.Handle#close} reclaims
- * the {@code S3AFileSystem} instances when the source is closed. Without it, each credential rotation
- * would leak one filesystem under the long-lived login UGI.</p>
+ * lazily after the building method returns. It binds a throwaway-UGI {@link DeltaVendedFsScope} to the
+ * source's lifetime so every pull runs under that scope and {@link DeltaVendedFsScope.Handle#close}
+ * reclaims its filesystems on close.
  */
 final class ScopedRemoteFileInfoSource implements RemoteFileInfoSource {
     private final DeltaVendedFsScope.Handle handle;

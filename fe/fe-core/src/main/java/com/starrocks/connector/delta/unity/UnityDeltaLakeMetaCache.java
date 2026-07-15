@@ -28,6 +28,7 @@ import com.starrocks.connector.delta.DeltaLakeEngine;
 import com.starrocks.connector.delta.DeltaLakeFileStatus;
 import com.starrocks.connector.delta.DeltaLakeJsonHandler;
 import com.starrocks.connector.delta.DeltaLakeParquetHandler;
+import com.starrocks.connector.delta.DeltaVendedFsScope;
 import io.delta.kernel.data.ColumnarBatch;
 import io.delta.kernel.types.StructType;
 import org.apache.hadoop.conf.Configuration;
@@ -45,8 +46,8 @@ import java.util.stream.Collectors;
  * <p>Entries are keyed on {@code (principalScope, file identity)} so a hit is only ever served to
  * callers within the same Unity principal boundary; a different principal misses and loads under
  * its own vended credentials. Per-table credentials reach the loader through the scoped views
- * returned by {@link #getCheckpointCache(String, Configuration)} / {@link #getJsonCache(String,
- * Configuration)}.</p>
+ * returned by {@link #getCheckpointCache(String, Configuration, boolean)} / {@link #getJsonCache(String,
+ * Configuration, boolean)}.</p>
  *
  * <p>Sized once from {@link UnityDeltaLakeMetaCacheConfig} on first use; restart the FE to
  * change TTLs or memory-usage ratios.</p>
@@ -91,25 +92,44 @@ public class UnityDeltaLakeMetaCache {
     }
 
     DeltaLakeEngine createEngine(String principalScope, Configuration hadoopConfiguration,
-                                 DeltaLakeCatalogProperties properties) {
+                                 DeltaLakeCatalogProperties properties, boolean vendedCredentials) {
         return DeltaLakeEngine.create(hadoopConfiguration, properties,
-                getCheckpointCache(principalScope, hadoopConfiguration),
-                getJsonCache(principalScope, hadoopConfiguration), false);
+                getCheckpointCache(principalScope, hadoopConfiguration, vendedCredentials),
+                getJsonCache(principalScope, hadoopConfiguration, vendedCredentials), false);
     }
 
     LoadingCache<Pair<DeltaLakeFileStatus, StructType>, List<ColumnarBatch>> getCheckpointCache(
-            String principalScope, Configuration hadoopConfiguration) {
+            String principalScope, Configuration hadoopConfiguration, boolean vendedCredentials) {
         return new ScopedLoadingCache<>(checkpointCache, principalScope,
-                key -> DeltaLakeParquetHandler.readParquetFile(
-                        key.first.getPath(), key.first.getSize(), key.first.getModificationTime(),
-                        key.second, hadoopConfiguration));
+                key -> {
+                    String path = key.first.getPath();
+                    return runScopedIfVended(vendedCredentials, path,
+                            () -> DeltaLakeParquetHandler.readParquetFile(
+                                    path, key.first.getSize(), key.first.getModificationTime(),
+                                    key.second, hadoopConfiguration));
+                });
     }
 
     LoadingCache<DeltaLakeFileStatus, List<JsonNode>> getJsonCache(String principalScope,
-                                                                   Configuration hadoopConfiguration) {
+                                                                   Configuration hadoopConfiguration,
+                                                                   boolean vendedCredentials) {
         return new ScopedLoadingCache<>(jsonCache, principalScope,
-                fileStatus -> DeltaLakeJsonHandler.readJsonFile(
-                        fileStatus.getPath(), hadoopConfiguration));
+                fileStatus -> {
+                    String path = fileStatus.getPath();
+                    return runScopedIfVended(vendedCredentials, path,
+                            () -> DeltaLakeJsonHandler.readJsonFile(path, hadoopConfiguration));
+                });
+    }
+
+    // Static credentials read directly under any UGI. Vended credentials read through a scope so the
+    // filesystem is built with this file's own lease: Hadoop keys its FS cache on (scheme, authority,
+    // UGI) and ignores the SAS, so a shared UGI would reuse one table's filesystem for another and 403.
+    private static <V> V runScopedIfVended(boolean vendedCredentials, String path,
+                                           DeltaVendedFsScope.ScopedAction<V> read) throws Exception {
+        if (!vendedCredentials) {
+            return read.run();
+        }
+        return DeltaVendedFsScope.runScopedReentrant(DeltaVendedFsScope.scopeNameForPath(path), read);
     }
 
     public Map<String, Long> estimateCount() {

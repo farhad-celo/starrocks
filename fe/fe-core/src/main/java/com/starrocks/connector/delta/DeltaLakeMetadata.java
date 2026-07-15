@@ -286,10 +286,8 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
         DeltaLakeTable deltaLakeTable = (DeltaLakeTable) table;
         Engine engine = deltaLakeTable.getDeltaEngine();
         if (engine instanceof DeltaLakeEngine && ((DeltaLakeEngine) engine).isPerTableConfig()) {
-            // Vended credentials: this source is consumed lazily during scan-range scheduling, so the
-            // getScanFiles filesystem access happens after this method returns. ScopedRemoteFileInfoSource
-            // binds a throwaway-UGI scope to the source's lifetime so the filesystems it builds are reclaimed
-            // on close instead of leaking one per credential rotation under the long-lived login UGI.
+            // Vended credentials: this source is consumed lazily after this method returns, so bind a
+            // throwaway-UGI scope to its lifetime; the filesystems getScanFiles builds are reclaimed on close.
             return ScopedRemoteFileInfoSource.open(
                     DeltaVendedFsScope.scopeNameFor(catalogName, deltaLakeTable.getCatalogDBName(),
                             deltaLakeTable.getCatalogTableName()),
@@ -367,9 +365,8 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
             return null;
         };
 
-        // Vended credentials: drain the listing under a throwaway-UGI scope so closeAllForUGI reclaims
-        // the S3AFileSystem instances it builds. The drain is fully synchronous here, so a single
-        // runScoped suffices (the incremental path in buildRemoteInfoSource needs the lifecycle Handle).
+        // Vended credentials: drain the listing under a throwaway-UGI scope so closeAllForUGI reclaims the
+        // filesystems it builds. Fully synchronous here, so a single runScoped suffices.
         Engine engine = deltaLakeTable.getDeltaEngine();
         try {
             if (engine instanceof DeltaLakeEngine && ((DeltaLakeEngine) engine).isPerTableConfig()) {

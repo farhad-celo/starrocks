@@ -177,8 +177,7 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         if (usePerTableConfig) {
             effectiveConfiguration = new Configuration(hdfsConfiguration);
             tableCloudConfiguration.applyToConfiguration(effectiveConfiguration);
-            // Keep the cloud FS cache on for this per-table copy so the throwaway-UGI scope's
-            // closeAllForUGI can reclaim the S3AFileSystem instances every vended read builds.
+            // Keep the FS cache on for this per-table copy so the scope's closeAllForUGI can reclaim it.
             DeltaVendedFsScope.enableFilesystemCache(effectiveConfiguration);
         }
         DeltaLakeEngine deltaLakeEngine = createDeltaLakeEngine(effectiveConfiguration, usePerTableConfig);
@@ -186,9 +185,8 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
 
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "DeltaLake.getSnapshot")) {
             if (usePerTableConfig) {
-                // Vended credentials: run the kernel log replay under a throwaway, per-load UGI so the
-                // S3AFileSystem instances it builds are reclaimed via closeAllForUGI when the load
-                // returns, instead of leaking one uncached filesystem (and its threads) per metadata file.
+                // Vended credentials: run the kernel log replay under a throwaway per-load UGI so its
+                // filesystems are reclaimed via closeAllForUGI on return instead of leaking per metadata file.
                 snapshot = DeltaVendedFsScope.runScoped(
                         DeltaVendedFsScope.scopeNameFor(catalogName, dbName, tableName),
                         () -> (SnapshotImpl) Table.forPath(deltaLakeEngine, path).getLatestSnapshot(deltaLakeEngine));
@@ -236,8 +234,7 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         ScanBuilder scanBuilder = deltaLakeTable.getDeltaSnapshot().getScanBuilder();
         Scan scan = scanBuilder.build();
         try {
-            // Mirror the getLatestSnapshot scoping: scan-file listing reuses the same engine and
-            // would otherwise leak an uncached S3AFileSystem under vended credentials.
+            // Mirror the getLatestSnapshot scoping so the scan-file listing's filesystems are reclaimed.
             if (deltaEngine instanceof DeltaLakeEngine && ((DeltaLakeEngine) deltaEngine).isPerTableConfig()) {
                 DeltaVendedFsScope.runScoped(
                         DeltaVendedFsScope.scopeNameFor(catalogName, dbName, tableName),

@@ -84,4 +84,78 @@ public class DeltaVendedFsScopeTest {
         handle.close();
         Assertions.assertDoesNotThrow(handle::close);
     }
+
+    @Test
+    public void testScopeNameForPathPinsToTableDirectoryAndSanitizes() {
+        String name = DeltaVendedFsScope.scopeNameForPath(
+                "abfss://c@a.dfs.core.windows.net/t/__unitystorage/tables/tid/_delta_log/00000000000000000756.json");
+
+        Assertions.assertEquals(
+                "delta-vended-fs-abfss___c_a_dfs_core_windows_net_t___unitystorage_tables_tid", name);
+    }
+
+    @Test
+    public void testRunScopedRejectsInvalidScopeName() {
+        Assertions.assertThrows(IllegalArgumentException.class, () ->
+                DeltaVendedFsScope.runScoped("abfss://c@a/x", () -> null));
+    }
+
+    @Test
+    public void testScopeNameForPathRejectsNullPath() {
+        Assertions.assertThrows(IllegalArgumentException.class, () ->
+                DeltaVendedFsScope.scopeNameForPath(null));
+    }
+
+    @Test
+    public void testScopeNameForPathContainsNoColon() throws Exception {
+        String name = DeltaVendedFsScope.scopeNameForPath(
+                "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/1.json");
+
+        String userInside = DeltaVendedFsScope.runScoped(name, () ->
+                UserGroupInformation.getCurrentUser().getUserName());
+        Assertions.assertFalse(userInside.contains(":"), userInside);
+    }
+
+    @Test
+    public void testIsActiveOnThreadOnlyInsideScope() throws Exception {
+        Assertions.assertFalse(DeltaVendedFsScope.isActiveOnThread());
+
+        boolean insideScope = DeltaVendedFsScope.runScoped("scope-active", () -> {
+            Assertions.assertTrue(DeltaVendedFsScope.isActiveOnThread());
+            return DeltaVendedFsScope.isActiveOnThread();
+        });
+
+        Assertions.assertTrue(insideScope);
+        Assertions.assertFalse(DeltaVendedFsScope.isActiveOnThread(),
+                "the marker must be cleared once the scope's action returns");
+    }
+
+    @Test
+    public void testIsActiveOnThreadClearedAfterException() {
+        Assertions.assertThrows(IOException.class, () ->
+                DeltaVendedFsScope.runScoped("scope-active-throw", () -> {
+                    throw new IOException("boom");
+                }));
+
+        Assertions.assertFalse(DeltaVendedFsScope.isActiveOnThread(),
+                "the marker must be cleared even when the action throws");
+    }
+
+    @Test
+    public void testActiveDepthNestsAndRestores() throws Exception {
+        String outerAndInner = DeltaVendedFsScope.runScoped("scope-outer", () -> {
+            String outerUser = UserGroupInformation.getCurrentUser().getUserName();
+            // A nested scope still runs under its own UGI; the marker stays active throughout.
+            String innerUser = DeltaVendedFsScope.runScoped("scope-inner", () -> {
+                Assertions.assertTrue(DeltaVendedFsScope.isActiveOnThread());
+                return UserGroupInformation.getCurrentUser().getUserName();
+            });
+            Assertions.assertTrue(DeltaVendedFsScope.isActiveOnThread(),
+                    "outer scope must still be active after the nested scope returns");
+            return outerUser + "|" + innerUser;
+        });
+
+        Assertions.assertEquals("scope-outer|scope-inner", outerAndInner);
+        Assertions.assertFalse(DeltaVendedFsScope.isActiveOnThread());
+    }
 }

@@ -21,15 +21,20 @@ import com.databricks.sdk.service.catalog.TableInfo;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.starrocks.common.Pair;
 import com.starrocks.connector.delta.DeltaLakeCatalogProperties;
+import com.starrocks.connector.delta.DeltaLakeEngine;
 import com.starrocks.connector.delta.DeltaLakeFileStatus;
 import com.starrocks.connector.delta.DeltaLakeJsonHandler;
+import com.starrocks.connector.delta.DeltaLakeParquetHandler;
 import com.starrocks.connector.delta.DeltaLakeSnapshot;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.credential.CloudType;
 import com.starrocks.credential.aws.AwsCloudConfiguration;
+import io.delta.kernel.data.ColumnarBatch;
+import io.delta.kernel.types.StructType;
 import mockit.Expectations;
 import mockit.Mock;
 import mockit.MockUp;
@@ -40,6 +45,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class UnityBackedDeltaMetastoreTest {
@@ -280,7 +287,7 @@ public class UnityBackedDeltaMetastoreTest {
                 io.delta.kernel.utils.FileStatus.of("s3://bucket/shared-unity-cache-test.json", 123, 456));
 
         String scope = props.getPrincipalScope();
-        cache.getJsonCache(scope, new Configuration(false)).put(status, Lists.newArrayList());
+        cache.getJsonCache(scope, new Configuration(false), true).put(status, Lists.newArrayList());
         backed.invalidateAll();
 
         Assertions.assertTrue(cache.containsJson(scope, status),
@@ -296,7 +303,7 @@ public class UnityBackedDeltaMetastoreTest {
         DeltaLakeFileStatus status = DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(
                 "s3://bucket/principal-scope-isolation-" + System.nanoTime() + ".json", 1, 2));
 
-        cache.getJsonCache("principal-a", new Configuration(false)).put(status, Lists.newArrayList());
+        cache.getJsonCache("principal-a", new Configuration(false), true).put(status, Lists.newArrayList());
 
         Assertions.assertTrue(cache.containsJson("principal-a", status),
                 "the populating principal must see its own cached entry");
@@ -322,8 +329,161 @@ public class UnityBackedDeltaMetastoreTest {
             }
         };
 
-        cache.getJsonCache("test-principal-scope", scoped).get(status);
+        cache.getJsonCache("test-principal-scope", scoped, false).get(status);
 
         Assertions.assertEquals("expected", seen.get());
+    }
+
+    @Test
+    public void testVendedLoaderRunsUnderPerLoadUgi() throws Exception {
+        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
+        String path = "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/"
+                + System.nanoTime() + ".json";
+        DeltaLakeFileStatus status = DeltaLakeFileStatus.of(
+                io.delta.kernel.utils.FileStatus.of(path, 1, 2));
+        AtomicReference<String> ugiInside = new AtomicReference<>();
+
+        new MockUp<DeltaLakeJsonHandler>() {
+            @Mock
+            public java.util.List<com.fasterxml.jackson.databind.JsonNode> readJsonFile(String filePath,
+                                                                                       Configuration hadoopConf)
+                    throws java.io.IOException {
+                ugiInside.set(
+                        org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName());
+                return Lists.newArrayList();
+            }
+        };
+
+        String loginUgi = org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName();
+        cache.getJsonCache("vended-principal-scope", new Configuration(false), true).get(status);
+
+        Assertions.assertEquals(
+                com.starrocks.connector.delta.DeltaVendedFsScope.scopeNameForPath(path), ugiInside.get(),
+                "vended loader must read under a per-load scope UGI, not the shared login UGI");
+        Assertions.assertNotEquals(loginUgi, ugiInside.get());
+    }
+
+    @Test
+    public void testVendedLoaderReusesEnclosingScopeUgi() throws Exception {
+        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
+        String path = "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/"
+                + System.nanoTime() + ".json";
+        DeltaLakeFileStatus status = DeltaLakeFileStatus.of(
+                io.delta.kernel.utils.FileStatus.of(path, 1, 2));
+        AtomicReference<String> ugiInside = new AtomicReference<>();
+
+        new MockUp<DeltaLakeJsonHandler>() {
+            @Mock
+            public java.util.List<com.fasterxml.jackson.databind.JsonNode> readJsonFile(String filePath,
+                                                                                       Configuration hadoopConf)
+                    throws java.io.IOException {
+                ugiInside.set(
+                        org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName());
+                return Lists.newArrayList();
+            }
+        };
+
+        // Already inside a per-table scope (the synchronous query / background-refresh path): the loader
+        // must reuse this scope's UGI, not open a redundant per-path scope.
+        com.starrocks.connector.delta.DeltaVendedFsScope.runScoped("enclosing-scope", () -> {
+            cache.getJsonCache("vended-principal-scope", new Configuration(false), true).get(status);
+            return null;
+        });
+
+        Assertions.assertEquals("enclosing-scope", ugiInside.get(),
+                "with an active scope the vended loader must reuse the enclosing UGI");
+    }
+
+    @Test
+    public void testCheckpointCacheIsolatesEntriesByPrincipalScope() {
+        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
+        Pair<DeltaLakeFileStatus, StructType> key = Pair.create(
+                DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(
+                        "s3://bucket/checkpoint-isolation-" + System.nanoTime() + ".checkpoint.parquet", 1, 2)),
+                new StructType());
+
+        cache.getCheckpointCache("principal-a", new Configuration(false), true).put(key, Lists.newArrayList());
+
+        Assertions.assertNotNull(
+                cache.getCheckpointCache("principal-a", new Configuration(false), true).getIfPresent(key),
+                "the populating principal must see its own cached checkpoint entry");
+        Assertions.assertNull(
+                cache.getCheckpointCache("principal-b", new Configuration(false), true).getIfPresent(key),
+                "a different principal must never be served a checkpoint entry it did not populate");
+    }
+
+    @Test
+    public void testCheckpointVendedLoaderRunsUnderPerLoadUgi() throws Exception {
+        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
+        String path = "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/"
+                + System.nanoTime() + ".checkpoint.parquet";
+        Pair<DeltaLakeFileStatus, StructType> key = Pair.create(
+                DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(path, 1, 2)), new StructType());
+        AtomicReference<String> ugiInside = new AtomicReference<>();
+
+        new MockUp<DeltaLakeParquetHandler>() {
+            @Mock
+            public List<ColumnarBatch> readParquetFile(String filePath, long fileSize, long modificationTime,
+                                                       StructType physicalSchema, Configuration hadoopConf)
+                throws IOException {
+                ugiInside.set(
+                        org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName());
+                return Lists.newArrayList();
+            }
+        };
+
+        String loginUgi = org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName();
+        cache.getCheckpointCache("vended-principal-scope", new Configuration(false), true).get(key);
+
+        Assertions.assertEquals(
+                com.starrocks.connector.delta.DeltaVendedFsScope.scopeNameForPath(path), ugiInside.get(),
+                "vended checkpoint loader must read under a per-load scope UGI, not the shared login UGI");
+        Assertions.assertNotEquals(loginUgi, ugiInside.get());
+    }
+
+    @Test
+    public void testCheckpointVendedLoaderReusesEnclosingScopeUgi() throws Exception {
+        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
+        String path = "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/"
+                + System.nanoTime() + ".checkpoint.parquet";
+        Pair<DeltaLakeFileStatus, StructType> key = Pair.create(
+                DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(path, 1, 2)), new StructType());
+        AtomicReference<String> ugiInside = new AtomicReference<>();
+
+        new MockUp<DeltaLakeParquetHandler>() {
+            @Mock
+            public List<ColumnarBatch> readParquetFile(String filePath, long fileSize, long modificationTime,
+                                                       StructType physicalSchema, Configuration hadoopConf)
+                throws IOException {
+                ugiInside.set(
+                        org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName());
+                return Lists.newArrayList();
+            }
+        };
+
+        com.starrocks.connector.delta.DeltaVendedFsScope.runScoped("enclosing-scope", () -> {
+            cache.getCheckpointCache("vended-principal-scope", new Configuration(false), true).get(key);
+            return null;
+        });
+
+        Assertions.assertEquals("enclosing-scope", ugiInside.get(),
+                "with an active scope the vended checkpoint loader must reuse the enclosing UGI");
+    }
+
+    @Test
+    public void testCreateEngineWiresSharedCachingHandlers() {
+        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
+        Configuration conf = new Configuration(false);
+
+        DeltaLakeEngine engine = cache.createEngine("principal-scope", conf,
+                new DeltaLakeCatalogProperties(Maps.newHashMap()), true);
+
+        Assertions.assertSame(conf, engine.getHadoopConf());
+        Assertions.assertFalse(engine.isPerTableConfig(),
+                "the shared-cache engine must consult the meta cache, not bypass it");
+        Assertions.assertTrue(engine.getJsonHandler() instanceof DeltaLakeJsonHandler,
+                "createEngine must wire the caching JSON handler");
+        Assertions.assertTrue(engine.getParquetHandler() instanceof DeltaLakeParquetHandler,
+                "createEngine must wire the caching parquet handler");
     }
 }
