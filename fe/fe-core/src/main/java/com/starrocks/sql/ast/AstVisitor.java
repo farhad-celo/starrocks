@@ -56,6 +56,7 @@ import com.starrocks.analysis.VariableExpr;
 import com.starrocks.connector.parser.trino.PlaceholderExpr;
 import com.starrocks.sql.ShowTemporaryTableStmt;
 import com.starrocks.sql.ast.AdminShowTabletStatusStmt;
+import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 import com.starrocks.sql.ast.feedback.AddPlanAdvisorStmt;
 import com.starrocks.sql.ast.feedback.ClearPlanAdvisorStmt;
 import com.starrocks.sql.ast.feedback.DelPlanAdvisorStmt;
@@ -1583,6 +1584,10 @@ public interface AstVisitor<R, C> {
     }
 
     default R visitShowPlanAdvisorStatement(ShowPlanAdvisorStmt statement, C context) {
+        return visitStatement(statement, context);
+    }
+
+    default R visitExplainInputColumnsStatement(ExplainInputColumnsStmt statement, C context) {
         return visitStatement(statement, context);
     }
 

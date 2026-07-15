@@ -63,6 +63,9 @@ import com.starrocks.connector.metadata.MetadataTable;
 import com.starrocks.connector.metadata.MetadataTableType;
 import com.starrocks.connector.statistics.ConnectorTableColumnStats;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.server.celonis.CelostarExtensionSet;
+import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
+import com.starrocks.server.celonis.explaininputcolumns.VirtualExtensionTable;
 import com.starrocks.sql.ast.AlterTableStmt;
 import com.starrocks.sql.ast.AlterViewStmt;
 import com.starrocks.sql.ast.CleanTemporaryTableStmt;
@@ -514,6 +517,19 @@ public class MetadataMgr {
             if (!originTableExist) {
                 LOG.error("origin table not exists with {}.{}.{}", catalogName, dbName, tblName);
                 return null;
+            }
+        }
+
+        if (context != null) {
+            CelostarExtensionSet celostarExtensions = context.getCelostarExtensions();
+            if (celostarExtensions != null) {
+                CelostarSchemaExtension schemaExtension = celostarExtensions.getSchemaExtension();
+                // Celostar extensions add virtual catalog entities. Metadata lookup is the earliest point where a
+                // missing extension-only table can be synthesized before table resolution reports it as unknown.
+                if (connectorTable == null && schemaExtension.hasExtensionsFor(catalogName, dbName, tblName)) {
+                    return VirtualExtensionTable.virtualTable(tblName,
+                            schemaExtension.virtualColumnsFor(catalogName, dbName, tblName));
+                }
             }
         }
         return connectorTable;

@@ -17,6 +17,7 @@ package com.starrocks.sql.ast;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.OrderByElement;
 import com.starrocks.analysis.Subquery;
+import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 import com.starrocks.sql.ast.pipe.CreatePipeStmt;
 
 public class AstTraverser<R, C> implements AstVisitor<R, C> {
@@ -26,6 +27,14 @@ public class AstTraverser<R, C> implements AstVisitor<R, C> {
     @Override
     public R visitQueryStatement(QueryStatement statement, C context) {
         visit(statement.getQueryRelation(), context);
+        return null;
+    }
+
+    @Override
+    public R visitExplainInputColumnsStatement(ExplainInputColumnsStmt statement, C context) {
+        if (statement.getQueryStmt() != null) {
+            visit(statement.getQueryStmt(), context);
+        }
         return null;
     }
 

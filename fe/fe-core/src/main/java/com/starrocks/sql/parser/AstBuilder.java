@@ -477,6 +477,7 @@ import com.starrocks.sql.ast.UserIdentity;
 import com.starrocks.sql.ast.UserVariable;
 import com.starrocks.sql.ast.ValueList;
 import com.starrocks.sql.ast.ValuesRelation;
+import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 import com.starrocks.sql.ast.feedback.AddPlanAdvisorStmt;
 import com.starrocks.sql.ast.feedback.ClearPlanAdvisorStmt;
 import com.starrocks.sql.ast.feedback.DelPlanAdvisorStmt;
@@ -5260,6 +5261,38 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
         }
         queryStmt.setIsExplain(false, StatementBase.ExplainLevel.PLAN_ADVISOR);
         return new AddPlanAdvisorStmt(createPos(context), queryStmt);
+    }
+
+    @Override
+    public ParseNode visitExplainInputColumnsStatement(StarRocksParser.ExplainInputColumnsStatementContext context) {
+        QueryStatement queryStmt = (QueryStatement) visitQueryStatement(context.queryStatement());
+        if (queryStmt.isExplain()) {
+            throw new ParsingException(
+                    PARSER_ERROR_MSG.unsupportedStatement("inner query of EXPLAIN INPUT COLUMNS must not be an EXPLAIN"));
+        }
+        if (queryStmt.hasOutFileClause()) {
+            throw new ParsingException(
+                    PARSER_ERROR_MSG.unsupportedStatement("INTO OUTFILE is not supported in EXPLAIN INPUT COLUMNS"));
+        }
+        List<ExplainInputColumnsStmt.VirtualExtension> virtualExtensions = new ArrayList<>();
+        if (context.explainInputColumnsExtensionList() != null) {
+            for (StarRocksParser.ExplainInputColumnsExtensionContext extensionContext :
+                    context.explainInputColumnsExtensionList().explainInputColumnsExtension()) {
+                QualifiedName qualifiedName = getQualifiedName(extensionContext.qualifiedName());
+                String columnName = ((Identifier) visit(extensionContext.identifier())).getValue();
+                StarRocksParser.TypeContext typeContext =
+                        extensionContext.getRuleContext(StarRocksParser.TypeContext.class, 0);
+                if (typeContext == null) {
+                    throw new ParsingException("EXPLAIN INPUT COLUMNS extension requires a type",
+                            createPos(extensionContext));
+                }
+                Type type = getType(typeContext);
+                virtualExtensions.add(
+                        new ExplainInputColumnsStmt.VirtualExtension(qualifiedName.getParts(), columnName, type,
+                                createPos(extensionContext)));
+            }
+        }
+        return new ExplainInputColumnsStmt(createPos(context), queryStmt, virtualExtensions);
     }
 
     public ParseNode visitTruncatePlanAdvisorStatement(StarRocksParser.TruncatePlanAdvisorStatementContext context) {

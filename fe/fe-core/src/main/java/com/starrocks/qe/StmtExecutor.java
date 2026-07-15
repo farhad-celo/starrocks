@@ -128,6 +128,7 @@ import com.starrocks.proto.PPlanFragmentCancelReason;
 import com.starrocks.proto.PQueryStatistics;
 import com.starrocks.proto.QueryStatisticsItemPB;
 import com.starrocks.qe.QueryState.MysqlStateType;
+import com.starrocks.qe.celonis.explaininputcolumns.ExplainInputColumnsExecutor;
 import com.starrocks.qe.feedback.OperatorTuningGuides;
 import com.starrocks.qe.feedback.PlanAdvisorExecutor;
 import com.starrocks.qe.feedback.PlanTuningAdvisor;
@@ -196,6 +197,7 @@ import com.starrocks.sql.ast.UpdateStmt;
 import com.starrocks.sql.ast.UseCatalogStmt;
 import com.starrocks.sql.ast.UseDbStmt;
 import com.starrocks.sql.ast.UserVariable;
+import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 import com.starrocks.sql.ast.feedback.PlanAdvisorStmt;
 import com.starrocks.sql.ast.translate.TranslateStmt;
 import com.starrocks.sql.ast.txn.BeginStmt;
@@ -931,6 +933,8 @@ public class StmtExecutor {
                 handleDelBackendBlackListStmt();
             } else if (parsedStmt instanceof PlanAdvisorStmt) {
                 handlePlanAdvisorStmt();
+            } else if (parsedStmt instanceof ExplainInputColumnsStmt) {
+                handleExplainInputColumnsStmt();
             } else if (parsedStmt instanceof TranslateStmt) {
                 handleTranslateStmt();
             } else if (parsedStmt instanceof BeginStmt) {
@@ -2252,6 +2256,17 @@ public class StmtExecutor {
             // state changed in execute
             return;
         }
+        if (isProxy) {
+            proxyResultSet = resultSet;
+            context.getState().setEof();
+            return;
+        }
+
+        sendShowResult(resultSet);
+    }
+
+    private void handleExplainInputColumnsStmt() throws IOException {
+        ShowResultSet resultSet = ExplainInputColumnsExecutor.execute((ExplainInputColumnsStmt) parsedStmt, context);
         if (isProxy) {
             proxyResultSet = resultSet;
             context.getState().setEof();

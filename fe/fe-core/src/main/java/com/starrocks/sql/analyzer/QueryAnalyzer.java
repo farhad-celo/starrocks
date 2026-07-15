@@ -61,6 +61,9 @@ import com.starrocks.common.profile.Tracers;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.server.MetadataMgr;
+import com.starrocks.server.celonis.CelostarExtensionSet;
+import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
+import com.starrocks.server.celonis.explaininputcolumns.SchemaExtensionColumn;
 import com.starrocks.sql.ast.AstTraverser;
 import com.starrocks.sql.ast.AstVisitor;
 import com.starrocks.sql.ast.CTERelation;
@@ -695,6 +698,8 @@ public class QueryAnalyzer {
         @Override
         public Scope visitTable(TableRelation node, Scope outerScope) {
             TableName tableName = node.getResolveTableName();
+            // getResolveTableName() is alias-aware; schema extensions are keyed by the real table name.
+            TableName extensionLookupTableName = node.getName();
             Table table = node.getTable();
 
             ImmutableList.Builder<Field> fields = ImmutableList.builder();
@@ -710,7 +715,12 @@ public class QueryAnalyzer {
                     fields.add(field);
                 }
             } else {
-                List<Column> fullSchema = table.getFullSchema();
+                // Celostar extensions add virtual catalog entities. Inject virtual columns while building relation
+                // fields so explicit references resolve, while the original table metadata and base schema stay
+                // unchanged and SELECT * semantics are not widened.
+                List<Column> extensionColumns = getExtensionColumns(extensionLookupTableName, table);
+                List<Column> fullSchema = new ArrayList<>(table.getFullSchema());
+                fullSchema.addAll(extensionColumns);
                 Set<Column> baseSchema = new HashSet<>(table.getBaseSchema());
 
                 List<String> pruneScanColumns = node.getPruneScanColumns();
@@ -785,6 +795,23 @@ public class QueryAnalyzer {
             collector.process(node, scope);
 
             return scope;
+        }
+
+        private List<Column> getExtensionColumns(TableName tableName, Table table) {
+            CelostarExtensionSet celostarExtensions = session.getCelostarExtensions();
+            if (celostarExtensions == null) {
+                return List.of();
+            }
+            CelostarSchemaExtension schemaExtension = celostarExtensions.getSchemaExtension();
+
+            List<Column> extensionColumns = new ArrayList<>();
+            for (SchemaExtensionColumn extensionColumn : schemaExtension.virtualColumnsFor(
+                    tableName.getCatalog(), tableName.getDb(), tableName.getTbl())) {
+                if (table.getColumn(extensionColumn.name()) == null) {
+                    extensionColumns.add(new Column(extensionColumn.name(), extensionColumn.type(), true));
+                }
+            }
+            return extensionColumns;
         }
 
         private List<Column> getBinlogMetaColumns() {

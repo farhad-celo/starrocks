@@ -25,6 +25,7 @@ import com.starrocks.catalog.system.SystemTable;
 import com.starrocks.connector.metadata.MetadataTable;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.GlobalStateMgr;
+import com.starrocks.server.celonis.explaininputcolumns.VirtualExtensionTable;
 import com.starrocks.sql.analyzer.Analyzer;
 import com.starrocks.sql.analyzer.Authorizer;
 import com.starrocks.sql.ast.AstTraverser;
@@ -70,7 +71,8 @@ public class ColumnPrivilege {
             TableName tableName = entry.getKey();
             Table table = entry.getValue();
 
-            if (excludeTables.contains(tableName) || table instanceof MetadataTable) {
+            if (excludeTables.contains(tableName) || table instanceof MetadataTable ||
+                    table instanceof VirtualExtensionTable) {
                 continue;
             }
 
@@ -94,6 +96,8 @@ public class ColumnPrivilege {
                 tableUsedExternalAccessController.add(tableName);
             }
         }
+        tableUsedExternalAccessController.removeIf(tableName ->
+                tableNameTableObj.get(tableName) instanceof VirtualExtensionTable);
 
         Map<TableName, Set<String>> scanColumns = new HashMap<>();
         OptExpression optimizedPlan;
@@ -126,7 +130,8 @@ public class ColumnPrivilege {
             TableName tableName = entry.getKey();
             Table table = entry.getValue();
 
-            if (excludeTables.contains(tableName) || table instanceof MetadataTable) {
+            if (excludeTables.contains(tableName) || table instanceof MetadataTable ||
+                    table instanceof VirtualExtensionTable) {
                 continue;
             }
 

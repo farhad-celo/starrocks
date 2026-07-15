@@ -52,6 +52,7 @@ import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.CatalogMgr;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.server.WarehouseManager;
+import com.starrocks.sql.analyzer.celonis.explaininputcolumns.ExplainInputColumnsAuthorizationScope;
 import com.starrocks.sql.ast.AddBackendBlackListStmt;
 import com.starrocks.sql.ast.AddSqlBlackListStmt;
 import com.starrocks.sql.ast.AdminCancelRepairTableStmt;
@@ -210,6 +211,7 @@ import com.starrocks.sql.ast.UpdateStmt;
 import com.starrocks.sql.ast.UseCatalogStmt;
 import com.starrocks.sql.ast.UseDbStmt;
 import com.starrocks.sql.ast.UserIdentity;
+import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 import com.starrocks.sql.ast.group.CreateGroupProviderStmt;
 import com.starrocks.sql.ast.group.DropGroupProviderStmt;
 import com.starrocks.sql.ast.group.ShowCreateGroupProviderStmt;
@@ -286,6 +288,14 @@ public class AuthorizerStmtVisitor implements AstVisitor<Void, ConnectContext> {
         }
 
         return null;
+    }
+
+    @Override
+    public Void visitExplainInputColumnsStatement(ExplainInputColumnsStmt statement, ConnectContext context) {
+        try (ExplainInputColumnsAuthorizationScope ignored =
+                     ExplainInputColumnsAuthorizationScope.install(statement, context)) {
+            return visit(statement.getQueryStmt(), context);
+        }
     }
 
     // ------------------------------------------- DML Statement -------------------------------------------------------

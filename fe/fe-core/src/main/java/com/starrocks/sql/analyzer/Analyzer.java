@@ -17,6 +17,7 @@ package com.starrocks.sql.analyzer;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.OriginStatement;
 import com.starrocks.server.GlobalStateMgr;
+import com.starrocks.sql.analyzer.celonis.explaininputcolumns.ExplainInputColumnsAnalyzer;
 import com.starrocks.sql.ast.AddSqlBlackListStmt;
 import com.starrocks.sql.ast.AdminCancelRepairTableStmt;
 import com.starrocks.sql.ast.AdminCheckTabletsStmt;
@@ -149,6 +150,7 @@ import com.starrocks.sql.ast.UninstallPluginStmt;
 import com.starrocks.sql.ast.UpdateStmt;
 import com.starrocks.sql.ast.UseCatalogStmt;
 import com.starrocks.sql.ast.UseDbStmt;
+import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 import com.starrocks.sql.ast.group.CreateGroupProviderStmt;
 import com.starrocks.sql.ast.group.DropGroupProviderStmt;
 import com.starrocks.sql.ast.group.ShowCreateGroupProviderStmt;
@@ -1209,6 +1211,12 @@ public class Analyzer {
         @Override
         public Void visitTranslateStatement(TranslateStmt statement, ConnectContext context) {
             TranslateAnalyzer.analyze(statement, context);
+            return null;
+        }
+
+        @Override
+        public Void visitExplainInputColumnsStatement(ExplainInputColumnsStmt statement, ConnectContext context) {
+            ExplainInputColumnsAnalyzer.analyze(statement, context);
             return null;
         }
     }

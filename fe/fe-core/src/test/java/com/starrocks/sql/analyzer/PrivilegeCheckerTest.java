@@ -366,6 +366,18 @@ public class PrivilegeCheckerTest {
         }
     }
 
+    private static void verifyGrantSuccess(String sql, String grantSql, String revokeSql) throws Exception {
+        ConnectContext ctx = starRocksAssert.getCtx();
+        ctxToRoot();
+        DDLStmtExecutor.execute(UtFrameUtils.parseStmtWithNewParser(grantSql, ctx), ctx);
+        try {
+            verifySuccess(sql, ctx);
+        } finally {
+            ctxToRoot();
+            DDLStmtExecutor.execute(UtFrameUtils.parseStmtWithNewParser(revokeSql, ctx), ctx);
+        }
+    }
+
     private static void verifyGrantRevokeFail(String sql, String grantSql, String revokeSql,
                                               String expectError1st, String expectError2nd) throws Exception {
         ConnectContext ctx = starRocksAssert.getCtx();
@@ -955,6 +967,38 @@ public class PrivilegeCheckerTest {
                 "revoke select on materialized view db3.mv1 from test",
                 "Access denied; you need (at least one of) the SELECT privilege(s) on MATERIALIZED VIEW mv1 " +
                         "for this operation");
+    }
+
+    @Test
+    public void testExplainInputColumnsPrivileges() throws Exception {
+        verifyGrantRevoke(
+                "EXPLAIN INPUT COLUMNS SELECT k1 FROM db1.tbl1",
+                "grant select on db1.tbl1 to test",
+                "revoke select on db1.tbl1 from test",
+                "Access denied; you need (at least one of) the SELECT privilege(s) on TABLE tbl1 for this operation");
+        verifyGrantRevoke(
+                "EXPLAIN INPUT COLUMNS SELECT virt FROM db1.tbl1 EXTENSIONS (db1.tbl1.virt : BIGINT)",
+                "grant select on db1.tbl1 to test",
+                "revoke select on db1.tbl1 from test",
+                "Access denied; you need (at least one of) the SELECT privilege(s) on TABLE tbl1 for this operation");
+        verifyGrantSuccess(
+                "EXPLAIN INPUT COLUMNS SELECT virt FROM db1.tbl1 EXTENSIONS (db1.tbl1.virt : BIGINT)",
+                "grant select on db1.tbl1 to test",
+                "revoke select on db1.tbl1 from test");
+        verifyGrantRevoke(
+                "EXPLAIN INPUT COLUMNS SELECT virt, k1 FROM db1.tbl1 EXTENSIONS (db1.tbl1.virt : BIGINT)",
+                "grant select on db1.tbl1 to test",
+                "revoke select on db1.tbl1 from test",
+                "Access denied; you need (at least one of) the SELECT privilege(s) on TABLE tbl1 for this operation");
+        verifyGrantRevoke(
+                "EXPLAIN INPUT COLUMNS SELECT k1, virt FROM db1.tbl1 JOIN db1.vtab ON k1 = virt " +
+                        "EXTENSIONS (db1.vtab.virt : VARCHAR(32))",
+                "grant select on db1.tbl1 to test",
+                "revoke select on db1.tbl1 from test",
+                "Access denied; you need (at least one of) the SELECT privilege(s) on TABLE tbl1 for this operation");
+        verifySuccess(
+                "EXPLAIN INPUT COLUMNS SELECT virt FROM db1.vtab EXTENSIONS (db1.vtab.virt : BIGINT)",
+                starRocksAssert.getCtx());
     }
 
     @Test

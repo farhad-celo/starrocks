@@ -324,6 +324,9 @@ statement
     | alterPlanAdvisorDropStatement
     | showPlanAdvisorStatement
 
+    // Explain Input Columns statement
+    | explainInputColumnsStatement
+
     // Warehouse Statement
     | createWarehouseStatement
     | dropWarehouseStatement
@@ -2136,6 +2139,19 @@ lock_type
 alterPlanAdvisorAddStatement
     : ALTER PLAN ADVISOR ADD queryStatement;
 
+// ------------------------------------------- Explain Input Columns Statement ------------------------------------------------
+explainInputColumnsStatement
+    : EXPLAIN INPUT COLUMNS queryStatement (EXTENSIONS '(' explainInputColumnsExtensionList? ')')?
+    ;
+
+explainInputColumnsExtensionList
+    : explainInputColumnsExtension (',' explainInputColumnsExtension)*
+    ;
+
+explainInputColumnsExtension
+    : qualifiedName '.' identifier ':' type
+    ;
+
 truncatePlanAdvisorStatement
     : TRUNCATE PLAN ADVISOR;
 
@@ -3089,12 +3105,12 @@ nonReserved
     | CUME_DIST | CUMULATIVE | COMMENT | COMMIT | COMMITTED | COMPUTE | CONNECTION | CONSISTENT | COSTS | COUNT
     | CONFIG | COMPACT
     | DATA | DATE | DATACACHE | DATETIME | DAY | DAYS | DECOMMISSION | DIALECT | DISABLE | DISK | DISTRIBUTION | DUPLICATE | DYNAMIC | DISTRIBUTED | DICTIONARY | DICTIONARY_GET | DEALLOCATE
-    | ENABLE | END | ENGINE | ENGINES | ERRORS | EVENTS | EXECUTE | EXTERNAL | EXTRACT | EVERY | ENCLOSE | ESCAPE | EXPORT
+    | ENABLE | END | ENGINE | ENGINES | ERRORS | EVENTS | EXECUTE | EXTENSIONS | EXTERNAL | EXTRACT | EVERY | ENCLOSE | ESCAPE | EXPORT
     | FAILPOINT | FAILPOINTS | FIELDS | FILE | FILTER | FIRST | FLOOR | FOLLOWING | FORMAT | FN | FRONTEND | FRONTENDS | FOLLOWER | FREE
     | FUNCTIONS
     | GLOBAL | GRANTS | GROUP_CONCAT
     | HASH | HISTOGRAM | HELP | HLL_UNION | HOST | HOUR | HOURS | HUB
-    | IDENTIFIED | IMAGE | IMPERSONATE | INACTIVE | INCREMENTAL | INDEXES | INSTALL | INTEGRATION | INTEGRATIONS | INTERMEDIATE
+    | IDENTIFIED | IMAGE | IMPERSONATE | INACTIVE | INCREMENTAL | INDEXES | INPUT | INSTALL | INTEGRATION | INTEGRATIONS | INTERMEDIATE
     | INTERVAL | ISOLATION
     | JOB
     | LABEL | LAST | LESS | LEVEL | LIST | LOCAL | LOCATION | LOGS | LOGICAL | LOW_PRIORITY | LOCK | LOCATIONS

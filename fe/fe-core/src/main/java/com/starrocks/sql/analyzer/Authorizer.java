@@ -35,6 +35,7 @@ import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.CatalogMgr;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.server.WarehouseManager;
+import com.starrocks.sql.analyzer.celonis.explaininputcolumns.ExplainInputColumnsPrivilegeSupport;
 import com.starrocks.sql.ast.StatementBase;
 import com.starrocks.sql.ast.UserIdentity;
 import com.starrocks.sql.ast.pipe.PipeName;
@@ -105,6 +106,9 @@ public class Authorizer {
         if (tableObj.isPresent() && !tableObj.get().isTable() && privilegeType.equals(PrivilegeType.INSERT)) {
             return;
         }
+        if (ExplainInputColumnsPrivilegeSupport.allowVirtualTableAction(context, tableName, privilegeType)) {
+            return;
+        }
         getInstance().getAccessControlOrDefault(InternalCatalog.DEFAULT_INTERNAL_CATALOG_NAME)
                 .checkTableAction(context,
                         new TableName(InternalCatalog.DEFAULT_INTERNAL_CATALOG_NAME, db, table), privilegeType);
@@ -117,6 +121,9 @@ public class Authorizer {
         if (tableObj.isPresent() && !tableObj.get().isTable() && privilegeType.equals(PrivilegeType.INSERT)) {
             return;
         }
+        if (ExplainInputColumnsPrivilegeSupport.allowVirtualTableAction(context, tableName, privilegeType)) {
+            return;
+        }
         getInstance().getAccessControlOrDefault(catalog).checkTableAction(context,
                 new TableName(catalog, db, table), privilegeType);
     }
@@ -125,6 +132,9 @@ public class Authorizer {
                                         PrivilegeType privilegeType) throws AccessDeniedException {
         Optional<Table> table = GlobalStateMgr.getCurrentState().getMetadataMgr().getTable(context, tableName);
         if (table.isPresent() && !table.get().isTable() && privilegeType.equals(PrivilegeType.INSERT)) {
+            return;
+        }
+        if (ExplainInputColumnsPrivilegeSupport.allowVirtualTableAction(context, tableName, privilegeType)) {
             return;
         }
         String catalog = tableName.getCatalog();
@@ -141,6 +151,17 @@ public class Authorizer {
     public static void checkColumnAction(ConnectContext context,
                                          TableName tableName, String column,
                                          PrivilegeType privilegeType) throws AccessDeniedException {
+        if (ExplainInputColumnsPrivilegeSupport.isVirtualColumnAction(context, tableName, column, privilegeType)) {
+            try {
+                checkTableAction(context, tableName, PrivilegeType.SELECT);
+            } catch (AccessDeniedException e) {
+                AccessDeniedException.reportAccessDenied(
+                        tableName.getCatalog(),
+                        context.getCurrentUserIdentity(), context.getCurrentRoleIds(),
+                        PrivilegeType.SELECT.name(), ObjectType.TABLE.name(), tableName.getTbl());
+            }
+            return;
+        }
         getInstance().getAccessControlOrDefault(tableName.getCatalog()).checkColumnAction(context,
                 tableName, column, privilegeType);
     }
