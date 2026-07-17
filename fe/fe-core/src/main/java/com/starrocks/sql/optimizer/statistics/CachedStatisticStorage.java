@@ -70,6 +70,12 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
     private static final String METRIC_STATISTICS_FETCHES_NOT_READY_TOTAL_DESCRIPTION = 
             "No. of times where statistics were not ready in time for each lookup";
 
+    private static final String METRIC_STATISTICS_FETCHES_READY_TOTAL =
+            "statistics_fetches_ready_total";
+
+    private static final String METRIC_STATISTICS_FETCHES_READY_TOTAL_DESCRIPTION =
+            "No. of times where statistics were ready in time for each lookup";
+
     private final Executor statsCacheRefresherExecutor =
             ThreadPoolManager.newDaemonFixedThreadPoolWithUnboundedQueue(Config.statistic_cache_thread_pool_size,
                     "stats-cache-refresher", true);
@@ -362,6 +368,12 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
             if (result.isDone()) {
                 Optional<ColumnStatistic> realResult;
                 realResult = result.get();
+                if (Config.record_statistics_ready_fetches) {
+                    CelonisMetrics.increaseCounter(
+                            METRIC_STATISTICS_FETCHES_READY_TOTAL,
+                            METRIC_STATISTICS_FETCHES_READY_TOTAL_DESCRIPTION,
+                            new MetricLabel("type", "column_statistic_single"));
+                }
                 return realResult.orElseGet(ColumnStatistic::unknown);
             } else {
                 CelonisMetrics.increaseCounter(
@@ -416,6 +428,12 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                     } else {
                         columnStatistics.add(ColumnStatistic.unknown());
                     }
+                }
+                if (Config.record_statistics_ready_fetches) {
+                    CelonisMetrics.increaseCounter(
+                            METRIC_STATISTICS_FETCHES_READY_TOTAL,
+                            METRIC_STATISTICS_FETCHES_READY_TOTAL_DESCRIPTION,
+                            new MetricLabel("type", "column_statistics"));
                 }
                 return columnStatistics;
             } else {
@@ -593,6 +611,12 @@ public class CachedStatisticStorage implements StatisticStorage, MemoryTrackable
                     Optional<Histogram> histogramStatistics =
                             realResult.getOrDefault(new ColumnStatsCacheKey(tableId, columnName), Optional.empty());
                     histogramStatistics.ifPresent(histogram -> histogramStats.put(columnName, histogram));
+                }
+                if (Config.record_statistics_ready_fetches) {
+                    CelonisMetrics.increaseCounter(
+                            METRIC_STATISTICS_FETCHES_READY_TOTAL,
+                            METRIC_STATISTICS_FETCHES_READY_TOTAL_DESCRIPTION,
+                            new MetricLabel("type", "histogram_statistics"));
                 }
                 return histogramStats;
             } else {

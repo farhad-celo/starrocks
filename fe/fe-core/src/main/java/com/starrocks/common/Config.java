@@ -2594,6 +2594,9 @@ public class Config extends ConfigBase {
             "(when `enable_sync_statistics_load` is enabled). A negative value uses `sync_statistics_load_timeout_ms`.")
     public static int sync_statistics_load_per_query_budget_ms = -1;
 
+    @ConfField(mutable = true, comment = "Whether to record the `statistics_fetches_ready_total` metric.")
+    public static boolean record_statistics_ready_fetches = true;
+
     /**
      * default bucket size of histogram statistics
      */
