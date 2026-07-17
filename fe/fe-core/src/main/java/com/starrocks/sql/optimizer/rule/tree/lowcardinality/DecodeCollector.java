@@ -155,7 +155,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.CELONIS_XX_HASH3_128_V3, FunctionSet.CELONIS_XX_HASH3_128_V4, FunctionSet.CELONIS_TRANSLATE,
             FunctionSet.CELONIS_STRING_SPLIT, FunctionSet.CELONIS_REMAP_VALUES, FunctionSet.CELONIS_IN_LIKE_V2,
             FunctionSet.CELONIS_IN, FunctionSet.CELONIS_STRING_TO_INT, FunctionSet.CELONIS_LTRIM,
-            FunctionSet.CELONIS_PATINDEX, FunctionSet.CELONIS_IN_JSON);
+            FunctionSet.CELONIS_PATINDEX, FunctionSet.CELONIS_IN_JSON, FunctionSet.CELONIS_STRINGHASH);
 
     static {
         if (Config.celonis_enable_scalar_functions_dictification) {
