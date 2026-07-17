@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
+# change the directory to the scripts so that everything can be relative.
+cd "$(dirname "$0")"
+
 # default config -c
-config="./arm/devcontainer.json"
-arch=$(uname -m)
-if [[ $arch == x86_* ]]; then
-  config="./x86/devcontainer.json"
-fi
+config="../devcontainer.json"
 # default workplace_folder -w
-workspace_folder=$(realpath ../)
+workspace_folder=$(realpath ../../)
 
 # override defaults when specified
 while getopts 'c:w:' flag; do

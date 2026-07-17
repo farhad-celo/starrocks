@@ -16,13 +16,11 @@ See below how either of the options work.
 ### Automatic compilation
 The simplest way to compile the backend is with this dev-container is running
 ```bash
-./compile_be.sh    
+./scripts/compile_be.sh    
 ```
 which builds and starts the dev-container, compiles the sr-backend and stops the dev container again.
 If need be, you can override the following parameters:
 
-* `-c` the place where the `devcontainer.json` is situated is defaulted to `./x86/devcontainer.json`,
-* `-w` sets the workspace, it is defaulted to `../` so you don't need to do anything if calling the script from the directory it is situated in
 * `-p` the preset that is defaulted to  `Default`
 
 Using the flags may look like this:
@@ -33,14 +31,10 @@ Using the flags may look like this:
 ### Connecting to the dev-container shell
 Builds and starts a dev-container, and connects a shell to it.
 When the shell is `exit`ed, the docker container is stopped.
-The following parameters can be overridden:
-
-* `-c` the place where the `devcontainer.json` is situated is defaulted to `./x86/devcontainer.json`,
-* `-w` sets the workspace, it is defaulted to `../` so you don't need to do anything if calling the script from the directory it is situated in
 
 You can run
 ```bash
-./connect_to_dev_container.sh
+./scripts/connect_to_dev_container.sh
 ```
 to be able to execute any commands in the shell that is created.
 
@@ -50,14 +44,14 @@ The path that was set as workspace is available under `/workspaces/celostar-star
 If you want to build and start a dev container and want to have the freedom to connect to it and stop it however you like, you can do so with `build_and_start_dev_container.sh`.
 As above, the script has the options:
 
-* `-c` the place where the `devcontainer.json` is situated is defaulted to `./x86/devcontainer.json`,
+* `-c` the place where the `devcontainer.json` is situated is defaulted to `./devcontainer.json`,
 * `-w` sets the workspace, it is defaulted to `../` so you don't need to do anything if calling the script from the directory it is situated in
 
 It returns the container_id so that you could reuse it if you need to.
 
 A possible usage is
 ```bash
-container_id=$(./build_and_start_dev_container.sh)
+container_id=$(./scripts/build_and_start_dev_container.sh)
 echo ${container_id}
 ```
 
@@ -69,8 +63,6 @@ You have the full flexibility to do anything with the started dev-container.
 It runs similar to the automatic compilation, but only runs the build script which might result in issues.
 You can override the following parameters:
 
-* `-c` the place where the `devcontainer.json` is situated is defaulted to `./x86/devcontainer.json`,
-* `-w` sets the workspace, it is defaulted to `../` so you don't need to do anything if calling the script from the directory it is situated in
 * `-b` the build_type, which is defaulted to `Release`
 * `-o` compilation options, which is defaulted to `--be`
 * `-j` number of jobs is set to 60 by default

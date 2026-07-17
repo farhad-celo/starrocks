@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 
-# default config -c
-config=""
-# default workspace_folder -w
-workspace_folder=$(realpath ../)
+# change the directory to the scripts so that everything can be relative.
+cd "$(dirname "$0")"
+
+# default preset -p
+preset=Debug
 
 # override defaults when specified
-while getopts 'c:w:' flag; do
+while getopts 'c:w:p:' flag; do
   case "${flag}" in
-  c) config="${OPTARG}" ;;
-  w) workspace_folder="${OPTARG}" ;;
+  p) preset="${OPTARG}" ;;
   *)
     exit 1
     ;;
@@ -21,16 +21,12 @@ function log() {
   echo $1
   echo "------------------------------------------------------------------------"
 }
+
 # Ensure the container is stopped when the script exits or is interrupted
 trap 'log "Stopping docker container"; docker stop "${container_id}" >/dev/null 2>&1' EXIT INT TERM
-
 log "Starting docker container"
 
-if [[ $config != "" ]]; then
-  container_id=$(./build_and_start_dev_container.sh -c "${config}" -w "${workspace_folder}")
-else
-  # use the default -c of the ./build_and_start_dev_container.sh
-  container_id=$(./build_and_start_dev_container.sh -w "${workspace_folder}")
-fi
+container_id=$(./build_and_start_dev_container.sh)
 
-docker exec -it ${container_id} /bin/bash
+log "Start compilation"
+docker exec "${container_id}" bash -lc 'cd /workspaces/celostar-starrocks/be && cmake --preset $1 && cmake --build --preset $1' -- "${preset}"

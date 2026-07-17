@@ -1,18 +1,32 @@
 {
     "name": "sr-dev-homcc",
+    "containerUser": "root",
+    "remoteUser": "root",
+    "initializeCommand": ".devcontainer/scripts/link_dockerfile.sh",
     "build": {
-        "dockerfile": "../../docker/dockerfiles/dev-env-homcc-base/arm/Dockerfile",
-        "context": "../../docker/dockerfiles/dev-env-homcc-base/arm"
+        "dockerfile": "dev-env-homcc-base/Dockerfile",
+        "context": "dev-env-homcc-base"
     },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/celostar-starrocks,type=bind",
+    "workspaceFolder": "/workspaces/celostar-starrocks",
+
     "postCreateCommand": "cp .devcontainer/CMakePresets.json be/CMakePresets.json && pip install -r test/requirements.txt",
     "containerEnv": {
         // This is covered by the CMake presets already but still useful to have in case you want to execute build.sh
         "STARROCKS_GCC_HOME": "/usr/",
-        "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/jemalloc/lib-shared:/var/local/thirdparty/installed/lib:/usr/lib/jvm/java-17-openjdk-arm64/lib/server",
+        "LD_LIBRARY_PATH": "/workspaces/celostar-starrocks/output/be/lib:/var/local/thirdparty/installed/jemalloc/lib-shared:/var/local/thirdparty/installed/lib:/usr/lib/jvm/java-17-openjdk-arm64/lib/server:/usr/lib/jvm/java-17-openjdk-amd64/lib/server",
         "STARROCKS_LINKER": "lld",
-        "CMAKE_GENERATOR": "ninja"
+        "CMAKE_GENERATOR": "ninja",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "STARROCKS_HOME": "/workspaces/celostar-starrocks",
+        "UDF_RUNTIME_DIR": "lib/udf-runtime"
     },
     "customizations": {
+        "jetbrains": {
+            "settings": {
+                "com.intellij:app:HttpConfigurable.use_proxy_pac": true
+            }
+        },
         "vscode": {
             "extensions": [
                 "ms-vscode.cpptools-extension-pack",
@@ -27,8 +41,6 @@
                     {
                         "pattern": "be/{**/test,out/build/**/test}/starrocks_test",
                         "env": {
-                            "LD_LIBRARY_PATH": "${workspaceFolder}/output/be/lib/:/var/local/thirdparty/installed/jemalloc/lib-shared:/var/local/thirdparty/installed/lib",
-                            "STARROCKS_HOME": "${workspaceFolder}",
                             "UDF_RUNTIME_DIR": "${workspaceFolder}"
                         }
                     }

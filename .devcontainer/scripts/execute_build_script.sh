@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# default config -c
-config=""
-# default workspace_folder -w
-workspace_folder=$(realpath ../)
+# change the directory to the scripts so that everything can be relative.
+cd "$(dirname "$0")"
+
+
 # default build_type -b
 build_type=Debug
 # default options -o
@@ -15,8 +15,6 @@ jobs=60
 # override defaults when specified
 while getopts 'c:w:b:o:' flag; do
   case "${flag}" in
-  c) config="${OPTARG}" ;;
-  w) workspace_folder="${OPTARG}" ;;
   b) build_type="${OPTARG}" ;;
   o) options="${OPTARG}" ;;
   j) jobs="${OPTARG}" ;;
@@ -36,12 +34,7 @@ function log() {
 trap 'log "Stopping docker container"; docker stop "${container_id}" >/dev/null 2>&1' EXIT INT TERM
 log "Starting docker container"
 
-if [[ $config != "" ]]; then
-  container_id=$(./build_and_start_dev_container.sh -c "${config}" -w "${workspace_folder}")
-else
-  # use the default -c of the ./build_and_start_dev_container.sh
-  container_id=$(./build_and_start_dev_container.sh -w "${workspace_folder}")
-fi
+container_id=$(./build_and_start_dev_container.sh)
 
 log "Start compilation"
 docker exec "${container_id}" bash -lc 'cd /workspaces/celostar-starrocks && BUILD_TYPE="$1" ./build.sh $2 -j "$3"' -- "${build_type}" "${options}" "${jobs}"
