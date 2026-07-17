@@ -1500,15 +1500,14 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                         .filter(i -> !collectors.get(i).equals(CONSTANTS)).boxed().toList();
                 if (nonConstants.size() == 1) {
                     Type nonConstantType = scalarOperator.getChild(nonConstantIndices.get(0)).getType();
-                    boolean isArray = nonConstantType.isArrayType();
                     if (scalarOperator instanceof CallOperator call) {
                         if (supportLowCardinality(nonConstantType)) {
-                            logUnsupportedFunctionMetric(call.getFnName(), isArray);
+                            logUnsupportedFunctionMetric(call.getFnName(), nonConstantType);
                         } else {
-                            logNonStringFunctionMetric(call.getFnName(), isArray);
+                            logNonStringFunctionMetric(call.getFnName(), nonConstantType);
                         }
                     } else {
-                        logUnsupportedScalarOperatorMetric(scalarOperator.getOpType().toString(), isArray);
+                        logUnsupportedScalarOperatorMetric(scalarOperator.getOpType().toString(), nonConstantType);
                     }
                 }
             } else if (scalarOperator instanceof CallOperator call
@@ -1700,19 +1699,24 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return merge(visitChildren(operator, context), operator);
         }
 
-        private void logUnsupportedFunctionMetric(String fn, boolean isArray) {
+        private static MetricLabel getTypeMetricLabel(Type type) {
+            return new MetricLabel("input_type",
+                    type.isArrayType() ? "array" : type.isStructType() ? "struct" : "scalar");
+        }
+
+        private void logUnsupportedFunctionMetric(String fn, Type inputType) {
             CelonisMetrics.increaseCounter("lco_unsupported_fn", "lco unsupported fn",
-                    new MetricLabel("function", fn), new MetricLabel("is_array", Boolean.toString(isArray)));
+                    new MetricLabel("function", fn), getTypeMetricLabel(inputType));
         }
 
-        private void logNonStringFunctionMetric(String fn, boolean isArray) {
+        private void logNonStringFunctionMetric(String fn, Type inputType) {
             CelonisMetrics.increaseCounter("lco_non_string_fn", "lco non string fn",
-                    new MetricLabel("function", fn), new MetricLabel("is_array", Boolean.toString(isArray)));
+                    new MetricLabel("function", fn), getTypeMetricLabel(inputType));
         }
 
-        private void logUnsupportedScalarOperatorMetric(String op, boolean isArray) {
+        private void logUnsupportedScalarOperatorMetric(String op, Type inputType) {
             CelonisMetrics.increaseCounter("lco_unsupported_scalar_op", "lco unsupported scalar op",
-                    new MetricLabel("scalar_op", op), new MetricLabel("is_array", Boolean.toString(isArray)));
+                    new MetricLabel("scalar_op", op), getTypeMetricLabel(inputType));
         }
 
         private void logUnsupportedArrayFunctionWithExtraArgs(String fn) {
