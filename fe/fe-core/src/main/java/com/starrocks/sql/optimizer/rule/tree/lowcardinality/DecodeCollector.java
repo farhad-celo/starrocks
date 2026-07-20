@@ -149,7 +149,9 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.CELONIS_GREATEST, FunctionSet.CELONIS_XX_HASH3_96, FunctionSet.CELONIS_XX_HASH3_128,
             FunctionSet.CELONIS_XX_HASH3_128_NULLABLE, FunctionSet.CELONIS_XX_HASH3_128_V2,
             FunctionSet.CELONIS_XX_HASH3_128_V3, FunctionSet.CELONIS_XX_HASH3_128_V4, FunctionSet.CELONIS_TRANSLATE,
-            FunctionSet.CELONIS_STRING_SPLIT);
+            FunctionSet.CELONIS_STRING_SPLIT, FunctionSet.CELONIS_REMAP_VALUES, FunctionSet.CELONIS_IN_LIKE_V2,
+            FunctionSet.CELONIS_IN, FunctionSet.CELONIS_STRING_TO_INT,
+            FunctionSet.CELONIS_LTRIM);
 
     static {
         if (Config.celonis_enable_scalar_functions_dictification) {
@@ -165,7 +167,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     //  array<string> -> string       : array element
     // Only processed if the first argument (input array) is not constant. Any string or array<string> constant
     // parameters will be encoded into the array's dictionary domain using dict_encode().
-    public static final Set<String> LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
+    public static final Set<String> LOW_CARD_ARRAY_FUNCTIONS = Sets.newHashSet(
             FunctionSet.ARRAY_MIN,  // ARRAY -> STRING
             FunctionSet.ARRAY_MAX, FunctionSet.ARRAY_DISTINCT, // ARRAY -> ARRAY
             FunctionSet.ARRAY_SORT, FunctionSet.REVERSE, FunctionSet.ARRAY_SLICE, FunctionSet.ARRAY_FILTER,
@@ -173,6 +175,13 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.CARDINALITY, FunctionSet.ARRAY_CONTAINS, FunctionSet.ARRAY_CONTAINS_ALL,
             FunctionSet.ARRAY_CONTAINS_SEQ, FunctionSet.ARRAY_INTERSECT, FunctionSet.ARRAY_POSITION,
             FunctionSet.ARRAY_REMOVE);
+
+    public static final Set<String> CELONIS_LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
+            FunctionSet.CELONIS_ARRAY_COUNT);
+
+    static {
+        LOW_CARD_ARRAY_FUNCTIONS.addAll(CELONIS_LOW_CARD_ARRAY_FUNCTIONS);
+    }
 
     private final SessionVariable sessionVariable;
     private final boolean isQuery;

@@ -335,6 +335,7 @@ public class FunctionSet {
     public static final String CELONIS_BUILD_LINEAR_REGRESSION_MODEL = "celonis_build_linear_regression_model";
     public static final String CELONIS_BUILD_MULTI_LINEAR_REGRESSION_MODEL = "celonis_build_multi_linear_regression_model";
     public static final String CELONIS_PERCENTILE_DISC = "celonis_percentile_disc";
+    public static final String CELONIS_IN_LIKE_V2 = "celonis_in_like_v2";
 
     // Bitmap functions:
     public static final String BITMAP_AND = "bitmap_and";
