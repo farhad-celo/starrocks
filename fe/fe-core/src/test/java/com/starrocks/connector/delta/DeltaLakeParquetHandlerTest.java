@@ -23,6 +23,7 @@ import com.starrocks.common.Pair;
 import io.delta.kernel.data.ColumnVector;
 import io.delta.kernel.data.ColumnarBatch;
 import io.delta.kernel.data.Row;
+import io.delta.kernel.engine.FileReadResult;
 import io.delta.kernel.internal.InternalScanFileUtils;
 import io.delta.kernel.internal.replay.LogReplay;
 import io.delta.kernel.internal.util.Utils;
@@ -41,6 +42,7 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -69,7 +71,8 @@ public class DeltaLakeParquetHandlerTest {
                 @NotNull
                 @Override
                 public List<ColumnarBatch> load(@NotNull Pair<DeltaLakeFileStatus, StructType> pair) {
-                    return DeltaLakeParquetHandler.readParquetFile(pair.first.getPath(), pair.second, hdfsConfiguration);
+                    return DeltaLakeParquetHandler.readParquetFile(pair.first.getPath(), pair.first.getSize(),
+                            pair.first.getModificationTime(), pair.second, hdfsConfiguration);
                 }
             });
 
@@ -78,14 +81,15 @@ public class DeltaLakeParquetHandlerTest {
         String path = deltaLakePath + "/00000000000000000030.checkpoint.parquet";
         DeltaLakeParquetHandler deltaLakeParquetHandler = new DeltaLakeParquetHandler(hdfsConfiguration, checkpointCache);
         StructType readSchema = LogReplay.getAddRemoveReadSchema(true);
-        FileStatus fileStatus = FileStatus.of(path, 111, 111111);
+        File file = new File(path);
+        FileStatus fileStatus = FileStatus.of(path, file.length(), file.lastModified());
         DeltaLakeFileStatus deltaLakeFileStatus = DeltaLakeFileStatus.of(fileStatus);
 
         List<Row> addRows = Lists.newArrayList();
-        try (CloseableIterator<ColumnarBatch> parquetIter = deltaLakeParquetHandler.readParquetFiles(
+        try (CloseableIterator<FileReadResult> parquetIter = deltaLakeParquetHandler.readParquetFiles(
                 Utils.singletonCloseableIterator(fileStatus), readSchema, Optional.empty())) {
             while (parquetIter.hasNext()) {
-                ColumnarBatch columnarBatch = parquetIter.next();
+                ColumnarBatch columnarBatch = parquetIter.next().getData();
                 ColumnVector addsVector = columnarBatch.getColumnVector(ADD_FILE_ORDINAL);
 
                 for (int rowId = 0; rowId < addsVector.getSize(); rowId++) {
@@ -126,42 +130,49 @@ public class DeltaLakeParquetHandlerTest {
 
     @Test
     public void testCheckpointCache() throws ExecutionException {
-        LoadingCache<Pair<String, StructType>, List<ColumnarBatch>> checkpointCache = CacheBuilder.newBuilder()
-                .expireAfterWrite(3600, TimeUnit.SECONDS)
-                .weigher((key, value) ->
-                        Math.toIntExact(SizeEstimator.estimate(key) + SizeEstimator.estimate(value)))
-                .maximumWeight(400 * 2)
-                .concurrencyLevel(1)
-                .build(new CacheLoader<>() {
-                    @NotNull
-                    @Override
-                    public List<ColumnarBatch> load(@NotNull Pair<String, StructType> pair) {
-                        return DeltaLakeParquetHandler.readParquetFile(pair.first, pair.second, hdfsConfiguration);
-                    }
-                });
-        List<ColumnarBatch> columnarBatches = Lists.newArrayList();
-        new MockUp<DeltaLakeParquetHandler>() {
-            @Mock
-            public List<ColumnarBatch> readParquetFile(@NotNull String path, @NotNull StructType schema,
-                                                       @NotNull Configuration hdfsConfiguration) {
-                return columnarBatches;
-            }
-        };
-
+        // Test intent: verify weight-based LRU eviction (one entry fits, the second evicts
+        // the first). The exact byte cost of a Pair<String, StructType> drifts with each
+        // Kernel release as StructField/FieldMetadata grow internal state, so size the cap
+        // dynamically off a sample entry instead of pinning a brittle literal.
         List<StructField> fields = ImmutableList.of(
                 new StructField("col1", IntegerType.INTEGER, true),
                 new StructField("col2", StringType.STRING, true)
         );
         StructType deltaType = new io.delta.kernel.types.StructType(fields);
 
+        List<ColumnarBatch> columnarBatches = Lists.newArrayList();
         String location1 = "hdfs://127.0.0.1:9000/delta_lake/00000000000000000030.checkpoint.parquet.1";
+        String location2 = "hdfs://127.0.0.1:9000/delta_lake/00000000000000000030.checkpoint.parquet.2";
         Pair<String, StructType> pair1 = Pair.create(location1, deltaType);
+        Pair<String, StructType> pair2 = Pair.create(location2, deltaType);
+
+        long oneEntryWeight = SizeEstimator.estimate(pair1) + SizeEstimator.estimate(columnarBatches);
+        long capacity = oneEntryWeight + (oneEntryWeight / 2);
+
+        LoadingCache<Pair<String, StructType>, List<ColumnarBatch>> checkpointCache = CacheBuilder.newBuilder()
+                .expireAfterWrite(3600, TimeUnit.SECONDS)
+                .weigher((key, value) ->
+                        Math.toIntExact(SizeEstimator.estimate(key) + SizeEstimator.estimate(value)))
+                .maximumWeight(capacity)
+                .concurrencyLevel(1)
+                .build(new CacheLoader<>() {
+                    @NotNull
+                    @Override
+                    public List<ColumnarBatch> load(@NotNull Pair<String, StructType> pair) {
+                        return DeltaLakeParquetHandler.readParquetFile(pair.first, 0, 0, pair.second, hdfsConfiguration);
+                    }
+                });
+        new MockUp<DeltaLakeParquetHandler>() {
+            @Mock
+            public List<ColumnarBatch> readParquetFile(@NotNull String path, long fileSize, long modificationTime,
+                                                       @NotNull StructType schema, @NotNull Configuration hdfsConfiguration) {
+                return columnarBatches;
+            }
+        };
 
         checkpointCache.get(pair1);
         Assertions.assertEquals(1, checkpointCache.size());
 
-        String location2 = "hdfs://127.0.0.1:9000/delta_lake/00000000000000000030.checkpoint.parquet.2";
-        Pair<String, StructType> pair2 = Pair.create(location2, deltaType);
         checkpointCache.get(pair2);
         Assertions.assertEquals(1, checkpointCache.size());
         Assertions.assertFalse(checkpointCache.asMap().containsKey(pair1));

@@ -19,6 +19,7 @@ import com.google.common.cache.LoadingCache;
 import com.starrocks.common.Pair;
 import io.delta.kernel.data.ColumnarBatch;
 import io.delta.kernel.defaults.engine.DefaultEngine;
+import io.delta.kernel.defaults.engine.hadoopio.HadoopFileIO;
 import io.delta.kernel.engine.JsonHandler;
 import io.delta.kernel.engine.ParquetHandler;
 import io.delta.kernel.types.StructType;
@@ -40,7 +41,7 @@ public class DeltaLakeEngine extends DefaultEngine {
                               LoadingCache<Pair<DeltaLakeFileStatus, StructType>, List<ColumnarBatch>> checkpointCache,
                               LoadingCache<DeltaLakeFileStatus, List<JsonNode>> jsonCache,
                               boolean bypassMetaCache) {
-        super(hadoopConf);
+        super(new HadoopFileIO(hadoopConf));
         this.hadoopConf = hadoopConf;
         this.properties = properties;
         this.checkpointCache = checkpointCache;

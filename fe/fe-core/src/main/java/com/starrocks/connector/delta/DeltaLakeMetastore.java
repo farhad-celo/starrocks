@@ -92,7 +92,8 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
                     @NotNull
                     @Override
                     public List<ColumnarBatch> load(@NotNull Pair<DeltaLakeFileStatus, StructType> pair) {
-                        return DeltaLakeParquetHandler.readParquetFile(pair.first.getPath(), pair.second, hdfsConfiguration);
+                        return DeltaLakeParquetHandler.readParquetFile(pair.first.getPath(), pair.first.getSize(),
+                                pair.first.getModificationTime(), pair.second, hdfsConfiguration);
                     }
                 });
 
@@ -206,7 +207,7 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
             throw new SemanticException("Failed to get latest snapshot for %s.%s.%s, %s. caused by : %s",
                     catalogName, dbName, tableName, e.getMessage(), e.getCause());
         }
-        long version = snapshot.getVersion(deltaLakeEngine);
+        long version = snapshot.getVersion();
         return new DeltaLakeSnapshot(dbName, tableName, deltaLakeEngine, snapshot, createTime, version, path);
     }
 
@@ -232,7 +233,7 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         Engine deltaEngine = deltaLakeTable.getDeltaEngine();
         List<String> partitionColumnNames = deltaLakeTable.getPartitionColumnNames();
 
-        ScanBuilder scanBuilder = deltaLakeTable.getDeltaSnapshot().getScanBuilder(deltaEngine);
+        ScanBuilder scanBuilder = deltaLakeTable.getDeltaSnapshot().getScanBuilder();
         Scan scan = scanBuilder.build();
         try {
             // Mirror the getLatestSnapshot scoping: scan-file listing reuses the same engine and

@@ -101,7 +101,8 @@ public class UnityDeltaLakeMetaCache {
             String principalScope, Configuration hadoopConfiguration) {
         return new ScopedLoadingCache<>(checkpointCache, principalScope,
                 key -> DeltaLakeParquetHandler.readParquetFile(
-                        key.first.getPath(), key.second, hadoopConfiguration));
+                        key.first.getPath(), key.first.getSize(), key.first.getModificationTime(),
+                        key.second, hadoopConfiguration));
     }
 
     LoadingCache<DeltaLakeFileStatus, List<JsonNode>> getJsonCache(String principalScope,
