@@ -15,7 +15,6 @@
 
 #include "modules/common/enum_indexed_array.h"
 #include "modules/common/execution_context.h"
-#include "modules/memory/tracking/static_array_with_context_tracking.h"
 #include "modules/operators/process/align_model/align_model_types.h"
 
 namespace celonis::accelerator::operators::process::align_model {

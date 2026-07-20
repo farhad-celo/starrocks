@@ -78,12 +78,6 @@ template <typename T>
     const common::execution_context& context,
     legacy_embedded_ctl::utils::allocation_priority priority = legacy_embedded_ctl::utils::allocation_priority::LOW);
 
-template <typename T>
-[[nodiscard]] legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(
-    std::initializer_list<T> init, const legacy_embedded_ctl::utils::allocation_reason& reason,
-    const common::execution_context& context,
-    legacy_embedded_ctl::utils::allocation_priority priority = legacy_embedded_ctl::utils::allocation_priority::LOW);
-
 /*
  ***********************************************************************************************************************
  *** Implementation section of above declarations
@@ -157,14 +151,6 @@ inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(
     const size_t size, const T& init_value, const legacy_embedded_ctl::utils::allocation_reason& reason,
     const common::execution_context& context, const legacy_embedded_ctl::utils::allocation_priority priority) {
   return legacy_embedded_ctl::make_shared_static_array<T>(size, init_value, reason,
-                                                          spawn_allocator<T>(context, reason, priority));
-}
-
-template <typename T>
-inline legacy_embedded_ctl::shared_static_array<T> make_shared_static_array(
-    std::initializer_list<T> init, const legacy_embedded_ctl::utils::allocation_reason& reason,
-    const common::execution_context& context, const legacy_embedded_ctl::utils::allocation_priority priority) {
-  return legacy_embedded_ctl::make_shared_static_array<T>(std::move(init), reason,
                                                           spawn_allocator<T>(context, reason, priority));
 }
 

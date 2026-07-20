@@ -8,7 +8,6 @@
 #include "legacy_embedded_ctl/assert.h"
 #include "legacy_embedded_ctl/source_location.h"
 #include "legacy_embedded_ctl/type_traits.h"
-#include "modules/memory/column_fwd.h"
 #include "modules/operators/framework/operator_node_fwd.h"
 
 namespace celonis::accelerator::operators {
@@ -77,8 +76,6 @@ struct specific_inputs {
 
   framework::operator_node_pointers_t operator_nodes_;
 };
-
-[[nodiscard]] bool shall_dictify_pull_up_column(const memory::column_t& column, const memory::table* target);
 
 }  // namespace dictify
 

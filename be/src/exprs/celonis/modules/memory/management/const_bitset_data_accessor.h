@@ -5,7 +5,7 @@
 #include "legacy_embedded_ctl/assert.h"
 #include "legacy_embedded_ctl/bitset_view.h"
 #include "modules/common/int_types.h"
-#include "modules/memory/null_flags.h"
+#include "modules/memory/null_flags_fwd.h"
 
 namespace celonis::accelerator::memory::management {
 

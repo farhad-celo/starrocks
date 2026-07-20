@@ -4,9 +4,9 @@
 #include <utility>
 
 #include <cpml/conformance/alignment_types.h>
-#include <cpml/model/bpmn/vertex_types.h>
 #include <cpml/model/bpmn_graph_fwd.h>
 
+#include "modules/common/execution_context_fwd.h"
 #include "modules/memory/cache/variant_trace_cache_fwd.h"
 #include "modules/operators/process/align_model/align_model_statistics.h"
 #include "modules/operators/process/align_model/align_model_types.h"

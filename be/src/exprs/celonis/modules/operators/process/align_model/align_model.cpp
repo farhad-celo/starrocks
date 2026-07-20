@@ -19,26 +19,22 @@
 #include <ctl/array_view.h>
 #include <ctl/assert.h>
 #include <ctl/conversion.h>
-#include <ctl/interval.h>
 #include <ctl/named_type.h>
-#include <ctl/numeric.h>
 #include <ctl/static_array.h>
 #include <ctl/static_array_fwd.h>
 #include <ctl/time.h>
-#include <ctl/utility.h>
 #include <ctl/utils/allocation_messages.h>
 #include <ctl/utils/time_utils.h>
 
 #include "align_model_statistics.h"
 #include "align_model_types.h"
+#include "exprs/celonis/cpml_utils/sr_context.h"
+#include "legacy_embedded_ctl/static_array.h"
 #include "modules/common/execution_context.h"
 #include "modules/memory/cache/remap_variants.h"
 #include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/row_id.h"
-// #include "modules/memory/table_utils.h"
-#include "exprs/celonis/cpml_utils/sr_context.h"
-#include "legacy_embedded_ctl/static_array.h"
 #include "modules/operators/aggregation/string_aggregation.h"
 #include "modules/operators/process/align_model/replay_aligned_variant.h"
 #include "modules/sr_glue_code/tbb_parallel_for.h"
@@ -377,7 +373,7 @@ std::pair<alignments_t, cpml::conformance::behavioral_relations> align_model(
   ctl::wall_timer_t pruned_variants_computation_timer{};
   const auto pruned_variants{aggregation::compute_variant_row_ids(
       align_variants_context, config.pruned_variant_cache_key, activity_table_name, variants->get_num_traces(),
-      pruned_projection, pruned_buffer, config.variant_trace_cache_manager_instance, config.grain_size)};
+      pruned_projection, pruned_buffer, config.grain_size)};
   ctl::format_and_add_duration<duration_unit_for_logging_t>(
       "time_pruned_variant_computation", pruned_variants_computation_timer.elapsed_wall_time_so_far(), callback);
   callback("pruned_variant_count", pruned_variants->get_num_traces());

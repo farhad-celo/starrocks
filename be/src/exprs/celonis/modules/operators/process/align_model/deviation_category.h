@@ -1,12 +1,10 @@
 #pragma once
 
-#include <cstdint>
-#include <unordered_map>
-#include <vector>
-
 #include <ctl/static_array.h>
 
+#include "modules/common/execution_context_fwd.h"
 #include "modules/operators/process/align_model/align_model_types.h"
+
 namespace celonis::accelerator::operators::process::align_model {
 
 /*These are the 6 deviation categories that are currently defined.

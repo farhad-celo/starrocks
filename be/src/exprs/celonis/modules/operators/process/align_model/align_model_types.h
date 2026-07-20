@@ -7,12 +7,10 @@
 
 #include <cpml/conformance/alignment_settings.h>
 #include <cpml/model/bpmn/vertex_types.h>
-#include <cpml/model/bpmn_graph_fwd.h>
 #include <ctl/hash.h>
 
 #include "modules/common/enum_indexed_array.h"
-#include "modules/cube/variant_trace_cache_manager.h"
-#include "modules/cube/variant_trace_cache_manager_fwd.h"
+#include "modules/memory/cache/variant_trace_cache_fwd.h"
 #include "modules/memory/row_id.h"
 
 namespace celonis::accelerator::operators::process::align_model {
@@ -40,13 +38,11 @@ struct align_model_config {
   static constexpr size_t ALIGN_MODEL_GRAIN_SIZE{1u << 15};
 
   [[nodiscard]] static align_model_config make(std::string pruned_variant_cache_key,
-                                               cube::variant_trace_cache_manager& trace_cache_manager,
                                                cpml::conformance::alignment_execution_strategy execution_strategy =
                                                    cpml::conformance::alignment_execution_strategy::DEFAULT);
 
   size_t grain_size{};
   std::string pruned_variant_cache_key;
-  cube::variant_trace_cache_manager& variant_trace_cache_manager_instance;
   cpml::conformance::alignment_execution_strategy execution_strategy;
 };
 

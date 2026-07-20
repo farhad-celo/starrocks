@@ -7,8 +7,6 @@
 #include "modules/memory/table_group.h"
 #include "modules/operators/process/align_model/align_model.h"
 #include "modules/operators/process/align_model/align_model_table_group_node_settings.h"
-#include "modules/operators/process/align_model/deviation_category.h"
-#include "modules/operators/process/bpmn/bpmn_from_proto.h"
 
 namespace celonis::accelerator {
 
@@ -19,16 +17,14 @@ namespace operators::process::align_model {
 
 class create_align_model_tables {
  public:
-  create_align_model_tables(memory::column_t activity_column, memory::column_t case_column, memory::table_t case_table,
+  create_align_model_tables(memory::column_t activity_column, memory::column_t case_column, row_id case_table_row_count,
                             memory::join_projection_vector_t activity_to_case_join,
-                            cube::variant_trace_cache_manager& variant_trace_cache_manager,
                             starrocks::celonis::bpmn_model_description model_description,
                             align_model_table_group_node_settings settings)
       : activity_column_{std::move(activity_column)},
         case_column_{std::move(case_column)},
-        case_table_{std::move(case_table)},
+        case_table_row_count_{case_table_row_count},
         activity_to_case_join_{std::move(activity_to_case_join)},
-        variant_trace_cache_manager_{variant_trace_cache_manager},
         model_description_{std::move(model_description)},
         settings_{std::move(settings)} {}
 
@@ -37,9 +33,8 @@ class create_align_model_tables {
  private:
   memory::column_t activity_column_;
   memory::column_t case_column_;
-  memory::table_t case_table_;
+  row_id case_table_row_count_;
   memory::join_projection_vector_t activity_to_case_join_;
-  cube::variant_trace_cache_manager& variant_trace_cache_manager_;
   const starrocks::celonis::bpmn_model_description model_description_;
   align_model_table_group_node_settings settings_;
 };

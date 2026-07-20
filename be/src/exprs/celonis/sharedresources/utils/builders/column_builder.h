@@ -5,9 +5,9 @@
 #include <memory>
 
 #include "modules/common/buffer_types.h"
-#include "modules/common/execution_context.h"
 #include "modules/memory/builders/temp_column_builder.h"
 #include "modules/memory/column.h"
+#include "modules/memory/null_flags.h"
 #include "modules/memory/table.h"
 #include "utils/nullable_pql_value.h"
 
@@ -41,7 +41,7 @@ public:
             data_array_ = legacy_embedded_ctl::make_static_array_for_overwrite<T>(
                     legacy_embedded_ctl::cast<size_t>(size),
                     LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG));
-            null_flags_ = memory::create_null_flags(size, common::execution_context{});
+            null_flags_ = memory::create_null_flags(size);
             size_set_ = true;
         }
         return *this;
@@ -133,7 +133,7 @@ public:
         } else {
             data_size_ = row_id_size;
             data_array_ = std::vector<std::string>(size);
-            null_flags_ = memory::create_null_flags(size, common::execution_context{});
+            null_flags_ = memory::create_null_flags(size);
             size_set_ = true;
         }
         return *this;

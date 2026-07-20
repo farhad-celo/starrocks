@@ -1,16 +1,11 @@
 #include "create_align_model_tables.h"
 
-#include <algorithm>
 #include <glog/logging.h>
 #include <string>
 #include <string_view>
 
-#include <fmt/core.h>
-
 #include <cpml/model/bpmn_graph.h>
 #include <ctl/assert.h>
-#include <ctl/bits/checked_shared_ptr.h>
-#include <ctl/numeric.h>
 #include <ctl/scope_guards.h>
 #include <ctl/time.h>
 #include <format/json/json_fwd.h>
@@ -18,7 +13,6 @@
 #include "align_model_statistics.h"
 #include "modules/common/call_and_log_unsafe_callable.h"
 #include "modules/common/execution_context.h"
-#include "modules/common/shared_types.h"
 #include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/memory/table_group.h"
 #include "modules/memory/typed_dictionary.h"
@@ -29,7 +23,6 @@
 #include "modules/operators/process/align_model/replay_aligned_variant.h"
 #include "modules/operators/process/align_model/v1/sr_specific_inflation_glue_code.h"
 #include "modules/operators/process/align_model/v2/create_alignment_inflation.h"
-#include "modules/operators/process/bpmn/bpmn_from_proto.h"
 #include "modules/query/operators.pb.h"
 #include "utils/json_to_model.h"
 
@@ -86,9 +79,10 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   stats.bpmn_graph = bpmn_graph;
 
   ctl::wall_timer_t variants_computation_timer{};
-  const auto variants{aggregation::compute_variant_row_ids(
-      {.table_one_side = case_table_.get(), .column_n_side = activity_column_, .projection = activity_to_case_join_},
-      context)};
+  const auto variants{aggregation::compute_variant_row_ids({.table_one_side_size = case_table_row_count_,
+                                                            .column_n_side = activity_column_,
+                                                            .projection = activity_to_case_join_},
+                                                           context)};
   stats.variant_computation = variants_computation_timer.elapsed_wall_time_so_far();
   stats.variant_count = variants->get_num_traces();
 
@@ -99,12 +93,11 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
     log::jinfo("Large ALIGN_MODEL input.",
                {{"number_of_variants", number_of_variants},
                 {"event_log_table_size", activity_table->get_rows()},
-                {"case_table_size", case_table_->get_rows()},
+                {"case_table_size", case_table_row_count_},
                 {"distinct_events_count", activity_column_->get_domain_count(context, no_dictify_request{})}});
   }
 
-  auto config{align_model_config::make("CACHE_KEY_PRUNED_VARIANTS", variant_trace_cache_manager_,
-                                       settings_.get_alignment_execution_strategy())};
+  auto config{align_model_config::make("CACHE_KEY_PRUNED_VARIANTS", settings_.get_alignment_execution_strategy())};
 
   // per variant alignments and replay results
   const auto [alignments, parallel_vertices]{align_model(

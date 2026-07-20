@@ -13,7 +13,6 @@
 #include "modules/memory/column_processing_state.h"
 #include "modules/memory/management/raw_data_handler.h"
 #include "modules/memory/table_fwd.h"
-#include "modules/memory/tracking/dynamic_bitset_with_context_tracking.h"
 #include "modules/memory/typed_dictionary.h"
 #include "modules/operators/framework/dictify_inputs.h"
 

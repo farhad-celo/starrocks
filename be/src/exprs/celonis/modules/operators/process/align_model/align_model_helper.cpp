@@ -6,15 +6,14 @@
 
 #include <cpml/exception.h>
 #include <ctl/assert.h>
+#include <ctl/conversion.h>
 
 #include "common/status.h"
 #include "exprs/celonis/result_table.h"
 #include "exprs/celonis/utils/exception_remapping.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types_fwd.h"
-#include "modules/cube/variant_trace_cache_manager.h"
 #include "modules/memory/join_projection_vector.h"
-#include "modules/memory/table.h"
 #include "modules/operators/process/align_model/align_model_table_group_node_settings.h"
 #include "modules/operators/process/align_model/create_align_model_tables.h"
 #include "modules/query/operators.pb.h"
@@ -60,13 +59,10 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
   // Convert variant_map and activity_map to Saola event_table, case_table and activity_to_case_join.
   utils::nullable_vec_t<cel_int_t> case_column_data;
   utils::nullable_vec_t<cel_string_t> activity_column_data;
-  utils::nullable_vec_t<cel_int_t> unique_object_ids;
   std::vector<row_id> activity_to_case_join_temp;
-  unique_object_ids.reserve(deduped_traces.size());
   int object_id = 0;
   std::ranges::for_each(std::move(deduped_traces), [&](auto& current_trace) {
     object_id++;
-    unique_object_ids.emplace_back(object_id);
     std::ranges::for_each(std::move(current_trace), [&](auto& activity) {
       case_column_data.emplace_back(object_id);
       activity_to_case_join_temp.push_back(object_id - 1);
@@ -103,28 +99,25 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
   event_table->add_existing_column(case_id_column, memory::MAX_TABLE_ROW_LIMIT);
   event_table->add_existing_column(activity_column, memory::MAX_TABLE_ROW_LIMIT);
 
-  memory::table_t case_table{std::make_shared<memory::table>(
-      deduped_traces.size(), params.case_table_name, params.case_table_name, memory::management::no_swap(),
-      memory::table_meta_data::make_for_query_scope_aggregation_table(),
-      memory::user_visible_table_name{params.case_table_name}, memory::MAX_TABLE_ROW_LIMIT)};
-
-  const auto id_column{column_builder<cel_int_t>{}
-                           .owner(case_table.get())
-                           .name(OBJECT_ID_COLUMN_KEY)
-                           .data(unique_object_ids)
-                           .cache_key(fmt::format("{}.{}", params.case_table_name, params.case_col_name))
-                           .build()};
-
-  case_table->add_existing_column(id_column, memory::MAX_TABLE_ROW_LIMIT);
-
-  cube::variant_trace_cache_manager variant_trace_cache_manager(memory::management::no_swap());
+  // After some investigation, it was found that Celostar-SR never really required the memory::table data structure.
+  // The only table usage was in the code below. When the table usage was followed, it was found that the only thing
+  // called on the case_table was 'get_rows()' that returns the row count of the table. It was implemented as:
+  // - If no column exists in the table, return its default row count (given to the ctor)
+  // - If a column exists in the table, use the first column and return its row count (column::get_row_count(...))
+  // For the table row count arg in the ctor we used 'deduped_traces.size()' and for the column row count we used
+  // 'unique_object_ids.size()'. Since both sizes were equal, it is safe to simply directly pass around this size
+  // instead of constructing a memory::table just for this purpose.
+  // Note: The table row count was only accessed during the variant data structure computation in string_aggregation.h
+  // 'compute_variant_row_ids'. Further proof that the table was not actually required but only its size can be found in
+  // the string_aggregation.h alternative function interface compute_variant_row_ids where only a 'num_case_rows' arg
+  // was passed and no (case table) at all.
+  const row_id case_table_row_count{ctl::cast<row_id>(deduped_traces.size())};
 
   auto align_model = align_model::create_align_model_tables{
       activity_column,
       case_id_column,
-      case_table,
+      case_table_row_count,
       activity_to_case_join,
-      variant_trace_cache_manager,
       starrocks::celonis::bpmn_model_description::from_proto(bpmn_model_description),
       settings};
 

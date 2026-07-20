@@ -82,9 +82,6 @@ constexpr const char* QUERY_SCOPE_TABLE_VERSION{"0"};
 }  // anonymous namespace
 
 std::string table::get_user_visible_name(const common::execution_context& context, bool bounds) const {
-  if (auto visible_name{context.lookup_user_visible_name(this)}; visible_name.has_value()) {
-    return bounds ? fmt::format(R"("{}")", visible_name->get_name()) : visible_name->get_name();
-  }
   if (user_visible_name.has_value()) {
     return bounds ? fmt::format(R"(<{}>)", user_visible_name->get_name()) : user_visible_name->get_name();
   }

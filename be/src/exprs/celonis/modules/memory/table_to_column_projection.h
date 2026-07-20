@@ -1,9 +1,8 @@
 #pragma once
 
-#include "legacy_embedded_ctl/checked_ptr_fwd.h"
 #include "modules/memory/column_fwd.h"
 #include "modules/memory/join_projection_vector.h"
-#include "modules/memory/table_fwd.h"
+#include "modules/memory/row_id.h"
 
 namespace celonis::accelerator::memory {
 
@@ -17,8 +16,8 @@ namespace celonis::accelerator::memory {
  * @example The relationship between the case table (one-side) and the activity column (n-side)
  */
 struct table_to_column_projection final {
-  /** Table on the one-side of the join */
-  const legacy_embedded_ctl::checked_raw_ptr<const table> table_one_side;
+  /** Table size on the one-side of the join */
+  const row_id table_one_side_size;
   /** Column on the n-side of the join */
   const column_t column_n_side;
   /** Projection from the n-side (column) to the one-side (table) */

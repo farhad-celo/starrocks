@@ -93,9 +93,8 @@ void verify_alignment_constraints(const alignment_view_t value) {
 using cpml::model::bpmn::vertex_id_type;
 
 align_model_config align_model_config::make(std::string pruned_variant_cache_key,
-                                            cube::variant_trace_cache_manager& trace_cache_manager,
                                             cpml::conformance::alignment_execution_strategy execution_strategy) {
-  return {ALIGN_MODEL_GRAIN_SIZE, std::move(pruned_variant_cache_key), trace_cache_manager, execution_strategy};
+  return {ALIGN_MODEL_GRAIN_SIZE, std::move(pruned_variant_cache_key), execution_strategy};
 }
 
 }  // namespace celonis::accelerator::operators::process::align_model
