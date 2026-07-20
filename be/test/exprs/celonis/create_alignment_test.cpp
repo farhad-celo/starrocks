@@ -26,38 +26,18 @@
 
 namespace starrocks {
 
+#define EDGE_TYPES(VIOLATION_NAME)                                                                      \
+    std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, \
+            std::vector<int64_t>, std::vector<int64_t>
+
 class CelonisCreateAlignmentTest : public testing::Test {
 public:
     typedef std::vector<std::string> Variant;
     typedef std::vector<Variant> VariantRows;
     typedef std::tuple<std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
-                       std::vector<std::string>,
-                       // SYNC edge types
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
-                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>,
-                       // MODEL edge types
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
-                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>,
-
-                       // SKIP edge types
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
-                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>,
-
-                       // LOG edge types
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
-                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>,
-
-                       // UNMAPPED edge types
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
-                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>,
-
-                       // MISSING_VIOLATION edge types
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
-                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>,
-
-                       // EXCLUSIVE_VIOLATION edge types
-                       std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>,
-                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>>
+                       std::vector<std::string>, EDGE_TYPES("SYNC"), EDGE_TYPES("MODEL"), EDGE_TYPES("SKIP"),
+                       EDGE_TYPES("LOG"), EDGE_TYPES("UNMAPPED"), EDGE_TYPES("MISSING"),
+                       EDGE_TYPES("EXCLUSIVE_VIOLATION")>
             Result;
     using ResultMap = std::map<Variant, Result>;
 
