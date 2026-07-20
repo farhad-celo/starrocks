@@ -1403,6 +1403,9 @@ celostar_functions = [
 
     [1000301, 'celonis_match_activities', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities'],
     [1000302, 'celonis_remap_timestamp_weekday', True, False, 'ARRAY_BIGINT', ['ARRAY_DATETIME'], 'CelonisRemapTimestampWeekday::celonis_remap_timestamp_weekday'],
+
+    # Array functions
+    [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],
 ]
 
 vectorized_functions.extend(celostar_functions)

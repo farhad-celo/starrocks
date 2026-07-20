@@ -142,6 +142,7 @@ set(EXEC_FILES
         ./exprs/case_expr_test.cpp
         ./exprs/cast_expr_test.cpp
         ./exprs/unary_function_test.cpp
+        ./exprs/celonis/array_functions_test.cpp
         ./exprs/celonis/calc_throughput_test.cpp
         ./exprs/celonis/match_activities_test.cpp
         ./exprs/celonis/remap_timestamp_weekday_test.cpp
