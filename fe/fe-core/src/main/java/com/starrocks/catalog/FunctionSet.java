@@ -589,7 +589,6 @@ public class FunctionSet {
     public static final String CELONIS_TRANSLATE = "celonis_translate";
     public static final String CELONIS_TO_DOUBLE = "celonis_to_double";
     public static final String CELONIS_LIKE = "celonis_like";
-    public static final String CELONIS_CALC_THROUGHPUT = "celonis_calc_throughput";
 
     // Celonis window functions:
     public static final String CELONIS_LINEAR_INTERPOLATE = "celonis_linear_interpolate";

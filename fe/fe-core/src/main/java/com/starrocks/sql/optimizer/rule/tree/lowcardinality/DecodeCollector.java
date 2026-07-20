@@ -177,7 +177,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.ARRAY_REMOVE);
 
     public static final Set<String> CELONIS_LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
-            FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_CALC_THROUGHPUT);
+            FunctionSet.CELONIS_ARRAY_COUNT);
 
     static {
         LOW_CARD_ARRAY_FUNCTIONS.addAll(CELONIS_LOW_CARD_ARRAY_FUNCTIONS);
@@ -1578,13 +1578,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 // for support: `dictExpr(array_min(array) = 'a')`, not `dictExpr(array_min(array)) = 'a'`
                 ScalarOperator result = mergeWithArray(visitChildren(call, context), call);
                 return !result.isConstant() ? call : result;
-            }
-
-            if (FunctionSet.CELONIS_CALC_THROUGHPUT.equals(call.getFnName())) {
-                List<ScalarOperator> newChildren = visitChildren(call, context);
-                return call.getChildren().size() < 4 || !call.getChild(0).isColumnRef() ||
-                        !call.getChild(2).isConstantRef() || !call.getChild(3).isConstantRef()
-                        ? forbidden(newChildren, call) : newChildren.get(0);
             }
 
             if (LOW_CARD_ARRAY_FUNCTIONS.contains(call.getFnName()) ||

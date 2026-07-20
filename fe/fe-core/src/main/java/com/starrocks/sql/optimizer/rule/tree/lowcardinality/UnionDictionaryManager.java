@@ -31,7 +31,6 @@ import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.statistics.ColumnDict;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -193,22 +192,6 @@ public class UnionDictionaryManager {
         Integer index = dict.get(constantValue);
         Preconditions.checkNotNull(index);
         return ConstantOperator.createInt(index);
-    }
-
-    ConstantOperator generateDictifiedConstantNullIfNotFound(ColumnRefOperator dictColumn,
-                                                             ConstantOperator stringConstant) {
-        Integer dictColumnId = getSourceDictionaryColumnId(dictColumn.getId());
-        Preconditions.checkNotNull(dictColumnId);
-        Map<ByteBuffer, Integer> dictData = unionColumnGroups.getGroupId(dictColumnId)
-                .map(unionDictData::get).orElse(globalDicts.get(dictColumnId).getDict());
-        Preconditions.checkNotNull(dictData);
-        ByteBuffer buffer = stringConstant.isConstantNull() ? null :
-                ByteBuffer.wrap(stringConstant.getVarchar().getBytes(StandardCharsets.UTF_8));
-        Integer idx = dictData.get(buffer);
-        if (idx == null) {
-            return ConstantOperator.createNull(Type.INT);
-        }
-        return ConstantOperator.createInt(idx);
     }
 
     List<Map<Integer, ConstantOperator>> generateConstantEncodingMap(List<ColumnRefOperator> outputColumns,
