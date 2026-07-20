@@ -1382,3 +1382,19 @@ vectorized_functions = [
     [181000, 'bar', True, False, 'VARCHAR', ['BIGINT', "BIGINT", 'BIGINT', 'BIGINT'], 'UtilityFunctions::bar'],
     [181001, 'equiwidth_bucket', True, False, 'BIGINT', ['BIGINT', 'BIGINT', 'BIGINT', 'BIGINT'], 'UtilityFunctions::equiwidth_bucket'],
 ]
+
+# Celostar: start ----->
+celostar_functions = [
+    # PQL functions
+    [1000100, 'celonis_array_sources', True, False, 'ARRAY_INT', ['ARRAY_INT', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
+    [1000101, 'celonis_array_sources', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
+    [1000102, 'celonis_array_sources', True, False, 'ARRAY_DATETIME', ['ARRAY_DATETIME', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
+    [1000103, 'celonis_array_sources', True, False, 'ARRAY_BIGINT', ['ARRAY_BIGINT', 'VARCHAR'], 'CelonisSourceTargetFunctions::celonis_array_sources'],
+
+    [1000104, 'celonis_calc_throughput', True, False, 'BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT', 'VARCHAR', 'VARCHAR', 'VARCHAR', 'VARCHAR'], 'CelonisCalcThroughputFunctions::celonis_calc_throughput'],
+
+    [1000105, 'celonis_match_activities', True, False, 'BOOLEAN', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisMatchActivitiesFunctions::celonis_match_activities'],
+]
+
+vectorized_functions.extend(celostar_functions)
+# Celostar: end ----->

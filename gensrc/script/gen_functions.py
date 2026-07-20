@@ -70,6 +70,9 @@ ${license}
 #include "exprs/array_functions.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/dict_functions.h"
+#include "exprs/celonis/calc_throughput.h"
+#include "exprs/celonis/match_activities.h"
+#include "exprs/celonis/source_target.h"
 #include "exprs/map_functions.h"
 #include "exprs/struct_functions.h"
 #include "exprs/math_functions.h"
@@ -216,3 +219,4 @@ if __name__ == '__main__':
 
     generate_fe(fe_functions_dir + "/VectorizedBuiltinFunctions.java")
     generate_cpp(be_functions_dir + "/builtin_functions.cpp")
+

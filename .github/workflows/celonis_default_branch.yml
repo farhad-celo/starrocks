@@ -1,0 +1,33 @@
+name: Celonis branch-2.4-ubuntu build.
+
+on:
+  push:
+    branches:
+      - branch-2.5.0-5fad90c8-celo
+
+env:
+  RELEASE_VERSION: "v0.0.0-${{ github.sha }}-2.5.0-5fad90c8"
+
+jobs:
+  build-image:
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v3
+      - name: GitHub Docker login
+        env:
+          DOCKER_GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+        run: |
+          echo $DOCKER_GITHUB_TOKEN | docker login ghcr.io -u ${{ github.repository }} --password-stdin
+      - name: Build Starrocks Docker Image
+        id: build
+        run: |
+          ./celonis/build.sh --tag celostar-starrocks:${RELEASE_VERSION}
+      - name: Push Starrocks Docker image to GitHub Docker registry
+        run: |
+          docker tag celostar-starrocks:${RELEASE_VERSION} ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}
+          # Pushing to the GitHub packages docker registry regularly fails with "unknown blob" errors. The "fix" suggested by GitHub is looping.
+          until docker push ghcr.io/celonis/docker-registry/celostar-starrocks:${RELEASE_VERSION}
+          do
+            echo "Could not push to github docker registry, trying again."
+          done        

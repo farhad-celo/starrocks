@@ -91,4 +91,30 @@ public class AnalyzeArrayTest {
         analyzeSuccess("select null_or_empty([1, 2, 3])");
         analyzeSuccess("select null_or_empty([[1, 2], [1, 4]])");
     }
+
+    @Test
+    public void testCelonisArray() {
+        analyzeSuccess("select celonis_array_sources([1,2,3,4], \"any->any\")");
+    }
+
+    @Test
+    public void testCelonisArraySourcesStrings() {
+        analyzeSuccess("select celonis_array_sources([\"a\", \"b\"], \"any->any\")");
+    }
+
+    @Test
+    public void testCelonisArraySourcesBigInt() {
+        analyzeSuccess("select celonis_array_sources([cast(123 as bigint)], \"any->any\")");
+    }
+
+    @Test
+    public void testCelonisArraySourcesDates() {
+        analyzeSuccess("select\n" +
+                "celonis_array_sources([cast(\"2022:01:01\" as date), cast(\"2023:01:01\" as date)], \"any->any\");");
+    }
+
+    @Test
+    public void testCelonisCalcThroughput() {
+        analyzeSuccess("select celonis_calc_throughput([\"a\", \"b\"], [1,2,3,4], \"a\", \"b\", \"first\", \"last\")");
+    }
 }
