@@ -474,13 +474,20 @@ class DecodeContext {
             if (!hasChange[0]) {
                 return call;
             }
-
             if (isSupportedArrayFunction(call)) {
                 ColumnRefOperator stringRef = getUseStringRef(call);
                 ColumnRefOperator dictRef = stringRefToDictRefMap.get(stringRef);
                 Preconditions.checkNotNull(dictRef);
                 newChildren = newChildren.stream().map(op -> op.isConstant() ?
                         dictEncodeConstant(op, dictRef.getId()) : op).collect(Collectors.toCollection(ArrayList::new));
+            }
+            if (call.getFnName().equals(FunctionSet.CELONIS_CALC_THROUGHPUT)) {
+                Preconditions.checkState(call.getChildren().size() >= 4);
+                ColumnRefOperator dictRef = call.getChild(0).cast();
+                newChildren.set(2, unionDictionaryManager.generateDictifiedConstantNullIfNotFound(dictRef,
+                        call.getChild(2).cast()));
+                newChildren.set(3, unionDictionaryManager.generateDictifiedConstantNullIfNotFound(dictRef,
+                        call.getChild(3).cast()));
             }
             Function fn = buildFunction(call.getFnName(), newChildren);
             ScalarOperator result = new CallOperator(call.getFnName(), fn.getReturnType(), newChildren, fn);

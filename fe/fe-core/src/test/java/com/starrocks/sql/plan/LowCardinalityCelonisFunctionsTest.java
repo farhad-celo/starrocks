@@ -14,12 +14,21 @@
 
 package com.starrocks.sql.plan;
 
+import com.google.common.collect.ImmutableMap;
+import com.starrocks.catalog.ColumnId;
 import com.starrocks.common.FeConstants;
+import com.starrocks.sql.optimizer.statistics.ColumnDict;
+import com.starrocks.sql.optimizer.statistics.IDictManager;
 import com.starrocks.utframe.StarRocksAssert;
+import mockit.Expectations;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
 
@@ -31,7 +40,7 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 CREATE TABLE T (
                     KEY_COL             INTEGER NOT NULL,
                     VARCHAR_COL         VARCHAR(25),
-                    VARCHAR_COL2         VARCHAR(25),
+                    VARCHAR_COL2        VARCHAR(25),
                     ARRAY_VARCHAR_COL   ARRAY<VARCHAR(40)>,
                     INTEGER_COL         INTEGER)
                 ENGINE=OLAP
@@ -44,6 +53,20 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 );
                 """);
 
+        starRocksAssert.withTable("""
+                CREATE TABLE TestCelonisCalcThroughputTable (
+                    KEY_COL          INTEGER NOT NULL,
+                    ACTIVITIES       ARRAY<VARCHAR(40)>,
+                    TIMESTAMPS       ARRAY<BIGINT>)
+                ENGINE=OLAP
+                DUPLICATE KEY(`KEY_COL`)
+                COMMENT "OLAP"
+                DISTRIBUTED by HASH(`KEY_COL`) BUCKETS 1
+                PROPERTIES (
+                    "replication_num" = "1",
+                    "in_memory" = "false"
+                );
+                """);
 
         FeConstants.USE_MOCK_DICT_MANAGER = true;
         connectContext.getSessionVariable().setSqlMode(2);
@@ -162,5 +185,31 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 "VARBINARY; args nullable: true; result nullable: true]\n" +
                 "  |  cardinality: 1\n" +
                 "  |  "), plan);
+    }
+
+    @Test
+    public void testCalcThroughput() throws Exception {
+        String sql = """
+                SELECT
+                CELONIS_CALC_THROUGHPUT(ACTIVITIES, TIMESTAMPS, 'b' , 'd' , 'first' , 'last')
+                FROM TestCelonisCalcThroughputTable
+                """;
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("ACTIVITIES"), anyLong);
+                result = true;
+                dictManager.getGlobalDict(anyLong, ColumnId.create("ACTIVITIES"));
+                ImmutableMap<ByteBuffer, Integer> data = ImmutableMap.<ByteBuffer, Integer>builder()
+                        .put(ByteBuffer.wrap("a".getBytes(StandardCharsets.UTF_8)), 1)
+                        .put(ByteBuffer.wrap("b".getBytes(StandardCharsets.UTF_8)), 2)
+                        .put(ByteBuffer.wrap("c".getBytes(StandardCharsets.UTF_8)), 3)
+                        .build();
+                result = Optional.of(new ColumnDict(data, 0));
+            }
+        };
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("celonis_calc_throughput[([5: ACTIVITIES, ARRAY<INT>, true], " +
+                "[3: TIMESTAMPS, ARRAY<BIGINT>, true], 2, NULL, 'first', 'last')"), plan);
     }
 }
