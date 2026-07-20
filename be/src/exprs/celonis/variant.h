@@ -3,6 +3,7 @@
 #include "column/hash_set.h"
 #include "rapidjson/document.h"
 #include "util/phmap/phmap.h"
+#include "util/slice.h"
 
 namespace starrocks {
 

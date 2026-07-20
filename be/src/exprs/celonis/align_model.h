@@ -2,26 +2,29 @@
 
 #include "exprs/celonis/modules/operators/process/align_model/align_model_helper.h"
 #include "exprs/celonis/variant_agg.h"
+#include "exprs/function_context.h"
+#include "exprs/function_helper.h"
 
 namespace starrocks {
 
-class AlignModelFinalizer : public VariantAggregateFinalizer {
+class CelonisAlignModel {
 public:
-    AlignModelFinalizer(FunctionContext* ctx, const VariantAggregateState& state)
-            : VariantAggregateFinalizer(ctx, state) {}
-
-    std::string finalize() override;
-};
-
-// Extends VariantAggregateFunction, runs the align model algorithm and returns result tables in json.
-class AlignModelAggregateFunction final : public VariantAggregateFunction {
-public:
-    std::unique_ptr<VariantAggregateFinalizer> get_finalizer(FunctionContext* ctx,
-                                                             const VariantAggregateState& state) const override {
-        return std::make_unique<AlignModelFinalizer>(ctx, state);
-    }
-
-    std::string get_name() const override { return "celonis_align_model"; }
+    /**
+     * @param: [activityArray, json_bpmn_model_description]
+     * @paramType: [ARRAY_VARCHAR, VARCHAR]
+     * @return: STRUCT {
+     *      variant: ARRAY_VARCHAR (matches activityArray)
+     *      alignment_model_vertex_id: ARRAY_BIGINT
+     *      alignment_vertex_label: ARRAY_VARCHAR
+     *      alignment_move_type: ARRAY_VARCHAR
+     *      alignment_activity_index: ARRAY_BIGINT
+     *      association_edge_class: ARRAY_BIGINT
+     *      assocation_alignment_index: ARRAY_BIGINT
+     *      edge_class_id:  ARRAY_BIGINT
+     *      edge_class_type: ARRAY_VARCHAR
+     *    }
+     */
+    DEFINE_VECTORIZED_FN(align_model);
 };
 
 } // namespace starrocks

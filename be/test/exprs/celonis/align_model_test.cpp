@@ -1,58 +1,36 @@
-#include <algorithm>
 #include <gtest/gtest.h>
-#include <random>
-#include <re2/re2.h>
 
 #include "column/array_column.h"
 #include "column/column_builder.h"
-#include "column/fixed_length_column.h"
-#include "exprs/agg/aggregate_factory.h"
-#include "exprs/agg/nullable_aggregate.h"
+#include "column/struct_column.h"
+#include "exprs/anyval_util.h"
+#include "exprs/celonis/align_model.h"
 #include "exprs/celonis/variant_stats.h"
 #include "runtime/mem_pool.h"
 #include "testutil/function_utils.h"
+#include "util.h"
 #include "util/slice.h"
 
 namespace starrocks {
 
-namespace {
-
-class ManagedAggrState {
-public:
-    ~ManagedAggrState() { _func->destroy(_ctx, _state); }
-
-    static std::unique_ptr<ManagedAggrState> create(FunctionContext* ctx, const AggregateFunction* func) {
-        return std::make_unique<ManagedAggrState>(ctx, func);
-    }
-
-    AggDataPtr state() { return _state; }
-
-private:
-    ManagedAggrState(FunctionContext* ctx, const AggregateFunction* func) : _ctx(ctx), _func(func) {
-        _state = _mem_pool.allocate_aligned(func->size(), func->alignof_size());
-        _func->create(_ctx, _state);
-    }
-
-    FunctionContext* _ctx;
-    const AggregateFunction* _func;
-    MemPool _mem_pool;
-    AggDataPtr _state;
-};
-
-} // namespace
-
 class CelonisAlignModelTest : public testing::Test {
 public:
+    typedef std::tuple<std::vector<std::string>, std::vector<int64_t>, std::vector<std::string>,
+                       std::vector<std::string>, std::vector<int64_t>, std::vector<int64_t>, std::vector<int64_t>,
+                       std::vector<int64_t>, std::vector<std::string>> Result;
+
     CelonisAlignModelTest() = default;
 
     typedef std::vector<std::vector<std::string>> VariantRows;
 
-    void SetUp() override {
-        utils = new FunctionUtils();
-        ctx = utils->get_fn_ctx();
-    }
+    void SetUp() override {}
 
-    void TearDown() override { delete utils; }
+    void TearDown() override {}
+
+    FunctionContext::TypeDesc TYPEDESC_ARRAY_VARCHAR =
+            AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_VARCHAR));
+    FunctionContext::TypeDesc TYPEDESC_ARRAY_BIGINT =
+            AnyValUtil::column_type_to_type_desc(celonis::array_type(TYPE_BIGINT));
 
     ArrayColumn::Ptr build_variant_column(const std::vector<std::vector<std::string>>& rows) {
         ColumnBuilder<TYPE_VARCHAR> builder(config::vector_chunk_size);
@@ -76,77 +54,86 @@ public:
         return ArrayColumn::create(data_col, offsets);
     }
 
-    Column::Ptr build_weight_column(const std::vector<int>& weights) {
-        ColumnBuilder<TYPE_BIGINT> builder(config::vector_chunk_size);
+    class Evaluator {
+    public:
+        Evaluator(const StructColumn& result, const std::vector<Result>& expected,
+                  const FunctionContext::TypeDesc& return_type)
+                : result_(result), expected_(expected), return_type_(return_type) {}
 
-        for (int i = 0; i < weights.size(); i++) {
-            builder.append(weights[i]);
+        void evaluate() {
+            ASSERT_EQ(result_.size(), expected_.size());
+            for (int row = 0; row < result_.size(); ++row) {
+                compare_array<0, std::string>(row);
+                compare_array<1, int64_t>(row);
+                compare_array<2, std::string>(row);
+                compare_array<3, std::string>(row);
+                compare_array<4, int64_t>(row);
+                compare_array<5, int64_t>(row);
+                compare_array<6, int64_t>(row);
+                compare_array<7, int64_t>(row);
+                compare_array<8, std::string>(row);
+            }
         }
-        return builder.build(false);
-    }
 
-    Column::Ptr build_random_weight_column(int size) {
-        ColumnBuilder<TYPE_BIGINT> builder(config::vector_chunk_size);
-
-        std::random_device rd;
-        std::uniform_int_distribution<size_t> weight(1, 10000);
-
-        for (int i = 0; i < size; i++) {
-            builder.append(weight(rd));
+    private:
+        template <int field, typename TYPE>
+        void compare_array(int row) {
+            auto result_array = result_.fields()[field]->get(row).get_array();
+            const auto& expected_array = std::get<field>(expected_[row]);
+            ASSERT_EQ(result_array.size(), expected_array.size());
+            for (int i = 0; i < result_array.size(); i++) {
+                if constexpr (std::is_same_v<TYPE, std::string>) {
+                    EXPECT_EQ(result_array[i].get_slice(), expected_array[i])
+                            << "row: " << row << ", field: " << return_type_.field_names[field] << ", element: " << i;
+                } else if constexpr (std::is_same_v<TYPE, int64_t>) {
+                    EXPECT_EQ(result_array[i].get_int64(), expected_array[i])
+                            << "row: " << row << ", field: " << return_type_.field_names[field] << ", element: " << i;
+                } else {
+                    static_assert("Invalid type");
+                }
+            }
         }
-        return builder.build(false);
-    }
 
-    Column::Ptr build_const_weight_column(int weight, int size) {
-        return ColumnHelper::create_const_column<TYPE_BIGINT>(weight, size);
-    }
+        const StructColumn& result_;
+        const std::vector<Result>& expected_;
+        const FunctionContext::TypeDesc& return_type_;
+    };
 
-    void Run(const VariantRows& variant_rows, Column::Ptr weight_column,
-             const std::string& bpmn_model_description_json, std::string expected) {
-        const AggregateFunction* func = get_aggregate_function("celonis_align_model", TYPE_ARRAY, TYPE_VARCHAR, false);
+    void Run(const VariantRows& variant_rows, const std::string& bpmn_model_description_json,
+             const std::vector<Result>& expected) {
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_ARRAY)),
+                AnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+        FunctionContext::TypeDesc return_type{
+                .type = TYPE_STRUCT,
+                .children = {
+                        TYPEDESC_ARRAY_VARCHAR, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_VARCHAR, TYPEDESC_ARRAY_VARCHAR,
+                        TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT, TYPEDESC_ARRAY_BIGINT,
+                        TYPEDESC_ARRAY_VARCHAR
+                },
+                .field_names = {
+                        "variant", "alignment_model_vertex_id", "alignment_vertex_label",
+                        "alignment_move_type", "alignment_activity_index", "association_edge_class",
+                        "association_alignment_index", "edge_class_id", "edge_class_type"
+                }
+        };
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+
         auto variants = build_variant_column(variant_rows);
         auto model_column =
                 ColumnHelper::create_const_column<TYPE_VARCHAR>(bpmn_model_description_json, variant_rows.size());
 
         Columns columns;
         columns.push_back(variants);
-        columns.push_back(weight_column);
         columns.push_back(model_column);
         ctx->set_constant_columns(columns);
 
-        std::vector<const Column*> raw_columns;
-        raw_columns.resize(3);
-        raw_columns[0] = variants.get();
-        raw_columns[1] = weight_column.get();
-        raw_columns[2] = model_column.get();
-        auto state = ManagedAggrState::create(ctx, func);
-        func->update_batch_single_state(ctx, variants->size(), raw_columns.data(), state->state());
-
-        // Get the result
-        auto result = BinaryColumn::create();
-        func->finalize_to_column(ctx, state->state(), result.get());
-
-        ASSERT_EQ(result->size(), 1);
-        auto rs = result->get_slice(0).to_string();
-        std::cout << rs;
-        re2::RE2::GlobalReplace(&rs, "[\\t\\n ]+", "");
-        re2::RE2::GlobalReplace(&expected, "[\\t\\n ]+", "");
-        EXPECT_EQ(rs, expected);
+        const auto result = CelonisAlignModel::align_model(ctx.get(), columns).value();
+        ASSERT_TRUE(result->is_struct());
+        StructColumn* st = down_cast<StructColumn*>(result.get());
+        Evaluator evaluator(*st, expected, return_type);
+        evaluator.evaluate();
     }
-
-    void Run(const VariantRows& variant_rows, const std::string& bpmn_model_description_json,
-             const std::string& expected) {
-        int size = variant_rows.size();
-        Run(variant_rows, build_const_weight_column(1, size), bpmn_model_description_json, expected);
-        Run(variant_rows, build_const_weight_column(1000, size), bpmn_model_description_json, expected);
-        for (int i = 0; i < 100; i++) {
-            Run(variant_rows, build_random_weight_column(size), bpmn_model_description_json, expected);
-        }
-    }
-
-private:
-    FunctionUtils* utils{};
-    FunctionContext* ctx{};
 };
 
 TEST_F(CelonisAlignModelTest, Parallel) {
@@ -220,83 +207,47 @@ TEST_F(CelonisAlignModelTest, Parallel) {
             ],
             "cache_key": "CACHE_KEY"
         })json";
-    std::string expected =
-        R"json({
-            "alignment__SCHEMA": {
-                    "variant": "ARRAY<STRING>",
-                    "model_vertex_id": "ARRAY<BIGINT>",
-                    "vertex_label": "ARRAY<STRING>",
-                    "move_type": "ARRAY<STRING>",
-                    "activity_index": "ARRAY<BIGINT>"
-             },
-            "alignment": [
+        std::vector<Result> expected = {
                 {
-                    "variant": ["A", "C"],
-                    "model_vertex_id": [0, 1, 2, 4, 3, 5, 6],
-                    "vertex_label": [ "BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_PARALLEL", "BPMN_END"],
-                    "move_type": ["GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"],
-                    "activity_index": [0, 0, 0, 1, 0, 1, 1]
+                        {"A", "C"},
+                        {0, 1, 2, 4, 3, 5, 6},
+                        {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_PARALLEL",
+                                "BPMN_END"},
+                        {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
+                                "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 0, 1, 1},
+                        {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
+                        {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
+                        {0, 1, 2},
+                        {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
                 },
                 {
-                    "variant": ["A", "B", "C"],
-                    "model_vertex_id": [0, 1, 2, 3, 4, 5, 6],
-                    "vertex_label": ["BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK B", "BPMN_TASK C", "BPMN_PARALLEL", "BPMN_END"],
-                    "move_type": ["GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"],
-                    "activity_index": [0, 0, 0, 1, 2, 2, 2]
+                        {"A", "B", "C"},
+                        {0, 1, 2, 3, 4, 5, 6},
+                        {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK B", "BPMN_TASK C", "BPMN_PARALLEL",
+                                "BPMN_END"},
+                        {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
+                                "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 2, 2, 2},
+                        {0, 0, 0, 0, 0, 0, 1, 1, 1},
+                        {0, 1, 2, 3, 5, 6, 2, 4, 5},
+                        {0, 1},
+                        {"SYNC_EDGE", "SYNC_EDGE"}
                 },
                 {
-                    "variant": ["C", "B", "B"],
-                    "model_vertex_id": [0, 1, 2, 4, 3, 3, 5, 6],
-                    "vertex_label": ["BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_TASK B", "BPMN_PARALLEL", "BPMN_END"],
-                    "move_type": ["GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"],
-                    "activity_index": [0, 0, 0, 0, 1, 2, 1, 2]
+                        {"C", "B", "B"},
+                        {0, 1, 2, 4, 3, 3, 5, 6},
+                        {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_TASK B",
+                                "BPMN_PARALLEL", "BPMN_END"},
+                        {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
+                                "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 0, 1, 2, 1, 2},
+                        {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
+                        {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7},
+                        {0, 1, 2, 3, 4},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE"}
                 }
-            ],
-            "association__SCHEMA": {
-                    "variant": "ARRAY<STRING>",
-                    "edge_class": "ARRAY<BIGINT>",
-                    "alignment_index": "ARRAY<BIGINT>"
-             },
-            "association": [
-                {
-                    "variant": ["A", "C"],
-                    "edge_class": [0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2],
-                    "alignment_index": [0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5]
-                },
-                {
-                    "variant": ["A", "B", "C"],
-                    "edge_class": [0, 0, 0, 0, 0, 0, 1, 1, 1],
-                    "alignment_index": [0, 1, 2, 3, 5, 6, 2, 4, 5]
-                },
-                {
-                    "variant": ["C", "B", "B"],
-                    "edge_class": [0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4],
-                    "alignment_index": [2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7]
-                }
-            ],
-            "edge_class__SCHEMA": {
-                    "variant": "ARRAY<STRING>",
-                    "id": "ARRAY<BIGINT>",
-                    "type": "ARRAY<STRING>"
-             },
-            "edge_class": [
-                {
-                    "variant": ["A", "C"],
-                    "id": [0, 1, 2],
-                    "type": ["SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"]
-                },
-                {
-                    "variant": ["A", "B", "C"],
-                    "id": [0, 1],
-                    "type": ["SYNC_EDGE", "SYNC_EDGE"]
-                },
-                {
-                    "variant": ["C", "B", "B"],
-                    "id": [0, 1, 2, 3, 4],
-                    "type": ["SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE"]
-                }
-            ]
-        })json";
+        };
     Run(variants, model, expected);
 }
 
@@ -371,83 +322,180 @@ TEST_F(CelonisAlignModelTest, Loop) {
             ],
             "cache_key": "CACHE_KEY"
         })json";
-    std::string expected =
-            R"json({
-            "alignment__SCHEMA": {
-                    "variant": "ARRAY<STRING>",
-                    "model_vertex_id": "ARRAY<BIGINT>",
-                    "vertex_label": "ARRAY<STRING>",
-                    "move_type": "ARRAY<STRING>",
-                    "activity_index": "ARRAY<BIGINT>"
-             },
-            "alignment": [
+        std::vector<Result> expected = {
                 {
-                    "variant": ["A", "B", "C", "A", "B"],
-                    "model_vertex_id": [0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6],
-                    "vertex_label": [ "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"],
-                    "move_type": ["GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"],
-                    "activity_index": [0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 4]
+                        {"A", "B", "C", "A", "B"},
+                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
+                        {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE",
+                                "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B",
+                                "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
+                                "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 4},
+                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+                        {0},
+                        {"SYNC_EDGE"}
                 },
                 {
-                    "variant": ["A", "B", "C"],
-                    "model_vertex_id": [0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6],
-                    "vertex_label": [ "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"],
-                    "move_type": ["GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"],
-                    "activity_index": [0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2]
+                        {"A", "B", "C"},
+                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
+                        { "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE",
+                                "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B",
+                                "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE",
+                                "GATEWAY_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2},
+                        {0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3},
+                        {0, 1, 2, 3, 4, 5, 6, 9, 10, 6, 7, 8, 9, 6, 9},
+                        {0, 1, 2, 3},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
                 },
                 {
-                    "variant": ["A", "B", "A", "B"],
-                    "model_vertex_id": [0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6],
-                    "vertex_label": [ "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"],
-                    "move_type": ["GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"],
-                    "activity_index": [0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3]
+                        {"A", "B", "A", "B"},
+                        {0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
+                        { "BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B", "BPMN_EXCLUSIVE_CHOICE",
+                                "BPMN_TASK C", "BPMN_EXCLUSIVE_CHOICE", "BPMN_TASK A", "BPMN_TASK B",
+                                "BPMN_EXCLUSIVE_CHOICE", "BPMN_END"},
+                        {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "MODEL_MOVE",
+                                "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                        {0, 0, 0, 1, 1, 1, 1, 2, 3, 3, 3},
+                        {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3},
+                        {0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 4, 5, 6, 4, 6},
+                        {0, 1, 2, 3},
+                        {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
                 }
-            ],
-            "association__SCHEMA": {
-                    "variant": "ARRAY<STRING>",
-                    "edge_class": "ARRAY<BIGINT>",
-                    "alignment_index": "ARRAY<BIGINT>"
-             },
-            "association": [
-                {
-                    "variant": ["A", "B", "C", "A", "B"],
-                    "edge_class": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    "alignment_index": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-                },
-                {
-                    "variant": ["A", "B", "C"],
-                    "edge_class": [0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3],
-                    "alignment_index": [0, 1, 2, 3, 4, 5, 6, 9, 10, 6, 7, 8, 9, 6, 9]
-                },
-                {
-                    "variant": ["A", "B", "A", "B"],
-                    "edge_class": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3],
-                    "alignment_index": [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 4, 5, 6, 4, 6]
-                }
-            ],
-            "edge_class__SCHEMA": {
-                    "variant": "ARRAY<STRING>",
-                    "id": "ARRAY<BIGINT>",
-                    "type": "ARRAY<STRING>"
-             },
-            "edge_class": [
-                {
-                    "variant": ["A", "B", "C", "A", "B"],
-                    "id": [0],
-                    "type": ["SYNC_EDGE"]
-                },
-                {
-                    "variant": ["A", "B", "C"],
-                    "id": [0, 1, 2, 3],
-                    "type": ["SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"]
-                },
-                {
-                    "variant": ["A", "B", "A", "B"],
-                    "id": [0, 1, 2, 3],
-                    "type": ["SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"]
-                }
-            ]
-        })json";
+        };
     Run(variants, model, expected);
 }
+
+TEST_F(CelonisAlignModelTest, Parallel_DuplicatedVariants) {
+    VariantRows variants = {{"A", "C"},
+                            {"A", "B", "C"},
+                            {"A", "C"},
+                            {"C", "B", "B"}};
+    std::string model =
+            R"json({
+        "nodes": [
+            {
+                "node_id": 0,
+                "node_type": 4
+            },
+            {
+                "node_id": 1,
+                "node_type": 1,
+                "task_name": "A"
+            },
+            {
+                "node_id": 2,
+                "node_type": 3
+            },
+            {
+                "node_id": 3,
+                "node_type": 1,
+                "task_name": "B"
+            },
+            {
+                "node_id": 4,
+                "node_type": 1,
+                "task_name": "C"
+            },
+            {
+                "node_id": 5,
+                "node_type": 3
+            },
+            {
+                "node_id": 6,
+                "node_type": 5
+            }
+        ],
+        "edges": [
+            {
+                "from": 0,
+                "to": 1
+            },
+            {
+                "from": 1,
+                "to": 2
+            },
+            {
+                "from": 2,
+                "to": 3
+            },
+            {
+                "from": 2,
+                "to": 4
+            },
+            {
+                "from": 3,
+                "to": 5
+            },
+            {
+                "from": 4,
+                "to": 5
+            },
+            {
+                "from": 5,
+                "to": 6
+            }
+        ],
+        "cache_key": "CACHE_KEY"
+    })json";
+    std::vector<Result> expected = {
+            {
+                    {"A", "C"},
+                    {0, 1, 2, 4, 3, 5, 6},
+                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_PARALLEL",
+                            "BPMN_END"},
+                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
+                            "GATEWAY_MOVE"},
+                    {0, 0, 0, 1, 0, 1, 1},
+                    {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
+                    {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
+                    {0, 1, 2},
+                    {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
+            },
+            {
+                    {"A", "B", "C"},
+                    {0, 1, 2, 3, 4, 5, 6},
+                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK B", "BPMN_TASK C", "BPMN_PARALLEL",
+                            "BPMN_END"},
+                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE",
+                            "GATEWAY_MOVE"},
+                    {0, 0, 0, 1, 2, 2, 2},
+                    {0, 0, 0, 0, 0, 0, 1, 1, 1},
+                    {0, 1, 2, 3, 5, 6, 2, 4, 5},
+                    {0, 1},
+                    {"SYNC_EDGE", "SYNC_EDGE"}
+            },
+            {
+                    {"A", "C"},
+                    {0, 1, 2, 4, 3, 5, 6},
+                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_PARALLEL",
+                            "BPMN_END"},
+                    {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE",
+                            "GATEWAY_MOVE"},
+                    {0, 0, 0, 1, 0, 1, 1},
+                    {0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2},
+                    {0, 1, 2, 3, 5, 6, 2, 4, 5, 2, 5},
+                    {0, 1, 2},
+                    {"SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE"}
+            },
+            {
+                    {"C", "B", "B"},
+                    {0, 1, 2, 4, 3, 3, 5, 6},
+                    {"BPMN_START", "BPMN_TASK A", "BPMN_PARALLEL", "BPMN_TASK C", "BPMN_TASK B", "BPMN_TASK B",
+                            "BPMN_PARALLEL", "BPMN_END"},
+                    {"GATEWAY_MOVE", "MODEL_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE",
+                            "GATEWAY_MOVE", "GATEWAY_MOVE"},
+                    {0, 0, 0, 0, 1, 2, 1, 2},
+                    {0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4},
+                    {2, 3, 6, 7, 2, 4, 6, 0, 1, 2, 0, 2, 4, 5, 7},
+                    {0, 1, 2, 3, 4},
+                    {"SYNC_EDGE", "SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE"}
+            }
+    };
+    Run(variants, model, expected);
+}
+
 } // namespace starrocks

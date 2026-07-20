@@ -799,22 +799,17 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
 #ifdef CELOSTAR
   const auto& variant_table_size = table_sizes.variant_table_size;
 
-  auto alignment_table = std::make_unique<ResultTable>(INTERNAL_ALIGNMENT_TABLE_NAME, variant_table_size);
-  auto& alignment_variant = alignment_table->AddColumn<std::vector<std::string>>("variant");
-  auto& alignment_model_vertex_id = alignment_table->AddColumn<utils::nullable_vec_t<cel_int_t>>("model_vertex_id");
-  auto& alignment_vertex_label = alignment_table->AddColumn<std::vector<std::string>>("vertex_label");
-  auto& alignment_move_type = alignment_table->AddColumn<std::vector<std::string>>("move_type");
-  auto& alignment_activity_index = alignment_table->AddColumn<std::vector<row_id>>("activity_index");
-
-  auto association_table = std::make_unique<ResultTable>(INTERNAL_ASSOCIATION_TABLE_NAME, variant_table_size);
-  auto& association_variant = association_table->AddColumn<std::vector<std::string>>("variant");
-  auto& association_edge_class = association_table->AddColumn<std::vector<row_id>>("edge_class");
-  auto& association_alignment_index = association_table->AddColumn<std::vector<row_id>>("alignment_index");
-
-  auto edge_class_table = std::make_unique<ResultTable>(INTERNAL_EDGE_CLASS_TABLE_NAME, variant_table_size);
-  auto& edge_class_variant = edge_class_table->AddColumn<std::vector<std::string>>("variant");
-  auto& edge_class_id = edge_class_table->AddColumn<std::vector<row_id>>("id");
-  auto& edge_class_type = edge_class_table->AddColumn<std::vector<std::string>>("type");
+  auto result_table = std::make_unique<ResultTable>("align_model", variant_table_size);
+  auto& variant = result_table->AddColumn<std::vector<std::string>>("variant");
+  auto& alignment_model_vertex_id =
+      result_table->AddColumn<std::vector<std::optional<size_t>>>("alignment_model_vertex_id");
+  auto& alignment_vertex_label = result_table->AddColumn<std::vector<std::string>>("alignment_vertex_label");
+  auto& alignment_move_type = result_table->AddColumn<std::vector<std::string>>("alignment_move_type");
+  auto& alignment_activity_index = result_table->AddColumn<std::vector<row_id>>("alignment_activity_index");
+  auto& association_edge_class = result_table->AddColumn<std::vector<row_id>>("association_edge_class");
+  auto& association_alignment_index = result_table->AddColumn<std::vector<row_id>>("association_alignment_index");
+  auto& edge_class_id = result_table->AddColumn<std::vector<row_id>>("edge_class_id");
+  auto& edge_class_type = result_table->AddColumn<std::vector<std::string>>("edge_class_type");
 
   // maps petri net label ids to strings to create alignment_labels - uses either the string dictionary (e.g. for
   // unmapped activities) or the bpmn model
@@ -849,9 +844,8 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
       blocks,
       // It is safe to fill blocks of the `storage` data in parallel
 #ifdef CELOSTAR
-      [&alignment_variant, &alignment_model_vertex_id, &alignment_vertex_label, &alignment_move_type,
-       &alignment_activity_index, &association_variant, &association_edge_class, &association_alignment_index,
-       &edge_class_variant, &edge_class_id, &edge_class_type, &activity_column,
+      [&variant, &alignment_model_vertex_id, &alignment_vertex_label, &alignment_move_type, &alignment_activity_index,
+       &association_edge_class, &association_alignment_index, &edge_class_id, &edge_class_type, &activity_column,
        &case_id_column = std::as_const(case_id_column), &case_to_trace_ptrs = std::as_const(case_to_trace_ptrs),
        &activity_to_case_join = std::as_const(activity_to_case_join), &alignments = std::as_const(alignments),
        &replay_results = std::as_const(replay_results),
@@ -907,14 +901,10 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
                     const replay_result_type& replay_result_for_case{replay_results.at(variant_trace_id)};
 
 #ifdef CELOSTAR
-                    std::vector<std::string> variant;
-                    variant.reserve(interval.end() - interval.begin());
+                    variant[current_variant_row].reserve(interval.end() - interval.begin());
                     for (auto activity_index = interval.begin(); activity_index < interval.end(); activity_index++) {
-                      variant.push_back(activity_column->get_string_value(activity_index));
+                      variant[current_variant_row].push_back(activity_column->get_string_value(activity_index));
                     }
-                    alignment_variant[current_variant_row] = variant;
-                    association_variant[current_variant_row] = variant;
-                    edge_class_variant[current_variant_row] = variant;
 #endif
 
                     // 1. Fill the association table
@@ -1027,9 +1017,7 @@ memory::table_group_t inflate(const alignments_t& alignments, const replay_resul
 #ifdef CELOSTAR
   // Make table group
   memory::table_group_t tables{};
-  tables.emplace(INTERNAL_ALIGNMENT_TABLE_NAME, std::move(alignment_table));
-  tables.emplace(INTERNAL_ASSOCIATION_TABLE_NAME, std::move(association_table));
-  tables.emplace(INTERNAL_EDGE_CLASS_TABLE_NAME, std::move(edge_class_table));
+  tables.emplace("align_model", std::move(result_table));
 
   return tables;
 #else

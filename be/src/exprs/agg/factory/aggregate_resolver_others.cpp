@@ -24,7 +24,6 @@
 namespace starrocks {
 
 void AggregateFuncResolver::register_celonis() {
-    add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_align_model");
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_inductive_miner");
     add_array_mapping_celonis<TYPE_ARRAY, TYPE_VARCHAR>("celonis_variant_stats");
 }

@@ -1419,6 +1419,8 @@ celostar_functions = [
     [1000404, 'celonis_in', True, False, 'BOOLEAN', ['DATETIME', 'ARRAY_DATETIME'], 'CelonisIn::celonis_in'],
     [1000405, 'celonis_in', True, False, 'BOOLEAN', ['VARCHAR', 'ARRAY_VARCHAR'], 'CelonisIn::celonis_in'],
     [1000501, 'celonis_like', True, False, 'BOOLEAN', ['VARCHAR', 'VARCHAR'], 'CelonisLike::like', 'CelonisLike::like_prepare', 'CelonisLike::like_close'],
+    # The fields of STRUCT are set in ExpressionAnalyzer.java in FE.
+    [1000601, 'celonis_align_model', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisAlignModel::align_model'],
 
     # Array functions
     [2000100, 'celonis_array_is_sorted', True, False, 'BOOLEAN', ['ANY_ARRAY'], 'CelonisArrayFunctions::array_is_sorted'],

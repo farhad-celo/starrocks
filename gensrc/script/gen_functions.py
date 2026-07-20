@@ -70,6 +70,7 @@ ${license}
 #include "exprs/array_functions.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/dict_functions.h"
+#include "exprs/celonis/align_model.h"
 #include "exprs/celonis/array_functions.h"
 #include "exprs/celonis/calc_throughput.h"
 #include "exprs/celonis/conformance.h"
