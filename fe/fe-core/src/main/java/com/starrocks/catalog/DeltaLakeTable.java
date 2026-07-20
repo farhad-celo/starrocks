@@ -23,6 +23,7 @@ import com.starrocks.analysis.DescriptorTable;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.LiteralExpr;
 import com.starrocks.connector.delta.DeltaUtils;
+import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.server.CatalogMgr;
 import com.starrocks.thrift.TColumn;
 import com.starrocks.thrift.TDeltaLakeTable;
@@ -47,6 +48,7 @@ public class DeltaLakeTable extends Table {
     private SnapshotImpl deltaSnapshot;
     private String tableLocation;
     private Engine deltaEngine;
+    private CloudConfiguration cloudConfiguration;
 
     public static final String PARTITION_NULL_VALUE = "null";
 
@@ -76,6 +78,14 @@ public class DeltaLakeTable extends Table {
     @Override
     public String getTableLocation() {
         return tableLocation;
+    }
+
+    public CloudConfiguration getCloudConfiguration() {
+        return cloudConfiguration;
+    }
+
+    public void setCloudConfiguration(CloudConfiguration cloudConfiguration) {
+        this.cloudConfiguration = cloudConfiguration;
     }
 
     public Metadata getDeltaMetadata() {

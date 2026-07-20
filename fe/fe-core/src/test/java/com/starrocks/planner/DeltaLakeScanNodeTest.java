@@ -48,6 +48,8 @@ public class DeltaLakeScanNodeTest {
         CloudConfiguration cc = CloudConfigurationFactory.buildCloudConfigurationForStorage(new HashMap<>());
         new Expectations() {
             {
+                table.getCloudConfiguration();
+                result = null;
                 GlobalStateMgr.getCurrentState().getConnectorMgr().getConnector(catalog);
                 result = connector;
                 connector.getMetadata().getCloudConfiguration();
@@ -69,6 +71,10 @@ public class DeltaLakeScanNodeTest {
                 buildCloudConfigurationForStorage(new HashMap<>());
         new Expectations() {
             {
+                table.getCloudConfiguration();
+                result = null;
+                minTimes = 0;
+
                 GlobalStateMgr.getCurrentState().getConnectorMgr().getConnector(catalogName);
                 result = connector;
                 minTimes = 0;
@@ -102,6 +108,10 @@ public class DeltaLakeScanNodeTest {
                 buildCloudConfigurationForStorage(new HashMap<>());
 
         new Expectations() {{
+            table.getCloudConfiguration();
+            result = null;
+            minTimes = 0;
+
             GlobalStateMgr.getCurrentState().getConnectorMgr().getConnector(catalogName);
             result = connector;
             minTimes = 0;
@@ -169,5 +179,33 @@ public class DeltaLakeScanNodeTest {
         scanNode.prepareRetry();
         Assertions.assertNull(Deencapsulation.getField(scanNode, "scanRangeSource"),
                 "scanRangeSource should be cleared by clear()");
+    }
+
+    @Test
+    public void testPrefersPerTableCloudConfiguration(@Mocked GlobalStateMgr globalStateMgr,
+                                                      @Mocked CatalogConnector connector,
+                                                      @Mocked DeltaLakeTable table) {
+        String catalogName = "delta0";
+        CloudConfiguration perTableCloudConfiguration = CloudConfigurationFactory
+                .buildCloudConfigurationForStorage(new HashMap<>());
+        new Expectations() {
+            {
+                table.getCatalogName();
+                result = catalogName;
+                minTimes = 0;
+
+                table.getCloudConfiguration();
+                result = perTableCloudConfiguration;
+                minTimes = 0;
+
+                // times = 0 must bind to the chain root (getMetadata), not the trailing call.
+                connector.getMetadata();
+                times = 0;
+            }
+        };
+        TupleDescriptor desc = new TupleDescriptor(new TupleId(0));
+        desc.setTable(table);
+        DeltaLakeScanNode scanNode = new DeltaLakeScanNode(new PlanNodeId(0), desc, "Delta Scan Node", null, null, null);
+        Assertions.assertNotNull(scanNode);
     }
 }

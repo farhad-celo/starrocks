@@ -232,7 +232,9 @@ under the License.
             </dependency>
 
             <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-lang3 -->
-            <!-- 3.18.0 fixes CVE-2025-48924 (ClassUtils.getClass StackOverflow) -->
+            <!-- Pinned to >= 3.13.0 so commons-configuration2 (transitively pulled in by
+                 databricks-sdk-java) can resolve org.apache.commons.lang3.SystemProperties.
+                 3.18.0 also fixes CVE-2025-48924 (ClassUtils.getClass StackOverflow). -->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>

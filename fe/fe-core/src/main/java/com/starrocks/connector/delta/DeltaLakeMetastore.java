@@ -27,6 +27,7 @@ import com.starrocks.common.profile.Tracers;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.metastore.IMetastore;
 import com.starrocks.connector.metastore.MetastoreTable;
+import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.sql.analyzer.SemanticException;
 import io.delta.kernel.Scan;
 import io.delta.kernel.ScanBuilder;
@@ -138,6 +139,31 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
     @Override
     public DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName) {
         MetastoreTable metastoreTable = getMetastoreTable(dbName, tableName);
+        return getLatestSnapshot(dbName, tableName, metastoreTable,
+                resolveTableCloudConfiguration(dbName, tableName));
+    }
+
+    /**
+     * Variant that uses a pre-resolved per-table {@link CloudConfiguration} instead of calling
+     * {@link #resolveTableCloudConfiguration(String, String)} again. Lets subclasses that already
+     * have the value (e.g. {@link com.starrocks.connector.delta.unity.UnityBackedDeltaMetastore#getTable})
+     * avoid a second round-trip through the credential-vending pipeline.
+     */
+    protected DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName,
+                                                  CloudConfiguration tableCloudConfiguration) {
+        return getLatestSnapshot(dbName, tableName, getMetastoreTable(dbName, tableName),
+                tableCloudConfiguration);
+    }
+
+    /**
+     * Variant that uses a pre-fetched {@link MetastoreTable} (and pre-resolved
+     * {@link CloudConfiguration}) so callers that already have both values do not pay for a
+     * second metastore lookup. {@link com.starrocks.connector.delta.unity.UnityBackedDeltaMetastore#getTable}
+     * uses this to collapse the per-call Unity Catalog round-trips down to one.
+     */
+    protected DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName,
+                                                  MetastoreTable metastoreTable,
+                                                  CloudConfiguration tableCloudConfiguration) {
         if (metastoreTable == null) {
             LOG.error("get metastore table failed. dbName: {}, tableName: {}", dbName, tableName);
             return null;
@@ -145,7 +171,17 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
 
         String path = metastoreTable.getTableLocation();
         long createTime = metastoreTable.getCreateTime();
-        DeltaLakeEngine deltaLakeEngine = DeltaLakeEngine.create(hdfsConfiguration, properties, checkpointCache, jsonCache);
+        Configuration effectiveConfiguration = hdfsConfiguration;
+        boolean usePerTableConfig = tableCloudConfiguration != null;
+        if (usePerTableConfig) {
+            effectiveConfiguration = new Configuration(hdfsConfiguration);
+            tableCloudConfiguration.applyToConfiguration(effectiveConfiguration);
+        }
+        // When per-table vended credentials are active, the catalog-level json/checkpoint
+        // caches must be bypassed: their CacheLoaders close over the credential-less
+        // hdfsConfiguration and would ignore the table-scoped config we just built.
+        DeltaLakeEngine deltaLakeEngine = DeltaLakeEngine.create(effectiveConfiguration, properties,
+                checkpointCache, jsonCache, usePerTableConfig);
         SnapshotImpl snapshot;
 
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "DeltaLake.getSnapshot")) {

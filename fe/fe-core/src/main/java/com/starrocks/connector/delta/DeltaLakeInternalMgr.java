@@ -21,6 +21,12 @@ import com.starrocks.common.util.Util;
 import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.MetastoreType;
 import com.starrocks.connector.ReentrantExecutor;
+import com.starrocks.connector.delta.unity.CachingUnityCatalogClient;
+import com.starrocks.connector.delta.unity.UnityBackedDeltaMetastore;
+import com.starrocks.connector.delta.unity.UnityCatalogApi;
+import com.starrocks.connector.delta.unity.UnityCatalogClient;
+import com.starrocks.connector.delta.unity.UnityCatalogProperties;
+import com.starrocks.connector.delta.unity.UnityMetastore;
 import com.starrocks.connector.hive.CachingHiveMetastoreConf;
 import com.starrocks.connector.hive.HiveMetaClient;
 import com.starrocks.connector.hive.HiveMetastore;
@@ -37,13 +43,14 @@ import static com.starrocks.connector.hive.HiveConnector.HIVE_METASTORE_TYPE;
 import static com.starrocks.connector.hive.HiveConnector.HIVE_METASTORE_URIS;
 
 public class DeltaLakeInternalMgr {
-    public static final List<String> SUPPORTED_METASTORE_TYPE = ImmutableList.of("hive", "glue", "dlf");
+    public static final List<String> SUPPORTED_METASTORE_TYPE = ImmutableList.of("hive", "glue", "dlf", "unity");
     protected final String catalogName;
     protected final DeltaLakeCatalogProperties deltaLakeCatalogProperties;
     protected final HdfsEnvironment hdfsEnvironment;
     private final CachingHiveMetastoreConf hmsConf;
     private ExecutorService refreshHiveMetastoreExecutor;
     protected final MetastoreType metastoreType;
+    protected final UnityCatalogProperties unityCatalogProperties;
 
     public DeltaLakeInternalMgr(String catalogName, Map<String, String> properties, HdfsEnvironment hdfsEnvironment) {
         this.catalogName = catalogName;
@@ -62,6 +69,9 @@ public class DeltaLakeInternalMgr {
             Util.validateMetastoreUris(hiveMetastoreUris);
         }
         this.metastoreType = MetastoreType.get(hiveMetastoreType);
+        this.unityCatalogProperties = metastoreType == MetastoreType.UNITY
+                ? new UnityCatalogProperties(properties)
+                : null;
     }
 
     protected boolean isSupportedMetastoreType(String metastoreType) {
@@ -69,7 +79,51 @@ public class DeltaLakeInternalMgr {
     }
 
     public IDeltaLakeMetastore createDeltaLakeMetastore() {
+        if (metastoreType == MetastoreType.UNITY) {
+            return createUnityBackedDeltaLakeMetastore();
+        }
         return createHMSBackedDeltaLakeMetastore();
+    }
+
+    public IDeltaLakeMetastore createUnityBackedDeltaLakeMetastore() {
+        Preconditions.checkNotNull(unityCatalogProperties, "unityCatalogProperties must be set when metastore type is UNITY");
+        UnityCatalogApi client = new UnityCatalogClient(unityCatalogProperties);
+        if (unityCatalogProperties.isCacheEnabled()) {
+            client = new CachingUnityCatalogClient(client, unityCatalogProperties);
+        }
+        UnityMetastore unityMetastore = new UnityMetastore(client, unityCatalogProperties);
+        UnityBackedDeltaMetastore unityBackedDeltaMetastore = new UnityBackedDeltaMetastore(
+                catalogName,
+                unityMetastore,
+                hdfsEnvironment.getConfiguration(),
+                deltaLakeCatalogProperties,
+                unityCatalogProperties);
+        IDeltaLakeMetastore deltaLakeMetastore;
+        if (!deltaLakeCatalogProperties.isEnableDeltaLakeTableCache()) {
+            deltaLakeMetastore = unityBackedDeltaMetastore;
+        } else {
+            refreshHiveMetastoreExecutor = Executors.newCachedThreadPool(
+                    new ThreadFactoryBuilder().setNameFormat("deltalake-metastore-refresh-%d").build());
+            Executor executor = new ReentrantExecutor(refreshHiveMetastoreExecutor, hmsConf.getCacheRefreshThreadMaxNum());
+            // When vended credentials are active, the cached snapshot embeds the per-table
+            // cloud credentials inside its DeltaLakeEngine. To make sure we never hand a stale
+            // credential to a query, clamp the snapshot cache TTL/refresh to the Unity client
+            // cache TTL: that cache already guarantees credentials are evicted well inside the
+            // server-side expiration_time minus safety_margin window. Operators that disable
+            // the Unity client cache (or set its TTL=0) take the bypass path in
+            // UnityBackedDeltaMetastore#isSnapshotCacheBypassed() and never reach this branch.
+            long snapshotTtlSec = hmsConf.getCacheTtlSec();
+            long snapshotRefreshSec = hmsConf.getCacheRefreshIntervalSec();
+            if (unityCatalogProperties.isVendedCredentialsEnabled()
+                    && unityCatalogProperties.isCacheEnabled()) {
+                long unityTtlSec = unityCatalogProperties.getCacheTtlSec();
+                snapshotTtlSec = Math.min(snapshotTtlSec, unityTtlSec);
+                snapshotRefreshSec = Math.min(snapshotRefreshSec, unityTtlSec);
+            }
+            deltaLakeMetastore = CachingDeltaLakeMetastore.createCatalogLevelInstance(unityBackedDeltaMetastore, executor,
+                    snapshotTtlSec, snapshotRefreshSec, hmsConf.getCacheMaxNum());
+        }
+        return deltaLakeMetastore;
     }
 
     public IDeltaLakeMetastore createHMSBackedDeltaLakeMetastore() {

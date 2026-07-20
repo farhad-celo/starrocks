@@ -398,6 +398,13 @@ under the License.
             <artifactId>okhttp</artifactId>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/com.databricks/databricks-sdk-java -->
+        <dependency>
+            <groupId>com.databricks</groupId>
+            <artifactId>databricks-sdk-java</artifactId>
+            <version>0.103.0</version>
+        </dependency>
+
         <!-- https://mvnrepository.com/artifact/com.squareup.okio/okio -->
         <dependency>
             <groupId>com.squareup.okio</groupId>

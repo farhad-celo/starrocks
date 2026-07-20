@@ -19,7 +19,12 @@ import com.starrocks.connector.CatalogConnector;
 import com.starrocks.connector.ConnectorContext;
 import com.starrocks.connector.ConnectorFactory;
 import com.starrocks.connector.ConnectorMetadata;
+import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.MetastoreType;
+import com.starrocks.connector.delta.unity.CachingUnityCatalogClient;
+import com.starrocks.connector.delta.unity.UnityBackedDeltaMetastore;
+import com.starrocks.connector.delta.unity.UnityCatalogApi;
+import com.starrocks.connector.delta.unity.UnityCatalogClient;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -90,5 +95,112 @@ public class DeltaLakeConnectorTest {
         FileScanTask fileScanTask = null;
         DeltaRemoteFileInfo deltaRemoteFileInfo = new DeltaRemoteFileInfo(fileScanTask);
         Assertions.assertNull(deltaRemoteFileInfo.getFileScanTask());
+    }
+
+    @Test
+    public void testUnityCatalogCachingClientWiredByDefault() {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("type", "deltalake")
+                .put("hive.metastore.type", "unity")
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .build();
+        UnityCatalogApi client = extractUnityClient(properties);
+        Assertions.assertInstanceOf(CachingUnityCatalogClient.class, client,
+                "unity.catalog.cache.enabled defaults to true, so the REST client should be wrapped");
+    }
+
+    @Test
+    public void testUnityCatalogCachingClientBypassedWhenDisabled() {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("type", "deltalake")
+                .put("hive.metastore.type", "unity")
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.cache.enabled", "false")
+                .build();
+        UnityCatalogApi client = extractUnityClient(properties);
+        Assertions.assertInstanceOf(UnityCatalogClient.class, client,
+                "when the cache is disabled the raw REST client must be handed to UnityMetastore");
+        Assertions.assertFalse(client instanceof CachingUnityCatalogClient);
+    }
+
+    @Test
+    public void testUnitySnapshotCacheNotBypassedWhenUnityClientCacheEnabled() throws Exception {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("type", "deltalake")
+                .put("hive.metastore.type", "unity")
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .build();
+        UnityBackedDeltaMetastore unity = extractUnityBackedMetastore(properties);
+        Assertions.assertTrue(unity.isVendedCredentialsEnabled(),
+                "vended credentials default to true for Unity Catalog");
+        Assertions.assertFalse(unity.isSnapshotCacheBypassed(),
+                "with the unity client cache active the snapshot cache must be reused");
+    }
+
+    @Test
+    public void testUnitySnapshotCacheBypassedWhenUnityClientCacheDisabled() throws Exception {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("type", "deltalake")
+                .put("hive.metastore.type", "unity")
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.cache.enabled", "false")
+                .build();
+        UnityBackedDeltaMetastore unity = extractUnityBackedMetastore(properties);
+        Assertions.assertTrue(unity.isVendedCredentialsEnabled());
+        Assertions.assertTrue(unity.isSnapshotCacheBypassed(),
+                "disabling the unity client cache must force snapshot bypass to keep credentials fresh");
+    }
+
+    @Test
+    public void testUnitySnapshotCacheBypassedWhenUnityClientCacheTtlIsZero() throws Exception {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("type", "deltalake")
+                .put("hive.metastore.type", "unity")
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.cache.ttl-sec", "0")
+                .build();
+        UnityBackedDeltaMetastore unity = extractUnityBackedMetastore(properties);
+        Assertions.assertTrue(unity.isSnapshotCacheBypassed(),
+                "ttl-sec=0 means no client-side cache lifetime, so the snapshot cache must bypass too");
+    }
+
+    @Test
+    public void testUnitySnapshotCacheNotBypassedWhenVendedCredentialsDisabled() throws Exception {
+        Map<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("type", "deltalake")
+                .put("hive.metastore.type", "unity")
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.vended-credentials-enabled", "false")
+                .put("unity.catalog.cache.enabled", "false")
+                .build();
+        UnityBackedDeltaMetastore unity = extractUnityBackedMetastore(properties);
+        Assertions.assertFalse(unity.isVendedCredentialsEnabled());
+        Assertions.assertFalse(unity.isSnapshotCacheBypassed());
+    }
+
+    private static UnityBackedDeltaMetastore extractUnityBackedMetastore(Map<String, String> properties) {
+        DeltaLakeInternalMgr mgr = new DeltaLakeInternalMgr("uc_delta", properties, new HdfsEnvironment());
+        IDeltaLakeMetastore metastore = mgr.createUnityBackedDeltaLakeMetastore();
+        if (metastore instanceof CachingDeltaLakeMetastore) {
+            metastore = ((CachingDeltaLakeMetastore) metastore).delegate;
+        }
+        Assertions.assertInstanceOf(UnityBackedDeltaMetastore.class, metastore);
+        return (UnityBackedDeltaMetastore) metastore;
+    }
+
+    private static UnityCatalogApi extractUnityClient(Map<String, String> properties) {
+        return extractUnityBackedMetastore(properties).getUnityCatalogClient();
     }
 }
