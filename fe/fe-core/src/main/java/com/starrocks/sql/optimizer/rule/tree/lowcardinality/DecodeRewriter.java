@@ -91,7 +91,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
     }
 
     // For structs, we only return the encoded fields collected by DecodeCollector.
-    static ColumnRefSet getUsedColumns(ScalarOperator scalarOperator, DecodeContext context) {
+    static ColumnRefSet getUsedStringRefs(ScalarOperator scalarOperator, DecodeContext context) {
         if (scalarOperator.isColumnRef()) {
             return new ColumnRefSet(((ColumnRefOperator) scalarOperator).getId());
         }
@@ -100,7 +100,10 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
             return new ColumnRefSet(structFieldsData.values());
         }
         ColumnRefSet result = new ColumnRefSet();
-        scalarOperator.getChildren().forEach(c -> result.union(getUsedColumns(c, context)));
+        scalarOperator.getChildren().forEach(c -> result.union(getUsedStringRefs(c, context)));
+        if (context.exprToSupportColumnsMap.containsKey(scalarOperator)) {
+            result.intersect(context.exprToSupportColumnsMap.get(scalarOperator));
+        }
         return result;
     }
 
@@ -870,7 +873,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
                 newColumnRefMap.put(key, value.accept(replacer, null));
                 continue;
             }
-            if (!inputs.containsAll(getUsedColumns(value, context))) {
+            if (!inputs.containsAll(getUsedStringRefs(value, context))) {
                 newColumnRefMap.put(key, value);
                 continue;
             }
@@ -921,7 +924,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         @Override
         public Optional<ScalarOperator> preprocess(ScalarOperator scalarOperator) {
             if (exprMapping.containsKey(scalarOperator)
-                    && supportColumns.containsAll(getUsedColumns(scalarOperator, context))) {
+                    && supportColumns.containsAll(getUsedStringRefs(scalarOperator, context))) {
                 return Optional.of(exprMapping.get(scalarOperator));
             }
             return Optional.empty();
@@ -948,7 +951,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
             }
 
             if (stringRefToDictRefMap.containsKey(columnRef) && supportColumns.containsAll(
-                    getUsedColumns(columnRef, context))) {
+                    getUsedStringRefs(columnRef, context))) {
                 return Optional.of(stringRefToDictRefMap.get(columnRef));
             }
 

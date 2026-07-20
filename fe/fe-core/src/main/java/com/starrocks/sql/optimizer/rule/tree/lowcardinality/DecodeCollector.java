@@ -85,6 +85,7 @@ import com.starrocks.thrift.TAccessPathType;
 import com.starrocks.type.ArrayType;
 import com.starrocks.type.StructType;
 import com.starrocks.type.Type;
+import groovy.util.MapEntry;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -174,6 +175,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     private final Map<Integer, Integer> tableFunctionDependencies = Maps.newHashMap();
 
     private final Map<Integer, ScalarOperator> stringRefToDefineExprMap = Maps.newHashMap();
+
+    private final Map<ScalarOperator, ColumnRefSet> exprToSupportColumnsMap = Maps.newIdentityHashMap();
 
     // string column use counter, 0 meanings decoded immediately after it was generated.
     // for compute global dict define expressions
@@ -413,28 +416,12 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             info.usedStringColumns.intersect(alls);
             if (!info.isEmpty()) {
                 context.operatorDecodeInfo.put(operator, info);
-                if (operator instanceof PhysicalHashAggregateOperator hashAgg) {
-                    hashAgg.getAggregations().keySet().forEach(agg -> {
-                        context.aggIdToSupportColumns.computeIfAbsent(agg.getId(), k -> new ColumnRefSet())
-                                .union(info.inputStringColumns);
-                    });
-                }
-                if (operator instanceof PhysicalWindowOperator window) {
-                    window.getAnalyticCall().keySet().forEach(agg -> {
-                        context.aggIdToSupportColumns.computeIfAbsent(agg.getId(), k -> new ColumnRefSet())
-                                .union(info.inputStringColumns);
-                    });
-                }
-                if (operator instanceof PhysicalTopNOperator topN && topN.getPreAggCall() != null) {
-                    topN.getPreAggCall().keySet().forEach(agg -> {
-                        context.aggIdToSupportColumns.computeIfAbsent(agg.getId(), k -> new ColumnRefSet())
-                                .union(info.inputStringColumns);
-                    });
-                }
             }
         }
         structManager.finalize(context.allStringColumns);
         context.structManager = structManager;
+        exprToSupportColumnsMap.forEach((k, v) -> v.intersect(alls));
+        context.exprToSupportColumnsMap = exprToSupportColumnsMap;
     }
 
     // For SubfieldOperators, we just need to get the field column refs, not the whole columns in the struct.
@@ -644,6 +631,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 }
                 // aggregate ref -> aggregate expr
                 stringAggregateExpressions.computeIfAbsent(key.getId(), x -> Lists.newArrayList()).add(value);
+                exprToSupportColumnsMap.put(value, info.inputStringColumns);
                 // min/max should replace to dict column, count/count distinct don't need
                 if (FunctionSet.MAX.equals(value.getFnName()) || FunctionSet.MIN.equals(value.getFnName())) {
                     info.outputStringColumns.union(key.getId());
@@ -906,6 +894,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             }
 
             stringAggregateExpressions.computeIfAbsent(key.getId(), x -> Lists.newArrayList()).add(value);
+            exprToSupportColumnsMap.put(value, info.inputStringColumns);
             // if the function return type is not string or array<string>, then its output column can not be
             // encoded, however the function evaluation can adopt encoded columns, for examples:
             // 1. select v1, count(t.a1) over(partition by v1) select t0, unnest(t0.a1) t(a1);
@@ -976,6 +965,11 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 && supportColumns.containsAll(agg.getUsedColumns());
     }
 
+    private static boolean isFirstStageAgg(ColumnRefOperator aggColumn, CallOperator agg) {
+        return !agg.getArguments().isEmpty() &&
+                (!(agg.getArguments().get(0) instanceof ColumnRefOperator ref) || ref.getId() != aggColumn.getId());
+    }
+
     @Override
     public DecodeInfo visitPhysicalHashAggregate(OptExpression optExpression, DecodeInfo context) {
         if (context.outputStringColumns.isEmpty() && context.inProgressStringAggregations.isEmpty()) {
@@ -987,8 +981,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         ColumnRefSet disableColumns = new ColumnRefSet();
         for (ColumnRefOperator key : aggregate.getAggregations().keySet()) {
             CallOperator agg = aggregate.getAggregations().get(key);
-            final boolean isFirstStage = !agg.getArguments().isEmpty() &&
-                    (!(agg.getArguments().get(0) instanceof ColumnRefOperator ref) || ref.getId() != key.getId());
+            final boolean isFirstStage = isFirstStageAgg(key, agg);
             if (!shouldProcessAggFunction(agg, info, isFirstStage)) {
                 disableColumns.union(agg.getUsedColumns());
                 disableColumns.union(key);
@@ -1030,6 +1023,9 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             }
             final boolean isFinalStage = aggregate.getType().isGlobal() ||
                     (aggregate.getType().isLocal() && !aggregate.isSplit());
+            if (isFirstStageAgg(key, value)) {
+                exprToSupportColumnsMap.put(value, info.inputStringColumns);
+            }
             if (isFinalStage) {
                 info.finalizingStringAggregations.union(key.getId());
                 if (supportLowCardinality(value.getType())) {
@@ -1350,6 +1346,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             if (!expressions.isEmpty()) {
                 // predicate only translate to string expression
                 stringExpressions.computeIfAbsent(c, l -> Lists.newArrayList()).addAll(expressions);
+                expressions.forEach(e -> exprToSupportColumnsMap.put(e, info.outputStringColumns));
             }
         });
 
@@ -1384,6 +1381,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 if (!exprs.isEmpty()) {
                     // maybe not new dict, just optimize the expression with dictionary
                     stringExpressions.computeIfAbsent(c, l -> Lists.newArrayList()).addAll(exprs);
+                    exprs.forEach(e -> exprToSupportColumnsMap.put(e, decodeInput));
                 }
 
                 // whole expression support dictionary, define new dict column
