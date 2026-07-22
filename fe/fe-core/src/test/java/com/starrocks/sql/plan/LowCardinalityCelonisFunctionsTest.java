@@ -234,4 +234,15 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
         Assertions.assertTrue(plan.contains("celonis_sorted_first[([3: VARCHAR_COL2, VARCHAR, true], " +
                 "[7: VARCHAR_COL, INT, true])"), plan);
     }
+
+    @Test
+    public void testIndexActivity() throws Exception {
+        String sql = """
+                select CELONIS_INDEX_ACTIVITY(ACTIVITIES, 'INDEX_ACTIVITY_TYPE', 'FORWARD')
+                FROM TestActivityTimestampTable
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains(
+                "celonis_index_activity[([5: ACTIVITIES, ARRAY<INT>, true], 'INDEX_ACTIVITY_TYPE', 'FORWARD')"), plan);
+    }
 }

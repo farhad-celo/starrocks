@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_ARRAY_FN_PARAM_CONFIGS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_ARRAY_FUNCTIONS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_STRUCT_FUNCTIONS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS;
@@ -480,8 +481,19 @@ class DecodeContext {
                 ColumnRefOperator stringRef = getUseStringRef(call);
                 ColumnRefOperator dictRef = stringRefToDictRefMap.get(stringRef);
                 Preconditions.checkNotNull(dictRef);
-                newChildren = newChildren.stream().map(op -> op.isConstant() ?
-                        dictEncodeConstant(op, dictRef.getId()) : op).collect(Collectors.toCollection(ArrayList::new));
+                final List<Boolean> arrayParamModes = LOW_CARD_ARRAY_FN_PARAM_CONFIGS.get(call.getFnName());
+                Preconditions.checkState(arrayParamModes == null ||
+                        (arrayParamModes.size() >= newChildren.size() && !arrayParamModes.get(0)));
+                List<ScalarOperator> encodedChildren = Lists.newArrayList();
+                for (int i = 0; i < newChildren.size(); ++i) {
+                    ScalarOperator op = newChildren.get(i);
+                    if (op.isConstant() && (arrayParamModes == null || arrayParamModes.get(i))) {
+                        encodedChildren.add(dictEncodeConstant(op, dictRef.getId()));
+                    } else {
+                        encodedChildren.add(op);
+                    }
+                }
+                newChildren = encodedChildren;
             }
             Function fn = buildFunction(call.getFnName(), newChildren);
             ScalarOperator result = new CallOperator(call.getFnName(), fn.getReturnType(), newChildren, fn);

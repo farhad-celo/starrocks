@@ -15,6 +15,7 @@
 package com.starrocks.sql.optimizer.rule.tree.lowcardinality;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -183,7 +184,16 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     public static final Set<String> CELONIS_LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
             FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_SHORTENED_VARIANT, FunctionSet.CELONIS_ARRAY_FIRST,
             FunctionSet.CELONIS_ARRAY_LAST, FunctionSet.CELONIS_ARRAY_LAG, FunctionSet.CELONIS_ARRAY_LEAD,
-            FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT);
+            FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT, FunctionSet.CELONIS_INDEX_ACTIVITY);
+
+    // The framework automatically encodes string/array<string> constants to dictionary space for ARRAY_FUNCTIONS.
+    // Use this map to override that behavior per function: each boolean indicates whether the constant at that
+    // argument position should be dictionary-encoded (true) or kept in string space (false).
+    // Functions not present in this map keep the default behavior (encode all eligible constant arguments).
+    // First argument is always the array input and hence the value must be false.
+    public static final Map<String, List<Boolean>> LOW_CARD_ARRAY_FN_PARAM_CONFIGS = ImmutableMap.of(
+            FunctionSet.CELONIS_INDEX_ACTIVITY, List.of(false, false, false)
+    );
 
     static {
         LOW_CARD_ARRAY_FUNCTIONS.addAll(CELONIS_LOW_CARD_ARRAY_FUNCTIONS);
