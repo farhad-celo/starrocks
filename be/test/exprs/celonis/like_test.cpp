@@ -158,4 +158,17 @@ TEST_F(CelonisLikeTest, like_multiple_rows_with_constant_no_wildcard) {
     EXPECT_TRUE(result->get(4).is_null());
 }
 
+TEST_F(CelonisLikeTest, like_constant_null_pattern) {
+    auto input = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    input->append_datum("abcde");
+    input->append_datum(Datum{});
+
+    auto pattern = ColumnHelper::create_const_null_column(1);
+
+    const auto result = Run(input, pattern).value();
+    ASSERT_EQ(2, result->size());
+    EXPECT_TRUE(result->get(0).is_null());
+    EXPECT_TRUE(result->get(1).is_null());
+}
+
 } // namespace starrocks

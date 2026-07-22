@@ -60,7 +60,7 @@ Status CelonisLike::like_prepare(FunctionContext* context, FunctionContext::Func
         auto state = new LikeStateFragmentLocal();
         context->set_function_state(scope, state);
 
-        if (!context->is_constant_column(1)) {
+        if (!context->is_notnull_constant_column(1)) {
             state->function = like_non_constant;
             state->function_type = LikeFunctionType::LIKE_NON_CONSTANT;
             return Status::OK();
