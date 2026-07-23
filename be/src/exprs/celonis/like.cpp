@@ -149,6 +149,8 @@ std::pair<std::string, bool> CelonisLike::convert_like_pattern(const Slice& patt
 }
 
 StatusOr<ColumnPtr> CelonisLike::like_non_constant(FunctionContext* context, const Columns& columns) {
+    RETURN_IF_COLUMNS_ONLY_NULL(columns);
+
     const auto& value_column = VECTORIZED_FN_ARGS(0);
     const auto& pattern_column = VECTORIZED_FN_ARGS(1);
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);

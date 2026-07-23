@@ -163,7 +163,7 @@ TEST_F(CelonisLikeTest, like_constant_null_pattern) {
     input->append_datum("abcde");
     input->append_datum(Datum{});
 
-    auto pattern = ColumnHelper::create_const_null_column(1);
+    auto pattern = ColumnHelper::create_const_null_column(input->size());
 
     const auto result = Run(input, pattern).value();
     ASSERT_EQ(2, result->size());
