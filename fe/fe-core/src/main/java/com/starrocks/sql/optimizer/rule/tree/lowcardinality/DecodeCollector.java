@@ -184,7 +184,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     public static final Set<String> CELONIS_LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
             FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_SHORTENED_VARIANT, FunctionSet.CELONIS_ARRAY_FIRST,
             FunctionSet.CELONIS_ARRAY_LAST, FunctionSet.CELONIS_ARRAY_LAG, FunctionSet.CELONIS_ARRAY_LEAD,
-            FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT, FunctionSet.CELONIS_INDEX_ACTIVITY);
+            FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT, FunctionSet.CELONIS_INDEX_ACTIVITY,
+            FunctionSet.CELONIS_NULL_TO_EMPTY);
 
     // The framework automatically encodes string/array<string> constants to dictionary space for ARRAY_FUNCTIONS.
     // Use this map to override that behavior per function: each boolean indicates whether the constant at that
