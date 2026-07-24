@@ -11,9 +11,8 @@
 #include "runtime/types.h"
 
 namespace starrocks {
-
 /*
-2026-07-23T23:30:14+00:00
+2026-07-24T00:25:05+00:00
 Running ./be/build_Release/src/bench/celonis/output/calc_crop_bench
 Run on (32 X 2499.99 MHz CPU s)
 CPU Caches:
@@ -21,70 +20,88 @@ CPU Caches:
   L1 Instruction 32 KiB (x16)
   L2 Unified 1024 KiB (x16)
   L3 Unified 36608 KiB (x1)
-Load Average: 4.41, 3.00, 2.58
------------------------------------------------------------------------------------------------
-Benchmark                                     Time             CPU   Iterations UserCounters...
------------------------------------------------------------------------------------------------
-BM_CalcCropAllAll/1000/10                152485 ns       152479 ns         4295 RowInvRate=152.479ns
-BM_CalcCropAllAll/10000/10              1498610 ns      1498353 ns          462 RowInvRate=149.835ns
-BM_CalcCropAllAll/100000/10            28948634 ns     28947962 ns           24 RowInvRate=289.48ns
-BM_CalcCropAllAll/1000/20                288259 ns       288187 ns         2426 RowInvRate=288.187ns
-BM_CalcCropAllAll/10000/20              2887426 ns      2887166 ns          237 RowInvRate=288.717ns
-BM_CalcCropAllAll/100000/20            58811366 ns     58811170 ns           12 RowInvRate=588.112ns
-BM_CalcCropAllAll/1000/40                535345 ns       535314 ns         1308 RowInvRate=535.314ns
-BM_CalcCropAllAll/10000/40              5434372 ns      5434137 ns          126 RowInvRate=543.414ns
-BM_CalcCropAllAll/100000/40           121860030 ns    121853823 ns            6 RowInvRate=1.21854us
-BM_CalcCropFirstLast/1000/10             260009 ns       259964 ns         2693 RowInvRate=259.964ns
-BM_CalcCropFirstLast/10000/10           2570643 ns      2570426 ns          268 RowInvRate=257.043ns
-BM_CalcCropFirstLast/100000/10         37973246 ns     37971378 ns           19 RowInvRate=379.714ns
-BM_CalcCropFirstLast/1000/20             463021 ns       462959 ns         1520 RowInvRate=462.959ns
-BM_CalcCropFirstLast/10000/20           4618122 ns      4618031 ns          152 RowInvRate=461.803ns
-BM_CalcCropFirstLast/100000/20         69579815 ns     69575922 ns           11 RowInvRate=695.759ns
-BM_CalcCropFirstLast/1000/40             897078 ns       897004 ns          779 RowInvRate=897.004ns
-BM_CalcCropFirstLast/10000/40           9191281 ns      9190722 ns           74 RowInvRate=919.072ns
-BM_CalcCropFirstLast/100000/40        144678637 ns    144669314 ns            5 RowInvRate=1.44669us
-BM_CalcCropToNullAllAll/1000/10          309985 ns       310015 ns         2258 RowInvRate=310.015ns
-BM_CalcCropToNullAllAll/10000/10        3109005 ns      3107065 ns          225 RowInvRate=310.706ns
-BM_CalcCropToNullAllAll/100000/10      47827775 ns     47824228 ns           13 RowInvRate=478.242ns
-BM_CalcCropToNullAllAll/1000/20          593378 ns       593348 ns         1182 RowInvRate=593.348ns
-BM_CalcCropToNullAllAll/10000/20        5924009 ns      5923931 ns          118 RowInvRate=592.393ns
-BM_CalcCropToNullAllAll/100000/20     116999365 ns    116988128 ns            6 RowInvRate=1.16988us
-BM_CalcCropToNullAllAll/1000/40         1131276 ns      1130974 ns          619 RowInvRate=1.13097us
-BM_CalcCropToNullAllAll/10000/40       11661148 ns     11660123 ns           60 RowInvRate=1.16601us
-BM_CalcCropToNullAllAll/100000/40     233836391 ns    233830158 ns            3 RowInvRate=2.3383us
-BM_CalcCropToNullFirstLast/1000/10       348203 ns       348107 ns         2011 RowInvRate=348.107ns
-BM_CalcCropToNullFirstLast/10000/10     3461304 ns      3460931 ns          202 RowInvRate=346.093ns
-BM_CalcCropToNullFirstLast/100000/10   43517972 ns     43516977 ns           16 RowInvRate=435.17ns
-BM_CalcCropToNullFirstLast/1000/20       617172 ns       617167 ns         1123 RowInvRate=617.167ns
-BM_CalcCropToNullFirstLast/10000/20     6152572 ns      6152318 ns          111 RowInvRate=615.232ns
-BM_CalcCropToNullFirstLast/100000/20   93809135 ns     93802310 ns            7 RowInvRate=938.023ns
-BM_CalcCropToNullFirstLast/1000/40      1196164 ns      1195730 ns          575 RowInvRate=1.19573us
-BM_CalcCropToNullFirstLast/10000/40    12204724 ns     12203373 ns           55 RowInvRate=1.22034us
-BM_CalcCropToNullFirstLast/100000/40  179805339 ns    179802208 ns            3 RowInvRate=1.79802us
-BM_CalcCropAllAllInt/1000/10             127978 ns       127931 ns         5477 RowInvRate=127.931ns
-BM_CalcCropAllAllInt/10000/10           1245941 ns      1245752 ns          560 RowInvRate=124.575ns
-BM_CalcCropAllAllInt/100000/10         16301428 ns     16300782 ns           43 RowInvRate=163.008ns
-BM_CalcCropAllAllInt/1000/20             241139 ns       241127 ns         2906 RowInvRate=241.127ns
-BM_CalcCropAllAllInt/10000/20           2389805 ns      2389015 ns          294 RowInvRate=238.902ns
-BM_CalcCropAllAllInt/100000/20         32543477 ns     32540465 ns           21 RowInvRate=325.405ns
-BM_CalcCropAllAllInt/1000/40             439287 ns       439214 ns         1593 RowInvRate=439.214ns
-BM_CalcCropAllAllInt/10000/40           4398571 ns      4398279 ns          159 RowInvRate=439.828ns
-BM_CalcCropAllAllInt/100000/40         63371263 ns     63367405 ns           11 RowInvRate=633.674ns
-BM_CalcCropFirstLastInt/1000/10          145835 ns       145832 ns         4794 RowInvRate=145.832ns
-BM_CalcCropFirstLastInt/10000/10        1418090 ns      1417598 ns          493 RowInvRate=141.76ns
-BM_CalcCropFirstLastInt/100000/10      16184150 ns     16183081 ns           45 RowInvRate=161.831ns
-BM_CalcCropFirstLastInt/1000/20          256524 ns       256497 ns         2726 RowInvRate=256.497ns
-BM_CalcCropFirstLastInt/10000/20        2539241 ns      2538924 ns          278 RowInvRate=253.892ns
-BM_CalcCropFirstLastInt/100000/20      29953365 ns     29952920 ns           23 RowInvRate=299.529ns
-BM_CalcCropFirstLastInt/1000/40          462898 ns       462839 ns         1510 RowInvRate=462.839ns
-BM_CalcCropFirstLastInt/10000/40        4615849 ns      4615698 ns          151 RowInvRate=461.57ns
-BM_CalcCropFirstLastInt/100000/40      51737947 ns     51735741 ns           10 RowInvRate=517.357ns
+Load Average: 6.29, 5.75, 3.34
+--------------------------------------------------------------------------------------------------
+Benchmark                                        Time             CPU   Iterations UserCounters...
+--------------------------------------------------------------------------------------------------
+BM_CalcCropAllAll/1000/10                   150474 ns       150462 ns         4625 RowInvRate=150.462ns
+BM_CalcCropAllAll/10000/10                 1483893 ns      1483676 ns          472 RowInvRate=148.368ns
+BM_CalcCropAllAll/100000/10               28875456 ns     28875153 ns           24 RowInvRate=288.752ns
+BM_CalcCropAllAll/1000/20                   286859 ns       286706 ns         2465 RowInvRate=286.706ns
+BM_CalcCropAllAll/10000/20                 2852993 ns      2852774 ns          247 RowInvRate=285.277ns
+BM_CalcCropAllAll/100000/20               59047143 ns     59043994 ns           12 RowInvRate=590.44ns
+BM_CalcCropAllAll/1000/40                   527749 ns       527349 ns         1327 RowInvRate=527.349ns
+BM_CalcCropAllAll/10000/40                 5370283 ns      5369967 ns          128 RowInvRate=536.997ns
+BM_CalcCropAllAll/100000/40              115632102 ns    115631568 ns            6 RowInvRate=1.15632us
+BM_CalcCropFirstLast/1000/10                259820 ns       259805 ns         2688 RowInvRate=259.805ns
+BM_CalcCropFirstLast/10000/10              2577940 ns      2577747 ns          268 RowInvRate=257.775ns
+BM_CalcCropFirstLast/100000/10            38178090 ns     38177232 ns           18 RowInvRate=381.772ns
+BM_CalcCropFirstLast/1000/20                447688 ns       447623 ns         1562 RowInvRate=447.623ns
+BM_CalcCropFirstLast/10000/20              4466048 ns      4465985 ns          157 RowInvRate=446.599ns
+BM_CalcCropFirstLast/100000/20            69273477 ns     69272073 ns            9 RowInvRate=692.721ns
+BM_CalcCropFirstLast/1000/40                874043 ns       873835 ns          804 RowInvRate=873.835ns
+BM_CalcCropFirstLast/10000/40              8972579 ns      8972465 ns           75 RowInvRate=897.247ns
+BM_CalcCropFirstLast/100000/40           143334951 ns    143332582 ns            5 RowInvRate=1.43333us
+BM_CalcCropToNullAllAll/1000/10             316654 ns       316668 ns         2210 RowInvRate=316.668ns
+BM_CalcCropToNullAllAll/10000/10           3187187 ns      3186098 ns          219 RowInvRate=318.61ns
+BM_CalcCropToNullAllAll/100000/10         47743192 ns     47743053 ns           13 RowInvRate=477.431ns
+BM_CalcCropToNullAllAll/1000/20             600800 ns       600913 ns         1162 RowInvRate=600.913ns
+BM_CalcCropToNullAllAll/10000/20           6021512 ns      6020408 ns          117 RowInvRate=602.041ns
+BM_CalcCropToNullAllAll/100000/20        117788089 ns    117787553 ns            6 RowInvRate=1.17788us
+BM_CalcCropToNullAllAll/1000/40            1188361 ns      1187902 ns          611 RowInvRate=1.1879us
+BM_CalcCropToNullAllAll/10000/40          11739939 ns     11739243 ns           55 RowInvRate=1.17392us
+BM_CalcCropToNullAllAll/100000/40        239384401 ns    239371586 ns            3 RowInvRate=2.39372us
+BM_CalcCropToNullFirstLast/1000/10          345275 ns       345086 ns         2028 RowInvRate=345.086ns
+BM_CalcCropToNullFirstLast/10000/10        3464773 ns      3464646 ns          207 RowInvRate=346.465ns
+BM_CalcCropToNullFirstLast/100000/10      44498021 ns     44497161 ns           16 RowInvRate=444.972ns
+BM_CalcCropToNullFirstLast/1000/20          605240 ns       605278 ns         1182 RowInvRate=605.278ns
+BM_CalcCropToNullFirstLast/10000/20        6049740 ns      6049443 ns          113 RowInvRate=604.944ns
+BM_CalcCropToNullFirstLast/100000/20      87713900 ns     87705170 ns            8 RowInvRate=877.052ns
+BM_CalcCropToNullFirstLast/1000/40         1171254 ns      1171128 ns          592 RowInvRate=1.17113us
+BM_CalcCropToNullFirstLast/10000/40       12070156 ns     12069607 ns           56 RowInvRate=1.20696us
+BM_CalcCropToNullFirstLast/100000/40     163822672 ns    163819750 ns            4 RowInvRate=1.6382us
+BM_CalcCropAllAllInt/1000/10                127402 ns       127388 ns         5508 RowInvRate=127.388ns
+BM_CalcCropAllAllInt/10000/10              1236251 ns      1235739 ns          563 RowInvRate=123.574ns
+BM_CalcCropAllAllInt/100000/10            16198251 ns     16197559 ns           43 RowInvRate=161.976ns
+BM_CalcCropAllAllInt/1000/20                247291 ns       247188 ns         2919 RowInvRate=247.188ns
+BM_CalcCropAllAllInt/10000/20              2376241 ns      2376192 ns          286 RowInvRate=237.619ns
+BM_CalcCropAllAllInt/100000/20            32443278 ns     32442585 ns           20 RowInvRate=324.426ns
+BM_CalcCropAllAllInt/1000/40                439585 ns       439529 ns         1557 RowInvRate=439.529ns
+BM_CalcCropAllAllInt/10000/40              4422795 ns      4422726 ns          153 RowInvRate=442.273ns
+BM_CalcCropAllAllInt/100000/40            63209989 ns     63208957 ns           11 RowInvRate=632.09ns
+BM_CalcCropFirstLastInt/1000/10             149634 ns       149623 ns         4681 RowInvRate=149.623ns
+BM_CalcCropFirstLastInt/10000/10           1439274 ns      1439146 ns          484 RowInvRate=143.915ns
+BM_CalcCropFirstLastInt/100000/10         16519741 ns     16519427 ns           45 RowInvRate=165.194ns
+BM_CalcCropFirstLastInt/1000/20             260408 ns       260361 ns         2706 RowInvRate=260.361ns
+BM_CalcCropFirstLastInt/10000/20           2566381 ns      2566311 ns          274 RowInvRate=256.631ns
+BM_CalcCropFirstLastInt/100000/20         30131297 ns     30130369 ns           22 RowInvRate=301.304ns
+BM_CalcCropFirstLastInt/1000/40             514790 ns       514617 ns         1407 RowInvRate=514.617ns
+BM_CalcCropFirstLastInt/10000/40           5224921 ns      5224683 ns          114 RowInvRate=522.468ns
+BM_CalcCropFirstLastInt/100000/40         62638442 ns     62636152 ns           10 RowInvRate=626.362ns
+BM_CalcCropToNullAllAllInt/1000/10          141176 ns       141121 ns         4875 RowInvRate=141.121ns
+BM_CalcCropToNullAllAllInt/10000/10        1335293 ns      1335112 ns          489 RowInvRate=133.511ns
+BM_CalcCropToNullAllAllInt/100000/10      13100885 ns     13100435 ns           52 RowInvRate=131.004ns
+BM_CalcCropToNullAllAllInt/1000/20          250992 ns       250958 ns         2788 RowInvRate=250.958ns
+BM_CalcCropToNullAllAllInt/10000/20        2476852 ns      2476640 ns          284 RowInvRate=247.664ns
+BM_CalcCropToNullAllAllInt/100000/20      30356508 ns     30354874 ns           23 RowInvRate=303.549ns
+BM_CalcCropToNullAllAllInt/1000/40          466767 ns       466678 ns         1506 RowInvRate=466.678ns
+BM_CalcCropToNullAllAllInt/10000/40        4593207 ns      4593016 ns          146 RowInvRate=459.302ns
+BM_CalcCropToNullAllAllInt/100000/40      58825231 ns     58823309 ns           12 RowInvRate=588.233ns
+BM_CalcCropToNullFirstLastInt/1000/10       148399 ns       148362 ns         4712 RowInvRate=148.362ns
+BM_CalcCropToNullFirstLastInt/10000/10     1455650 ns      1455562 ns          491 RowInvRate=145.556ns
+BM_CalcCropToNullFirstLastInt/100000/10   14439337 ns     14438912 ns           49 RowInvRate=144.389ns
+BM_CalcCropToNullFirstLastInt/1000/20       256735 ns       256711 ns         2733 RowInvRate=256.711ns
+BM_CalcCropToNullFirstLastInt/10000/20     2531621 ns      2531493 ns          276 RowInvRate=253.149ns
+BM_CalcCropToNullFirstLastInt/100000/20   27966533 ns     27965982 ns           26 RowInvRate=279.66ns
+BM_CalcCropToNullFirstLastInt/1000/40       464120 ns       463970 ns         1508 RowInvRate=463.97ns
+BM_CalcCropToNullFirstLastInt/10000/40     4567257 ns      4567089 ns          153 RowInvRate=456.709ns
+BM_CalcCropToNullFirstLastInt/100000/40   51863465 ns     51862585 ns           11 RowInvRate=518.626ns
 */
 
 // element_type is the activity element type (args 1/2/4); the begin/end range
 // modes (args 3/5) are always VARCHAR. Fn is the scalar function to benchmark
-// (kept as a template parameter so both calc_crop<...> and calc_crop_to_null
-// can be passed). Pass the matching calc_crop<element_type> for Fn.
+// (kept as a template parameter so both calc_crop<...> and calc_crop_to_null<...>
+// can be passed). Pass the calc_crop*/<element_type> that matches element_type.
 template <LogicalType element_type, typename Fn>
 static void bench(benchmark::State& state, Fn scalar_function, const std::string& begin_mode,
                   const std::string& end_mode) {
@@ -170,29 +187,37 @@ static void bench(benchmark::State& state, Fn scalar_function, const std::string
 }
 
 static void BM_CalcCropAllAll(benchmark::State& state) {
-    bench<TYPE_VARCHAR>(state, &(CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>), "ALL", "ALL");
+    bench<TYPE_VARCHAR>(state, CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>, "ALL", "ALL");
 }
 
 static void BM_CalcCropFirstLast(benchmark::State& state) {
-    bench<TYPE_VARCHAR>(state, &CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>, "FIRST", "LAST");
+    bench<TYPE_VARCHAR>(state, CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>, "FIRST", "LAST");
 }
 
 static void BM_CalcCropToNullAllAll(benchmark::State& state) {
-    bench<TYPE_VARCHAR>(state, CelonisArrayFunctions::calc_crop_to_null, "ALL", "ALL");
+    bench<TYPE_VARCHAR>(state, CelonisArrayFunctions::calc_crop_to_null<TYPE_VARCHAR>, "ALL", "ALL");
 }
 
 static void BM_CalcCropToNullFirstLast(benchmark::State& state) {
-    bench<TYPE_VARCHAR>(state, CelonisArrayFunctions::calc_crop_to_null, "FIRST", "LAST");
+    bench<TYPE_VARCHAR>(state, CelonisArrayFunctions::calc_crop_to_null<TYPE_VARCHAR>, "FIRST", "LAST");
 }
 
-// INT-typed variants of calc_crop (element type passed as the template argument
-// to calc_crop). calc_crop_to_null is intentionally not run with integers.
+// INT-typed variants (element type passed as the template argument to the
+// scalar function).
 static void BM_CalcCropAllAllInt(benchmark::State& state) {
-    bench<TYPE_INT>(state, &(CelonisArrayFunctions::calc_crop<TYPE_INT>), "ALL", "ALL");
+    bench<TYPE_INT>(state, CelonisArrayFunctions::calc_crop<TYPE_INT>, "ALL", "ALL");
 }
 
 static void BM_CalcCropFirstLastInt(benchmark::State& state) {
-    bench<TYPE_INT>(state, &CelonisArrayFunctions::calc_crop<TYPE_INT>, "FIRST", "LAST");
+    bench<TYPE_INT>(state, CelonisArrayFunctions::calc_crop<TYPE_INT>, "FIRST", "LAST");
+}
+
+static void BM_CalcCropToNullAllAllInt(benchmark::State& state) {
+    bench<TYPE_INT>(state, CelonisArrayFunctions::calc_crop_to_null<TYPE_INT>, "ALL", "ALL");
+}
+
+static void BM_CalcCropToNullFirstLastInt(benchmark::State& state) {
+    bench<TYPE_INT>(state, CelonisArrayFunctions::calc_crop_to_null<TYPE_INT>, "FIRST", "LAST");
 }
 
 // Args: Number of rows / Array Length
@@ -207,6 +232,10 @@ BENCHMARK(BM_CalcCropToNullFirstLast)->ArgsProduct({{1000, 10000, 100000}, {10, 
 BENCHMARK(BM_CalcCropAllAllInt)->ArgsProduct({{1000, 10000, 100000}, {10, 20, 40}});
 
 BENCHMARK(BM_CalcCropFirstLastInt)->ArgsProduct({{1000, 10000, 100000}, {10, 20, 40}});
+
+BENCHMARK(BM_CalcCropToNullAllAllInt)->ArgsProduct({{1000, 10000, 100000}, {10, 20, 40}});
+
+BENCHMARK(BM_CalcCropToNullFirstLastInt)->ArgsProduct({{1000, 10000, 100000}, {10, 20, 40}});
 
 } // namespace starrocks
 

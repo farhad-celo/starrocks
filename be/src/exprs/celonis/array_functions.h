@@ -96,7 +96,7 @@ public:
      * @return: ARRAY_VARCHAR
      * Implements PQL CALC_CROP_TO_NULL: https://docs.celonis.com/en/calc_crop_to_null.html
      */
-    DEFINE_VECTORIZED_FN(calc_crop_to_null);
+    DEFINE_VECTORIZED_FN_TEMPLATE(calc_crop_to_null);
 
     /**
      * @param: [input_array]

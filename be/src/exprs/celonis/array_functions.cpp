@@ -8,7 +8,10 @@
 #include "column/type_traits.h"
 #include "exprs/celonis/util.h"
 #include "gutil/strings/strcat.h"
+#include "runtime/global_dict/config.h"
 #include "util/faststring.h"
+
+static_assert(std::is_same_v<starrocks::DictId, int32>);
 
 namespace starrocks {
 
@@ -888,14 +891,18 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionCo
 template StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(FunctionContext*, const Columns&);
 template StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop<TYPE_INT>(FunctionContext*, const Columns&);
 
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] FunctionContext* context,
                                                              const Columns& columns) {
     DCHECK(columns.size() == 5);
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
-    RETURN_IF_ERROR(calc_crop_impl<TYPE_VARCHAR>(columns, false, result.get()));
+    RETURN_IF_ERROR(calc_crop_impl<LT>(columns, false, result.get()));
     return result;
 }
+
+template StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null<TYPE_VARCHAR>(FunctionContext*, const Columns&);
+template StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null<TYPE_INT>(FunctionContext*, const Columns&);
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::array_count([[maybe_unused]] FunctionContext* context,
                                                        const Columns& columns) {
