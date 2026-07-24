@@ -185,7 +185,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_SHORTENED_VARIANT, FunctionSet.CELONIS_ARRAY_FIRST,
             FunctionSet.CELONIS_ARRAY_LAST, FunctionSet.CELONIS_ARRAY_LAG, FunctionSet.CELONIS_ARRAY_LEAD,
             FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT, FunctionSet.CELONIS_INDEX_ACTIVITY,
-            FunctionSet.CELONIS_NULL_TO_EMPTY);
+            FunctionSet.CELONIS_NULL_TO_EMPTY, FunctionSet.CELONIS_CALC_CROP);
 
     // The framework automatically encodes string/array<string> constants to dictionary space for ARRAY_FUNCTIONS.
     // Use this map to override that behavior per function: each boolean indicates whether the constant at that
@@ -193,7 +193,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     // Functions not present in this map keep the default behavior (encode all eligible constant arguments).
     // First argument is always the array input and hence the value must be false.
     public static final Map<String, List<Boolean>> LOW_CARD_ARRAY_FN_PARAM_CONFIGS = ImmutableMap.of(
-            FunctionSet.CELONIS_INDEX_ACTIVITY, List.of(false, false, false)
+            FunctionSet.CELONIS_INDEX_ACTIVITY, List.of(false, false, false),
+            FunctionSet.CELONIS_CALC_CROP, List.of(false, true, false, true, false)
     );
 
     static {
@@ -1573,6 +1574,12 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 // TODO(farhad-celo): For backward compatibility. It can be removed after 1 release.
                 return forbidden(visitChildren(call, context), call);
             }
+            if (FunctionSet.CELONIS_CALC_CROP.equals(call.getFnName())
+                    && !sessionVariable.isEnableCalcCropLowCardinalityOptimize()) {
+                // TODO(farhad-celo): For backward compatibility. It can be removed after 1 release.
+                return forbidden(visitChildren(call, context), call);
+            }
+
             if (FunctionSet.nonDeterministicFunctions.contains(call.getFnName())) {
                 return VARIABLES;
             }

@@ -5,6 +5,7 @@
 #include "column/array_column.h"
 #include "column/column_builder.h"
 #include "column/column_viewer.h"
+#include "column/type_traits.h"
 #include "exprs/celonis/util.h"
 #include "gutil/strings/strcat.h"
 #include "util/faststring.h"
@@ -742,6 +743,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::null_to_empty([[maybe_unused]] Functi
     return CelonisNullToEmpty::process(columns);
 }
 
+template <LogicalType LT>
 Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
     DCHECK_EQ(columns.size(), 5);
     size_t n_rows = columns[0]->size();
@@ -750,14 +752,12 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
     }
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(n_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
-    DCHECK(activity_array_data.elements->is_binary());
-    const auto& activities =
-            down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*activity_array_data.elements).get_data().data();
+    const auto& activities = down_cast<const RunTimeColumnType<LT>&>(*activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
 
-    ColumnViewer begin_activity_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
+    ColumnViewer begin_activity_viewer = ColumnViewer<LT>(columns[1]);
     ColumnViewer begin_mode_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);
-    ColumnViewer end_activity_viewer = ColumnViewer<TYPE_VARCHAR>(columns[3]);
+    ColumnViewer end_activity_viewer = ColumnViewer<LT>(columns[3]);
     ColumnViewer end_mode_viewer = ColumnViewer<TYPE_VARCHAR>(columns[4]);
 
     DCHECK(result->is_nullable());
@@ -780,9 +780,10 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
         result->append_nulls(n_rows);
         return Status::OK();
     }
-    // An empty Slice() is used to represent the 'ALL' mode
-    const Slice begin_activity = begin_mode == "ALL" ? Slice() : begin_activity_viewer.value(0);
-    const Slice end_activity = end_mode == "ALL" ? Slice() : end_activity_viewer.value(0);
+    // A default CppType() is used to represent the 'ALL' mode
+    using CppType = RunTimeCppType<LT>;
+    const CppType begin_activity = begin_mode == "ALL" ? CppType() : begin_activity_viewer.value(0);
+    const CppType end_activity = end_mode == "ALL" ? CppType() : end_activity_viewer.value(0);
     if (begin_mode != "FIRST" && begin_mode != "LAST" && begin_mode != "ALL") {
         return Status::InvalidArgument("begin range mode must be FIRST/LAST/ALL.");
     }
@@ -870,6 +871,7 @@ Status calc_crop_impl(const Columns& columns, bool fill_one, Column* result) {
     return Status::OK();
 }
 
+template <LogicalType LT>
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionContext* context,
                                                      const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
@@ -879,16 +881,19 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop([[maybe_unused]] FunctionCo
     type_array_bigint.children[0].type = TYPE_BIGINT;
     type_array_bigint.children[0].len = -1;
     auto result = ColumnHelper::create_column(type_array_bigint, true);
-    RETURN_IF_ERROR(calc_crop_impl(columns, true, result.get()));
+    RETURN_IF_ERROR(calc_crop_impl<LT>(columns, true, result.get()));
     return result;
 }
+
+template StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(FunctionContext*, const Columns&);
+template StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop<TYPE_INT>(FunctionContext*, const Columns&);
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::calc_crop_to_null([[maybe_unused]] FunctionContext* context,
                                                              const Columns& columns) {
     DCHECK(columns.size() == 5);
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     auto result = NullableColumn::wrap_if_necessary(columns[0]->clone_empty());
-    RETURN_IF_ERROR(calc_crop_impl(columns, false, result.get()));
+    RETURN_IF_ERROR(calc_crop_impl<TYPE_VARCHAR>(columns, false, result.get()));
     return result;
 }
 

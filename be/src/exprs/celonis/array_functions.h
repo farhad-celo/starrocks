@@ -88,7 +88,7 @@ public:
      * @return: ARRAY_BIGINT
      * Implements PQL CALC_CROP: https://docs.celonis.com/en/calc_crop.html
      */
-    DEFINE_VECTORIZED_FN(calc_crop);
+    DEFINE_VECTORIZED_FN_TEMPLATE(calc_crop);
 
     /**
      * @param: [activities, begin_range_activity, begin_range_mode, end_range_activity, end_range_mode]

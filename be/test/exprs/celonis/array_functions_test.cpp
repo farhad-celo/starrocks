@@ -2624,7 +2624,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
         auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         EXPECT_EQ(0, result->size());
@@ -2643,7 +2643,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum("C");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2663,7 +2663,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum("C");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2693,7 +2693,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_mode->append_datum("LAST");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(2, result->size());
@@ -2721,7 +2721,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum("B");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2744,7 +2744,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum("B");
         end_mode->append_datum("FIRST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2767,7 +2767,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum("X");
         end_mode->append_datum("FIRST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2790,7 +2790,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum("B");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2814,7 +2814,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum(kNullDatum);
         end_mode->append_datum("ALL");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2838,7 +2838,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum(kNullDatum);
         end_mode->append_datum("ALL");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2862,7 +2862,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum(kNullDatum);
         end_mode->append_datum("ALL");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2886,7 +2886,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum(kNullDatum);
         end_mode->append_datum("ALL");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2910,7 +2910,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum(kNullDatum);
         end_mode->append_datum("ALL");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2929,7 +2929,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_activity->append_datum(kNullDatum);
         end_mode->append_datum("ALL");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2954,7 +2954,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases) {
         end_mode->append_datum("ALL");
         end_mode->append_datum("ALL");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(2, result->size());
@@ -2980,7 +2980,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_null_input) {
         end_activity->append_datum("C");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -2999,7 +2999,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_null_input) {
         end_activity->append_datum("C");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -3018,7 +3018,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_null_input) {
         end_activity->append_datum("C");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -3037,7 +3037,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_null_input) {
         end_activity->append_datum(kNullDatum);
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -3056,7 +3056,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_null_input) {
         end_activity->append_datum("C");
         end_mode->append_datum(kNullDatum);
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                                     nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
                                     .value();
         ASSERT_EQ(1, result->size());
@@ -3078,7 +3078,7 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_invalid_input) {
         end_activity->append_datum("C");
         end_mode->append_datum("LAST");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
                 nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode});
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "begin range mode must be FIRST/LAST/ALL.");
@@ -3096,7 +3096,494 @@ TEST_F(CelonisArrayFunctionsTest, calc_crop_invalid_input) {
         end_activity->append_datum("C");
         end_mode->append_datum("UNKNOWN");
 
-        const auto result = CelonisArrayFunctions::calc_crop(
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_VARCHAR>(
+                nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().message(), "end range mode must be FIRST/LAST/ALL.");
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, calc_crop_normal_cases_int) {
+    // empty input
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        EXPECT_EQ(0, result->size());
+    }
+    // empty activity array
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{});
+        begin_activity->append_datum(2);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(3);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ(0, result->get(0).get_array().size());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{kNullDatum, 2, kNullDatum, 3, 3, kNullDatum, 6, 3, 4, kNullDatum});
+        begin_activity->append_datum(2);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(3);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(10, result->get(0).get_array().size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        for (size_t i = 1; i <= 7; ++i) {
+            EXPECT_EQ(1, result->get(0).get_array()[i].get_int64());
+        }
+        EXPECT_TRUE(result->get(0).get_array()[8].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[9].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, 2, 3, 4});
+        activity->append_datum(DatumArray{1, 2, 4, 5});
+        begin_activity->append_datum(2);
+        begin_activity->append_datum(2);
+        begin_mode->append_datum("FIRST");
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(3);
+        end_activity->append_datum(3);
+        end_mode->append_datum("LAST");
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_EQ(4, result->get(0).get_array().size());
+        ASSERT_EQ(4, result->get(1).get_array().size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_EQ(1, result->get(0).get_array()[1].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[2].get_int64());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+        EXPECT_TRUE(result->get(1).get_array()[0].is_null());
+        EXPECT_TRUE(result->get(1).get_array()[1].is_null());
+        EXPECT_TRUE(result->get(1).get_array()[2].is_null());
+        EXPECT_TRUE(result->get(1).get_array()[3].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, 2, 3, 4});
+        begin_activity->append_datum(3);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(2);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(4, result->get(0).get_array().size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, 1, 2, 2});
+        begin_activity->append_datum(1);
+        begin_mode->append_datum("LAST");
+        end_activity->append_datum(2);
+        end_mode->append_datum("FIRST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(4, result->get(0).get_array().size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_EQ(1, result->get(0).get_array()[1].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[2].get_int64());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, 1, 2, 2});
+        begin_activity->append_datum(1);
+        begin_mode->append_datum("LAST");
+        end_activity->append_datum(99);
+        end_mode->append_datum("FIRST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(4, result->get(0).get_array().size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, 2, 3, 2, 4});
+        begin_activity->append_datum(1);
+        begin_mode->append_datum("ALL");
+        end_activity->append_datum(2);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(5, result->get(0).get_array().size());
+        EXPECT_EQ(1, result->get(0).get_array()[0].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[1].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[2].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[3].get_int64());
+        EXPECT_TRUE(result->get(0).get_array()[4].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, 2, 3, 2, 4});
+        begin_activity->append_datum(kNullDatum);
+        begin_mode->append_datum("ALL");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(5, result->get(0).get_array().size());
+        EXPECT_EQ(1, result->get(0).get_array()[0].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[1].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[2].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[3].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[4].get_int64());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, 2, 3, 2, 4});
+        begin_activity->append_datum(99);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(5, result->get(0).get_array().size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[2].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[3].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[4].is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, 2, 3, 2, 4});
+        begin_activity->append_datum(3);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(5, result->get(0).get_array().size());
+        EXPECT_TRUE(result->get(0).get_array()[0].is_null());
+        EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+        EXPECT_EQ(1, result->get(0).get_array()[2].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[3].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[4].get_int64());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{kNullDatum, 2, kNullDatum, 2, kNullDatum});
+        begin_activity->append_datum(kNullDatum);
+        begin_mode->append_datum("ALL");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(5, result->get(0).get_array().size());
+        EXPECT_EQ(1, result->get(0).get_array()[0].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[1].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[2].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[3].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[4].get_int64());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{});
+        begin_activity->append_datum(kNullDatum);
+        begin_mode->append_datum("ALL");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(0, result->get(0).get_array().size());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{kNullDatum});
+        begin_activity->append_datum(kNullDatum);
+        begin_mode->append_datum("ALL");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(1, result->get(0).get_array().size());
+        EXPECT_EQ(1L, result->get(0).get_array()[0].get_int64());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{1, kNullDatum, 3});
+        activity->append_datum(DatumArray{});
+        begin_activity->append_datum(kNullDatum);
+        begin_activity->append_datum(kNullDatum);
+        begin_mode->append_datum("ALL");
+        begin_mode->append_datum("ALL");
+        end_activity->append_datum(kNullDatum);
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("ALL");
+        end_mode->append_datum("ALL");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_EQ(3, result->get(0).get_array().size());
+        ASSERT_EQ(0, result->get(1).get_array().size());
+        EXPECT_EQ(1, result->get(0).get_array()[0].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[1].get_int64());
+        EXPECT_EQ(1, result->get(0).get_array()[2].get_int64());
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, calc_crop_null_input_int) {
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(kNullDatum);
+        begin_activity->append_datum(2);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(3);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{2, 3});
+        begin_activity->append_datum(kNullDatum);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(3);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{2, 3});
+        begin_activity->append_datum(2);
+        begin_mode->append_datum(kNullDatum);
+        end_activity->append_datum(3);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{2, 3});
+        begin_activity->append_datum(2);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(kNullDatum);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+
+        activity->append_datum(DatumArray{2, 3});
+        begin_activity->append_datum(2);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(3);
+        end_mode->append_datum(kNullDatum);
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                                    nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode})
+                                    .value();
+        ASSERT_EQ(1, result->size());
+        EXPECT_TRUE(result->get(0).is_null());
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, calc_crop_invalid_input_int) {
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{2, 3});
+        begin_activity->append_datum(2);
+        begin_mode->append_datum("UNKNOWN");
+        end_activity->append_datum(3);
+        end_mode->append_datum("LAST");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
+                nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().message(), "begin range mode must be FIRST/LAST/ALL.");
+    }
+    {
+        auto activity = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        auto begin_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto begin_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+        auto end_activity = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), false);
+        auto end_mode = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), false);
+
+        activity->append_datum(DatumArray{2, 3});
+        begin_activity->append_datum(2);
+        begin_mode->append_datum("FIRST");
+        end_activity->append_datum(3);
+        end_mode->append_datum("UNKNOWN");
+
+        const auto result = CelonisArrayFunctions::calc_crop<TYPE_INT>(
                 nullptr, {activity, begin_activity, begin_mode, end_activity, end_mode});
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "end range mode must be FIRST/LAST/ALL.");

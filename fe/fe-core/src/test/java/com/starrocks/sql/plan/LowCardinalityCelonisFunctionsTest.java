@@ -245,4 +245,16 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
         Assertions.assertTrue(plan.contains(
                 "celonis_index_activity[([5: ACTIVITIES, ARRAY<INT>, true], 'INDEX_ACTIVITY_TYPE', 'FORWARD')"), plan);
     }
+
+    @Test
+    public void testCalcCrop() throws Exception {
+        String sql = """
+                select /*+ SET_VAR('enable_calc_crop_low_cardinality_optimize', 'true') */
+                CELONIS_CALC_CROP(ACTIVITIES, 'a', 'ALL', 'b', 'ALL')
+                FROM TestActivityTimestampTable
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "celonis_calc_crop(5: ACTIVITIES, dict_encode('a', 5), 'ALL', dict_encode('b', 5), 'ALL')"), plan);
+    }
 }
