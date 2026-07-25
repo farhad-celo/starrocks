@@ -170,8 +170,12 @@ public:
                      CelonisHistogramBoundariesAggregateState<LT>& state) const {
         DCHECK_EQ(ctx->get_num_args(), 4);
         state.initialized = true;
-        state.no_lower_bound = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(1));
-        state.no_upper_bound = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(2));
+        if (ctx->is_notnull_constant_column(1)) {
+            state.no_lower_bound = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(1));
+        }
+        if (ctx->is_notnull_constant_column(2)) {
+            state.no_upper_bound = ColumnHelper::get_const_value<TYPE_BOOLEAN>(ctx->get_constant_column(2));
+        }
         const auto* boundary_column = ctx->get_constant_column(3).get();
         if (boundary_column == nullptr) {
             boundary_column = columns[3];

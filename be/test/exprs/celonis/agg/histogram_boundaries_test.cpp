@@ -152,6 +152,29 @@ protected:
     std::vector<std::unique_ptr<MemPool>> mem_pools_;
 };
 
+TEST_F(CelonisHistogramBoundariesTest, constant_null_bounds_config_uses_defaults) {
+    auto local_ctx = get_ctx(TYPE_BIGINT);
+    auto null_column = ColumnHelper::create_const_null_column(1);
+    auto true_column = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, 1);
+    auto boundaries_column = ColumnHelper::create_column(celonis::array_type(TYPE_BIGINT), true);
+    boundaries_column->append_datum(DatumArray{100L});
+    CelonisHistogramBoundariesAggregationFunction<TYPE_BIGINT> function;
+
+    CelonisHistogramBoundariesAggregateState<TYPE_BIGINT> state_with_null_lower_bound;
+    local_ctx->set_constant_columns({nullptr, null_column, true_column, boundaries_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_lower_bound);
+    EXPECT_FALSE(state_with_null_lower_bound.no_lower_bound);
+    EXPECT_TRUE(state_with_null_lower_bound.no_upper_bound);
+    EXPECT_EQ(1, state_with_null_lower_bound.bucket_map.size());
+
+    CelonisHistogramBoundariesAggregateState<TYPE_BIGINT> state_with_null_upper_bound;
+    local_ctx->set_constant_columns({nullptr, true_column, null_column, boundaries_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_upper_bound);
+    EXPECT_TRUE(state_with_null_upper_bound.no_lower_bound);
+    EXPECT_FALSE(state_with_null_upper_bound.no_upper_bound);
+    EXPECT_EQ(1, state_with_null_upper_bound.bucket_map.size());
+}
+
 TEST_F(CelonisHistogramBoundariesTest, histogram11_bigint_no_upper_bound_merge) {
     auto logical_type = TYPE_BIGINT;
     auto input1 = DatumArray{0L, 100L, 100L};
