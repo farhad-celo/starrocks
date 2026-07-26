@@ -490,6 +490,36 @@ TEST_F(CelonisBuildAbcModelTest, bigint_unique_values_sample_works) {
     }
 }
 
+TEST_F(CelonisBuildAbcModelTest, constant_null_config_uses_defaults) {
+    auto local_ctx = get_ctx(TYPE_BIGINT);
+    auto null_column = ColumnHelper::create_const_null_column(1);
+    auto sample_ratio_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(0.5, 1);
+    auto ratio_a_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(0.7, 1);
+    auto ratio_b_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(0.2, 1);
+    CelonisAbcModelAggregationFunction<TYPE_BIGINT> function;
+
+    CelonisAbcModelAggregateState<TYPE_BIGINT> state_with_null_sample_ratio;
+    local_ctx->set_constant_columns({nullptr, nullptr, null_column, ratio_a_column, ratio_b_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_sample_ratio);
+    EXPECT_DOUBLE_EQ(1.0, state_with_null_sample_ratio.sample_ratio);
+    EXPECT_DOUBLE_EQ(0.7, state_with_null_sample_ratio.ratio_a);
+    EXPECT_DOUBLE_EQ(0.2, state_with_null_sample_ratio.ratio_b);
+
+    CelonisAbcModelAggregateState<TYPE_BIGINT> state_with_null_ratio_a;
+    local_ctx->set_constant_columns({nullptr, nullptr, sample_ratio_column, null_column, ratio_b_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_ratio_a);
+    EXPECT_DOUBLE_EQ(0.5, state_with_null_ratio_a.sample_ratio);
+    EXPECT_DOUBLE_EQ(0.8, state_with_null_ratio_a.ratio_a);
+    EXPECT_DOUBLE_EQ(0.2, state_with_null_ratio_a.ratio_b);
+
+    CelonisAbcModelAggregateState<TYPE_BIGINT> state_with_null_ratio_b;
+    local_ctx->set_constant_columns({nullptr, nullptr, sample_ratio_column, ratio_a_column, null_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_ratio_b);
+    EXPECT_DOUBLE_EQ(0.5, state_with_null_ratio_b.sample_ratio);
+    EXPECT_DOUBLE_EQ(0.7, state_with_null_ratio_b.ratio_a);
+    EXPECT_DOUBLE_EQ(0.15, state_with_null_ratio_b.ratio_b);
+}
+
 TEST_F(CelonisBuildAbcModelTest, bigint_invalid_sample_ratio) {
     auto input = DatumArray{50L, 30L, 8L, 7L, 5L};
     auto pk_hash = DatumArray{1L, 2L, 3L, 4L, 5L};

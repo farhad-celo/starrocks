@@ -153,9 +153,15 @@ public:
     void create_impl(FunctionContext* ctx, const Column** columns, CelonisAbcModelAggregateState<LT>& state) const {
         DCHECK_EQ(ctx->get_num_args(), 5);
         state.initialized = true;
-        state.sample_ratio = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(2));
-        state.ratio_a = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(3));
-        state.ratio_b = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(4));
+        if (ctx->is_notnull_constant_column(2)) {
+            state.sample_ratio = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(2));
+        }
+        if (ctx->is_notnull_constant_column(3)) {
+            state.ratio_a = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(3));
+        }
+        if (ctx->is_notnull_constant_column(4)) {
+            state.ratio_b = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(4));
+        }
     }
 
     void update(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state,
