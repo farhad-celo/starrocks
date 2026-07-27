@@ -590,6 +590,7 @@ public class FunctionSet {
     public static final String CELONIS_TO_DOUBLE = "celonis_to_double";
     public static final String CELONIS_LIKE = "celonis_like";
     public static final String CELONIS_INDEX_ACTIVITY = "celonis_index_activity";
+    public static final String CELONIS_MATCH_ACTIVITIES = "celonis_match_activities";
 
     // Celonis window functions:
     public static final String CELONIS_LINEAR_INTERPOLATE = "celonis_linear_interpolate";

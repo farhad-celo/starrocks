@@ -399,6 +399,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String MULTI_ARRAY_AGG_V2_DEBUG_LEVEL = "multi_array_agg_v2_debug_level";
     public static final String ENABLE_SHORTENED_VARIANT_LOW_CARDINALITY_OPTIMIZE =
                     "enable_shortened_variant_low_cardinality_optimize";
+    public static final String ENABLE_MATCH_ACTIVITIES_LOW_CARDINALITY_OPTIMIZE =
+            "enable_match_activities_low_cardinality_optimize";
     public static final String ENABLE_CALC_CROP_LOW_CARDINALITY_OPTIMIZE =
             "enable_calc_crop_low_cardinality_optimize";
     public static final String MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH = "multi_array_agg_max_array_length";
@@ -1645,6 +1647,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VariableMgr.VarAttr(name = ENABLE_SHORTENED_VARIANT_LOW_CARDINALITY_OPTIMIZE)
     private boolean enableShortenedVariantLowCardinalityOptimize = false;
 
+    @VariableMgr.VarAttr(name = ENABLE_MATCH_ACTIVITIES_LOW_CARDINALITY_OPTIMIZE)
+    private boolean enableMatchActivitiesLowCardinalityOptimize = false;
+
     @VariableMgr.VarAttr(name = ENABLE_CALC_CROP_LOW_CARDINALITY_OPTIMIZE)
     private boolean enableCalcCropLowCardinalityOptimize = false;
     // Per-session override for the maximum number of elements that multi_array_agg (v1 and v2) is
@@ -2142,6 +2147,10 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public boolean isEnableShortenedVariantLowCardinalityOptimize() {
         return enableShortenedVariantLowCardinalityOptimize;
+    }
+
+    public boolean isEnableMatchActivitiesLowCardinalityOptimize() {
+        return enableMatchActivitiesLowCardinalityOptimize;
     }
 
     public boolean isEnableCalcCropLowCardinalityOptimize() {

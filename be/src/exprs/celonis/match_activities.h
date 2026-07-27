@@ -4,6 +4,7 @@
 
 namespace starrocks {
 
+template <LogicalType LT>
 class CelonisMatchActivitiesFunctions {
 public:
     /**

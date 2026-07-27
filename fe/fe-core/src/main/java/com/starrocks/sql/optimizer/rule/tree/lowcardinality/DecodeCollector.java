@@ -186,7 +186,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.CELONIS_ARRAY_LAST, FunctionSet.CELONIS_ARRAY_LAG, FunctionSet.CELONIS_ARRAY_LEAD,
             FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT, FunctionSet.CELONIS_INDEX_ACTIVITY,
             FunctionSet.CELONIS_NULL_TO_EMPTY, FunctionSet.CELONIS_CALC_CROP,
-            FunctionSet.CELONIS_CALC_CROP_TO_NULL);
+            FunctionSet.CELONIS_CALC_CROP_TO_NULL, FunctionSet.CELONIS_MATCH_ACTIVITIES);
 
     // The framework automatically encodes string/array<string> constants to dictionary space for ARRAY_FUNCTIONS.
     // Use this map to override that behavior per function: each boolean indicates whether the constant at that
@@ -1573,6 +1573,11 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         public ScalarOperator visitCall(CallOperator call, Void context) {
             if (FunctionSet.CELONIS_SHORTENED_VARIANT.equals(call.getFnName())
                     && !sessionVariable.isEnableShortenedVariantLowCardinalityOptimize()) {
+                // TODO(farhad-celo): For backward compatibility. It can be removed after 1 release.
+                return forbidden(visitChildren(call, context), call);
+            }
+            if (FunctionSet.CELONIS_MATCH_ACTIVITIES.equals(call.getFnName())
+                    && !sessionVariable.isEnableMatchActivitiesLowCardinalityOptimize()) {
                 // TODO(farhad-celo): For backward compatibility. It can be removed after 1 release.
                 return forbidden(visitChildren(call, context), call);
             }

@@ -4,11 +4,18 @@
 #include "column/hash_set.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
+#include "runtime/global_dict/config.h"
 
 namespace starrocks {
 
 namespace {
 
+static_assert(std::is_same_v<DictId, int32_t>);
+
+template <LogicalType LT>
+using FilterType = std::conditional_t<LT == TYPE_INT, phmap::flat_hash_set<int32_t>, SliceHashSet>;
+
+template <LogicalType LT>
 struct MatchConfig {
     // STARTING: case has to start with specified activity
     // NODE: case has to have the specified activities
@@ -16,12 +23,12 @@ struct MatchConfig {
     // EXCLUDING: case must not have the specified activities (and must have at least one non-NULL activity)
     // EXCLUDING_ALL: case must not have any of the specified activities (and must have at least one non-NULL activity)
     // NODES_ANY: case has to have at least one of the specified activities
-    SliceHashSet start_nodes;
-    SliceHashSet nodes;
-    SliceHashSet end_nodes;
-    SliceHashSet excluding_nodes;
-    SliceHashSet excluding_all_nodes;
-    SliceHashSet any_nodes;
+    FilterType<LT> start_nodes;
+    FilterType<LT> nodes;
+    FilterType<LT> end_nodes;
+    FilterType<LT> excluding_nodes;
+    FilterType<LT> excluding_all_nodes;
+    FilterType<LT> any_nodes;
     // any_nodes_mode is set to true when only any_nodes is non-empty.
     bool any_nodes_mode = false;
     // nodes_mode is set to true when only nodes is non-empty.
@@ -38,20 +45,23 @@ struct MatchConfig {
     }
 };
 
+template <LogicalType LT>
 struct MatchActivitiesStateFragmentLocal {
-    MatchConfig match_config;
+    MatchConfig<LT> match_config;
     ScalarFunction function;
 };
 
-int64_t _match_activities(size_t row, const UnnestedArrayData& activity_array_data, const Slice* activities,
-                          const unsigned int* offsets, const SliceHashSet& start_nodes, const SliceHashSet& nodes,
-                          const SliceHashSet& end_nodes, const SliceHashSet& excluding_nodes,
-                          const SliceHashSet& excluding_all_nodes, const SliceHashSet& any_nodes, bool any_nodes_mode,
-                          bool nodes_mode) {
+template <LogicalType LT>
+int64_t _match_activities(size_t row, const UnnestedArrayData& activity_array_data,
+                          const RunTimeCppType<LT>* activities, const unsigned int* offsets,
+                          const FilterType<LT>& start_nodes, const FilterType<LT>& nodes,
+                          const FilterType<LT>& end_nodes, const FilterType<LT>& excluding_nodes,
+                          const FilterType<LT>& excluding_all_nodes, const FilterType<LT>& any_nodes,
+                          bool any_nodes_mode, bool nodes_mode) {
     const auto& null_elements = activity_array_data.null_elements;
-    SliceHashSet nodes_seen;
+    FilterType<LT> nodes_seen;
     nodes_seen.reserve(nodes.size());
-    SliceHashSet excluding_nodes_seen;
+    FilterType<LT> excluding_nodes_seen;
     excluding_nodes_seen.reserve(excluding_all_nodes.size());
     // contain node in any_nodes
     bool has_any_node = false;
@@ -74,8 +84,8 @@ int64_t _match_activities(size_t row, const UnnestedArrayData& activity_array_da
     const int64_t start = left_to_right ? static_cast<int64_t>(offset_start) : static_cast<int64_t>(offset_end) - 1;
     const int64_t end = left_to_right ? static_cast<int64_t>(offset_end) : static_cast<int64_t>(offset_start) - 1;
     const int64_t delta_index = left_to_right ? 1 : -1;
-    const SliceHashSet& first_visit_nodes = left_to_right ? start_nodes : end_nodes;
-    const SliceHashSet& last_visit_nodes = left_to_right ? end_nodes : start_nodes;
+    const FilterType<LT>& first_visit_nodes = left_to_right ? start_nodes : end_nodes;
+    const FilterType<LT>& last_visit_nodes = left_to_right ? end_nodes : start_nodes;
     for (auto index = start; index != end; index += delta_index) {
         // Nulls are ignored
         if (null_elements != nullptr && (*null_elements)[index] != 0) {
@@ -137,12 +147,17 @@ int64_t _match_activities(size_t row, const UnnestedArrayData& activity_array_da
     return 0L;
 }
 
-void _populate_filter(const ColumnPtr& column, int row, SliceHashSet& filter) {
+template <typename T>
+void _populate_filter(const ColumnPtr& column, int row, T& filter) {
     if (!column->is_null(row)) {
         auto start_node_array = column->get(row).get_array();
         for (const auto& value : start_node_array) {
             if (!value.is_null()) {
-                filter.insert(value.get_slice());
+                if constexpr (std::is_same_v<T, SliceHashSet>) {
+                    filter.insert(value.get_slice());
+                } else {
+                    filter.insert(value.get_int32());
+                }
             }
         }
     }
@@ -150,12 +165,13 @@ void _populate_filter(const ColumnPtr& column, int row, SliceHashSet& filter) {
 
 } // namespace
 
-Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* context,
-                                                FunctionContext::FunctionStateScope scope) {
+template <LogicalType LT>
+Status CelonisMatchActivitiesFunctions<LT>::prepare(starrocks::FunctionContext* context,
+                                                    FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
     }
-    auto state = new MatchActivitiesStateFragmentLocal();
+    auto state = new MatchActivitiesStateFragmentLocal<LT>();
     context->set_function_state(scope, state);
 
     auto start_nodes_column = context->get_constant_column(1);
@@ -190,24 +206,24 @@ Status CelonisMatchActivitiesFunctions::prepare(starrocks::FunctionContext* cont
     return Status::OK();
 }
 
-Status CelonisMatchActivitiesFunctions::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+template <LogicalType LT>
+Status CelonisMatchActivitiesFunctions<LT>::close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
-        const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
+        const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal<LT>*>(
                 context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
         delete state;
     }
     return Status::OK();
 }
 
-StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities_non_constant_config(
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions<LT>::celonis_match_activities_non_constant_config(
         starrocks::FunctionContext* context, const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
-    DCHECK(activity_array_data.elements->is_binary());
-    const auto& activities =
-            down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*activity_array_data.elements).get_data().data();
+    const auto& activities = down_cast<const RunTimeColumnType<LT>&>(*activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
     for (size_t row = 0; row < num_rows; ++row) {
@@ -216,64 +232,67 @@ StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities_no
             continue;
         }
 
-        SliceHashSet start_nodes;
+        FilterType<LT> start_nodes;
         _populate_filter(columns[1], row, start_nodes);
-        SliceHashSet nodes;
+        FilterType<LT> nodes;
         _populate_filter(columns[2], row, nodes);
-        SliceHashSet end_nodes;
+        FilterType<LT> end_nodes;
         _populate_filter(columns[3], row, end_nodes);
-        SliceHashSet excluding_nodes;
+        FilterType<LT> excluding_nodes;
         _populate_filter(columns[4], row, excluding_nodes);
-        SliceHashSet excluding_all_nodes;
+        FilterType<LT> excluding_all_nodes;
         _populate_filter(columns[5], row, excluding_all_nodes);
-        SliceHashSet any_nodes;
+        FilterType<LT> any_nodes;
         _populate_filter(columns[6], row, any_nodes);
         bool any_nodes_mode = ((!any_nodes.empty()) && start_nodes.empty() && nodes.empty() && end_nodes.empty() &&
                                excluding_nodes.empty() && excluding_all_nodes.empty());
         bool nodes_mode = ((!nodes.empty()) && start_nodes.empty() && any_nodes.empty() && end_nodes.empty() &&
                            excluding_nodes.empty() && excluding_all_nodes.empty());
-        result.append(_match_activities(row, activity_array_data, activities, activity_offsets, start_nodes, nodes,
-                                        end_nodes, excluding_nodes, excluding_all_nodes, any_nodes, any_nodes_mode,
-                                        nodes_mode));
+        result.append(_match_activities<LT>(row, activity_array_data, activities, activity_offsets, start_nodes, nodes,
+                                            end_nodes, excluding_nodes, excluding_all_nodes, any_nodes, any_nodes_mode,
+                                            nodes_mode));
     }
 
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities_constant_config(
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions<LT>::celonis_match_activities_constant_config(
         starrocks::FunctionContext* context, const starrocks::Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL({columns[0]});
     auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
     ColumnPtr activity_array_column = ColumnHelper::unpack_and_duplicate_const_column(num_rows, columns[0]);
     UnnestedArrayData activity_array_data = prepare_array_input(activity_array_column.get());
-    DCHECK(activity_array_data.elements->is_binary());
-    const auto& activities =
-            down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(*activity_array_data.elements).get_data().data();
+    const auto& activities = down_cast<const RunTimeColumnType<LT>&>(*activity_array_data.elements).get_data().data();
     const auto& activity_offsets = activity_array_data.offsets->get_data().data();
     ColumnBuilder<TYPE_BIGINT> result(num_rows);
-    const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
+    const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     for (size_t row = 0; row < num_rows; ++row) {
         if (columns[0]->is_null(row)) {
             result.append_null();
             continue;
         }
-        result.append(_match_activities(row, activity_array_data, activities, activity_offsets,
-                                        state->match_config.start_nodes, state->match_config.nodes,
-                                        state->match_config.end_nodes, state->match_config.excluding_nodes,
-                                        state->match_config.excluding_all_nodes, state->match_config.any_nodes,
-                                        state->match_config.any_nodes_mode, state->match_config.nodes_mode));
+        result.append(_match_activities<LT>(row, activity_array_data, activities, activity_offsets,
+                                            state->match_config.start_nodes, state->match_config.nodes,
+                                            state->match_config.end_nodes, state->match_config.excluding_nodes,
+                                            state->match_config.excluding_all_nodes, state->match_config.any_nodes,
+                                            state->match_config.any_nodes_mode, state->match_config.nodes_mode));
     }
 
     return result.build(all_const);
 }
 
-StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions::celonis_match_activities(FunctionContext* context,
-                                                                              const Columns& columns) {
+template <LogicalType LT>
+StatusOr<ColumnPtr> CelonisMatchActivitiesFunctions<LT>::celonis_match_activities(FunctionContext* context,
+                                                                                  const Columns& columns) {
     DCHECK_EQ(columns.size(), 7);
-    const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal*>(
+    const auto* state = reinterpret_cast<const MatchActivitiesStateFragmentLocal<LT>*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     return state->function(context, columns);
 }
+
+template class CelonisMatchActivitiesFunctions<TYPE_INT>;
+template class CelonisMatchActivitiesFunctions<TYPE_VARCHAR>;
 
 } // namespace starrocks
