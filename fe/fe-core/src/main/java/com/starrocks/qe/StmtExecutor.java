@@ -129,6 +129,7 @@ import com.starrocks.proto.PQueryStatistics;
 import com.starrocks.proto.QueryStatisticsItemPB;
 import com.starrocks.qe.QueryState.MysqlStateType;
 import com.starrocks.qe.celonis.explaininputcolumns.ExplainInputColumnsExecutor;
+import com.starrocks.qe.celonis.validate.ValidateExecutor;
 import com.starrocks.qe.feedback.OperatorTuningGuides;
 import com.starrocks.qe.feedback.PlanAdvisorExecutor;
 import com.starrocks.qe.feedback.PlanTuningAdvisor;
@@ -198,6 +199,7 @@ import com.starrocks.sql.ast.UseCatalogStmt;
 import com.starrocks.sql.ast.UseDbStmt;
 import com.starrocks.sql.ast.UserVariable;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
+import com.starrocks.sql.ast.celonis.validate.ValidateStmt;
 import com.starrocks.sql.ast.feedback.PlanAdvisorStmt;
 import com.starrocks.sql.ast.translate.TranslateStmt;
 import com.starrocks.sql.ast.txn.BeginStmt;
@@ -725,7 +727,10 @@ public class StmtExecutor {
 
         try {
             context.getState().setIsQuery(context.isQueryStmt(parsedStmt));
-            if (parsedStmt.isExistQueryScopeHint()) {
+            // VALIDATE never executes the inner query, so its hints must not be processed either — a
+            // UserVariableHint can otherwise run arbitrary SQL through an internal executor before the
+            // whitelist check ever sees it. ValidateAnalyzer rejects statements carrying hints outright.
+            if (parsedStmt.isExistQueryScopeHint() && !(parsedStmt instanceof ValidateStmt)) {
                 processQueryScopeHint();
             }
 
@@ -935,6 +940,8 @@ public class StmtExecutor {
                 handlePlanAdvisorStmt();
             } else if (parsedStmt instanceof ExplainInputColumnsStmt) {
                 handleExplainInputColumnsStmt();
+            } else if (parsedStmt instanceof ValidateStmt) {
+                handleValidateStmt();
             } else if (parsedStmt instanceof TranslateStmt) {
                 handleTranslateStmt();
             } else if (parsedStmt instanceof BeginStmt) {
@@ -2267,6 +2274,17 @@ public class StmtExecutor {
 
     private void handleExplainInputColumnsStmt() throws IOException {
         ShowResultSet resultSet = ExplainInputColumnsExecutor.execute((ExplainInputColumnsStmt) parsedStmt, context);
+        if (isProxy) {
+            proxyResultSet = resultSet;
+            context.getState().setEof();
+            return;
+        }
+
+        sendShowResult(resultSet);
+    }
+
+    private void handleValidateStmt() throws IOException {
+        ShowResultSet resultSet = ValidateExecutor.execute((ValidateStmt) parsedStmt);
         if (isProxy) {
             proxyResultSet = resultSet;
             context.getState().setEof();

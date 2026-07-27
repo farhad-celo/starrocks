@@ -155,7 +155,7 @@ class ExplainInputColumnsAnalyzerTest extends PlanTestBase {
     void duplicateExtension() {
         analyzeFail(
                 "EXPLAIN INPUT COLUMNS SELECT virt FROM t0 EXTENSIONS (test.t0.virt : BIGINT, test.t0.virt : BIGINT)",
-                "Duplicate EXPLAIN INPUT COLUMNS extension");
+                "Duplicate schema extension");
     }
 
     @Test

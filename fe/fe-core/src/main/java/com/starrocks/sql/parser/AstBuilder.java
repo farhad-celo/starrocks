@@ -477,7 +477,9 @@ import com.starrocks.sql.ast.UserIdentity;
 import com.starrocks.sql.ast.UserVariable;
 import com.starrocks.sql.ast.ValueList;
 import com.starrocks.sql.ast.ValuesRelation;
+import com.starrocks.sql.ast.celonis.CelostarSchemaExtensionSpec;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
+import com.starrocks.sql.ast.celonis.validate.ValidateStmt;
 import com.starrocks.sql.ast.feedback.AddPlanAdvisorStmt;
 import com.starrocks.sql.ast.feedback.ClearPlanAdvisorStmt;
 import com.starrocks.sql.ast.feedback.DelPlanAdvisorStmt;
@@ -5274,25 +5276,47 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
             throw new ParsingException(
                     PARSER_ERROR_MSG.unsupportedStatement("INTO OUTFILE is not supported in EXPLAIN INPUT COLUMNS"));
         }
-        List<ExplainInputColumnsStmt.VirtualExtension> virtualExtensions = new ArrayList<>();
-        if (context.explainInputColumnsExtensionList() != null) {
-            for (StarRocksParser.ExplainInputColumnsExtensionContext extensionContext :
-                    context.explainInputColumnsExtensionList().explainInputColumnsExtension()) {
-                QualifiedName qualifiedName = getQualifiedName(extensionContext.qualifiedName());
-                String columnName = ((Identifier) visit(extensionContext.identifier())).getValue();
-                StarRocksParser.TypeContext typeContext =
-                        extensionContext.getRuleContext(StarRocksParser.TypeContext.class, 0);
-                if (typeContext == null) {
-                    throw new ParsingException("EXPLAIN INPUT COLUMNS extension requires a type",
-                            createPos(extensionContext));
-                }
-                Type type = getType(typeContext);
-                virtualExtensions.add(
-                        new ExplainInputColumnsStmt.VirtualExtension(qualifiedName.getParts(), columnName, type,
-                                createPos(extensionContext)));
-            }
-        }
+        List<CelostarSchemaExtensionSpec> virtualExtensions =
+                buildCelostarExtensions(context.celostarExtensionClause());
         return new ExplainInputColumnsStmt(createPos(context), queryStmt, virtualExtensions);
+    }
+
+    @Override
+    public ParseNode visitValidateStatement(StarRocksParser.ValidateStatementContext context) {
+        QueryStatement queryStmt = (QueryStatement) visitQueryStatement(context.queryStatement());
+        if (queryStmt.isExplain()) {
+            throw new ParsingException(
+                    PARSER_ERROR_MSG.unsupportedStatement("inner query of VALIDATE must not be an EXPLAIN"));
+        }
+        if (queryStmt.hasOutFileClause()) {
+            throw new ParsingException(
+                    PARSER_ERROR_MSG.unsupportedStatement("INTO OUTFILE is not supported in VALIDATE"));
+        }
+        List<CelostarSchemaExtensionSpec> virtualExtensions =
+                buildCelostarExtensions(context.celostarExtensionClause());
+        return new ValidateStmt(createPos(context), queryStmt, virtualExtensions);
+    }
+
+    private List<CelostarSchemaExtensionSpec> buildCelostarExtensions(
+            StarRocksParser.CelostarExtensionClauseContext clauseContext) {
+        List<CelostarSchemaExtensionSpec> virtualExtensions = new ArrayList<>();
+        if (clauseContext == null || clauseContext.celostarExtensionList() == null) {
+            return virtualExtensions;
+        }
+        for (StarRocksParser.CelostarExtensionContext extensionContext :
+                clauseContext.celostarExtensionList().celostarExtension()) {
+            QualifiedName qualifiedName = getQualifiedName(extensionContext.qualifiedName());
+            String columnName = ((Identifier) visit(extensionContext.identifier())).getValue();
+            StarRocksParser.TypeContext typeContext =
+                    extensionContext.getRuleContext(StarRocksParser.TypeContext.class, 0);
+            if (typeContext == null) {
+                throw new ParsingException("schema extension requires a type", createPos(extensionContext));
+            }
+            Type type = getType(typeContext);
+            virtualExtensions.add(new CelostarSchemaExtensionSpec(qualifiedName.getParts(), columnName, type,
+                    createPos(extensionContext)));
+        }
+        return virtualExtensions;
     }
 
     public ParseNode visitTruncatePlanAdvisorStatement(StarRocksParser.TruncatePlanAdvisorStatementContext context) {

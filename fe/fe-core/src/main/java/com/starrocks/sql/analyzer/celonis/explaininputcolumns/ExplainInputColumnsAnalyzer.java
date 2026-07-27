@@ -15,25 +15,17 @@
 package com.starrocks.sql.analyzer.celonis.explaininputcolumns;
 
 import com.starrocks.analysis.ParseNode;
-import com.starrocks.analysis.TableName;
-import com.starrocks.catalog.Database;
-import com.starrocks.catalog.Table;
 import com.starrocks.qe.ConnectContext;
-import com.starrocks.server.GlobalStateMgr;
-import com.starrocks.server.celonis.CelostarExtensionSet;
 import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
-import com.starrocks.server.celonis.explaininputcolumns.ExtensionTableKey;
 import com.starrocks.sql.analyzer.Analyzer;
 import com.starrocks.sql.analyzer.SemanticException;
+import com.starrocks.sql.analyzer.celonis.CelostarExtensionScope;
+import com.starrocks.sql.analyzer.celonis.CelostarSchemaExtensionResolver;
 import com.starrocks.sql.ast.AstTraverser;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.SelectListItem;
 import com.starrocks.sql.ast.SelectRelation;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
-
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
 
 public final class ExplainInputColumnsAnalyzer {
     private ExplainInputColumnsAnalyzer() {
@@ -41,14 +33,11 @@ public final class ExplainInputColumnsAnalyzer {
 
     public static void analyze(ExplainInputColumnsStmt statement, ConnectContext connectContext) {
         validateInnerQuery(statement.getQueryStmt());
-        CelostarSchemaExtension schemaExtension = resolveExtensions(statement, connectContext);
-        CelostarExtensionSet previousCelostarExtensions = connectContext.getCelostarExtensions();
+        CelostarSchemaExtension schemaExtension =
+                CelostarSchemaExtensionResolver.resolveValidated(statement.getVirtualExtensions(), connectContext);
         // Install extensions only while the inner query is analyzed so normal statements keep the unextended catalog.
-        connectContext.setCelostarExtensions(CelostarExtensionSet.ofSchemaExtension(schemaExtension));
-        try {
+        try (CelostarExtensionScope ignored = CelostarExtensionScope.install(connectContext, schemaExtension)) {
             Analyzer.analyze(statement.getQueryStmt(), connectContext);
-        } finally {
-            connectContext.setCelostarExtensions(previousCelostarExtensions);
         }
     }
 
@@ -78,57 +67,5 @@ public final class ExplainInputColumnsAnalyzer {
                 return super.visitSelect(node, context);
             }
         }.visit(queryStmt);
-    }
-
-    private static CelostarSchemaExtension resolveExtensions(ExplainInputColumnsStmt statement, ConnectContext connectContext) {
-        CelostarSchemaExtension schemaExtension = new CelostarSchemaExtension();
-        Set<ExtensionColumnKey> seenExtensions = new HashSet<>();
-        com.starrocks.server.MetadataMgr metadataManager = GlobalStateMgr.getCurrentState().getMetadataMgr();
-
-        for (ExplainInputColumnsStmt.VirtualExtension virtualExtension : statement.getVirtualExtensions()) {
-            TableName tableName = tableName(virtualExtension);
-            tableName.normalization(connectContext);
-
-            ExtensionTableKey tableKey = new ExtensionTableKey(tableName.getCatalog(), tableName.getDb(),
-                    tableName.getTbl());
-            if (!seenExtensions.add(new ExtensionColumnKey(tableKey, virtualExtension.column()))) {
-                throw new SemanticException("Duplicate EXPLAIN INPUT COLUMNS extension: %s.%s",
-                        tableName.getTbl(), virtualExtension.column());
-            }
-
-            if (!GlobalStateMgr.getCurrentState().getCatalogMgr().catalogExists(tableName.getCatalog())) {
-                throw new SemanticException("Extension refers to unknown catalog: %s", tableName.getCatalog());
-            }
-            Database database = metadataManager.getDb(connectContext, tableName.getCatalog(), tableName.getDb());
-            if (database == null) {
-                throw new SemanticException("Extension refers to unknown database: %s.%s", tableName.getCatalog(),
-                        tableName.getDb());
-            }
-
-            Table table = metadataManager.getTable(connectContext, tableName.getCatalog(), tableName.getDb(),
-                    tableName.getTbl());
-            if (table != null && table.getColumn(virtualExtension.column()) != null) {
-                throw new SemanticException(
-                        "Extension column '%s' already exists on table '%s'", virtualExtension.column(),
-                        tableName.getTbl());
-            }
-
-            schemaExtension.add(tableKey, virtualExtension.column(), virtualExtension.type());
-        }
-        return schemaExtension;
-    }
-
-    private static TableName tableName(ExplainInputColumnsStmt.VirtualExtension virtualExtension) {
-        try {
-            return virtualExtension.tableName();
-        } catch (IllegalArgumentException e) {
-            throw new SemanticException(e.getMessage());
-        }
-    }
-
-    private record ExtensionColumnKey(ExtensionTableKey tableKey, String column) {
-        private ExtensionColumnKey {
-            column = column == null ? "" : column.toLowerCase(Locale.ROOT);
-        }
     }
 }

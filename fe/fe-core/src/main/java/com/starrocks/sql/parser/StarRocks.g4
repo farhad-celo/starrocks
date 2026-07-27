@@ -327,6 +327,9 @@ statement
     // Explain Input Columns statement
     | explainInputColumnsStatement
 
+    // Validate statement
+    | validateStatement
+
     // Warehouse Statement
     | createWarehouseStatement
     | dropWarehouseStatement
@@ -2141,14 +2144,24 @@ alterPlanAdvisorAddStatement
 
 // ------------------------------------------- Explain Input Columns Statement ------------------------------------------------
 explainInputColumnsStatement
-    : EXPLAIN INPUT COLUMNS queryStatement (EXTENSIONS '(' explainInputColumnsExtensionList? ')')?
+    : EXPLAIN INPUT COLUMNS queryStatement celostarExtensionClause?
     ;
 
-explainInputColumnsExtensionList
-    : explainInputColumnsExtension (',' explainInputColumnsExtension)*
+// ------------------------------------------- Validate Statement ------------------------------------------------
+validateStatement
+    : VALIDATE queryStatement celostarExtensionClause?
     ;
 
-explainInputColumnsExtension
+// Shared Celostar schema-extension clause: declares columns defined elsewhere so the inner query can reference them.
+celostarExtensionClause
+    : EXTENSIONS '(' celostarExtensionList? ')'
+    ;
+
+celostarExtensionList
+    : celostarExtension (',' celostarExtension)*
+    ;
+
+celostarExtension
     : qualifiedName '.' identifier ':' type
     ;
 
@@ -3131,7 +3144,7 @@ nonReserved
     | TRIM_SPACE
     | TRIGGERS | TRUNCATE | TYPE | TYPES
     | UNBOUNDED | UNCOMMITTED | UNSET | UNINSTALL | USAGE | USER | USERS | UNLOCK
-    | VALUE | VARBINARY | VARIABLES | VIEW | VIEWS | VERBOSE | VERSION | VOLUME | VOLUMES
+    | VALIDATE | VALUE | VARBINARY | VARIABLES | VIEW | VIEWS | VERBOSE | VERSION | VOLUME | VOLUMES
     | WARNINGS | WEEK | WHITELIST | WORK | WRITE  | WAREHOUSE | WAREHOUSES
     | YEAR
     | DOTDOTDOT | NGRAMBF | VECTOR

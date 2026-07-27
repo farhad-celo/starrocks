@@ -14,61 +14,18 @@
 
 package com.starrocks.sql.ast.celonis.explaininputcolumns;
 
-import com.google.common.collect.ImmutableList;
-import com.starrocks.analysis.RedirectStatus;
-import com.starrocks.analysis.TableName;
-import com.starrocks.catalog.Type;
 import com.starrocks.sql.ast.AstVisitor;
 import com.starrocks.sql.ast.QueryStatement;
-import com.starrocks.sql.ast.StatementBase;
+import com.starrocks.sql.ast.celonis.AbstractQueryWithVirtualExtensionsStmt;
+import com.starrocks.sql.ast.celonis.CelostarSchemaExtensionSpec;
 import com.starrocks.sql.parser.NodePosition;
 
 import java.util.List;
 
-public class ExplainInputColumnsStmt extends StatementBase {
-    private final QueryStatement queryStmt;
-    private final List<VirtualExtension> virtualExtensions;
-
+public class ExplainInputColumnsStmt extends AbstractQueryWithVirtualExtensionsStmt {
     public ExplainInputColumnsStmt(NodePosition pos, QueryStatement queryStmt,
-                                   List<VirtualExtension> virtualExtensions) {
-        super(pos);
-        this.queryStmt = queryStmt;
-        this.virtualExtensions = ImmutableList.copyOf(virtualExtensions);
-    }
-
-    public QueryStatement getQueryStmt() {
-        return queryStmt;
-    }
-
-    public List<VirtualExtension> getVirtualExtensions() {
-        return virtualExtensions;
-    }
-
-    /**
-     * Parser-time form: catalog.db.table OR db.table OR table, plus typed column.
-     */
-    public record VirtualExtension(List<String> tablePath, String column, Type type, NodePosition pos) {
-        public TableName tableName() {
-            if (tablePath == null || tablePath.isEmpty() || tablePath.size() > 3) {
-                throw new IllegalArgumentException(
-                        "Invalid extension table path; expect table, db.table, or catalog.db.table");
-            }
-            switch (tablePath.size()) {
-                case 1:
-                    return new TableName(null, null, tablePath.get(0));
-                case 2:
-                    return new TableName(null, tablePath.get(0), tablePath.get(1));
-                case 3:
-                    return new TableName(tablePath.get(0), tablePath.get(1), tablePath.get(2));
-                default:
-                    throw new IllegalArgumentException("Invalid extension table path");
-            }
-        }
-    }
-
-    @Override
-    public RedirectStatus getRedirectStatus() {
-        return RedirectStatus.NO_FORWARD;
+                                   List<CelostarSchemaExtensionSpec> virtualExtensions) {
+        super(pos, queryStmt, virtualExtensions);
     }
 
     @Override

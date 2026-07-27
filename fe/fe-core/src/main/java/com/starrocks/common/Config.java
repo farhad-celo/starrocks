@@ -4232,4 +4232,14 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = false, comment = "Whether to enable dictification for Celonis scalar functions")
     public static boolean celonis_enable_scalar_functions_dictification = true;
+
+    @ConfField(mutable = true, comment = "Comma-separated list of extra function names allowed by the VALIDATE " +
+            "statement, in addition to the hardcoded default whitelist (config is additive, never replaces the " +
+            "default).")
+    public static String[] validate_allowed_functions = {};
+
+    @ConfField(mutable = true, comment = "Maximum LIMIT value allowed on the outer query of a VALIDATE " +
+            "statement. 0 (default) disables the check. When > 0, the inner query's outer LIMIT must be " +
+            "present and <= this value.")
+    public static long validate_max_limit = 0;
 }
