@@ -60,10 +60,12 @@ jobs:
           - arch: amd64
             runner: 64cpu-linux-x64,volume=150g
             image_suffix: x86
+            oci_suffix: amd
             ubuntu_image: ubuntu24-full-x64
           - arch: arm64
             runner: 64cpu-linux-arm64,volume=150g
             image_suffix: arm
+            oci_suffix: arm
             ubuntu_image: ubuntu24-full-arm64
     runs-on: ['runs-on', 'runner=${{ matrix.runner }}', 'image=${{ matrix.ubuntu_image }}', 'disk=large', 'run-id=${{ github.run_id }}']
     steps:
@@ -93,6 +95,7 @@ jobs:
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-${{ matrix.image_suffix }}
           image_tag: ${{ inputs.image-tag }}-${{ matrix.image_suffix }}
+          oci_version: ${{ inputs.celostar-docker-tag && format('{0}-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -108,10 +111,12 @@ jobs:
           - arch: amd64
             runner: 64cpu-linux-x64,volume=150g
             image_suffix: x86
+            oci_suffix: amd
             ubuntu_image: ubuntu24-full-x64
           - arch: arm64
             runner: 64cpu-linux-arm64,volume=150g
             image_suffix: arm
+            oci_suffix: arm
             ubuntu_image: ubuntu24-full-arm64
     runs-on: ['runs-on', 'runner=${{ matrix.runner }}', 'image=${{ matrix.ubuntu_image }}', 'disk=large', 'run-id=${{ github.run_id }}']
     steps:
@@ -126,6 +131,7 @@ jobs:
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-${{ matrix.image_suffix }}
           image_tag: ${{ inputs.image-tag }}-debian12-${{ matrix.image_suffix }}
+          oci_version: ${{ inputs.celostar-docker-tag && format('{0}-debian12-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -141,10 +147,12 @@ jobs:
           - arch: amd64
             runner: 64cpu-linux-x64,volume=150g
             asan_suffix: amd64
+            oci_suffix: amd
             ubuntu_image: ubuntu22-full-x64
           - arch: arm64
             runner: 64cpu-linux-arm64,volume=150g
             asan_suffix: arm64
+            oci_suffix: arm
             ubuntu_image: ubuntu22-full-arm64
     runs-on: ['runs-on', 'runner=${{ matrix.runner }}', 'image=${{ matrix.ubuntu_image }}', 'disk=large', 'run-id=${{ github.run_id }}']
     steps:
@@ -168,6 +176,7 @@ jobs:
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ inputs.image-tag }}-asan-${{ matrix.asan_suffix }}
           image_tag: ${{ inputs.image-tag }}-asan-${{ matrix.asan_suffix }}
+          oci_version: ${{ inputs.celostar-docker-tag && format('{0}-asan-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -211,7 +220,7 @@ jobs:
           publish_allin1: 'false'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          celostar_docker_tag: ${{ inputs.celostar-docker-tag }}-debian12
+          celostar_docker_tag: ${{ inputs.celostar-docker-tag && format('{0}-debian12', inputs.celostar-docker-tag) || '' }}
 
   build-and-push-asan-manifest:
     runs-on: [runs-on, runner=1cpu-linux-x64, "run-id=${{ github.run_id }}"]
@@ -231,4 +240,4 @@ jobs:
           publish_allin1: 'false'
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          celostar_docker_tag: ${{ inputs.celostar-docker-tag }}-asan
+          celostar_docker_tag: ${{ inputs.celostar-docker-tag && format('{0}-asan', inputs.celostar-docker-tag) || '' }}

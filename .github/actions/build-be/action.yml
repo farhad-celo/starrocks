@@ -7,6 +7,10 @@ inputs:
     required: true
   branch:
     required: false
+  oci_version:
+    description: OCI version label for the single-architecture image.
+    required: false
+    default: ''
   to_push:
     required: false
     default: 'true'
@@ -46,9 +50,18 @@ runs:
       shell: bash
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        OCI_VERSION: ${{ inputs.oci_version }}
       run: |
         IMAGE_TAG=${{ inputs.image_tag }}
         ARTIFACT_IMAGE=${{ inputs.artifact_image }}
+
+        oci_labels=(
+          --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+        )
+        if [[ -n "${OCI_VERSION}" ]]; then
+          oci_labels+=(--label "org.opencontainers.image.version=${OCI_VERSION}")
+        fi
 
         if [ -n "${{ inputs.branch }}" ]; then
           echo "Switching to branch ${{ inputs.branch }}"
@@ -58,6 +71,7 @@ runs:
         docker build --no-cache \
           --build-arg RUN_AS_USER=starrocks \
           --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
+          "${oci_labels[@]}" \
           -f ${{ inputs.be_dockerfile }} \
           -t ghcr.io/celonis/celostar/starrocks-be:$IMAGE_TAG \
           -t ${ECR_REGISTRY}/celostar/starrocks-be:$IMAGE_TAG .

@@ -7,6 +7,10 @@ inputs:
     required: true
   branch:
     required: false
+  oci_version:
+    description: OCI version label for the single-architecture image.
+    required: false
+    default: ''
   pull_artifact:
     description: 'Whether to pull artifact image'
     required: false
@@ -63,11 +67,20 @@ runs:
       shell: bash
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        OCI_VERSION: ${{ inputs.oci_version }}
       run: |
         set -e
 
         IMAGE_TAG="${{ inputs.image_tag }}"
         ARTIFACT_IMAGE="${{ inputs.artifact_image }}"
+
+        oci_labels=(
+          --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+        )
+        if [[ -n "${OCI_VERSION}" ]]; then
+          oci_labels+=(--label "org.opencontainers.image.version=${OCI_VERSION}")
+        fi
 
         # Add config
         echo "empty_load_as_error = false" >> docker/dockerfiles/allin1/fe.conf
@@ -87,6 +100,7 @@ runs:
         docker build --no-cache \
           --build-arg WITH_DEBUG_INFO=true \
           --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
+          "${oci_labels[@]}" \
           -f ${{ inputs.allin1_dockerfile }} \
           -t ghcr.io/celonis/celostar/starrocks-allin1:$IMAGE_TAG \
           -t $ECR_REGISTRY/celostar/starrocks-allin1:$IMAGE_TAG .
