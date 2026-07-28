@@ -90,18 +90,8 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         this.sessionVariable = sessionVariable;
     }
 
-    // For structs, we only return the encoded fields collected by DecodeCollector.
-    static ColumnRefSet getUsedColumns(ScalarOperator scalarOperator, DecodeContext context) {
-        if (scalarOperator.isColumnRef()) {
-            return new ColumnRefSet(((ColumnRefOperator) scalarOperator).getId());
-        }
-        Map<String, ColumnRefOperator> structFieldsData = context.structManager.getFieldStringRefMap(scalarOperator);
-        if (structFieldsData != null) {
-            return new ColumnRefSet(structFieldsData.values());
-        }
-        ColumnRefSet result = new ColumnRefSet();
-        scalarOperator.getChildren().forEach(c -> result.union(getUsedColumns(c, context)));
-        return result;
+    static boolean shouldEncodeOp(ScalarOperator op, ColumnRefSet supportColumns) {
+        return !op.isColumnRef() || supportColumns.contains(op.cast());
     }
 
     public OptExpression rewrite(OptExpression optExpression) {
@@ -257,7 +247,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         }
 
         // replace string predicate to dict predicate
-        JoinOnPredicateReplacer replacer = new JoinOnPredicateReplacer(context.stringRefToDictRefMap, inputs, context);
+        JoinOnPredicateReplacer replacer = new JoinOnPredicateReplacer(context.stringRefToDictRefMap, inputs);
         return predicate.accept(replacer, null);
     }
 
@@ -724,7 +714,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
                                 : new Pair<>(e.getKey(), e.getValue()))
                 .collect(Collectors.toMap(p -> p.first, p -> p.second));
         ColumnRefSet supportColumns = new ColumnRefSet(consume.getCteOutputColumnRefMap().entrySet().stream()
-                .filter(k -> info.inputStringColumns.contains(k.getValue())).map(Map.Entry::getKey).toList());
+                .filter(k -> info.inputStringColumns.contains(k.getValue()) || info.usedStringColumns.contains(k.getValue())).map(Map.Entry::getKey).toList());
         PhysicalCTEConsumeOperator newOp = new PhysicalCTEConsumeOperator(
                 consume.getCteId(),
                 newMap,
@@ -852,7 +842,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         }
 
         // replace string predicate to dict predicate
-        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs, context);
+        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs);
         return predicate.accept(replacer, null);
     }
 
@@ -861,7 +851,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
             return null;
         }
 
-        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs, context);
+        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs);
         Map<ColumnRefOperator, ScalarOperator> newColumnRefMap = Maps.newHashMap();
         for (ColumnRefOperator key : projection.getColumnRefMap().keySet()) {
             ScalarOperator value = projection.getColumnRefMap().get(key);
@@ -870,7 +860,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
                 newColumnRefMap.put(key, value.accept(replacer, null));
                 continue;
             }
-            if (!inputs.containsAll(getUsedColumns(value, context))) {
+            if (!shouldEncodeOp(value, inputs)) {
                 newColumnRefMap.put(key, value);
                 continue;
             }
@@ -908,20 +898,17 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
     private static class ExprReplacer extends BaseScalarOperatorShuttle {
         private final Map<ScalarOperator, ScalarOperator> exprMapping;
         private final ColumnRefSet supportColumns;
-        private final DecodeContext context;
 
         public ExprReplacer(Map<ScalarOperator, ScalarOperator> exprMapping,
-                            ColumnRefSet supportColumns,
-                            DecodeContext context) {
+                            ColumnRefSet supportColumns) {
             this.exprMapping = exprMapping;
             this.supportColumns = supportColumns;
-            this.context = context;
         }
 
         @Override
         public Optional<ScalarOperator> preprocess(ScalarOperator scalarOperator) {
             if (exprMapping.containsKey(scalarOperator)
-                    && supportColumns.containsAll(getUsedColumns(scalarOperator, context))) {
+                    && shouldEncodeOp(scalarOperator, supportColumns)) {
                 return Optional.of(exprMapping.get(scalarOperator));
             }
             return Optional.empty();
@@ -931,14 +918,11 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
     private static class JoinOnPredicateReplacer extends BaseScalarOperatorShuttle {
         private final Map<ColumnRefOperator, ColumnRefOperator> stringRefToDictRefMap;
         private final ColumnRefSet supportColumns;
-        private final DecodeContext context;
 
         public JoinOnPredicateReplacer(Map<ColumnRefOperator, ColumnRefOperator> stringRefToDictRefMap,
-                                       ColumnRefSet supportColumns,
-                                       DecodeContext context) {
+                                       ColumnRefSet supportColumns) {
             this.stringRefToDictRefMap = stringRefToDictRefMap;
             this.supportColumns = supportColumns;
-            this.context = context;
         }
 
         @Override
@@ -947,8 +931,8 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
                 return Optional.empty();
             }
 
-            if (stringRefToDictRefMap.containsKey(columnRef) && supportColumns.containsAll(
-                    getUsedColumns(columnRef, context))) {
+            if (stringRefToDictRefMap.containsKey(columnRef) &&
+                    shouldEncodeOp(columnRef, supportColumns)) {
                 return Optional.of(stringRefToDictRefMap.get(columnRef));
             }
 
