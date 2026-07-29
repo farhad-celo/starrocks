@@ -15,13 +15,12 @@
 package com.starrocks.sql.analyzer.celonis.validate;
 
 import com.google.common.collect.ImmutableSet;
-import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.FunctionCallExpr;
 import com.starrocks.analysis.FunctionName;
 import com.starrocks.analysis.GroupingFunctionCallExpr;
 import com.starrocks.analysis.ParseNode;
 import com.starrocks.catalog.Function;
-import com.starrocks.sql.ast.AstTraverser;
+import com.starrocks.sql.analyzer.celonis.CelostarAstTraverser;
 import com.starrocks.sql.ast.DdlStmt;
 import com.starrocks.sql.ast.DmlStmt;
 import com.starrocks.sql.ast.FileTableFunctionRelation;
@@ -47,10 +46,10 @@ import java.util.Set;
  *     function whitelist.</li>
  * </ul>
  * Table functions ({@code unnest}, {@code generate_series}, {@code files()}, the Celonis {@code celonis_*} TVFs) are
- * not {@link FunctionCallExpr}s — they are relation nodes the stock {@link AstTraverser} does not descend into — so
- * they are handled by the relation overrides below rather than {@link #visitFunctionCall}.
+ * not {@link FunctionCallExpr}s, so their names are handled by the relation overrides below while the shared
+ * Celostar traversal descends into their arguments.
  */
-public final class ValidateWhitelistChecker extends AbstractRelationLeafFixupVisitor {
+public final class ValidateWhitelistChecker extends CelostarAstTraverser {
     // Relation nodes handled explicitly below; excluded from the generic ast_node check so a table function yields a
     // single clear `function` violation instead of also an `ast_node` row.
     private static final Set<Class<?>> TABLE_FUNCTION_RELATIONS = ImmutableSet.of(
@@ -108,29 +107,7 @@ public final class ValidateWhitelistChecker extends AbstractRelationLeafFixupVis
     public Void visitTableFunction(TableFunctionRelation node, Void context) {
         FunctionName fnName = node.getFunctionName();
         checkFunctionCall(fnName == null ? null : fnName.getFunction(), node.getTableFunction());
-        // AstTraverser does not descend into table-function arguments, so recurse explicitly.
-        List<Expr> args = node.getChildExpressions();
-        if (args == null && node.getFunctionParams() != null) {
-            args = node.getFunctionParams().exprs();
-        }
-        if (args != null) {
-            for (Expr arg : args) {
-                visit(arg, context);
-            }
-        }
-        return null;
-    }
-
-    @Override
-    public Void visitNormalizedTableFunction(NormalizedTableFunctionRelation node, Void context) {
-        // TABLE(fn(...)) is a cross join of a dual relation with the TableFunctionRelation on the right.
-        if (node.getLeft() != null) {
-            visit(node.getLeft(), context);
-        }
-        if (node.getRight() != null) {
-            visit(node.getRight(), context);
-        }
-        return null;
+        return super.visitTableFunction(node, context);
     }
 
     @Override

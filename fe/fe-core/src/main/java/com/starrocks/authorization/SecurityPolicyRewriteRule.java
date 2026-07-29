@@ -87,6 +87,8 @@ public class SecurityPolicyRewriteRule {
 
         SelectRelation selectRelation = new SelectRelation(new SelectList(selectListItemList, false),
                 relation, rowAccessExpr, null, null);
+        // Keep the synthesized projection identifiable after it is wrapped in a SubqueryRelation.
+        selectRelation.setCreateByPolicyRewritten(true);
         selectRelation.setOrderBy(Collections.emptyList());
         return new QueryStatement(selectRelation);
     }

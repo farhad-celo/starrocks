@@ -14,7 +14,6 @@
 
 package com.starrocks.sql.analyzer.celonis.validate;
 
-import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.FunctionName;
 import com.starrocks.analysis.GroupByClause;
 import com.starrocks.analysis.LimitElement;
@@ -24,11 +23,11 @@ import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
 import com.starrocks.sql.analyzer.Analyzer;
 import com.starrocks.sql.analyzer.SemanticException;
+import com.starrocks.sql.analyzer.celonis.CelostarAstTraverser;
 import com.starrocks.sql.analyzer.celonis.CelostarExtensionScope;
 import com.starrocks.sql.analyzer.celonis.CelostarSchemaExtensionResolver;
 import com.starrocks.sql.ast.AstTraverser;
 import com.starrocks.sql.ast.FileTableFunctionRelation;
-import com.starrocks.sql.ast.NormalizedTableFunctionRelation;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.SelectListItem;
 import com.starrocks.sql.ast.SelectRelation;
@@ -105,15 +104,14 @@ public final class ValidateAnalyzer {
      * <p>{@link AstTraverser#visitSelect} traverses {@code getOutputExpression()}, which is only populated once
      * analysis has run and is null here, so a SELECT list expression (e.g. a scalar subquery containing
      * {@code FILES(...)}, or a nested {@code SELECT *}) would otherwise be invisible to this pass. This overrides
-     * {@code visitSelect} to explicitly walk the raw {@code SelectListItem}s instead. It also recurses into raw
-     * table-function arguments; the VALUES/PIVOT fix-up is shared with {@link ValidateWhitelistChecker} via
-     * {@link AbstractRelationLeafFixupVisitor} since the stock {@link AstTraverser} treats those as leaves too.
+     * {@code visitSelect} to explicitly walk the raw {@code SelectListItem}s instead. Raw table-function arguments,
+     * VALUES, and PIVOT payloads use the shared {@link CelostarAstTraverser}.
      */
     private static void rawAstSafetyPass(QueryStatement queryStmt) {
         new RawAstSafetyVisitor(ValidateFunctionWhitelist.effectiveAllowedFunctions()).visit(queryStmt);
     }
 
-    private static final class RawAstSafetyVisitor extends AbstractRelationLeafFixupVisitor {
+    private static final class RawAstSafetyVisitor extends CelostarAstTraverser {
         private final Set<String> allowedFunctions;
 
         private RawAstSafetyVisitor(Set<String> allowedFunctions) {
@@ -161,19 +159,7 @@ public final class ValidateAnalyzer {
         @Override
         public Void visitTableFunction(TableFunctionRelation node, Void context) {
             rejectIfNotAllowed(node.getFunctionName());
-            // AstTraverser does not descend into table-function arguments, so recurse explicitly; getChildExpressions()
-            // is only populated once analysis has run, so getFunctionParams() is the raw source here.
-            if (node.getFunctionParams() != null && node.getFunctionParams().exprs() != null) {
-                for (Expr arg : node.getFunctionParams().exprs()) {
-                    visit(arg, context);
-                }
-            }
-            return null;
-        }
-
-        @Override
-        public Void visitNormalizedTableFunction(NormalizedTableFunctionRelation node, Void context) {
-            return visit(node.getRight(), context);
+            return super.visitTableFunction(node, context);
         }
 
         @Override

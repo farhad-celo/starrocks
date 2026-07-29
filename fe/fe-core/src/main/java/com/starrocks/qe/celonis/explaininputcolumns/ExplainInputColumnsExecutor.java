@@ -20,7 +20,7 @@ import com.starrocks.catalog.ScalarType;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.ShowResultSet;
 import com.starrocks.qe.ShowResultSetMetaData;
-import com.starrocks.sql.analyzer.AnalyzerUtils;
+import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 
 import java.util.ArrayList;
@@ -31,6 +31,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 public final class ExplainInputColumnsExecutor {
+    private static final String TABLE_REFERENCE_COLUMN = "__STARROCKS_TABLE_REF__";
+
     private static final ShowResultSetMetaData META_DATA =
             ShowResultSetMetaData.builder()
                     .addColumn(new Column("Input Column", ScalarType.createVarchar(20)))
@@ -41,29 +43,47 @@ public final class ExplainInputColumnsExecutor {
 
     /**
      * Build analyzed EXPLAIN INPUT COLUMNS output. The inner query must already have been analyzed.
+     *
+     * A table/view whose merged column set is empty uses {@link #TABLE_REFERENCE_COLUMN} as its placeholder
+     * column, preserving the command's existing one-column result format. Stored view definitions remain opaque
+     * because only references in the submitted SELECT are reported. The marker is reserved and rejected as a real
+     * referenced column so the representation remains unambiguous.
      */
     public static ShowResultSet execute(ExplainInputColumnsStmt statement, ConnectContext connectContext) {
         Map<TableName, Set<String>> tableColumns =
-                AnalyzerUtils.collectAllSelectTableColumns(statement.getQueryStmt());
+                InputReferenceCollector.collect(statement.getQueryStmt());
         return new ShowResultSet(META_DATA, resultRows(tableColumns, connectContext));
     }
 
     private static List<List<String>> resultRows(Map<TableName, Set<String>> tableToColumns,
                                                  ConnectContext connectContext) {
-        TreeSet<String> outputLines = new TreeSet<>();
+        TreeSet<String> outputReferences = new TreeSet<>();
         for (Map.Entry<TableName, Set<String>> entry : tableToColumns.entrySet()) {
             TableName tableName = normalizeTableName(entry.getKey(), connectContext);
-            for (String columnName : entry.getValue()) {
-                outputLines.add(tableName.getCatalog() + "." + tableName.getDb() + "." + tableName.getTbl() +
-                        "." + columnName);
+            String tablePrefix = tablePrefix(tableName);
+            if (entry.getValue().isEmpty()) {
+                // The collector uses an empty set for a table/view referenced without any explicit column.
+                outputReferences.add(tablePrefix + "." + TABLE_REFERENCE_COLUMN);
+            } else {
+                for (String columnName : entry.getValue()) {
+                    if (columnName.equalsIgnoreCase(TABLE_REFERENCE_COLUMN)) {
+                        throw new SemanticException("Column name '%s' is reserved by EXPLAIN INPUT COLUMNS",
+                                TABLE_REFERENCE_COLUMN);
+                    }
+                    outputReferences.add(tablePrefix + "." + columnName);
+                }
             }
         }
 
-        List<List<String>> rows = new ArrayList<>(outputLines.size());
-        for (String outputLine : outputLines) {
-            rows.add(Collections.singletonList(outputLine));
+        List<List<String>> rows = new ArrayList<>(outputReferences.size());
+        for (String reference : outputReferences) {
+            rows.add(Collections.singletonList(reference));
         }
         return rows;
+    }
+
+    private static String tablePrefix(TableName tableName) {
+        return tableName.getCatalog() + "." + tableName.getDb() + "." + tableName.getTbl();
     }
 
     private static TableName normalizeTableName(TableName tableName, ConnectContext connectContext) {
