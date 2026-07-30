@@ -15,18 +15,22 @@
 package com.starrocks.sql.plan;
 
 import com.google.common.collect.Lists;
+import com.starrocks.catalog.ColumnId;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.common.FeConstants;
 import com.starrocks.planner.AnalyticEvalNode;
 import com.starrocks.planner.TableFunctionNode;
 import com.starrocks.sql.ast.expression.FunctionCallExpr;
+import com.starrocks.sql.optimizer.statistics.IDictManager;
 import com.starrocks.utframe.StarRocksAssert;
+import mockit.Expectations;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -1263,4 +1267,94 @@ public class LowCardinalityArrayTest extends PlanTestBase {
                 "  |  <slot 9> : DictDecode(10: S_ADDRESS, [<place-holder>], " +
                 "array_intersect(10: S_ADDRESS, array_distinct(10: S_ADDRESS)))"), plan);
     }
-}
+
+    @Test
+    public void testArrayFilterNonConstant() throws Exception {
+        String sql = """
+                SELECT  ARRAY_FILTER(a1, ARRAY_MAP(a2, x -> length(x) > 0))
+                FROM s1
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "DictDecode(7: a1, [<place-holder>], array_filter(7: a1, array_map(<slot 5> -> length(<slot 5>) > 0, " +
+                        "DictDecode(8: a2, [<place-holder>]))))"), plan);
+    }
+
+    @Test
+    public void testArraySortBy() throws Exception {
+        String sql = """
+                SELECT  ARRAY_SORTBY(a1, a2)
+                FROM s1
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "DictDecode(6: a1, [<place-holder>], array_sortby(6: a1, 7: a2))"), plan);
+    }
+
+    @Test
+    public void testArraySort() throws Exception {
+        String sql = """
+                SELECT  ARRAY_SORTBY(a1, x -> lower(x))
+                FROM s1
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "DictDecode(7: a1, [<place-holder>], array_sortby(7: a1, array_map(<slot 5> -> lower(<slot 5>)," +
+                        " DictDecode(7: a1, [<place-holder>]))))\n"), plan);
+    }
+
+    @Test
+    public void testArrayFilterWithLambda() throws Exception {
+        String sql = """
+                SELECT  ARRAY_FILTER(a1, x -> lower(x) > 'a')
+                FROM s1
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("<slot 6> : DictDecode(7: a1, [<place-holder>], " +
+                "array_filter(7: a1, array_map(<slot 5> -> lower(<slot 5>) > 'a', " +
+                "DictDecode(7: a1, [<place-holder>]))))\n"), plan);
+    }
+
+    @Test
+    public void testScalarOpSupportColumns() throws Exception {
+        String sql = """
+                SELECT ARRAY_SORTBY(a2, a1), a3
+                FROM (
+                    SELECT a1, a2, ARRAY_AGG(a1) AS a3
+                    FROM (
+                        SELECT a1, a2
+                        FROM s1
+                        GROUP BY a1, a2
+                    ) T1
+                    GROUP BY a1, a2
+                ) T2
+                """;
+
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("DictDecode([8: a2, ARRAY<INT>, true], [<place-holder>], " +
+                "array_sortby[([8: a2, ARRAY<INT>, true], [3: a1, ARRAY<VARCHAR(65533)>, true])"), plan);
+    }
+
+    @Test
+    public void testScalarOpSupportColumns2() throws Exception {
+        String sql = """
+                SELECT ARRAY_SORTBY(a1, a2), a3
+                FROM (
+                    SELECT a1, a2, ARRAY_AGG(a1) AS a3
+                    FROM (
+                        SELECT a1, a2
+                        FROM s1
+                        GROUP BY a1, a2
+                    ) T1
+                    GROUP BY a1, a2
+                ) T2
+                """;
+
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("array_sortby[([3: a1, ARRAY<VARCHAR(65533)>, true]," +
+                " [8: a2, ARRAY<INT>, true])"), plan);
+    }
+
+
+
+    }
