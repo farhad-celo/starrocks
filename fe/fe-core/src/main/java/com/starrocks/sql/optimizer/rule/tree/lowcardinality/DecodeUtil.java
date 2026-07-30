@@ -15,6 +15,8 @@
 package com.starrocks.sql.optimizer.rule.tree.lowcardinality;
 
 import com.google.common.base.Preconditions;
+import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
+import com.starrocks.sql.optimizer.operator.scalar.LambdaFunctionOperator;
 import com.starrocks.type.ArrayType;
 import com.starrocks.type.IntegerType;
 import com.starrocks.type.Type;
@@ -35,5 +37,10 @@ final class DecodeUtil {
             return ArrayType.ARRAY_INT;
         }
         return type;
+    }
+
+    static LambdaFunctionOperator getLambdaFunctionArg(CallOperator call) {
+        return call.getChild(0) instanceof LambdaFunctionOperator ? call.getChild(0).cast()
+                : call.getChild(call.getChildren().size() - 1).cast();
     }
 }

@@ -58,6 +58,7 @@ import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.DictMappingOperator;
+import com.starrocks.sql.optimizer.operator.scalar.LambdaFunctionOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.rewrite.BaseScalarOperatorShuttle;
 import com.starrocks.sql.optimizer.statistics.ColumnDict;
@@ -100,7 +101,8 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
             return new ColumnRefSet(structFieldsData.values());
         }
         ColumnRefSet result = new ColumnRefSet();
-        scalarOperator.getChildren().forEach(c -> result.union(getUsedColumns(c, context)));
+        scalarOperator.getChildren().stream().filter(c -> !(c instanceof LambdaFunctionOperator))
+                .forEach(c -> result.union(getUsedColumns(c, context)));
         return result;
     }
 
