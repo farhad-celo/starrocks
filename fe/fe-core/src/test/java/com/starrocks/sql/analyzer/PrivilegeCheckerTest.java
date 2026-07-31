@@ -977,6 +977,16 @@ public class PrivilegeCheckerTest {
                 "revoke select on db1.tbl1 from test",
                 "Access denied; you need (at least one of) the SELECT privilege(s) on TABLE tbl1 for this operation");
         verifyGrantRevoke(
+                "EXPLAIN INPUT COLUMNS SELECT k1 FROM db1.tbl1 EXTENSIONS (db1.tbl1.k1 : VARCHAR)",
+                "grant select on db1.tbl1 to test",
+                "revoke select on db1.tbl1 from test",
+                "Access denied; you need (at least one of) the SELECT privilege(s) on TABLE tbl1 for this operation");
+        verifyGrantRevoke(
+                "VALIDATE SELECT k1 FROM db1.tbl1 EXTENSIONS (db1.tbl1.k1)",
+                "grant select on db1.tbl1 to test",
+                "revoke select on db1.tbl1 from test",
+                "Access denied; you need (at least one of) the SELECT privilege(s) on TABLE tbl1 for this operation");
+        verifyGrantRevoke(
                 "EXPLAIN INPUT COLUMNS SELECT virt FROM db1.tbl1 EXTENSIONS (db1.tbl1.virt : BIGINT)",
                 "grant select on db1.tbl1 to test",
                 "revoke select on db1.tbl1 from test",
@@ -998,6 +1008,9 @@ public class PrivilegeCheckerTest {
                 "Access denied; you need (at least one of) the SELECT privilege(s) on TABLE tbl1 for this operation");
         verifySuccess(
                 "EXPLAIN INPUT COLUMNS SELECT virt FROM db1.vtab EXTENSIONS (db1.vtab.virt : BIGINT)",
+                starRocksAssert.getCtx());
+        verifySuccess(
+                "EXPLAIN INPUT COLUMNS SELECT virt FROM db1.vtab EXTENSIONS (db1.vtab.virt)",
                 starRocksAssert.getCtx());
     }
 

@@ -17,10 +17,12 @@ package com.starrocks.sql.parser.celonis.explaininputcolumns;
 import com.google.common.collect.ImmutableList;
 import com.starrocks.catalog.PrimitiveType;
 import com.starrocks.catalog.ScalarType;
+import com.starrocks.catalog.Type;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.sql.ast.StatementBase;
 import com.starrocks.sql.ast.celonis.CelostarSchemaExtensionSpec;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
+import com.starrocks.sql.ast.celonis.validate.ValidateStmt;
 import com.starrocks.sql.parser.ParsingException;
 import com.starrocks.sql.parser.SqlParser;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -106,9 +109,25 @@ class ExplainInputColumnsParserTest {
     }
 
     @Test
-    void rejectExtensionWithoutType() {
-        assertThrows(Exception.class,
-                () -> SqlParser.parse("EXPLAIN INPUT COLUMNS SELECT 1 EXTENSIONS (t.col)", new SessionVariable()));
+    void parseExtensionWithoutType() {
+        List<StatementBase> statements =
+                SqlParser.parse("EXPLAIN INPUT COLUMNS SELECT 1 EXTENSIONS (t.col)", new SessionVariable());
+        ExplainInputColumnsStmt statement = assertAndCast(statements.get(0));
+        assertEquals(1, statement.getVirtualExtensions().size());
+        assertEquals(ImmutableList.of("t"), statement.getVirtualExtensions().get(0).tablePath());
+        assertEquals("col", statement.getVirtualExtensions().get(0).column());
+        assertNull(statement.getVirtualExtensions().get(0).type());
+    }
+
+    @Test
+    void parseMixedTypedAndUntypedExtensions() {
+        List<StatementBase> statements = SqlParser.parse(
+                "VALIDATE SELECT 1 EXTENSIONS (t.untyped, t.typed : BIGINT)", new SessionVariable());
+        List<CelostarSchemaExtensionSpec> extensions =
+                ((ValidateStmt) statements.get(0)).getVirtualExtensions();
+        assertEquals(2, extensions.size());
+        assertNull(extensions.get(0).type());
+        assertEquals(Type.BIGINT, extensions.get(1).type());
     }
 
     @Test

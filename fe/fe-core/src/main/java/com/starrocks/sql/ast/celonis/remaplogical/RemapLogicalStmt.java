@@ -15,20 +15,22 @@
 package com.starrocks.sql.ast.celonis.remaplogical;
 
 import com.google.common.collect.ImmutableList;
-import com.starrocks.analysis.RedirectStatus;
 import com.starrocks.sql.ast.AstVisitor;
 import com.starrocks.sql.ast.QueryStatement;
-import com.starrocks.sql.ast.StatementBase;
+import com.starrocks.sql.ast.celonis.AbstractQueryWithVirtualExtensionsStmt;
 import com.starrocks.sql.ast.celonis.CelostarSchemaExtensionSpec;
 import com.starrocks.sql.parser.NodePosition;
 
 import java.util.List;
 
-public class RemapLogicalStmt extends StatementBase {
-    private final QueryStatement queryStmt;
+/**
+ * Shares {@link AbstractQueryWithVirtualExtensionsStmt} with the other EXTENSIONS-carrying statements so that the
+ * clause behaves identically across all of them -- including recording the analysis-time extension set for
+ * authorization to reuse.
+ */
+public class RemapLogicalStmt extends AbstractQueryWithVirtualExtensionsStmt {
     private final List<TableMapping> tableMappings;
     private final List<ColumnMapping> columnMappings;
-    private final List<CelostarSchemaExtensionSpec> virtualExtensions;
     private RemappingSet remappingSet;
 
     public RemapLogicalStmt(NodePosition pos,
@@ -36,15 +38,9 @@ public class RemapLogicalStmt extends StatementBase {
                             List<TableMapping> tableMappings,
                             List<ColumnMapping> columnMappings,
                             List<CelostarSchemaExtensionSpec> virtualExtensions) {
-        super(pos);
-        this.queryStmt = queryStmt;
+        super(pos, queryStmt, virtualExtensions);
         this.tableMappings = ImmutableList.copyOf(tableMappings);
         this.columnMappings = ImmutableList.copyOf(columnMappings);
-        this.virtualExtensions = ImmutableList.copyOf(virtualExtensions);
-    }
-
-    public QueryStatement getQueryStmt() {
-        return queryStmt;
     }
 
     public List<TableMapping> getTableMappings() {
@@ -53,10 +49,6 @@ public class RemapLogicalStmt extends StatementBase {
 
     public List<ColumnMapping> getColumnMappings() {
         return columnMappings;
-    }
-
-    public List<CelostarSchemaExtensionSpec> getVirtualExtensions() {
-        return virtualExtensions;
     }
 
     public RemappingSet getRemappingSet() {
@@ -76,11 +68,6 @@ public class RemapLogicalStmt extends StatementBase {
      * Parser-time form: catalog.db.table.column OR db.table.column OR table.column, remapped to a column identifier.
      */
     public record ColumnMapping(List<String> tablePath, String column, String targetColumn, NodePosition pos) {}
-
-    @Override
-    public RedirectStatus getRedirectStatus() {
-        return RedirectStatus.NO_FORWARD;
-    }
 
     @Override
     public <R, C> R accept(AstVisitor<R, C> visitor, C context) {

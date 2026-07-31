@@ -807,6 +807,9 @@ public class QueryAnalyzer {
             List<Column> extensionColumns = new ArrayList<>();
             for (SchemaExtensionColumn extensionColumn : schemaExtension.virtualColumnsFor(
                     tableName.getCatalog(), tableName.getDb(), tableName.getTbl())) {
+                // Keeps a real column from being shadowed during analysis. CelostarSchemaExtensionResolver is the
+                // authoritative enforcement point for that invariant -- it drops existing columns from the extension
+                // set so authorization sees them as real too -- so this guard should not be relied on alone.
                 if (table.getColumn(extensionColumn.name()) == null) {
                     extensionColumns.add(new Column(extensionColumn.name(), extensionColumn.type(), true));
                 }

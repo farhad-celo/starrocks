@@ -63,6 +63,9 @@ public final class RemapLogicalAnalyzer {
         statement.setRemappingSet(remappingSet);
 
         CelostarSchemaExtension schemaExtension = buildSchemaExtension(statement, connectContext);
+        // Authorization reuses this rather than resolving again, so the two phases cannot disagree about which
+        // references are virtual.
+        statement.setResolvedExtensions(schemaExtension);
         // Install extensions only while the inner query is analyzed so normal statements keep the unextended catalog.
         try (CelostarExtensionScope ignored = CelostarExtensionScope.install(connectContext, schemaExtension)) {
             Analyzer.analyze(statement.getQueryStmt(), connectContext);
@@ -74,11 +77,15 @@ public final class RemapLogicalAnalyzer {
 
     /**
      * Builds the schema extension covering both the statement's declared virtual extensions and the
-     * table-mapping source tables, so that logical/mapped table and column references resolve. Used both while
-     * analyzing the inner query and, later, while authorizing it (see {@code AuthorizerStmtVisitor}).
+     * table-mapping source tables, so that logical/mapped table and column references resolve.
+     *
+     * <p>Called once, from {@link #analyze}, which records the result on the statement. Authorization installs that
+     * recorded set instead of calling this again: the two resolutions are not guaranteed to agree, because
+     * {@link com.starrocks.sql.analyzer.PlannerMetaLocker} does not lock external catalogs, and a physical column that
+     * came back absent the second time would be re-added as virtual and so exempted from its privilege check.
      */
-    public static CelostarSchemaExtension buildSchemaExtension(RemapLogicalStmt statement,
-                                                                ConnectContext connectContext) {
+    private static CelostarSchemaExtension buildSchemaExtension(RemapLogicalStmt statement,
+                                                                 ConnectContext connectContext) {
         CelostarSchemaExtension schemaExtension = CelostarSchemaExtensionResolver.resolveValidated(
                 statement.getVirtualExtensions(), connectContext);
         registerMappedVirtualTables(statement, schemaExtension, connectContext);
@@ -143,7 +150,10 @@ public final class RemapLogicalAnalyzer {
 
     private static void rejectStructExtensions(RemapLogicalStmt statement) {
         for (CelostarSchemaExtensionSpec extension : statement.getVirtualExtensions()) {
-            if (extension.type().isStructType()) {
+            // The type is optional in the shared EXTENSIONS clause, and an omitted one is null here (it becomes
+            // Type.NULL only once resolved). An untyped declaration is not known to be a struct, so it is not what
+            // this rejects -- same as for the other statements, omitting the type means "unknown", not "invalid".
+            if (extension.type() != null && extension.type().isStructType()) {
                 throw new SemanticException("%s does not support STRUCT extension columns: %s",
                         STATEMENT_NAME, extension.column());
             }

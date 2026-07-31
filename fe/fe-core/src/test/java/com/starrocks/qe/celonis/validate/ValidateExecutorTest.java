@@ -217,6 +217,18 @@ class ValidateExecutorTest extends PlanTestBase {
     }
 
     @Test
+    void untypedExternalColumnViaExtensionsIsValid() {
+        List<List<String>> rows = run("VALIDATE SELECT virt FROM t0 EXTENSIONS (test.t0.virt)");
+        assertTrue(isValid(rows), rows.toString());
+    }
+
+    @Test
+    void physicalColumnRestatementIsValid() {
+        List<List<String>> rows = run("VALIDATE SELECT v1 FROM t0 EXTENSIONS (test.t0.v1)");
+        assertTrue(isValid(rows), rows.toString());
+    }
+
+    @Test
     void extensionsDoNotLeakAfterValidate() {
         run("VALIDATE SELECT v1 FROM t0 EXTENSIONS (test.t0.virt : BIGINT)");
         assertNull(connectContext.getCelostarExtensions(),

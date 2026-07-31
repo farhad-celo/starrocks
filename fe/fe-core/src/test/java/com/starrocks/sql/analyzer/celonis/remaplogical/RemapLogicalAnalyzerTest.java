@@ -24,6 +24,8 @@ import com.starrocks.sql.plan.PlanTestBase;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -62,10 +64,32 @@ class RemapLogicalAnalyzerTest extends PlanTestBase {
     @Test
     void authorizationSucceedsForLogicalTableNotInCatalog() {
         // "logical_table" has no backing table in the catalog; only the REMAP LOGICAL table mapping makes it
-        // resolvable. Authorization runs after analysis has already restored the un-extended catalog on the
-        // context, so it must re-derive the same schema extension itself to recognize this table.
+        // resolvable. Analysis restores the un-extended catalog on the context before returning, so authorization
+        // reinstalls the extension set analysis recorded on the statement in order to recognize this table.
         RemapLogicalStmt statement = analyzeOk("REMAP LOGICAL SELECT COUNT(*) FROM logical_table " +
                 "LIMIT 500 MAPPINGS (TABLE test.logical_table TO physical_table)");
+        assertDoesNotThrow(() -> Authorizer.check(statement, connectContext));
+    }
+
+    @Test
+    void resolvedExtensionsAreRecordedByAnalysis() {
+        // Authorization installs this set rather than rebuilding it, so the two phases cannot classify a reference
+        // differently -- external catalogs are not locked in between.
+        String sql = "REMAP LOGICAL SELECT logical_v1 FROM t0 LIMIT 500 " +
+                "MAPPINGS (TABLE test.t0 TO physical_t0, COLUMN test.t0.logical_v1 TO physical_v1) " +
+                "EXTENSIONS (test.t0.logical_v1 : BIGINT)";
+        assertNull(parse(sql).getResolvedExtensions());
+        assertNotNull(analyzeOk(sql).getResolvedExtensions());
+    }
+
+    @Test
+    void untypedExtensionIsAnalyzable() {
+        // The EXTENSIONS type is optional in the shared grammar production, which REMAP LOGICAL also uses, so an
+        // omitted type has to be handled here rather than dereferenced. Untyped means unknown, not invalid.
+        RemapLogicalStmt statement = analyzeOk("REMAP LOGICAL SELECT logical_v1 FROM t0 " +
+                "LIMIT 500 " +
+                "MAPPINGS (TABLE test.t0 TO physical_t0, COLUMN test.t0.logical_v1 TO physical_v1) " +
+                "EXTENSIONS (test.t0.logical_v1)");
         assertDoesNotThrow(() -> Authorizer.check(statement, connectContext));
     }
 

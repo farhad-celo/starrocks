@@ -2153,7 +2153,7 @@ validateStatement
     : VALIDATE queryStatement celostarExtensionClause?
     ;
 
-// Shared Celostar schema-extension clause: declares columns defined elsewhere so the inner query can reference them.
+// Shared Celostar schema-extension clause: declares optionally typed columns so the inner query can reference them.
 celostarExtensionClause
     : EXTENSIONS '(' celostarExtensionList? ')'
     ;
@@ -2163,7 +2163,7 @@ celostarExtensionList
     ;
 
 celostarExtension
-    : qualifiedName '.' identifier ':' type
+    : qualifiedName '.' identifier (':' type)?
     ;
 
 // ------------------------------------------- Remap Logical Statement ------------------------------------------------

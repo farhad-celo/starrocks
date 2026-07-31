@@ -52,9 +52,8 @@ import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.CatalogMgr;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.server.WarehouseManager;
+import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
 import com.starrocks.sql.analyzer.celonis.CelostarExtensionScope;
-import com.starrocks.sql.analyzer.celonis.CelostarSchemaExtensionResolver;
-import com.starrocks.sql.analyzer.celonis.remaplogical.RemapLogicalAnalyzer;
 import com.starrocks.sql.ast.AddBackendBlackListStmt;
 import com.starrocks.sql.ast.AddSqlBlackListStmt;
 import com.starrocks.sql.ast.AdminCancelRepairTableStmt;
@@ -213,6 +212,7 @@ import com.starrocks.sql.ast.UpdateStmt;
 import com.starrocks.sql.ast.UseCatalogStmt;
 import com.starrocks.sql.ast.UseDbStmt;
 import com.starrocks.sql.ast.UserIdentity;
+import com.starrocks.sql.ast.celonis.AbstractQueryWithVirtualExtensionsStmt;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 import com.starrocks.sql.ast.celonis.remaplogical.RemapLogicalStmt;
 import com.starrocks.sql.ast.celonis.validate.ValidateStmt;
@@ -296,26 +296,38 @@ public class AuthorizerStmtVisitor implements AstVisitor<Void, ConnectContext> {
 
     @Override
     public Void visitExplainInputColumnsStatement(ExplainInputColumnsStmt statement, ConnectContext context) {
-        try (CelostarExtensionScope ignored = CelostarExtensionScope.install(context,
-                CelostarSchemaExtensionResolver.resolveUnchecked(statement.getVirtualExtensions(), context))) {
+        try (CelostarExtensionScope ignored = CelostarExtensionScope.install(context, analyzedExtensions(statement))) {
             return visit(statement.getQueryStmt(), context);
         }
     }
 
     @Override
     public Void visitValidateStatement(ValidateStmt statement, ConnectContext context) {
-        try (CelostarExtensionScope ignored = CelostarExtensionScope.install(context,
-                CelostarSchemaExtensionResolver.resolveUnchecked(statement.getVirtualExtensions(), context))) {
+        try (CelostarExtensionScope ignored = CelostarExtensionScope.install(context, analyzedExtensions(statement))) {
             return visit(statement.getQueryStmt(), context);
         }
     }
 
     @Override
     public Void visitRemapLogicalStatement(RemapLogicalStmt statement, ConnectContext context) {
-        try (CelostarExtensionScope ignored = CelostarExtensionScope.install(context,
-                RemapLogicalAnalyzer.buildSchemaExtension(statement, context))) {
+        try (CelostarExtensionScope ignored = CelostarExtensionScope.install(context, analyzedExtensions(statement))) {
             return visit(statement.getQueryStmt(), context);
         }
+    }
+
+    /**
+     * The extension set analysis resolved, which is what authorization must classify references against. Resolving the
+     * declarations again here could produce a different answer -- external catalogs are not locked between the two
+     * phases -- and a column that analysis resolved physically would then be treated as virtual, which exempts it from
+     * privilege checks.
+     *
+     * <p>An empty set when analysis has not run is deliberate: it grants no exemption, so every reference is authorized
+     * as a real catalog object. In the normal flow this cannot happen, since
+     * {@link com.starrocks.sql.StatementPlanner#plan} analyzes before it authorizes.
+     */
+    private static CelostarSchemaExtension analyzedExtensions(AbstractQueryWithVirtualExtensionsStmt statement) {
+        CelostarSchemaExtension resolvedExtensions = statement.getResolvedExtensions();
+        return resolvedExtensions != null ? resolvedExtensions : new CelostarSchemaExtension();
     }
 
     // ------------------------------------------- DML Statement -------------------------------------------------------

@@ -89,9 +89,18 @@ class ValidateAnalyzerTest extends PlanTestBase {
     }
 
     @Test
-    void extensionOnExistingColumnThrows() {
-        assertThrows(SemanticException.class,
-                () -> analyze("VALIDATE SELECT v1 FROM t0 EXTENSIONS (test.t0.v1 : BIGINT)"));
+    void extensionOnExistingColumnIsIgnoredWhateverTypeItDeclares() {
+        assertDoesNotThrow(() -> analyze("VALIDATE SELECT v1 FROM t0 EXTENSIONS (test.t0.v1 : BIGINT)"));
+        assertDoesNotThrow(() -> analyze("VALIDATE SELECT v1 FROM t0 EXTENSIONS (test.t0.v1)"));
+        // v1 is bigint. A contradicting declaration is inert -- the restatement is dropped and the query is analyzed
+        // against the catalog column -- and rejecting it would leak the column's type family to a caller with no
+        // privilege on the table, since extensions resolve before authorization.
+        assertDoesNotThrow(() -> analyze("VALIDATE SELECT v1 FROM t0 EXTENSIONS (test.t0.v1 : INT)"));
+    }
+
+    @Test
+    void untypedExternalColumnResolvesAsNullType() {
+        assertDoesNotThrow(() -> analyze("VALIDATE SELECT virt FROM t0 EXTENSIONS (test.t0.virt)"));
     }
 
     @Test

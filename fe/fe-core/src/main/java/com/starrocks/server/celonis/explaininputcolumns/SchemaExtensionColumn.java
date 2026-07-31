@@ -16,5 +16,12 @@ package com.starrocks.server.celonis.explaininputcolumns;
 
 import com.starrocks.catalog.Type;
 
-/** A virtual schema column injected for statement-scoped EXPLAIN INPUT COLUMNS analysis. */
-public record SchemaExtensionColumn(String name, Type type) {}
+/** A virtual schema column injected for statement-scoped analysis. Omitted types are normalized to {@link Type#NULL}. */
+public record SchemaExtensionColumn(String name, Type type) {
+    public SchemaExtensionColumn {
+        // Type.NULL is only a best-effort placeholder when the caller does not know the extension type. It keeps
+        // basic references analyzable, but type-sensitive expressions may resolve differently or fail; callers that
+        // need accurate validation for those expressions should provide the actual type.
+        type = type == null ? Type.NULL : type;
+    }
+}

@@ -20,14 +20,18 @@ import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
 import com.starrocks.sql.analyzer.Analyzer;
 import com.starrocks.sql.analyzer.Authorizer;
 import com.starrocks.sql.analyzer.SemanticException;
+import com.starrocks.sql.analyzer.celonis.CelostarSchemaExtensionResolver;
 import com.starrocks.sql.ast.StatementBase;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 import com.starrocks.sql.parser.SqlParser;
 import com.starrocks.sql.plan.PlanTestBase;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -116,11 +120,77 @@ class ExplainInputColumnsAnalyzerTest extends PlanTestBase {
     }
 
     @Test
-    void collisionWithRealColumn() {
-        // v1 is a real column on t0, so the extension must be rejected.
-        analyzeFail(
-                "EXPLAIN INPUT COLUMNS SELECT virt FROM t0 EXTENSIONS (test.t0.v1 : BIGINT)",
-                "already exists on table");
+    void matchingRestatementOfRealColumnIsIgnored() {
+        ExplainInputColumnsStmt statement =
+                analyzeOk("EXPLAIN INPUT COLUMNS SELECT v1 FROM t0 EXTENSIONS (test.t0.v1 : BIGINT)");
+        assertTrue(statement.getResolvedExtensions().isEmpty());
+    }
+
+    @Test
+    void untypedRestatementOfRealColumnIsIgnored() {
+        ExplainInputColumnsStmt statement =
+                analyzeOk("EXPLAIN INPUT COLUMNS SELECT v1 FROM t0 EXTENSIONS (test.t0.v1)");
+        assertTrue(statement.getResolvedExtensions().isEmpty());
+    }
+
+    @Test
+    void resolvedExtensionsAreRecordedByAnalysis() {
+        // Authorization installs this set rather than resolving the declarations again, so it has to be populated by
+        // analysis and by nothing else.
+        String sql = "EXPLAIN INPUT COLUMNS SELECT virt FROM t0 EXTENSIONS (test.t0.virt)";
+        assertNull(parse(sql).getResolvedExtensions());
+
+        ExplainInputColumnsStmt statement = analyzeOk(sql);
+        assertNotNull(statement.getResolvedExtensions());
+        assertTrue(statement.getResolvedExtensions()
+                .hasVirtualColumnFor("default_catalog", "test", "t0", "virt"));
+    }
+
+    @Test
+    void anyDeclaredTypeOnExistingColumnIsIgnored() {
+        // Whatever type a restatement declares -- exact, loosely specified, or outright contradicting the catalog --
+        // it is dropped along with the rest of the declaration, so it never reaches the query. Validating it instead
+        // would leak the column's type family: resolution runs before Authorizer.check and covers every spec, so a
+        // caller with no privilege on the table could tell which declaration was accepted. t1a is varchar(20),
+        // id_decimal is decimal(10,2).
+        List<String> declarations = List.of(
+                "test.test_all_type.t1a : VARCHAR(20)",
+                "test.test_all_type.t1a : VARCHAR",
+                "test.test_all_type.t1a : CHAR",
+                "test.test_all_type.t1a : INT",
+                "test.test_all_type.id_decimal : DECIMAL",
+                "test.test_all_type.id_decimal : DECIMAL(38,10)",
+                "test.test_all_type.id_decimal : DATETIME");
+        for (String declaration : declarations) {
+            ExplainInputColumnsStmt statement = analyzeOk(
+                    "EXPLAIN INPUT COLUMNS SELECT t1a FROM test_all_type EXTENSIONS (" + declaration + ")");
+            assertTrue(statement.getResolvedExtensions().isEmpty(), declaration);
+        }
+    }
+
+    @Test
+    void untypedVirtualColumnUsesNullType() {
+        ExplainInputColumnsStmt statement =
+                analyzeOk("EXPLAIN INPUT COLUMNS SELECT virt FROM t0 EXTENSIONS (test.t0.virt)");
+        assertEquals(Type.NULL,
+                statement.getQueryStmt().getQueryRelation().getOutputExpression().get(0).getType());
+    }
+
+    @Test
+    void mixedRestatementsRetainOnlyVirtualColumns() {
+        ExplainInputColumnsStmt statement = parse(
+                "EXPLAIN INPUT COLUMNS SELECT v1, typed, untyped FROM t0 " +
+                        "EXTENSIONS (test.t0.v1, test.t0.typed : BIGINT, test.t0.untyped)");
+        CelostarSchemaExtension resolved = CelostarSchemaExtensionResolver.resolveValidated(
+                statement.getVirtualExtensions(), connectContext);
+        assertTrue(resolved.hasVirtualColumnFor("default_catalog", "test", "t0", "typed"));
+        assertTrue(resolved.hasVirtualColumnFor("default_catalog", "test", "t0", "untyped"));
+        assertFalse(resolved.hasVirtualColumnFor("default_catalog", "test", "t0", "v1"));
+        assertEquals(Type.NULL, resolved.virtualColumnsFor("default_catalog", "test", "t0").stream()
+                .filter(column -> column.name().equals("untyped"))
+                .findFirst()
+                .orElseThrow()
+                .type());
     }
 
     @Test

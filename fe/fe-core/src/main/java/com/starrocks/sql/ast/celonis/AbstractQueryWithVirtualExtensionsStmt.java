@@ -16,6 +16,7 @@ package com.starrocks.sql.ast.celonis;
 
 import com.google.common.collect.ImmutableList;
 import com.starrocks.analysis.RedirectStatus;
+import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.StatementBase;
 import com.starrocks.sql.parser.NodePosition;
@@ -31,6 +32,7 @@ import java.util.List;
 public abstract class AbstractQueryWithVirtualExtensionsStmt extends StatementBase {
     private final QueryStatement queryStmt;
     private final List<CelostarSchemaExtensionSpec> virtualExtensions;
+    private CelostarSchemaExtension resolvedExtensions;
 
     protected AbstractQueryWithVirtualExtensionsStmt(NodePosition pos, QueryStatement queryStmt,
                                                       List<CelostarSchemaExtensionSpec> virtualExtensions) {
@@ -45,6 +47,24 @@ public abstract class AbstractQueryWithVirtualExtensionsStmt extends StatementBa
 
     public List<CelostarSchemaExtensionSpec> getVirtualExtensions() {
         return virtualExtensions;
+    }
+
+    /**
+     * Record the extension set analysis resolved these declarations into, so that authorization can classify every
+     * reference exactly as analysis did instead of resolving it a second time.
+     *
+     * <p>The two resolutions are not guaranteed to agree. {@link com.starrocks.sql.analyzer.PlannerMetaLocker} does not
+     * lock external catalogs, so between analysis and authorization a catalog change or a metadata miss can make a
+     * table that analysis resolved physically come back absent. Re-resolving would then classify an
+     * already-analyzed physical column as virtual, and virtual references are exempt from privilege checks.
+     */
+    public void setResolvedExtensions(CelostarSchemaExtension resolvedExtensions) {
+        this.resolvedExtensions = resolvedExtensions;
+    }
+
+    /** Null until analysis has run. Callers must fail closed rather than resolve their own replacement. */
+    public CelostarSchemaExtension getResolvedExtensions() {
+        return resolvedExtensions;
     }
 
     @Override

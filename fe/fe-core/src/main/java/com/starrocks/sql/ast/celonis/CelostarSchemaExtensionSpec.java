@@ -23,8 +23,9 @@ import java.util.List;
 /**
  * Parser-time declaration of a Celostar schema extension: a column that is defined elsewhere (not in the real table
  * metadata) which the inner query of an EXTENSIONS-carrying statement (EXPLAIN INPUT COLUMNS, VALIDATE) may reference.
+ * The type is optional; an omitted type is represented by {@code null}.
  *
- * <p>Table path form: catalog.db.table OR db.table OR table, plus a typed column.
+ * <p>Table path form: catalog.db.table OR db.table OR table, plus a column and optional type.
  */
 public record CelostarSchemaExtensionSpec(List<String> tablePath, String column, Type type, NodePosition pos) {
     public TableName tableName() {

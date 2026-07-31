@@ -126,6 +126,21 @@ class ExplainInputColumnsExecutorTest extends PlanTestBase {
     }
 
     @Test
+    void untypedVirtualColumnAppearsWhenReferenced() {
+        String output = run("EXPLAIN INPUT COLUMNS SELECT virt FROM t0 EXTENSIONS (test.t0.virt)");
+        assertTrue(output.contains("default_catalog.test.t0.virt"), output);
+    }
+
+    @Test
+    void physicalColumnRestatementIsReported() {
+        // The output format does not distinguish virtual from physical, so this only pins that restating a real column
+        // is accepted and still reported. That it stays *physical* is asserted in ExplainInputColumnsAnalyzerTest
+        // (empty resolved extension set) and PrivilegeCheckerTest (SELECT still required).
+        String output = run("EXPLAIN INPUT COLUMNS SELECT v1 FROM t0 EXTENSIONS (test.t0.v1)");
+        assertTrue(output.contains("default_catalog.test.t0.v1"), output);
+    }
+
+    @Test
     void aliasedVirtualColumnReportsRealTable() {
         String output = run("EXPLAIN INPUT COLUMNS SELECT x.virt FROM t0 x " +
                 "EXTENSIONS (test.t0.virt : BIGINT)");

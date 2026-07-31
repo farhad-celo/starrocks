@@ -28,6 +28,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,6 +55,17 @@ class RemapLogicalParserTest {
         assertEquals(ImmutableList.of("db1", "t1"), statement.getVirtualExtensions().get(0).tablePath());
         assertEquals("logical_col", statement.getVirtualExtensions().get(0).column());
         assertEquals(PrimitiveType.BIGINT, statement.getVirtualExtensions().get(0).type().getPrimitiveType());
+    }
+
+    @Test
+    void parseExtensionWithoutType() {
+        // REMAP LOGICAL shares the celostarExtension production, so the type is optional here as well.
+        RemapLogicalStmt statement = parseOne("REMAP LOGICAL SELECT logical_col FROM db1.t1 MAPPINGS " +
+                "(COLUMN db1.t1.logical_col TO physical_col) EXTENSIONS (db1.t1.logical_col)");
+
+        assertEquals(1, statement.getVirtualExtensions().size());
+        assertEquals("logical_col", statement.getVirtualExtensions().get(0).column());
+        assertNull(statement.getVirtualExtensions().get(0).type());
     }
 
     @Test

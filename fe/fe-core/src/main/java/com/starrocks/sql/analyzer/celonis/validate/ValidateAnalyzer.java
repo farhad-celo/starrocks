@@ -51,6 +51,9 @@ public final class ValidateAnalyzer {
         validateInnerQuery(statement.getQueryStmt());
         CelostarSchemaExtension schemaExtension =
                 CelostarSchemaExtensionResolver.resolveValidated(statement.getVirtualExtensions(), connectContext);
+        // Authorization reuses this rather than resolving again, so the two phases cannot disagree about which
+        // references are virtual.
+        statement.setResolvedExtensions(schemaExtension);
         // Install extensions only while the inner query is analyzed so normal statements keep the unextended catalog.
         try (CelostarExtensionScope ignored = CelostarExtensionScope.install(connectContext, schemaExtension)) {
             Analyzer.analyze(statement.getQueryStmt(), connectContext);

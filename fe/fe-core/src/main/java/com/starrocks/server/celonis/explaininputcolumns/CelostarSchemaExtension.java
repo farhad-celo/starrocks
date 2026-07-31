@@ -18,12 +18,11 @@ import com.starrocks.catalog.Type;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Stores typed virtual extension columns by normalized table key.
+ * Stores virtual extension columns, optionally typed, by normalized table key.
  */
 public final class CelostarSchemaExtension {
     private final Map<ExtensionTableKey, Map<String, SchemaExtensionColumn>> virtualColumns = new TreeMap<>(
@@ -43,20 +42,6 @@ public final class CelostarSchemaExtension {
         return virtualColumns.isEmpty();
     }
 
-    public boolean hasExtensionsForDatabase(String catalogName, String databaseName) {
-        if (virtualColumns.isEmpty()) {
-            return false;
-        }
-        String normalizedCatalog = normalizeName(catalogName);
-        String normalizedDatabase = normalizeName(databaseName);
-        for (ExtensionTableKey tableKey : virtualColumns.keySet()) {
-            if (tableKey.catalog().equals(normalizedCatalog) && tableKey.database().equals(normalizedDatabase)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public boolean hasExtensionsFor(String catalogName, String databaseName, String tableName) {
         return virtualColumns.containsKey(new ExtensionTableKey(catalogName, databaseName, tableName));
     }
@@ -72,12 +57,5 @@ public final class CelostarSchemaExtension {
         ExtensionTableKey tableKey = new ExtensionTableKey(catalogName, databaseName, tableName);
         Map<String, SchemaExtensionColumn> columns = virtualColumns.get(tableKey);
         return columns == null ? List.of() : columns.values();
-    }
-
-    private static String normalizeName(String name) {
-        if (name == null) {
-            return "";
-        }
-        return name.toLowerCase(Locale.ROOT);
     }
 }

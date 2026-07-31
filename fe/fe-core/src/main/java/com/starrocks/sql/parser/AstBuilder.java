@@ -5344,12 +5344,9 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
                 clauseContext.celostarExtensionList().celostarExtension()) {
             QualifiedName qualifiedName = getQualifiedName(extensionContext.qualifiedName());
             String columnName = ((Identifier) visit(extensionContext.identifier())).getValue();
-            StarRocksParser.TypeContext typeContext =
-                    extensionContext.getRuleContext(StarRocksParser.TypeContext.class, 0);
-            if (typeContext == null) {
-                throw new ParsingException("schema extension requires a type", createPos(extensionContext));
-            }
-            Type type = getType(typeContext);
+            // The type is optional; a null context means it was omitted.
+            StarRocksParser.TypeContext typeContext = extensionContext.type();
+            Type type = typeContext == null ? null : getType(typeContext);
             virtualExtensions.add(new CelostarSchemaExtensionSpec(qualifiedName.getParts(), columnName, type,
                     createPos(extensionContext)));
         }
