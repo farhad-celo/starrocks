@@ -38,6 +38,15 @@ public final class CelostarExtensionScope implements AutoCloseable {
         return new CelostarExtensionScope(context, previousCelostarExtensions);
     }
 
+    /**
+     * Temporarily removes any installed extensions, e.g. to re-resolve references against the unextended catalog.
+     */
+    public static CelostarExtensionScope clear(ConnectContext context) {
+        CelostarExtensionSet previousCelostarExtensions = context.getCelostarExtensions();
+        context.setCelostarExtensions(null);
+        return new CelostarExtensionScope(context, previousCelostarExtensions);
+    }
+
     @Override
     public void close() {
         context.setCelostarExtensions(previousCelostarExtensions);

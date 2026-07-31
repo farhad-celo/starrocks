@@ -63,7 +63,6 @@ import com.starrocks.connector.metadata.MetadataTable;
 import com.starrocks.connector.metadata.MetadataTableType;
 import com.starrocks.connector.statistics.ConnectorTableColumnStats;
 import com.starrocks.qe.ConnectContext;
-import com.starrocks.server.celonis.CelostarExtensionSet;
 import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
 import com.starrocks.server.celonis.explaininputcolumns.VirtualExtensionTable;
 import com.starrocks.sql.ast.AlterTableStmt;
@@ -503,6 +502,13 @@ public class MetadataMgr {
     public Table getTable(ConnectContext context, String catalogName, String dbName, String tblName) {
         Optional<ConnectorMetadata> connectorMetadata = getOptionalMetadata(catalogName);
         Table connectorTable = connectorMetadata.map(metadata -> metadata.getTable(context, dbName, tblName)).orElse(null);
+        CelostarSchemaExtension schemaExtension = getCelostarSchemaExtension(context);
+        if (connectorTable == null && schemaExtension != null &&
+                schemaExtension.hasExtensionsFor(catalogName, dbName, tblName)) {
+            // Logical SQL can spell an extension-backed table with different case than physical metadata.
+            // Keep normal lookup exact, but prefer a physical case-only match before synthesizing a virtual table.
+            connectorTable = getCaseInsensitiveTable(context, connectorMetadata, dbName, tblName);
+        }
         if (connectorTable != null && !connectorTable.isMetadataTable()) {
             // Load meta information from ConnectorTblMetaInfoMgr for each external table.
             connectorTblMetaInfoMgr.setTableInfoForConnectorTable(catalogName, dbName, connectorTable);
@@ -520,19 +526,34 @@ public class MetadataMgr {
             }
         }
 
-        if (context != null) {
-            CelostarExtensionSet celostarExtensions = context.getCelostarExtensions();
-            if (celostarExtensions != null) {
-                CelostarSchemaExtension schemaExtension = celostarExtensions.getSchemaExtension();
-                // Celostar extensions add virtual catalog entities. Metadata lookup is the earliest point where a
-                // missing extension-only table can be synthesized before table resolution reports it as unknown.
-                if (connectorTable == null && schemaExtension.hasExtensionsFor(catalogName, dbName, tblName)) {
-                    return VirtualExtensionTable.virtualTable(tblName,
-                            schemaExtension.virtualColumnsFor(catalogName, dbName, tblName));
-                }
-            }
+        // Celostar extensions add virtual catalog entities. Metadata lookup is the earliest point where a
+        // missing extension-only table can be synthesized before table resolution reports it as unknown.
+        if (connectorTable == null && schemaExtension != null &&
+                schemaExtension.hasExtensionsFor(catalogName, dbName, tblName)) {
+            return VirtualExtensionTable.virtualTable(tblName,
+                    schemaExtension.virtualColumnsFor(catalogName, dbName, tblName));
         }
         return connectorTable;
+    }
+
+    private Table getCaseInsensitiveTable(ConnectContext context, Optional<ConnectorMetadata> connectorMetadata,
+                                          String dbName, String tblName) {
+        if (!connectorMetadata.isPresent()) {
+            return null;
+        }
+        for (String candidateTableName : connectorMetadata.get().listTableNames(context, dbName)) {
+            if (!candidateTableName.equals(tblName) && candidateTableName.equalsIgnoreCase(tblName)) {
+                return connectorMetadata.get().getTable(context, dbName, candidateTableName);
+            }
+        }
+        return null;
+    }
+
+    private static CelostarSchemaExtension getCelostarSchemaExtension(ConnectContext context) {
+        if (context == null || context.getCelostarExtensions() == null) {
+            return null;
+        }
+        return context.getCelostarExtensions().getSchemaExtension();
     }
 
     public TableVersionRange getTableVersionRange(String dbName, Table table,

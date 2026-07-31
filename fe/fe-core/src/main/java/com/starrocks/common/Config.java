@@ -4238,8 +4238,8 @@ public class Config extends ConfigBase {
             "default).")
     public static String[] validate_allowed_functions = {};
 
-    @ConfField(mutable = true, comment = "Maximum LIMIT value allowed on the outer query of a VALIDATE " +
-            "statement. 0 (default) disables the check. When > 0, the inner query's outer LIMIT must be " +
-            "present and <= this value.")
+    @ConfField(mutable = true, comment = "Maximum LIMIT value allowed on the outer query of a VALIDATE or " +
+            "REMAP LOGICAL statement. 0 (default) disables the check. When > 0, the inner query's outer LIMIT " +
+            "must be present and <= this value.")
     public static long validate_max_limit = 0;
 }

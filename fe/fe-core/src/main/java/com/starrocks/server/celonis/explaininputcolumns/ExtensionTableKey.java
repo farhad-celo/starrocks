@@ -20,7 +20,7 @@ import java.util.Objects;
 
 /** Case-insensitive key for (catalog, database, table). */
 public final class ExtensionTableKey {
-    static final Comparator<ExtensionTableKey> CASE_INSENSITIVE_ORDER = Comparator
+    public static final Comparator<ExtensionTableKey> CASE_INSENSITIVE_ORDER = Comparator
             .comparing(ExtensionTableKey::catalog)
             .thenComparing(ExtensionTableKey::database)
             .thenComparing(ExtensionTableKey::table);

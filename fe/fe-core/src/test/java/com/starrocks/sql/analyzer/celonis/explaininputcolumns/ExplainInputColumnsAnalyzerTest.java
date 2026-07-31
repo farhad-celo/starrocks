@@ -76,6 +76,11 @@ class ExplainInputColumnsAnalyzerTest extends PlanTestBase {
     }
 
     @Test
+    void realColumnResolvesWhenLogicalTableCaseComesFromExtension() {
+        analyzeOk("EXPLAIN INPUT COLUMNS SELECT v1 FROM T0 EXTENSIONS (test.T0.virt : BIGINT)");
+    }
+
+    @Test
     void virtualColumnArithmetic() {
         analyzeOk("EXPLAIN INPUT COLUMNS SELECT virt + 1 FROM t0 EXTENSIONS (test.t0.virt : BIGINT)");
     }

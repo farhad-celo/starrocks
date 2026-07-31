@@ -21,6 +21,7 @@ import com.starrocks.sql.analyzer.Analyzer;
 import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.analyzer.celonis.CelostarExtensionScope;
 import com.starrocks.sql.analyzer.celonis.CelostarSchemaExtensionResolver;
+import com.starrocks.sql.analyzer.celonis.LogicalSchemaExtensionAnalyzer;
 import com.starrocks.sql.ast.AstTraverser;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.SelectListItem;
@@ -32,23 +33,14 @@ public final class ExplainInputColumnsAnalyzer {
     }
 
     public static void analyze(ExplainInputColumnsStmt statement, ConnectContext connectContext) {
-        validateInnerQuery(statement.getQueryStmt());
+        LogicalSchemaExtensionAnalyzer.validateInnerQuery(statement.getQueryStmt(), "EXPLAIN INPUT COLUMNS");
+        rejectSelectStar(statement.getQueryStmt());
         CelostarSchemaExtension schemaExtension =
                 CelostarSchemaExtensionResolver.resolveValidated(statement.getVirtualExtensions(), connectContext);
         // Install extensions only while the inner query is analyzed so normal statements keep the unextended catalog.
         try (CelostarExtensionScope ignored = CelostarExtensionScope.install(connectContext, schemaExtension)) {
             Analyzer.analyze(statement.getQueryStmt(), connectContext);
         }
-    }
-
-    private static void validateInnerQuery(QueryStatement queryStmt) {
-        if (queryStmt.isExplain()) {
-            throw new SemanticException("Inner query of EXPLAIN INPUT COLUMNS must not be an EXPLAIN");
-        }
-        if (queryStmt.hasOutFileClause()) {
-            throw new SemanticException("INTO OUTFILE is not supported in EXPLAIN INPUT COLUMNS");
-        }
-        rejectSelectStar(queryStmt);
     }
 
     private static void rejectSelectStar(QueryStatement queryStmt) {

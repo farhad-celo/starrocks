@@ -479,6 +479,7 @@ import com.starrocks.sql.ast.ValueList;
 import com.starrocks.sql.ast.ValuesRelation;
 import com.starrocks.sql.ast.celonis.CelostarSchemaExtensionSpec;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
+import com.starrocks.sql.ast.celonis.remaplogical.RemapLogicalStmt;
 import com.starrocks.sql.ast.celonis.validate.ValidateStmt;
 import com.starrocks.sql.ast.feedback.AddPlanAdvisorStmt;
 import com.starrocks.sql.ast.feedback.ClearPlanAdvisorStmt;
@@ -5282,6 +5283,42 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
     }
 
     @Override
+    public ParseNode visitRemapLogicalStatement(StarRocksParser.RemapLogicalStatementContext context) {
+        QueryStatement queryStmt = (QueryStatement) visitQueryStatement(context.queryStatement());
+        if (queryStmt.isExplain()) {
+            throw new ParsingException(
+                    PARSER_ERROR_MSG.unsupportedStatement("inner query of REMAP LOGICAL must not be an EXPLAIN"));
+        }
+        if (queryStmt.hasOutFileClause()) {
+            throw new ParsingException(
+                    PARSER_ERROR_MSG.unsupportedStatement("INTO OUTFILE is not supported in REMAP LOGICAL"));
+        }
+
+        List<RemapLogicalStmt.TableMapping> tableMappings = new ArrayList<>();
+        List<RemapLogicalStmt.ColumnMapping> columnMappings = new ArrayList<>();
+        if (context.remapLogicalMappingList() != null) {
+            for (StarRocksParser.RemapLogicalMappingContext mappingContext :
+                    context.remapLogicalMappingList().remapLogicalMapping()) {
+                if (mappingContext.TABLE() != null) {
+                    QualifiedName sourceTable = getQualifiedName(mappingContext.qualifiedName());
+                    String targetTable = ((Identifier) visit(mappingContext.identifier(0))).getValue();
+                    tableMappings.add(new RemapLogicalStmt.TableMapping(sourceTable.getParts(), targetTable,
+                            createPos(mappingContext)));
+                } else {
+                    QualifiedName sourceTable = getQualifiedName(mappingContext.qualifiedName());
+                    String sourceColumn = ((Identifier) visit(mappingContext.identifier(0))).getValue();
+                    String targetColumn = ((Identifier) visit(mappingContext.identifier(1))).getValue();
+                    columnMappings.add(new RemapLogicalStmt.ColumnMapping(sourceTable.getParts(), sourceColumn,
+                            targetColumn, createPos(mappingContext)));
+                }
+            }
+        }
+
+        return new RemapLogicalStmt(createPos(context), queryStmt, tableMappings, columnMappings,
+                buildCelostarExtensions(context.celostarExtensionClause()));
+    }
+
+    @Override
     public ParseNode visitValidateStatement(StarRocksParser.ValidateStatementContext context) {
         QueryStatement queryStmt = (QueryStatement) visitQueryStatement(context.queryStatement());
         if (queryStmt.isExplain()) {
@@ -7028,7 +7065,7 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
 
     // Iteratively build a left-deep CompoundPredicate tree for LogicalBinaryContext,
     // allowing each node to have its own operator, using LogicalBinaryNode for clarity.
-    // Corrected: Properly builds left-deep tree by pushing all contexts and operators, 
+    // Corrected: Properly builds left-deep tree by pushing all contexts and operators,
     // and reconstructing from the bottom up, preserving associativity.
     private CompoundPredicate buildCompoundPredicateIterative(
             com.starrocks.sql.parser.StarRocksParser.LogicalBinaryContext context) {

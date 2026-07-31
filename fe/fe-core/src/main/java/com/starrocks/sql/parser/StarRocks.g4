@@ -326,6 +326,7 @@ statement
 
     // Explain Input Columns statement
     | explainInputColumnsStatement
+    | remapLogicalStatement
 
     // Validate statement
     | validateStatement
@@ -2165,6 +2166,21 @@ celostarExtension
     : qualifiedName '.' identifier ':' type
     ;
 
+// ------------------------------------------- Remap Logical Statement ------------------------------------------------
+remapLogicalStatement
+    : REMAP LOGICAL queryStatement MAPPINGS '(' remapLogicalMappingList? ')'
+      celostarExtensionClause?
+    ;
+
+remapLogicalMappingList
+    : remapLogicalMapping (',' remapLogicalMapping)*
+    ;
+
+remapLogicalMapping
+    : TABLE qualifiedName TO identifier
+    | COLUMN qualifiedName '.' identifier TO identifier
+    ;
+
 truncatePlanAdvisorStatement
     : TRUNCATE PLAN ADVISOR;
 
@@ -3134,7 +3150,7 @@ nonReserved
     | PARTITIONS | PASSWORD | PATH | PAUSE | PENDING | PERCENTILE_UNION | PIVOT | PLAN | PLUGIN | PLUGINS | POLICY | POLICIES
     | PERCENT_RANK | PREDICATE | PRECEDING | PRIORITY | PROC | PROCESSLIST | PROFILE | PROFILELIST | PROVIDER | PROVIDERS | PRIVILEGES | PROBABILITY | PROPERTIES | PROPERTY | PIPE | PIPES
     | QUARTER | QUERY | QUERIES | QUEUE | QUOTA | QUALIFY
-    | REASON | REMOVE | REWRITE | RANDOM | RANK | RECOVER | REFRESH | REPAIR | REPEATABLE | REPLACE_IF_NOT_NULL | REPLICA | REPOSITORY
+    | REASON | REMOVE | REMAP | REWRITE | RANDOM | RANK | RECOVER | REFRESH | REPAIR | REPEATABLE | REPLACE_IF_NOT_NULL | REPLICA | REPOSITORY
     | REPOSITORIES
     | RESOURCE | RESOURCES | RESTORE | RESUME | RETAIN | RETENTION | RETURNS | RETRY | REVERT | ROLE | ROLES | ROLLUP | ROLLBACK | ROUTINE | ROW | RUNNING | RULE | RULES
     | SAMPLE | SCHEDULE | SCHEDULER | SECOND | SECURITY | SEPARATOR | SERIALIZABLE |SEMI | SESSION | SETS | SIGNED | SNAPSHOT | SNAPSHOTS | SQLBLACKLIST | START | STARROCKS

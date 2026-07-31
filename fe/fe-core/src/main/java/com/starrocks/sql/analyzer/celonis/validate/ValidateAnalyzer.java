@@ -15,7 +15,6 @@
 package com.starrocks.sql.analyzer.celonis.validate;
 
 import com.starrocks.analysis.FunctionName;
-import com.starrocks.analysis.GroupByClause;
 import com.starrocks.analysis.LimitElement;
 import com.starrocks.analysis.ParseNode;
 import com.starrocks.common.Config;
@@ -23,14 +22,13 @@ import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.celonis.explaininputcolumns.CelostarSchemaExtension;
 import com.starrocks.sql.analyzer.Analyzer;
 import com.starrocks.sql.analyzer.SemanticException;
-import com.starrocks.sql.analyzer.celonis.CelostarAstTraverser;
 import com.starrocks.sql.analyzer.celonis.CelostarExtensionScope;
 import com.starrocks.sql.analyzer.celonis.CelostarSchemaExtensionResolver;
+import com.starrocks.sql.analyzer.celonis.RawAstSelectTraverser;
 import com.starrocks.sql.ast.AstTraverser;
 import com.starrocks.sql.ast.FileTableFunctionRelation;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.SelectListItem;
-import com.starrocks.sql.ast.SelectRelation;
 import com.starrocks.sql.ast.TableFunctionRelation;
 import com.starrocks.sql.ast.celonis.validate.ValidateStmt;
 
@@ -111,7 +109,7 @@ public final class ValidateAnalyzer {
         new RawAstSafetyVisitor(ValidateFunctionWhitelist.effectiveAllowedFunctions()).visit(queryStmt);
     }
 
-    private static final class RawAstSafetyVisitor extends CelostarAstTraverser {
+    private static final class RawAstSafetyVisitor extends RawAstSelectTraverser {
         private final Set<String> allowedFunctions;
 
         private RawAstSafetyVisitor(Set<String> allowedFunctions) {
@@ -124,36 +122,11 @@ public final class ValidateAnalyzer {
         }
 
         @Override
-        public Void visitSelect(SelectRelation node, Void context) {
-            visitSelectList(node, context);
-            visitGroupBy(node, context);
-            return super.visitSelect(node, context);
-        }
-
-        private void visitSelectList(SelectRelation node, Void context) {
-            if (node.getSelectList() == null) {
-                return;
+        protected void visitSelectListItem(SelectListItem item, Void context) {
+            if (item.isStar()) {
+                throw new SemanticException("SELECT * is not supported in VALIDATE");
             }
-            for (SelectListItem item : node.getSelectList().getItems()) {
-                if (item.isStar()) {
-                    throw new SemanticException("SELECT * is not supported in VALIDATE");
-                }
-                visit(item.getExpr(), context);
-            }
-        }
-
-        private void visitGroupBy(SelectRelation node, Void context) {
-            GroupByClause groupByClause = node.getGroupByClause();
-            if (groupByClause == null) {
-                return;
-            }
-            if (groupByClause.getOriGroupingExprs() != null) {
-                groupByClause.getOriGroupingExprs().forEach(expr -> visit(expr, context));
-            }
-            if (groupByClause.getGroupingSetList() != null) {
-                groupByClause.getGroupingSetList().forEach(
-                        groupingSet -> groupingSet.forEach(expr -> visit(expr, context)));
-            }
+            super.visitSelectListItem(item, context);
         }
 
         @Override

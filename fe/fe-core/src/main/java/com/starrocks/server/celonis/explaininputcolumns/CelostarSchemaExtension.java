@@ -35,6 +35,10 @@ public final class CelostarSchemaExtension {
                 .put(columnName, new SchemaExtensionColumn(columnName, type));
     }
 
+    public void addTable(ExtensionTableKey tableKey) {
+        virtualColumns.computeIfAbsent(tableKey, ignored -> new TreeMap<>(String.CASE_INSENSITIVE_ORDER));
+    }
+
     public boolean isEmpty() {
         return virtualColumns.isEmpty();
     }
