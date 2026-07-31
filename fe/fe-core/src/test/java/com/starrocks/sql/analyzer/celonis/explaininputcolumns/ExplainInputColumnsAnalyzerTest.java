@@ -416,6 +416,20 @@ class ExplainInputColumnsAnalyzerTest extends PlanTestBase {
     }
 
     @Test
+    void nestedSelectStarInSelectListThrows() {
+        analyzeFail(
+                "EXPLAIN INPUT COLUMNS SELECT (SELECT * FROM t0 LIMIT 1) FROM t1",
+                "SELECT * is not supported in EXPLAIN INPUT COLUMNS");
+    }
+
+    @Test
+    void nestedSelectStarInGroupByThrows() {
+        analyzeFail(
+                "EXPLAIN INPUT COLUMNS SELECT 1 FROM t1 GROUP BY (SELECT * FROM t0 LIMIT 1)",
+                "SELECT * is not supported in EXPLAIN INPUT COLUMNS");
+    }
+
+    @Test
     void nestingRestoresPriorState() {
         // Simulate a scenario where celostarExtensions was already set on the context before
         // ExplainInputColumnsAnalyzer.analyze is called.

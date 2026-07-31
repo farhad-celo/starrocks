@@ -22,10 +22,9 @@ import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.analyzer.celonis.CelostarExtensionScope;
 import com.starrocks.sql.analyzer.celonis.CelostarSchemaExtensionResolver;
 import com.starrocks.sql.analyzer.celonis.LogicalSchemaExtensionAnalyzer;
-import com.starrocks.sql.ast.AstTraverser;
+import com.starrocks.sql.analyzer.celonis.RawAstSelectTraverser;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.SelectListItem;
-import com.starrocks.sql.ast.SelectRelation;
 import com.starrocks.sql.ast.celonis.explaininputcolumns.ExplainInputColumnsStmt;
 
 public final class ExplainInputColumnsAnalyzer {
@@ -44,20 +43,25 @@ public final class ExplainInputColumnsAnalyzer {
     }
 
     private static void rejectSelectStar(QueryStatement queryStmt) {
-        new AstTraverser<Void, Void>() {
-            @Override
-            public Void visit(ParseNode node, Void context) {
-                return node == null ? null : node.accept(this, context);
-            }
+        new SelectStarRejectionVisitor().visit(queryStmt);
+    }
 
-            @Override
-            public Void visitSelect(SelectRelation node, Void context) {
-                if (node.getSelectList() != null &&
-                        node.getSelectList().getItems().stream().anyMatch(SelectListItem::isStar)) {
-                    throw new SemanticException("SELECT * is not supported in EXPLAIN INPUT COLUMNS");
-                }
-                return super.visitSelect(node, context);
+    /**
+     * Walks the raw select-list items and GROUP BY expressions (via {@link RawAstSelectTraverser}), not just the
+     * top-level select list, so a {@code SELECT *} nested in a select-list or GROUP BY subquery is also rejected.
+     */
+    private static final class SelectStarRejectionVisitor extends RawAstSelectTraverser {
+        @Override
+        public Void visit(ParseNode node, Void context) {
+            return node == null ? null : node.accept(this, context);
+        }
+
+        @Override
+        protected void visitSelectListItem(SelectListItem item, Void context) {
+            if (item.isStar()) {
+                throw new SemanticException("SELECT * is not supported in EXPLAIN INPUT COLUMNS");
             }
-        }.visit(queryStmt);
+            super.visitSelectListItem(item, context);
+        }
     }
 }
