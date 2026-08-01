@@ -36,6 +36,7 @@ import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.OptExpressionVisitor;
+import com.starrocks.sql.optimizer.base.ColumnRefFactory;
 import com.starrocks.sql.optimizer.base.ColumnRefSet;
 import com.starrocks.sql.optimizer.base.DistributionCol;
 import com.starrocks.sql.optimizer.base.DistributionProperty;
@@ -69,6 +70,7 @@ import com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.InPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.IsNullPredicateOperator;
+import com.starrocks.sql.optimizer.operator.scalar.LambdaFunctionOperator;
 import com.starrocks.sql.optimizer.operator.scalar.LikePredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.MatchExprOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
@@ -90,6 +92,7 @@ import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.TestOnly;
 
 import java.util.Collection;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -98,6 +101,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeUtil.getLambdaFunctionArg;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
 
@@ -156,7 +160,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.ARRAY_REMOVE);
 
     public static final Set<String> LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS = ImmutableSet.of(
-            FunctionSet.ARRAY_FILTER, FunctionSet.ARRAY_SORTBY);
+            FunctionSet.ARRAY_FILTER, FunctionSet.ARRAY_SORTBY, FunctionSet.ARRAY_MAP);
 
     private final SessionVariable sessionVariable;
     private final boolean isQuery;
@@ -201,15 +205,20 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
     private final StructManager structManager;
 
+    private final Map<ScalarOperator, ColumnRefOperator> arrayMapPseudoColumns = Maps.newHashMap();
+
+    private final ColumnRefFactory factory;
+
     // check if there is a blocking node in plan
     private boolean canBlockingOutput = false;
 
-    public DecodeCollector(SessionVariable session, boolean isQuery) {
+    public DecodeCollector(SessionVariable session, ColumnRefFactory factory, boolean isQuery) {
         this.sessionVariable = session;
         this.isQuery = isQuery;
         unionDictionaryManager = new UnionDictionaryManager(
                 sessionVariable, stringRefToDefineExprMap, globalDicts, joinEqColumnGroupIds);
         structManager = new StructManager(sessionVariable.isEnableStructLowCardinalityOptimize());
+        this.factory = factory;
     }
 
     public void collect(OptExpression root, DecodeContext context) {
@@ -346,6 +355,13 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         return result;
     }
 
+    boolean shouldProcessExpression(ScalarOperator expr, ColumnRefSet supportColumns) {
+        if (expr instanceof ColumnRefOperator col) {
+            return supportColumns.contains(col);
+        }
+        return expr.getChildren().stream().anyMatch(c -> shouldProcessExpression(c, supportColumns));
+    }
+
     private void initContext(DecodeContext context) {
         Set<Integer> mergedUnionDictColumns = unionDictionaryManager.getMergedDictColumnIds();
         mergeJoinEqColumnDicts(mergedUnionDictColumns);
@@ -420,9 +436,24 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
         ColumnRefSet alls = new ColumnRefSet();
         context.allStringColumns.forEach(alls::union);
-        context.stringExpressions = stringExpressions.stream()
-                .filter(k -> alls.containsAny(k.getUsedColumns()))
-                .collect(Collectors.toCollection(Sets::newIdentityHashSet));
+        context.stringExpressions = Sets.newIdentityHashSet();
+        for (ScalarOperator expr : stringExpressions) {
+            if (expr instanceof ColumnRefOperator col) {
+                if (alls.contains(col)) {
+                    context.stringExpressions.add(col);
+                }
+            } else {
+                ColumnRefSet supportColumns = stringExpressionToSupportColumns.get(expr);
+                Preconditions.checkNotNull(supportColumns);
+                Preconditions.checkState(supportColumns != null);
+                supportColumns.intersect(alls);
+                if (shouldProcessExpression(expr, supportColumns)) {
+                    context.stringExpressions.add(expr);
+                    context.stringExprToSupportColumns.put(expr, supportColumns);
+                }
+            }
+
+        }
         for (Operator operator : allOperatorDecodeInfo.keySet()) {
             DecodeInfo info = allOperatorDecodeInfo.get(operator);
             info.outputStringColumns.intersect(alls);
@@ -451,31 +482,52 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 }
             }
         }
-        stringExpressionToSupportColumns.forEach((cid, supportColumns) ->  {supportColumns.intersect(alls);});
-        context.stringExprToSupportColumns = stringExpressionToSupportColumns;
+        //stringExpressionToSupportColumns.forEach((expr, supportColumns) ->  supportColumns.intersect(alls));
+        //context.stringExprToSupportColumns = stringExpressionToSupportColumns;
         structManager.finalize(context.allStringColumns);
         context.structManager = structManager;
+        context.arrayMapPseudoColumns = arrayMapPseudoColumns.entrySet().stream()
+                .filter(e -> alls.contains(e.getValue()))
+                .collect(Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (oldVal, newVal) -> oldVal,
+                    IdentityHashMap::new));
     }
 
-    // For SubfieldOperators, we just need to get the field column refs, not the whole columns in the struct.
-    private List<ColumnRefOperator> getColumnRefs(ScalarOperator op) {
-        if (op.isColumnRef()) {
-            return List.of((ColumnRefOperator) op);
+    private boolean checkDependOnExpr(ScalarOperator expr, Collection<Integer> checkList) {
+        if (expr instanceof ColumnRefOperator ref) {
+            return checkDependOnExpr(ref.getId(), checkList);
         }
-        if (op instanceof SubfieldOperator) {
-            SubfieldOperator subfieldOp = op.cast();
-            Map<String, ColumnRefOperator> fields = structManager.getFieldStringRefMap(subfieldOp.getChild((0)));
-            if (fields != null
-                    && subfieldOp.getFieldNames().size() == 1
-                    && fields.containsKey(subfieldOp.getFieldNames().get(0))) {
-                return List.of(fields.get(subfieldOp.getFieldNames().get(0)));
+        if (expr instanceof CallOperator call && call.getFnName().equals(FunctionSet.ARRAY_AGG)) {
+            return checkDependOnExpr(call.getChild(0), checkList);
+        }
+        if (expr instanceof CallOperator call && LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.contains(call.getFnName())) {
+            ScalarOperator useChild =
+                    call.getFnName().equals(FunctionSet.ARRAY_MAP) ? getLambdaFunctionArg(call) : call.getChild(0);
+            return stringExpressions.contains(useChild) && checkDependOnExpr(useChild, checkList);
+
+        }
+        if (expr.getType().isStructType()) {
+            Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(expr);
+            if (fieldsMap == null) {
+                return false;
             }
+            // Any structs with encoded fields should pass. We filter the fields list later.
+            return fieldsMap.values().stream().anyMatch(c -> checkDependOnExpr(c.getId(), checkList));
         }
-        List<ColumnRefOperator> result = Lists.newArrayList();
-        for (ScalarOperator child : op.getChildren()) {
-            result.addAll(getColumnRefs(child));
+        if (expr instanceof SubfieldOperator subfieldOperator) {
+            Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(subfieldOperator.getChild(0));
+            if (fieldsMap == null || subfieldOperator.getFieldNames().size() != 1) {
+                return false;
+            }
+            ColumnRefOperator fieldRef = fieldsMap.get(subfieldOperator.getFieldNames().get(0));
+            return fieldRef != null && checkDependOnExpr(fieldRef.getId(), checkList);
         }
-        return result;
+        if (expr instanceof CallOperator call && call.getFnName().equals(FunctionSet.ARRAY_AGG)) {
+            return checkDependOnExpr(call.getChild(0), checkList);
+        }
+        return expr.getChildren().stream().anyMatch(child -> checkDependOnExpr(child, checkList));
     }
 
     private boolean checkDependOnExpr(int cid, Collection<Integer> checkList) {
@@ -486,37 +538,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return false;
         }
         ScalarOperator define = stringRefToDefineExprMap.get(cid);
-        if (define instanceof CallOperator call && (FunctionSet.ARRAY_AGG.equals(call.getFnName())
-                    || LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.contains(call.getFnName()))) {
-            return define.getChild(0).isColumnRef() &&
-                    checkDependOnExpr(((ColumnRefOperator) define.getChild(0)).getId(), checkList);
+        if (define instanceof ColumnRefOperator defineRef && defineRef.getId() == cid) {
+            return false;
         }
-        if (define.getType().isStructType()) {
-            Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(define);
-            if (fieldsMap == null) {
-                return false;
-            }
-            // Any structs with encoded fields should pass. We filter the fields list later.
-            return fieldsMap.values().stream().anyMatch(c -> checkDependOnExpr(c.getId(), checkList));
-        }
-        if (define instanceof SubfieldOperator) {
-            SubfieldOperator subfieldOperator = define.cast();
-            Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(subfieldOperator.getChild(0));
-            if (fieldsMap == null || subfieldOperator.getFieldNames().size() != 1) {
-                return false;
-            }
-            ColumnRefOperator fieldRef = fieldsMap.get(subfieldOperator.getFieldNames().get(0));
-            return fieldRef != null && checkDependOnExpr(fieldRef.getId(), checkList);
-        }
-        for (ColumnRefOperator ref : getColumnRefs(define)) {
-            if (ref.getId() == cid) {
-                return false;
-            }
-            if (!checkDependOnExpr(ref.getId(), checkList)) {
-                return false;
-            }
-        }
-        return true;
+        return checkDependOnExpr(define, checkList);
     }
 
     void setDefineExpr(ColumnRefOperator col, ScalarOperator define, int counter) {
@@ -1046,8 +1071,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 Preconditions.checkNotNull(fieldsData);
                 structManager.setFieldMapping(value, fieldsData);
             }
-            final boolean isFirstStage = !value.getArguments().isEmpty() &&
-                    (!(value.getArguments().get(0) instanceof ColumnRefOperator ref) || ref.getId() != key.getId());
             if (supportLowCardinality(aggFn.getReturnType())) {
                 setDefineExpr(key, value, 1);
             }
@@ -1360,13 +1383,25 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         return false;
     }
 
+    private void registerArrayMapPseudoColumns(Map<ScalarOperator, ColumnRefOperator> arrayMapPseudoColumns,
+                                               DecodeInfo info) {
+        info.usedStringColumns.union(arrayMapPseudoColumns.values());
+        this.arrayMapPseudoColumns.putAll(arrayMapPseudoColumns);
+    }
+
     private void collectPredicate(Operator operator, DecodeInfo info) {
         if (operator.getPredicate() == null) {
             return;
         }
-        DictExpressionCollector dictExpressionCollector = new DictExpressionCollector(info.outputStringColumns);
+        ColumnRefSet supportColumns = new ColumnRefSet();
+        supportColumns.union(info.outputStringColumns);
+        info.outputStringColumns.getStream().filter(structManager::contains).forEach(
+                c -> supportColumns.union(structManager.getFieldStringRefMap(c).values())
+        );
+        DictExpressionCollector dictExpressionCollector = new DictExpressionCollector(supportColumns);
         dictExpressionCollector.collect(operator.getPredicate());
-
+        registerArrayMapPseudoColumns(dictExpressionCollector.arrayMapPseudoColumns, info);
+        info.usedStringColumns.union(dictExpressionCollector.arrayMapLambdaColumns);
     }
 
     private void collectProjection(Operator operator, DecodeInfo info) {
@@ -1374,20 +1409,20 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return;
         }
 
-        ColumnRefSet decodeInput = new ColumnRefSet();
-        decodeInput.union(info.outputStringColumns);
+        ColumnRefSet supportColumns = new ColumnRefSet();
+        supportColumns.union(info.outputStringColumns);
         info.outputStringColumns.getStream().filter(structManager::contains).forEach(
-                c -> decodeInput.union(structManager.getFieldStringRefMap(c).values())
+                c -> supportColumns.union(structManager.getFieldStringRefMap(c).values())
         );
         info.usedStringColumns.union(info.outputStringColumns);
         info.outputStringColumns = new ColumnRefSet();
         for (ColumnRefOperator key : operator.getProjection().getColumnRefMap().keySet()) {
-            if (decodeInput.contains(key)) {
+            if (supportColumns.contains(key)) {
                 info.outputStringColumns.union(key.getId());
                 continue;
             }
 
-            DictExpressionCollector dictExpressionCollector = new DictExpressionCollector(decodeInput);
+            DictExpressionCollector dictExpressionCollector = new DictExpressionCollector(supportColumns);
 
             ScalarOperator value = operator.getProjection().getColumnRefMap().get(key);
             dictExpressionCollector.collect(value);
@@ -1399,6 +1434,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 info.outputStringColumns.union(key.getId());
             }
             unionDictionaryManager.recordIfConstant(key, value);
+            registerArrayMapPseudoColumns(dictExpressionCollector.arrayMapPseudoColumns, info);
+            info.usedStringColumns.union(dictExpressionCollector.arrayMapLambdaColumns);
         }
         info.usedStringColumns.except(info.outputStringColumns);
     }
@@ -1433,10 +1470,14 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         // if expression contains multi columns, return VARIABLES, we should ignore the expression
         private static final ScalarOperator VARIABLES = ConstantOperator.FALSE;
 
-        private final ColumnRefSet allDictColumnRefs;
+        private final ColumnRefSet supportColumns;
 
-        public DictExpressionCollector(ColumnRefSet allDictColumnRefs) {
-            this.allDictColumnRefs = allDictColumnRefs;
+        private final Map<ScalarOperator, ColumnRefOperator> arrayMapPseudoColumns = Maps.newIdentityHashMap();
+
+        private final ColumnRefSet arrayMapLambdaColumns = new ColumnRefSet();
+
+        public DictExpressionCollector(ColumnRefSet supportColumns) {
+            this.supportColumns = supportColumns;
         }
 
         public void collect(ScalarOperator scalarOperator) {
@@ -1448,7 +1489,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             if (!dictColumn.isConstant()) {
                 stringExpressions.add(dictExpr);
                 if (!dictExpr.isColumnRef()) {
-                    stringExpressionToSupportColumns.put(dictExpr, allDictColumnRefs);
+                    stringExpressionToSupportColumns.put(dictExpr, supportColumns);
                 }
             }
         }
@@ -1511,7 +1552,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         @Override
         public ScalarOperator visitVariableReference(ColumnRefOperator variable, Void context) {
             // return actual dict-column
-            if (allDictColumnRefs.contains(variable)) {
+            if (supportColumns.contains(variable)) {
                 return variable;
             }
             return VARIABLES;
@@ -1534,6 +1575,50 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 return VARIABLES;
             }
 
+            if (FunctionSet.ARRAY_MAP.equalsIgnoreCase(call.getFnName())) {
+                LambdaFunctionOperator lambdaFunction = getLambdaFunctionArg(call);
+                ScalarOperator lambdaExpr = lambdaFunction.getLambdaExpr();
+                List<ScalarOperator> arrayChildren;
+                int childOffset;
+                if (call.getChild(0) == lambdaFunction) {
+                    arrayChildren = call.getChildren().subList(1, call.getChildren().size());
+                    childOffset = 1;
+                } else {
+                    arrayChildren = call.getChildren().subList(0, call.getChildren().size() - 1);
+                    childOffset = 0;
+                }
+                List<ScalarOperator> newArrayChildren = arrayChildren.stream()
+                        .map(c -> c.accept(this, context)).toList();
+                boolean shouldProcess = false;
+                for (int i = 0; i < newArrayChildren.size(); ++i) {
+                    if (!newArrayChildren.get(i).isConstant()) {
+                        ColumnRefOperator lambdaColumn = lambdaFunction.getRefColumns().get(i);
+                        setDefineExpr(lambdaColumn, call.getChild(i + childOffset), 2);
+                        supportColumns.union(lambdaColumn);
+                        arrayMapLambdaColumns.union(lambdaColumn);
+                        shouldProcess = true;
+                    }
+                }
+                if (!shouldProcess) {
+                    return VARIABLES;
+                }
+                stringExpressions.add(call);
+                stringExpressionToSupportColumns.put(call, supportColumns);
+                for (int i = 0; i < arrayChildren.size(); ++i) {
+                    saveDictExpr(newArrayChildren.get(i), arrayChildren.get(i));
+                }
+                ScalarOperator newLambda = lambdaExpr.accept(this, context);
+                saveDictExpr(newLambda, lambdaExpr);
+                if (!newLambda.isConstant() && lambdaExpr.getType().isStringType()) {
+                    ColumnRefOperator arrayMapStringRef = factory.create(call, call.getType(), call.isNullable());
+                    setDefineExpr(arrayMapStringRef, call, 1);
+                    supportColumns.union(arrayMapStringRef);
+                    arrayMapPseudoColumns.put(call, arrayMapStringRef);
+                    saveDictExpr(newLambda, lambdaFunction);
+                    return arrayMapStringRef;
+                }
+                return VARIABLES;
+            }
             if (FunctionSet.ARRAY_MIN.equalsIgnoreCase(call.getFnName()) ||
                     FunctionSet.ARRAY_MAX.equalsIgnoreCase(call.getFnName())
                     || FunctionSet.ANY_VALUE.equals(call.getFnName())) {
@@ -1546,13 +1631,12 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 if (newChildren.stream().allMatch(CONSTANTS::equals)) {
                     return CONSTANTS;
                 }
-                for (int i = 1; i < newChildren.size(); i++) {
+                for (int i = 0; i < newChildren.size(); i++) {
                     saveDictExpr(newChildren.get(i), call.getChild(i));
                 }
-                if (call.getFnName().equals(FunctionSet.ARRAY_SORTBY) && newChildren.get(0).isConstant() &&
-                        newChildren.stream().anyMatch(c -> !c.isConstant())) {
+                if (newChildren.stream().anyMatch(c -> !c.isConstant())) {
                     stringExpressions.add(call);
-                    stringExpressionToSupportColumns.put(call, allDictColumnRefs);
+                    stringExpressionToSupportColumns.put(call, supportColumns);
                 }
                 return !newChildren.get(0).isConstant() ? newChildren.get(0) : VARIABLES;
             }
