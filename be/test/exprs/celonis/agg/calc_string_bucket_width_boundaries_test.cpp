@@ -267,6 +267,26 @@ TEST_F(CelonisCalcStringBucketWidthBoundariesTest, non_positive_width) {
     Run(strings1, strings2, hashes1, hashes2, width, sample_ratio, expected);
 }
 
+TEST_F(CelonisCalcStringBucketWidthBoundariesTest, constant_null_config_uses_defaults) {
+    auto local_ctx = get_ctx();
+    auto null_column = ColumnHelper::create_const_null_column(1);
+    auto width_column = ColumnHelper::create_const_column<TYPE_BIGINT>(5, 1);
+    auto sample_ratio_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(0.5, 1);
+    CelonisCalcStringBucketWidthBoundariesAggregationFunction function;
+
+    CelonisCalcStringBucketWidthBoundariesAggregateState state_with_null_width;
+    local_ctx->set_constant_columns({nullptr, nullptr, null_column, sample_ratio_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_width);
+    EXPECT_EQ(1, state_with_null_width.width);
+    EXPECT_DOUBLE_EQ(0.5, state_with_null_width.sample_ratio);
+
+    CelonisCalcStringBucketWidthBoundariesAggregateState state_with_null_sample_ratio;
+    local_ctx->set_constant_columns({nullptr, nullptr, width_column, null_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_sample_ratio);
+    EXPECT_EQ(5, state_with_null_sample_ratio.width);
+    EXPECT_DOUBLE_EQ(1.0, state_with_null_sample_ratio.sample_ratio);
+}
+
 TEST_F(CelonisCalcStringBucketWidthBoundariesTest, negative_sample_ratio) {
     std::vector<std::optional<std::string>> strings1 = {"a", "b", "c", "d", "e"};
     std::vector<std::optional<std::string>> strings2 = {"f", "g", "h", "i", "j"};

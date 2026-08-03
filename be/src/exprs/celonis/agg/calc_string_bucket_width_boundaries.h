@@ -146,15 +146,19 @@ public:
                      CelonisCalcStringBucketWidthBoundariesAggregateState& state) const {
         DCHECK_EQ(ctx->get_num_args(), 4);
         state.initialized = true;
-        auto width = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
-        if (width > 0) {
-            state.width = width;
-        } else if (width == 0) {
-            state.width = 1;
+        if (ctx->is_notnull_constant_column(2)) {
+            auto width = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
+            if (width > 0) {
+                state.width = width;
+            } else if (width == 0) {
+                state.width = 1;
+            }
         }
-        auto sample_ratio = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(3));
-        if (!is_ratio_invalid(sample_ratio)) {
-            state.sample_ratio = sample_ratio;
+        if (ctx->is_notnull_constant_column(3)) {
+            auto sample_ratio = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(3));
+            if (!is_ratio_invalid(sample_ratio)) {
+                state.sample_ratio = sample_ratio;
+            }
         }
     }
 

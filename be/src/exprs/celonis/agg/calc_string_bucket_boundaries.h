@@ -146,13 +146,17 @@ public:
                      CelonisCalcStringBucketCountBoundariesAggregateState& state) const {
         DCHECK_EQ(ctx->get_num_args(), 4);
         state.initialized = true;
-        auto count = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
-        if (count > 0) {
-            state.count = count;
+        if (ctx->is_notnull_constant_column(2)) {
+            auto count = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
+            if (count > 0) {
+                state.count = count;
+            }
         }
-        auto sample_ratio = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(3));
-        if (!is_ratio_invalid(sample_ratio)) {
-            state.sample_ratio = sample_ratio;
+        if (ctx->is_notnull_constant_column(3)) {
+            auto sample_ratio = ColumnHelper::get_const_value<TYPE_DOUBLE>(ctx->get_constant_column(3));
+            if (!is_ratio_invalid(sample_ratio)) {
+                state.sample_ratio = sample_ratio;
+            }
         }
     }
 

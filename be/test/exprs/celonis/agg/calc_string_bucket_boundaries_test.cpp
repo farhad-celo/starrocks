@@ -266,6 +266,26 @@ TEST_F(CelonisCalcStringBucketCountBoundariesTest, non_positive_count) {
     Run(strings1, strings2, hashes1, hashes2, count, sample_ratio, expected);
 }
 
+TEST_F(CelonisCalcStringBucketCountBoundariesTest, constant_null_config_uses_defaults) {
+    auto local_ctx = get_ctx();
+    auto null_column = ColumnHelper::create_const_null_column(1);
+    auto count_column = ColumnHelper::create_const_column<TYPE_BIGINT>(5, 1);
+    auto sample_ratio_column = ColumnHelper::create_const_column<TYPE_DOUBLE>(0.5, 1);
+    CelonisCalcStringBucketCountBoundariesAggregationFunction function;
+
+    CelonisCalcStringBucketCountBoundariesAggregateState state_with_null_count;
+    local_ctx->set_constant_columns({nullptr, nullptr, null_column, sample_ratio_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_count);
+    EXPECT_EQ(10, state_with_null_count.count);
+    EXPECT_DOUBLE_EQ(0.5, state_with_null_count.sample_ratio);
+
+    CelonisCalcStringBucketCountBoundariesAggregateState state_with_null_sample_ratio;
+    local_ctx->set_constant_columns({nullptr, nullptr, count_column, null_column});
+    function.create_impl(local_ctx.get(), nullptr, state_with_null_sample_ratio);
+    EXPECT_EQ(5, state_with_null_sample_ratio.count);
+    EXPECT_DOUBLE_EQ(1.0, state_with_null_sample_ratio.sample_ratio);
+}
+
 TEST_F(CelonisCalcStringBucketCountBoundariesTest, negative_sample_ratio) {
     std::vector<std::optional<std::string>> strings1 = {"a", "b", "c", "d", "e"};
     std::vector<std::optional<std::string>> strings2 = {"f", "g", "h", "i", "j"};
