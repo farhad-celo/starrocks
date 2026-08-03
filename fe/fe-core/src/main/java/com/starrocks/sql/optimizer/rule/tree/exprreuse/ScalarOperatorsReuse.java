@@ -286,8 +286,16 @@ public class ScalarOperatorsReuse {
         }
 
         @Override
-        public ScalarOperator visitDictMappingOperator(DictMappingOperator operator, Void context) {
-            return tryRewrite(operator.clone());
+        public ScalarOperator visitDictMappingOperator(DictMappingOperator op, Void context) {
+            if (op.getStringProvideOperator() == null) {
+                return tryRewrite(op.clone());
+            }
+            if (commonOperatorsMap.containsKey(op)) {
+                return commonOperatorsMap.get(op);
+            }
+            ScalarOperator newStringProvider = op.getStringProvideOperator().accept(this, context);
+            return newStringProvider == op.getStringProvideOperator() ? op.clone() : new DictMappingOperator(
+                    op.getType(), op.getDictColumn(), op.getOriginScalaOperator(), newStringProvider);
         }
 
         @Override
@@ -493,9 +501,15 @@ public class ScalarOperatorsReuse {
         }
 
         @Override
-        public CommonResult visitDictMappingOperator(DictMappingOperator scalarOperator,
-                                                     CommonOperatorContext context) {
-            return collectCommonOperatorsByDepth(1, scalarOperator, List.of(), context);
+        public CommonResult visitDictMappingOperator(DictMappingOperator op, CommonOperatorContext context) {
+            if (op.getDictColumn().getOpType() == OperatorType.LAMBDA_ARGUMENT) {
+                context.usedColumns.union(op.getDictColumn());
+            }
+            if (op.getStringProvideOperator() != null) {
+                CommonResult res = op.getStringProvideOperator().accept(this, context);
+                return collectCommonOperatorsByDepth(res.depth + 1, op, res.childrenGroup, context);
+            }
+            return collectCommonOperatorsByDepth(1, op, List.of(), context);
         }
     }
 
