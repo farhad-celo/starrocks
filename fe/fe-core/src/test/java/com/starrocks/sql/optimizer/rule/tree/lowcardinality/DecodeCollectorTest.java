@@ -18,6 +18,7 @@ import com.starrocks.catalog.Column;
 import com.starrocks.catalog.ColumnAccessPath;
 import com.starrocks.catalog.Table;
 import com.starrocks.qe.SessionVariable;
+import com.starrocks.sql.optimizer.base.ColumnRefFactory;
 import com.starrocks.sql.optimizer.operator.Operator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalOlapScanOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
@@ -39,7 +40,7 @@ public class DecodeCollectorTest {
     @Test
     public void testCheckComplexTypeInvalidUsesColumnIdForRenamedColumn() throws Exception {
         SessionVariable session = new SessionVariable();
-        DecodeCollector collector = new DecodeCollector(session, true);
+        DecodeCollector collector = new DecodeCollector(session, new ColumnRefFactory(), true);
 
         // Simulate a renamed complex column: ColumnId = "j", current name = "j_new"
         ColumnRefOperator colRef = new ColumnRefOperator(1, TypeFactory.createVarcharType(10), "j_new", true);
