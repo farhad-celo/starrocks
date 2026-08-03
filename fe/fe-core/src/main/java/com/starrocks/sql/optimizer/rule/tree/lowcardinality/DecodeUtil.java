@@ -40,7 +40,12 @@ final class DecodeUtil {
     }
 
     static LambdaFunctionOperator getLambdaFunctionArg(CallOperator call) {
-        return call.getChild(0) instanceof LambdaFunctionOperator ? call.getChild(0).cast()
-                : call.getChild(call.getChildren().size() - 1).cast();
+        if (call.getChild(0) instanceof LambdaFunctionOperator lambda) {
+            return lambda;
+        }
+        if (call.getChild(call.getChildren().size() - 1) instanceof LambdaFunctionOperator lambda) {
+            return lambda;
+        }
+        return null;
     }
 }

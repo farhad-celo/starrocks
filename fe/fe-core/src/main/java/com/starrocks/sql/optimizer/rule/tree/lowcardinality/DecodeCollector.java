@@ -76,6 +76,7 @@ import com.starrocks.sql.optimizer.operator.scalar.MatchExprOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperatorVisitor;
 import com.starrocks.sql.optimizer.operator.scalar.SubfieldOperator;
+import com.starrocks.sql.optimizer.rule.tree.JsonPathRewriteRule;
 import com.starrocks.sql.optimizer.statistics.CacheDictManager;
 import com.starrocks.sql.optimizer.statistics.CacheRelaxDictManager;
 import com.starrocks.sql.optimizer.statistics.ColumnDict;
@@ -181,6 +182,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     private final Map<Integer, Integer> tableFunctionDependencies = Maps.newHashMap();
 
     private final Map<Integer, ScalarOperator> stringRefToDefineExprMap = Maps.newHashMap();
+
+    private final Map<Integer, Pair<Integer, Integer>> profitabilityCounters = Maps.newHashMap();
 
     // string column use counter, 0 meanings decoded immediately after it was generated.
     // for compute global dict define expressions
@@ -331,30 +334,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         }
     }
 
-    ColumnRefSet getProfitableExpressions() {
-        Map<Integer, Pair<Integer, Integer>> counters = Maps.newHashMap();
-        for (ScalarOperator op : stringExpressions) {
-            op.getColumnRefs().forEach(c -> {
-                Pair<Integer, Integer> p = counters.computeIfAbsent(c.getId(), cid -> Pair.create(0, 0));
-                if (op.isColumnRef()) {
-                    p.second = p.second + 1;
-                } else {
-                    p.first = p.first + 1;
-                }
-            });
-        }
-        ColumnRefSet result =  new ColumnRefSet();
-        counters.forEach((k, v) -> {
-            int allExprNum = v.first + v.second;
-            int worthless = v.second;
-            // we believe that the more complex expressions using the dict-column, and the preformance will be better
-            if (worthless == 0 && allExprNum != 0 || allExprNum >= worthless * 2) {
-                result.union(k);
-            }
-        });
-        return result;
-    }
-
     boolean shouldProcessExpression(ScalarOperator expr, ColumnRefSet supportColumns) {
         if (expr instanceof ColumnRefOperator col) {
             return supportColumns.contains(col);
@@ -368,7 +347,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         fillDisableStringColumns();
         unionDictionaryManager.finalizeColumnDictionaries();
         context.unionDictionaryManager = unionDictionaryManager;
-        ColumnRefSet profitableExpressions = getProfitableExpressions();
 
         // choose the profitable string columns
         for (Integer cid : scanStringColumns) {
@@ -386,7 +364,12 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 context.allStringColumns.add(cid);
                 continue;
             }
-            if (profitableExpressions.contains(cid)) {
+            Pair<Integer, Integer> profitabilityCounter = profitabilityCounters.computeIfAbsent(
+                    cid, k -> new Pair<>(0, 0));
+            int allExprNum = profitabilityCounter.first;
+            int worthless = profitabilityCounter.second;
+            // we believe that the more complex expressions using the dict-column, and the preformance will be better
+            if (allExprNum != 0 && allExprNum >= worthless * 2) {
                 context.allStringColumns.add(cid);
             }
         }
@@ -506,7 +489,6 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             ScalarOperator useChild =
                     call.getFnName().equals(FunctionSet.ARRAY_MAP) ? getLambdaFunctionArg(call) : call.getChild(0);
             return stringExpressions.contains(useChild) && checkDependOnExpr(useChild, checkList);
-
         }
         if (expr.getType().isStructType()) {
             Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(expr);
@@ -1486,10 +1468,23 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         }
 
         private void saveDictExpr(ScalarOperator dictColumn, ScalarOperator dictExpr) {
+            saveDictExpr(dictColumn, dictExpr, false);
+        }
+
+        private void saveDictExpr(ScalarOperator dictColumn, ScalarOperator dictExpr, boolean forceProfitable) {
             if (!dictColumn.isConstant()) {
                 stringExpressions.add(dictExpr);
                 if (!dictExpr.isColumnRef()) {
                     stringExpressionToSupportColumns.put(dictExpr, supportColumns);
+                }
+                for (ColumnRefOperator col : dictExpr.getColumnRefs()) {
+                    Pair<Integer, Integer> p = profitabilityCounters.computeIfAbsent(
+                            col.getId(), k -> Pair.create(0, 0));
+                    p.first++;
+                    if (!forceProfitable && dictExpr.isColumnRef()
+                            && !dictExpr.getHints().contains(JsonPathRewriteRule.COLUMN_REF_HINT)) {
+                        p.second++;
+                    }
                 }
             }
         }
@@ -1593,7 +1588,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 for (int i = 0; i < newArrayChildren.size(); ++i) {
                     if (!newArrayChildren.get(i).isConstant()) {
                         ColumnRefOperator lambdaColumn = lambdaFunction.getRefColumns().get(i);
-                        setDefineExpr(lambdaColumn, call.getChild(i + childOffset), 2);
+                        setDefineExpr(lambdaColumn, call.getChild(i + childOffset), 1);
                         supportColumns.union(lambdaColumn);
                         arrayMapLambdaColumns.union(lambdaColumn);
                         shouldProcess = true;
@@ -1605,16 +1600,17 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 stringExpressions.add(call);
                 stringExpressionToSupportColumns.put(call, supportColumns);
                 for (int i = 0; i < arrayChildren.size(); ++i) {
-                    saveDictExpr(newArrayChildren.get(i), arrayChildren.get(i));
+                    saveDictExpr(newArrayChildren.get(i), arrayChildren.get(i), true);
                 }
                 ScalarOperator newLambda = lambdaExpr.accept(this, context);
-                saveDictExpr(newLambda, lambdaExpr);
+                saveDictExpr(newLambda, lambdaExpr, true);
                 if (!newLambda.isConstant() && lambdaExpr.getType().isStringType()) {
-                    ColumnRefOperator arrayMapStringRef = factory.create(call, call.getType(), call.isNullable());
+                    ColumnRefOperator arrayMapStringRef = arrayMapPseudoColumns.computeIfAbsent(call,
+                            k -> factory.create(call, call.getType(), call.isNullable()));
                     setDefineExpr(arrayMapStringRef, call, 1);
                     supportColumns.union(arrayMapStringRef);
                     arrayMapPseudoColumns.put(call, arrayMapStringRef);
-                    saveDictExpr(newLambda, lambdaFunction);
+                    saveDictExpr(newLambda, lambdaFunction, true);
                     return arrayMapStringRef;
                 }
                 return VARIABLES;
@@ -1632,7 +1628,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                     return CONSTANTS;
                 }
                 for (int i = 0; i < newChildren.size(); i++) {
-                    saveDictExpr(newChildren.get(i), call.getChild(i));
+                    saveDictExpr(newChildren.get(i), call.getChild(i), true);
                 }
                 if (newChildren.stream().anyMatch(c -> !c.isConstant())) {
                     stringExpressions.add(call);
@@ -1710,9 +1706,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                     && fieldsUseStringRef.containsKey(op.getFieldNames().get(0))) {
                 return fieldsUseStringRef.get(op.getFieldNames().get(0));
             }
-            if (result.isColumnRef()) {
-                saveDictExpr(result, op);
-            }
+            saveDictExpr(result, op);
             return VARIABLES;
         }
 

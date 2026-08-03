@@ -367,7 +367,6 @@ class DecodeContext {
             Type[] argTypes = args.stream().map(ScalarOperator::getType).toArray(Type[]::new);
             fn = ExprUtils.getBuiltinFunction(
                     fnName, argTypes, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF).copy();
-            // DO NOT SUBMIT
             fn.setRetType(new ArrayType(((LambdaFunctionOperator) args.get(0)).getLambdaExpr().getType()));
         } else {
             Type[] argTypes = args.stream().map(ScalarOperator::getType).toArray(Type[]::new);
@@ -467,12 +466,16 @@ class DecodeContext {
     }
 
     public ScalarOperator defineImpl(ScalarOperator expression) {
-        DictExprEncoder encoder = new DictExprEncoder(stringExprToSupportColumns.get(expression));
+        ColumnRefSet supportColumns = stringExprToSupportColumns.get(expression);
+        DictExprEncoder encoder = new DictExprEncoder(supportColumns);
         ScalarOperator result = expression.accept(encoder, null);
         if (expression.getType().isStructType()) {
             return result;
         }
         ColumnRefOperator useStringRef = getUseStringRef(expression);
+        if (useStringRef == null || (supportColumns != null && !supportColumns.contains(useStringRef))) {
+            return result;
+        }
         ColumnRefOperator useDictRef = stringRefToDictRefMap.get(useStringRef);
         if (useStringRef.getType().isVarchar() && encoder.getAnchorOp() == null) {
             return new DictMappingOperator(useDictRef, expression.clone(), useDictRef.getType());
@@ -583,9 +586,9 @@ class DecodeContext {
                         rewrite(lambdaFunction.getLambdaExpr(), supportColumns);
                 newChildren.add(new LambdaFunctionOperator(
                         newLambdaColumns, newLambdaExpr, lambdaFunction.getType()));
-                boolean update = newLambdaExpr != lambdaFunction;
+                boolean update = newLambdaExpr != lambdaFunction.getLambdaExpr();
                 for (int i = 0; i < arrayChildren.size(); ++i) {
-                    update = arrayChildren.get(i) != newChildren.get(i);
+                    update |= arrayChildren.get(i) != newChildren.get(i);
                 }
                 return update ? buildCallOperator(call, newChildren) : call;
             }
@@ -596,13 +599,13 @@ class DecodeContext {
             } else {
                 newChildren = Lists.newArrayList();
                 newChildren.add(defineOrRewrite(call.getChild(0), supportColumns));
-                final boolean processinSortArgs = call.getFnName().equals(FunctionSet.ARRAY_SORTBY);
+                final boolean useDefine = call.getFnName().equals(FunctionSet.ARRAY_SORTBY);
                 for (int i = 1; i < call.getChildren().size(); ++i) {
-                    newChildren.add(processinSortArgs ? defineOrRewrite(call.getChild(i), supportColumns) :
+                    newChildren.add(useDefine ? defineOrRewrite(call.getChild(i), supportColumns) :
                             rewrite(call.getChild(i), supportColumns));
                 }
                 for (int i = 0; i < newChildren.size(); ++i) {
-                    hasChange[0] = hasChange[0] || newChildren.get(i) != call.getChild(i);
+                    hasChange[0] |= newChildren.get(i) != call.getChild(i);
                 }
             }
             if (!hasChange[0]) {
