@@ -36,6 +36,8 @@ enum InputColumnIndex {
 
 enum LengthComparison { LESS, LESS_EQUAL, EQUAL, GREATER, GREATER_EQUAL, NOT_EQUAL };
 
+constexpr int kTransitiveEdgesMaxLengthColumnIndex = 2;
+
 LengthComparison parseLengthComparison(std::string str) {
     std::transform(str.begin(), str.end(), str.begin(), ::toupper);
     if (str == "LESS") return LengthComparison::LESS;
@@ -608,6 +610,33 @@ std::vector<bool> CelonisEnumerateAggregateState::deserialize(FunctionContext* c
     return is_nulls;
 }
 
+void CelonisEnumerateAggregateFunction::initialize_constant_options(const FunctionContext* ctx,
+                                                                    CelonisEnumerateAggregateState& state) const {
+    if (mode_ == Mode::NODE_PATHS) {
+        if (ctx->is_notnull_constant_column(InputColumnIndex::ALLOW_CYCLES)) {
+            state.allow_cycles = ColumnHelper::get_const_value<TYPE_BOOLEAN>(
+                    ctx->get_constant_column(InputColumnIndex::ALLOW_CYCLES));
+        }
+        if (ctx->is_notnull_constant_column(InputColumnIndex::LENGTH_COMPARISON)) {
+            state.length_comparison =
+                    parseLengthComparison(ColumnHelper::get_const_value<TYPE_VARCHAR>(
+                                                  ctx->get_constant_column(InputColumnIndex::LENGTH_COMPARISON))
+                                                  .to_string());
+        }
+        if (ctx->is_notnull_constant_column(InputColumnIndex::LENGTH)) {
+            state.length =
+                    ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(InputColumnIndex::LENGTH));
+        }
+        return;
+    }
+
+    DCHECK(mode_ == Mode::TRANSITIVE_EDGES);
+    if (ctx->is_notnull_constant_column(kTransitiveEdgesMaxLengthColumnIndex)) {
+        state.length = ColumnHelper::get_const_value<TYPE_BIGINT>(
+                ctx->get_constant_column(kTransitiveEdgesMaxLengthColumnIndex));
+    }
+}
+
 void CelonisEnumerateAggregateFunction::create_impl(FunctionContext* ctx, CelonisEnumerateAggregateState& state,
                                                     std::vector<bool>* is_nulls) const {
     int num_of_columns = mode_ == Mode::NODE_PATHS ? InputColumnIndex::NUMBER_OF_COLUMNS : 3;
@@ -654,22 +683,12 @@ void CelonisEnumerateAggregateFunction::create_impl(FunctionContext* ctx, Celoni
             state.data_columns->emplace_back(ctx->create_column(type_desc, false));
             state.logical_types->push_back(type_desc.type);
         }
-        // Non-optional constant columns. Types are defined in FunctionSet.java.
-        if (is_nulls == nullptr) {
-            state.allow_cycles = ColumnHelper::get_const_value<TYPE_BOOLEAN>(
-                    ctx->get_constant_column(InputColumnIndex::ALLOW_CYCLES));
-            state.length_comparison =
-                    parseLengthComparison(ColumnHelper::get_const_value<TYPE_VARCHAR>(
-                                                  ctx->get_constant_column(InputColumnIndex::LENGTH_COMPARISON))
-                                                  .to_string());
-            state.length =
-                    ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(InputColumnIndex::LENGTH));
-        }
-    } else {
-        DCHECK(mode_ == Mode::TRANSITIVE_EDGES);
-        if (is_nulls == nullptr) {
-            state.length = ColumnHelper::get_const_value<TYPE_BIGINT>(ctx->get_constant_column(2));
-        }
+    }
+
+    // Non-optional constant columns. Types are defined in FunctionSet.java. During merge, deserialize() has already
+    // restored these options from the intermediate state.
+    if (is_nulls == nullptr) {
+        initialize_constant_options(ctx, state);
     }
 
     for (const auto& column : *state.data_columns) {

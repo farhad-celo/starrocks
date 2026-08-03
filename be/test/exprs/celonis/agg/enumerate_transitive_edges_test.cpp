@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <optional>
 
 #include "column/column_builder.h"
 #include "column/fixed_length_column.h"
@@ -123,7 +124,7 @@ private:
 
     std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
             const std::vector<LogicalType>& value_logical_types, const std::vector<std::vector<DatumArray>>& input,
-            int max_length) {
+            const std::optional<int64_t>& max_length) {
         auto value_type = logical_types_to_struct_type(value_logical_types);
 
         auto local_ctx = get_ctx(value_type);
@@ -136,7 +137,8 @@ private:
         for (int i = 0; i < 2; ++i) {
             columns.push_back(prepare_input_column(local_ctx.get(), input, i, size));
         }
-        columns.push_back(ColumnHelper::create_const_column<TYPE_BIGINT>(max_length, size));
+        columns.push_back(max_length.has_value() ? ColumnHelper::create_const_column<TYPE_BIGINT>(*max_length, size)
+                                                 : ColumnHelper::create_const_null_column(size));
 
         std::vector<ColumnPtr> const_columns;
         std::vector<const Column*> raw_columns;
@@ -273,6 +275,15 @@ private:
 
     phmap::flat_hash_set<std::string> expected_set_;
 };
+
+TEST_F(CelonisEnumerateTransitiveEdgesTest, constant_null_max_length_uses_default) {
+    auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
+    std::vector<std::vector<DatumArray>> input = {{DatumArray{"A", "B"}}, {DatumArray{"B", "C"}}};
+
+    auto [local_ctx, state, func] = RunUpdate(value_lts, input, std::nullopt);
+    const auto& state_impl = *reinterpret_cast<const CelonisEnumerateAggregateState*>(state->state());
+    EXPECT_EQ(0, state_impl.length);
+}
 
 TEST_F(CelonisEnumerateTransitiveEdgesTest, basic) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};

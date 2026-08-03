@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <optional>
 
 #include "column/column_builder.h"
 #include "column/fixed_length_column.h"
@@ -160,7 +161,8 @@ protected:
     std::tuple<std::unique_ptr<FunctionContext>, std::unique_ptr<ManagedAggrState>, const AggregateFunction*> RunUpdate(
             const std::vector<LogicalType>& value_logical_types, const std::vector<LogicalType>& pk_logical_types,
             const std::vector<std::vector<DatumArray>>& input, const std::vector<DatumArray>& options,
-            bool allow_cycles, const std::string& length_comparison, int length) {
+            const std::optional<bool>& allow_cycles, const std::optional<std::string>& length_comparison,
+            const std::optional<int64_t>& length) {
         auto value_type = logical_types_to_struct_type(value_logical_types);
         auto pk_type = logical_types_to_struct_type(pk_logical_types);
         auto bool_type = CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_BOOLEAN));
@@ -178,9 +180,14 @@ protected:
         for (int i = 0; i < 6; ++i) {
             columns.push_back(prepare_option_column(local_ctx.get(), options, i, size));
         }
-        columns.push_back(ColumnHelper::create_const_column<TYPE_BOOLEAN>(allow_cycles, size));
-        columns.push_back(ColumnHelper::create_const_column<TYPE_VARCHAR>(length_comparison, size));
-        columns.push_back(ColumnHelper::create_const_column<TYPE_BIGINT>(length, size));
+        columns.push_back(allow_cycles.has_value()
+                                  ? ColumnHelper::create_const_column<TYPE_BOOLEAN>(*allow_cycles, size)
+                                  : ColumnHelper::create_const_null_column(size));
+        columns.push_back(length_comparison.has_value()
+                                  ? ColumnHelper::create_const_column<TYPE_VARCHAR>(*length_comparison, size)
+                                  : ColumnHelper::create_const_null_column(size));
+        columns.push_back(length.has_value() ? ColumnHelper::create_const_column<TYPE_BIGINT>(*length, size)
+                                             : ColumnHelper::create_const_null_column(size));
 
         std::vector<ColumnPtr> const_columns;
         std::vector<const Column*> raw_columns;
@@ -299,6 +306,35 @@ protected:
                       length_comparison, length, expected);
     }
 };
+
+TEST_F(CelonisEnumerateNodePathsTest, constant_null_config_uses_defaults) {
+    auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};
+    auto pk_lts = std::vector<LogicalType>{LogicalType::TYPE_BIGINT};
+    std::vector<std::vector<DatumArray>> input = {{DatumArray{"A", "B"}}, {DatumArray{"B", "C"}}, {DatumArray{1L, 2L}}};
+    std::vector<DatumArray> options;
+
+    {
+        auto [local_ctx, state, func] = RunUpdate(value_lts, pk_lts, input, options, std::nullopt, "LESS_EQUAL", 10);
+        const auto& state_impl = *reinterpret_cast<const CelonisEnumerateAggregateState*>(state->state());
+        EXPECT_FALSE(state_impl.allow_cycles);
+        EXPECT_EQ(1, state_impl.length_comparison);
+        EXPECT_EQ(10, state_impl.length);
+    }
+    {
+        auto [local_ctx, state, func] = RunUpdate(value_lts, pk_lts, input, options, true, std::nullopt, 10);
+        const auto& state_impl = *reinterpret_cast<const CelonisEnumerateAggregateState*>(state->state());
+        EXPECT_TRUE(state_impl.allow_cycles);
+        EXPECT_EQ(0, state_impl.length_comparison);
+        EXPECT_EQ(10, state_impl.length);
+    }
+    {
+        auto [local_ctx, state, func] = RunUpdate(value_lts, pk_lts, input, options, true, "LESS_EQUAL", std::nullopt);
+        const auto& state_impl = *reinterpret_cast<const CelonisEnumerateAggregateState*>(state->state());
+        EXPECT_TRUE(state_impl.allow_cycles);
+        EXPECT_EQ(1, state_impl.length_comparison);
+        EXPECT_EQ(0, state_impl.length);
+    }
+}
 
 TEST_F(CelonisEnumerateNodePathsTest, ex1_basic) {
     auto value_lts = std::vector<LogicalType>{LogicalType::TYPE_VARCHAR};

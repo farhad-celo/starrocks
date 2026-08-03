@@ -291,6 +291,8 @@ public:
     }
 
 private:
+    void initialize_constant_options(const FunctionContext* ctx, CelonisEnumerateAggregateState& state) const;
+
     void create_impl(FunctionContext* ctx, CelonisEnumerateAggregateState& state, std::vector<bool>* is_nulls) const;
 
     void update_impl(FunctionContext* ctx, const Column** columns, AggDataPtr __restrict state, size_t row_num,
