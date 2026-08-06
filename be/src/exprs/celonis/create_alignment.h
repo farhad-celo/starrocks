@@ -18,8 +18,9 @@ public:
      *      alignment_move_type: ARRAY_VARCHAR
      *      alignment_activity_index: ARRAY_BIGINT
      *      alignment_deviation_category: ARRAY_VARCHAR
+     *      alignment_deviation_category_v2: ARRAY_VARCHAR
      *  
-     *      for <EDGE_TYPE> in [SYNC_EDGE, MODEL_EDGE, LOG_EDGE, SKIP_EDGE, UNMAPPED_EDGE, MISSING_VIOLATION, EXCLUSIVE_VIOLATION]:    
+     *      for <EDGE_TYPE> in [SYNC_EDGE, MODEL_EDGE, LOG_EDGE, SKIP_EDGE, UNMAPPED_EDGE, MISSING_VIOLATION, EXCLUSIVE_VIOLATION, INCOMPLETE_VIOLATION]:    
      *          <EDGE_TYPE>_model_vertex_id: ARRAY_BIGINT
      *          <EDGE_TYPE>_vertex_label: ARRAY_VARCHAR
      *          <EDGE_TYPE>_move_type: ARRAY_VARCHAR

@@ -11,6 +11,7 @@
 #include <format/json/json_fwd.h>
 
 #include "align_model_statistics.h"
+#include "deviation_category.h"
 #include "modules/common/call_and_log_unsafe_callable.h"
 #include "modules/common/execution_context.h"
 #include "modules/memory/cache/variant_trace_cache.h"
@@ -110,12 +111,12 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   const auto replay_results{replay_aligned_variants(bpmn_graph, alignments, parallel_vertices, align_model_op_context)};
   stats.time_variant_replay = replay_timer.elapsed_wall_time_so_far();
 
-  ctl::wall_timer_t deviation_category_timer{};
-  const auto deviation_categories{compute_categories(alignments, context)};
-  stats.time_deviation_categories = deviation_category_timer.elapsed_wall_time_so_far();
-
   memory::table_group_t tables{};
   if (settings_.get_version() == align_model_version::V1) {
+    ctl::wall_timer_t deviation_category_timer{};
+    const auto deviation_categories{compute_categories<compute_incomplete_category::NO>(alignments, context)};
+    stats.time_deviation_categories = deviation_category_timer.elapsed_wall_time_so_far();
+
     tables = v1::create_tables(                  //
         alignments,                              //
         replay_results,                          //
@@ -130,6 +131,9 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
     );
   } else {
     debug_assert(settings_.get_version() == align_model_version::V2);
+    ctl::wall_timer_t deviation_category_timer{};
+    const auto deviation_categories{compute_categories<compute_incomplete_category::YES>(alignments, context)};
+    stats.time_deviation_categories = deviation_category_timer.elapsed_wall_time_so_far();
     tables = v2::create_tables(                  //
         alignments,                              //
         replay_results,                          //

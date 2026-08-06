@@ -61,6 +61,13 @@ struct alignment_deviation_category_col {
   constexpr static std::string_view name{"deviation_category"};
 };
 
+// v2 changes behavior from v1, as we classify
+// some MISSING deviations as INCOMPLETE
+struct alignment_deviation_category_v2_col {
+  using value_type = std::vector<std::string>;
+  constexpr static std::string_view name{"deviation_category_v2"};
+};
+
 struct association_edge_class_col {
   using value_type = std::vector<row_id>;
   constexpr static std::string_view name{"edge_class"};
@@ -83,7 +90,9 @@ struct alignment_columns {
                              table.AddColumn<alignment_activity_index_col::value_type>(
                                  fmt::format("{}_{}", prefix, alignment_activity_index_col::name)),
                              table.AddColumn<alignment_deviation_category_col::value_type>(
-                                 fmt::format("{}_{}", prefix, alignment_deviation_category_col::name))};
+                                 fmt::format("{}_{}", prefix, alignment_deviation_category_col::name)),
+                             table.AddColumn<alignment_deviation_category_v2_col::value_type>(
+                                 fmt::format("{}_{}", prefix, alignment_deviation_category_v2_col::name))};
   }
   ResultColumn<variant_col::value_type>& variant;
   ResultColumn<alignment_model_vertex_id_col::value_type>& model_vertex_id;
@@ -91,6 +100,7 @@ struct alignment_columns {
   ResultColumn<alignment_move_type_col::value_type>& move_type;
   ResultColumn<alignment_activity_index_col::value_type>& activity_index;
   ResultColumn<alignment_deviation_category_col::value_type>& deviation_category;
+  ResultColumn<alignment_deviation_category_col::value_type>& deviation_category_v2;
 
  private:
   alignment_columns(ResultColumn<variant_col::value_type>& variant,
@@ -98,13 +108,15 @@ struct alignment_columns {
                     ResultColumn<alignment_vertex_label_col::value_type>& vertex_label,
                     ResultColumn<alignment_move_type_col::value_type>& move_type,
                     ResultColumn<alignment_activity_index_col::value_type>& activity_index,
-                    ResultColumn<alignment_deviation_category_col::value_type>& deviation_category)
+                    ResultColumn<alignment_deviation_category_col::value_type>& deviation_category,
+                    ResultColumn<alignment_deviation_category_v2_col::value_type>& deviation_category_v2)
       : variant(variant),
         model_vertex_id(model_vertex_id),
         vertex_label(vertex_label),
         move_type(move_type),
         activity_index(activity_index),
-        deviation_category(deviation_category){};
+        deviation_category(deviation_category),
+        deviation_category_v2(deviation_category_v2){};
 };
 
 struct association_columns {
@@ -128,6 +140,7 @@ struct association_columns {
   ResultColumn<alignment_vertex_label_col::value_type>& vertex_label;
   ResultColumn<alignment_move_type_col::value_type>& move_type;
   ResultColumn<alignment_deviation_category_col::value_type>& deviation_category;
+  [[nodiscard]] size_t size() const { return alignment_index.size(); }
 
  private:
   association_columns(ResultColumn<association_edge_class_col::value_type>& edge_class,
@@ -324,7 +337,7 @@ template <typename ACTIVITY_ACCESSOR>
 }
 
 memory::table_group_t inflate(const alignments_t& full_alignments, const replay_results_t& replay_results,
-                              const deviation_categories_for_cases_view_t deviation_categories,
+                              const deviation_categories& deviation_categories,
                               const memory::join_projection_vector_t& activity_to_case_join,
                               const memory::column_ptrs_t& case_to_trace_ptrs,
                               const bpmn::bpmn_to_string_t& bpmn_to_string, const memory::column_t& activity_column,
@@ -352,6 +365,8 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
   const petri_net_label_id_to_string_mapper petri_net_to_string_mapper{
       bpmn_to_string, *activity_column->get_string_dict(context), alignment_label_buffer_with_lookup.buffer_lookup};
 
+  const auto& [deviation_categories_v1, deviation_categories_v2]{deviation_categories};
+
   // Create the data columns for the 3 tables and the corresponding join vectors:
   tbb::parallel_for_each(
       blocks,
@@ -362,7 +377,8 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
        &replay_results = std::as_const(replay_results),
        &petri_net_to_string_mapper = std::as_const(petri_net_to_string_mapper), &context,
        &association_columns_per_edge_type, &condensed_alignments = std::as_const(condensed_alignments),
-       &deviation_categories = std::as_const(deviation_categories)](const parallel_block& block) {
+       &deviation_categories = std::as_const(deviation_categories_v1),
+       &deviation_categories_v2 = std::as_const(deviation_categories_v2)](const parallel_block& block) {
         memory::cast_execute_column_pointers(
             [&](auto tup) {
               const auto activity_accessor{std::get<0>(tup).get_const_accessor()};
@@ -392,6 +408,7 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                     const auto& optional_condensed_alignment_for_case{condensed_alignments.at(variant_trace_id)};
                     const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
                     const auto& deviation_categories_for_case{deviation_categories.at(variant_trace_id)};
+                    const auto& deviation_categories_v2_for_case{deviation_categories_v2.at(variant_trace_id)};
                     debug_assert(optional_full_alignment_for_case.has_value() ==
                                  optional_replay_result_for_case.has_value());
                     debug_assert(optional_full_alignment_for_case.has_value() ==
@@ -408,10 +425,10 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
 
                     // 1. Fill the edge tables
                     // A counter for the current edge class id. Each edge type has its own counter as it is saola.
-                    // Having separate counters for each type is not really necessary and a global counter is simpler to
-                    // implement, but for now I would like to keep the implementation changes minimal.
-                    edge_type_array<size_t> edge_class_id{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
-                    edge_type_array<size_t> edges_per_type{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
+                    // Having separate counters for each type is not really necessary and a global counter is
+                    // simpler to implement, but for now I would like to keep the implementation changes minimal.
+                    edge_type_array<size_t> edge_class_id{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
+                    edge_type_array<size_t> edges_per_type{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
                     for (const auto& component : replay_result_for_case.components()) {
                       edges_per_type.at(component.component_type) += component.size();
                     }
@@ -425,40 +442,62 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                       association_cols.move_type.at(current_variant_row).reserve(reserve_size);
                       association_cols.deviation_category.at(current_variant_row).reserve(reserve_size);
                     }
+                    const auto populate_association_cols{
+                        [&](row_id idx, auto& association_cols, auto& component, auto& dev_categories_for_case) {
+                          for (size_t vertex_id : component.edges_as_vertices) {
+                            association_cols.edge_class.at(current_variant_row)
+                                .push_back(edge_class_id.at(component.component_type));
+                            // represent edges by joining to the correct row in the alignment table, for each vertex in
+                            // the component the aligned_variant_vertex_id is just an index into the alignment, to find
+                            // the right join partner on  the alignment table we need to first determine which preceding
+                            // move in the alignment this one joins to via the `preceding_move_join_map`, then determine
+                            // the position of that move in the condensed alignment via
+                            // `map_full_alignment_to_condensed_for_case` and then offset by start of the current
+                            // alignment block.
+                            association_cols.alignment_index.at(current_variant_row)
+                                .push_back(condensed_alignment_for_case.get_full_to_condensed_idx_map().left.at(
+                                    replay_result_for_case.alignment_to_preceding_move().at(vertex_id)));
+
+                            const auto& move{alignment_for_case.at(vertex_id)};
+                            // Write MODEL_VERTEX_ID column
+                            if (move.move_on_model()) {
+                              association_cols.model_vertex_id.at(current_variant_row)
+                                  .push_back(move.move_on_model().value());
+                            } else {
+                              association_cols.model_vertex_id.at(current_variant_row).emplace_back();
+                            }
+                            association_cols.vertex_label.at(current_variant_row)
+                                .emplace_back(petri_net_to_string_mapper(move));
+                            association_cols.move_type.at(current_variant_row)
+                                .emplace_back(alignment_move_to_string(move.move_type()));
+                            association_cols.deviation_category.at(current_variant_row)
+                                .emplace_back(deviation_category_to_string(dev_categories_for_case.at(vertex_id)));
+                          }
+                        }};
+                    const auto is_incomplete{[](const auto& component, const auto& local_alignment_for_case,
+                                                const auto& dev_categories_for_case) -> bool {
+                      size_t idx{component.edges_as_vertices.size()};
+
+                      while (idx > 0 &&
+                             local_alignment_for_case.at(component.edges_as_vertices.at(--idx)).is_gateway_move()) {
+                      }
+                      return dev_categories_for_case.at(component.edges_as_vertices.at(idx)) ==
+                             deviation_category::INCOMPLETE;
+                    }};
 
                     for (row_id id = 0; id < replay_result_for_case.components().size(); id++) {
                       auto component{replay_result_for_case.components().at(id)};
                       // Each component contains only a single edge type, fetch those columns
-                      auto& association_cols{association_columns_per_edge_type.at(component.component_type)};
-
-                      for (size_t vertex_id : component.edges_as_vertices) {
-                        association_cols.edge_class.at(current_variant_row)
-                            .push_back(edge_class_id.at(component.component_type));
-                        // represent edges by joining to the correct row in the alignment table, for each vertex in the
-                        // component
-                        // the aligned_variant_vertex_id is just an index into the alignment, to find the right join
-                        // partner on  the alignment table we need to first determine which preceding move in the
-                        // alignment this one joins to via the `preceding_move_join_map`, then determine the position of
-                        // that move in the condensed alignment via `map_full_alignment_to_condensed_for_case` and then
-                        // offset by start of the current alignment block.
-                        association_cols.alignment_index.at(current_variant_row)
-                            .push_back(condensed_alignment_for_case.get_full_to_condensed_idx_map().left.at(
-                                replay_result_for_case.alignment_to_preceding_move().at(vertex_id)));
-
-                        const auto& move{alignment_for_case.at(vertex_id)};
-                        // Write MODEL_VERTEX_ID column
-                        if (move.move_on_model()) {
-                          association_cols.model_vertex_id.at(current_variant_row)
-                              .push_back(move.move_on_model().value());
-                        } else {
-                          association_cols.model_vertex_id.at(current_variant_row).emplace_back();
-                        }
-                        association_cols.vertex_label.at(current_variant_row)
-                            .emplace_back(petri_net_to_string_mapper(move));
-                        association_cols.move_type.at(current_variant_row)
-                            .emplace_back(alignment_move_to_string(move.move_type()));
-                        association_cols.deviation_category.at(current_variant_row)
-                            .emplace_back(deviation_category_to_string(deviation_categories_for_case.at(vertex_id)));
+                      auto component_type{component.component_type};
+                      auto& association_cols{association_columns_per_edge_type.at(component_type)};
+                      populate_association_cols(id, association_cols, component, deviation_categories_for_case);
+                      // INCOMPLETE is a specialization of MISSING. We still need to check if the trace contains any
+                      // INCOMPLETE activities.
+                      if (component_type == edge_type::L1_MISSING &&
+                          is_incomplete(component, alignment_for_case, deviation_categories_v2_for_case)) {
+                        populate_association_cols(
+                            id, association_columns_per_edge_type.at(edge_type::L1_INCOMPLETE_VIOLATION), component,
+                            deviation_categories_v2_for_case);
                       }
                       edge_class_id.at(component.component_type)++;
                     }
@@ -485,6 +524,9 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                       alignment_cols.deviation_category.at(current_variant_row)
                           .emplace_back(deviation_category_to_string(deviation_categories_for_case.at(
                               condensed_alignment_for_case.get_full_to_condensed_idx_map().right.at(offset))));
+                      alignment_cols.deviation_category_v2.at(current_variant_row)
+                          .emplace_back(deviation_category_to_string(deviation_categories_v2_for_case.at(
+                              condensed_alignment_for_case.get_full_to_condensed_idx_map().right.at(offset))));
                       if (move.move_on_model()) {
                         alignment_cols.model_vertex_id.at(current_variant_row).push_back(move.move_on_model().value());
                       } else {
@@ -497,14 +539,14 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                     for (size_t condensed_alignment_idx{0};
                          condensed_alignment_idx < condensed_alignment_for_case.get_alignment().size();
                          condensed_alignment_idx++) {
-                      // To find the right join partner for this move in the condensed alignment we first need to map it
-                      // back to the index in the full alignment via `full_to_condensed_idx_map` full_alignment_idx is
-                      // an index into the alignment. i.e. it points to a move.
+                      // To find the right join partner for this move in the condensed alignment we first need to
+                      // map it back to the index in the full alignment via `full_to_condensed_idx_map`
+                      // full_alignment_idx is an index into the alignment. i.e. it points to a move.
                       const auto full_alignment_idx{
                           condensed_alignment_for_case.get_full_to_condensed_idx_map().right.at(
                               condensed_alignment_idx)};
-                      // Then we map the move in the full alignment to the preceding LOG or SYNC_MOVE in the alignment,
-                      // full_alignment_preceding_move still points to a move in the full alignment
+                      // Then we map the move in the full alignment to the preceding LOG or SYNC_MOVE in the
+                      // alignment, full_alignment_preceding_move still points to a move in the full alignment
                       const auto full_alignment_preceding_move{
                           replay_result_for_case.alignment_to_preceding_move().at(full_alignment_idx)};
                       // Then we map this to an index into the variant, which points to an activity
@@ -514,8 +556,8 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                       // differ if the case has null activities, e.g. B in case <A,null,B> would have variant
                       // index 1 but case index 2)
                       const auto case_idx{variant_idx_to_row_map.at(variant_idx)};
-                      // Finally we offset this by the begin of the current interval to get the right index relative to
-                      // the case start
+                      // Finally we offset this by the begin of the current interval to get the right index relative
+                      // to the case start
                       alignment_cols.activity_index.at(current_variant_row)
                           .push_back(ctl::cast<row_id>(case_idx - interval.begin()));
                     }
@@ -535,7 +577,7 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
 }  // anonymous namespace
 
 memory::table_group_t create_tables(const alignments_t& alignments, const replay_results_t& replay_results,
-                                    deviation_categories_for_cases_view_t deviation_categories,
+                                    const deviation_categories& deviation_categories,
                                     const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
                                     const memory::column_t& activity_column, const memory::column_t& case_id_column,
                                     const memory::join_projection_vector_t& activity_to_case_join,

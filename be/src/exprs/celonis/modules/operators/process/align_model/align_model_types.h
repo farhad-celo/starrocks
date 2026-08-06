@@ -119,6 +119,7 @@ enum class edge_type : std::uint8_t {
   UNMAPPED,
   L1_MISSING,
   L1_EXCLUSIVE_VIOLATION,
+  L1_INCOMPLETE_VIOLATION,
   SIZE  // Not an actual edge type, exists to encode the size of the enum at compile time
 };
 
@@ -132,7 +133,8 @@ constexpr std::array<edge_type, ctl::enum_to_underlying_type(edge_type::SIZE)> E
     edge_type::LOG,
     edge_type::UNMAPPED,
     edge_type::L1_MISSING,
-    edge_type::L1_EXCLUSIVE_VIOLATION};
+    edge_type::L1_EXCLUSIVE_VIOLATION,
+    edge_type::L1_INCOMPLETE_VIOLATION};
 
 template <typename T, typename F>
 requires(std::is_invocable_r_v<T, F, edge_type>) [[nodiscard]] edge_type_array<T> for_each_edge_type(F&& functor) {
@@ -145,11 +147,13 @@ requires(std::is_invocable_r_v<T, F, edge_type>) [[nodiscard]] edge_type_array<T
                 "Edge type must be at the position of their int representation.");
   static_assert(EDGE_TYPES[6] == edge_type::L1_EXCLUSIVE_VIOLATION,
                 "Edge type must be at the position of their int representation.");
-  static_assert(ctl::enum_to_underlying_type(edge_type::SIZE) == 7,
+  static_assert(EDGE_TYPES[7] == edge_type::L1_INCOMPLETE_VIOLATION,
+                "Edge type must be at the position of their int representation.");
+  static_assert(ctl::enum_to_underlying_type(edge_type::SIZE) == 8,
                 "This function must be adjusted if edge types are added or removed");
   return edge_type_array<T>{functor(EDGE_TYPES[0]), functor(EDGE_TYPES[1]), functor(EDGE_TYPES[2]),
                             functor(EDGE_TYPES[3]), functor(EDGE_TYPES[4]), functor(EDGE_TYPES[5]),
-                            functor(EDGE_TYPES[6])};
+                            functor(EDGE_TYPES[6]), functor(EDGE_TYPES[7])};
 }
 
 struct alignment_move_type_strings {
@@ -226,6 +230,9 @@ struct edge_type_strings {
       return "MISSING_VIOLATION";
     case edge_type::L1_EXCLUSIVE_VIOLATION:
       return "EXCLUSIVE_VIOLATION";
+    case edge_type::L1_INCOMPLETE_VIOLATION:
+      return "INCOMPLETE_VIOLATION";
+
     default:
       ctl::assert_unreachable();
   }

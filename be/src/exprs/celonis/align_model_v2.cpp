@@ -60,7 +60,8 @@ enum class move_type {
     MODEL_EDGE,
     SKIP_EDGE,
     SYNC_EDGE,
-    UNMAPPED_EDGE
+    UNMAPPED_EDGE,
+    INCOMPLETE_VIOLATION
 };
 std::string get_move_type(const move_type t) {
     switch (t) {
@@ -78,9 +79,10 @@ std::string get_move_type(const move_type t) {
         return "SYNC_EDGE";
     case move_type::UNMAPPED_EDGE:
         return "UNMAPPED_EDGE";
+    case move_type::INCOMPLETE_VIOLATION:
+        return "INCOMPLETE_VIOLTION";
     }
-    // std::unreachable();
-    return "";
+    __builtin_unreachable();
 }
 struct alignment_move_columns {
     celonis::ResultColumn<std::vector<row_id>>& alignment_index;

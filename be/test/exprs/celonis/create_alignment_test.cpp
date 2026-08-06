@@ -35,9 +35,9 @@ public:
     typedef std::vector<std::string> Variant;
     typedef std::vector<Variant> VariantRows;
     typedef std::tuple<std::vector<int64_t>, std::vector<std::string>, std::vector<std::string>, std::vector<int64_t>,
-                       std::vector<std::string>, EDGE_TYPES("SYNC"), EDGE_TYPES("MODEL"), EDGE_TYPES("SKIP"),
-                       EDGE_TYPES("LOG"), EDGE_TYPES("UNMAPPED"), EDGE_TYPES("MISSING"),
-                       EDGE_TYPES("EXCLUSIVE_VIOLATION")>
+                       std::vector<std::string>, std::vector<std::string>, EDGE_TYPES("SYNC"), EDGE_TYPES("MODEL"),
+                       EDGE_TYPES("SKIP"), EDGE_TYPES("LOG"), EDGE_TYPES("UNMAPPED"), EDGE_TYPES("MISSING"),
+                       EDGE_TYPES("EXCLUSIVE_VIOLATION"), EDGE_TYPES("INCOMPLETE_VIOLATION")>
             Result;
     using ResultMap = std::map<Variant, Result>;
 
@@ -76,6 +76,11 @@ public:
 
         CreateAlignmentTestResultBuilder& alignment_deviation_category(std::vector<std::string> value) {
             alignment_deviation_category_ = std::move(value);
+            return *this;
+        }
+
+        CreateAlignmentTestResultBuilder& alignment_deviation_category_v2(std::vector<std::string> value) {
+            alignment_deviation_category_v2_ = std::move(value);
             return *this;
         }
 
@@ -121,6 +126,12 @@ public:
             return *this;
         }
 
+        CreateAlignmentTestResultBuilder& add_incomplete_violation_edge(edge_fields_t edge) {
+            EXPECT_TRUE(field_lengths_match(edge));
+            incomplete_violation_edges_.emplace_back(std::move(edge));
+            return *this;
+        }
+
         Result build() const {
             auto flattened_sync_edges{flatten_edge_fields(sync_edges_)};
             auto flattened_model_edges{flatten_edge_fields(model_edges_)};
@@ -129,11 +140,13 @@ public:
             auto flattened_unmapped_edges{flatten_edge_fields(unmapped_edges_)};
             auto flattened_missing_violation_edges{flatten_edge_fields(missing_violation_edges_)};
             auto flattened_exclusive_violation_edges{flatten_edge_fields(exclusive_violation_edges_)};
+            auto flattened_incomplete_violation_edges{flatten_edge_fields(incomplete_violation_edges_)};
             return {std::move(alignment_model_vertex_id_),
                     std::move(alignment_vertex_label_),
                     std::move(alignment_move_type_),
                     std::move(alignment_activity_index_),
                     std::move(alignment_deviation_category_),
+                    std::move(alignment_deviation_category_v2_),
                     std::move(std::get<0>(flattened_sync_edges)),
                     std::move(std::get<1>(flattened_sync_edges)),
                     std::move(std::get<2>(flattened_sync_edges)),
@@ -175,7 +188,13 @@ public:
                     std::move(std::get<2>(flattened_exclusive_violation_edges)),
                     std::move(std::get<3>(flattened_exclusive_violation_edges)),
                     std::move(std::get<4>(flattened_exclusive_violation_edges)),
-                    std::move(std::get<5>(flattened_exclusive_violation_edges))};
+                    std::move(std::get<5>(flattened_exclusive_violation_edges)),
+                    std::move(std::get<0>(flattened_incomplete_violation_edges)),
+                    std::move(std::get<1>(flattened_incomplete_violation_edges)),
+                    std::move(std::get<2>(flattened_incomplete_violation_edges)),
+                    std::move(std::get<3>(flattened_incomplete_violation_edges)),
+                    std::move(std::get<4>(flattened_incomplete_violation_edges)),
+                    std::move(std::get<5>(flattened_incomplete_violation_edges))};
         }
 
     private:
@@ -212,6 +231,7 @@ public:
         std::vector<std::string> alignment_move_type_;
         std::vector<int64_t> alignment_activity_index_;
         std::vector<std::string> alignment_deviation_category_;
+        std::vector<std::string> alignment_deviation_category_v2_;
 
         std::vector<edge_fields_t> sync_edges_;
         std::vector<edge_fields_t> model_edges_;
@@ -220,6 +240,7 @@ public:
         std::vector<edge_fields_t> unmapped_edges_;
         std::vector<edge_fields_t> missing_violation_edges_;
         std::vector<edge_fields_t> exclusive_violation_edges_;
+        std::vector<edge_fields_t> incomplete_violation_edges_;
     };
 
     class CreateAlignmentTestResultMapBuilder {
@@ -242,12 +263,12 @@ protected:
               return_type_(TypeDescriptor::from_logical_type(TYPE_STRUCT)) {
         // Initialize the struct type descriptor properly
         auto struct_desc = TypeDescriptor::from_logical_type(TYPE_STRUCT);
-        std::vector<TypeDescriptor> children = {celonis::array_type(TYPE_BIGINT), celonis::array_type(TYPE_VARCHAR),
+        std::vector<TypeDescriptor> children = {celonis::array_type(TYPE_BIGINT),  celonis::array_type(TYPE_VARCHAR),
                                                 celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_BIGINT),
-                                                celonis::array_type(TYPE_VARCHAR)};
-        std::vector<std::string> field_names = {"alignment_model_vertex_id", "alignment_vertex_label",
-                                                "alignment_move_type", "alignment_activity_index",
-                                                "alignment_deviation_category"};
+                                                celonis::array_type(TYPE_VARCHAR), celonis::array_type(TYPE_VARCHAR)};
+        std::vector<std::string> field_names = {"alignment_model_vertex_id",    "alignment_vertex_label",
+                                                "alignment_move_type",          "alignment_activity_index",
+                                                "alignment_deviation_category", "alignment_deviation_category_v2"};
         for (auto type : ::celonis::accelerator::operators::process::align_model::CS_EDGE_TYPES) {
             children.push_back(celonis::array_type(TYPE_BIGINT));
             children.push_back(celonis::array_type(TYPE_VARCHAR));
@@ -290,8 +311,9 @@ private:
                 compare_array<2, std::string>(row);
                 compare_array<3, int64_t>(row);
                 compare_array<4, std::string>(row);
+                compare_array<5, std::string>(row);
 
-                constexpr size_t num_alignment_fields{5};
+                constexpr size_t num_alignment_fields{6};
                 constexpr size_t num_edge_fields{6};
                 compare_edge_arrays<0 * num_edge_fields + num_alignment_fields>(row); // SYNC edge types
                 compare_edge_arrays<1 * num_edge_fields + num_alignment_fields>(row); // MODEL edge types
@@ -300,6 +322,8 @@ private:
                 compare_edge_arrays<4 * num_edge_fields + num_alignment_fields>(row); // UNMAPPED edge types
                 compare_edge_arrays<5 * num_edge_fields + num_alignment_fields>(row); // MISSING_VIOLATION edge types
                 compare_edge_arrays<6 * num_edge_fields + num_alignment_fields>(row); // EXCLUSIVE_VIOLATION edge types
+                compare_edge_arrays<7 * num_edge_fields + num_alignment_fields>(
+                        row); // INCOMPLETE__VIOLATION edge types
             }
         }
 
@@ -403,6 +427,7 @@ static const CelonisCreateAlignmentTest::ResultMap get_parallel_model_results() 
                     .alignment_move_type({"SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE"})
                     .alignment_activity_index({0, 1, 0})
                     .alignment_deviation_category({"CONFORMING", "CONFORMING", "MISSING"})
+                    .alignment_deviation_category_v2({"CONFORMING", "CONFORMING", "INCOMPLETE"})
                     .add_sync_edge(
                             {{0, 1, 2, 4, 5, 6},
                              {"BPMN_START", "A", "BPMN_PARALLEL", "C", "BPMN_PARALLEL", "BPMN_END"},
@@ -427,7 +452,15 @@ static const CelonisCreateAlignmentTest::ResultMap get_parallel_model_results() 
                                                  {"SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
                                                  {"CONFORMING", "MISSING", "CONFORMING"},
                                                  {0, 0, 0},
-                                                 {0, 2, 1}})};
+                                                 {0, 2, 1}})
+                    .add_incomplete_violation_edge({{1, 3, 6},
+                                                    {"A", "B", "BPMN_END"},
+                                                    {"SYNC_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                                                    {"CONFORMING", "INCOMPLETE", "CONFORMING"},
+                                                    {0, 0, 0},
+                                                    {0, 2, 1}})
+
+    };
 
     auto alignment_cbb{CelonisCreateAlignmentTest::CreateAlignmentTestResultBuilder{}
                                .alignment_model_vertex_id({1, 4, 3, 3})
@@ -435,6 +468,7 @@ static const CelonisCreateAlignmentTest::ResultMap get_parallel_model_results() 
                                .alignment_move_type({"MODEL_MOVE", "SYNC_MOVE", "SYNC_MOVE", "LOG_MOVE"})
                                .alignment_activity_index({0, 0, 1, 2})
                                .alignment_deviation_category({"MISSING", "CONFORMING", "CONFORMING", "EXCESSIVE"})
+                               .alignment_deviation_category_v2({"MISSING", "CONFORMING", "CONFORMING", "EXCESSIVE"})
                                .add_sync_edge({{2, 4, 5, 6},
                                                {"BPMN_PARALLEL", "C", "BPMN_PARALLEL", "BPMN_END"},
                                                {"GATEWAY_MOVE", "SYNC_MOVE", "GATEWAY_MOVE", "GATEWAY_MOVE"},
@@ -481,6 +515,7 @@ static const CelonisCreateAlignmentTest::ResultMap get_parallel_model_results() 
                          .alignment_move_type({"SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE"})
                          .alignment_activity_index({0, 1, 2})
                          .alignment_deviation_category({"CONFORMING", "CONFORMING", "CONFORMING"})
+                         .alignment_deviation_category_v2({"CONFORMING", "CONFORMING", "CONFORMING"})
                          .add_sync_edge(
                                  {{0, 1, 2, 3, 5, 6},
                                   {"BPMN_START", "A", "BPMN_PARALLEL", "B", "BPMN_PARALLEL", "BPMN_END"},
@@ -518,6 +553,8 @@ static const CelonisCreateAlignmentTest::ResultMap get_loop_model_results() {
                          .alignment_activity_index({0, 1, 2, 3, 4})
                          .alignment_deviation_category(
                                  {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING"})
+                         .alignment_deviation_category_v2(
+                                 {"CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING", "CONFORMING"})
                          .add_sync_edge(
                                  {{0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 6},
                                   {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
@@ -537,6 +574,8 @@ static const CelonisCreateAlignmentTest::ResultMap get_loop_model_results() {
                          .alignment_move_type({"SYNC_MOVE", "SYNC_MOVE", "SYNC_MOVE", "MODEL_MOVE", "MODEL_MOVE"})
                          .alignment_activity_index({0, 1, 2, 2, 2})
                          .alignment_deviation_category({"CONFORMING", "CONFORMING", "CONFORMING", "MISSING", "MISSING"})
+                         .alignment_deviation_category_v2(
+                                 {"CONFORMING", "CONFORMING", "CONFORMING", "INCOMPLETE", "INCOMPLETE"})
                          .add_sync_edge({{0, 1, 2, 3, 4, 5, 1},
                                          {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE", "C",
                                           "BPMN_EXCLUSIVE_CHOICE"},
@@ -570,6 +609,13 @@ static const CelonisCreateAlignmentTest::ResultMap get_loop_model_results() {
                                                       {"CONFORMING", "MISSING", "MISSING", "CONFORMING"},
                                                       {0, 0, 0, 0},
                                                       {2, 3, 4, 4}})
+                         .add_incomplete_violation_edge({{5, 2, 3, 6},
+                                                         {"C", "A", "B", "BPMN_END"},
+                                                         {"SYNC_MOVE", "MODEL_MOVE", "MODEL_MOVE", "GATEWAY_MOVE"},
+                                                         {"CONFORMING", "INCOMPLETE", "INCOMPLETE", "CONFORMING"},
+                                                         {0, 0, 0, 0},
+                                                         {2, 3, 4, 4}})
+
                          .build())
             .add({"A", "B", "A", "B"},
                  CelonisCreateAlignmentTest::CreateAlignmentTestResultBuilder{}
@@ -579,6 +625,9 @@ static const CelonisCreateAlignmentTest::ResultMap get_loop_model_results() {
                          .alignment_activity_index({0, 1, 1, 2, 3})
                          .alignment_deviation_category(
                                  {"CONFORMING", "CONFORMING", "MISSING", "CONFORMING", "CONFORMING"})
+                         .alignment_deviation_category_v2(
+                                 {"CONFORMING", "CONFORMING", "MISSING", "CONFORMING", "CONFORMING"})
+
                          .add_sync_edge({{0, 1, 2, 3, 4},
                                          {"BPMN_START", "BPMN_EXCLUSIVE_CHOICE", "A", "B", "BPMN_EXCLUSIVE_CHOICE"},
                                          {"GATEWAY_MOVE", "GATEWAY_MOVE", "SYNC_MOVE", "SYNC_MOVE", "GATEWAY_MOVE"},
