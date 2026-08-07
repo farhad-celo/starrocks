@@ -14,27 +14,27 @@
 
 package com.starrocks.connector.delta.unity;
 
-import com.databricks.sdk.service.catalog.AwsCredentials;
-import com.databricks.sdk.service.catalog.DataSourceFormat;
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialResponse;
-import com.databricks.sdk.service.catalog.TableInfo;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.starrocks.common.Pair;
 import com.starrocks.connector.delta.DeltaLakeCatalogProperties;
 import com.starrocks.connector.delta.DeltaLakeEngine;
 import com.starrocks.connector.delta.DeltaLakeFileStatus;
 import com.starrocks.connector.delta.DeltaLakeJsonHandler;
-import com.starrocks.connector.delta.DeltaLakeParquetHandler;
 import com.starrocks.connector.delta.DeltaLakeSnapshot;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.credential.CloudType;
 import com.starrocks.credential.aws.AwsCloudConfiguration;
-import io.delta.kernel.data.ColumnarBatch;
-import io.delta.kernel.types.StructType;
+import io.delta.kernel.SnapshotBuilder;
+import io.delta.kernel.Table;
+import io.delta.kernel.TableManager;
+import io.delta.kernel.engine.Engine;
+import io.delta.kernel.internal.SnapshotImpl;
+import io.delta.kernel.internal.files.ParsedLogData;
+import io.unitycatalog.client.delta.model.DeltaCommit;
+import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
 import mockit.Expectations;
 import mockit.Mock;
 import mockit.MockUp;
@@ -44,12 +44,19 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
-import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 public class UnityBackedDeltaMetastoreTest {
+
+    private static final String S3_LOCATION = "s3://bucket/prefix/orders";
 
     @BeforeEach
     void resetSharedCache() {
@@ -65,21 +72,12 @@ public class UnityBackedDeltaMetastoreTest {
                 "unity.catalog.aws.region", "us-east-1"));
     }
 
-    private static TableInfo tableInfo() {
-        return new TableInfo()
-                .setFullName("main.sales.orders")
-                .setTableId("abc-123")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/prefix/orders")
-                .setCreatedAt(1_700_000_000_000L);
-    }
-
-    private static GenerateTemporaryTableCredentialResponse creds() {
-        return new GenerateTemporaryTableCredentialResponse()
-                .setAwsTempCredentials(new AwsCredentials()
-                        .setAccessKeyId("AKIA_TEST")
-                        .setSecretAccessKey("secret")
-                        .setSessionToken("session"));
+    private static UnityCatalogProperties propsNoVendedCredentials() {
+        return new UnityCatalogProperties(ImmutableMap.of(
+                "unity.catalog.host", "https://example.cloud.databricks.com",
+                "unity.catalog.token", "dapiTEST",
+                "unity.catalog.name", "main",
+                "unity.catalog.vended-credentials-enabled", "false"));
     }
 
     private static UnityBackedDeltaMetastore newUnityBacked(UnityMetastore unityMetastore,
@@ -92,25 +90,25 @@ public class UnityBackedDeltaMetastoreTest {
                 props);
     }
 
+    private static UnityBackedDeltaMetastore metastore(UnityCatalogClient client, UnityCatalogProperties props) {
+        return newUnityBacked(new UnityMetastore(client, props), props);
+    }
+
     @Test
     public void testRefreshTableTriggersFreshCredentialVend(@Mocked UnityCatalogClient client) {
-        TableInfo info = tableInfo();
-        GenerateTemporaryTableCredentialResponse credentials = creds();
-
         new Expectations() {
             {
-                client.getTable("main.sales.orders");
-                result = info;
+                client.loadTable("main", "sales", "orders");
+                result = UnityDeltaModelFixtures.loadResponse(S3_LOCATION, 1_700_000_000_000L, null);
                 times = 2;
 
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = credentials;
+                client.getTableCredentials("main", "sales", "orders", UnityDeltaModelFixtures.TABLE_UUID.toString(), "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
                 times = 2;
             }
         };
 
-        UnityMetastore unityMetastore = new UnityMetastore(client, propsWithVendedCredentials());
-        UnityBackedDeltaMetastore backed = newUnityBacked(unityMetastore, propsWithVendedCredentials());
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
 
         CloudConfiguration first = backed.resolveTableCloudConfiguration("sales", "orders");
         Assertions.assertNotNull(first);
@@ -119,7 +117,6 @@ public class UnityBackedDeltaMetastoreTest {
 
         backed.refreshTable("sales", "orders");
 
-        // After refreshTable, the next call must hit UC again.
         CloudConfiguration second = backed.resolveTableCloudConfiguration("sales", "orders");
         Assertions.assertNotNull(second);
         Assertions.assertEquals(CloudType.AWS, second.getCloudType());
@@ -134,19 +131,7 @@ public class UnityBackedDeltaMetastoreTest {
 
     @Test
     public void testRefreshTableNoOpWhenVendedCredentialsDisabled(@Mocked UnityCatalogClient client) {
-        UnityCatalogProperties propsNoVend = new UnityCatalogProperties(ImmutableMap.of(
-                "unity.catalog.host", "https://example.cloud.databricks.com",
-                "unity.catalog.token", "dapiTEST",
-                "unity.catalog.name", "main",
-                "unity.catalog.vended-credentials-enabled", "false"));
-
-        UnityMetastore unityMetastore = new UnityMetastore(client, propsNoVend);
-        UnityBackedDeltaMetastore backed = new UnityBackedDeltaMetastore(
-                "delta_unity",
-                unityMetastore,
-                new Configuration(false),
-                new DeltaLakeCatalogProperties(Maps.newHashMap()),
-                propsNoVend);
+        UnityBackedDeltaMetastore backed = metastore(client, propsNoVendedCredentials());
 
         backed.refreshTable("sales", "orders");
 
@@ -159,42 +144,33 @@ public class UnityBackedDeltaMetastoreTest {
     }
 
     @Test
-    public void testGetTableInvokesUcGetTableExactlyOnce(@Mocked UnityCatalogClient client) {
-        TableInfo info = tableInfo();
-        GenerateTemporaryTableCredentialResponse credentials = creds();
-
+    public void testGetTableInvokesLoadTableExactlyOnce(@Mocked UnityCatalogClient client) {
         new Expectations() {
             {
-                // The whole point of the dedup: one logical UBDM#getTable -> one UC TableInfo
-                // fetch and one credential vend, even when metadata caching is bypassed.
-                client.getTable("main.sales.orders");
-                result = info;
+                // The whole point of the dedup: one logical UBDM#getTable -> one loadTable and one
+                // credential vend, even when metadata caching is bypassed.
+                client.loadTable("main", "sales", "orders");
+                result = UnityDeltaModelFixtures.loadResponse(S3_LOCATION, 1_700_000_000_000L, null);
                 times = 1;
 
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = credentials;
+                client.getTableCredentials("main", "sales", "orders", UnityDeltaModelFixtures.TABLE_UUID.toString(), "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
                 times = 1;
             }
         };
 
-        UnityMetastore unityMetastore = new UnityMetastore(client, propsWithVendedCredentials());
-        UnityBackedDeltaMetastore backed = new UnityBackedDeltaMetastore(
-                "delta_unity",
-                unityMetastore,
-                new Configuration(false),
-                new DeltaLakeCatalogProperties(Maps.newHashMap()),
-                propsWithVendedCredentials()) {
-            @Override
-            protected DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName,
-                                                         MetastoreTable mt,
-                                                         CloudConfiguration cc) {
-                // The storage location in the fixture is not reachable from a unit test, so
-                // we cannot let the Delta Kernel load run. Asserting the loader received a
-                // non-null MetastoreTable plus a per-table AWS CloudConfiguration is what
-                // proves UBDM#getTable threaded the dedup'd values through; we then
-                // short-circuit with a sentinel so the caller skips snapshot conversion
-                // (which would NPE on a null DeltaLakeSnapshot).
-                Assertions.assertNotNull(mt);
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
+
+        // The storage location in the fixture is not reachable from a unit test, so we cannot let
+        // the Delta Kernel load run. Stubbing the snapshot-load seam and asserting it received a
+        // UnityMetastoreTable (which carries the loadTable response) plus a per-table AWS
+        // CloudConfiguration proves UBDM#getTable threaded the dedup'd values through; the sentinel
+        // then short-circuits so the caller skips snapshot conversion.
+        new MockUp<UnityBackedDeltaMetastore>() {
+            @Mock
+            DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName, MetastoreTable mt,
+                                                CloudConfiguration cc) {
+                Assertions.assertInstanceOf(UnityMetastoreTable.class, mt);
                 Assertions.assertNotNull(cc);
                 Assertions.assertEquals(CloudType.AWS, cc.getCloudType());
                 Assertions.assertInstanceOf(AwsCloudConfiguration.class, cc);
@@ -207,9 +183,9 @@ public class UnityBackedDeltaMetastoreTest {
 
         new Verifications() {
             {
-                client.getTable("main.sales.orders");
+                client.loadTable("main", "sales", "orders");
                 times = 1;
-                client.getTemporaryTableCredentials("abc-123", "READ");
+                client.getTableCredentials("main", "sales", "orders", UnityDeltaModelFixtures.TABLE_UUID.toString(), "READ");
                 times = 1;
             }
         };
@@ -217,62 +193,274 @@ public class UnityBackedDeltaMetastoreTest {
 
     /**
      * Sentinel raised from the snapshot-loader override in
-     * {@link #testGetTableInvokesUcGetTableExactlyOnce} so the test can verify it reached the
-     * loader without paying for an actual Delta Kernel snapshot read.
+     * {@link #testGetTableInvokesLoadTableExactlyOnce} so the test can verify it reached the loader
+     * without paying for an actual Delta Kernel snapshot read.
      */
     private static final class SnapshotShortCircuit extends RuntimeException {
     }
 
-    @Test
-    public void testGetTablePropagatesVendingFailure(@Mocked UnityCatalogClient client) {
-        TableInfo info = tableInfo();
+    private static Stream<Arguments> nonManagedResponseCases() {
+        return Stream.of(
+                // Carried loadTable response is reused: no extra loadTable round-trip. Non-null
+                // properties without the catalog-managed feature exercise the isCatalogManaged
+                // feature check returning false.
+                Arguments.of(new UnityMetastoreTable("sales", "orders", S3_LOCATION, 0L,
+                                UnityDeltaModelFixtures.loadResponse(S3_LOCATION, 1L,
+                                        ImmutableMap.of("delta.minReaderVersion", "1"))),
+                        0),
+                // No carried response: loadSnapshot fetches it via loadTable. Null properties
+                // exercise the isCatalogManaged null short-circuit.
+                Arguments.of(new MetastoreTable("sales", "orders", S3_LOCATION, 0L), 1));
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonManagedResponseCases")
+    public void testLoadSnapshotReadsPublishedLogForNonManaged(MetastoreTable metastoreTable, int expectedLoadTableCalls,
+                                                               @Mocked UnityCatalogClient client,
+                                                               @Mocked DeltaLakeEngine engine,
+                                                               @Mocked Table table,
+                                                               @Mocked SnapshotImpl published) {
+        new Expectations() {
+            {
+                client.loadTable("main", "sales", "orders");
+                result = UnityDeltaModelFixtures.loadResponse(S3_LOCATION, 1L, null);
+                minTimes = 0;
+                Table.forPath((Engine) any, anyString);
+                result = table;
+                table.getLatestSnapshot((Engine) any);
+                result = published;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
+        SnapshotImpl result = backed.loadSnapshot(engine, S3_LOCATION, "sales", "orders", metastoreTable);
+
+        Assertions.assertSame(published, result);
+        new Verifications() {
+            {
+                client.loadTable(anyString, anyString, anyString);
+                times = expectedLoadTableCalls;
+            }
+        };
+    }
+
+    private static Stream<Arguments> catalogManagedCases() {
+        return Stream.of(
+                // Commits arrive out of order with a known latest version: toCatalogCommits must
+                // sort by version and the builder must receive withMaxCatalogVersion.
+                Arguments.of(new DeltaCommit[] {
+                        UnityDeltaModelFixtures.commit(2L, 222L, 2_000L),
+                        UnityDeltaModelFixtures.commit(1L, 111L, 1_000L)}, 2L, new long[] {1L, 2L}, 1),
+                // No commits but a known latest version: builder still receives withMaxCatalogVersion.
+                Arguments.of(new DeltaCommit[] {}, 0L, new long[] {}, 1));
+    }
+
+    @ParameterizedTest
+    @MethodSource("catalogManagedCases")
+    public void testLoadSnapshotBuildsSnapshotForCatalogManaged(DeltaCommit[] commits, Long latestVersion,
+                                                                long[] expectedVersions, int expectedMaxVersionCalls,
+                                                                @Mocked UnityCatalogClient client,
+                                                                @Mocked DeltaLakeEngine engine,
+                                                                @Mocked TableManager tableManager,
+                                                                @Mocked SnapshotBuilder builder,
+                                                                @Mocked SnapshotImpl managedSnapshot) {
+        DeltaLoadTableResponse response =
+                UnityDeltaModelFixtures.catalogManagedLoadResponse(S3_LOCATION, latestVersion, commits);
+        UnityMetastoreTable mt = new UnityMetastoreTable("sales", "orders", S3_LOCATION, 0L, response);
 
         new Expectations() {
             {
-                client.getTable("main.sales.orders");
-                result = info;
-                client.getTemporaryTableCredentials("abc-123", "READ");
+                TableManager.loadSnapshot(S3_LOCATION);
+                result = builder;
+                builder.withLogData((List<ParsedLogData>) any);
+                result = builder;
+                builder.withMaxCatalogVersion(anyLong);
+                result = builder;
+                minTimes = 0;
+                builder.build((Engine) any);
+                result = managedSnapshot;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
+        SnapshotImpl result = backed.loadSnapshot(engine, S3_LOCATION, "sales", "orders", mt);
+
+        Assertions.assertSame(managedSnapshot, result);
+        String stagedDir = S3_LOCATION + "/_delta_log/_staged_commits/";
+        new Verifications() {
+            {
+                List<ParsedLogData> logData;
+                builder.withLogData(logData = withCapture());
+                Assertions.assertEquals(expectedVersions.length, logData.size());
+                for (int i = 0; i < expectedVersions.length; i++) {
+                    final long version = expectedVersions[i];
+                    DeltaCommit expected = Arrays.stream(commits)
+                            .filter(c -> c.getVersion() == version).findFirst().orElseThrow();
+                    ParsedLogData entry = logData.get(i);
+                    Assertions.assertEquals(version, entry.getVersion());
+                    Assertions.assertEquals(stagedDir + expected.getFileName(), entry.getFileStatus().getPath());
+                    Assertions.assertEquals(expected.getFileSize().longValue(), entry.getFileStatus().getSize());
+                    Assertions.assertEquals(expected.getFileModificationTimestamp().longValue(),
+                            entry.getFileStatus().getModificationTime());
+                }
+                builder.withMaxCatalogVersion(anyLong);
+                times = expectedMaxVersionCalls;
+                client.loadTable(anyString, anyString, anyString);
+                times = 0;
+            }
+        };
+    }
+
+    @Test
+    public void testLoadSnapshotFailsWhenCatalogManagedHasNoLatestVersion(@Mocked UnityCatalogClient client,
+                                                                          @Mocked DeltaLakeEngine engine) {
+        DeltaLoadTableResponse response =
+                UnityDeltaModelFixtures.catalogManagedLoadResponse(S3_LOCATION, null, new DeltaCommit[] {});
+        UnityMetastoreTable mt = new UnityMetastoreTable("sales", "orders", S3_LOCATION, 0L, response);
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> backed.loadSnapshot(engine, S3_LOCATION, "sales", "orders", mt));
+        Assertions.assertTrue(ex.getMessage().contains("no latest version"));
+    }
+
+    @Test
+    public void testCreateDeltaLakeEngineUsesSharedCacheWhenEnabled(@Mocked UnityCatalogClient client,
+                                                                    @Mocked UnityDeltaLakeMetaCache cache,
+                                                                    @Mocked DeltaLakeEngine engine) {
+        new Expectations() {
+            {
+                UnityDeltaLakeMetaCache.getSharedInstance();
+                result = cache;
+                cache.createEngine(anyString, (Configuration) any, (DeltaLakeCatalogProperties) any, true);
+                result = engine;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
+        Assertions.assertSame(engine, backed.createDeltaLakeEngine(new Configuration(false), true));
+    }
+
+    @Test
+    public void testCreateDeltaLakeEngineBypassesSharedCacheWhenDisabled(@Mocked UnityCatalogClient client,
+                                                                         @Mocked UnityDeltaLakeMetaCache cache) {
+        new Expectations() {
+            {
+                UnityDeltaLakeMetaCache.getSharedInstance();
+                result = cache;
+            }
+        };
+        UnityCatalogProperties props = new UnityCatalogProperties(ImmutableMap.of(
+                "unity.catalog.host", "https://example.cloud.databricks.com",
+                "unity.catalog.token", "dapiTEST",
+                "unity.catalog.name", "main",
+                "unity.catalog.delta-cache.enabled", "false"));
+
+        UnityBackedDeltaMetastore backed = metastore(client, props);
+        DeltaLakeEngine created = backed.createDeltaLakeEngine(new Configuration(false), false);
+
+        Assertions.assertNotNull(created);
+        Assertions.assertTrue(created.isPerTableConfig(),
+                "with the shared cache off, super must be invoked in per-table-config mode");
+        new Verifications() {
+            {
+                cache.createEngine(anyString, (Configuration) any, (DeltaLakeCatalogProperties) any, anyBoolean);
+                times = 0;
+            }
+        };
+    }
+
+    private static Stream<Arguments> vendingFailureEntryPoints() {
+        return Stream.of(
+                Arguments.of("getTable",
+                        (Consumer<UnityBackedDeltaMetastore>) b -> b.getTable("sales", "orders")),
+                Arguments.of("resolveTableCloudConfiguration",
+                        (Consumer<UnityBackedDeltaMetastore>) b -> b.resolveTableCloudConfiguration("sales", "orders")));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("vendingFailureEntryPoints")
+    public void testVendingFailurePropagatesTableName(String entryPoint, Consumer<UnityBackedDeltaMetastore> action,
+                                                      @Mocked UnityCatalogClient client) {
+        new Expectations() {
+            {
+                client.loadTable("main", "sales", "orders");
+                result = UnityDeltaModelFixtures.loadResponse(S3_LOCATION, 1_700_000_000_000L, null);
+                client.getTableCredentials("main", "sales", "orders", UnityDeltaModelFixtures.TABLE_UUID.toString(), "READ");
                 result = new StarRocksConnectorException("403 forbidden");
             }
         };
 
-        UnityMetastore unityMetastore = new UnityMetastore(client, propsWithVendedCredentials());
-        UnityBackedDeltaMetastore backed = newUnityBacked(unityMetastore, propsWithVendedCredentials());
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
 
         StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> backed.getTable("sales", "orders"));
+                () -> action.accept(backed));
         Assertions.assertTrue(ex.getMessage().contains("main.sales.orders"),
                 "exception message must include the failing table name; was: " + ex.getMessage());
     }
 
     @Test
-    public void testResolveTableCloudConfigurationPropagatesVendingFailure(
-            @Mocked UnityCatalogClient client) {
-        TableInfo info = tableInfo();
+    public void testResolveTableCloudConfigurationNullWhenVendedDisabled(@Mocked UnityCatalogClient client) {
+        UnityBackedDeltaMetastore backed = metastore(client, propsNoVendedCredentials());
 
+        Assertions.assertNull(backed.resolveTableCloudConfiguration("sales", "orders"));
+        Assertions.assertNull(backed.resolveTableCloudConfiguration("sales", "orders", S3_LOCATION, "uuid"));
+
+        new Verifications() {
+            {
+                client.getTableCredentials(anyString, anyString, anyString, anyString, anyString);
+                times = 0;
+            }
+        };
+    }
+
+    @Test
+    public void testResolveTableCloudConfigurationCacheHitSkipsLoadTable(@Mocked UnityCatalogClient client) {
         new Expectations() {
             {
-                client.getTable("main.sales.orders");
-                result = info;
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = new StarRocksConnectorException("503 service unavailable");
+                client.getTableCredentials("main", "sales", "orders", "uuid-123", "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
             }
         };
 
-        UnityMetastore unityMetastore = new UnityMetastore(client, propsWithVendedCredentials());
-        UnityBackedDeltaMetastore backed = newUnityBacked(unityMetastore, propsWithVendedCredentials());
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
+        CloudConfiguration cc = backed.resolveTableCloudConfiguration("sales", "orders", S3_LOCATION, "uuid-123");
 
-        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> backed.resolveTableCloudConfiguration("sales", "orders"));
-        Assertions.assertTrue(ex.getMessage().contains("main.sales.orders"),
-                "exception message must include the failing table name; was: " + ex.getMessage());
+        Assertions.assertEquals(CloudType.AWS, cc.getCloudType());
+        new Verifications() {
+            {
+                client.loadTable(anyString, anyString, anyString);
+                times = 0;
+            }
+        };
+    }
+
+    private static Stream<Arguments> snapshotCacheBypassCases() {
+        return Stream.of(
+                Arguments.of("true", "60", false),
+                Arguments.of("false", "60", true),
+                Arguments.of("true", "0", true));
+    }
+
+    @ParameterizedTest(name = "cacheEnabled={0} ttlSec={1}")
+    @MethodSource("snapshotCacheBypassCases")
+    public void testIsSnapshotCacheBypassed(String cacheEnabled, String ttlSec, boolean expected,
+                                            @Mocked UnityCatalogClient client) {
+        UnityCatalogProperties props = new UnityCatalogProperties(ImmutableMap.of(
+                "unity.catalog.host", "https://example.cloud.databricks.com",
+                "unity.catalog.token", "dapiTEST",
+                "unity.catalog.name", "main",
+                "unity.catalog.cache.enabled", cacheEnabled,
+                "unity.catalog.cache.ttl-sec", ttlSec));
+
+        Assertions.assertEquals(expected, metastore(client, props).isSnapshotCacheBypassed());
     }
 
     @Test
     public void testUnityBackedMetastoresShareDeltaMetaCache(@Mocked UnityCatalogClient client) {
         UnityCatalogProperties props = propsWithVendedCredentials();
-        UnityBackedDeltaMetastore first = newUnityBacked(new UnityMetastore(client, props), props);
-        UnityBackedDeltaMetastore second = newUnityBacked(new UnityMetastore(client, props), props);
+        UnityBackedDeltaMetastore first = metastore(client, props);
+        UnityBackedDeltaMetastore second = metastore(client, props);
 
         Assertions.assertSame(first.getUnityMetaCache(), second.getUnityMetaCache(),
                 "Unity-backed Delta catalogs must share one FE-level JSON/checkpoint cache");
@@ -281,13 +469,13 @@ public class UnityBackedDeltaMetastoreTest {
     @Test
     public void testInvalidateAllDoesNotClearSharedDeltaMetaCache(@Mocked UnityCatalogClient client) {
         UnityCatalogProperties props = propsWithVendedCredentials();
-        UnityBackedDeltaMetastore backed = newUnityBacked(new UnityMetastore(client, props), props);
+        UnityBackedDeltaMetastore backed = metastore(client, props);
         UnityDeltaLakeMetaCache cache = backed.getUnityMetaCache();
         DeltaLakeFileStatus status = DeltaLakeFileStatus.of(
                 io.delta.kernel.utils.FileStatus.of("s3://bucket/shared-unity-cache-test.json", 123, 456));
 
         String scope = props.getPrincipalScope();
-        cache.getJsonCache(scope, new Configuration(false), true).put(status, Lists.newArrayList());
+        cache.getJsonCache(scope, new Configuration(false), false).put(status, Lists.newArrayList());
         backed.invalidateAll();
 
         Assertions.assertTrue(cache.containsJson(scope, status),
@@ -303,7 +491,7 @@ public class UnityBackedDeltaMetastoreTest {
         DeltaLakeFileStatus status = DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(
                 "s3://bucket/principal-scope-isolation-" + System.nanoTime() + ".json", 1, 2));
 
-        cache.getJsonCache("principal-a", new Configuration(false), true).put(status, Lists.newArrayList());
+        cache.getJsonCache("principal-a", new Configuration(false), false).put(status, Lists.newArrayList());
 
         Assertions.assertTrue(cache.containsJson("principal-a", status),
                 "the populating principal must see its own cached entry");
@@ -323,7 +511,7 @@ public class UnityBackedDeltaMetastoreTest {
         new MockUp<DeltaLakeJsonHandler>() {
             @Mock
             public java.util.List<com.fasterxml.jackson.databind.JsonNode> readJsonFile(String filePath,
-                                                                                       Configuration hadoopConf) {
+                                                                                        Configuration hadoopConf) {
                 seen.set(hadoopConf.get("unity.test.scoped-conf"));
                 return Lists.newArrayList();
             }
@@ -332,158 +520,5 @@ public class UnityBackedDeltaMetastoreTest {
         cache.getJsonCache("test-principal-scope", scoped, false).get(status);
 
         Assertions.assertEquals("expected", seen.get());
-    }
-
-    @Test
-    public void testVendedLoaderRunsUnderPerLoadUgi() throws Exception {
-        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
-        String path = "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/"
-                + System.nanoTime() + ".json";
-        DeltaLakeFileStatus status = DeltaLakeFileStatus.of(
-                io.delta.kernel.utils.FileStatus.of(path, 1, 2));
-        AtomicReference<String> ugiInside = new AtomicReference<>();
-
-        new MockUp<DeltaLakeJsonHandler>() {
-            @Mock
-            public java.util.List<com.fasterxml.jackson.databind.JsonNode> readJsonFile(String filePath,
-                                                                                       Configuration hadoopConf)
-                    throws java.io.IOException {
-                ugiInside.set(
-                        org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName());
-                return Lists.newArrayList();
-            }
-        };
-
-        String loginUgi = org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName();
-        cache.getJsonCache("vended-principal-scope", new Configuration(false), true).get(status);
-
-        Assertions.assertEquals(
-                com.starrocks.connector.delta.DeltaVendedFsScope.scopeNameForPath(path), ugiInside.get(),
-                "vended loader must read under a per-load scope UGI, not the shared login UGI");
-        Assertions.assertNotEquals(loginUgi, ugiInside.get());
-    }
-
-    @Test
-    public void testVendedLoaderReusesEnclosingScopeUgi() throws Exception {
-        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
-        String path = "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/"
-                + System.nanoTime() + ".json";
-        DeltaLakeFileStatus status = DeltaLakeFileStatus.of(
-                io.delta.kernel.utils.FileStatus.of(path, 1, 2));
-        AtomicReference<String> ugiInside = new AtomicReference<>();
-
-        new MockUp<DeltaLakeJsonHandler>() {
-            @Mock
-            public java.util.List<com.fasterxml.jackson.databind.JsonNode> readJsonFile(String filePath,
-                                                                                       Configuration hadoopConf)
-                    throws java.io.IOException {
-                ugiInside.set(
-                        org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName());
-                return Lists.newArrayList();
-            }
-        };
-
-        // Already inside a per-table scope (the synchronous query / background-refresh path): the loader
-        // must reuse this scope's UGI, not open a redundant per-path scope.
-        com.starrocks.connector.delta.DeltaVendedFsScope.runScoped("enclosing-scope", () -> {
-            cache.getJsonCache("vended-principal-scope", new Configuration(false), true).get(status);
-            return null;
-        });
-
-        Assertions.assertEquals("enclosing-scope", ugiInside.get(),
-                "with an active scope the vended loader must reuse the enclosing UGI");
-    }
-
-    @Test
-    public void testCheckpointCacheIsolatesEntriesByPrincipalScope() {
-        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
-        Pair<DeltaLakeFileStatus, StructType> key = Pair.create(
-                DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(
-                        "s3://bucket/checkpoint-isolation-" + System.nanoTime() + ".checkpoint.parquet", 1, 2)),
-                new StructType());
-
-        cache.getCheckpointCache("principal-a", new Configuration(false), true).put(key, Lists.newArrayList());
-
-        Assertions.assertNotNull(
-                cache.getCheckpointCache("principal-a", new Configuration(false), true).getIfPresent(key),
-                "the populating principal must see its own cached checkpoint entry");
-        Assertions.assertNull(
-                cache.getCheckpointCache("principal-b", new Configuration(false), true).getIfPresent(key),
-                "a different principal must never be served a checkpoint entry it did not populate");
-    }
-
-    @Test
-    public void testCheckpointVendedLoaderRunsUnderPerLoadUgi() throws Exception {
-        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
-        String path = "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/"
-                + System.nanoTime() + ".checkpoint.parquet";
-        Pair<DeltaLakeFileStatus, StructType> key = Pair.create(
-                DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(path, 1, 2)), new StructType());
-        AtomicReference<String> ugiInside = new AtomicReference<>();
-
-        new MockUp<DeltaLakeParquetHandler>() {
-            @Mock
-            public List<ColumnarBatch> readParquetFile(String filePath, long fileSize, long modificationTime,
-                                                       StructType physicalSchema, Configuration hadoopConf)
-                throws IOException {
-                ugiInside.set(
-                        org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName());
-                return Lists.newArrayList();
-            }
-        };
-
-        String loginUgi = org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName();
-        cache.getCheckpointCache("vended-principal-scope", new Configuration(false), true).get(key);
-
-        Assertions.assertEquals(
-                com.starrocks.connector.delta.DeltaVendedFsScope.scopeNameForPath(path), ugiInside.get(),
-                "vended checkpoint loader must read under a per-load scope UGI, not the shared login UGI");
-        Assertions.assertNotEquals(loginUgi, ugiInside.get());
-    }
-
-    @Test
-    public void testCheckpointVendedLoaderReusesEnclosingScopeUgi() throws Exception {
-        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
-        String path = "abfss://c@a.dfs.core.windows.net/tables/tid/_delta_log/"
-                + System.nanoTime() + ".checkpoint.parquet";
-        Pair<DeltaLakeFileStatus, StructType> key = Pair.create(
-                DeltaLakeFileStatus.of(io.delta.kernel.utils.FileStatus.of(path, 1, 2)), new StructType());
-        AtomicReference<String> ugiInside = new AtomicReference<>();
-
-        new MockUp<DeltaLakeParquetHandler>() {
-            @Mock
-            public List<ColumnarBatch> readParquetFile(String filePath, long fileSize, long modificationTime,
-                                                       StructType physicalSchema, Configuration hadoopConf)
-                throws IOException {
-                ugiInside.set(
-                        org.apache.hadoop.security.UserGroupInformation.getCurrentUser().getUserName());
-                return Lists.newArrayList();
-            }
-        };
-
-        com.starrocks.connector.delta.DeltaVendedFsScope.runScoped("enclosing-scope", () -> {
-            cache.getCheckpointCache("vended-principal-scope", new Configuration(false), true).get(key);
-            return null;
-        });
-
-        Assertions.assertEquals("enclosing-scope", ugiInside.get(),
-                "with an active scope the vended checkpoint loader must reuse the enclosing UGI");
-    }
-
-    @Test
-    public void testCreateEngineWiresSharedCachingHandlers() {
-        UnityDeltaLakeMetaCache cache = UnityDeltaLakeMetaCache.getSharedInstance();
-        Configuration conf = new Configuration(false);
-
-        DeltaLakeEngine engine = cache.createEngine("principal-scope", conf,
-                new DeltaLakeCatalogProperties(Maps.newHashMap()), true);
-
-        Assertions.assertSame(conf, engine.getHadoopConf());
-        Assertions.assertFalse(engine.isPerTableConfig(),
-                "the shared-cache engine must consult the meta cache, not bypass it");
-        Assertions.assertTrue(engine.getJsonHandler() instanceof DeltaLakeJsonHandler,
-                "createEngine must wire the caching JSON handler");
-        Assertions.assertTrue(engine.getParquetHandler() instanceof DeltaLakeParquetHandler,
-                "createEngine must wire the caching parquet handler");
     }
 }

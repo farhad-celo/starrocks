@@ -107,8 +107,8 @@ public class UnityCatalogProperties {
         Preconditions.checkArgument(this.requestTimeoutMs >= 0,
                 "%s must be >= 0", UNITY_REQUEST_TIMEOUT_MS);
         long maxRetriesLong = parseLong(properties, UNITY_MAX_RETRIES, 3L);
-        Preconditions.checkArgument(maxRetriesLong >= 0 && maxRetriesLong <= Integer.MAX_VALUE,
-                "%s must be in [0, %s]", UNITY_MAX_RETRIES, Integer.MAX_VALUE);
+        Preconditions.checkArgument(maxRetriesLong >= 0 && maxRetriesLong < Integer.MAX_VALUE,
+                "%s must be in [0, %s]", UNITY_MAX_RETRIES, Integer.MAX_VALUE - 1);
         this.maxRetries = (int) maxRetriesLong;
 
         String cacheEnabledRaw = properties.getOrDefault(UNITY_CACHE_ENABLED, "true");

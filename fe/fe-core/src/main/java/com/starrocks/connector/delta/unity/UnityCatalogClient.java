@@ -18,52 +18,73 @@ import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.core.DatabricksConfig;
 import com.databricks.sdk.core.DatabricksException;
 import com.databricks.sdk.core.error.platform.NotFound;
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialRequest;
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialResponse;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.ListSchemasRequest;
 import com.databricks.sdk.service.catalog.ListTablesRequest;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.TableInfo;
-import com.databricks.sdk.service.catalog.TableOperation;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.PercentEscaper;
 import com.starrocks.connector.exception.StarRocksConnectorException;
+import io.unitycatalog.client.ApiClient;
+import io.unitycatalog.client.ApiClientBuilder;
+import io.unitycatalog.client.ApiException;
+import io.unitycatalog.client.auth.TokenProvider;
+import io.unitycatalog.client.delta.api.DeltaTablesApi;
+import io.unitycatalog.client.delta.api.DeltaTemporaryCredentialsApi;
+import io.unitycatalog.client.delta.model.DeltaCredentialOperation;
+import io.unitycatalog.client.delta.model.DeltaCredentialsResponse;
+import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
+import io.unitycatalog.client.retry.JitterDelayRetryPolicy;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 /**
- * Thin adapter over the Databricks Java SDK's {@link WorkspaceClient}. The SDK handles HTTP,
- * JSON serialization, retries, and authentication; this class only translates property-bag
- * config into a {@link DatabricksConfig} and forwards each {@link UnityCatalogApi} method to
- * the matching SDK call.
- *
- * <p>Two auth modes are supported:
- * <ul>
- *   <li>{@link UnityCatalogProperties.AuthType#PAT} (default) -- bearer Personal Access Token
- *       via {@code unity.catalog.token};</li>
- *   <li>{@link UnityCatalogProperties.AuthType#OAUTH_M2M} -- OAuth 2.0 client-credentials flow
- *       via {@code unity.catalog.client-id} + {@code unity.catalog.client-secret}.</li>
- * </ul>
+ * Adapter over two clients: the Databricks SDK {@link WorkspaceClient} for schema/table discovery
+ * and metastore summary, and the Unity Catalog {@code delta/v1} client ({@link DeltaTablesApi} +
+ * {@link DeltaTemporaryCredentialsApi}) for the read path. Both support PAT and OAuth-M2M auth.
  */
 public class UnityCatalogClient implements UnityCatalogApi {
     private static final Logger LOG = LogManager.getLogger(UnityCatalogClient.class);
-    private static final String READ_OPERATION = "READ";
     private static final PercentEscaper FULL_NAME_ESCAPER = new PercentEscaper("-_.*", false);
 
     private final WorkspaceClient workspace;
+    // delta/v1 read path, from the OSS unitycatalog-client. Null only in the WorkspaceClient-only
+    // test constructor; loadTable / getTableCredentials then fail fast.
+    private final DeltaTablesApi deltaTablesApi;
+    private final DeltaTemporaryCredentialsApi deltaCredentialsApi;
 
     public UnityCatalogClient(UnityCatalogProperties properties) {
-        this(buildWorkspaceClient(properties));
+        this(buildWorkspaceClient(properties), buildDeltaApiClient(properties));
+    }
+
+    private UnityCatalogClient(WorkspaceClient workspace, ApiClient deltaApiClient) {
+        this(workspace, new DeltaTablesApi(deltaApiClient), new DeltaTemporaryCredentialsApi(deltaApiClient));
     }
 
     /** Visible for testing. Lets unit tests inject a mocked or fake {@link WorkspaceClient}. */
+    @VisibleForTesting
     public UnityCatalogClient(WorkspaceClient workspace) {
+        this(workspace, (DeltaTablesApi) null, (DeltaTemporaryCredentialsApi) null);
+    }
+
+    /** Visible for testing. Lets unit tests inject fake {@code delta/v1} clients. */
+    @VisibleForTesting
+    UnityCatalogClient(WorkspaceClient workspace, DeltaTablesApi deltaTablesApi,
+                       DeltaTemporaryCredentialsApi deltaCredentialsApi) {
         this.workspace = Objects.requireNonNull(workspace, "workspace");
+        this.deltaTablesApi = deltaTablesApi;
+        this.deltaCredentialsApi = deltaCredentialsApi;
     }
 
     private static WorkspaceClient buildWorkspaceClient(UnityCatalogProperties properties) {
@@ -81,6 +102,48 @@ public class UnityCatalogClient implements UnityCatalogApi {
             cfg.setHttpTimeoutSeconds((int) Math.min(Integer.MAX_VALUE, timeoutSec));
         }
         return new WorkspaceClient(cfg);
+    }
+
+    /** Build the OSS {@code delta/v1} {@link ApiClient} shared by the two delta APIs. */
+    private static ApiClient buildDeltaApiClient(UnityCatalogProperties properties) {
+        Map<String, String> authConfig = new HashMap<>();
+        if (properties.getAuthType() == UnityCatalogProperties.AuthType.OAUTH_M2M) {
+            authConfig.put("type", "oauth");
+            authConfig.put("oauth.uri", properties.getHost() + "/oidc/v1/token");
+            authConfig.put("oauth.clientId", properties.getClientId());
+            authConfig.put("oauth.clientSecret", properties.getClientSecret());
+        } else {
+            authConfig.put("type", "static");
+            authConfig.put("token", properties.getToken());
+        }
+
+        // Databricks rejects delta/v1 with HTTP 400 unless the caller identifies itself in the
+        // User-Agent; the builder emits "UnityCatalog-Java-Client/<ver> Delta/... Spark/...".
+        ApiClient apiClient = ApiClientBuilder.create()
+                .uri(properties.getHost())
+                .addAppVersion("Delta", "4.3.0")
+                .addAppVersion("Spark", "4.0.0")
+                .addAppVersion("Scala", "2.13.16")
+                .addAppVersion("Java", "17.0.19")
+                .tokenProvider(TokenProvider.create(authConfig))
+                // maxAttempts counts the initial try, and the builder rejects 0, so translate the
+                // retry count into total attempts.
+                .retryPolicy(JitterDelayRetryPolicy.builder()
+                        .maxAttempts(properties.getMaxRetries() + 1).build())
+                .build();
+
+        // Databricks returns fields the OSS delta/v1 spec does not model; tolerate them.
+        ObjectMapper mapper = apiClient.getObjectMapper();
+        mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        apiClient.setObjectMapper(mapper);
+
+        long timeoutMs = properties.getRequestTimeoutMs();
+        if (timeoutMs > 0) {
+            Duration timeout = Duration.ofMillis(timeoutMs);
+            apiClient.setConnectTimeout(timeout);
+            apiClient.setReadTimeout(timeout);
+        }
+        return apiClient;
     }
 
     @Override
@@ -104,15 +167,6 @@ public class UnityCatalogClient implements UnityCatalogApi {
     }
 
     @Override
-    public TableInfo getTable(String fullName) {
-        try {
-            return workspace.tables().get(encodeFullName(fullName));
-        } catch (DatabricksException e) {
-            throw wrap("getTable(" + fullName + ")", e);
-        }
-    }
-
-    @Override
     public boolean tableExists(String fullName) {
         try {
             workspace.tables().get(encodeFullName(fullName));
@@ -125,18 +179,6 @@ public class UnityCatalogClient implements UnityCatalogApi {
     }
 
     @Override
-    public GenerateTemporaryTableCredentialResponse getTemporaryTableCredentials(String tableId, String operation) {
-        try {
-            return workspace.temporaryTableCredentials().generateTemporaryTableCredentials(
-                    new GenerateTemporaryTableCredentialRequest()
-                            .setTableId(tableId)
-                            .setOperation(parseOperation(operation)));
-        } catch (DatabricksException e) {
-            throw wrap("generateTemporaryTableCredentials(" + tableId + ", " + operation + ")", e);
-        }
-    }
-
-    @Override
     public GetMetastoreSummaryResponse getMetastoreSummary() {
         try {
             return workspace.metastores().summary();
@@ -145,10 +187,48 @@ public class UnityCatalogClient implements UnityCatalogApi {
         }
     }
 
-    private static TableOperation parseOperation(String operation) {
-        String normalized = operation == null ? READ_OPERATION : operation.trim().toUpperCase(Locale.ROOT);
+    @Override
+    public DeltaLoadTableResponse loadTable(String ucCatalog, String schemaName, String tableName) {
+        if (deltaTablesApi == null) {
+            throw new StarRocksConnectorException(
+                    "Unity Catalog delta/v1 client is not configured; loadTable is unavailable");
+        }
         try {
-            return TableOperation.valueOf(normalized);
+            return deltaTablesApi.loadTable(ucCatalog, schemaName, tableName);
+        } catch (ApiException e) {
+            String context = "loadTable(" + ucCatalog + "." + schemaName + "." + tableName + ")";
+            // The delta/v1 endpoint only serves Delta tables; a 4xx on a table accessed by name
+            // most often means it is missing or not a Delta table (Iceberg / Parquet / view).
+            if (e.getCode() >= 400 && e.getCode() < 500) {
+                context += "; verify the table exists and its data source format is Delta";
+            }
+            throw wrap(context, e);
+        }
+    }
+
+    @Override
+    public DeltaCredentialsResponse getTableCredentials(String ucCatalog, String schemaName, String tableName,
+                                                        String tableId, String operation) {
+        // tableId is not part of the delta/v1 request; it only keys the credential cache upstream.
+        if (deltaCredentialsApi == null) {
+            throw new StarRocksConnectorException(
+                    "Unity Catalog delta/v1 client is not configured; getTableCredentials is unavailable");
+        }
+        try {
+            return deltaCredentialsApi.getTableCredentials(parseOperation(operation), ucCatalog, schemaName, tableName);
+        } catch (ApiException e) {
+            throw wrap("getTableCredentials(" + ucCatalog + "." + schemaName + "." + tableName
+                    + ", " + operation + ")", e);
+        }
+    }
+
+    private static DeltaCredentialOperation parseOperation(String operation) {
+        if (operation == null) {
+            return DeltaCredentialOperation.READ;
+        }
+        try {
+            String normalized = operation.trim().toUpperCase(Locale.ROOT);
+            return DeltaCredentialOperation.valueOf(normalized);
         } catch (IllegalArgumentException e) {
             throw new StarRocksConnectorException(
                     "Unsupported Unity Catalog table operation: %s. Allowed: READ, READ_WRITE", operation);
@@ -158,6 +238,12 @@ public class UnityCatalogClient implements UnityCatalogApi {
     private static StarRocksConnectorException wrap(String context, DatabricksException e) {
         LOG.warn("Unity Catalog request {} failed: {}", context, e.getMessage());
         return new StarRocksConnectorException("Unity Catalog %s failed: %s", context, e.getMessage());
+    }
+
+    private static StarRocksConnectorException wrap(String context, ApiException e) {
+        LOG.warn("Unity Catalog request {} failed: code={} body={}", context, e.getCode(), e.getResponseBody());
+        return new StarRocksConnectorException("Unity Catalog %s failed (HTTP %s): %s",
+                context, e.getCode(), e.getMessage());
     }
 
     private static String encodeFullName(String fullName) {

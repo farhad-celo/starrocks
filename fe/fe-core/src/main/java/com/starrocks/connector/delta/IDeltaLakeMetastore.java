@@ -29,33 +29,36 @@ public interface IDeltaLakeMetastore extends IMetastore, MemoryTrackable {
     }
 
     /**
-     * Returns {@code true} when the operator has opted out of the catalog-level snapshot cache
-     * for this metastore. {@link CachingDeltaLakeMetastore#getTable} consults this and falls
-     * straight through to {@link #getTable} on the delegate, so a fresh snapshot is loaded for
-     * every query.
+     * Returns {@code true} when the operator has opted out of the catalog-level snapshot cache, so
+     * {@link CachingDeltaLakeMetastore#getTable} loads a fresh snapshot for every query.
      */
     default boolean isSnapshotCacheBypassed() {
         return false;
     }
 
     /**
-     * Per-table cloud configuration to attach to the SRTable when the snapshot cache returns a
-     * hit. Without this hook the cached path in {@link CachingDeltaLakeMetastore#getTable} would
-     * skip the per-table vended credentials that {@link DeltaLakeMetastore#getTable} normally
-     * attaches via its subclass override, causing the planner to ship credential-less scan
-     * ranges to the BE (resulting in S3 403s). Implementations that do not vend per-table
-     * credentials simply return {@code null}.
+     * Per-table cloud configuration to attach to the SRTable. Without this, snapshot-cache hits in
+     * {@link CachingDeltaLakeMetastore#getTable} would skip per-table vended credentials and the BE
+     * would get credential-less scan ranges (S3 403s). Returns {@code null} when not vending.
      */
     default CloudConfiguration resolveTableCloudConfiguration(String dbName, String tableName) {
         return null;
     }
 
     /**
-     * Drop any per-table state the implementation holds for {@code (dbName, tableName)}.
-     * Invoked from {@link CachingDeltaLakeMetastore#refreshTable} so that {@code REFRESH
-     * EXTERNAL TABLE} also flushes downstream metadata caches (e.g. Unity client
-     * {@code TableInfo} entries). The default is a no-op for backends that do not maintain
-     * their own per-table cache.
+     * Overload supplying an already-known {@code tableLocation} and Delta {@code tableId} (the table
+     * UUID) so the snapshot-cache-hit path in {@link CachingDeltaLakeMetastore#getTable} can vend
+     * credentials without re-fetching table metadata. Both come from the cached
+     * {@link DeltaLakeSnapshot}. The default falls back to {@link #resolveTableCloudConfiguration(String, String)}.
+     */
+    default CloudConfiguration resolveTableCloudConfiguration(String dbName, String tableName, String tableLocation,
+                                                              String tableId) {
+        return resolveTableCloudConfiguration(dbName, tableName);
+    }
+
+    /**
+     * Drop per-table state for {@code (dbName, tableName)} so {@code REFRESH EXTERNAL TABLE} flushes
+     * downstream caches. No-op default.
      */
     default void refreshTable(String dbName, String tableName) {
     }

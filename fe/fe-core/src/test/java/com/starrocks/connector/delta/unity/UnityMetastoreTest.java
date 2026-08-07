@@ -14,10 +14,7 @@
 
 package com.starrocks.connector.delta.unity;
 
-import com.databricks.sdk.service.catalog.AwsCredentials;
-import com.databricks.sdk.service.catalog.AzureUserDelegationSas;
 import com.databricks.sdk.service.catalog.DataSourceFormat;
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialResponse;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.TableInfo;
@@ -34,10 +31,18 @@ import mockit.Mocked;
 import mockit.Verifications;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 public class UnityMetastoreTest {
+
+    private static final String S3_LOCATION = "s3://bucket/prefix/orders";
+    private static final String ADLS_LOCATION = "abfss://container@account.dfs.core.windows.net/prefix/orders";
+    private static final String TABLE_ID = "11111111-1111-1111-1111-111111111111";
 
     private static UnityCatalogProperties propsWithVendedCredentials(boolean enabled) {
         return new UnityCatalogProperties(ImmutableMap.of(
@@ -54,22 +59,6 @@ public class UnityMetastoreTest {
                 "unity.catalog.name", "main",
                 "unity.catalog.vended-credentials-enabled", "true",
                 "unity.catalog.aws.region", region));
-    }
-
-    private static TableInfo deltaTable(String tableId) {
-        return new TableInfo()
-                .setFullName("main.sales.orders")
-                .setTableId(tableId)
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/prefix/orders");
-    }
-
-    private static GenerateTemporaryTableCredentialResponse awsCreds() {
-        return new GenerateTemporaryTableCredentialResponse()
-                .setAwsTempCredentials(new AwsCredentials()
-                        .setAccessKeyId("AKIA_TEST")
-                        .setSecretAccessKey("secret")
-                        .setSessionToken("session"));
     }
 
     @Test
@@ -102,7 +91,6 @@ public class UnityMetastoreTest {
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
-        // Caller passes a differently-cased name; lookup must still resolve.
         Database db = metastore.getDb("SALES");
         Assertions.assertNotNull(db);
         Assertions.assertEquals("SALES", db.getFullName());
@@ -125,34 +113,25 @@ public class UnityMetastoreTest {
         Assertions.assertEquals("", db.getLocation());
     }
 
-    @Test
-    public void testGetDbReturnsNullWhenDatabaseMissing(@Mocked UnityCatalogClient client) {
-        SchemaInfo sales = new SchemaInfo().setName("sales");
-
-        new Expectations() {
-            {
-                client.listSchemas("main");
-                result = ImmutableList.of(sales);
-            }
-        };
-
-        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
-        // A missing database returns null (the connector's "does not exist" contract); the
-        // caching layer translates that into a clean unknown-database error for the user.
-        Assertions.assertNull(metastore.getDb("missing"));
+    private static Stream<Arguments> getDbAbsentCases() {
+        return Stream.of(
+                Arguments.of(ImmutableList.of(new SchemaInfo().setName("sales")), "missing"),
+                Arguments.of(ImmutableList.<SchemaInfo>of(), "sales"));
     }
 
-    @Test
-    public void testGetDbReturnsNullWhenCatalogHasNoSchemas(@Mocked UnityCatalogClient client) {
+    @ParameterizedTest
+    @MethodSource("getDbAbsentCases")
+    public void testGetDbReturnsNullWhenAbsent(List<SchemaInfo> schemas, String query,
+                                               @Mocked UnityCatalogClient client) {
         new Expectations() {
             {
                 client.listSchemas("main");
-                result = ImmutableList.of();
+                result = schemas;
             }
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
-        Assertions.assertNull(metastore.getDb("sales"));
+        Assertions.assertNull(metastore.getDb(query));
     }
 
     @Test
@@ -174,32 +153,29 @@ public class UnityMetastoreTest {
     }
 
     @Test
-    public void testGetMetastoreTableReturnsPlainMetastoreTable(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123")
-                .setCreatedAt(1_700_000_000_000L);
-
+    public void testGetMetastoreTableReturnsUnityMetastoreTable(@Mocked UnityCatalogClient client) {
         new Expectations() {
             {
-                client.getTable("main.sales.orders");
-                result = info;
+                client.loadTable("main", "sales", "orders");
+                result = UnityDeltaModelFixtures.loadResponse(S3_LOCATION, 1_700_000_000_000L, null);
             }
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
         MetastoreTable mt = metastore.getMetastoreTable("sales", "orders");
-        Assertions.assertEquals("s3://bucket/prefix/orders", mt.getTableLocation());
+        Assertions.assertInstanceOf(UnityMetastoreTable.class, mt);
+        Assertions.assertEquals(S3_LOCATION, mt.getTableLocation());
         // Unity Catalog reports millis; MetastoreTable stores seconds.
         Assertions.assertEquals(1_700_000_000L, mt.getCreateTime());
+        Assertions.assertNotNull(((UnityMetastoreTable) mt).getLoadTableResponse());
     }
 
     @Test
     public void testGetMetastoreTableHandlesMissingTimestamps(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
-
         new Expectations() {
             {
-                client.getTable("main.sales.orders");
-                result = info;
+                client.loadTable("main", "sales", "orders");
+                result = UnityDeltaModelFixtures.loadResponse(S3_LOCATION, null, null);
             }
         };
 
@@ -209,14 +185,27 @@ public class UnityMetastoreTest {
     }
 
     @Test
+    public void testGetMetastoreTableRejectsMissingLocation(@Mocked UnityCatalogClient client) {
+        new Expectations() {
+            {
+                client.loadTable("main", "sales", "managed_tbl");
+                result = UnityDeltaModelFixtures.loadResponse(null, 1L, null);
+            }
+        };
+
+        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
+        Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> metastore.getMetastoreTable("sales", "managed_tbl"));
+    }
+
+    @Test
     public void testResolveCloudConfigurationWithAwsVendedCredentials(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
         GetMetastoreSummaryResponse summary = new GetMetastoreSummaryResponse().setRegion("us-east-1");
 
         new Expectations() {
             {
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = awsCreds();
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
                 client.getMetastoreSummary();
                 result = summary;
                 times = 1;
@@ -224,7 +213,7 @@ public class UnityMetastoreTest {
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
-        CloudConfiguration cc = metastore.resolveCloudConfiguration(info);
+        CloudConfiguration cc = metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID);
         Assertions.assertNotNull(cc);
         Assertions.assertEquals(CloudType.AWS, cc.getCloudType());
         Assertions.assertInstanceOf(AwsCloudConfiguration.class, cc);
@@ -232,13 +221,12 @@ public class UnityMetastoreTest {
 
     @Test
     public void testResolveCloudConfigurationUsesMetastoreRegion(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
         GetMetastoreSummaryResponse summary = new GetMetastoreSummaryResponse().setRegion("eu-central-1");
 
         new Expectations() {
             {
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = awsCreds();
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
                 times = 2;
                 client.getMetastoreSummary();
                 result = summary;
@@ -247,26 +235,22 @@ public class UnityMetastoreTest {
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
-        // First call resolves and memoizes the region.
-        CloudConfiguration cc = metastore.resolveCloudConfiguration(info);
+        CloudConfiguration cc = metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID);
         Assertions.assertEquals("eu-central-1",
                 ((AwsCloudConfiguration) cc).getAwsCloudCredential().getRegion());
-        // Second call must reuse the memoized region (times = 1 above asserts no extra REST hit).
-        CloudConfiguration cc2 = metastore.resolveCloudConfiguration(info);
+        CloudConfiguration cc2 = metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID);
         Assertions.assertEquals("eu-central-1",
                 ((AwsCloudConfiguration) cc2).getAwsCloudCredential().getRegion());
     }
 
     @Test
-    public void testResolveCloudConfigurationRetriesAfterRegionLookupFailure(
-            @Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
+    public void testResolveCloudConfigurationRetriesAfterRegionLookupFailure(@Mocked UnityCatalogClient client) {
         GetMetastoreSummaryResponse summary = new GetMetastoreSummaryResponse().setRegion("eu-central-1");
 
         new Expectations() {
             {
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = awsCreds();
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
                 times = 2;
                 client.getMetastoreSummary();
                 result = new Object[] {
@@ -278,207 +262,117 @@ public class UnityMetastoreTest {
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
-        // First lookup fails -> throws and leaves the memo unset so the next call retries.
         Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> metastore.resolveCloudConfiguration(info));
-        // Second lookup succeeds -> region resolved.
-        CloudConfiguration second = metastore.resolveCloudConfiguration(info);
+                () -> metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID));
+        CloudConfiguration second = metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID);
         Assertions.assertEquals("eu-central-1",
                 ((AwsCloudConfiguration) second).getAwsCloudCredential().getRegion());
     }
 
-    @Test
-    public void testResolveCloudConfigurationThrowsWhenSummaryFails(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
-
-        new Expectations() {
-            {
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = awsCreds();
-                client.getMetastoreSummary();
-                result = new StarRocksConnectorException("403 forbidden on metastore_summary");
-            }
-        };
-
-        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
-        Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> metastore.resolveCloudConfiguration(info));
+    private static Stream<Arguments> unresolvableRegionCases() {
+        // The region lookup fails outright, or succeeds but carries no region: both must fail loudly
+        // instead of silently falling back to us-east-1.
+        return Stream.of(
+                Arguments.of(new StarRocksConnectorException("403 forbidden on metastore_summary")),
+                Arguments.of(new GetMetastoreSummaryResponse()));
     }
 
-    @Test
-    public void testResolveCloudConfigurationThrowsWhenSummaryHasNoRegion(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
-
+    @ParameterizedTest
+    @MethodSource("unresolvableRegionCases")
+    public void testResolveCloudConfigurationFailsWhenRegionUnresolvable(Object summaryResult,
+                                                                         @Mocked UnityCatalogClient client) {
         new Expectations() {
             {
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = awsCreds();
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
                 client.getMetastoreSummary();
-                result = new GetMetastoreSummaryResponse();
+                result = summaryResult;
             }
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
         Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> metastore.resolveCloudConfiguration(info),
-                "missing region must fail loudly instead of silently falling back to us-east-1");
+                () -> metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID));
     }
 
     @Test
     public void testResolveCloudConfigurationUsesAwsRegionOverride(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
-
         new Expectations() {
             {
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = awsCreds();
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
                 client.getMetastoreSummary();
                 times = 0;
             }
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithAwsRegionOverride("us-west-2"));
-        CloudConfiguration cc = metastore.resolveCloudConfiguration(info);
+        CloudConfiguration cc = metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID);
         Assertions.assertEquals("us-west-2",
                 ((AwsCloudConfiguration) cc).getAwsCloudCredential().getRegion());
     }
 
     @Test
     public void testResolveCloudConfigurationDoesNotQueryRegionForAzure(@Mocked UnityCatalogClient client) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders")
-                .setTableId("abc-azure")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("abfss://container@account.dfs.core.windows.net/prefix/orders");
-
-        GenerateTemporaryTableCredentialResponse creds = new GenerateTemporaryTableCredentialResponse()
-                .setAzureUserDelegationSas(new AzureUserDelegationSas().setSasToken("sv=2022-11-02&sig=fakesignature"));
-
         new Expectations() {
             {
-                client.getTemporaryTableCredentials("abc-azure", "READ");
-                result = creds;
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = UnityDeltaModelFixtures.credsResponse(UnityDeltaModelFixtures.credential(
+                        ADLS_LOCATION,
+                        UnityDeltaModelFixtures.azureConfig("sv=2022-11-02&sig=fakesignature"), 1L));
                 client.getMetastoreSummary();
                 times = 0;
             }
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
-        CloudConfiguration cc = metastore.resolveCloudConfiguration(info);
+        CloudConfiguration cc = metastore.resolveCloudConfiguration("sales", "orders", ADLS_LOCATION, TABLE_ID);
         Assertions.assertEquals(CloudType.AZURE, cc.getCloudType());
     }
 
     @Test
     public void testResolveCloudConfigurationReturnsNullWhenDisabled(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
-
         new Expectations() {
             {
-                client.getTemporaryTableCredentials(anyString, anyString);
+                client.getTableCredentials(anyString, anyString, anyString, anyString, anyString);
                 times = 0;
             }
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
-        Assertions.assertNull(metastore.resolveCloudConfiguration(info));
-    }
-
-    @Test
-    public void testGetMetastoreTableRejectsNonDelta(@Mocked UnityCatalogClient client) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.t")
-                .setTableId("id")
-                .setDataSourceFormat(DataSourceFormat.ICEBERG)
-                .setStorageLocation("s3://bucket/t");
-
-        new Expectations() {
-            {
-                client.getTable("main.sales.t");
-                result = info;
-            }
-        };
-
-        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
-        Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> metastore.getMetastoreTable("sales", "t"));
-    }
-
-    @Test
-    public void testGetMetastoreTableRejectsMissingLocation(@Mocked UnityCatalogClient client) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.managed_tbl")
-                .setTableId("id")
-                .setDataSourceFormat(DataSourceFormat.DELTA);
-
-        new Expectations() {
-            {
-                client.getTable("main.sales.managed_tbl");
-                result = info;
-            }
-        };
-
-        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(false));
-        Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> metastore.getMetastoreTable("sales", "managed_tbl"));
+        Assertions.assertNull(metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID));
     }
 
     @Test
     public void testResolveCloudConfigurationThrowsOnVendingFailure(@Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
-
         new Expectations() {
             {
-                client.getTemporaryTableCredentials("abc-123", "READ");
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
                 result = new StarRocksConnectorException("forbidden");
             }
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
         StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> metastore.resolveCloudConfiguration(info));
+                () -> metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID));
         Assertions.assertTrue(ex.getMessage().contains("main.sales.orders"),
                 "exception message must include the failing table name; was: " + ex.getMessage());
     }
 
     @Test
-    public void testResolveCloudConfigurationThrowsWhenTableIdMissing(@Mocked UnityCatalogClient client) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/prefix/orders");
-
+    public void testResolveCloudConfigurationThrowsWhenTranslationProducesNothing(@Mocked UnityCatalogClient client) {
         new Expectations() {
             {
-                client.getTemporaryTableCredentials(anyString, anyString);
-                times = 0;
-            }
-        };
-
-        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
-        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> metastore.resolveCloudConfiguration(info));
-        Assertions.assertTrue(ex.getMessage().contains("main.sales.orders"),
-                "exception message must include the failing table name; was: " + ex.getMessage());
-    }
-
-    @Test
-    public void testResolveCloudConfigurationThrowsWhenTranslationProducesNothing(
-            @Mocked UnityCatalogClient client) {
-        TableInfo info = deltaTable("abc-123");
-
-        new Expectations() {
-            {
-                // UC returned a successful response but populated none of the AWS/Azure/GCP
-                // credential fields. The translator yields a DEFAULT/empty CloudConfiguration;
-                // we expect the metastore to surface that as a hard failure.
-                client.getTemporaryTableCredentials("abc-123", "READ");
-                result = new GenerateTemporaryTableCredentialResponse();
+                // UC returned a successful response but no usable credentials. The translator yields
+                // a DEFAULT/empty CloudConfiguration; the metastore must surface a hard failure.
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = UnityDeltaModelFixtures.credsResponse();
             }
         };
 
         UnityMetastore metastore = new UnityMetastore(client, propsWithAwsRegionOverride("us-east-1"));
         StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> metastore.resolveCloudConfiguration(info));
+                () -> metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID));
         Assertions.assertTrue(ex.getMessage().contains("main.sales.orders"),
                 "exception message must include the failing table name; was: " + ex.getMessage());
     }

@@ -15,23 +15,31 @@
 package com.starrocks.connector.delta.unity;
 
 import com.databricks.sdk.service.catalog.DataSourceFormat;
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialResponse;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.TableInfo;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.unitycatalog.client.delta.model.DeltaCredentialsResponse;
+import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
 import mockit.Expectations;
 import mockit.Mocked;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 public class CachingUnityCatalogClientTest {
+
+    private static final String TABLE_ID = "11111111-1111-1111-1111-111111111111";
 
     private static UnityCatalogProperties propsWith(long ttlSec, long credentialsSafetyMarginSec) {
         return propsWith(ttlSec, credentialsSafetyMarginSec, true);
@@ -112,134 +120,31 @@ public class CachingUnityCatalogClientTest {
         client.listTables("main", "marketing");
     }
 
-    @Test
-    public void testGetTableCachesByFullName(@Mocked UnityCatalogApi delegate) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders")
-                .setTableId("abc-123")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/orders");
-
+    @ParameterizedTest
+    @CsvSource({"main.sales.orders, true", "main.sales.missing, false"})
+    public void testTableExistsAlwaysDelegates(String fullName, boolean exists, @Mocked UnityCatalogApi delegate) {
+        // v1 has no cache to short-circuit on and does not negative-cache: every call reaches the delegate.
         new Expectations() {
             {
-                delegate.getTable("main.sales.orders");
-                result = info;
-                times = 1;
-            }
-        };
-
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
-                new AdvanceableTicker(), new AtomicLong());
-
-        Assertions.assertSame(info, client.getTable("main.sales.orders"));
-        Assertions.assertSame(info, client.getTable("main.sales.orders"));
-    }
-
-    @Test
-    public void testTableExistsShortCircuitsWhenTableInfoCached(@Mocked UnityCatalogApi delegate) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/orders");
-
-        new Expectations() {
-            {
-                delegate.getTable("main.sales.orders");
-                result = info;
-                times = 1;
-                delegate.tableExists(anyString);
-                times = 0;
-            }
-        };
-
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
-                new AdvanceableTicker(), new AtomicLong());
-        client.getTable("main.sales.orders");
-        Assertions.assertTrue(client.tableExists("main.sales.orders"));
-    }
-
-    @Test
-    public void testTableExistsDelegatesWhenNotCached(@Mocked UnityCatalogApi delegate) {
-        new Expectations() {
-            {
-                delegate.tableExists("main.sales.missing");
-                result = false;
-                times = 1;
-            }
-        };
-
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
-                new AdvanceableTicker(), new AtomicLong());
-        Assertions.assertFalse(client.tableExists("main.sales.missing"));
-    }
-
-    @Test
-    public void testTableExistsDoesNotNegativeCache(@Mocked UnityCatalogApi delegate) {
-        // v1 explicitly skips negative caching: two calls -> two delegate hits.
-        new Expectations() {
-            {
-                delegate.tableExists("main.sales.missing");
-                result = false;
+                delegate.tableExists(fullName);
+                result = exists;
                 times = 2;
             }
         };
 
         CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
                 new AdvanceableTicker(), new AtomicLong());
-        Assertions.assertFalse(client.tableExists("main.sales.missing"));
-        Assertions.assertFalse(client.tableExists("main.sales.missing"));
+        Assertions.assertEquals(exists, client.tableExists(fullName));
+        Assertions.assertEquals(exists, client.tableExists(fullName));
     }
 
     @Test
-    public void testCredentialsCacheHitWhenWellBeforeExpiry(@Mocked UnityCatalogApi delegate) {
-        GenerateTemporaryTableCredentialResponse creds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(10_000_000L);
-        AtomicLong wallClock = new AtomicLong(1_000L);
+    public void testLoadTableAlwaysDelegates(@Mocked UnityCatalogApi delegate) {
+        DeltaLoadTableResponse first = UnityDeltaModelFixtures.loadResponse("s3://bucket/orders", 1L, null);
+        DeltaLoadTableResponse second = UnityDeltaModelFixtures.loadResponse("s3://bucket/orders", 2L, null);
         new Expectations() {
             {
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
-                result = creds;
-                times = 1;
-            }
-        };
-
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
-                new AdvanceableTicker(), wallClock);
-        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
-    }
-
-    @Test
-    public void testCredentialsBypassedWhenInsideSafetyMargin(@Mocked UnityCatalogApi delegate) {
-        GenerateTemporaryTableCredentialResponse first = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(10_000L);
-        GenerateTemporaryTableCredentialResponse second = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(200_000L);
-
-        AtomicLong wallClock = new AtomicLong(1_000L);
-        new Expectations() {
-            {
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
-                returns(first, second);
-                times = 2;
-            }
-        };
-
-        // safety margin 60s => creds that expire at 10s are always "near expiry".
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
-                new AdvanceableTicker(), wallClock);
-        Assertions.assertSame(first, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(second, client.getTemporaryTableCredentials("abc-123", "READ"));
-    }
-
-    @Test
-    public void testCredentialsWithoutExpirationTimeAreNotCached(@Mocked UnityCatalogApi delegate) {
-        GenerateTemporaryTableCredentialResponse first = new GenerateTemporaryTableCredentialResponse();
-        GenerateTemporaryTableCredentialResponse second = new GenerateTemporaryTableCredentialResponse();
-
-        new Expectations() {
-            {
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
+                delegate.loadTable("main", "sales", "orders");
                 returns(first, second);
                 times = 2;
             }
@@ -247,41 +152,58 @@ public class CachingUnityCatalogClientTest {
 
         CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
                 new AdvanceableTicker(), new AtomicLong());
-        Assertions.assertSame(first, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(second, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(first, client.loadTable("main", "sales", "orders"));
+        Assertions.assertSame(second, client.loadTable("main", "sales", "orders"));
     }
 
-    @Test
-    public void testTtlExpiryReloadsEntry(@Mocked UnityCatalogApi delegate) {
-        TableInfo info1 = new TableInfo().setFullName("main.sales.orders");
-        TableInfo info2 = new TableInfo().setFullName("main.sales.orders");
+    private static Stream<Arguments> credentialExpiryCases() {
+        return Stream.of(
+                // Well before expiry: cached, delegate hit once.
+                Arguments.of(UnityDeltaModelFixtures.awsCredsResponse(10_000_000L),
+                        UnityDeltaModelFixtures.awsCredsResponse(10_000_000L), 1_000L, true),
+                // Inside the 60s safety margin: re-vended on every call.
+                Arguments.of(UnityDeltaModelFixtures.awsCredsResponse(10_000L),
+                        UnityDeltaModelFixtures.awsCredsResponse(200_000L), 1_000L, false),
+                // Earliest expiry across credentials wins, so the response is near-expiry and not cached.
+                Arguments.of(UnityDeltaModelFixtures.credsResponse(
+                                UnityDeltaModelFixtures.credential("s3://bucket/a", UnityDeltaModelFixtures.awsConfig(), 10_000_000L),
+                                UnityDeltaModelFixtures.credential("s3://bucket/b", UnityDeltaModelFixtures.awsConfig(), 10_000L)),
+                        UnityDeltaModelFixtures.awsCredsResponse(10_000_000L), 1_000L, false));
+    }
 
+    @ParameterizedTest
+    @MethodSource("credentialExpiryCases")
+    public void testCredentialExpiryDrivesCaching(DeltaCredentialsResponse first, DeltaCredentialsResponse second,
+                                                  long wallClockMillis, boolean expectCached,
+                                                  @Mocked UnityCatalogApi delegate) {
         new Expectations() {
             {
-                delegate.getTable("main.sales.orders");
-                returns(info1, info2);
-                times = 2;
+                delegate.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                if (expectCached) {
+                    result = first;
+                    times = 1;
+                } else {
+                    returns(first, second);
+                    times = 2;
+                }
             }
         };
 
-        AdvanceableTicker ticker = new AdvanceableTicker();
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60), ticker, new AtomicLong());
-
-        Assertions.assertSame(info1, client.getTable("main.sales.orders"));
-        ticker.advance(61, TimeUnit.SECONDS);
-        Assertions.assertSame(info2, client.getTable("main.sales.orders"));
+        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
+                new AdvanceableTicker(), new AtomicLong(wallClockMillis));
+        Assertions.assertSame(first, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        Assertions.assertSame(expectCached ? first : second,
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
     }
 
     @Test
     public void testTtlExpiryReloadsCredentialEntry(@Mocked UnityCatalogApi delegate) {
-        GenerateTemporaryTableCredentialResponse first = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
-        GenerateTemporaryTableCredentialResponse second = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
+        DeltaCredentialsResponse first = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
+        DeltaCredentialsResponse second = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
 
         new Expectations() {
             {
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
+                delegate.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
                 returns(first, second);
                 times = 2;
             }
@@ -290,59 +212,23 @@ public class CachingUnityCatalogClientTest {
         AdvanceableTicker ticker = new AdvanceableTicker();
         CachingUnityCatalogClient client = newClient(delegate, propsWith(2, 60), ticker, new AtomicLong());
 
-        Assertions.assertSame(first, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(first, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
         ticker.advance(3, TimeUnit.SECONDS);
-        Assertions.assertSame(second, client.getTemporaryTableCredentials("abc-123", "READ"));
-    }
-
-    @Test
-    public void testInvalidateClearsTableInfoButKeepsCredentials(@Mocked UnityCatalogApi delegate) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders")
-                .setTableId("abc-123")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/orders");
-
-        GenerateTemporaryTableCredentialResponse creds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
-
-        new Expectations() {
-            {
-                delegate.getTable("main.sales.orders");
-                result = info;
-                times = 2;
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
-                result = creds;
-                times = 1;
-            }
-        };
-
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
-                new AdvanceableTicker(), new AtomicLong());
-        client.getTable("main.sales.orders");
-        client.getTemporaryTableCredentials("abc-123", "READ");
-
-        client.invalidate("main.sales.orders");
-
-        client.getTable("main.sales.orders");
-        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(second, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
     }
 
     @Test
     public void testCredentialsCachedPerOperation(@Mocked UnityCatalogApi delegate) {
-        GenerateTemporaryTableCredentialResponse readCreds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
-        GenerateTemporaryTableCredentialResponse writeCreds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
+        DeltaCredentialsResponse readCreds = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
+        DeltaCredentialsResponse writeCreds = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
 
         new Expectations() {
             {
-                // Each (tableId, operation) is its own request identity. Two distinct
-                // operations on the same tableId must not alias each other in the cache.
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
+                // Distinct operations on the same table must not alias each other in the cache.
+                delegate.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
                 result = readCreds;
                 times = 1;
-                delegate.getTemporaryTableCredentials("abc-123", "READ_WRITE");
+                delegate.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ_WRITE");
                 result = writeCreds;
                 times = 1;
             }
@@ -351,66 +237,52 @@ public class CachingUnityCatalogClientTest {
         CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
                 new AdvanceableTicker(), new AtomicLong());
 
-        Assertions.assertSame(readCreds, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(writeCreds, client.getTemporaryTableCredentials("abc-123", "READ_WRITE"));
+        Assertions.assertSame(readCreds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        Assertions.assertSame(writeCreds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ_WRITE"));
         // Repeats hit the per-operation entry, not each other.
-        Assertions.assertSame(readCreds, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(writeCreds, client.getTemporaryTableCredentials("abc-123", "READ_WRITE"));
+        Assertions.assertSame(readCreds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        Assertions.assertSame(writeCreds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ_WRITE"));
     }
 
     @Test
-    public void testInvalidateKeepsCredentialsForEveryOperation(@Mocked UnityCatalogApi delegate) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders")
-                .setTableId("abc-123")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/orders");
-
-        GenerateTemporaryTableCredentialResponse readCreds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
-        GenerateTemporaryTableCredentialResponse writeCreds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
+    public void testCredentialsCachedPerTableId(@Mocked UnityCatalogApi delegate) {
+        // Same three-part name, different Delta table UUID (a drop/recreate): must not alias.
+        String recreatedId = "22222222-2222-2222-2222-222222222222";
+        DeltaCredentialsResponse original = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
+        DeltaCredentialsResponse recreated = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
 
         new Expectations() {
             {
-                delegate.getTable("main.sales.orders");
-                result = info;
+                delegate.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = original;
                 times = 1;
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
-                result = readCreds;
-                times = 1;
-                delegate.getTemporaryTableCredentials("abc-123", "READ_WRITE");
-                result = writeCreds;
+                delegate.getTableCredentials("main", "sales", "orders", recreatedId, "READ");
+                result = recreated;
                 times = 1;
             }
         };
 
         CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60),
                 new AdvanceableTicker(), new AtomicLong());
-        client.getTable("main.sales.orders");
-        client.getTemporaryTableCredentials("abc-123", "READ");
-        client.getTemporaryTableCredentials("abc-123", "READ_WRITE");
 
-        client.invalidate("main.sales.orders");
-
-        Assertions.assertSame(readCreds, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(writeCreds, client.getTemporaryTableCredentials("abc-123", "READ_WRITE"));
+        Assertions.assertSame(original, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        Assertions.assertSame(recreated, client.getTableCredentials("main", "sales", "orders", recreatedId, "READ"));
+        Assertions.assertSame(original, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        Assertions.assertSame(recreated, client.getTableCredentials("main", "sales", "orders", recreatedId, "READ"));
     }
 
     @Test
     public void testZeroTtlBypassesMetadataAndCredentialsCache(@Mocked UnityCatalogApi delegate) {
         SchemaInfo s = new SchemaInfo().setName("sales");
-        GenerateTemporaryTableCredentialResponse firstCreds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
-        GenerateTemporaryTableCredentialResponse secondCreds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
+        DeltaCredentialsResponse firstCreds = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
+        DeltaCredentialsResponse secondCreds = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
 
         new Expectations() {
             {
                 delegate.listSchemas("main");
                 result = ImmutableList.of(s);
                 times = 2;
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
+                delegate.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
                 returns(firstCreds, secondCreds);
                 times = 2;
             }
@@ -420,37 +292,8 @@ public class CachingUnityCatalogClientTest {
                 new AdvanceableTicker(), new AtomicLong());
         client.listSchemas("main");
         client.listSchemas("main");
-        Assertions.assertSame(firstCreds, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(secondCreds, client.getTemporaryTableCredentials("abc-123", "READ"));
-    }
-
-    @Test
-    public void testDisabledMetadataCacheStillCachesCredentials(@Mocked UnityCatalogApi delegate) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders")
-                .setTableId("abc-123")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/orders");
-        GenerateTemporaryTableCredentialResponse creds = new GenerateTemporaryTableCredentialResponse()
-                .setExpirationTime(Long.MAX_VALUE);
-
-        new Expectations() {
-            {
-                delegate.getTable("main.sales.orders");
-                result = info;
-                times = 2;
-                delegate.getTemporaryTableCredentials("abc-123", "READ");
-                result = creds;
-                times = 1;
-            }
-        };
-
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(60, 60, false),
-                new AdvanceableTicker(), new AtomicLong());
-        client.getTable("main.sales.orders");
-        client.getTable("main.sales.orders");
-        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
-        Assertions.assertSame(creds, client.getTemporaryTableCredentials("abc-123", "READ"));
+        Assertions.assertSame(firstCreds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        Assertions.assertSame(secondCreds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
     }
 
     @Test

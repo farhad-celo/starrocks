@@ -15,7 +15,6 @@
 package com.starrocks.connector.delta.unity;
 
 import com.databricks.sdk.service.catalog.DataSourceFormat;
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialResponse;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.TableInfo;
 import com.google.common.annotations.VisibleForTesting;
@@ -26,6 +25,9 @@ import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.metastore.IMetastore;
 import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
+import io.unitycatalog.client.delta.model.DeltaCredentialsResponse;
+import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
+import io.unitycatalog.client.delta.model.DeltaTableMetadata;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -36,18 +38,17 @@ import java.util.stream.Collectors;
 /**
  * {@link IMetastore} implementation backed by the Databricks Unity Catalog REST API. Used as the
  * delegate inside {@link UnityBackedDeltaMetastore} to list schemas/tables and resolve per-table
- * storage locations (with optional vended credentials).
+ * storage locations (with optional vended credentials). The read path uses the Unity Catalog
+ * {@code delta/v1} client for {@code loadTable} and {@code getTableCredentials}.
  */
 public class UnityMetastore implements IMetastore {
     private static final Logger LOG = LogManager.getLogger(UnityMetastore.class);
+    private static final String READ_OPERATION = "READ";
 
     private final UnityCatalogApi client;
     private final UnityCatalogProperties properties;
-    // The Unity Catalog metastore is pinned to a single AWS region at creation time and Databricks
-    // does not support cross-region migration, so the region returned by metastore_summary is
-    // immutable for the lifetime of a catalog handle. We memoize it on first successful lookup
-    // and skip the REST call thereafter. {@code null} means "not fetched yet (or last attempt
-    // failed)" so a transient 5xx naturally retries on the next query.
+    // A UC metastore's AWS region is immutable, so memoize it on first success. null means
+    // "not fetched yet (or last attempt failed)" so a transient failure retries next query.
     private volatile String cachedRegion;
 
     public UnityMetastore(UnityCatalogApi client, UnityCatalogProperties properties) {
@@ -90,44 +91,38 @@ public class UnityMetastore implements IMetastore {
 
     @Override
     public MetastoreTable getMetastoreTable(String dbName, String tableName) {
-        return toMetastoreTable(dbName, tableName, fetchTableInfo(dbName, tableName));
+        return toMetastoreTable(dbName, tableName, loadTable(dbName, tableName));
     }
 
     /**
-     * Build a {@link MetastoreTable} from an already-fetched {@link TableInfo}, without making
-     * a fresh REST call. Used by {@link UnityBackedDeltaMetastore#getTable} so that one logical
-     * table load only triggers a single {@link UnityCatalogApi#getTable} round-trip even when
-     * Unity metadata caching is disabled or TTL=0.
+     * Build a {@link UnityMetastoreTable} from an already-fetched {@link DeltaLoadTableResponse},
+     * which is carried on the returned table so {@link UnityBackedDeltaMetastore} can reuse its
+     * inline commits when loading the snapshot (one {@code loadTable} per load).
      */
-    public MetastoreTable toMetastoreTable(String dbName, String tableName, TableInfo info) {
-        // Unity Catalog returns created_at as epoch milliseconds, but StarRocks table
-        // timestamps surfaced via information_schema / SHOW TABLE STATUS are epoch seconds
-        // (see Table.createTime and DateUtils.formatTimestampInSeconds). Convert to seconds
-        // so downstream formatting does not produce far-future dates.
-        long createTime = info.getCreatedAt() != null ? info.getCreatedAt() / 1000L : 0L;
-        return new MetastoreTable(dbName, tableName, info.getStorageLocation(), createTime);
+    public UnityMetastoreTable toMetastoreTable(String dbName, String tableName, DeltaLoadTableResponse response) {
+        DeltaTableMetadata metadata = response == null ? null : response.getMetadata();
+        if (metadata == null || Strings.isNullOrEmpty(metadata.getLocation())) {
+            throw new StarRocksConnectorException(
+                    "Unity Catalog table %s is missing a storage location; only external Delta tables " +
+                            "with a resolvable location are supported", fullName(dbName, tableName));
+        }
+        // UC returns created-time in epoch millis; StarRocks table timestamps are epoch seconds.
+        long createTime = epochMillisToSeconds(metadata.getCreatedTime());
+        return new UnityMetastoreTable(dbName, tableName, metadata.getLocation(), createTime, response);
     }
 
-    public TableInfo fetchTableInfo(String dbName, String tableName) {
-        String fullName = fullName(dbName, tableName);
-        TableInfo info;
+    private static long epochMillisToSeconds(Long epochMillis) {
+        return epochMillis != null ? epochMillis / 1000L : 0L;
+    }
+
+    /** Load Delta metadata plus inline catalog-owned commits via {@code delta/v1} {@code loadTable}. */
+    public DeltaLoadTableResponse loadTable(String dbName, String tableName) {
         try {
-            info = client.getTable(fullName);
+            return client.loadTable(properties.getUcCatalogName(), dbName, tableName);
         } catch (StarRocksConnectorException e) {
-            LOG.error("Failed to load Unity Catalog table {}", fullName, e);
+            LOG.error("Failed to load Unity Catalog table {}", fullName(dbName, tableName), e);
             throw e;
         }
-        if (info == null || Strings.isNullOrEmpty(info.getStorageLocation())) {
-            throw new StarRocksConnectorException(
-                    "Unity Catalog table %s is missing a storage_location; only external Delta tables " +
-                            "with a resolvable location are supported", fullName);
-        }
-        if (!isDelta(info)) {
-            throw new StarRocksConnectorException(
-                    "Unity Catalog table %s has unsupported data_source_format=%s; only DELTA is supported",
-                    fullName, info.getDataSourceFormat());
-        }
-        return info;
     }
 
     @Override
@@ -135,55 +130,43 @@ public class UnityMetastore implements IMetastore {
         return client.tableExists(fullName(dbName, tableName));
     }
 
-    public CloudConfiguration resolveCloudConfiguration(TableInfo info) {
+    /**
+     * Vend cloud credentials for {@code (dbName, tableName)} at {@code tableLocation} and translate
+     * them into a StarRocks {@link CloudConfiguration}. {@code tableId} (Delta table UUID) keys the
+     * credential cache. Returns {@code null} when vended credentials are disabled.
+     */
+    public CloudConfiguration resolveCloudConfiguration(String dbName, String tableName, String tableLocation,
+                                                        String tableId) {
         if (!properties.isVendedCredentialsEnabled()) {
             return null;
         }
-        if (Strings.isNullOrEmpty(info.getTableId())) {
-            throw new StarRocksConnectorException(
-                    "Unity Catalog table %s has no table_id; cannot vend credentials",
-                    info.getFullName());
-        }
-        GenerateTemporaryTableCredentialResponse creds;
+        DeltaCredentialsResponse creds;
         try {
-            creds = client.getTemporaryTableCredentials(info.getTableId(), "READ");
+            creds = client.getTableCredentials(properties.getUcCatalogName(), dbName, tableName, tableId,
+                    READ_OPERATION);
         } catch (StarRocksConnectorException e) {
             throw new StarRocksConnectorException(
-                    "Failed to vend Unity Catalog credentials for " + info.getFullName()
+                    "Failed to vend Unity Catalog credentials for " + fullName(dbName, tableName)
                             + ": " + e.getMessage(), e);
         }
-        // Region is only consumed by the AWS branch of the translator; resolving it for Azure
-        // or GCP would burn a metastore_summary call we do not need and -- worse -- would
-        // throw a misleading "AWS metastore" error if UC ever returned no region.
-        String awsRegion = (creds != null && creds.getAwsTempCredentials() != null) ? resolveAwsRegion() : null;
-        CloudConfiguration cc = UnityCatalogCredentialTranslator.toCloudConfiguration(creds,
-                info.getStorageLocation(), awsRegion);
+        // Region is only consumed by the AWS branch; resolving it for Azure/GCP would waste a
+        // metastore_summary call and could raise a misleading "AWS metastore" error.
+        String awsRegion = UnityCatalogCredentialTranslator.hasAwsCredential(creds, tableLocation)
+                ? resolveAwsRegion() : null;
+        CloudConfiguration cc = UnityCatalogCredentialTranslator.toCloudConfiguration(creds, tableLocation, awsRegion);
         if (cc == null || cc.getCloudType() == com.starrocks.credential.CloudType.DEFAULT) {
             throw new StarRocksConnectorException(
                     "Unity Catalog returned no recognizable credentials for %s; expected AWS, " +
                             "Azure or GCP fields",
-                    info.getFullName());
+                    fullName(dbName, tableName));
         }
         return cc;
     }
 
     /**
-     * Resolve the AWS region for vended credentials.
-     *
-     * <p>Resolution order:
-     * <ol>
-     *   <li>Operator override via {@link UnityCatalogProperties#getAwsRegionOverride()} if
-     *       set -- trusted as-is, no REST call.</li>
-     *   <li>Otherwise look up the region from Unity Catalog's {@code metastore_summary}
-     *       endpoint exactly once per catalog handle. Region is immutable for the lifetime
-     *       of a UC metastore so memoizing on first success avoids any further REST calls.
-     *       Throws when UC does not expose a region: a Databricks AWS metastore always
-     *       returns one, and silently defaulting to the AWS SDK's {@code us-east-1} would
-     *       otherwise cause hard-to-diagnose 403s for buckets in other regions. Transient
-     *       REST failures propagate too -- the outer caller treats them like a credential
-     *       vend failure and {@link #cachedRegion} stays {@code null} so the next query
-     *       retries.</li>
-     * </ol>
+     * Resolve the AWS region for vended credentials: the operator override if set, otherwise a
+     * once-per-handle {@code metastore_summary} lookup. Throws when UC exposes no region rather
+     * than defaulting to {@code us-east-1}, which would cause opaque 403s for other regions.
      */
     private String resolveAwsRegion() {
         String override = properties.getAwsRegionOverride();
@@ -206,11 +189,7 @@ public class UnityMetastore implements IMetastore {
         return cachedRegion;
     }
 
-    /**
-     * Drop any cached client-side metadata for {@code (dbName, tableName)}. Called from
-     * {@link UnityBackedDeltaMetastore#refreshTable(String, String)} so a manual {@code REFRESH
-     * EXTERNAL TABLE} also flushes the {@link CachingUnityCatalogClient} {@code TableInfo} entry.
-     */
+    /** Drop cached client-side state for {@code (dbName, tableName)} (for {@code REFRESH EXTERNAL TABLE}). */
     public void invalidateTable(String dbName, String tableName) {
         client.invalidate(fullName(dbName, tableName));
     }

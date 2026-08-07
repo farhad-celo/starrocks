@@ -316,6 +316,17 @@ under the License.
             <artifactId>delta-kernel-defaults</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.unitycatalog</groupId>
+            <artifactId>unitycatalog-client</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j2-impl</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- https://mvnrepository.com/artifact/org.apache.thrift/libthrift -->
         <dependency>
             <groupId>org.apache.thrift</groupId>

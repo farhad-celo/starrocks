@@ -29,6 +29,7 @@ import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.mysql.MysqlCommand;
 import com.starrocks.qe.ConnectContext;
+import io.delta.kernel.internal.SnapshotImpl;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -53,14 +54,8 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
     public final IDeltaLakeMetastore delegate;
     private final Map<DatabaseTableName, Long> lastAccessTimeMap;
     protected LoadingCache<DatabaseTableName, DeltaLakeSnapshot> tableSnapshotCache;
-    /**
-     * {@code true} for the per-query layer built by {@link #createQueryLevelInstance}. The
-     * per-query cache exists for intra-query snapshot stability and dedup; it is rebuilt for
-     * every query and lives only for that query's lifetime, so it is always safe to use even
-     * when the inner catalog-level metastore opted out of cross-query caching (e.g. UC
-     * metadata caching disabled or TTL=0). The catalog-level layer
-     * leaves this {@code false} so it continues to honor the underlying delegate's bypass.
-     */
+    // true for the per-query layer, whose cache is always safe (rebuilt and scoped to one query).
+    // The catalog-level layer leaves this false so it honors the delegate's bypass.
     private final boolean perQueryInstance;
 
     public CachingDeltaLakeMetastore(IDeltaLakeMetastore metastore, Executor executor, long expireAfterWriteSec,
@@ -125,10 +120,8 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
         try {
             return get(databaseCache, dbName);
         } catch (CacheLoader.InvalidCacheLoadException e) {
-            // A null from loadDb (e.g. Unity Catalog reporting an unknown schema) violates the
-            // LoadingCache non-null contract and surfaces as InvalidCacheLoadException. Translate
-            // it back to the "database does not exist" null contract so callers report a clean
-            // unknown-database error instead of the raw Guava cache exception.
+            // A null from loadDb (unknown schema) surfaces as InvalidCacheLoadException; translate
+            // back to the "database does not exist" null contract.
             return null;
         }
     }
@@ -152,10 +145,7 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
 
     @Override
     public DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName) {
-        // Hop into the inner CachingDeltaLakeMetastore's snapshot cache when it is safe to
-        // share. If the inner layer has opted out (e.g. UC metadata caching disabled or
-        // TTL=0), fall through to its uncached getLatestSnapshot so this
-        // loader call does not repopulate the cache the inner layer is trying to keep empty.
+        // Reuse the inner layer's snapshot cache unless it has opted out of caching.
         if (delegate instanceof CachingDeltaLakeMetastore && !delegate.isSnapshotCacheBypassed()) {
             return ((CachingDeltaLakeMetastore) delegate).getCachedSnapshot(DatabaseTableName.of(dbName, tableName));
         }
@@ -169,35 +159,39 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
 
     @Override
     public CloudConfiguration resolveTableCloudConfiguration(String dbName, String tableName) {
-        // Delta lake catalogs typically nest a query-level CachingDeltaLakeMetastore around a
-        // catalog-level CachingDeltaLakeMetastore around the real metastore (e.g. UnityBacked).
-        // Without this passthrough, the new interface method's default would return null at the
-        // outermost layer and the per-table vended credentials would never reach the planner.
+        // Passthrough so vended credentials reach the planner through the nested caching layers.
         return delegate.resolveTableCloudConfiguration(dbName, tableName);
     }
 
     @Override
+    public CloudConfiguration resolveTableCloudConfiguration(String dbName, String tableName, String tableLocation,
+                                                             String tableId) {
+        return delegate.resolveTableCloudConfiguration(dbName, tableName, tableLocation, tableId);
+    }
+
+    @Override
     public Table getTable(String dbName, String tableName) {
-        // Each caching layer asks itself whether its own cache is safe to use: the
-        // catalog-level layer follows the underlying delegate's bypass, while the per-query
-        // layer always caches because its lifetime is bounded by a single query (vended
-        // creds fetched at query start stay valid for that query's lifetime).
         if (isSnapshotCacheBypassed()) {
             return delegate.getTable(dbName, tableName);
         }
         DeltaLakeSnapshot snapshot = getCachedSnapshot(DatabaseTableName.of(dbName, tableName));
         DeltaLakeTable table = DeltaUtils.convertDeltaSnapshotToSRTable(getCatalogName(), snapshot);
-        // Snapshot cache hits skip the delegate's getTable() entirely, so per-table vended
-        // credentials would otherwise never reach the planner -> the BE ends up with only
-        // the catalog-level config (which has no AWS creds for UC vended-creds catalogs)
-        // and S3 returns 403. Re-attach the per-table cloud config here.
+        // Snapshot cache hits skip the delegate's getTable(), so re-attach per-table vended
+        // credentials here or the BE gets credential-less scan ranges (S3 403s). Pass the location
+        // and Delta table id from the cached snapshot so no second loadTable is needed.
         if (table != null) {
-            CloudConfiguration tableCloudConfiguration = delegate.resolveTableCloudConfiguration(dbName, tableName);
+            CloudConfiguration tableCloudConfiguration = delegate.resolveTableCloudConfiguration(
+                    dbName, tableName, snapshot.getPath(), snapshotTableId(snapshot));
             if (tableCloudConfiguration != null) {
                 table.setCloudConfiguration(tableCloudConfiguration);
             }
         }
         return table;
+    }
+
+    private static String snapshotTableId(DeltaLakeSnapshot snapshot) {
+        SnapshotImpl impl = snapshot == null ? null : snapshot.getSnapshot();
+        return impl == null ? null : impl.getMetadata().getId();
     }
 
     @Override
@@ -207,12 +201,7 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
 
     @Override
     public boolean isSnapshotCacheBypassed() {
-        // The per-query cache is rebuilt from scratch for every query and lives only for
-        // that query's lifetime, so its purpose is intra-query snapshot stability and dedup,
-        // not long-term freshness. Bypassing it would only force redundant upstream lookups
-        // within a single query without any safety benefit; vended credentials fetched at
-        // query start stay valid for the (typically short) query lifetime. The catalog-level
-        // layer below still honors the delegate's bypass via the passthrough branch.
+        // The per-query cache is always safe (scoped to one query); the catalog layer defers.
         if (perQueryInstance) {
             return false;
         }
@@ -234,10 +223,8 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
         DatabaseTableName databaseTableName = DatabaseTableName.of(dbName, tblName);
         tableNameLockMap.putIfAbsent(databaseTableName, dbName + "_" + tblName + "_lock");
         synchronized (tableNameLockMap.get(databaseTableName)) {
-            // Drop the delegate's per-table metadata state BEFORE reloading the snapshot.
-            // Otherwise the reload below would re-populate the snapshot cache from stale
-            // upstream metadata and the manual REFRESH would be a no-op for callers that
-            // wanted fresh table metadata.
+            // Drop the delegate's per-table state before reloading, or the reload repopulates from
+            // stale upstream metadata and REFRESH becomes a no-op.
             delegate.refreshTable(dbName, tblName);
 
             DeltaLakeSnapshot newSnapshot;
@@ -260,11 +247,6 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
         }
     }
 
-    /**
-     * Used when this metastore is the delegate of an outer {@link CachingDeltaLakeMetastore}
-     * (the typical query-level-around-catalog-level layering): drop our cached snapshot for the
-     * table and propagate to whatever sits underneath.
-     */
     @Override
     public void refreshTable(String dbName, String tableName) {
         invalidateTable(dbName, tableName);

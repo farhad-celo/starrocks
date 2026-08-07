@@ -145,22 +145,8 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
     }
 
     /**
-     * Variant that uses a pre-resolved per-table {@link CloudConfiguration} instead of calling
-     * {@link #resolveTableCloudConfiguration(String, String)} again. Lets subclasses that already
-     * have the value (e.g. {@link com.starrocks.connector.delta.unity.UnityBackedDeltaMetastore#getTable})
-     * avoid a second round-trip through the credential-vending pipeline.
-     */
-    protected DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName,
-                                                  CloudConfiguration tableCloudConfiguration) {
-        return getLatestSnapshot(dbName, tableName, getMetastoreTable(dbName, tableName),
-                tableCloudConfiguration);
-    }
-
-    /**
-     * Variant that uses a pre-fetched {@link MetastoreTable} (and pre-resolved
-     * {@link CloudConfiguration}) so callers that already have both values do not pay for a
-     * second metastore lookup. {@link com.starrocks.connector.delta.unity.UnityBackedDeltaMetastore#getTable}
-     * uses this to collapse the per-call Unity Catalog round-trips down to one.
+     * Variant using a pre-fetched {@link MetastoreTable} and pre-resolved {@link CloudConfiguration}
+     * so callers that already have both avoid a second metastore lookup.
      */
     protected DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName,
                                                   MetastoreTable metastoreTable,
@@ -177,7 +163,7 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         if (usePerTableConfig) {
             effectiveConfiguration = new Configuration(hdfsConfiguration);
             tableCloudConfiguration.applyToConfiguration(effectiveConfiguration);
-            // Keep the FS cache on for this per-table copy so the scope's closeAllForUGI can reclaim it.
+            // Keep the FS cache on so the throwaway-UGI scope can reclaim vended S3AFileSystems.
             DeltaVendedFsScope.enableFilesystemCache(effectiveConfiguration);
         }
         DeltaLakeEngine deltaLakeEngine = createDeltaLakeEngine(effectiveConfiguration, usePerTableConfig);
@@ -189,10 +175,9 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
                 // filesystems are reclaimed via closeAllForUGI on return instead of leaking per metadata file.
                 snapshot = DeltaVendedFsScope.runScoped(
                         DeltaVendedFsScope.scopeNameFor(catalogName, dbName, tableName),
-                        () -> (SnapshotImpl) Table.forPath(deltaLakeEngine, path).getLatestSnapshot(deltaLakeEngine));
+                        () -> loadSnapshot(deltaLakeEngine, path, dbName, tableName, metastoreTable));
             } else {
-                Table deltaTable = Table.forPath(deltaLakeEngine, path);
-                snapshot = (SnapshotImpl) deltaTable.getLatestSnapshot(deltaLakeEngine);
+                snapshot = loadSnapshot(deltaLakeEngine, path, dbName, tableName, metastoreTable);
             }
         } catch (TableNotFoundException e) {
             LOG.error("Failed to find Delta table for {}.{}.{}, {}. caused by : {}", catalogName, dbName, tableName,
@@ -207,6 +192,20 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         }
         long version = snapshot.getVersion();
         return new DeltaLakeSnapshot(dbName, tableName, deltaLakeEngine, snapshot, createTime, version, path);
+    }
+
+    /**
+     * Load the latest snapshot. The default reads the published Delta log from {@code path};
+     * catalog-managed subclasses override to also supply unbackfilled catalog commits. The
+     * {@code metastoreTable} is the instance from {@link #getMetastoreTable}, letting subclasses
+     * reuse backend-specific state carried on it; the default read ignores it.
+     */
+    // squid:S1172: dbName/tableName/metastoreTable are unused by this default read but are part of
+    // the overridable contract (see UnityBackedDeltaMetastore#loadSnapshot), so they must stay.
+    @SuppressWarnings("squid:S1172")
+    protected SnapshotImpl loadSnapshot(DeltaLakeEngine engine, String path, String dbName, String tableName,
+                                        MetastoreTable metastoreTable) {
+        return (SnapshotImpl) Table.forPath(engine, path).getLatestSnapshot(engine);
     }
 
     protected DeltaLakeEngine createDeltaLakeEngine(Configuration effectiveConfiguration, boolean usePerTableConfig) {

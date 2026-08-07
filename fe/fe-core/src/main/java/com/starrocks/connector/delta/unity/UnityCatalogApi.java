@@ -14,18 +14,18 @@
 
 package com.starrocks.connector.delta.unity;
 
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialResponse;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.TableInfo;
+import io.unitycatalog.client.delta.model.DeltaCredentialsResponse;
+import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
 
 import java.util.List;
 
 /**
- * Narrow Unity Catalog surface area the Delta Lake connector depends on. The interface returns
- * Databricks Java SDK model types directly so that {@link UnityCatalogClient} (live, backed by
- * {@code WorkspaceClient}) and {@link CachingUnityCatalogClient} (decorator) can be swapped
- * interchangeably by {@link UnityMetastore}.
+ * Narrow Unity Catalog surface the Delta Lake connector depends on. Schema/table discovery and the
+ * metastore summary use Databricks SDK model types; the read path ({@link #loadTable},
+ * {@link #getTableCredentials}) goes through the Unity Catalog {@code delta/v1} client.
  */
 public interface UnityCatalogApi {
 
@@ -33,25 +33,26 @@ public interface UnityCatalogApi {
 
     List<TableInfo> listTables(String ucCatalog, String schemaName);
 
-    TableInfo getTable(String fullName);
-
     boolean tableExists(String fullName);
 
-    GenerateTemporaryTableCredentialResponse getTemporaryTableCredentials(String tableId, String operation);
+    /**
+     * Load Delta metadata plus the inline ratified (unbackfilled) commits via {@code delta/v1}
+     * {@code loadTable}. The commit list is complete (not paginated) and must not be REST-cached,
+     * since it changes on every write.
+     */
+    DeltaLoadTableResponse loadTable(String ucCatalog, String schemaName, String tableName);
 
     /**
-     * Returns a summary of the Unity Catalog metastore the configured credentials authenticate
-     * against. Used by the connector to derive the AWS region for vended S3 credentials so the
-     * BE's AWS SDK does not default to {@code us-east-1}. Implementations should cache the
-     * result; the value rarely (if ever) changes for the lifetime of a catalog.
+     * Vend temporary cloud storage credentials via {@code delta/v1} {@code getTableCredentials}.
+     * {@code tableId} is the Delta table UUID; it is not sent to the endpoint but participates in
+     * the credential cache key so credentials never alias across a drop/recreate of the same name.
      */
+    DeltaCredentialsResponse getTableCredentials(String ucCatalog, String schemaName, String tableName,
+                                                 String tableId, String operation);
+
     GetMetastoreSummaryResponse getMetastoreSummary();
 
-    /**
-     * Drop any cached state referencing {@code fullName}. Called from {@code REFRESH EXTERNAL
-     * TABLE} so manual refresh propagates through the caching decorator. Direct (non-caching)
-     * implementations have nothing to drop and inherit this no-op default.
-     */
+    /** Drop any cached state referencing {@code fullName} (for {@code REFRESH EXTERNAL TABLE}). */
     default void invalidate(String fullName) {
     }
 }

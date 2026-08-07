@@ -16,10 +16,7 @@ package com.starrocks.connector.delta.unity;
 
 import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.core.error.platform.NotFound;
-import com.databricks.sdk.service.catalog.AwsCredentials;
 import com.databricks.sdk.service.catalog.DataSourceFormat;
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialRequest;
-import com.databricks.sdk.service.catalog.GenerateTemporaryTableCredentialResponse;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.ListSchemasRequest;
 import com.databricks.sdk.service.catalog.ListTablesRequest;
@@ -27,20 +24,28 @@ import com.databricks.sdk.service.catalog.MetastoresAPI;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.SchemasAPI;
 import com.databricks.sdk.service.catalog.TableInfo;
-import com.databricks.sdk.service.catalog.TableOperation;
 import com.databricks.sdk.service.catalog.TablesAPI;
-import com.databricks.sdk.service.catalog.TemporaryTableCredentialsAPI;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.starrocks.connector.exception.StarRocksConnectorException;
+import io.unitycatalog.client.ApiException;
+import io.unitycatalog.client.delta.api.DeltaTablesApi;
+import io.unitycatalog.client.delta.api.DeltaTemporaryCredentialsApi;
+import io.unitycatalog.client.delta.model.DeltaCredentialOperation;
+import io.unitycatalog.client.delta.model.DeltaCredentialsResponse;
+import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
 import mockit.Expectations;
 import mockit.Mocked;
 import mockit.Verifications;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 public class UnityCatalogClientTest {
 
@@ -100,99 +105,129 @@ public class UnityCatalogClientTest {
         };
     }
 
-    @Test
-    public void testGetTableDelegatesToSdk(@Mocked WorkspaceClient ws,
-                                           @Mocked TablesAPI tables) {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders")
-                .setTableId("abc-123")
-                .setDataSourceFormat(DataSourceFormat.DELTA)
-                .setStorageLocation("s3://bucket/prefix/orders");
+    private static Stream<Arguments> tableExistsCases() {
+        // A returned TableInfo means the table exists; a thrown NotFound means it does not.
+        return Stream.of(
+                Arguments.of("main.sales.orders", new TableInfo().setFullName("main.sales.orders"), true),
+                Arguments.of("main.sales.missing", new NotFound("table missing", null), false));
+    }
+
+    @ParameterizedTest
+    @MethodSource("tableExistsCases")
+    public void testTableExists(String fullName, Object sdkResult, boolean expected,
+                                @Mocked WorkspaceClient ws, @Mocked TablesAPI tables) {
         new Expectations() {
             {
                 ws.tables();
                 result = tables;
-                tables.get("main.sales.orders");
-                result = info;
+                tables.get(fullName);
+                result = sdkResult;
             }
         };
-
         UnityCatalogClient client = new UnityCatalogClient(ws);
-        TableInfo got = client.getTable("main.sales.orders");
-        Assertions.assertEquals("abc-123", got.getTableId());
-        Assertions.assertEquals("s3://bucket/prefix/orders", got.getStorageLocation());
-        Assertions.assertEquals(DataSourceFormat.DELTA, got.getDataSourceFormat());
+        Assertions.assertEquals(expected, client.tableExists(fullName));
     }
 
     @Test
-    public void testTableExistsTrueWhenSdkReturns(@Mocked WorkspaceClient ws,
-                                                  @Mocked TablesAPI tables) {
+    public void testLoadTableDelegatesToDeltaApi(@Mocked WorkspaceClient ws,
+                                                 @Mocked DeltaTablesApi deltaTablesApi,
+                                                 @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        DeltaLoadTableResponse resp = UnityDeltaModelFixtures.loadResponse(
+                "s3://bucket/prefix/orders", 1_700_000_000_000L, null);
         new Expectations() {
             {
-                ws.tables();
-                result = tables;
-                tables.get("main.sales.orders");
-                result = new TableInfo().setFullName("main.sales.orders");
+                try {
+                    deltaTablesApi.loadTable("main", "sales", "orders");
+                    result = resp;
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
             }
         };
-        UnityCatalogClient client = new UnityCatalogClient(ws);
-        Assertions.assertTrue(client.tableExists("main.sales.orders"));
+
+        UnityCatalogClient client = new UnityCatalogClient(ws, deltaTablesApi, deltaCredentialsApi);
+        Assertions.assertSame(resp, client.loadTable("main", "sales", "orders"));
     }
 
     @Test
-    public void testTableExistsFalseOnNotFound(@Mocked WorkspaceClient ws,
-                                               @Mocked TablesAPI tables) {
-        new Expectations() {
-            {
-                ws.tables();
-                result = tables;
-                tables.get("main.sales.missing");
-                result = new NotFound("table missing", null);
-            }
-        };
-        UnityCatalogClient client = new UnityCatalogClient(ws);
-        Assertions.assertFalse(client.tableExists("main.sales.missing"));
-    }
-
-    @Test
-    public void testGetTemporaryTableCredentialsAws(@Mocked WorkspaceClient ws,
-                                                    @Mocked TemporaryTableCredentialsAPI temp) {
-        GenerateTemporaryTableCredentialResponse resp = new GenerateTemporaryTableCredentialResponse()
-                .setAwsTempCredentials(new AwsCredentials()
-                        .setAccessKeyId("AKIA")
-                        .setSecretAccessKey("s")
-                        .setSessionToken("t"))
-                .setExpirationTime(1_700_000_000_000L);
-        new Expectations() {
-            {
-                ws.temporaryTableCredentials();
-                result = temp;
-                temp.generateTemporaryTableCredentials((GenerateTemporaryTableCredentialRequest) any);
-                result = resp;
-            }
-        };
-
-        UnityCatalogClient client = new UnityCatalogClient(ws);
-        GenerateTemporaryTableCredentialResponse creds = client.getTemporaryTableCredentials("abc", "READ");
-        Assertions.assertNotNull(creds.getAwsTempCredentials());
-        Assertions.assertEquals("AKIA", creds.getAwsTempCredentials().getAccessKeyId());
-        Assertions.assertEquals(Long.valueOf(1_700_000_000_000L), creds.getExpirationTime());
-
-        new Verifications() {
-            {
-                GenerateTemporaryTableCredentialRequest captured;
-                temp.generateTemporaryTableCredentials(captured = withCapture());
-                Assertions.assertEquals("abc", captured.getTableId());
-                Assertions.assertEquals(TableOperation.READ, captured.getOperation());
-            }
-        };
-    }
-
-    @Test
-    public void testGetTemporaryTableCredentialsRejectsUnknownOperation(@Mocked WorkspaceClient ws) {
+    public void testLoadTableUnavailableWhenDeltaClientMissing(@Mocked WorkspaceClient ws) {
         UnityCatalogClient client = new UnityCatalogClient(ws);
         Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> client.getTemporaryTableCredentials("abc", "BOGUS"));
+                () -> client.loadTable("main", "sales", "orders"));
+    }
+
+    private static Stream<Arguments> loadTableApiErrorCases() {
+        // Only 4xx responses get the "not a Delta table" hint appended; 5xx are wrapped verbatim.
+        return Stream.of(
+                Arguments.of(400, true),
+                Arguments.of(404, true),
+                Arguments.of(500, false));
+    }
+
+    @ParameterizedTest(name = "HTTP {0}")
+    @MethodSource("loadTableApiErrorCases")
+    public void testLoadTableWrapsApiException(int httpCode, boolean expectFormatHint,
+                                               @Mocked WorkspaceClient ws,
+                                               @Mocked DeltaTablesApi deltaTablesApi,
+                                               @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    deltaTablesApi.loadTable("main", "sales", "orders");
+                    result = new ApiException(httpCode, "boom");
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws, deltaTablesApi, deltaCredentialsApi);
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> client.loadTable("main", "sales", "orders"));
+
+        Assertions.assertTrue(ex.getMessage().contains("loadTable(main.sales.orders"),
+                "wrapped message must identify the table; was: " + ex.getMessage());
+        Assertions.assertTrue(ex.getMessage().contains("HTTP " + httpCode),
+                "wrapped message must include the HTTP code; was: " + ex.getMessage());
+        Assertions.assertEquals(expectFormatHint,
+                ex.getMessage().contains("verify the table exists and its data source format is Delta"),
+                "data-source-format hint must appear only for 4xx; was: " + ex.getMessage());
+    }
+
+    @Test
+    public void testGetTableCredentialsDelegatesToDeltaApi(@Mocked WorkspaceClient ws,
+                                                           @Mocked DeltaTablesApi deltaTablesApi,
+                                                           @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        DeltaCredentialsResponse resp = UnityDeltaModelFixtures.awsCredsResponse(1_700_000_000_000L);
+        new Expectations() {
+            {
+                try {
+                    deltaCredentialsApi.getTableCredentials(DeltaCredentialOperation.READ, "main", "sales", "orders");
+                    result = resp;
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws, deltaTablesApi, deltaCredentialsApi);
+        Assertions.assertSame(resp, client.getTableCredentials("main", "sales", "orders", "tbl-uuid", "READ"));
+    }
+
+    @Test
+    public void testGetTableCredentialsRejectsUnknownOperation(@Mocked WorkspaceClient ws,
+                                                               @Mocked DeltaTablesApi deltaTablesApi,
+                                                               @Mocked DeltaTemporaryCredentialsApi credsApi) {
+        UnityCatalogClient client = new UnityCatalogClient(ws, deltaTablesApi, credsApi);
+        Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> client.getTableCredentials("main", "sales", "orders", "tbl-uuid", "BOGUS"));
+    }
+
+    @Test
+    public void testGetTableCredentialsUnavailableWhenDeltaClientMissing(@Mocked WorkspaceClient ws) {
+        UnityCatalogClient client = new UnityCatalogClient(ws);
+        Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> client.getTableCredentials("main", "sales", "orders", "tbl-uuid", "READ"));
     }
 
     @Test
@@ -212,42 +247,16 @@ public class UnityCatalogClientTest {
         Assertions.assertEquals("eu-central-1", client.getMetastoreSummary().getRegion());
     }
 
-    @ParameterizedTest(name = "[{index}] ''{0}'' -> ''{1}''")
-    @CsvSource({
-            // space in each position of the three-part name
-            "cat.schema.Store Name,         cat.schema.Store%20Name",
-            "cat.my schema.orders,          cat.my%20schema.orders",
-            "my cat.schema.tbl,             my%20cat.schema.tbl",
-            // plain ASCII must survive unchanged
-            "main.sales.orders,             main.sales.orders",
-            // literal '+' -> '%2B', not '%20'
-            "cat.schema.a+b,                cat.schema.a%2Bb",
-            // literal '%' -> '%25'
-            "cat.schema.100%_report,        cat.schema.100%25_report",
-            // spaces in both schema and table name
-            "cat.my schema.Store Mapping,   cat.my%20schema.Store%20Mapping",
-    })
-    public void testGetTableEncodesFullName(String input, String expectedEncoded,
-                                            @Mocked WorkspaceClient ws,
-                                            @Mocked TablesAPI tables) {
-        TableInfo info = new TableInfo();
-        new Expectations() {
-            {
-                ws.tables();
-                result = tables;
-                tables.get(anyString);
-                result = info;
-            }
-        };
-
-        UnityCatalogClient client = new UnityCatalogClient(ws);
-        Assertions.assertSame(info, client.getTable(input));
-
-        new Verifications() {
-            {
-                tables.get(expectedEncoded);
-            }
-        };
+    @Test
+    public void testZeroMaxRetriesBuildsClient() {
+        // JitterDelayRetryPolicy rejects maxAttempts=0, so max-retries=0 must be translated into a
+        // total-attempts count of 1 rather than being passed through verbatim.
+        UnityCatalogProperties props = new UnityCatalogProperties(ImmutableMap.of(
+                "unity.catalog.host", "https://example.cloud.databricks.com",
+                "unity.catalog.token", "dapiTEST",
+                "unity.catalog.name", "main",
+                "unity.catalog.max-retries", "0"));
+        Assertions.assertDoesNotThrow(() -> new UnityCatalogClient(props));
     }
 
     @ParameterizedTest(name = "[{index}] ''{0}'' -> ''{1}''")
