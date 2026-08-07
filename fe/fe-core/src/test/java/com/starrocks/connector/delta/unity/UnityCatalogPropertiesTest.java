@@ -38,6 +38,7 @@ public class UnityCatalogPropertiesTest {
         Assertions.assertNull(p.getClientId());
         Assertions.assertNull(p.getClientSecret());
         Assertions.assertTrue(p.isVendedCredentialsEnabled(), "vended creds should default to true");
+        Assertions.assertFalse(p.isSpoofUserAgent(), "Unity client user-agent spoofing should default to false");
         Assertions.assertEquals(30_000L, p.getRequestTimeoutMs());
         Assertions.assertEquals(3, p.getMaxRetries());
     }
@@ -51,6 +52,17 @@ public class UnityCatalogPropertiesTest {
                 "unity.catalog.vended-credentials-enabled", "false");
         UnityCatalogProperties p = new UnityCatalogProperties(props);
         Assertions.assertFalse(p.isVendedCredentialsEnabled());
+    }
+
+    @Test
+    public void testSpoofUserAgentExplicitlyEnabled() {
+        Map<String, String> props = ImmutableMap.of(
+                "unity.catalog.host", "https://example.cloud.databricks.com",
+                "unity.catalog.token", "dapiXYZ",
+                "unity.catalog.name", "main",
+                "unity.catalog.spoof-user-agent", "true");
+        UnityCatalogProperties p = new UnityCatalogProperties(props);
+        Assertions.assertTrue(p.isSpoofUserAgent());
     }
 
     @Test

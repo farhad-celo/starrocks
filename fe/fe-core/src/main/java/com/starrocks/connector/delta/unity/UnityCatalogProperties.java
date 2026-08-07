@@ -30,6 +30,7 @@ public class UnityCatalogProperties {
     public static final String UNITY_VENDED_CREDENTIALS_ENABLED = "unity.catalog.vended-credentials-enabled";
     public static final String UNITY_REQUEST_TIMEOUT_MS = "unity.catalog.request-timeout-ms";
     public static final String UNITY_MAX_RETRIES = "unity.catalog.max-retries";
+    public static final String UNITY_CATALOG_SPOOF_USER_AGENT = "unity.catalog.spoof-user-agent";
     // Optional explicit AWS region for vended credentials. If unset we infer it from
     // Unity Catalog's metastore_summary endpoint on first use; setting it here is an
     // escape hatch for environments where the inference call is undesirable (extra
@@ -71,6 +72,7 @@ public class UnityCatalogProperties {
     private final String clientSecret;
     private final String ucCatalogName;
     private final boolean vendedCredentialsEnabled;
+    private final boolean spoofUserAgent;
     private final long requestTimeoutMs;
     private final int maxRetries;
     private final boolean cacheEnabled;
@@ -102,6 +104,8 @@ public class UnityCatalogProperties {
 
         String vendedCredsRaw = properties.getOrDefault(UNITY_VENDED_CREDENTIALS_ENABLED, "true");
         this.vendedCredentialsEnabled = Boolean.parseBoolean(vendedCredsRaw);
+        String spoofUserAgentRaw = properties.getOrDefault(UNITY_CATALOG_SPOOF_USER_AGENT, "false");
+        this.spoofUserAgent = Boolean.parseBoolean(spoofUserAgentRaw);
 
         this.requestTimeoutMs = parseLong(properties, UNITY_REQUEST_TIMEOUT_MS, 30_000L);
         Preconditions.checkArgument(this.requestTimeoutMs >= 0,
@@ -153,6 +157,10 @@ public class UnityCatalogProperties {
 
     public boolean isVendedCredentialsEnabled() {
         return vendedCredentialsEnabled;
+    }
+
+    public boolean isSpoofUserAgent() {
+        return spoofUserAgent;
     }
 
     public long getRequestTimeoutMs() {

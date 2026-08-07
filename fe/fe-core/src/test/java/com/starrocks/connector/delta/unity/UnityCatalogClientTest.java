@@ -28,6 +28,7 @@ import com.databricks.sdk.service.catalog.TablesAPI;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.starrocks.connector.exception.StarRocksConnectorException;
+import io.unitycatalog.client.ApiClient;
 import io.unitycatalog.client.ApiException;
 import io.unitycatalog.client.delta.api.DeltaTablesApi;
 import io.unitycatalog.client.delta.api.DeltaTemporaryCredentialsApi;
@@ -44,6 +45,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.net.URI;
+import java.net.http.HttpRequest;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -259,6 +262,26 @@ public class UnityCatalogClientTest {
         Assertions.assertDoesNotThrow(() -> new UnityCatalogClient(props));
     }
 
+    @Test
+    public void testDefaultUserAgentUsesStarRocks() {
+        String userAgent = userAgent(propsWithUserAgentSpoof(false));
+        Assertions.assertTrue(userAgent.contains("Delta/4.3.0"));
+        Assertions.assertTrue(userAgent.contains("StarRocks/3.5"));
+        Assertions.assertTrue(userAgent.contains("Java/" + UnityCatalogClient.javaAppVersion()));
+        Assertions.assertFalse(userAgent.contains("Spark/4.0.0"), userAgent);
+        Assertions.assertFalse(userAgent.contains("Scala/2.13.16"), userAgent);
+    }
+
+    @Test
+    public void testSpoofUserAgentPreservesSparkUserAgent() {
+        String userAgent = userAgent(propsWithUserAgentSpoof(true));
+        Assertions.assertTrue(userAgent.contains("Delta/4.3.0"));
+        Assertions.assertTrue(userAgent.contains("Spark/4.0.0"));
+        Assertions.assertTrue(userAgent.contains("Scala/2.13.16"));
+        Assertions.assertTrue(userAgent.contains("Java/17.0.19"));
+        Assertions.assertFalse(userAgent.contains("StarRocks/"), userAgent);
+    }
+
     @ParameterizedTest(name = "[{index}] ''{0}'' -> ''{1}''")
     @CsvSource({
             "cat.schema.Store Name, cat.schema.Store%20Name",
@@ -284,5 +307,23 @@ public class UnityCatalogClientTest {
                 tables.get(expectedEncoded);
             }
         };
+    }
+
+    private static UnityCatalogProperties propsWithUserAgentSpoof(boolean spoofUserAgent) {
+        ImmutableMap.Builder<String, String> builder = ImmutableMap.<String, String>builder()
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main");
+        if (spoofUserAgent) {
+            builder.put("unity.catalog.spoof-user-agent", "true");
+        }
+        return new UnityCatalogProperties(builder.build());
+    }
+
+    private static String userAgent(UnityCatalogProperties properties) {
+        ApiClient client = UnityCatalogClient.buildDeltaApiClient(properties);
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(URI.create("https://example.com"));
+        client.getRequestInterceptor().accept(requestBuilder);
+        return requestBuilder.build().headers().firstValue("User-Agent").orElseThrow();
     }
 }

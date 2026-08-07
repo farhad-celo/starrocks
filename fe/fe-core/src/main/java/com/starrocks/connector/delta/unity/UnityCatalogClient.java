@@ -57,6 +57,12 @@ import java.util.Objects;
 public class UnityCatalogClient implements UnityCatalogApi {
     private static final Logger LOG = LogManager.getLogger(UnityCatalogClient.class);
     private static final PercentEscaper FULL_NAME_ESCAPER = new PercentEscaper("-_.*", false);
+    private static final String DELTA_APP_VERSION = "4.3.0";
+    private static final String SPOOF_SPARK_APP_VERSION = "4.0.0";
+    private static final String SPOOF_JAVA_VERSION = "17.0.19";
+    private static final String SCALA_APP_VERSION = "2.13.16";
+    // Currently no way to retrieve this easily.
+    private static final String STARROCKS_VERSION = "3.5";
 
     private final WorkspaceClient workspace;
     // delta/v1 read path, from the OSS unitycatalog-client. Null only in the WorkspaceClient-only
@@ -105,7 +111,8 @@ public class UnityCatalogClient implements UnityCatalogApi {
     }
 
     /** Build the OSS {@code delta/v1} {@link ApiClient} shared by the two delta APIs. */
-    private static ApiClient buildDeltaApiClient(UnityCatalogProperties properties) {
+    @VisibleForTesting
+    static ApiClient buildDeltaApiClient(UnityCatalogProperties properties) {
         Map<String, String> authConfig = new HashMap<>();
         if (properties.getAuthType() == UnityCatalogProperties.AuthType.OAUTH_M2M) {
             authConfig.put("type", "oauth");
@@ -118,19 +125,16 @@ public class UnityCatalogClient implements UnityCatalogApi {
         }
 
         // Databricks rejects delta/v1 with HTTP 400 unless the caller identifies itself in the
-        // User-Agent; the builder emits "UnityCatalog-Java-Client/<ver> Delta/... Spark/...".
-        ApiClient apiClient = ApiClientBuilder.create()
+        // User-Agent; the builder emits "UnityCatalog-Java-Client/<ver> ..." app tokens.
+        ApiClientBuilder builder = ApiClientBuilder.create()
                 .uri(properties.getHost())
-                .addAppVersion("Delta", "4.3.0")
-                .addAppVersion("Spark", "4.0.0")
-                .addAppVersion("Scala", "2.13.16")
-                .addAppVersion("Java", "17.0.19")
                 .tokenProvider(TokenProvider.create(authConfig))
                 // maxAttempts counts the initial try, and the builder rejects 0, so translate the
                 // retry count into total attempts.
                 .retryPolicy(JitterDelayRetryPolicy.builder()
-                        .maxAttempts(properties.getMaxRetries() + 1).build())
-                .build();
+                        .maxAttempts(properties.getMaxRetries() + 1).build());
+        addUserAgentAppVersions(builder, properties);
+        ApiClient apiClient = builder.build();
 
         // Databricks returns fields the OSS delta/v1 spec does not model; tolerate them.
         ObjectMapper mapper = apiClient.getObjectMapper();
@@ -144,6 +148,26 @@ public class UnityCatalogClient implements UnityCatalogApi {
             apiClient.setReadTimeout(timeout);
         }
         return apiClient;
+    }
+
+    private static void addUserAgentAppVersions(ApiClientBuilder builder, UnityCatalogProperties properties) {
+        builder.addAppVersion("Delta", DELTA_APP_VERSION);
+        if (properties.isSpoofUserAgent()) {
+            LOG.info("Using Spark-compatible Unity Catalog delta/v1 User-Agent because {} is enabled",
+                    UnityCatalogProperties.UNITY_CATALOG_SPOOF_USER_AGENT);
+            builder.addAppVersion("Spark", SPOOF_SPARK_APP_VERSION)
+                    .addAppVersion("Scala", SCALA_APP_VERSION)
+                    .addAppVersion("Java", SPOOF_JAVA_VERSION);
+        } else {
+            builder.addAppVersion("StarRocks", STARROCKS_VERSION);
+            builder.addAppVersion("Java", javaAppVersion());
+        }
+    }
+
+    @VisibleForTesting
+    static String javaAppVersion() {
+        String javaVersion = System.getProperty("java.version");
+        return javaVersion == null || javaVersion.isEmpty() ? "unknown" : javaVersion;
     }
 
     @Override
