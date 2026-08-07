@@ -403,8 +403,7 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
     public Table getTable(ConnectContext context, String dbName, String tblName) {
         try {
             return deltaOps.getTable(dbName, tblName);
-        } catch (Exception e) {
-            LOG.error("Failed to get table {}.{}", dbName, tblName, e);
+        } catch (DeltaLakeTableNotFoundException e) {
             return null;
         }
     }

@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.PercentEscaper;
+import com.starrocks.connector.delta.DeltaLakeTableNotFoundException;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import io.unitycatalog.client.ApiClient;
 import io.unitycatalog.client.ApiClientBuilder;
@@ -220,9 +221,13 @@ public class UnityCatalogClient implements UnityCatalogApi {
         try {
             return deltaTablesApi.loadTable(ucCatalog, schemaName, tableName);
         } catch (ApiException e) {
+            if (e.getCode() == 404) {
+                throw new DeltaLakeTableNotFoundException(
+                        "Unity Catalog table %s.%s.%s not found", ucCatalog, schemaName, tableName);
+            }
             String context = "loadTable(" + ucCatalog + "." + schemaName + "." + tableName + ")";
-            // The delta/v1 endpoint only serves Delta tables; a 4xx on a table accessed by name
-            // most often means it is missing or not a Delta table (Iceberg / Parquet / view).
+            // The delta/v1 endpoint only serves Delta tables; a non-404 4xx on a table accessed by
+            // name most often means it is not a Delta table (Iceberg / Parquet / view).
             if (e.getCode() >= 400 && e.getCode() < 500) {
                 context += "; verify the table exists and its data source format is Delta";
             }

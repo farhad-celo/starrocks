@@ -27,6 +27,7 @@ import com.databricks.sdk.service.catalog.TableInfo;
 import com.databricks.sdk.service.catalog.TablesAPI;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.starrocks.connector.delta.DeltaLakeTableNotFoundException;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import io.unitycatalog.client.ApiClient;
 import io.unitycatalog.client.ApiException;
@@ -160,10 +161,10 @@ public class UnityCatalogClientTest {
     }
 
     private static Stream<Arguments> loadTableApiErrorCases() {
-        // Only 4xx responses get the "not a Delta table" hint appended; 5xx are wrapped verbatim.
+        // Non-404 4xx responses get the "not a Delta table" hint appended; 5xx are wrapped verbatim.
+        // 404 is handled separately (typed not-found), see testLoadTableThrowsNotFoundOn404.
         return Stream.of(
                 Arguments.of(400, true),
-                Arguments.of(404, true),
                 Arguments.of(500, false));
     }
 
@@ -195,6 +196,30 @@ public class UnityCatalogClientTest {
         Assertions.assertEquals(expectFormatHint,
                 ex.getMessage().contains("verify the table exists and its data source format is Delta"),
                 "data-source-format hint must appear only for 4xx; was: " + ex.getMessage());
+    }
+
+    @Test
+    public void testLoadTableThrowsNotFoundOn404(@Mocked WorkspaceClient ws,
+                                                 @Mocked DeltaTablesApi deltaTablesApi,
+                                                 @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    deltaTablesApi.loadTable("main", "sales", "orders");
+                    result = new ApiException(404, "not found");
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws, deltaTablesApi, deltaCredentialsApi);
+        DeltaLakeTableNotFoundException ex = Assertions.assertThrows(DeltaLakeTableNotFoundException.class,
+                () -> client.loadTable("main", "sales", "orders"));
+        Assertions.assertTrue(ex.getMessage().contains("main.sales.orders"),
+                "not-found message must identify the table; was: " + ex.getMessage());
+        Assertions.assertFalse(ex.getMessage().contains("verify the table exists and its data source format is Delta"),
+                "a genuine 404 must not carry the not-a-Delta-table hint; was: " + ex.getMessage());
     }
 
     @Test

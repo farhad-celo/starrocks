@@ -24,6 +24,7 @@ import com.starrocks.connector.ConnectorType;
 import com.starrocks.connector.DatabaseTableName;
 import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.MetastoreType;
+import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.hive.HiveMetaClient;
 import com.starrocks.connector.hive.HiveMetastore;
 import com.starrocks.connector.hive.HiveMetastoreTest;
@@ -61,6 +62,7 @@ import java.util.Optional;
 
 public class DeltaLakeMetadataTest {
     private HiveMetaClient client;
+    private DeltaLakeMetastore metastore;
     private DeltaLakeMetadata deltaLakeMetadata;
 
     @BeforeEach
@@ -70,10 +72,10 @@ public class DeltaLakeMetadataTest {
         client = new HiveMetastoreTest.MockedHiveMetaClient();
         IHiveMetastore hiveMetastore = new HiveMetastore(client, "delta0", MetastoreType.HMS);
 
-        HMSBackedDeltaMetastore hmsBackedDeltaMetastore = new HMSBackedDeltaMetastore("delta0", hiveMetastore,
+        metastore = new HMSBackedDeltaMetastore("delta0", hiveMetastore,
                 new Configuration(), new DeltaLakeCatalogProperties(Maps.newHashMap()));
         DeltaMetastoreOperations deltaOps = new DeltaMetastoreOperations(
-                CachingDeltaLakeMetastore.createQueryLevelInstance(hmsBackedDeltaMetastore, 10000), false,
+                CachingDeltaLakeMetastore.createQueryLevelInstance(metastore, 10000), false,
                 MetastoreType.HMS);
 
         deltaLakeMetadata = new DeltaLakeMetadata(hdfsEnvironment, "delta0", deltaOps, null,
@@ -214,5 +216,58 @@ public class DeltaLakeMetadataTest {
         Assertions.assertEquals("table1", deltaTable.getName());
         Assertions.assertEquals(Table.TableType.DELTALAKE, deltaTable.getType());
         Assertions.assertEquals("path/to/table", deltaTable.getTableLocation());
+    }
+
+    @Test
+    public void testGetTableReturnsNullWhenDeltaOpsReturnsNull() {
+        DeltaLakeMetadata metadata = metadataWithOps(new DeltaMetastoreOperations(
+                newCachingMetastore(), false, MetastoreType.HMS) {
+            @Override
+            public Table getTable(String dbName, String tableName) {
+                return null;
+            }
+        });
+
+        Assertions.assertNull(metadata.getTable(new ConnectContext(), "db1", "missing"));
+    }
+
+    @Test
+    public void testGetTablePropagatesConnectorException() {
+        DeltaLakeMetadata metadata = metadataWithOps(new DeltaMetastoreOperations(
+                newCachingMetastore(), false, MetastoreType.HMS) {
+            @Override
+            public Table getTable(String dbName, String tableName) {
+                throw new StarRocksConnectorException(
+                        "Unity Catalog loadTable(main.db1.table1) failed (HTTP 0): EOF reached while reading");
+            }
+        });
+
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> metadata.getTable(new ConnectContext(), "db1", "table1"));
+        Assertions.assertTrue(ex.getMessage().contains("HTTP 0"),
+                "transport failures must not be flattened into table-not-found; was: " + ex.getMessage());
+    }
+
+    @Test
+    public void testGetTableReturnsNullWhenTableNotFound() {
+        DeltaLakeMetadata metadata = metadataWithOps(new DeltaMetastoreOperations(
+                newCachingMetastore(), false, MetastoreType.HMS) {
+            @Override
+            public Table getTable(String dbName, String tableName) {
+                throw new DeltaLakeTableNotFoundException(
+                        "Unity Catalog table main.db1.missing not found");
+            }
+        });
+
+        Assertions.assertNull(metadata.getTable(new ConnectContext(), "db1", "missing"));
+    }
+
+    private DeltaLakeMetadata metadataWithOps(DeltaMetastoreOperations deltaOps) {
+        return new DeltaLakeMetadata(new HdfsEnvironment(Maps.newHashMap()), "delta0", deltaOps, null,
+                new ConnectorProperties(ConnectorType.DELTALAKE));
+    }
+
+    private CachingDeltaLakeMetastore newCachingMetastore() {
+        return CachingDeltaLakeMetastore.createQueryLevelInstance(metastore, 10000);
     }
 }

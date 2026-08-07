@@ -166,6 +166,28 @@ public class CachingDeltaLakeMetastoreTest {
     }
 
     @Test
+    public void testGetTablePropagatesTableNotFoundThroughCache() {
+        DeltaLakeMetastore notFoundMetastore = new HMSBackedDeltaMetastore(
+                "delta0",
+                new HiveMetastore(client, "delta0", MetastoreType.HMS),
+                new Configuration(),
+                new DeltaLakeCatalogProperties(Maps.newHashMap())) {
+            @Override
+            public DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName) {
+                throw new DeltaLakeTableNotFoundException("delta0.%s.%s not found", dbName, tableName);
+            }
+        };
+        CachingDeltaLakeMetastore cachingDeltaLakeMetastore =
+                CachingDeltaLakeMetastore.createCatalogLevelInstance(notFoundMetastore, executor,
+                        expireAfterWriteSec, refreshAfterWriteSec, 100);
+
+        // The typed not-found survives the cache so the connector boundary can turn it into null;
+        // a null must never be routed through the cache (Guava forbids it).
+        Assertions.assertThrows(DeltaLakeTableNotFoundException.class,
+                () -> cachingDeltaLakeMetastore.getTable("db1", "missing"));
+    }
+
+    @Test
     public void testGetLatestSnapshot1() {
         Throwable exception = assertThrows(SemanticException.class, () -> {
             new MockUp<HMSBackedDeltaMetastore>() {
