@@ -27,6 +27,7 @@ import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.credential.CloudType;
 import com.starrocks.credential.aws.AwsCloudConfiguration;
+import com.starrocks.qe.ConnectContext;
 import io.delta.kernel.SnapshotBuilder;
 import io.delta.kernel.Table;
 import io.delta.kernel.TableManager;
@@ -454,6 +455,25 @@ public class UnityBackedDeltaMetastoreTest {
                 "unity.catalog.cache.ttl-sec", ttlSec));
 
         Assertions.assertEquals(expected, metastore(client, props).isSnapshotCacheBypassed());
+    }
+
+    @Test
+    public void testSessionVariableBypassesUnitySnapshotCache(@Mocked UnityCatalogClient client) {
+        UnityCatalogProperties props = new UnityCatalogProperties(ImmutableMap.of(
+                "unity.catalog.host", "https://example.cloud.databricks.com",
+                "unity.catalog.token", "dapiTEST",
+                "unity.catalog.name", "main",
+                "unity.catalog.cache.enabled", "true",
+                "unity.catalog.cache.ttl-sec", "60"));
+
+        ConnectContext context = new ConnectContext();
+        context.getSessionVariable().setEnableUnityTableSnapshotCache(false);
+        context.setThreadLocalInfo();
+        try {
+            Assertions.assertTrue(metastore(client, props).isSnapshotCacheBypassed());
+        } finally {
+            ConnectContext.remove();
+        }
     }
 
     @Test

@@ -507,6 +507,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String ENABLE_READ_ICEBERG_EQUALITY_DELETE_WITH_PARTITION_EVOLUTION =
             "enable_read_iceberg_equality_delete_with_partition_evolution";
     public static final String ENABLE_DELTA_LAKE_COLUMN_STATISTICS = "enable_delta_lake_column_statistics";
+    public static final String ENABLE_UNITY_TABLE_SNAPSHOT_CACHE = "enable_unity_table_snapshot_cache";
 
     public static final String ENABLE_QUERY_TRIGGER_ANALYZE = "enable_query_trigger_analyze";
 
@@ -2826,6 +2827,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VarAttr(name = ENABLE_DELTA_LAKE_COLUMN_STATISTICS)
     private boolean enableDeltaLakeColumnStatistics = false;
 
+    @VarAttr(name = ENABLE_UNITY_TABLE_SNAPSHOT_CACHE)
+    private boolean enableUnityTableSnapshotCache = true;
+
     @VarAttr(name = ENABLE_QUERY_TRIGGER_ANALYZE)
     private boolean enableQueryTriggerAnalyze = true;
 
@@ -2966,6 +2970,10 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
         return enableDeltaLakeColumnStatistics;
     }
 
+    public boolean isEnableUnityTableSnapshotCache() {
+        return enableUnityTableSnapshotCache;
+    }
+
     public boolean enableIcebergColumnStatistics() {
         return enableIcebergColumnStatistics;
     }
@@ -2984,6 +2992,10 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableDeltaLakeColumnStatistics(boolean enableDeltaLakeColumnStatistics) {
         this.enableDeltaLakeColumnStatistics = enableDeltaLakeColumnStatistics;
+    }
+
+    public void setEnableUnityTableSnapshotCache(boolean enableUnityTableSnapshotCache) {
+        this.enableUnityTableSnapshotCache = enableUnityTableSnapshotCache;
     }
 
     public void setEnableIcebergColumnStatistics(boolean enableIcebergColumnStatistics) {

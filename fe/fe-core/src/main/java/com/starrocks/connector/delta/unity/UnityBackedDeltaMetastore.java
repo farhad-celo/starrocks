@@ -25,6 +25,7 @@ import com.starrocks.connector.delta.DeltaUtils;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
+import com.starrocks.qe.ConnectContext;
 import io.delta.kernel.SnapshotBuilder;
 import io.delta.kernel.TableManager;
 import io.delta.kernel.internal.SnapshotImpl;
@@ -250,7 +251,13 @@ public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
         if (unityProperties == null) {
             return false;
         }
-        return !unityProperties.isCacheEnabled() || unityProperties.getCacheTtlSec() == 0L;
+        return !isSessionSnapshotCacheEnabled()
+                || !unityProperties.isCacheEnabled()
+                || unityProperties.getCacheTtlSec() == 0L;
+    }
+
+    private boolean isSessionSnapshotCacheEnabled() {
+        return ConnectContext.getSessionVariableOrDefault().isEnableUnityTableSnapshotCache();
     }
 
     private boolean isDeltaCacheEnabled() {
