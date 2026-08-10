@@ -22,6 +22,7 @@ import com.starrocks.sql.optimizer.base.ColumnRefFactory;
 import com.starrocks.sql.optimizer.dump.DumpInfo;
 import com.starrocks.sql.optimizer.dump.QueryDumpInfo;
 import com.starrocks.sql.optimizer.rule.tree.TreeRewriteRule;
+import com.starrocks.sql.optimizer.rule.tree.UniqueLambdaArgumentRule;
 import com.starrocks.sql.optimizer.task.TaskContext;
 
 public class LowCardinalityRewriteRule implements TreeRewriteRule {
@@ -35,6 +36,9 @@ public class LowCardinalityRewriteRule implements TreeRewriteRule {
         if (!session.isEnableLowCardinalityOptimize() || !session.isUseLowCardinalityOptimizeV2()) {
             return root;
         }
+
+        // Settle lambda argument ids before any dict work below, which keys on column ids throughout.
+        root = new UniqueLambdaArgumentRule().rewrite(root, taskContext);
 
         // Capture the accepted global dicts into the query dump so offline replay reproduces the Decode.
         // Capturing here (not during scan statistics) makes the captured dict exactly the one the rewrite
