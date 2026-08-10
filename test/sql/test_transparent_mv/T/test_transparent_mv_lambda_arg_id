@@ -32,7 +32,8 @@ PARTITION BY RANGE(dt)
   PARTITION p20240102 VALUES [("2024-01-02"), ("2024-01-03")),
   PARTITION p20240103 VALUES [("2024-01-03"), ("2024-01-04"))
 )
-DISTRIBUTED BY HASH(dt);
+DISTRIBUTED BY HASH(dt)
+PROPERTIES ("replication_num" = "1");
 
 INSERT INTO t_arr VALUES
   ("2024-01-01","a","b","c",1,1,[1,2,3]),
@@ -44,7 +45,10 @@ INSERT INTO t_arr VALUES
 CREATE MATERIALIZED VIEW test_mv1
 PARTITION BY dt
 REFRESH DEFERRED MANUAL
-PROPERTIES ("transparent_mv_rewrite_mode" = "true")
+PROPERTIES (
+  "transparent_mv_rewrite_mode" = "true",
+  "replication_num" = "1"
+)
 AS SELECT dt, c1, c2, array_map(x -> x + 1, arr) AS mapped FROM t_arr;
 
 REFRESH MATERIALIZED VIEW test_mv1 WITH SYNC MODE;
