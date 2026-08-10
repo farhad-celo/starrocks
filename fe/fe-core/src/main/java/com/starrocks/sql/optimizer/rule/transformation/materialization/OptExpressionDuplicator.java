@@ -91,7 +91,9 @@ public class OptExpressionDuplicator {
     public OptExpressionDuplicator(MaterializationContext materializationContext) {
         this.columnRefFactory = materializationContext.getQueryRefFactory();
         this.columnMapping = Maps.newHashMap();
-        this.rewriter = new ReplaceColumnRefRewriter(columnMapping);
+        // Duplicating variant: lambda arguments must be re-bound to fresh ids along with everything else,
+        // otherwise the copy and the original share them.
+        this.rewriter = new ReplaceColumnRefRewriter(columnMapping, false, columnRefFactory);
         this.mvRefBaseTableColumns = materializationContext.getMv().getRefBaseTablePartitionColumns();
         this.partialPartitionRewrite = !materializationContext.getMvUpdateInfo().getMVToRefreshPCells().isEmpty();
         this.optimizerContext = materializationContext.getOptimizerContext();
@@ -100,7 +102,7 @@ public class OptExpressionDuplicator {
     public OptExpressionDuplicator(ColumnRefFactory columnRefFactory, OptimizerContext optimizerContext) {
         this.columnRefFactory = columnRefFactory;
         this.columnMapping = Maps.newHashMap();
-        this.rewriter = new ReplaceColumnRefRewriter(columnMapping);
+        this.rewriter = new ReplaceColumnRefRewriter(columnMapping, false, columnRefFactory);
         this.mvRefBaseTableColumns = null;
         this.partialPartitionRewrite = false;
         this.optimizerContext = optimizerContext;
