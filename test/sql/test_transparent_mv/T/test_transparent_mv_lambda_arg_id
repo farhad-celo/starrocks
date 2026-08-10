@@ -1,0 +1,79 @@
+-- name: test_transparent_mv_lambda_arg_id
+create database db_${uuid0};
+use db_${uuid0};
+set enable_materialized_view_transparent_union_rewrite = true;
+
+-- Regression for lambda-argument ids leaking across ColumnRefFactory instances.
+--
+-- Querying a partially fresh MV under transparent rewrite makes
+-- MaterializedViewTransparentRewriteRule splice the MV's defined query plan into the query via
+-- OptExpressionDuplicator, passing the MV's own ColumnRefFactory as the source. Every column ref is
+-- remapped into the query's id space, but lambda arguments are not: getUsedColumns() hides them, so
+-- they never enter the duplicator's columnMapping, and refColumns is not a child so walking children
+-- cannot reach it. The argument therefore arrives carrying an id the query factory has already given
+-- to some other column of another type -- and ScalarOperatorToExpr keys colRefToExpr by an id-only
+-- equals, so the two entries collide and a lookup can return the wrong type.
+--
+-- Several column widths on purpose: the query factory must allocate a wide enough id range to
+-- overlap whatever low id the MV factory gave the lambda argument.
+CREATE TABLE t_arr (
+  dt date,
+  c1 varchar(64),
+  c2 varchar(64),
+  c3 varchar(64),
+  c4 int,
+  c5 int,
+  arr array<int>
+)
+DUPLICATE KEY(dt)
+PARTITION BY RANGE(dt)
+(
+  PARTITION p20240101 VALUES [("2024-01-01"), ("2024-01-02")),
+  PARTITION p20240102 VALUES [("2024-01-02"), ("2024-01-03")),
+  PARTITION p20240103 VALUES [("2024-01-03"), ("2024-01-04"))
+)
+DISTRIBUTED BY HASH(dt);
+
+INSERT INTO t_arr VALUES
+  ("2024-01-01","a","b","c",1,1,[1,2,3]),
+  ("2024-01-02","d","e","f",2,2,[4,5,6]),
+  ("2024-01-03","g","h","i",3,3,[7,8,9]);
+
+-- array_map over an int array yields ARRAY<BIGINT>, so the lambda argument (INT) and the MV column
+-- holding the result have different types. That is what turns a shared id into a type conflict.
+CREATE MATERIALIZED VIEW test_mv1
+PARTITION BY dt
+REFRESH DEFERRED MANUAL
+PROPERTIES ("transparent_mv_rewrite_mode" = "true")
+AS SELECT dt, c1, c2, array_map(x -> x + 1, arr) AS mapped FROM t_arr;
+
+REFRESH MATERIALIZED VIEW test_mv1 WITH SYNC MODE;
+
+-- Fully fresh: served from the MV alone, no duplication involved. Establishes the correct answers.
+SELECT dt, mapped FROM test_mv1 ORDER BY dt;
+SELECT dt, array_length(mapped), array_sum(mapped) FROM test_mv1 ORDER BY dt;
+
+-- Make one partition stale. Now the transparent rewrite has to union the fresh MV partitions with
+-- the MV's defined query re-run over the base table, which is the cross-factory duplication.
+INSERT INTO t_arr VALUES ("2024-01-01","a","b","c",1,1,[10,20]);
+
+function: print_hit_materialized_view("SELECT dt, mapped FROM test_mv1 ORDER BY dt;", "test_mv1", "UNION")
+
+-- Pass the lambda column straight through.
+SELECT dt, mapped FROM test_mv1 ORDER BY dt;
+
+-- Consume it, so one projection both computes array_map and reads the colliding ref back. This is
+-- the shape that can make colRefToExpr hand out the wrong slot type.
+SELECT dt, array_length(mapped), array_sum(mapped) FROM test_mv1 ORDER BY dt;
+
+-- Same column behind a predicate.
+SELECT dt, mapped FROM test_mv1 WHERE array_length(mapped) > 2 ORDER BY dt;
+
+-- A second lambda over the first one's output, so two lambda arguments coexist in one expression.
+SELECT dt, array_map(y -> y * 2, mapped) FROM test_mv1 ORDER BY dt;
+
+-- Aggregate over it, which forces the value through an extra projection.
+SELECT sum(array_sum(mapped)) FROM test_mv1;
+
+DROP MATERIALIZED VIEW test_mv1;
+drop table t_arr force;
