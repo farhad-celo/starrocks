@@ -27,6 +27,7 @@ import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.plan.ExecPlan;
 import com.starrocks.sql.plan.PlanTestBase;
 import com.starrocks.thrift.TExplainLevel;
+import com.starrocks.utframe.StarRocksAssert;
 import com.starrocks.utframe.UtFrameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -83,14 +84,17 @@ public class MvTransparentRewriteLambdaArgIdTest extends MVTestBase {
         );
     }
 
-    @Test
-    public void testEveryColumnRefInThePlanIsOwnedByTheQueryFactory() throws Exception {
+    private static final String QUERY = "select k1, c1, c2, mapped from mv_lambda";
+
+    /**
+     * transparent_mv_rewrite_mode forces the transparent path without depending on staleness heuristics;
+     * refreshing only p1 leaves the MV partially fresh, which is what makes the rule splice the MV's defined
+     * query plan (over the base table) into the query.
+     */
+    private void withPartiallyRefreshedLambdaMv(StarRocksAssert.ExceptionRunnable runner) throws Exception {
         starRocksAssert.withTable(tableWithArray, () -> {
             cluster.runSql("test", "insert into t_arr values " +
                     "(1,'a','b','c',1,1,[1,2,3]), (4,'d','e','f',2,2,[4,5,6]);");
-            // transparent_mv_rewrite_mode forces the transparent path without depending on staleness
-            // heuristics; refreshing only p1 leaves the MV partially fresh, which is what makes the rule
-            // splice the MV's defined query plan (over the base table) into the query.
             starRocksAssert.withMaterializedView("CREATE MATERIALIZED VIEW mv_lambda " +
                             " PARTITION BY (k1) " +
                             " DISTRIBUTED BY HASH(k1) " +
@@ -100,58 +104,80 @@ public class MvTransparentRewriteLambdaArgIdTest extends MVTestBase {
                     () -> {
                         starRocksAssert.refreshMvPartition(
                                 "REFRESH MATERIALIZED VIEW mv_lambda PARTITION START ('1') END ('3')");
-
-                        String sql = "select k1, c1, c2, mapped from mv_lambda";
-                        Pair<String, Pair<ExecPlan, String>> result =
-                                UtFrameUtils.getFragmentPlanWithTrace(connectContext, sql, "MV");
-                        ExecPlan execPlan = result.second.first;
-                        String plan = execPlan.getExplainString(TExplainLevel.NORMAL);
-
-                        // Guards against a vacuous pass: the MV's defined query plan must really have been
-                        // duplicated in, and the lambda must have survived projection pruning.
-                        PlanTestBase.assertContains(plan, "t_arr");
-                        PlanTestBase.assertContains(plan, "array_map");
-
-                        ColumnRefFactory queryFactory = execPlan.getColumnRefFactory();
-                        Assertions.assertNotNull(queryFactory,
-                                "ExecPlan carries no ColumnRefFactory, so ownership cannot be checked this way");
-                        int allocated = queryFactory.getColumnRefs().size();
-
-                        List<ColumnRefOperator> all = new ArrayList<>();
-                        collectColumnRefs(execPlan.getPhysicalPlan(), all);
-                        Assertions.assertFalse(all.isEmpty(), "collected no column refs, the plan walk is wrong");
-
-                        List<String> lambdaArgs = new ArrayList<>();
-                        List<String> unowned = new ArrayList<>();
-                        for (ColumnRefOperator ref : all) {
-                            int id = ref.getId();
-                            if (ref.getOpType() == OperatorType.LAMBDA_ARGUMENT) {
-                                lambdaArgs.add(describe(ref));
-                            }
-                            if (id < 1 || id > allocated) {
-                                unowned.add(describe(ref) + " -> the query factory never allocated id " + id
-                                        + " (it allocated 1.." + allocated + ")");
-                                continue;
-                            }
-                            ColumnRefOperator owner = queryFactory.getColumnRef(id);
-                            // ColumnRefOperator.equals compares ids only, so it cannot answer this. A
-                            // different object carrying the same id and the same identity is fine -- clones
-                            // are everywhere -- so only disagreeing fields count.
-                            if (owner != ref && (owner.getOpType() != ref.getOpType()
-                                    || !owner.getName().equals(ref.getName())
-                                    || !owner.getType().equals(ref.getType()))) {
-                                unowned.add(describe(ref) + " -> the query factory holds id " + id + " as "
-                                        + describe(owner));
-                            }
-                        }
-
-                        Assertions.assertFalse(lambdaArgs.isEmpty(),
-                                "no lambda argument reached the physical plan, so this test proves nothing");
-                        Assertions.assertTrue(unowned.isEmpty(),
-                                "plan contains column refs the query factory does not own, i.e. ids leaked in "
-                                        + "from another ColumnRefFactory:\n  " + String.join("\n  ", unowned)
-                                        + "\nlambda arguments seen: " + lambdaArgs);
+                        runner.run();
                     });
+        });
+    }
+
+    /**
+     * Whether the ambiguous id is merely present or actually consulted. ScalarOperatorToExpr writes every
+     * lambda argument into the projection-wide colRefToExpr and reads that same map back in
+     * visitVariableReference, keyed by a ColumnRefOperator whose equals/hashCode are id-only, so one of the
+     * two entries for the shared id wins and a later lookup gets the wrong type. Which one wins depends on
+     * the order PlanFragmentBuilder assigns slots, so this executes the query rather than reasoning about it:
+     * a type mismatch surfaces FE-side while building descriptors, as a SQLException.
+     *
+     * <p>Kept separate from the ownership test on purpose. That one fails before reaching execution on an
+     * unfixed tree, which is exactly where this question needs answering.
+     */
+    @Test
+    public void testQueryOverPartiallyRefreshedLambdaMvExecutes() throws Exception {
+        withPartiallyRefreshedLambdaMv(() -> cluster.runSql("test", QUERY));
+    }
+
+    @Test
+    public void testEveryColumnRefInThePlanIsOwnedByTheQueryFactory() throws Exception {
+        withPartiallyRefreshedLambdaMv(() -> {
+            String sql = QUERY;
+            Pair<String, Pair<ExecPlan, String>> result =
+                    UtFrameUtils.getFragmentPlanWithTrace(connectContext, sql, "MV");
+            ExecPlan execPlan = result.second.first;
+            String plan = execPlan.getExplainString(TExplainLevel.NORMAL);
+
+            // Guards against a vacuous pass: the MV's defined query plan must really have been
+            // duplicated in, and the lambda must have survived projection pruning.
+            PlanTestBase.assertContains(plan, "t_arr");
+            PlanTestBase.assertContains(plan, "array_map");
+
+            ColumnRefFactory queryFactory = execPlan.getColumnRefFactory();
+            Assertions.assertNotNull(queryFactory,
+                    "ExecPlan carries no ColumnRefFactory, so ownership cannot be checked this way");
+            int allocated = queryFactory.getColumnRefs().size();
+
+            List<ColumnRefOperator> all = new ArrayList<>();
+            collectColumnRefs(execPlan.getPhysicalPlan(), all);
+            Assertions.assertFalse(all.isEmpty(), "collected no column refs, the plan walk is wrong");
+
+            List<String> lambdaArgs = new ArrayList<>();
+            List<String> unowned = new ArrayList<>();
+            for (ColumnRefOperator ref : all) {
+                int id = ref.getId();
+                if (ref.getOpType() == OperatorType.LAMBDA_ARGUMENT) {
+                    lambdaArgs.add(describe(ref));
+                }
+                if (id < 1 || id > allocated) {
+                    unowned.add(describe(ref) + " -> the query factory never allocated id " + id
+                            + " (it allocated 1.." + allocated + ")");
+                    continue;
+                }
+                ColumnRefOperator owner = queryFactory.getColumnRef(id);
+                // ColumnRefOperator.equals compares ids only, so it cannot answer this. A
+                // different object carrying the same id and the same identity is fine -- clones
+                // are everywhere -- so only disagreeing fields count.
+                if (owner != ref && (owner.getOpType() != ref.getOpType()
+                        || !owner.getName().equals(ref.getName())
+                        || !owner.getType().equals(ref.getType()))) {
+                    unowned.add(describe(ref) + " -> the query factory holds id " + id + " as "
+                            + describe(owner));
+                }
+            }
+
+            Assertions.assertFalse(lambdaArgs.isEmpty(),
+                    "no lambda argument reached the physical plan, so this test proves nothing");
+            Assertions.assertTrue(unowned.isEmpty(),
+                    "plan contains column refs the query factory does not own, i.e. ids leaked in "
+                            + "from another ColumnRefFactory:\n  " + String.join("\n  ", unowned)
+                            + "\nlambda arguments seen: " + lambdaArgs);
         });
     }
 
