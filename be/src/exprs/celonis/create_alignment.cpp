@@ -188,8 +188,6 @@ StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* co
     const std::string alignment_move_type_name{fmt::format("{}_{}", ALIGNMENT_PREFIX, MOVE_TYPE_SUFFIX)};
     const std::string alignment_deviation_category_name{
             fmt::format("{}_{}", ALIGNMENT_PREFIX, DEVIATION_CATEGORY_SUFFIX)};
-    const std::string alignment_deviation_category_v2_name{fmt::format("{}_v2", alignment_deviation_category_name)};
-
     const std::string alignment_activity_index_name{fmt::format("{}_{}", ALIGNMENT_PREFIX, ACTIVITY_INDEX_SUFFIX)};
 
     const auto& alignment_model_vertex_id{result_table.column<model_vertex_id_column>(alignment_model_vertex_id_name)};
@@ -197,9 +195,6 @@ StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* co
     const auto& alignment_move_type{result_table.column<move_type_column>(alignment_move_type_name)};
     const auto& alignment_deviation_category{
             result_table.column<deviation_category_column>(alignment_deviation_category_name)};
-    const auto& alignment_deviation_category_v2{
-            result_table.column<deviation_category_column>(alignment_deviation_category_v2_name)};
-
     const auto& alignment_activity_index{result_table.column<activity_index_column>(alignment_activity_index_name)};
 
     auto map{string_to_idx_map(st->field_names())};
@@ -216,7 +211,6 @@ StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* co
         AddArray(fields[map.at(alignment_move_type_name)], alignment_move_type[index]);
         AddArray(fields[map.at(alignment_activity_index_name)], alignment_activity_index[index]);
         AddArray(fields[map.at(alignment_deviation_category_name)], alignment_deviation_category[index]);
-        AddArray(fields[map.at(alignment_deviation_category_v2_name)], alignment_deviation_category_v2[index]);
 
         // Edge tables
         for (auto type : CS_EDGE_TYPES) {

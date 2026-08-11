@@ -942,10 +942,9 @@ public class FunctionAnalyzer {
             sf.add(new StructField("alignment_move_type", Type.ARRAY_VARCHAR));
             sf.add(new StructField("alignment_activity_index", Type.ARRAY_BIGINT));
             sf.add(new StructField("alignment_deviation_category", Type.ARRAY_VARCHAR));
-            sf.add(new StructField("alignment_deviation_category_v2", Type.ARRAY_VARCHAR));
 
             List<String> edgeTypes = Arrays.asList("SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE",
-                    "UNMAPPED_EDGE", "MISSING_VIOLATION", "EXCLUSIVE_VIOLATION", "INCOMPLETE_VIOLATION");
+                    "UNMAPPED_EDGE", "MISSING_VIOLATION", "EXCLUSIVE_VIOLATION");
 
             for (String edgeType : edgeTypes) {
                 sf.add(new StructField(edgeType + "_model_vertex_id", Type.ARRAY_BIGINT));
