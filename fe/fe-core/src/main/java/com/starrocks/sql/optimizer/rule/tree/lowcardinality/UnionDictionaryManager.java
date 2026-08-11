@@ -49,6 +49,8 @@ public class UnionDictionaryManager {
 
     private static final int CONSTANT_ID = -1;
 
+    private final Set<Integer> generatedDictionaryIds = Sets.newHashSet();
+
     public UnionDictionaryManager(SessionVariable sessionVariable,
                                   Map<Integer, ScalarOperator> stringRefToDefineExprMap,
                                   Map<Integer, ColumnDict> globalDicts,
@@ -67,7 +69,8 @@ public class UnionDictionaryManager {
         int totalDictSize = uniques.stream().map(b -> b.remaining() + 4).reduce(0, Integer::sum);
         // TODO(farhad-celo): This constant is hardcoded in other places, refactor to a config.
         final int DICT_PAGE_MAX_SIZE = 1024 * 1024;
-        if (uniques.size() > Config.low_cardinality_threshold || totalDictSize > DICT_PAGE_MAX_SIZE - 32) {
+        if (uniques.size() > Config.low_cardinality_threshold || totalDictSize > DICT_PAGE_MAX_SIZE - 32
+                || uniques.isEmpty()) {
             return null;
         }
         // Sort unsigned to match BE's memcmp order; plain sorted() is signed on JDK 8. See ColumnDict.UNSIGNED_LEX.
@@ -97,7 +100,7 @@ public class UnionDictionaryManager {
         return getSourceDictionaryColumnId(newId);
     }
 
-    Integer mergeDictionaries(List<Integer> columnIds) {
+    Integer mergeDictionaries(List<Integer> columnIds, Integer outputColumnId) {
         if (!sessionVariable.isEnableLowCardinalityOptimizeForUnionAll()) {
             return null;
         }
@@ -105,8 +108,7 @@ public class UnionDictionaryManager {
                 columnIds.stream().map(constantColumns::get).filter(Objects::nonNull).toList();
         List<Integer> nonConstantColumnIds = columnIds.stream().map(this::getSourceDictionaryColumnId)
                 .filter(cid -> cid == null || cid != CONSTANT_ID).toList();
-        if (nonConstantColumnIds.isEmpty()
-                || nonConstantColumnIds.contains(null)
+        if (nonConstantColumnIds.contains(null)
                 || !nonConstantColumnIds.stream().allMatch(globalDicts::containsKey)
                 || nonConstantColumnIds.stream().anyMatch(joinEqColumnGroupIds::contains)) {
             return null;
@@ -124,6 +126,13 @@ public class UnionDictionaryManager {
         ImmutableMap<ByteBuffer, Integer> mergedDictData = mergeDictionaryData(allDictData, allConstantData);
         if (mergedDictData == null) {
             return null;
+        }
+        if (nonConstantColumnIds.isEmpty()) {
+            globalDicts.put(outputColumnId, new ColumnDict(mergedDictData, 0, 0));
+            generatedDictionaryIds.add(outputColumnId);
+            Integer groupId = unionColumnGroups.getGroupIdOrAdd(outputColumnId);
+            unionDictData.put(groupId, mergedDictData);
+            return outputColumnId;
         }
         final Integer firstElement = nonConstantColumnIds.get(0);
         nonConstantColumnIds.forEach(cid -> unionColumnGroups.union(cid, firstElement));
@@ -208,5 +217,9 @@ public class UnionDictionaryManager {
 
     boolean isSupportedConstant(ColumnRefOperator c) {
         return constantColumns.containsKey(c.getId());
+    }
+
+    public Set<Integer> getGeneratedDictionaryIds() {
+        return generatedDictionaryIds;
     }
 }

@@ -3293,4 +3293,50 @@ public class LowCardinalityTest2 extends PlanTestBase {
             connectContext.getGlobalStateMgr().setStatisticStorage(prevStorage);
         }
     }
+
+    @Test
+    void testUnionAllConstantInputsOnly() throws Exception {
+        String sql = """
+                select c_user, "abc" const FROM low_card_t1 as s
+                UNION ALL
+                select c_mr, null FROM low_card_t2;
+                """;
+        String plan = getVerboseExplain(sql);
+        assertContains(plan, "  9:Decode\n" +
+                "  |  <dict id 25> : <string id 22>\n" +
+                "  |  <dict id 27> : <string id 21>\n" +
+                "  |  cardinality: 2\n" +
+                "  |  \n" +
+                "  0:UNION\n" +
+                "  |  output exprs:\n" +
+                "  |      [27, INT, true] | [25, INT, true]\n" +
+                "  |  child exprs:\n" +
+                "  |      [23: c_user, INT, true] | [28: expr, INT, false]\n" +
+                "  |      [26: cast, INT, true] | [29: expr, INT, true]", plan);
+        String thrift = getThriftPlan(sql);
+        Assertions.assertTrue(thrift.contains("TGlobalDict(columnId:25"), thrift);
+    }
+
+    @Test
+    void testUnionAllNullInputsOnly() throws Exception {
+        String sql = """
+                select c_user, null const FROM low_card_t1 as s
+                UNION ALL
+                select c_mr, null FROM low_card_t2;
+                """;
+        String plan = getVerboseExplain(sql);
+        assertContains(plan, "  9:Decode\n" +
+                "  |  <dict id 25> : <string id 22>\n" +
+                "  |  <dict id 27> : <string id 21>\n" +
+                "  |  cardinality: 2\n" +
+                "  |  \n" +
+                "  0:UNION\n" +
+                "  |  output exprs:\n" +
+                "  |      [27, INT, true] | [25, INT, true]\n" +
+                "  |  child exprs:\n" +
+                "  |      [23: c_user, INT, true] | [28: expr, INT, false]\n" +
+                "  |      [26: cast, INT, true] | [29: expr, INT, true]", plan);
+        String thrift = getThriftPlan(sql);
+        Assertions.assertTrue(thrift.contains("TGlobalDict(columnId:25"), thrift);
+    }
 }
