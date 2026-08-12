@@ -550,6 +550,23 @@ public class CelonisExpressionStatisticsCalculatorTest {
         assertEquals(-1, columnStatistic.getCollectionSize(), 0.001);
     }
 
+    @Test
+    public void testCelonisLike() {
+        final var unaryTestScenario = unaryTestScenario();
+        final var statistics = unaryTestScenario.statistics;
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_LIKE, Type.BOOLEAN,
+                Lists.newArrayList(unaryTestScenario.stringArrayColumnRefOperator, 
+                        new ConstantOperator("%foo%", Type.VARCHAR)));
+
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+        assertEquals(1, columnStatistic.getMaxValue(), 0.001);
+        assertEquals(0, columnStatistic.getMinValue(), 0.001);
+        assertEquals(2, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.2, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(1, columnStatistic.getAverageRowSize(), 0.001);
+    }
+
     private static void testCelonisPatindex(CallOperator callOperator, Statistics statistics) {
         // WHEN
         final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);

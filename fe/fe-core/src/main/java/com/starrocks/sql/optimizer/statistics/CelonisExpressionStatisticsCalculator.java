@@ -399,6 +399,12 @@ public class CelonisExpressionStatisticsCalculator {
                 averageRowSize = callOperator.getType().getTypeSize();
                 collectionSize = ColumnStatistic.DEFAULT_COLLECTION_SIZE;
                 break;
+            case FunctionSet.CELONIS_LIKE:
+                minValue = 0;
+                maxValue = 1;
+                distinctValues = 2;
+                averageRowSize = callOperator.getType().getTypeSize();
+                break;
             default:
                 return null;
         }
