@@ -85,6 +85,11 @@ public class DeltaLakeTable extends Table {
     }
 
     @Override
+    public boolean isTemporal() {
+        return true;
+    }
+
+    @Override
     public String getTableLocation() {
         return tableLocation;
     }

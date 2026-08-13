@@ -18,6 +18,7 @@ import com.google.common.base.Preconditions;
 import com.starrocks.catalog.Column;
 import com.starrocks.catalog.DeltaLakeTable;
 import com.starrocks.catalog.Table;
+import com.starrocks.connector.TableVersionRange;
 import com.starrocks.sql.optimizer.operator.OperatorType;
 import com.starrocks.sql.optimizer.operator.OperatorVisitor;
 import com.starrocks.sql.optimizer.operator.ScanOperatorPredicates;
@@ -34,8 +35,17 @@ public class LogicalDeltaLakeScanOperator extends LogicalScanOperator {
                                         Map<ColumnRefOperator, Column> colRefToColumnMetaMap,
                                         Map<Column, ColumnRefOperator> columnMetaToColRefMap,
                                         long limit, ScalarOperator predicate) {
+        this(table, colRefToColumnMetaMap, columnMetaToColRefMap, limit, predicate, TableVersionRange.empty());
+    }
+
+    public LogicalDeltaLakeScanOperator(Table table,
+                                        Map<ColumnRefOperator, Column> colRefToColumnMetaMap,
+                                        Map<Column, ColumnRefOperator> columnMetaToColRefMap,
+                                        long limit,
+                                        ScalarOperator predicate,
+                                        TableVersionRange tableVersionRange) {
         super(OperatorType.LOGICAL_DELTALAKE_SCAN, table, colRefToColumnMetaMap, columnMetaToColRefMap, limit,
-                predicate, null);
+                predicate, null, tableVersionRange);
         Preconditions.checkState(table instanceof DeltaLakeTable);
     }
 

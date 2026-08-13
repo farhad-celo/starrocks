@@ -119,6 +119,12 @@ public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
         return getLatestSnapshot(dbName, tableName, loaded.first, loaded.second);
     }
 
+    @Override
+    public DeltaLakeSnapshot getSnapshotByVersion(String dbName, String tableName, long version) {
+        Pair<UnityMetastoreTable, CloudConfiguration> loaded = loadTableAndConfig(dbName, tableName);
+        return getSnapshotByVersion(dbName, tableName, loaded.first, loaded.second, version);
+    }
+
     /**
      * Fetch the table once (metadata + inline commits) and, when enabled, vend its credentials. The
      * returned {@link UnityMetastoreTable} carries the {@code loadTable} response so the snapshot
@@ -150,15 +156,37 @@ public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
     @Override
     protected SnapshotImpl loadSnapshot(DeltaLakeEngine engine, String path, String dbName, String tableName,
                                         MetastoreTable metastoreTable) {
-        DeltaLoadTableResponse response = metastoreTable instanceof UnityMetastoreTable
-                ? ((UnityMetastoreTable) metastoreTable).getLoadTableResponse()
-                : null;
-        if (response == null) {
-            response = unityMetastore.loadTable(dbName, tableName);
-        }
+        DeltaLoadTableResponse response = loadTableResponse(metastoreTable, dbName, tableName);
         if (!isCatalogManaged(response.getMetadata())) {
             return super.loadSnapshot(engine, path, dbName, tableName, metastoreTable);
         }
+        return buildCatalogManagedSnapshot(engine, path, dbName, tableName, response, null);
+    }
+
+    // Time travel: as loadSnapshot but pinned to version. Non-managed uses the default filesystem read.
+    @Override
+    protected SnapshotImpl loadSnapshotAsOfVersion(DeltaLakeEngine engine, String path, String dbName, String tableName,
+                                                   MetastoreTable metastoreTable, long version) {
+        DeltaLoadTableResponse response = loadTableResponse(metastoreTable, dbName, tableName);
+        if (!isCatalogManaged(response.getMetadata())) {
+            return super.loadSnapshotAsOfVersion(engine, path, dbName, tableName, metastoreTable, version);
+        }
+        return buildCatalogManagedSnapshot(engine, path, dbName, tableName, response, version);
+    }
+
+    private DeltaLoadTableResponse loadTableResponse(MetastoreTable metastoreTable, String dbName, String tableName) {
+        if (metastoreTable instanceof UnityMetastoreTable) {
+            DeltaLoadTableResponse response = ((UnityMetastoreTable) metastoreTable).getLoadTableResponse();
+            if (response != null) {
+                return response;
+            }
+        }
+        return unityMetastore.loadTable(dbName, tableName);
+    }
+
+    private SnapshotImpl buildCatalogManagedSnapshot(DeltaLakeEngine engine, String path, String dbName,
+                                                     String tableName, DeltaLoadTableResponse response,
+                                                     Long version) {
         Long latestVersion = response.getLatestTableVersion();
         if (latestVersion == null) {
             throw new StarRocksConnectorException(
@@ -168,6 +196,9 @@ public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
         SnapshotBuilder builder = TableManager.loadSnapshot(path)
                 .withLogData(toCatalogCommits(response.getCommits(), path))
                 .withMaxCatalogVersion(latestVersion);
+        if (version != null) {
+            builder = builder.atVersion(version);
+        }
         return (SnapshotImpl) builder.build(engine);
     }
 

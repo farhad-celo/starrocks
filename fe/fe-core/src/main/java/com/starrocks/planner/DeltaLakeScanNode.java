@@ -57,6 +57,8 @@ public class DeltaLakeScanNode extends ScanNode {
     private final List<String> fieldNames;
     private final PartitionIdGenerator partitionIdGenerator;
     private boolean enableIncrementalScanRanges = false;
+    // The query's requested snapshot version (VERSION AS OF). Empty range => scan the latest snapshot.
+    private TableVersionRange tableVersionRange = TableVersionRange.empty();
 
     public DeltaLakeScanNode(PlanNodeId id, TupleDescriptor desc, String planNodeName,
                              ScalarOperator predicate, List<String> fieldNames,
@@ -75,6 +77,10 @@ public class DeltaLakeScanNode extends ScanNode {
 
     public DeltaLakeTable getDeltaLakeTable() {
         return deltaLakeTable;
+    }
+
+    public void setTableVersionRange(TableVersionRange tableVersionRange) {
+        this.tableVersionRange = tableVersionRange;
     }
 
     private void setupCloudCredential() {
@@ -132,10 +138,13 @@ public class DeltaLakeScanNode extends ScanNode {
         this.enableIncrementalScanRanges = enableIncrementalScanRanges;
         SnapshotImpl snapshot = (SnapshotImpl) deltaLakeTable.getDeltaSnapshot();
         DeltaUtils.checkProtocolAndMetadata(snapshot.getProtocol(), snapshot.getMetadata());
-        long snapshotId = snapshot.getVersion();
+        // Honor VERSION AS OF when the query pinned one; otherwise scan the table's loaded snapshot.
+        TableVersionRange versionRange = tableVersionRange != null && tableVersionRange.end().isPresent()
+                ? tableVersionRange
+                : TableVersionRange.withEnd(Optional.of(snapshot.getVersion()));
 
         GetRemoteFilesParams params =
-                GetRemoteFilesParams.newBuilder().setTableVersionRange(TableVersionRange.withEnd(Optional.of(snapshotId)))
+                GetRemoteFilesParams.newBuilder().setTableVersionRange(versionRange)
                         .setPredicate(predicate).setFieldNames(fieldNames).build();
         RemoteFileInfoSource remoteFileInfoSource = null;
         if (enableIncrementalScanRanges) {

@@ -186,16 +186,60 @@ public class UnityBackedDeltaMetastoreTest {
             {
                 client.loadTable("main", "sales", "orders");
                 times = 1;
-                client.getTableCredentials("main", "sales", "orders", UnityDeltaModelFixtures.TABLE_UUID.toString(), "READ");
+                client.getTableCredentials("main", "sales", "orders",
+                        UnityDeltaModelFixtures.TABLE_UUID.toString(), "READ");
+                times = 1;
+            }
+        };
+    }
+
+    @Test
+    public void testGetSnapshotByVersionInvokesLoadTableExactlyOnce(@Mocked UnityCatalogClient client) {
+        new Expectations() {
+            {
+                client.loadTable("main", "sales", "orders");
+                result = UnityDeltaModelFixtures.loadResponse(S3_LOCATION, 1_700_000_000_000L, null);
+                times = 1;
+
+                client.getTableCredentials("main", "sales", "orders",
+                        UnityDeltaModelFixtures.TABLE_UUID.toString(), "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
+                times = 1;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
+
+        new MockUp<UnityBackedDeltaMetastore>() {
+            @Mock
+            DeltaLakeSnapshot getSnapshotByVersion(String dbName, String tableName, MetastoreTable mt,
+                                                   CloudConfiguration cc, long version) {
+                Assertions.assertEquals(3L, version);
+                Assertions.assertInstanceOf(UnityMetastoreTable.class, mt);
+                Assertions.assertNotNull(cc);
+                Assertions.assertEquals(CloudType.AWS, cc.getCloudType());
+                Assertions.assertInstanceOf(AwsCloudConfiguration.class, cc);
+                throw new SnapshotShortCircuit();
+            }
+        };
+
+        Assertions.assertThrows(SnapshotShortCircuit.class,
+                () -> backed.getSnapshotByVersion("sales", "orders", 3L));
+
+        new Verifications() {
+            {
+                client.loadTable("main", "sales", "orders");
+                times = 1;
+                client.getTableCredentials("main", "sales", "orders",
+                        UnityDeltaModelFixtures.TABLE_UUID.toString(), "READ");
                 times = 1;
             }
         };
     }
 
     /**
-     * Sentinel raised from the snapshot-loader override in
-     * {@link #testGetTableInvokesLoadTableExactlyOnce} so the test can verify it reached the loader
-     * without paying for an actual Delta Kernel snapshot read.
+     * Sentinel raised from snapshot-loader overrides so single-load tests can verify they reached
+     * the loader without paying for an actual Delta Kernel snapshot read.
      */
     private static final class SnapshotShortCircuit extends RuntimeException {
     }
@@ -247,19 +291,20 @@ public class UnityBackedDeltaMetastoreTest {
 
     private static Stream<Arguments> catalogManagedCases() {
         return Stream.of(
-                // Commits arrive out of order with a known latest version: toCatalogCommits must
-                // sort by version and the builder must receive withMaxCatalogVersion.
                 Arguments.of(new DeltaCommit[] {
                         UnityDeltaModelFixtures.commit(2L, 222L, 2_000L),
-                        UnityDeltaModelFixtures.commit(1L, 111L, 1_000L)}, 2L, new long[] {1L, 2L}, 1),
+                        UnityDeltaModelFixtures.commit(1L, 111L, 1_000L)}, 2L, new long[] {1L, 2L}, null),
                 // No commits but a known latest version: builder still receives withMaxCatalogVersion.
-                Arguments.of(new DeltaCommit[] {}, 0L, new long[] {}, 1));
+                Arguments.of(new DeltaCommit[] {}, 0L, new long[] {}, null),
+                Arguments.of(new DeltaCommit[] {
+                        UnityDeltaModelFixtures.commit(1L, 111L, 1_000L),
+                        UnityDeltaModelFixtures.commit(2L, 222L, 2_000L)}, 2L, new long[] {1L, 2L}, 1L));
     }
 
     @ParameterizedTest
     @MethodSource("catalogManagedCases")
     public void testLoadSnapshotBuildsSnapshotForCatalogManaged(DeltaCommit[] commits, Long latestVersion,
-                                                                long[] expectedVersions, int expectedMaxVersionCalls,
+                                                                long[] expectedVersions, Long requestedVersion,
                                                                 @Mocked UnityCatalogClient client,
                                                                 @Mocked DeltaLakeEngine engine,
                                                                 @Mocked TableManager tableManager,
@@ -277,6 +322,8 @@ public class UnityBackedDeltaMetastoreTest {
                 result = builder;
                 builder.withMaxCatalogVersion(anyLong);
                 result = builder;
+                builder.atVersion(anyLong);
+                result = builder;
                 minTimes = 0;
                 builder.build((Engine) any);
                 result = managedSnapshot;
@@ -284,7 +331,9 @@ public class UnityBackedDeltaMetastoreTest {
         };
 
         UnityBackedDeltaMetastore backed = metastore(client, propsWithVendedCredentials());
-        SnapshotImpl result = backed.loadSnapshot(engine, S3_LOCATION, "sales", "orders", mt);
+        SnapshotImpl result = requestedVersion == null
+                ? backed.loadSnapshot(engine, S3_LOCATION, "sales", "orders", mt)
+                : backed.loadSnapshotAsOfVersion(engine, S3_LOCATION, "sales", "orders", mt, requestedVersion);
 
         Assertions.assertSame(managedSnapshot, result);
         String stagedDir = S3_LOCATION + "/_delta_log/_staged_commits/";
@@ -304,8 +353,16 @@ public class UnityBackedDeltaMetastoreTest {
                     Assertions.assertEquals(expected.getFileModificationTimestamp().longValue(),
                             entry.getFileStatus().getModificationTime());
                 }
-                builder.withMaxCatalogVersion(anyLong);
-                times = expectedMaxVersionCalls;
+                times = 1;
+                builder.withMaxCatalogVersion(latestVersion);
+                times = 1;
+                if (requestedVersion == null) {
+                    builder.atVersion(anyLong);
+                    times = 0;
+                } else {
+                    builder.atVersion(requestedVersion);
+                    times = 1;
+                }
                 client.loadTable(anyString, anyString, anyString);
                 times = 0;
             }

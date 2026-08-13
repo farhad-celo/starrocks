@@ -15,6 +15,7 @@
 package com.starrocks.connector.delta;
 
 import com.starrocks.catalog.Table;
+import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.metastore.IMetastore;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.memory.MemoryTrackable;
@@ -68,4 +69,9 @@ public interface IDeltaLakeMetastore extends IMetastore, MemoryTrackable {
     List<String> getPartitionKeys(String dbName, String tableName);
 
     DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName);
+
+    // Load a historical snapshot for time travel (VERSION AS OF); unsupported by default.
+    default DeltaLakeSnapshot getSnapshotByVersion(String dbName, String tableName, long version) {
+        throw new StarRocksConnectorException("Time travel is not supported for %s.%s", dbName, tableName);
+    }
 }

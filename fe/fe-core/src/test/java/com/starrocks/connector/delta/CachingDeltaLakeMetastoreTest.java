@@ -207,6 +207,7 @@ public class CachingDeltaLakeMetastoreTest {
             metastore.getLatestSnapshot("db1", "table1");
         });
         assertThat(exception.getMessage(), containsString("Failed to find Delta table for delta0.db1.table1"));
+        assertThat(exception.getMessage(), containsString("caused by : null"));
     }
 
     @Test

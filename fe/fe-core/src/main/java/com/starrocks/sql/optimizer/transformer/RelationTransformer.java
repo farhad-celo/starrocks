@@ -685,7 +685,7 @@ public class RelationTransformer implements AstVisitor<LogicalPlan, ExpressionMa
                     columnMetaToColRefMap, Operator.DEFAULT_LIMIT, partitionPredicate);
         } else if (Table.TableType.DELTALAKE.equals(node.getTable().getType())) {
             scanOperator = new LogicalDeltaLakeScanOperator(node.getTable(), colRefToColumnMetaMapBuilder.build(),
-                    columnMetaToColRefMap, Operator.DEFAULT_LIMIT, null);
+                    columnMetaToColRefMap, Operator.DEFAULT_LIMIT, null, tableVersionRange);
         } else if (Table.TableType.PAIMON.equals(node.getTable().getType())) {
             scanOperator = new LogicalPaimonScanOperator(node.getTable(), colRefToColumnMetaMapBuilder.build(),
                     columnMetaToColRefMap, Operator.DEFAULT_LIMIT, null);

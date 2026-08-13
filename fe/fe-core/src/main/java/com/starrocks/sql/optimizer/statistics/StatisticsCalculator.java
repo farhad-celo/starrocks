@@ -581,21 +581,24 @@ public class StatisticsCalculator extends OperatorVisitor<Void, ExpressionContex
 
     @Override
     public Void visitLogicalDeltaLakeScan(LogicalDeltaLakeScanOperator node, ExpressionContext context) {
-        return computeDeltaLakeScanNode(node, context, node.getTable(), node.getColRefToColumnMetaMap());
+        return computeDeltaLakeScanNode(node, context, node.getTable(), node.getColRefToColumnMetaMap(),
+                node.getTableVersionRange());
     }
 
     @Override
     public Void visitPhysicalDeltaLakeScan(PhysicalDeltaLakeScanOperator node, ExpressionContext context) {
-        return computeDeltaLakeScanNode(node, context, node.getTable(), node.getColRefToColumnMetaMap());
+        return computeDeltaLakeScanNode(node, context, node.getTable(), node.getColRefToColumnMetaMap(),
+                node.getTableVersionRange());
     }
 
     private Void computeDeltaLakeScanNode(Operator node, ExpressionContext context, Table table,
-                                          Map<ColumnRefOperator, Column> columnRefOperatorColumnMap) {
+                                          Map<ColumnRefOperator, Column> columnRefOperatorColumnMap,
+                                          TableVersionRange tableVersionRange) {
         if (context.getStatistics() == null) {
             String catalogName = table.getCatalogName();
             Statistics stats = GlobalStateMgr.getCurrentState().getMetadataMgr().getTableStatistics(
                     optimizerContext, catalogName, table, columnRefOperatorColumnMap, null,
-                    node.getPredicate(), node.getLimit(), TableVersionRange.empty());
+                    node.getPredicate(), node.getLimit(), tableVersionRange);
             context.setStatistics(stats);
 
             if (node.isLogical()) {

@@ -68,7 +68,8 @@ public class DeltaLakeMetastoreVendedFsScopeTest {
         SemanticException ex = assertThrows(SemanticException.class, () ->
                 metastore.getLatestSnapshot("db1", "table1", table, vendedConfig("creds-v1")));
 
-        assertThat(ex.getMessage(), containsString("Failed to get latest snapshot"));
+        assertThat(ex.getMessage(), containsString("Failed to get snapshot for delta0.db1.table1"));
+        assertThat(ex.getMessage(), containsString("short-circuit after capture"));
         Captured captured = calls.get(0);
         Assertions.assertEquals("delta-vended-fs-delta0-db1-table1", captured.ugi,
                 "vended snapshot load must run under the per-table throwaway UGI");

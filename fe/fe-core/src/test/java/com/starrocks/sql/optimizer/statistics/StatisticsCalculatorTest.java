@@ -21,9 +21,11 @@ import com.google.common.collect.Maps;
 import com.starrocks.analysis.BinaryType;
 import com.starrocks.analysis.JoinOperator;
 import com.starrocks.catalog.Column;
+import com.starrocks.catalog.DeltaLakeTable;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Partition;
+import com.starrocks.catalog.PartitionKey;
 import com.starrocks.catalog.Table;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.FeConstants;
@@ -43,6 +45,7 @@ import com.starrocks.sql.optimizer.base.ColumnRefSet;
 import com.starrocks.sql.optimizer.base.LogicalProperty;
 import com.starrocks.sql.optimizer.operator.AggType;
 import com.starrocks.sql.optimizer.operator.logical.LogicalAggregationOperator;
+import com.starrocks.sql.optimizer.operator.logical.LogicalDeltaLakeScanOperator;
 import com.starrocks.sql.optimizer.operator.logical.LogicalIcebergScanOperator;
 import com.starrocks.sql.optimizer.operator.logical.LogicalJoinOperator;
 import com.starrocks.sql.optimizer.operator.logical.LogicalOlapScanOperator;
@@ -54,6 +57,7 @@ import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
+import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.plan.ConnectorPlanTestBase;
 import com.starrocks.utframe.StarRocksAssert;
 import com.starrocks.utframe.UtFrameUtils;
@@ -76,6 +80,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class StatisticsCalculatorTest {
@@ -341,6 +347,49 @@ public class StatisticsCalculatorTest {
                     getColumnStatistic(partitionColumn).getMaxValue(), 0.001);
         Assertions.assertTrue(optimizerContext.isObtainedFromInternalStatistics());
         optimizerContext.setObtainedFromInternalStatistics(false);
+    }
+
+    @Test
+    public void testLogicalDeltaLakeScanUsesTableVersionRangeForStatistics() {
+        Column column = new Column("c1", Type.INT);
+        DeltaLakeTable deltaLakeTable = new DeltaLakeTable(1, "delta0", "db1", "table1",
+                Lists.newArrayList(column), Lists.newArrayList(), null,
+                "s3://bucket/path/to/table", null, 0, 7L);
+
+        ColumnRefOperator ref = new ColumnRefOperator(1, Type.INT, "c1", true);
+        Map<ColumnRefOperator, Column> refToColumn = Maps.newHashMap();
+        Map<Column, ColumnRefOperator> columnToRef = Maps.newHashMap();
+        refToColumn.put(ref, column);
+        columnToRef.put(column, ref);
+
+        TableVersionRange tableVersionRange = TableVersionRange.withEnd(Optional.of(3L));
+        LogicalDeltaLakeScanOperator deltaLakeScanOperator = new LogicalDeltaLakeScanOperator(deltaLakeTable,
+                refToColumn, columnToRef, -1, null, tableVersionRange);
+
+        GroupExpression groupExpression = new GroupExpression(deltaLakeScanOperator, Lists.newArrayList());
+        groupExpression.setGroup(new Group(0));
+        ExpressionContext expressionContext = new ExpressionContext(groupExpression);
+        AtomicReference<TableVersionRange> capturedVersionRange = new AtomicReference<>();
+
+        new MockUp<MetadataMgr>() {
+            @Mock
+            public Statistics getTableStatistics(OptimizerContext session, String catalogName, Table table,
+                                                 Map<ColumnRefOperator, Column> columns,
+                                                 List<PartitionKey> partitionKeys, ScalarOperator predicate,
+                                                 long limit, TableVersionRange versionRange) {
+                capturedVersionRange.set(versionRange);
+                return Statistics.builder()
+                        .setOutputRowCount(100)
+                        .addColumnStatistic(ref, ColumnStatistic.unknown())
+                        .build();
+            }
+        };
+
+        StatisticsCalculator statisticsCalculator = new StatisticsCalculator(expressionContext,
+                columnRefFactory, optimizerContext);
+        statisticsCalculator.estimatorStats();
+
+        Assertions.assertEquals(tableVersionRange, capturedVersionRange.get());
     }
 
     @Test

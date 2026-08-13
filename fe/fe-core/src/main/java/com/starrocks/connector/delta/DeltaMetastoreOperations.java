@@ -48,6 +48,10 @@ public class DeltaMetastoreOperations {
         return metastore.getTable(dbName, tableName);
     }
 
+    public DeltaLakeSnapshot getSnapshotByVersion(String dbName, String tableName, long version) {
+        return metastore.getSnapshotByVersion(dbName, tableName, version);
+    }
+
     public List<String> getPartitionKeys(String dbName, String tableName) {
         return metastore.getPartitionKeys(dbName, tableName);
     }

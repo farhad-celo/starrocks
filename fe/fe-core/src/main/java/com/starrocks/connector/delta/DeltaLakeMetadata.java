@@ -26,9 +26,11 @@ import com.starrocks.common.profile.Tracers;
 import com.starrocks.connector.ConnectorMetadatRequestContext;
 import com.starrocks.connector.ConnectorMetadata;
 import com.starrocks.connector.ConnectorProperties;
+import com.starrocks.connector.ConnectorTableVersion;
 import com.starrocks.connector.GetRemoteFilesParams;
 import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.MetastoreType;
+import com.starrocks.connector.PointerType;
 import com.starrocks.connector.PredicateSearchKey;
 import com.starrocks.connector.RemoteFileInfo;
 import com.starrocks.connector.RemoteFileInfoSource;
@@ -40,6 +42,7 @@ import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.OptimizerContext;
 import com.starrocks.sql.optimizer.Utils;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
+import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.statistics.Statistics;
 import io.delta.kernel.data.FilteredColumnarBatch;
@@ -61,6 +64,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -118,17 +122,17 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
 
     @Override
     public List<RemoteFileInfo> getRemoteFiles(Table table, GetRemoteFilesParams params) {
-        DeltaLakeTable deltaLakeTable = (DeltaLakeTable) table;
+        DeltaLakeTable deltaLakeTable = tableForVersion((DeltaLakeTable) table, params.getTableVersionRange());
         String dbName = deltaLakeTable.getCatalogDBName();
         String tableName = deltaLakeTable.getCatalogTableName();
         PredicateSearchKey key =
                 PredicateSearchKey.of(dbName, tableName, params.getTableVersionRange().end().get(), params.getPredicate());
 
-        triggerDeltaLakePlanFilesIfNeeded(key, table, params.getPredicate(), params.getFieldNames());
+        triggerDeltaLakePlanFilesIfNeeded(key, deltaLakeTable, params.getPredicate(), params.getFieldNames());
 
         List<FileScanTask> scanTasks = splitTasks.get(key);
         if (scanTasks == null) {
-            throw new StarRocksConnectorException("Missing deltalake split task for table:[{}.{}]. predicate:[{}]",
+            throw new StarRocksConnectorException("Missing deltalake split task for table:[%s.%s]. predicate:[%s]",
                     dbName, tableName, params.getPredicate());
         }
 
@@ -137,7 +141,66 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
 
     @Override
     public RemoteFileInfoSource getRemoteFilesAsync(Table table, GetRemoteFilesParams params) {
-        return buildRemoteInfoSource(table, params.getPredicate(), false);
+        DeltaLakeTable deltaLakeTable = tableForVersion((DeltaLakeTable) table, params.getTableVersionRange());
+        return buildRemoteInfoSource(deltaLakeTable, params.getPredicate(), false);
+    }
+
+    @Override
+    public TableVersionRange getTableVersionRange(String dbName, Table table,
+                                                  Optional<ConnectorTableVersion> startVersion,
+                                                  Optional<ConnectorTableVersion> endVersion) {
+        if (startVersion.isPresent()) {
+            throw new StarRocksConnectorException("Read Delta table with start version is not supported");
+        }
+        DeltaLakeTable deltaLakeTable = (DeltaLakeTable) table;
+        if (endVersion.isEmpty()) {
+            return TableVersionRange.withEnd(Optional.of(deltaLakeTable.getVersion()));
+        }
+        return TableVersionRange.withEnd(Optional.of(resolveVersion(endVersion.get())));
+    }
+
+    private long resolveVersion(ConnectorTableVersion version) {
+        if (version.getPointerType() != PointerType.VERSION) {
+            throw new StarRocksConnectorException(
+                    "Unsupported Delta table version type: %s; only VERSION AS OF <integer> is supported",
+                    version.getPointerType());
+        }
+        ConstantOperator constant = version.getConstantOperator();
+        if (!constant.getType().isIntegerType()) {
+            throw new StarRocksConnectorException(
+                    "Unsupported Delta version type: %s; VERSION AS OF expects an integer version", constant.getType());
+        }
+        long resolvedVersion = constant.castTo(com.starrocks.catalog.Type.BIGINT)
+                .orElseThrow(() -> new StarRocksConnectorException(
+                        "Failed to interpret Delta version %s as an integer", constant))
+                .getBigint();
+        if (resolvedVersion < 0) {
+            throw new StarRocksConnectorException(
+                    "Unsupported Delta version: %s; VERSION AS OF expects a non-negative integer version",
+                    resolvedVersion);
+        }
+        return resolvedVersion;
+    }
+
+    // Resolve the table to the pinned version; unchanged when no version is set or it matches the current one.
+    private DeltaLakeTable tableForVersion(DeltaLakeTable table, TableVersionRange versionRange) {
+        Optional<Long> endVersion = versionRange == null ? Optional.empty() : versionRange.end();
+        if (endVersion.isEmpty()) {
+            return table;
+        }
+        long version = endVersion.get();
+        if (version == table.getVersion()) {
+            return table;
+        }
+        DeltaLakeSnapshot snapshot = deltaOps.getSnapshotByVersion(table.getCatalogDBName(),
+                table.getCatalogTableName(), version);
+        if (snapshot == null) {
+            throw new StarRocksConnectorException("Failed to load Delta snapshot %s for table %s.%s", version,
+                    table.getCatalogDBName(), table.getCatalogTableName());
+        }
+        SnapshotImpl snapshotImpl = snapshot.getSnapshot();
+        DeltaUtils.checkProtocolAndMetadata(snapshotImpl.getProtocol(), snapshotImpl.getMetadata());
+        return DeltaUtils.convertDeltaSnapshotToSRTable(catalogName, snapshot);
     }
 
     @Override
@@ -148,7 +211,7 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
             return StatisticsUtils.buildDefaultStatistics(columns.keySet());
         }
 
-        DeltaLakeTable deltaLakeTable = (DeltaLakeTable) table;
+        DeltaLakeTable deltaLakeTable = tableForVersion((DeltaLakeTable) table, versionRange);
         SnapshotImpl snapshot = (SnapshotImpl) deltaLakeTable.getDeltaSnapshot();
         String dbName = deltaLakeTable.getCatalogDBName();
         String tableName = deltaLakeTable.getCatalogTableName();

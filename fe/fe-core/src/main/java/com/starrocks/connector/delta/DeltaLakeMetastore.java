@@ -151,6 +151,31 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
     protected DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName,
                                                   MetastoreTable metastoreTable,
                                                   CloudConfiguration tableCloudConfiguration) {
+        return loadSnapshotScoped(dbName, tableName, metastoreTable, tableCloudConfiguration, "DeltaLake.getSnapshot",
+                (engine, path) -> loadSnapshot(engine, path, dbName, tableName, metastoreTable));
+    }
+
+    // Load a historical snapshot for time travel; not cached (see CachingDeltaLakeMetastore).
+    @Override
+    public DeltaLakeSnapshot getSnapshotByVersion(String dbName, String tableName, long version) {
+        MetastoreTable metastoreTable = getMetastoreTable(dbName, tableName);
+        CloudConfiguration tableCloudConfiguration = resolveTableCloudConfiguration(dbName, tableName);
+        return getSnapshotByVersion(dbName, tableName, metastoreTable, tableCloudConfiguration, version);
+    }
+
+    protected DeltaLakeSnapshot getSnapshotByVersion(String dbName, String tableName,
+                                                     MetastoreTable metastoreTable,
+                                                     CloudConfiguration tableCloudConfiguration,
+                                                     long version) {
+        return loadSnapshotScoped(dbName, tableName, metastoreTable, tableCloudConfiguration,
+                "DeltaLake.getSnapshotAsOfVersion",
+                (engine, path) -> loadSnapshotAsOfVersion(engine, path, dbName, tableName, metastoreTable, version));
+    }
+
+    // Shared load path (engine setup, vended-cred scoping, error mapping) for latest and as-of loads.
+    private DeltaLakeSnapshot loadSnapshotScoped(String dbName, String tableName, MetastoreTable metastoreTable,
+                                                 CloudConfiguration tableCloudConfiguration, String traceLabel,
+                                                 SnapshotLoader loader) {
         if (metastoreTable == null) {
             LOG.error("get metastore table failed. dbName: {}, tableName: {}", dbName, tableName);
             return null;
@@ -169,26 +194,26 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
         DeltaLakeEngine deltaLakeEngine = createDeltaLakeEngine(effectiveConfiguration, usePerTableConfig);
         SnapshotImpl snapshot;
 
-        try (Timer ignored = Tracers.watchScope(EXTERNAL, "DeltaLake.getSnapshot")) {
+        try (Timer ignored = Tracers.watchScope(EXTERNAL, traceLabel)) {
             if (usePerTableConfig) {
                 // Vended credentials: run the kernel log replay under a throwaway per-load UGI so its
                 // filesystems are reclaimed via closeAllForUGI on return instead of leaking per metadata file.
                 snapshot = DeltaVendedFsScope.runScoped(
                         DeltaVendedFsScope.scopeNameFor(catalogName, dbName, tableName),
-                        () -> loadSnapshot(deltaLakeEngine, path, dbName, tableName, metastoreTable));
+                        () -> loader.load(deltaLakeEngine, path));
             } else {
-                snapshot = loadSnapshot(deltaLakeEngine, path, dbName, tableName, metastoreTable);
+                snapshot = loader.load(deltaLakeEngine, path);
             }
         } catch (TableNotFoundException e) {
             LOG.error("Failed to find Delta table for {}.{}.{}, {}. caused by : {}", catalogName, dbName, tableName,
                     e.getMessage(), e.getCause());
-            throw new SemanticException("Failed to find Delta table for %s.%s.%s, %s. caused by : %s", catalogName,
-                    dbName, tableName, e.getMessage(), e.getCause());
+            throw new SemanticException(String.format("Failed to find Delta table for %s.%s.%s, %s. caused by : %s",
+                    catalogName, dbName, tableName, e.getMessage(), e.getCause()), e);
         } catch (Exception e) {
-            LOG.error("Failed to get latest snapshot for {}.{}.{}, {}. caused by : {}", catalogName, dbName,
+            LOG.error("Failed to get snapshot for {}.{}.{}, {}. caused by : {}", catalogName, dbName,
                     tableName, e.getMessage(), e.getCause());
-            throw new SemanticException("Failed to get latest snapshot for %s.%s.%s, %s. caused by : %s",
-                    catalogName, dbName, tableName, e.getMessage(), e.getCause());
+            throw new SemanticException(String.format("Failed to get snapshot for %s.%s.%s, %s. caused by : %s",
+                    catalogName, dbName, tableName, e.getMessage(), e.getCause()), e);
         }
         long version = snapshot.getVersion();
         return new DeltaLakeSnapshot(dbName, tableName, deltaLakeEngine, snapshot, createTime, version, path);
@@ -206,6 +231,13 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
     protected SnapshotImpl loadSnapshot(DeltaLakeEngine engine, String path, String dbName, String tableName,
                                         MetastoreTable metastoreTable) {
         return (SnapshotImpl) Table.forPath(engine, path).getLatestSnapshot(engine);
+    }
+
+    // Load the as-of snapshot from the published Delta log; catalog-managed subclasses override.
+    @SuppressWarnings("squid:S1172") // params unused here but part of the overridable contract
+    protected SnapshotImpl loadSnapshotAsOfVersion(DeltaLakeEngine engine, String path, String dbName, String tableName,
+                                                   MetastoreTable metastoreTable, long version) {
+        return (SnapshotImpl) Table.forPath(engine, path).getSnapshotAsOfVersion(engine, version);
     }
 
     protected DeltaLakeEngine createDeltaLakeEngine(Configuration effectiveConfiguration, boolean usePerTableConfig) {
@@ -301,5 +333,10 @@ public abstract class DeltaLakeMetastore implements IDeltaLakeMetastore {
 
         return Lists.newArrayList(Pair.create(jsonSamples, jsonCache.size()),
                 Pair.create(checkpointSamples, checkpointCache.size()));
+    }
+
+    @FunctionalInterface
+    protected interface SnapshotLoader {
+        SnapshotImpl load(DeltaLakeEngine engine, String path);
     }
 }

@@ -1281,6 +1281,7 @@ public class PlanFragmentBuilder {
             DeltaLakeScanNode deltaLakeScanNode =
                     new DeltaLakeScanNode(context.getNextNodeId(), tupleDescriptor, "DeltaLakeScanNode",
                             node.getPredicate(), fieldNames, partitionIdGenerator);
+            deltaLakeScanNode.setTableVersionRange(node.getTableVersionRange());
             deltaLakeScanNode.computeStatistics(optExpression.getStatistics());
             deltaLakeScanNode.setScanOptimizeOption(node.getScanOptimizeOption());
             currentExecGroup.add(deltaLakeScanNode, true);

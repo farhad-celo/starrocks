@@ -153,6 +153,12 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
     }
 
     @Override
+    public DeltaLakeSnapshot getSnapshotByVersion(String dbName, String tableName, long version) {
+        // Time-travel snapshots are loaded fresh (not cached) so they never evict the latest entry.
+        return delegate.getSnapshotByVersion(dbName, tableName, version);
+    }
+
+    @Override
     public MetastoreTable getMetastoreTable(String dbName, String tableName) {
         return delegate.getMetastoreTable(dbName, tableName);
     }
