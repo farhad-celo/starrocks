@@ -66,6 +66,10 @@ public interface IDeltaLakeMetastore extends IMetastore, MemoryTrackable {
 
     Table getTable(String dbName, String tableName);
 
+    default Table getView(String dbName, String tableName) {
+        return null;
+    }
+
     List<String> getPartitionKeys(String dbName, String tableName);
 
     DeltaLakeSnapshot getLatestSnapshot(String dbName, String tableName);

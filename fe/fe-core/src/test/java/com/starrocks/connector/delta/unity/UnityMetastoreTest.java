@@ -18,6 +18,7 @@ import com.databricks.sdk.service.catalog.DataSourceFormat;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.TableInfo;
+import com.databricks.sdk.service.catalog.TableType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.starrocks.catalog.Database;
@@ -150,6 +151,24 @@ public class UnityMetastoreTest {
         UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
         List<String> tables = metastore.getAllTableNames("sales");
         Assertions.assertEquals(ImmutableList.of("orders", "delta_two"), tables);
+    }
+
+    @Test
+    public void testGetAllTableNamesIncludesViewsAlongsideDeltaTables(@Mocked UnityCatalogClient client) {
+        TableInfo delta = new TableInfo().setName("orders").setDataSourceFormat(DataSourceFormat.DELTA);
+        TableInfo iceberg = new TableInfo().setName("iceberg_tbl").setDataSourceFormat(DataSourceFormat.ICEBERG);
+        TableInfo view = new TableInfo().setName("orders_view").setTableType(TableType.VIEW);
+
+        new Expectations() {
+            {
+                client.listTables("main", "sales");
+                result = ImmutableList.of(delta, iceberg, view);
+            }
+        };
+
+        UnityMetastore metastore = new UnityMetastore(client, propsWithVendedCredentials(true));
+        List<String> tables = metastore.getAllTableNames("sales");
+        Assertions.assertEquals(ImmutableList.of("orders", "orders_view"), tables);
     }
 
     @Test

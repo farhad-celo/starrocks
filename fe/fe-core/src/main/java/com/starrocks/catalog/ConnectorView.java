@@ -18,7 +18,6 @@ import com.starrocks.analysis.ParseNode;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.sql.analyzer.AnalyzerUtils;
-import com.starrocks.sql.ast.CTERelation;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.TableRelation;
 import com.starrocks.sql.common.ErrorType;
@@ -26,8 +25,8 @@ import com.starrocks.sql.common.StarRocksPlannerException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -50,14 +49,15 @@ public abstract class ConnectorView extends Table {
     public QueryStatement getQueryStatement() throws StarRocksPlannerException {
         SessionVariable sessionVariable = ConnectContext.get() != null ? ConnectContext.get().getSessionVariable()
                 : new SessionVariable();
+        // The body is parsed with the session's SQL dialect. Connector view definitions (e.g. Celonis'
+        // celonis.sql.starrocks) are authored in StarRocks dialect, so a non-StarRocks session dialect such
+        // as Trino could mis-parse them. In practice sql_dialect is unset (defaults to StarRocks), so we do
+        // not force it here; the save/restore only shields the session from a dialect a subclass may set.
         String sqlDialect = sessionVariable.getSqlDialect();
         QueryStatement queryStatement = doGetQueryStatement(sessionVariable);
         sessionVariable.setSqlDialect(sqlDialect);
-        List<String> cteRelationNames = queryStatement.getQueryRelation().getCteRelations()
-                .stream().map(CTERelation::getName)
-                .collect(Collectors.toList());
-        List<TableRelation> tableRelations = AnalyzerUtils.collectTableRelations(queryStatement);
-        formatRelations(tableRelations, cteRelationNames);
+        List<TableRelation> tableRelations = AnalyzerUtils.collectNonCTETableRelations(queryStatement);
+        formatRelations(tableRelations, Collections.emptyList());
         return queryStatement;
     }
 

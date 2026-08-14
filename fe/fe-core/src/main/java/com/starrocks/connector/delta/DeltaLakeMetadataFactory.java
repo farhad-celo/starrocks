@@ -18,6 +18,7 @@ import com.starrocks.connector.ConnectorProperties;
 import com.starrocks.connector.ConnectorType;
 import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.MetastoreType;
+import com.starrocks.connector.delta.unity.UnityDeltaMetastoreOperations;
 import com.starrocks.connector.hive.CachingHiveMetastoreConf;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 
@@ -56,12 +57,19 @@ public class DeltaLakeMetadataFactory {
 
     public DeltaLakeMetadata create() {
         CachingDeltaLakeMetastore queryLevelCacheMetastore = createQueryLevelCacheMetastore();
-        DeltaMetastoreOperations metastoreOperations = new DeltaMetastoreOperations(queryLevelCacheMetastore,
-                metastore instanceof CachingDeltaLakeMetastore, metastoreType);
+        DeltaMetastoreOperations metastoreOperations = createMetastoreOperations(queryLevelCacheMetastore);
 
         Optional<DeltaLakeCacheUpdateProcessor> cacheUpdateProcessor = getCacheUpdateProcessor();
         return new DeltaLakeMetadata(hdfsEnvironment, catalogName, metastoreOperations,
                 cacheUpdateProcessor.orElse(null), connectorProperties);
+    }
+
+    protected DeltaMetastoreOperations createMetastoreOperations(CachingDeltaLakeMetastore queryLevelCacheMetastore) {
+        boolean enableCatalogLevelCache = metastore instanceof CachingDeltaLakeMetastore;
+        if (metastoreType == MetastoreType.UNITY) {
+            return new UnityDeltaMetastoreOperations(queryLevelCacheMetastore, enableCatalogLevelCache, metastoreType);
+        }
+        return new DeltaMetastoreOperations(queryLevelCacheMetastore, enableCatalogLevelCache, metastoreType);
     }
 
     public synchronized Optional<DeltaLakeCacheUpdateProcessor> getCacheUpdateProcessor() {

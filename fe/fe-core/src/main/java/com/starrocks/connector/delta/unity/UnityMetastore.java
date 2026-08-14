@@ -17,6 +17,7 @@ package com.starrocks.connector.delta.unity;
 import com.databricks.sdk.service.catalog.DataSourceFormat;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.TableInfo;
+import com.databricks.sdk.service.catalog.TableType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.starrocks.catalog.Database;
@@ -28,8 +29,6 @@ import com.starrocks.credential.CloudConfiguration;
 import io.unitycatalog.client.delta.model.DeltaCredentialsResponse;
 import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
 import io.unitycatalog.client.delta.model.DeltaTableMetadata;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.Objects;
@@ -42,7 +41,6 @@ import java.util.stream.Collectors;
  * {@code delta/v1} client for {@code loadTable} and {@code getTableCredentials}.
  */
 public class UnityMetastore implements IMetastore {
-    private static final Logger LOG = LogManager.getLogger(UnityMetastore.class);
     private static final String READ_OPERATION = "READ";
 
     private final UnityCatalogApi client;
@@ -72,7 +70,7 @@ public class UnityMetastore implements IMetastore {
     @Override
     public List<String> getAllTableNames(String dbName) {
         return client.listTables(properties.getUcCatalogName(), dbName).stream()
-                .filter(UnityMetastore::isDelta)
+                .filter(t -> isDelta(t) || isView(t))
                 .map(t -> t.getName())
                 .filter(n -> !Strings.isNullOrEmpty(n))
                 .collect(Collectors.toList());
@@ -117,12 +115,11 @@ public class UnityMetastore implements IMetastore {
 
     /** Load Delta metadata plus inline catalog-owned commits via {@code delta/v1} {@code loadTable}. */
     public DeltaLoadTableResponse loadTable(String dbName, String tableName) {
-        try {
-            return client.loadTable(properties.getUcCatalogName(), dbName, tableName);
-        } catch (StarRocksConnectorException e) {
-            LOG.error("Failed to load Unity Catalog table {}", fullName(dbName, tableName), e);
-            throw e;
-        }
+        return client.loadTable(properties.getUcCatalogName(), dbName, tableName);
+    }
+
+    public TableInfo getTableInfo(String dbName, String tableName) {
+        return client.getTableInfo(fullName(dbName, tableName));
     }
 
     @Override
@@ -200,5 +197,9 @@ public class UnityMetastore implements IMetastore {
 
     private static boolean isDelta(TableInfo info) {
         return info != null && info.getDataSourceFormat() == DataSourceFormat.DELTA;
+    }
+
+    private static boolean isView(TableInfo info) {
+        return info != null && info.getTableType() == TableType.VIEW;
     }
 }

@@ -24,6 +24,7 @@ import com.databricks.sdk.service.catalog.ListTablesRequest;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.TableInfo;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -58,6 +59,8 @@ import java.util.Objects;
 public class UnityCatalogClient implements UnityCatalogApi {
     private static final Logger LOG = LogManager.getLogger(UnityCatalogClient.class);
     private static final PercentEscaper FULL_NAME_ESCAPER = new PercentEscaper("-_.*", false);
+    private static final ObjectMapper ERROR_BODY_MAPPER = new ObjectMapper();
+    private static final String UNSUPPORTED_TABLE_FORMAT = "UnsupportedTableFormatException";
     private static final String DELTA_APP_VERSION = "4.3.0";
     private static final String SPOOF_SPARK_APP_VERSION = "4.0.0";
     private static final String SPOOF_JAVA_VERSION = "17.0.19";
@@ -192,6 +195,15 @@ public class UnityCatalogClient implements UnityCatalogApi {
     }
 
     @Override
+    public TableInfo getTableInfo(String fullName) {
+        try {
+            return workspace.tables().get(encodeFullName(fullName));
+        } catch (DatabricksException e) {
+            throw wrap("getTable(" + fullName + ")", e);
+        }
+    }
+
+    @Override
     public boolean tableExists(String fullName) {
         try {
             workspace.tables().get(encodeFullName(fullName));
@@ -230,6 +242,12 @@ public class UnityCatalogClient implements UnityCatalogApi {
             // name most often means it is not a Delta table (Iceberg / Parquet / view).
             if (e.getCode() >= 400 && e.getCode() < 500) {
                 context += "; verify the table exists and its data source format is Delta";
+                String message = String.format("Unity Catalog %s failed (HTTP %s): %s",
+                        context, e.getCode(), e.getMessage());
+                if (isUnsupportedTableFormat(e)) {
+                    throw new UnityCatalogUnsupportedTableFormatException(message, e);
+                }
+                throw new StarRocksConnectorException(message);
             }
             throw wrap(context, e);
         }
@@ -261,6 +279,22 @@ public class UnityCatalogClient implements UnityCatalogApi {
         } catch (IllegalArgumentException e) {
             throw new StarRocksConnectorException(
                     "Unsupported Unity Catalog table operation: %s. Allowed: READ, READ_WRITE", operation);
+        }
+    }
+
+    private static boolean isUnsupportedTableFormat(ApiException e) {
+        return e.getCode() == 400 && UNSUPPORTED_TABLE_FORMAT.equals(errorType(e.getResponseBody()));
+    }
+
+    private static String errorType(String responseBody) {
+        if (responseBody == null || responseBody.isEmpty()) {
+            return null;
+        }
+        try {
+            JsonNode type = ERROR_BODY_MAPPER.readTree(responseBody).path("error").path("type");
+            return type.isTextual() ? type.asText() : null;
+        } catch (Exception e) {
+            return null;
         }
     }
 

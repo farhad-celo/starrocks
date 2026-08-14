@@ -129,7 +129,9 @@ public class Table extends MetaObject implements Writable, GsonPostProcessable, 
         @SerializedName("HIVE_VIEW")
         HIVE_VIEW,
         @SerializedName("ICEBERG_VIEW")
-        ICEBERG_VIEW;
+        ICEBERG_VIEW,
+        @SerializedName("DELTALAKE_VIEW")
+        DELTALAKE_VIEW;
 
         public static String serialize(TableType type) {
             if (type == CLOUD_NATIVE) {
@@ -330,6 +332,10 @@ public class Table extends MetaObject implements Writable, GsonPostProcessable, 
         return type == TableType.ICEBERG_VIEW;
     }
 
+    public boolean isDeltaLakeView() {
+        return type == TableType.DELTALAKE_VIEW;
+    }
+
     public boolean isMetadataTable() {
         return type == TableType.METADATA;
     }
@@ -343,7 +349,7 @@ public class Table extends MetaObject implements Writable, GsonPostProcessable, 
     }
 
     public boolean isConnectorView() {
-        return isHiveView() || isIcebergView();
+        return isHiveView() || isIcebergView() || isDeltaLakeView();
     }
 
     public boolean isOlapTableOrMaterializedView() {

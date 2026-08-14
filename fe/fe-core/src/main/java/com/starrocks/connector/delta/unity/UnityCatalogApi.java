@@ -33,6 +33,8 @@ public interface UnityCatalogApi {
 
     List<TableInfo> listTables(String ucCatalog, String schemaName);
 
+    TableInfo getTableInfo(String fullName);
+
     boolean tableExists(String fullName);
 
     /**

@@ -15,6 +15,7 @@
 package com.starrocks.connector.delta.unity;
 
 import com.databricks.sdk.WorkspaceClient;
+import com.databricks.sdk.core.DatabricksException;
 import com.databricks.sdk.core.error.platform.NotFound;
 import com.databricks.sdk.service.catalog.DataSourceFormat;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
@@ -133,6 +134,45 @@ public class UnityCatalogClientTest {
     }
 
     @Test
+    public void testGetTableInfoDelegatesToSdk(@Mocked WorkspaceClient ws,
+                                               @Mocked TablesAPI tables) {
+        TableInfo info = new TableInfo().setFullName("main.sales.orders_view");
+        new Expectations() {
+            {
+                ws.tables();
+                result = tables;
+                tables.get("main.sales.orders_view");
+                result = info;
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws);
+        Assertions.assertSame(info, client.getTableInfo("main.sales.orders_view"));
+    }
+
+    @Test
+    public void testGetTableInfoWrapsSdkError(@Mocked WorkspaceClient ws,
+                                              @Mocked TablesAPI tables) {
+        new Expectations() {
+            {
+                ws.tables();
+                result = tables;
+                tables.get("main.sales.orders_view");
+                result = new DatabricksException("permission denied");
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws);
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> client.getTableInfo("main.sales.orders_view"));
+
+        Assertions.assertTrue(ex.getMessage().contains("getTable(main.sales.orders_view"),
+                "wrapped message must identify the table; was: " + ex.getMessage());
+        Assertions.assertTrue(ex.getMessage().contains("permission denied"),
+                "wrapped message must include the SDK error; was: " + ex.getMessage());
+    }
+
+    @Test
     public void testLoadTableDelegatesToDeltaApi(@Mocked WorkspaceClient ws,
                                                  @Mocked DeltaTablesApi deltaTablesApi,
                                                  @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
@@ -196,6 +236,53 @@ public class UnityCatalogClientTest {
         Assertions.assertEquals(expectFormatHint,
                 ex.getMessage().contains("verify the table exists and its data source format is Delta"),
                 "data-source-format hint must appear only for 4xx; was: " + ex.getMessage());
+    }
+
+    @Test
+    public void testLoadTableMarksUnsupportedTableFormat(@Mocked WorkspaceClient ws,
+                                                         @Mocked DeltaTablesApi deltaTablesApi,
+                                                         @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    deltaTablesApi.loadTable("main", "sales", "orders_view");
+                    result = new ApiException(400, "loadTable call failed", null,
+                            "{\"error\":{\"type\":\"UnsupportedTableFormatException\","
+                                    + "\"message\":\"VIEW UNKNOWN_DATA_SOURCE_FORMAT\"}}");
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws, deltaTablesApi, deltaCredentialsApi);
+        UnityCatalogUnsupportedTableFormatException ex =
+                Assertions.assertThrows(UnityCatalogUnsupportedTableFormatException.class,
+                        () -> client.loadTable("main", "sales", "orders_view"));
+        Assertions.assertTrue(ex.getMessage().contains("loadTable(main.sales.orders_view"));
+    }
+
+    @Test
+    public void testLoadTableUsesGenericErrorWhenUnsupportedFormatBodyCannotBeParsed(
+            @Mocked WorkspaceClient ws,
+            @Mocked DeltaTablesApi deltaTablesApi,
+            @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    deltaTablesApi.loadTable("main", "sales", "orders_view");
+                    result = new ApiException(400, "loadTable call failed", null, "{not-json");
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws, deltaTablesApi, deltaCredentialsApi);
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> client.loadTable("main", "sales", "orders_view"));
+        Assertions.assertFalse(ex instanceof UnityCatalogUnsupportedTableFormatException);
+        Assertions.assertTrue(ex.getMessage().contains("loadTable(main.sales.orders_view"));
     }
 
     @Test

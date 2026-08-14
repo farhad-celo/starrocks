@@ -110,6 +110,11 @@ public class CachingUnityCatalogClient implements UnityCatalogApi {
     }
 
     @Override
+    public TableInfo getTableInfo(String fullName) {
+        return delegate.getTableInfo(fullName);
+    }
+
+    @Override
     public boolean tableExists(String fullName) {
         return delegate.tableExists(fullName);
     }

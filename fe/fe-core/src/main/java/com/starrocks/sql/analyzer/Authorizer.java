@@ -223,6 +223,7 @@ public class Authorizer {
             case HUDI:
             case JDBC:
             case DELTALAKE:
+            case DELTALAKE_VIEW:
             case FILE:
             case SCHEMA:
             case PAIMON:

@@ -811,7 +811,7 @@ public class AnalyzerUtils {
             }
         }
 
-        private boolean isUnresolvedCteReference(TableRelation node) {
+        protected boolean isUnresolvedCteReference(TableRelation node) {
             if (node.getTable() != null || cteNameScopes.isEmpty()) {
                 return false;
             }
@@ -857,6 +857,12 @@ public class AnalyzerUtils {
     public static List<TableRelation> collectTableRelations(StatementBase statementBase) {
         List<TableRelation> tableRelations = Lists.newArrayList();
         new AnalyzerUtils.TableRelationsCollector(tableRelations).visit(statementBase);
+        return tableRelations;
+    }
+
+    public static List<TableRelation> collectNonCTETableRelations(StatementBase statementBase) {
+        List<TableRelation> tableRelations = Lists.newArrayList();
+        new AnalyzerUtils.TableRelationsCollector(tableRelations, true).visit(statementBase);
         return tableRelations;
     }
 
@@ -1200,14 +1206,23 @@ public class AnalyzerUtils {
     private static class TableRelationsCollector extends TableCollector {
 
         private final List<TableRelation> tableRelations;
+        private final boolean excludeUnresolvedCteReferences;
 
         public TableRelationsCollector(List<TableRelation> tableRelations) {
+            this(tableRelations, false);
+        }
+
+        public TableRelationsCollector(List<TableRelation> tableRelations, boolean excludeUnresolvedCteReferences) {
             super(null);
             this.tableRelations = tableRelations;
+            this.excludeUnresolvedCteReferences = excludeUnresolvedCteReferences;
         }
 
         @Override
         public Void visitTable(TableRelation node, Void context) {
+            if (excludeUnresolvedCteReferences && isUnresolvedCteReference(node)) {
+                return null;
+            }
             tableRelations.add(node);
             return null;
         }

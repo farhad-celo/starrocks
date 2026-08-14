@@ -14,9 +14,16 @@
 
 package com.starrocks.connector.delta.unity;
 
+import com.databricks.sdk.service.catalog.ColumnInfo;
+import com.databricks.sdk.service.catalog.ColumnTypeName;
+import com.databricks.sdk.service.catalog.TableInfo;
+import com.databricks.sdk.service.catalog.TableType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.starrocks.catalog.DeltaLakeView;
+import com.starrocks.connector.MetastoreType;
+import com.starrocks.connector.delta.CachingDeltaLakeMetastore;
 import com.starrocks.connector.delta.DeltaLakeCatalogProperties;
 import com.starrocks.connector.delta.DeltaLakeEngine;
 import com.starrocks.connector.delta.DeltaLakeFileStatus;
@@ -235,6 +242,154 @@ public class UnityBackedDeltaMetastoreTest {
                 times = 1;
             }
         };
+    }
+
+    @Test
+    public void testGetTableFallsBackToSdkViewWhenDeltaLoadTableFails(@Mocked UnityCatalogClient client) {
+        TableInfo viewInfo = new TableInfo()
+                .setFullName("main.sales.orders_view")
+                .setName("orders_view")
+                .setTableType(TableType.VIEW)
+                .setViewDefinition("SELECT * FROM default.foo")
+                .setProperties(ImmutableMap.of(
+                        UnityViewConverter.STARROCKS_VIEW_DEFINITION_PROPERTY, "SELECT id FROM `default`.`foo`"))
+                .setColumns(Lists.newArrayList(
+                        new ColumnInfo().setName("id").setTypeText("INT")
+                                .setTypeName(ColumnTypeName.INT).setTypeJson("\"integer\"").setPosition(0L)));
+
+        new Expectations() {
+            {
+                client.loadTable("main", "sales", "orders_view");
+                result = new UnityCatalogUnsupportedTableFormatException("delta/v1 does not load views", null);
+                times = 1;
+                client.getTableInfo("main.sales.orders_view");
+                result = viewInfo;
+                times = 1;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsNoVendedCredentials());
+        CachingDeltaLakeMetastore caching = CachingDeltaLakeMetastore.createCatalogLevelInstance(
+                backed, Runnable::run, 30, -1, 100);
+
+        UnityDeltaMetastoreOperations operations = new UnityDeltaMetastoreOperations(
+                caching, true, MetastoreType.UNITY);
+
+        com.starrocks.catalog.Table table = operations.getTable("sales", "orders_view");
+        Assertions.assertInstanceOf(DeltaLakeView.class, table);
+        Assertions.assertEquals("SELECT id FROM `default`.`foo`",
+                ((DeltaLakeView) table).getInlineViewDef());
+    }
+
+    @Test
+    public void testGetTableCachesResolvedViewWithinQueryScope(@Mocked UnityCatalogClient client) {
+        TableInfo viewInfo = new TableInfo()
+                .setFullName("main.sales.orders_view")
+                .setName("orders_view")
+                .setTableType(TableType.VIEW)
+                .setProperties(ImmutableMap.of(
+                        UnityViewConverter.STARROCKS_VIEW_DEFINITION_PROPERTY, "SELECT id FROM `default`.`foo`"))
+                .setColumns(Lists.newArrayList(
+                        new ColumnInfo().setName("id").setTypeText("INT")
+                                .setTypeName(ColumnTypeName.INT).setTypeJson("\"integer\"").setPosition(0L)));
+
+        new Expectations() {
+            {
+                client.loadTable("main", "sales", "orders_view");
+                result = new UnityCatalogUnsupportedTableFormatException("delta/v1 does not load views", null);
+                times = 1;
+                client.getTableInfo("main.sales.orders_view");
+                result = viewInfo;
+                times = 1;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsNoVendedCredentials());
+        CachingDeltaLakeMetastore catalogCaching = CachingDeltaLakeMetastore.createCatalogLevelInstance(
+                backed, Runnable::run, 30, -1, 100);
+        CachingDeltaLakeMetastore queryCaching = CachingDeltaLakeMetastore.createQueryLevelInstance(catalogCaching, 100);
+
+        UnityDeltaMetastoreOperations operations = new UnityDeltaMetastoreOperations(
+                queryCaching, true, MetastoreType.UNITY);
+
+        com.starrocks.catalog.Table first = operations.getTable("sales", "orders_view");
+        com.starrocks.catalog.Table second = operations.getTable("sales", "orders_view");
+
+        Assertions.assertInstanceOf(DeltaLakeView.class, first);
+        Assertions.assertSame(first, second);
+    }
+
+    @Test
+    public void testGetTablePropagatesSdkFailureWhenViewFallbackCannotReadTableInfo(
+            @Mocked UnityCatalogClient client) {
+        StarRocksConnectorException sdkFailure = new StarRocksConnectorException("sdk getTable failed");
+        new Expectations() {
+            {
+                client.loadTable("main", "sales", "orders_view");
+                result = new UnityCatalogUnsupportedTableFormatException("delta/v1 does not load views", null);
+                times = 1;
+                client.getTableInfo("main.sales.orders_view");
+                result = sdkFailure;
+                times = 1;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsNoVendedCredentials());
+        CachingDeltaLakeMetastore caching = CachingDeltaLakeMetastore.createCatalogLevelInstance(
+                backed, Runnable::run, 30, -1, 100);
+
+        UnityDeltaMetastoreOperations operations = new UnityDeltaMetastoreOperations(
+                caching, true, MetastoreType.UNITY);
+
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> operations.getTable("sales", "orders_view"));
+        Assertions.assertSame(sdkFailure, ex);
+    }
+
+    @Test
+    public void testGetTableDoesNotFallbackToViewForGenericLoadFailure(@Mocked UnityCatalogClient client) {
+        new Expectations() {
+            {
+                client.loadTable("main", "sales", "orders");
+                result = new StarRocksConnectorException("403 forbidden");
+                times = 1;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsNoVendedCredentials());
+        CachingDeltaLakeMetastore caching = CachingDeltaLakeMetastore.createCatalogLevelInstance(
+                backed, Runnable::run, 30, -1, 100);
+
+        UnityDeltaMetastoreOperations operations = new UnityDeltaMetastoreOperations(
+                caching, true, MetastoreType.UNITY);
+
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> operations.getTable("sales", "orders"));
+        Assertions.assertTrue(ex.getMessage().contains("403 forbidden"));
+        new Verifications() {
+            {
+                client.getTableInfo(anyString);
+                times = 0;
+            }
+        };
+    }
+
+    @Test
+    public void testGetViewReturnsNullForNonViewTableInfo(@Mocked UnityCatalogClient client) {
+        TableInfo tableInfo = new TableInfo()
+                .setFullName("main.sales.orders")
+                .setName("orders")
+                .setTableType(TableType.MANAGED);
+
+        new Expectations() {
+            {
+                client.getTableInfo("main.sales.orders");
+                result = tableInfo;
+            }
+        };
+
+        UnityBackedDeltaMetastore backed = metastore(client, propsNoVendedCredentials());
+        Assertions.assertNull(backed.getView("sales", "orders"));
     }
 
     /**

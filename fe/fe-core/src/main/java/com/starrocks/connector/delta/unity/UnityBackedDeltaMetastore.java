@@ -14,8 +14,11 @@
 
 package com.starrocks.connector.delta.unity;
 
+import com.databricks.sdk.service.catalog.TableInfo;
+import com.databricks.sdk.service.catalog.TableType;
 import com.google.common.annotations.VisibleForTesting;
 import com.starrocks.catalog.DeltaLakeTable;
+import com.starrocks.catalog.Table;
 import com.starrocks.common.Pair;
 import com.starrocks.connector.delta.DeltaLakeCatalogProperties;
 import com.starrocks.connector.delta.DeltaLakeEngine;
@@ -111,6 +114,19 @@ public class UnityBackedDeltaMetastore extends DeltaLakeMetastore {
             t.setCloudConfiguration(cc);
         }
         return t;
+    }
+
+    @Override
+    public Table getView(String dbName, String tableName) {
+        return resolveView(dbName, tableName);
+    }
+
+    private Table resolveView(String dbName, String tableName) {
+        TableInfo info = unityMetastore.getTableInfo(dbName, tableName);
+        if (info == null || info.getTableType() != TableType.VIEW) {
+            return null;
+        }
+        return UnityViewConverter.toDeltaLakeView(getCatalogName(), dbName, tableName, info);
     }
 
     @Override

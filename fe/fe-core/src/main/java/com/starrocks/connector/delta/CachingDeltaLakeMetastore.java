@@ -17,6 +17,7 @@ package com.starrocks.connector.delta;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.starrocks.catalog.Database;
 import com.starrocks.catalog.DeltaLakeTable;
 import com.starrocks.catalog.Table;
@@ -140,7 +141,14 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
         if (ConnectContext.get() != null && ConnectContext.get().getCommand() == MysqlCommand.COM_QUERY) {
             lastAccessTimeMap.put(databaseTableName, System.currentTimeMillis());
         }
-        return get(tableSnapshotCache, databaseTableName);
+        try {
+            return tableSnapshotCache.getUnchecked(databaseTableName);
+        } catch (UncheckedExecutionException e) {
+            if (e.getCause() instanceof StarRocksConnectorException) {
+                throw (StarRocksConnectorException) e.getCause();
+            }
+            throw e;
+        }
     }
 
     @Override
@@ -193,6 +201,11 @@ public class CachingDeltaLakeMetastore extends CachingMetastore implements IDelt
             }
         }
         return table;
+    }
+
+    @Override
+    public Table getView(String dbName, String tableName) {
+        return delegate.getView(dbName, tableName);
     }
 
     private static String snapshotTableId(DeltaLakeSnapshot snapshot) {
