@@ -405,6 +405,9 @@ public class CelonisExpressionStatisticsCalculator {
                 distinctValues = 2;
                 averageRowSize = callOperator.getType().getTypeSize();
                 break;
+            case FunctionSet.CELONIS_SORTED_FIRST:
+            case FunctionSet.CELONIS_SORTED_LAST:
+                return calculateCelonisSortedFirstLast(callOperator, left, rowCount);
             default:
                 return null;
         }
@@ -681,6 +684,9 @@ public class CelonisExpressionStatisticsCalculator {
                         .setDistinctValuesCount(Math.min(rowCount, maxNdv)) //
                         .build();
             }
+            case FunctionSet.CELONIS_SORTED_FIRST:
+            case FunctionSet.CELONIS_SORTED_LAST:
+                return calculateCelonisSortedFirstLast(callOperator, firstChildStats, rowCount);
             default:
                 return null;
         }
@@ -705,5 +711,23 @@ public class CelonisExpressionStatisticsCalculator {
                 .setAverageRowSize(callOperator.getType().getTypeSize()) //
                 .setDistinctValuesCount(Math.min(rowCount, maxNdv)) //
                 .build();
+    }
+
+    private static ColumnStatistic calculateCelonisSortedFirstLast(CallOperator callOperator,
+                                                                   ColumnStatistic childColumnStatistics,
+                                                                   double rowCount) {
+        if (childColumnStatistics.isUnknown()) {
+            return null;
+        }
+
+        boolean isStaticSizeType = isStaticSizeType(callOperator.getType());
+        double averageRowSize = isStaticSizeType ? callOperator.getType().getTypeSize() 
+                : childColumnStatistics.getAverageRowSize();
+
+        return ColumnStatistic.buildFrom(childColumnStatistics) //
+                .setDistinctValuesCount(Math.min(rowCount, childColumnStatistics.getDistinctValuesCount())) //
+                .setAverageRowSize(averageRowSize) //
+                .build();
+
     }
 }

@@ -1632,4 +1632,46 @@ public class CelonisExpressionStatisticsCalculatorTest {
         assertEquals(50, columnStatistic.getDistinctValuesCount(), 0.001);
         assertEquals(0.145, columnStatistic.getNullsFraction(), 0.001);
     }
+
+    @Test
+    public void testCelonisSortedFirst() {
+        // GIVEN
+        final var unaryTestScenario = unaryTestScenario();
+        final var statistics = unaryTestScenario.statistics;
+        // sorted_first(value=string ORDER by key=int) --> binary and non-static path
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_SORTED_FIRST, Type.VARCHAR,
+                Lists.newArrayList(unaryTestScenario.stringColumnRefOperator,
+                        unaryTestScenario.intColumnRefOperator));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+        // THEN
+        assertEquals(POSITIVE_INFINITY, columnStatistic.getMaxValue(), 0.001);
+        assertEquals(NEGATIVE_INFINITY, columnStatistic.getMinValue(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.2, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(10, columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+    @Test
+    public void testCelonisSortedLast() {
+        // GIVEN
+        final var unaryTestScenario = unaryTestScenario();
+        final var statistics = unaryTestScenario.statistics;
+        // sorted_first(value=int ORDER by k1, k2) --> multiary and static path
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_SORTED_LAST, Type.INT,
+                Lists.newArrayList(unaryTestScenario.intColumnRefOperator, unaryTestScenario.stringColumnRefOperator,
+                        unaryTestScenario.stringColumnRefOperator));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+        // THEN
+        assertEquals(100, columnStatistic.getMaxValue(), 0.001);
+        assertEquals(0, columnStatistic.getMinValue(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.2, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(4, columnStatistic.getAverageRowSize(), 0.001);
+    }
 }
