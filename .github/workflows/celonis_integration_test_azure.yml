@@ -469,9 +469,9 @@ jobs:
 
   celostar-compliance-test:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
-    needs: build-asan-manifest
+    needs: build-manifest
     env:
-      test_image_tag: ${{ needs.build-asan-manifest.outputs.allin1_image_tag }}
+      test_image_tag: ${{ needs.build-manifest.outputs.allin1_image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
