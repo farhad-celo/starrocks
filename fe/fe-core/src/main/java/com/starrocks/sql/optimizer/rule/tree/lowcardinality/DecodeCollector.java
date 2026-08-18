@@ -1400,6 +1400,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             if (!expressions.isEmpty()) {
                 // predicate only translate to string expression
                 stringExpressions.computeIfAbsent(c, l -> Lists.newArrayList()).addAll(expressions);
+                // the column is used by this operator's predicate. It must be recorded here as well,
+                // because a projection on the same operator may not output it, and the fragment still
+                // needs its global dict expression to evaluate the predicate.
+                info.usedStringColumns.union(c);
             }
         });
 

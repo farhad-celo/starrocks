@@ -3410,4 +3410,23 @@ public class LowCardinalityTest2 extends PlanTestBase {
             Config.push_down_non_grouped_aggregate_below_union = prevConfig;
         }
     }
+
+    @Test
+    void testDictExprForPredicateOnlyColumn() throws Exception {
+        // c_user is used by the predicate but not output by the projection above it. The fragment
+        // still has to carry the global dict expression of c_user, otherwise the BE fails with
+        // "couldn't found dict cid" when it opens the DictMapping expression of the predicate.
+        String sql = """
+                WITH t AS (
+                    SELECT c_user, c_dept FROM low_card_t1
+                ) [MATERIALIZED]
+                SELECT c_dept FROM t WHERE c_user = 'str'
+                """;
+        String plan = getVerboseExplain(sql);
+        assertContains(plan, "Global Dict Exprs:\n" +
+                "    16: DictDefine(14: c_user, [<place-holder>])\n" +
+                "    17: DictDefine(15: c_dept, [<place-holder>])");
+        assertContains(plan, "3:SELECT\n" +
+                "  |  predicates: DictDecode(16: c_user, [<place-holder> = 'str'])");
+    }
 }
