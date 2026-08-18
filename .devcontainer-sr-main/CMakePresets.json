@@ -1,0 +1,81 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "description": "Default settings for all presets",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+                "CMAKE_CXX_FLAGS": "-fuse-ld=lld",
+                "CMAKE_JOB_POOLS": "link_pool=2;compile_pool=72",
+                "CMAKE_JOB_POOL_COMPILE": "compile_pool",
+                "CMAKE_JOB_POOL_LINK": "link_pool",
+                "STARROCKS_THIRDPARTY": "$env{STARROCKS_THIRDPARTY}",
+                "STARROCKS_HOME": "/workspaces/starrocks",
+                "STARLET_INSTALL_DIR": "/var/local/thirdparty/installed/starlet",
+                "HOMCC_VERBOSE": "TRUE"
+            },
+            "environment": {
+                "STARROCKS_GCC_HOME": "/usr/",
+                "LD_LIBRARY_PATH": "/var/local/thirdparty/installed/lib",
+                "STARROCKS_LINKER": "lld",
+                "STARROCKS_HOME": "/workspaces/starrocks",
+                "JAVA_HOME": "/var/local/thirdparty/installed/open_jdk"
+            }
+        },
+        {
+            "name": "Debug",
+            "displayName": "Debug (with tests)",
+            "description": "Debug build with tests enabled.",
+            "inherits": "default",
+            "binaryDir": "build_Debug_Test",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "MAKE_TEST": "ON",
+                "STARROCKS_JIT_ENABLE": "ON"
+            }
+        },
+        {
+            "name": "Release",
+            "displayName": "Release (with benchmarks)",
+            "description": "Release build with benchmarks.",
+            "inherits": "default",
+            "binaryDir": "build_Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "MAKE_TEST": "OFF",
+                "WITH_BENCH": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "description": "Default build settings with homcc",
+            "jobs": 72,
+            "environment": {
+                "CCACHE_PREFIX": "homcc",
+                "HOMCC_DOCKER_CONTAINER": "sr-dev-main"
+            }
+        },
+        {
+            "name": "Debug",
+            "displayName": "Build (Debug)",
+            "description": "Debug build using homcc for distributed compilation",
+            "configurePreset": "Debug",
+            "inherits": "default"
+        },
+        {
+            "name": "Release",
+            "displayName": "Build (Release)",
+            "description": "Release build using homcc for distributed compilation",
+            "configurePreset": "Release",
+            "inherits": "default"
+        }
+    ]
+}
