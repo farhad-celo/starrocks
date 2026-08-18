@@ -9,7 +9,7 @@ metadata:
   annotations:
     github.com/project-slug: celonis/celostar-starrocks
     argocd/app-selector: app=celostar-starrocks
-    sonarqube.org/project-key: celonis_celostar-starrocks
+    sonarqube.org/project-key: celonis_celostar-starrocks-be
     backstage.io/code-coverage: scm-only
     backstage.io/techdocs-entity: system:celostar
     repo-depot.celonis.dev/project-type: CUSTOM
