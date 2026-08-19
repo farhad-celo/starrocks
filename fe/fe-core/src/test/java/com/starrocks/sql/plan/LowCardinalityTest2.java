@@ -3047,7 +3047,7 @@ public class LowCardinalityTest2 extends PlanTestBase {
         String thrift = getThriftPlan(sql);
         Assertions.assertTrue(thrift.contains("TGlobalDict(columnId:28"), thrift);
     }
-    
+
     @Test
     void testPredicateOnlyDictDecodeWithProjection() throws Exception {
         String sql = """
