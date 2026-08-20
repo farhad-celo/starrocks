@@ -20,9 +20,9 @@
 
 # Source code and binaries
 /be/ @jkim650 @hagonzal @zhangyaqi1989 @lxynov @OliLay @martinr0x @farhad-celo @wmann-celonis @spirsch @stefan-delorenzo
-/be/src/exprs/celonis/cpml_utils/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov @wmann-celonis @spirsch @stefan-delorenzo
-/be/src/exprs/celonis/modules/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov @wmann-celonis @spirsch @stefan-delorenzo
-/bin/ @jkim650 @hagonzal @zhangyaqi1989
+/be/src/exprs/celonis/cpml_utils/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov @wmann-celonis @spirsch @stefan-delorenzo @farhad-celo
+/be/src/exprs/celonis/modules/ @jkim650 @hagonzal @zhangyaqi1989 @WeberNick @OliLay @martinr0x @lxynov @wmann-celonis @spirsch @stefan-delorenzo @farhad-celo
+/bin/ @jkim650 @hagonzal @zhangyaqi1989 @farhad-celo
 /fe/ @jkim650 @hagonzal @zhangyaqi1989 @OliLay @martinr0x @lxynov @farhad-celo @wmann-celonis @spirsch @stefan-delorenzo
 
 # Misc
