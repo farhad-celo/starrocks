@@ -155,7 +155,7 @@ prune_variants_result prune_variants(const memory::cache::variant_trace_cache_t&
           bpmn_alignment.push_back(remapped_move.value());
         }
       }
-      bpmn_alignments.emplace_back(bpmn_alignment);
+      bpmn_alignments.emplace_back(std::move(bpmn_alignment));
     } else {
       bpmn_alignments.emplace_back(std::nullopt);
     }
@@ -378,7 +378,7 @@ std::pair<alignments_t, cpml::conformance::behavioral_relations> align_model(
       "time_pruned_variant_computation", pruned_variants_computation_timer.elapsed_wall_time_so_far(), callback);
   callback("pruned_variant_count", pruned_variants->get_num_traces());
 
-  const auto [pruned_alignments, parallel_vertices]{compute_pruned_alignments(
+  auto [pruned_alignments, parallel_vertices]{compute_pruned_alignments(
       pruned_variants, bpmn_model, config.execution_strategy, align_variants_context, json_alignment_stats)};
 
   ctl::wall_timer_t map_pruned_to_full_non_empty_variants_timer{};
@@ -393,7 +393,7 @@ std::pair<alignments_t, cpml::conformance::behavioral_relations> align_model(
                                                             alignment_timer.elapsed_wall_time_so_far(), callback);
   stats.alignment_stats = std::move(json_alignment_stats);
 
-  return {full_alignments, parallel_vertices};
+  return {std::move(full_alignments), std::move(parallel_vertices)};
 }
 
 replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_graph, const alignments_view_t alignments,
@@ -406,7 +406,7 @@ replay_results_t replay_aligned_variants(const cpml::model::bpmn_graph& bpmn_gra
       ctl::make_static_array<std::optional<replay_result_type>>(alignments.size(), ALLOC_MSG(ctl::RETURN_VALUE_MSG))};
 
   const auto replay_result_fn{
-      [parallel_vertices = std::as_const(parallel_vertices)](
+      [&parallel_vertices = std::as_const(parallel_vertices)](
           const auto& bpmn_graph, const auto& aligned_variant) -> std::optional<replay_result_type> {
         if (aligned_variant) {
           return replay_aligned_variant(bpmn_graph, aligned_variant.value(), parallel_vertices);

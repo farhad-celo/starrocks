@@ -780,7 +780,7 @@ std::vector<exclusive_violation_info> exclusive_violation_components(
         })};
     const auto last_sequenced_before_reverse_iter{std::ranges::find_if(
         std::reverse_iterator{first_exclusive_iter}, aligned_variant.rend(),
-        [behavior = std::as_const(behavior), vertex_id = activity.vertex_id](const auto& move) {
+        [&behavior = std::as_const(behavior), vertex_id = activity.vertex_id](const auto& move) {
           return move.is_gateway_move() && behavior.is_sequential({move.move_on_model().value(), vertex_id});
         })};
     debug_assert(last_sequenced_before_reverse_iter != aligned_variant.rend());

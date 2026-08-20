@@ -108,7 +108,7 @@ deviation_categories_for_cases_t compute_categories(const alignments_t& alignmen
           debug_assert(result.at(idx_alignment).empty(),
                        "Every alignment should only be processes once by a single thread.");
           if (alignments.at(idx_alignment).has_value()) {
-            const alignment_t alignment{alignments.at(idx_alignment).value()};
+            const alignment_t& alignment{alignments.at(idx_alignment).value()};
             const auto counts{count_moves(alignment)};
             result.at(idx_alignment) = ctl::make_static_array_for_overwrite<deviation_category>(
                 alignment.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));

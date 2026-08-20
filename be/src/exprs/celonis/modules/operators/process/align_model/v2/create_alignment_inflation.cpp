@@ -215,7 +215,7 @@ struct petri_net_label_id_to_string_mapper {
     buffer_lookup.emplace(old_buffer_ptr, entry.size());
   }
 
-  return {std::move(buffer), buffer_lookup};
+  return {std::move(buffer), std::move(buffer_lookup)};
 }
 
 struct table_sizes {
@@ -427,7 +427,7 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                     }
 
                     for (row_id id = 0; id < replay_result_for_case.components().size(); id++) {
-                      auto component{replay_result_for_case.components().at(id)};
+                      const auto& component{replay_result_for_case.components().at(id)};
                       // Each component contains only a single edge type, fetch those columns
                       auto& association_cols{association_columns_per_edge_type.at(component.component_type)};
 
