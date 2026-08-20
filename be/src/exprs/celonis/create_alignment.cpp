@@ -73,7 +73,7 @@ std::unordered_map<std::string, int> string_to_idx_map(const std::vector<std::st
 } // namespace
 
 struct CreateAlignmentStateFragmentLocal {
-    std::string json_bpmn_model_description;
+    const celonis::bpmn_model_description bpmn_model_description;
 };
 
 Status CelonisCreateAlignment::create_alignment_prepare(FunctionContext* context,
@@ -86,10 +86,14 @@ Status CelonisCreateAlignment::create_alignment_prepare(FunctionContext* context
         if (!context->is_notnull_constant_column(1)) {
             return Status::OK();
         }
-        auto state = new CreateAlignmentStateFragmentLocal();
         // As of 2023-10-11, get_const_value() is not thread-safe. So it shouldn't be called in align_model().
-        state->json_bpmn_model_description =
+        const auto json_bpmn_model_description =
                 ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(1)).to_string();
+        auto bpmn_model_description = AlignModelHelper::parse_bpmn_model_description(json_bpmn_model_description);
+        if (!bpmn_model_description.ok()) {
+            return bpmn_model_description.status();
+        }
+        auto state = new CreateAlignmentStateFragmentLocal{std::move(bpmn_model_description).value()};
         context->set_function_state(scope, state);
     }
 
@@ -110,7 +114,7 @@ StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* co
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto* align_model_state_fragment_local = reinterpret_cast<const CreateAlignmentStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
-    const auto& json_bpmn_model_description = align_model_state_fragment_local->json_bpmn_model_description;
+    const auto& bpmn_model_description = align_model_state_fragment_local->bpmn_model_description;
 
     ColumnPtr res = context->create_column(context->get_return_type(), false);
 
@@ -160,8 +164,8 @@ StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* co
     DCHECK_EQ(row_to_case_index.size(), chunk_size);
 
     AlignModelHelper helper;
-    RETURN_IF_ERROR(helper.execute(deduped_cases, json_bpmn_model_description,
-                                   AlignModelHelper::celostar_align_model_version::V2));
+    RETURN_IF_ERROR(
+            helper.execute(deduped_cases, bpmn_model_description, AlignModelHelper::celostar_align_model_version::V2));
     const auto& result_table = helper.result_table();
 
     // TODO(m.dierschke): Refactor this code for clarity and maintainability.

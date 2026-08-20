@@ -362,6 +362,28 @@ private:
         return array_column;
     }
 
+    void ExpectInvalidModelAtPrepare(const std::string& bpmn_model_description_json) {
+        auto variants = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), /*nullable=*/true);
+        variants->append_nulls(1);
+        auto model_column = ColumnHelper::create_const_column<TYPE_VARCHAR>(bpmn_model_description_json, 1);
+
+        Columns columns;
+        columns.push_back(variants);
+        columns.push_back(model_column);
+
+        auto arg_types = arg_types_;
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type_));
+        ctx->set_constant_columns(columns);
+
+        const auto status = CelonisCreateAlignment::create_alignment_prepare(
+                ctx.get(), FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        EXPECT_TRUE(status.is_invalid_argument());
+        EXPECT_EQ(nullptr, ctx->get_function_state(FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+
+        ASSERT_OK(CelonisCreateAlignment::create_alignment_close(ctx.get(),
+                                                                 FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+    }
+
     void Run(const VariantRows& variant_rows, const std::string& bpmn_model_description_json,
              const std::vector<Result>& expected) {
         auto variants = build_variant_column(variant_rows);
@@ -669,30 +691,13 @@ TEST_F(CelonisCreateAlignmentTest, Parallel_ONLYNULL) {
 }
 
 TEST_F(CelonisCreateAlignmentTest, InvalidModel) {
-    auto variants = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), /*nullable=*/true);
-    variants->append_nulls(1);
-    auto model_column = ColumnHelper::create_const_column<TYPE_VARCHAR>("Invalid JSON", 1);
+    ExpectInvalidModelAtPrepare("Invalid JSON");
+}
 
-    Columns columns;
-    columns.push_back(variants);
-    columns.push_back(model_column);
-
-    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types_), return_type_));
-    ctx->set_constant_columns(columns);
-
-    ASSERT_OK(CelonisCreateAlignment::create_alignment_prepare(ctx.get(),
-                                                               FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
-    ASSERT_OK(CelonisCreateAlignment::create_alignment_prepare(ctx.get(),
-                                                               FunctionContext::FunctionStateScope::THREAD_LOCAL));
-
-    const auto result = CelonisCreateAlignment::create_alignment(ctx.get(), columns);
-    ASSERT_FALSE(result.ok());
-    EXPECT_TRUE(result.status().is_invalid_argument());
-
-    ASSERT_OK(CelonisCreateAlignment::create_alignment_close(ctx.get(),
-                                                             FunctionContext::FunctionStateScope::THREAD_LOCAL));
-    ASSERT_OK(CelonisCreateAlignment::create_alignment_close(ctx.get(),
-                                                             FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+TEST_F(CelonisCreateAlignmentTest, InvalidTaskName) {
+    ExpectInvalidModelAtPrepare(R"json({"nodes":[{"node_id":"1","node_type":1}],"edges":[],"cache_key":"model"})json");
+    ExpectInvalidModelAtPrepare(
+            R"json({"nodes":[{"node_id":"1","node_type":4,"task_name":"A"}],"edges":[],"cache_key":"model"})json");
 }
 
 TEST_F(CelonisCreateAlignmentTest, LongVariant) {
@@ -732,6 +737,54 @@ TEST_F(CelonisCreateAlignmentTest, LongVariant) {
                                                              FunctionContext::FunctionStateScope::THREAD_LOCAL));
     ASSERT_OK(CelonisCreateAlignment::create_alignment_close(ctx.get(),
                                                              FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+}
+
+TEST_F(CelonisCreateAlignmentTest, SharedFragmentStateConcurrency) {
+    VariantRows variants = {{"A", "C"}};
+    const auto parallel_model_results = get_parallel_model_results();
+    const std::vector<Result> expected = {parallel_model_results.at(variants[0])};
+
+    Columns columns;
+    columns.push_back(build_variant_column(variants));
+    columns.push_back(ColumnHelper::create_const_column<TYPE_VARCHAR>(PARALLEL_MODEL, variants.size()));
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types_), return_type_));
+    ctx->set_constant_columns(columns);
+
+    DeferOp close_fragment_local(
+            [&ctx] { CelonisCreateAlignment::create_alignment_close(ctx.get(), FunctionContext::FRAGMENT_LOCAL); });
+    ASSERT_OK(CelonisCreateAlignment::create_alignment_prepare(ctx.get(),
+                                                               FunctionContext::FunctionStateScope::FRAGMENT_LOCAL));
+
+    constexpr int num_threads = 16;
+    std::vector<std::unique_ptr<FunctionContext>> thread_contexts;
+    thread_contexts.reserve(num_threads);
+    for (int i = 0; i < num_threads; ++i) {
+        thread_contexts.emplace_back(ctx->clone(nullptr));
+        EXPECT_EQ(ctx->get_function_state(FunctionContext::FRAGMENT_LOCAL),
+                  thread_contexts.back()->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    }
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads);
+    for (const auto& thread_context : thread_contexts) {
+        threads.emplace_back([&, context = thread_context.get()] {
+            ASSERT_OK(CelonisCreateAlignment::create_alignment_prepare(context, FunctionContext::THREAD_LOCAL));
+            DeferOp close_thread_local([context] {
+                CelonisCreateAlignment::create_alignment_close(context, FunctionContext::THREAD_LOCAL);
+            });
+
+            const auto result = CelonisCreateAlignment::create_alignment(context, columns);
+            ASSERT_TRUE(result.ok()) << result.status().message();
+            ASSERT_TRUE(result.value()->is_struct());
+            const auto* st = down_cast<const StructColumn*>(result.value().get());
+            Evaluator evaluator(*st, expected, return_type_);
+            evaluator.evaluate();
+        });
+    }
+    for (auto& thread : threads) {
+        thread.join();
+    }
 }
 
 TEST_F(CelonisCreateAlignmentTest, Concurrency) {

@@ -45,9 +45,8 @@ align_model_version to_saola_version(AlignModelHelper::celostar_align_model_vers
   }
 }
 
-Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::string& json_bpmn_model_description,
-                                 celostar_align_model_version version) {
-  auto settings{align_model_table_group_node_settings::builder{}.set_version(to_saola_version(version)).build()};
+starrocks::StatusOr<starrocks::celonis::bpmn_model_description> AlignModelHelper::parse_bpmn_model_description(
+    const std::string& json_bpmn_model_description) {
   // Convert json bpmn model description to BpmnModelDescription protobuf.
   BpmnModelDescription bpmn_model_description;
   auto status = google::protobuf::util::JsonStringToMessage(json_bpmn_model_description, &bpmn_model_description);
@@ -55,6 +54,31 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
     return Status::InvalidArgument(
         fmt::format("celonis_align_model: Invalid JSON bpmn model description. {}", status.error_message()));
   }
+  for (const auto& node : bpmn_model_description.nodes()) {
+    const bool is_task = node.node_type() == BpmnModelDescription::BpmnNode::TASK;
+    if (is_task != node.has_task_name()) {
+      return Status::InvalidArgument(fmt::format(
+          "celonis_align_model: Invalid BPMN model description. Node {} has an invalid task name.", node.node_id()));
+    }
+  }
+
+  return starrocks::celonis::bpmn_model_description::from_proto(bpmn_model_description);
+}
+
+Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::string& json_bpmn_model_description,
+                                 celostar_align_model_version version) {
+  auto bpmn_model_description = parse_bpmn_model_description(json_bpmn_model_description);
+  if (!bpmn_model_description.ok()) {
+    return bpmn_model_description.status();
+  }
+
+  return execute(deduped_traces, bpmn_model_description.value(), version);
+}
+
+Status AlignModelHelper::execute(const traces_t& deduped_traces,
+                                 const starrocks::celonis::bpmn_model_description& bpmn_model_description,
+                                 celostar_align_model_version version) {
+  auto settings{align_model_table_group_node_settings::builder{}.set_version(to_saola_version(version)).build()};
 
   // Convert variant_map and activity_map to Saola event_table, case_table and activity_to_case_join.
   utils::nullable_vec_t<cel_int_t> case_column_data;
@@ -114,12 +138,7 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
   const row_id case_table_row_count{ctl::cast<row_id>(deduped_traces.size())};
 
   auto align_model = align_model::create_align_model_tables{
-      activity_column,
-      case_id_column,
-      case_table_row_count,
-      activity_to_case_join,
-      starrocks::celonis::bpmn_model_description::from_proto(bpmn_model_description),
-      settings};
+      activity_column, case_id_column, case_table_row_count, activity_to_case_join, bpmn_model_description, settings};
 
   return starrocks::celonis::execute_and_return_status(
       [&] {
