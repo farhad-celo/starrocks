@@ -1,17 +1,15 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <string>
 
 #include "log/metadata.h"
-#ifndef CELOSTAR
-#include "logging/builder/level.h"
-#endif
 #include "modules/common/tracing/sampling/span_sampling_rules.h"
 
 namespace celonis::accelerator::common::tracing {
 
-enum class mode : int8_t { OFF, REMOTE };
+enum class mode : std::int8_t { OFF, REMOTE };
 
 // required for boost program options
 std::istream& operator>>(std::istream& in, mode& trace_mode);
@@ -25,7 +23,7 @@ static constexpr const char* DEFAULT_DATADOG_AGENT_HOST{"localhost"};
  *
  * @see celonis::accelerator::common::tracing::remote_tracing_options::agent_port
  **/
-constexpr uint32_t DEFAULT_DATADOG_AGENT_OTLP_GRPC_PORT{4317};
+constexpr std::uint32_t DEFAULT_DATADOG_AGENT_OTLP_GRPC_PORT{4317};
 /** @see celonis::accelerator::common::tracing::remote_tracing_options::service */
 static constexpr const char* DEFAULT_DATADOG_SERVICE_NAME{"compute"};
 /** @see celonis::accelerator::common::tracing::remote_tracing_options::environment */
@@ -65,7 +63,7 @@ struct remote_tracing_options {
   std::string agent_host{DEFAULT_DATADOG_AGENT_HOST};
 
   /** Port to which the traces are sent */
-  uint32_t agent_port{DEFAULT_DATADOG_AGENT_OTLP_GRPC_PORT};
+  std::uint32_t agent_port{DEFAULT_DATADOG_AGENT_OTLP_GRPC_PORT};
 
   /** Name of service being traced */
   std::string service{DEFAULT_DATADOG_SERVICE_NAME};

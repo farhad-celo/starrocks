@@ -23,19 +23,6 @@ class swappable_bitset : public data_handler {
   static std::shared_ptr<swappable_bitset> create_data_handler(const memory::null_flags_t& data,
                                                                const std::string& swap_file, const swap_info& sinfo,
                                                                const std::string& description);
-#ifndef CELOSTAR
-  // A init_from_swap version which supports both null flag ending (store in boolean array)
-  // and the new bitset ending (store in uint64 array) swap files
-  static std::shared_ptr<swappable_bitset> init_from_swap(const std::string& swap_file, const swap_info& sinfo,
-                                                          const std::string& description);
-  // init from bitset ending only
-  static std::shared_ptr<swappable_bitset> init_from_swap_bitset(const std::string& swap_file, const swap_info& sinfo,
-                                                                 const std::string& description);
-  // init from null flag ending only
-  static std::shared_ptr<swappable_bitset> init_from_swap_byte_array(const std::string& swap_file,
-                                                                     const swap_info& sinfo,
-                                                                     const std::string& description);
-#endif
 
   [[nodiscard]] load_status get_load_status() const override;
 
@@ -43,21 +30,11 @@ class swappable_bitset : public data_handler {
 
   [[nodiscard]] bool swap_file_broken() const override;
 
-#ifndef CELOSTAR
-  bool swap_out(common::execution_context& context) override;
-
-  void write_out(common::execution_context& context);
-#endif
-
   using const_data_accessor_t = const_bitset_data_accessor;
 
   const_data_accessor_t get_const_data(const common::execution_context& context);
 
   [[nodiscard]] bool is_swappable() const override;
-
-#ifndef CELOSTAR
-  bool compress() override;
-#endif
 
   [[nodiscard]] size_t get_size_in_memory() const override;
 
@@ -82,14 +59,6 @@ class swappable_bitset : public data_handler {
   void set_delete_from_disk_when_destructed(bool value);
 
   ~swappable_bitset() override;
-
-#ifndef CELOSTAR
-  // Using below functions in production is only allowed after CPL-9839 is deployed everywhere
-  // TODO(s.ling) remove the suffix.
-  bool swap_out_bitset_ending(common::execution_context& context);
-
-  void write_out_bitset_ending(common::execution_context& context);
-#endif
 
  private:
   swappable_bitset(memory::management::raw_data_handler_t<uint64_t>&& data_handler, std::string swap_file,

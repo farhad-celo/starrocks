@@ -5,9 +5,7 @@
 #include <ctl/static_array_fwd.h>
 
 #include "modules/common/execution_context_fwd.h"
-#include "modules/common/trace_types.h"
 #include "modules/memory/cache/variant_trace_cache_fwd.h"
-#include "modules/memory/column_pointers.h"
 #include "modules/memory/join_projection_vector.h"
 #include "modules/memory/table_to_column_projection.h"
 #include "modules/operators/process/variant_constants.h"

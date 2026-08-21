@@ -77,19 +77,6 @@ void typed_dictionary<T>::swap_in(common::execution_context& context) {
   data_handler->swap_in(context);
 }
 
-#ifndef CELOSTAR
-template <typename T>
-void typed_dictionary<T>::swap_out(common::execution_context& context) {
-  data_handler->swap_out(context);
-}
-
-template <typename T>
-bool typed_dictionary<T>::write_out(common::execution_context& context) {
-  data_handler->write_out(context);
-  return true;
-}
-#endif
-
 template <typename T>
 management::load_status typed_dictionary<T>::get_load_status() const {
   return data_handler->get_load_status();

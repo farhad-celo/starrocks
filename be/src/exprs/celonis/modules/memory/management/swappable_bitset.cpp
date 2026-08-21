@@ -9,8 +9,6 @@
 
 #include "concurrency/concurrency_utils.h"
 #include "log/log.h"
-#include "modules/common/aligned_blocked_range.h"
-#include "modules/common/exceptions.h"
 #include "modules/memory/management/const_bitset_data_accessor.h"
 #include "modules/memory/management/data_handler.h"
 #include "modules/memory/management/load_status.h"

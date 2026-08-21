@@ -7,7 +7,6 @@
 #include "modules/memory/management/pointer_data_handler.h"
 #include "modules/memory/management/raw_data_handler.h"
 #include "modules/memory/typed_dictionary.h"
-#include "raw_dictionary_fwd.h"
 
 namespace celonis::accelerator::memory {
 

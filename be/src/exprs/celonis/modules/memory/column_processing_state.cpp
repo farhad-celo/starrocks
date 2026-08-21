@@ -1,5 +1,7 @@
 #include "column_processing_state.h"
 
+#include "modules/common/exceptions.h"
+
 namespace celonis::accelerator::memory {
 
 column_processing_state::column_processing_state(std::string format, bool is_calculated_constant, bool is_filtered,

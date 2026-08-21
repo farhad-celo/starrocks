@@ -240,9 +240,6 @@ class raw_column_ptrs_abstract : public details::column_ptrs_abstract_base {
 
   explicit raw_column_ptrs_abstract(col_pointer_type type) noexcept : column_ptrs_abstract_base{type} {}
 
-#ifndef CELOSTAR
-  [[nodiscard]] virtual column_ptrs_t create_cache_column_pointer(const cache::column_register& column_register) = 0;
-#endif
   [[nodiscard]] virtual column_ptrs_t create_temp_column_pointer() = 0;
 
   [[nodiscard]] virtual raw_immutable_column_ptrs_t as_immutable() const = 0;

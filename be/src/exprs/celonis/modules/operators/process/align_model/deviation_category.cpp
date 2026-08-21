@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -14,7 +15,6 @@
 #include <ctl/utils/allocation_messages.h>
 
 #include "modules/common/enum_indexed_array.h"
-#include "modules/common/execution_context.h"
 #include "modules/operators/process/align_model/align_model_types.h"
 
 namespace celonis::accelerator::operators::process::align_model {
@@ -95,28 +95,26 @@ struct move_to_deviation_category_fn {
 
 }  // namespace
 
-deviation_categories_for_cases_t compute_categories(const alignments_t& alignments,
-                                                    const common::execution_context& context) {
+deviation_categories_for_cases_t compute_categories(const alignments_t& alignments) {
   auto result{ctl::make_static_array_for_overwrite<ctl::static_array<deviation_category>>(
       alignments.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
   // The category computation is local per variant-alignment, so we can parallelize over them
-  tbb::parallel_for(
-      tbb::blocked_range<size_t>{0, result.size()},
-      [&result, &alignments = std::as_const(alignments), &context = std::as_const(context)](const auto& range) {
-        // Iterate over alignments in block
-        for (size_t idx_alignment{range.begin()}; idx_alignment < range.end(); ++idx_alignment) {
-          debug_assert(result.at(idx_alignment).empty(),
-                       "Every alignment should only be processes once by a single thread.");
-          if (alignments.at(idx_alignment).has_value()) {
-            const alignment_t& alignment{alignments.at(idx_alignment).value()};
-            const auto counts{count_moves(alignment)};
-            result.at(idx_alignment) = ctl::make_static_array_for_overwrite<deviation_category>(
-                alignment.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));
-            // Iterate over moves in alignment
-            std::ranges::transform(alignment, result.at(idx_alignment).begin(), move_to_deviation_category_fn{counts});
-          }
-        }
-      });
+  tbb::parallel_for(tbb::blocked_range<size_t>{0, result.size()}, [&result, &alignments = std::as_const(alignments)](
+                                                                      const auto& range) {
+    // Iterate over alignments in block
+    for (size_t idx_alignment{range.begin()}; idx_alignment < range.end(); ++idx_alignment) {
+      debug_assert(result.at(idx_alignment).empty(),
+                   "Every alignment should only be processes once by a single thread.");
+      if (alignments.at(idx_alignment).has_value()) {
+        const alignment_t& alignment{alignments.at(idx_alignment).value()};
+        const auto counts{count_moves(alignment)};
+        result.at(idx_alignment) = ctl::make_static_array_for_overwrite<deviation_category>(
+            alignment.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG));
+        // Iterate over moves in alignment
+        std::ranges::transform(alignment, result.at(idx_alignment).begin(), move_to_deviation_category_fn{counts});
+      }
+    }
+  });
 
   return result;
 }

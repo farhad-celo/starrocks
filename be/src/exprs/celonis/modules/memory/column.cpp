@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <numeric>
 
 #include <fmt/format.h>
 #include <tbb/enumerable_thread_specific.h>
@@ -11,7 +10,6 @@
 
 #include "concurrency/concurrency_utils.h"
 #include "log/log.h"
-#include "modules/common/aligned_blocked_range.h"
 #include "modules/common/date/celonis_date_storage.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/timer.h"

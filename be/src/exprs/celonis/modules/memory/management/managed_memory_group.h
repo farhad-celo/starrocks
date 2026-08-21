@@ -47,19 +47,7 @@ class managed_memory_group {
 
   void force_swap_in(const common::execution_context& context) const;
 
-#ifndef CELOSTAR
-  void force_swap_out(common::execution_context& context);
-
-  void force_compress() const;
-#endif
-
   [[nodiscard]] bool is_persisted() const;
-
-#ifndef CELOSTAR
-  void swap_out(const std::thread::id& transaction_id,
-                const std::chrono::steady_clock::time_point& transaction_start_timestamp,
-                common::execution_context& context);
-#endif
 
   memory_group_info dump_header() const;
 

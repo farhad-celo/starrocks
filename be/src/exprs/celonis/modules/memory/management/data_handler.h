@@ -1,10 +1,7 @@
 #pragma once
 
-#include <algorithm>
 #include <chrono>
 #include <memory>
-#include <set>
-#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -14,7 +11,6 @@
 #include "modules/memory/management/data_handler_fwd.h"
 #include "modules/memory/management/load_status.h"
 #include "modules/memory/management/swap_info.h"
-#include "modules/memory/table_fwd.h"
 #include "modules/memory/types.h"
 
 namespace celonis::accelerator::memory::management {
@@ -61,15 +57,7 @@ class data_handler {
    */
   [[nodiscard]] virtual bool swap_file_broken() const = 0;
 
-#ifndef CELOSTAR
-  virtual bool swap_out(common::execution_context& context) = 0;
-#endif
-
   virtual void swap_in(const common::execution_context& context) = 0;
-
-#ifndef CELOSTAR
-  virtual bool compress() = 0;
-#endif
 
   [[nodiscard]] virtual size_t get_size_in_memory() const = 0;
 

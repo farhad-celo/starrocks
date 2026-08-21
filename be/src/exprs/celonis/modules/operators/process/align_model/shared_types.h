@@ -1,11 +1,9 @@
 #pragma once
 
 #include <optional>
-#include <vector>
 
-#include <cpml/model/bpmn_graph.h>
-
-#include "modules/memory/cache/variant_trace_cache_fwd.h"
+#include <ctl/array_view.h>
+#include <ctl/static_array.h>
 
 namespace celonis::accelerator::operators::process::align_model {
 

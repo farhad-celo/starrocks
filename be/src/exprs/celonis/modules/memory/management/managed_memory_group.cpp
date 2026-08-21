@@ -55,28 +55,12 @@ void managed_memory_group::force_swap_in(const common::execution_context& contex
   apply([&context](const std::shared_ptr<data_handler>& dh) { dh->swap_in(context); });
 }
 
-#ifndef CELOSTAR
-void managed_memory_group::force_swap_out(common::execution_context& context) {
-  apply_and_remove_dangling_weak([&context](const std::shared_ptr<data_handler>& dh) { dh->swap_out(context); });
-}
-
-void managed_memory_group::force_compress() const {
-  apply([](const std::shared_ptr<data_handler>& dh) { dh->compress(); });
-}
-#endif
-
 namespace {
 [[nodiscard]] std::string to_iso_extended_string(const mem_time_t time) {
   auto converted_time{std::chrono::system_clock::now() +
                       duration_cast<std::chrono::system_clock::duration>(time - mem_clock_t::now())};
 
-#ifdef CELOSTAR
   return fmt::format("{:%FT%TZ}", converted_time);
-#else
-  // TODO(j.boettcher) When clang supports it, we could replace this conversion using
-  // std::format("{:%FT%TZ}", converted_time)
-  return ::date::format("{:%FT%TZ}", converted_time);
-#endif
 }
 }  // namespace
 
@@ -109,17 +93,4 @@ memory_group_info managed_memory_group::dump_header() const {
 
 const std::string& managed_memory_group::get_type() const { return type; }
 
-#ifndef CELOSTAR
-void managed_memory_group::swap_out(const std::thread::id& transaction_id,
-                                    const std::chrono::steady_clock::time_point& transaction_start_timestamp,
-                                    common::execution_context& context) {
-  apply_and_remove_dangling_weak(
-      [&transaction_id, &transaction_start_timestamp, &context](const std::shared_ptr<data_handler>& data_handler) {
-        if (data_handler->get_loaded_by() == transaction_id &&
-            transaction_start_timestamp <= data_handler->get_loaded_at().get()) {
-          data_handler->swap_out(context);
-        }
-      });
-}
-#endif
 }  // namespace celonis::accelerator::memory::management

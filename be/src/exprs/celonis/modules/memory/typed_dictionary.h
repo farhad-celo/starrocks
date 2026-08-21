@@ -8,12 +8,10 @@
 #include "modules/common/shared_types_fwd.h"
 #include "modules/memory/dictionary.h"
 #include "modules/memory/dictionary_fwd.h"
-#include "modules/memory/management/const_data_accessor.h"
 #include "modules/memory/management/pointer_data_handler.h"
 #include "modules/memory/management/raw_data_handler.h"
 #include "modules/memory/row_id.h"
 #include "modules/memory/types.h"
-#include "types/uuid/uuid_storage.h"
 
 namespace celonis::accelerator::date {
 class celonis_date_storage;
@@ -34,12 +32,6 @@ class typed_dictionary : public dictionary {
   [[nodiscard]] const_data_accessor_t get_const_data(const common::execution_context& context = {}) const;
 
   void swap_in(common::execution_context& context) override;
-
-#ifndef CELOSTAR
-  void swap_out(common::execution_context& context) override;
-
-  bool write_out(common::execution_context& context) override;
-#endif
 
   [[nodiscard]] management::load_status get_load_status() const override;
 
@@ -104,18 +96,6 @@ class typed_dictionary : public dictionary {
                                                       const management::swap_info& sinfo,
                                                       const std::string& description);
 
-#ifndef CELOSTAR
-  /**
-   *
-   * @param swap_file_name The name of the swap file.
-   * @param sinfo Swap info containing swap-related meta-data.
-   * @param description The description of the swap_file
-   * @return The dictionary if it exists in the swap.
-   */
-  static std::shared_ptr<dictionary> init_from_swap(const std::string& swap_file_name,
-                                                    const management::swap_info& sinfo, const std::string& description);
-#endif
-
  private:
   management::raw_data_handler_t<T> data_handler;
 };
@@ -134,12 +114,6 @@ class typed_dictionary<cel_string_t> : public dictionary {
   [[nodiscard]] const_data_accessor_t get_const_data(const common::execution_context& context = {}) const;
 
   void swap_in(common::execution_context& context) override;
-
-#ifndef CELOSTAR
-  void swap_out(common::execution_context& context) override;
-
-  bool write_out(common::execution_context& context) override;
-#endif
 
   [[nodiscard]] management::load_status get_load_status() const override;
 
@@ -191,18 +165,6 @@ class typed_dictionary<cel_string_t> : public dictionary {
                                                       ctl::static_array<char>&& buffer, const std::string& swap_file,
                                                       const management::swap_info& sinfo,
                                                       const std::string& description);
-
-#ifndef CELOSTAR
-  /**
-   *
-   * @param swap_file_name The name of the swap file.
-   * @param sinfo Swap info containing swap-related meta-data.
-   * @param description The description of the swap_file
-   * @return The dictionary if it exists in the swap else nullptr.
-   */
-  static std::shared_ptr<dictionary> init_from_swap(const std::string& swap_file_name,
-                                                    const management::swap_info& sinfo, const std::string& description);
-#endif
 
  private:
   std::shared_ptr<management::string_data_handler> string_data_;

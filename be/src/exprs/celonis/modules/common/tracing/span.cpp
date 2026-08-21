@@ -9,19 +9,9 @@
 #include <opentelemetry/trace/scope.h>
 #include <opentelemetry/trace/span.h>
 #include <opentelemetry/trace/span_metadata.h>
-#ifdef CELOSTAR
-#include <variant>
-#endif
 
-#include "modules/common/exceptions.h"
 #include "modules/common/tracing/propagation/datadog_conversion.h"
-#ifndef CELOSTAR
-#include "modules/common/tracing/propagation/remote_execution_context_reader.h"
-#endif
 #include "modules/common/tracing/tracing_options.h"
-#ifndef CELOSTAR
-#include "modules/query/communication.pb.h"
-#endif
 
 namespace celonis::accelerator::common::tracing {
 
@@ -34,37 +24,12 @@ opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer> get_tracer() noex
       tracing::DEFAULT_OPENTELEMETRY_TRACER_LIBRARY_NAME);
 }
 
-#ifndef CELOSTAR
-/**
- * Returns the context that is defined with the given remote context.
- */
-opentelemetry::context::Context propagate_context(
-    const CommunicationRequest_ExecutionContext_SpanContext& remote_context) noexcept {
-  // Global propagator is set in propagation::init_opentelemetry_propagator_once
-  auto propagator{opentelemetry::context::propagation::GlobalTextMapPropagator::GetGlobalPropagator()};
-  auto current_context{opentelemetry::context::RuntimeContext::GetCurrent()};
-  remote_execution_context_reader reader{remote_context};
-  return propagator->Extract(reader, current_context);
-}
-#endif
-
 }  // namespace
 
 span::span() noexcept = default;
 
 span::span(const std::string& operation_name, const tags_t& tags)
     : span(get_tracer()->StartSpan(operation_name, tags)) {}
-
-#ifndef CELOSTAR
-span::span(const std::string& operation_name, const tags_t& tags,
-           const CommunicationRequest_ExecutionContext_SpanContext& remote_span_context)
-    : span(get_tracer()->StartSpan(
-          operation_name, tags,
-          opentelemetry::trace::StartSpanOptions{.start_system_time{},
-                                                 .start_steady_time{},
-                                                 .parent{propagate_context(remote_span_context)},
-                                                 .kind = DEFAULT_SPAN_KIND})) {}
-#endif
 
 span::span(opentelemetry_span_t&& span)
     : span_impl_{std::move(span)}, scope_impl_{span_impl_.lock_mutable([](auto& span_impl) {
@@ -99,12 +64,8 @@ void span::set_tag(const std::string& key, const tag_t& value) {
      */
     // Assert that opentelemetry::common::AttributeValue uses a c-string for storing nullptr values.
     static_assert(tag_t{nullptr}.index() == opentelemetry::common::kTypeCString);
-#ifdef CELOSTAR
     // This is due to the version mismatch of opentelemetry used by cpm and Celostar.
     if (const auto* cstring_value = opentelemetry::nostd::get_if<opentelemetry::common::kTypeCString>(&value);
-#else
-    if (const auto* cstring_value = std::get_if<opentelemetry::common::kTypeCString>(&value);
-#endif
         cstring_value != nullptr && *cstring_value == nullptr) {
       span_impl->SetAttribute(key, "nullptr");
     } else {

@@ -1,12 +1,6 @@
 #pragma once
 
-#include <opentelemetry/nostd/string_view.h>
-#include <opentelemetry/trace/span_id.h>
-#include <opentelemetry/trace/trace_flags.h>
-#include <opentelemetry/trace/trace_id.h>
-
 namespace celonis::accelerator::common::tracing::propagation {
-using datadog_id_t = uint64_t;
 /**
  * Tag as defined in:
  * https://github.com/opentracing/specification/blob/master/semantic_conventions.md#span-tags-table
@@ -26,10 +20,4 @@ static constexpr char DATADOG_SAMPLER_KEEP_PRIORITY{'1'};
 // Used for sampling priority conversions from strings
 static constexpr char DATADOG_USER_KEEP_PRIORITY{'2'};
 
-#ifndef CELOSTAR
-opentelemetry::trace::TraceId to_opentelemetry_trace_id(opentelemetry::nostd::string_view datadog_id_as_string);
-opentelemetry::trace::SpanId to_opentelemetry_span_id(opentelemetry::nostd::string_view datadog_id_as_string);
-opentelemetry::trace::TraceFlags to_opentelemetry_trace_flags(
-    opentelemetry::nostd::string_view datadog_sampling_priority);
-#endif
 }  // namespace celonis::accelerator::common::tracing::propagation

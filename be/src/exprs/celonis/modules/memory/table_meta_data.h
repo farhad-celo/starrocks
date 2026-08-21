@@ -4,22 +4,12 @@
 #include <ctl/named_type.h>
 #include <ctl/type_traits.h>
 
-#include "modules/common/int_types.h"
-#include "modules/memory/table_meta_data_fwd.h"
-
 namespace celonis::accelerator {
 
 // forward declare for proto TableMetaData in queries.pb.h
 class TableMetaData;
 
 namespace memory {
-
-#ifndef CELOSTAR
-/**
- * @brief Transforms a 'table_meta_data' instance to its equivalent proto representation 'TableMetaData'
- */
-void table_meta_data_to_proto(TableMetaData* table_meta_data_proto, const table_meta_data& meta_data);
-#endif
 
 /**
  * @brief Represents meta data of a table:

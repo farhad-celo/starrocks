@@ -111,7 +111,7 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   stats.time_variant_replay = replay_timer.elapsed_wall_time_so_far();
 
   ctl::wall_timer_t deviation_category_timer{};
-  const auto deviation_categories{compute_categories(alignments, context)};
+  const auto deviation_categories{compute_categories(alignments)};
   stats.time_deviation_categories = deviation_category_timer.elapsed_wall_time_so_far();
 
   memory::table_group_t tables{};
@@ -143,16 +143,6 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
         settings_.get_create_table_grain_size()  //
     );
   }
-
-  // TODO(j.kruska) Implement statistics for celostar
-#ifndef CELOSTAR
-  // TODO(j.kruska) Find equivalent statistics for CREATE_ALIGNMENT
-  if (settings_.get_version() == align_model_version::V1) {
-    stats.alignment_table_row_count = tables.at(std::string{INTERNAL_ALIGNMENT_TABLE_NAME})->size();
-    stats.association_table_row_count = tables.at(std::string{INTERNAL_ASSOCIATION_TABLE_NAME})->size();
-    stats.edge_class_table_row_count = tables.at(std::string{INTERNAL_EDGE_CLASS_TABLE_NAME})->size();
-  }
-#endif
 
   stats.status = computation_status::SUCCESS;
   return tables;

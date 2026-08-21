@@ -235,12 +235,7 @@ format::json::json_object_t to_json(const align_model_statistics& stats) {
     // N.B: If the computation status is successful, we expect all optional execution statistics fields to be set
     const auto total_execution_time{stats.proto_bpmn_to_bpmn_graph.value() + stats.bpmn_graph_to_petri_net.value() +
                                     stats.variant_computation.value() + total_wall_time_alignment +
-                                    stats.time_variant_replay.value()
-// TODO(j.kruska) We do not collect inflation time in celostar yet
-#ifndef CELOSTAR
-                                    + stats.inflation_stats.total_wall_time_inflation.value()
-#endif
-    };
+                                    stats.time_variant_replay.value()};
     add_formatted_time(alignment_metrics, "time_align_model_operator_execution", total_execution_time);
   }
 

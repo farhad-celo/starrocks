@@ -39,18 +39,6 @@ class dictionary {
    */
   virtual void swap_in(common::execution_context& context) = 0;
 
-#ifndef CELOSTAR
-  /**
-   * Swaps the column to disk.
-   */
-  virtual void swap_out(common::execution_context& context) = 0;
-
-  /**
-   * Writes the column to disk.
-   */
-  virtual bool write_out(common::execution_context& context) = 0;
-#endif
-
   [[nodiscard]] virtual management::load_status get_load_status() const = 0;
 
   [[nodiscard]] virtual bool is_swappable() const = 0;

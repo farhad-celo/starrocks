@@ -21,7 +21,6 @@
 #include "modules/common/exceptions.h"
 #include "modules/common/shared_types.h"
 #include "modules/memory/merge_dictionaries.h"
-#include "modules/memory/merge_dictionaries_internals.h"
 #include "modules/memory/raw_dictionary.h"
 #include "modules/memory/typed_dictionary.h"
 

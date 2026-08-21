@@ -2,7 +2,6 @@
 
 #include <ctl/static_array.h>
 
-#include "modules/common/execution_context_fwd.h"
 #include "modules/operators/process/align_model/align_model_types.h"
 
 namespace celonis::accelerator::operators::process::align_model {
@@ -56,6 +55,6 @@ using deviation_categories_for_cases_view_t = ctl::array_view<const deviation_ca
  * Each element has the same size as the alignment of that index and contain a deviation category for each move in that
  * alignment.
  */
-deviation_categories_for_cases_t compute_categories(const alignments_t& alignments,
-                                                    const common::execution_context& context);
+deviation_categories_for_cases_t compute_categories(const alignments_t& alignments);
+
 }  // namespace celonis::accelerator::operators::process::align_model

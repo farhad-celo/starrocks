@@ -1,10 +1,6 @@
 #pragma once
 
-#include <memory>
 #include <string>
-#include <utility>
-
-#include "modules/common/exceptions.h"
 
 namespace celonis::accelerator::memory {
 class column_processing_state {

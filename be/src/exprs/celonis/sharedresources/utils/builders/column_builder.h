@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ctl/bitset.h>
+
 #include <bytell_hash_map.hpp>
 #include <limits>
 #include <memory>
@@ -7,11 +9,19 @@
 #include "modules/common/buffer_types.h"
 #include "modules/memory/builders/temp_column_builder.h"
 #include "modules/memory/column.h"
-#include "modules/memory/null_flags.h"
+#include "modules/memory/null_flags_fwd.h"
 #include "modules/memory/table.h"
 #include "utils/nullable_pql_value.h"
 
 namespace celonis::accelerator {
+
+namespace memory {
+
+inline memory::null_flags_t create_null_flags(const size_t size) {
+    return std::make_shared<ctl::dynamic_bitset_t>(size, false);
+}
+
+} // namespace memory
 
 // TODO(n.weber): move impl into .cpp to reduce compile time
 template <typename T>

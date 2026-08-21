@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include <fmt/ostream.h>
 #include <google/protobuf/util/json_util.h>
 
 #include <cpml/exception.h>

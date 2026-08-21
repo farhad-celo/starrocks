@@ -3,17 +3,14 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
-#include <numeric>
 #include <utility>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <fmt/format.h>
 
 #include "concurrency/concurrency_utils.h"
-#include "legacy_embedded_format/json/json.h"
 #include "log/log.h"
 #include "modules/memory/column.h"
-#include "modules/memory/column_pointers.h"
 
 namespace celonis::accelerator::memory {
 

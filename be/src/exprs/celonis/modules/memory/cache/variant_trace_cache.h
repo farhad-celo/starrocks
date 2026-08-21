@@ -9,9 +9,7 @@
 #include <ctl/named_type.h>
 
 #include "modules/common/exceptions.h"
-#include "modules/common/shared_types.h"
 #include "modules/common/trace_types.h"
-#include "modules/memory/cache/variant_trace_cache_fwd.h"
 #include "modules/memory/management/pointer_data_handler.h"
 #include "modules/memory/management/raw_data_handler.h"
 #include "modules/memory/table.h"

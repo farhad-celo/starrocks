@@ -8,6 +8,7 @@
 
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/management/raw_data_handler.h"
+#include "modules/memory/row_id.h"
 #include "modules/memory/types.h"
 
 namespace celonis::accelerator::memory {

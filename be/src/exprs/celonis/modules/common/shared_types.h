@@ -2,15 +2,11 @@
 
 #include <array>
 #include <cmath>
-#include <ostream>
+#include <iosfwd>
 #include <string>
-#include <type_traits>
-
-#include <fmt/ostream.h>
 
 #include <ctl/type_traits.h>
 
-#include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
 
 namespace celonis::accelerator {
