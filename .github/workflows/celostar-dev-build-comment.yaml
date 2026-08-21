@@ -1,0 +1,75 @@
+name: Celostar Repo Depot Dev Build Comment
+run-name: 'Celostar Repo Depot Dev Build: PR #${{ github.event.issue.number }}'
+
+# Comment-triggered builds run from the default branch and never execute the PR head.
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: read
+  contents: write
+  id-token: write
+  packages: write
+  pull-requests: write
+
+jobs:
+  prepare-comment:
+    name: Acknowledge PR Comment Build
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.issue.state == 'open' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+      contains(fromJSON('["/dev-build","/dev-build be","/dev-build fe"]'), github.event.comment.body)
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    outputs:
+      service-names-as-csv: ${{ steps.announce.outputs.service-names-as-csv }}
+    steps:
+      - name: Post workflow link to PR
+        id: announce
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const commands = {
+              '/dev-build': {
+                label: 'BE and FE',
+                serviceNames: 'celostar-be,celostar-fe',
+              },
+              '/dev-build be': {
+                label: 'BE',
+                serviceNames: 'celostar-be',
+              },
+              '/dev-build fe': {
+                label: 'FE',
+                serviceNames: 'celostar-fe',
+              },
+            };
+
+            const command = commands[context.payload.comment.body];
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const defaultBranch = context.payload.repository.default_branch;
+
+            core.setOutput('service-names-as-csv', command.serviceNames);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `Repo Depot dev build requested for **${command.label}**.`,
+                '',
+                `Source: current default branch \`${defaultBranch}\``,
+                `Workflow: [view run](${runUrl})`,
+              ].join('\n'),
+            });
+
+  build:
+    name: Build Branch on PR Comment
+    needs: prepare-comment
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      target-release: DEV
+      repo-depot-version: stable
+      service-names-as-csv: ${{ needs.prepare-comment.outputs.service-names-as-csv }}

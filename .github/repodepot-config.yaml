@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=./repodepot-config.schema.json
+workflows:
+  build-dev-branch:
+    # Only changes under be/, bin/, fe/, thirdparty/, and tools/ should trigger a dev build.
+    # Ignore root-level files and every other currently tracked top-level directory.
+    paths-ignore:
+      - '*'
+      - '.devcontainer/**'
+      - '.devcontainer-sr-main/**'
+      - '.github/**'
+      - 'build-support/**'
+      - 'celonis/**'
+      - 'celostar-docs/**'
+      - 'community/**'
+      - 'conf/**'
+      - 'contrib/**'
+      - 'docker/**'
+      - 'docs/**'
+      - 'extra/**'
+      - 'format-sdk/**'
+      - 'fs_brokers/**'
+      - 'gensrc/**'
+      - 'images/**'
+      - 'java-extensions/**'
+      - 'licenses/**'
+      - 'licenses-binary/**'
+      - 'test/**'
+      - 'webroot/**'
