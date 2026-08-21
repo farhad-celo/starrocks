@@ -7,6 +7,9 @@ run-name: >-
   branch${{ (github.event_name == 'push' && 'EXISTING' || inputs.target-release) == 'EXISTING' && format(' `{0}`', github.event_name == 'push' && github.ref_name || inputs.custom-release) || '' }}
 
 on:
+  # At 16:30, only on Monday
+  schedule:
+    - cron: '30 16 * * 1'
 
   workflow_dispatch:
     inputs:
@@ -71,3 +74,13 @@ jobs:
       repo-depot-version: stable
       service-names-as-csv: 'celostar-be,celostar-fe'
       release-branch-with-service-name: ${{ github.ref_name }}
+
+  on-schedule:
+    name: On Schedule
+    if: github.event_name == 'schedule'
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      target-release: NEW
+      repo-depot-version: stable
+      service-names-as-csv: 'celostar-be,celostar-fe'

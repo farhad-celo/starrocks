@@ -1,14 +1,18 @@
 name: '[RepoDepot] Build Dev Branch'
 run-name: '[RepoDepot] Build Dev Branch: ${{ github.ref_name }}'
 
-# Ignored paths are defined in:
-# https://docs.google.com/document/d/1y3qW9s3M3iqbDmjGnomKGsx3vBZFxcJbeq7Z659op8c/edit?tab=t.0
-# must not be adjusted without proper review and approval from devtools team.
+# paths-ignore is baked in at delivery time by merging org-level defaults with the service's
+# own list from .github/repodepot-config.yaml. Do not edit this list by hand — changes will
+# be overwritten on the next enrollment. To add service-specific ignores, update
+# .github/repodepot-config.yaml (see repodepot-config.schema.json for the config schema).
 on:
   push:
-      branches:
-      - branch-3.5-cc-3ce541c2-celo
-      paths-ignore: []
+    branches:
+      - branch-3.5-cc-ce1789ea-celo
+    paths-ignore:
+      - '.claude/**'
+      - '.cursor/**'
+      - '.mirrord/**'
 
   workflow_dispatch:
     inputs:

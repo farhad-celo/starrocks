@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "repodepot-config.schema.json",
+  "title": "Repo Depot Config",
+  "description": "A service's configuration for optional service-level details in Repo Depot build/release workflows.",
+  "$ref": "#/definitions/RepoDepotConfig",
+  "definitions": {
+    "RepoDepotConfig": {
+      "properties": {
+        "workflows": {
+          "$ref": "#/definitions/celonis.repo_depot.repodepot_config.RepoDepotConfig.RepoDepotWorkflowConfig",
+          "description": "Container of build/release workflows and their associated configurations."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "title": "Repo Depot Config",
+      "description": "A service's configuration for optional service-level details in Repo Depot build/release workflows."
+    },
+    "celonis.repo_depot.repodepot_config.RepoDepotConfig.RepoDepotWorkflowConfig": {
+      "properties": {
+        "build-dev-branch": {
+          "$ref": "#/definitions/celonis.repo_depot.repodepot_config.RepoDepotConfig.RepoDepotWorkflowConfig.BuildDevBranchConfig",
+          "description": "Configuration for the workflow that builds releases for dev environments."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "title": "Repo Depot Workflow Config",
+      "description": "Map between workflow configurations and the type of workflow they apply to."
+    },
+    "celonis.repo_depot.repodepot_config.RepoDepotConfig.RepoDepotWorkflowConfig.BuildDevBranchConfig": {
+      "properties": {
+        "paths-ignore": {
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^\\s]+$"
+          },
+          "type": "array",
+          "description": "Path patterns to exclude from the build-dev-branch workflow trigger (uses GitHub glob syntax). Each entry must be a non-empty, non-whitespace string.",
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "title": "Build Dev Branch Config",
+      "description": "Configuration for the `build-dev-branch` workflow."
+    }
+  }
+}

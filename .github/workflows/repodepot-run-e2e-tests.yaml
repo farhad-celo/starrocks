@@ -22,6 +22,14 @@ on:
           cfg destination the tests execute against, formatted as
           `{clusterName}--{namespace}` (e.g. `develop-main-c059b72--develop`).
         required: true
+      stage:
+        type: choice
+        description: >-
+          Kargo promotion stage. Filters test suites by their `type` field.
+        required: true
+        options:
+          - develop
+          - staging
 
 jobs:
   run:
@@ -32,4 +40,5 @@ jobs:
       component-name: ${{ inputs.component-name }}
       image-tag: ${{ inputs.image-tag }}
       destination: ${{ inputs.destination }}
+      stage: ${{ inputs.stage }}
       repo-depot-version: stable
