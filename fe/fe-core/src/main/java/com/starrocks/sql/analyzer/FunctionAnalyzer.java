@@ -67,7 +67,25 @@ import java.util.stream.Collectors;
 
 public class FunctionAnalyzer {
     public static final Pattern HAS_TIME_PART = Pattern.compile("^.*[HhIiklrSsT]+.*$");
+    private static final String ALIGNMENT_MODEL_VERTEX_ID_FIELD_NAME = "alignment_model_vertex_id";
+    private static final String ALIGNMENT_VERTEX_LABEL_FIELD_NAME = "alignment_vertex_label";
+    private static final String ALIGNMENT_MOVE_TYPE_FIELD_NAME = "alignment_move_type";
+    private static final String ALIGNMENT_ACTIVITY_INDEX_FIELD_NAME = "alignment_activity_index";
+    private static final int CREATE_ALIGNMENT_FIELD_COUNT = 47;
+    private static final long CREATE_ALIGNMENT_ALL_FIELDS_MASK = (1L << CREATE_ALIGNMENT_FIELD_COUNT) - 1;
+    private static final List<CreateAlignmentOutputField> CREATE_ALIGNMENT_OUTPUT_FIELDS =
+            createAlignmentOutputFields();
     private static final Set<String> SUPPORTED_TGT_TYPES = Sets.newTreeSet(String.CASE_INSENSITIVE_ORDER);
+
+    private static final class CreateAlignmentOutputField {
+        private final String name;
+        private final Type type;
+
+        private CreateAlignmentOutputField(String name, Type type) {
+            this.name = name;
+            this.type = type;
+        }
+    }
 
     static {
         SUPPORTED_TGT_TYPES.addAll(Lists.newArrayList("HLL_8", "HLL_6", "HLL_4"));
@@ -678,6 +696,95 @@ public class FunctionAnalyzer {
         return Optional.empty();
     }
 
+    private static List<CreateAlignmentOutputField> createAlignmentOutputFields() {
+        List<CreateAlignmentOutputField> fields = Lists.newArrayList();
+        fields.add(new CreateAlignmentOutputField(ALIGNMENT_MODEL_VERTEX_ID_FIELD_NAME, Type.ARRAY_BIGINT));
+        fields.add(new CreateAlignmentOutputField(ALIGNMENT_VERTEX_LABEL_FIELD_NAME, Type.ARRAY_VARCHAR));
+        fields.add(new CreateAlignmentOutputField(ALIGNMENT_MOVE_TYPE_FIELD_NAME, Type.ARRAY_VARCHAR));
+        fields.add(new CreateAlignmentOutputField(ALIGNMENT_ACTIVITY_INDEX_FIELD_NAME, Type.ARRAY_BIGINT));
+        fields.add(new CreateAlignmentOutputField("alignment_deviation_category", Type.ARRAY_VARCHAR));
+
+        List<String> edgeTypes = Arrays.asList("SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE",
+                "UNMAPPED_EDGE", "MISSING_VIOLATION", "EXCLUSIVE_VIOLATION");
+        for (String edgeType : edgeTypes) {
+            fields.add(new CreateAlignmentOutputField(edgeType + "_model_vertex_id", Type.ARRAY_BIGINT));
+            fields.add(new CreateAlignmentOutputField(edgeType + "_vertex_label", Type.ARRAY_VARCHAR));
+            fields.add(new CreateAlignmentOutputField(edgeType + "_move_type", Type.ARRAY_VARCHAR));
+            fields.add(new CreateAlignmentOutputField(edgeType + "_deviation_category", Type.ARRAY_VARCHAR));
+            fields.add(new CreateAlignmentOutputField(edgeType + "_edge_class", Type.ARRAY_BIGINT));
+            fields.add(new CreateAlignmentOutputField(edgeType + "_alignment_index", Type.ARRAY_BIGINT));
+        }
+        Preconditions.checkState(fields.size() == CREATE_ALIGNMENT_FIELD_COUNT);
+        return fields;
+    }
+
+    private static StructType createAlignmentStructType(long mask) {
+        ArrayList<StructField> fields = Lists.newArrayList();
+        for (int bit = 0; bit < CREATE_ALIGNMENT_OUTPUT_FIELDS.size(); ++bit) {
+            if ((mask & (1L << bit)) != 0) {
+                CreateAlignmentOutputField field = CREATE_ALIGNMENT_OUTPUT_FIELDS.get(bit);
+                fields.add(new StructField(field.name, field.type));
+            }
+        }
+        return new StructType(fields);
+    }
+
+    private static Optional<Long> extractCreateAlignmentV2MaskValue(Expr expr) {
+        // Unlike extractIntegerValue(), do not unwrap arbitrary integer casts. The mask defines the return schema,
+        // so the FE value must be guaranteed to equal the BIGINT constant evaluated by the BE.
+        if (expr instanceof UserVariableExpr) {
+            expr = ((UserVariableExpr) expr).getValue();
+        }
+
+        if (expr instanceof IntLiteral) {
+            return Optional.of(((IntLiteral) expr).getLongValue());
+        }
+
+        if (!(expr instanceof CastExpr) || !expr.getType().isBigint()) {
+            return Optional.empty();
+        }
+
+        Expr castInput = expr.getChild(0);
+        if (castInput instanceof UserVariableExpr) {
+            castInput = ((UserVariableExpr) castInput).getValue();
+        }
+        if (!(castInput instanceof IntLiteral)) {
+            return Optional.empty();
+        }
+        return Optional.of(((IntLiteral) castInput).getLongValue());
+    }
+
+    private static long validateCreateAlignmentV2Mask(FunctionCallExpr functionCallExpr) {
+        Expr maskExpr = functionCallExpr.getChild(2);
+        if (maskExpr instanceof NullLiteral || maskExpr.getType().isNull()) {
+            throw new SemanticException("The third parameter required_fields_mask of " +
+                    "CELONIS_CREATE_ALIGNMENT_V2 must not be NULL", maskExpr.getPos());
+        }
+        if (!maskExpr.isConstant()) {
+            throw new SemanticException("The third parameter required_fields_mask of " +
+                    "CELONIS_CREATE_ALIGNMENT_V2 must be a constant BIGINT", maskExpr.getPos());
+        }
+
+        Optional<Long> value = extractCreateAlignmentV2MaskValue(maskExpr);
+        if (value.isEmpty()) {
+            throw new SemanticException("The third parameter required_fields_mask of " +
+                    "CELONIS_CREATE_ALIGNMENT_V2 must be an integer literal or CAST(integer literal AS BIGINT)",
+                    maskExpr.getPos());
+        }
+
+        long mask = value.get();
+        if (mask <= 0) {
+            throw new SemanticException("The third parameter required_fields_mask of " +
+                    "CELONIS_CREATE_ALIGNMENT_V2 must be positive, but received " + mask, maskExpr.getPos());
+        }
+        if ((mask & ~CREATE_ALIGNMENT_ALL_FIELDS_MASK) != 0) {
+            throw new SemanticException("The third parameter required_fields_mask of " +
+                    "CELONIS_CREATE_ALIGNMENT_V2 contains unknown bits: " + mask +
+                    "; allowed range is 1 through " + CREATE_ALIGNMENT_ALL_FIELDS_MASK, maskExpr.getPos());
+        }
+        return mask;
+    }
+
     /**
      * Get function by function call expression and argument types.
      *
@@ -905,10 +1012,10 @@ public class FunctionAnalyzer {
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             fn = fn.copy();
             ArrayList<StructField> sf = Lists.newArrayList();
-            sf.add(new StructField("alignment_model_vertex_id", Type.ARRAY_BIGINT));
-            sf.add(new StructField("alignment_vertex_label", Type.ARRAY_VARCHAR));
-            sf.add(new StructField("alignment_move_type", Type.ARRAY_VARCHAR));
-            sf.add(new StructField("alignment_activity_index", Type.ARRAY_BIGINT));
+            sf.add(new StructField(ALIGNMENT_MODEL_VERTEX_ID_FIELD_NAME, Type.ARRAY_BIGINT));
+            sf.add(new StructField(ALIGNMENT_VERTEX_LABEL_FIELD_NAME, Type.ARRAY_VARCHAR));
+            sf.add(new StructField(ALIGNMENT_MOVE_TYPE_FIELD_NAME, Type.ARRAY_VARCHAR));
+            sf.add(new StructField(ALIGNMENT_ACTIVITY_INDEX_FIELD_NAME, Type.ARRAY_BIGINT));
             sf.add(new StructField("association_edge_class", Type.ARRAY_BIGINT));
             sf.add(new StructField("association_alignment_index", Type.ARRAY_BIGINT));
             sf.add(new StructField("edge_class_id", Type.ARRAY_BIGINT));
@@ -920,10 +1027,10 @@ public class FunctionAnalyzer {
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             fn = fn.copy();
             ArrayList<StructField> sf = Lists.newArrayList();
-            sf.add(new StructField("alignment_model_vertex_id", Type.ARRAY_BIGINT));
-            sf.add(new StructField("alignment_vertex_label", Type.ARRAY_VARCHAR));
-            sf.add(new StructField("alignment_move_type", Type.ARRAY_VARCHAR));
-            sf.add(new StructField("alignment_activity_index", Type.ARRAY_BIGINT));
+            sf.add(new StructField(ALIGNMENT_MODEL_VERTEX_ID_FIELD_NAME, Type.ARRAY_BIGINT));
+            sf.add(new StructField(ALIGNMENT_VERTEX_LABEL_FIELD_NAME, Type.ARRAY_VARCHAR));
+            sf.add(new StructField(ALIGNMENT_MOVE_TYPE_FIELD_NAME, Type.ARRAY_VARCHAR));
+            sf.add(new StructField(ALIGNMENT_ACTIVITY_INDEX_FIELD_NAME, Type.ARRAY_BIGINT));
             sf.add(new StructField("association_edge_class", Type.ARRAY_BIGINT));
             sf.add(new StructField("association_alignment_index", Type.ARRAY_BIGINT));
             sf.add(new StructField("edge_class_id", Type.ARRAY_BIGINT));
@@ -935,26 +1042,15 @@ public class FunctionAnalyzer {
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_CREATE_ALIGNMENT, argumentTypes,
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             fn = fn.copy();
-            ArrayList<StructField> sf = Lists.newArrayList();
-            // Alignment columns
-            sf.add(new StructField("alignment_model_vertex_id", Type.ARRAY_BIGINT));
-            sf.add(new StructField("alignment_vertex_label", Type.ARRAY_VARCHAR));
-            sf.add(new StructField("alignment_move_type", Type.ARRAY_VARCHAR));
-            sf.add(new StructField("alignment_activity_index", Type.ARRAY_BIGINT));
-            sf.add(new StructField("alignment_deviation_category", Type.ARRAY_VARCHAR));
-
-            List<String> edgeTypes = Arrays.asList("SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE",
-                    "UNMAPPED_EDGE", "MISSING_VIOLATION", "EXCLUSIVE_VIOLATION");
-
-            for (String edgeType : edgeTypes) {
-                sf.add(new StructField(edgeType + "_model_vertex_id", Type.ARRAY_BIGINT));
-                sf.add(new StructField(edgeType + "_vertex_label", Type.ARRAY_VARCHAR));
-                sf.add(new StructField(edgeType + "_move_type", Type.ARRAY_VARCHAR));
-                sf.add(new StructField(edgeType + "_deviation_category", Type.ARRAY_VARCHAR));
-                sf.add(new StructField(edgeType + "_edge_class", Type.ARRAY_BIGINT));
-                sf.add(new StructField(edgeType + "_alignment_index", Type.ARRAY_BIGINT));
+            fn.setRetType(createAlignmentStructType(CREATE_ALIGNMENT_ALL_FIELDS_MASK));
+        } else if (FunctionSet.CELONIS_CREATE_ALIGNMENT_V2.equals(fnName)) {
+            fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_CREATE_ALIGNMENT_V2, argumentTypes,
+                    Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+            if (fn == null) {
+                return null;
             }
-            fn.setRetType(new StructType(sf));
+            fn = fn.copy();
+            fn.setRetType(createAlignmentStructType(validateCreateAlignmentV2Mask(node)));
         } else if (FunctionSet.CELONIS_PERCENTILE_DISC.equals(fnName)) {
             argumentTypes[1] = Type.DOUBLE;
             fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_IDENTICAL);

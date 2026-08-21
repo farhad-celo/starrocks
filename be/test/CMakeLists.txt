@@ -189,6 +189,7 @@ set(EXEC_FILES
         ./exprs/celonis/conformance_test.cpp
         ./exprs/celonis/cpml_utils/disjoint_sets_test.cpp
         ./exprs/celonis/create_alignment_test.cpp
+        ./exprs/celonis/create_alignment_v2_test.cpp
         ./exprs/celonis/date_match_test.cpp
         ./exprs/celonis/eventlog_utils.cpp
         ./exprs/celonis/get_calendar_entry_start_test.cpp

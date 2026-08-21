@@ -110,9 +110,12 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   const auto replay_results{replay_aligned_variants(bpmn_graph, alignments, parallel_vertices, align_model_op_context)};
   stats.time_variant_replay = replay_timer.elapsed_wall_time_so_far();
 
-  ctl::wall_timer_t deviation_category_timer{};
-  const auto deviation_categories{compute_categories(alignments)};
-  stats.time_deviation_categories = deviation_category_timer.elapsed_wall_time_so_far();
+  deviation_categories_for_cases_t deviation_categories{};
+  if (output_projection_.needs_deviation_categories()) {
+    ctl::wall_timer_t deviation_category_timer{};
+    deviation_categories = compute_categories(alignments);
+    stats.time_deviation_categories = deviation_category_timer.elapsed_wall_time_so_far();
+  }
 
   memory::table_group_t tables{};
   if (settings_.get_version() == align_model_version::V1) {
@@ -130,17 +133,18 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
     );
   } else {
     debug_assert(settings_.get_version() == align_model_version::V2);
-    tables = v2::create_tables(                  //
-        alignments,                              //
-        replay_results,                          //
-        deviation_categories,                    //
-        bpmn_to_string,                          //
-        variants,                                //
-        activity_column_,                        //
-        case_column_,                            //
-        activity_to_case_join_,                  //
-        align_model_op_context,                  //
-        settings_.get_create_table_grain_size()  //
+    tables = v2::create_tables(                   //
+        alignments,                               //
+        replay_results,                           //
+        deviation_categories,                     //
+        bpmn_to_string,                           //
+        variants,                                 //
+        activity_column_,                         //
+        case_column_,                             //
+        activity_to_case_join_,                   //
+        align_model_op_context,                   //
+        settings_.get_create_table_grain_size(),  //
+        output_projection_                        //
     );
   }
 

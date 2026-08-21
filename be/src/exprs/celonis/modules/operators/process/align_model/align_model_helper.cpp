@@ -79,7 +79,17 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
 Status AlignModelHelper::execute(const traces_t& deduped_traces,
                                  const starrocks::celonis::bpmn_model_description& bpmn_model_description,
                                  celostar_align_model_version version) {
+  return execute(deduped_traces, bpmn_model_description, version, v2::create_alignment_output_projection::all_fields());
+}
+
+Status AlignModelHelper::execute(const traces_t& deduped_traces,
+                                 const starrocks::celonis::bpmn_model_description& bpmn_model_description,
+                                 celostar_align_model_version version,
+                                 const v2::create_alignment_output_projection& output_projection) {
   auto settings{align_model_table_group_node_settings::builder{}.set_version(to_saola_version(version)).build()};
+  const auto effective_output_projection = version == celostar_align_model_version::V1
+                                               ? v2::create_alignment_output_projection::all_fields()
+                                               : output_projection;
 
   // Convert variant_map and activity_map to Saola event_table, case_table and activity_to_case_join.
   utils::nullable_vec_t<cel_int_t> case_column_data;
@@ -139,7 +149,8 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces,
   const row_id case_table_row_count{ctl::cast<row_id>(deduped_traces.size())};
 
   auto align_model = align_model::create_align_model_tables{
-      activity_column, case_id_column, case_table_row_count, activity_to_case_join, bpmn_model_description, settings};
+      activity_column,        case_id_column, case_table_row_count,       activity_to_case_join,
+      bpmn_model_description, settings,       effective_output_projection};
 
   return starrocks::celonis::execute_and_return_status(
       [&] {

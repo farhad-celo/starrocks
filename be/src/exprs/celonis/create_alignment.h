@@ -30,7 +30,15 @@ public:
      */
     DEFINE_VECTORIZED_FN(create_alignment);
 
+    /**
+     * @param: [activityArray, json_bpmn_model_description, required_fields_mask]
+     * @paramType: [ARRAY_VARCHAR, VARCHAR, BIGINT]
+     * @return: STRUCT containing only the public fields selected by required_fields_mask in canonical mask order.
+     */
+    DEFINE_VECTORIZED_FN(create_alignment_v2);
+
     static Status create_alignment_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status create_alignment_v2_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status create_alignment_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 };
 

@@ -551,6 +551,7 @@ public class FunctionSet {
     public static final String CELONIS_CALC_CROP = "celonis_calc_crop";
     public static final String CELONIS_CALC_CROP_TO_NULL = "celonis_calc_crop_to_null";
     public static final String CELONIS_CREATE_ALIGNMENT = "celonis_create_alignment";
+    public static final String CELONIS_CREATE_ALIGNMENT_V2 = "celonis_create_alignment_v2";
     public static final String CELONIS_DEDUP_SORTED_BY = "celonis_dedup_sorted_by";
     public static final String CELONIS_GREATEST = "celonis_greatest";
     public static final String CELONIS_LEAST = "celonis_least";

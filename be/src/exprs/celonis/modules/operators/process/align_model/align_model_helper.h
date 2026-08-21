@@ -5,6 +5,7 @@
 
 #include "common/status.h"
 #include "common/statusor.h"
+#include "exprs/celonis/modules/operators/process/align_model/v2/create_alignment_output_projection.h"
 #include "exprs/celonis/result_table.h"
 #include "exprs/celonis/utils/proto_utils.h"
 
@@ -30,6 +31,8 @@ class AlignModelHelper {
                  celostar_align_model_version version);
   Status execute(const traces_t& traces, const starrocks::celonis::bpmn_model_description& bpmn_model_description,
                  celostar_align_model_version version);
+  Status execute(const traces_t& traces, const starrocks::celonis::bpmn_model_description& bpmn_model_description,
+                 celostar_align_model_version version, const v2::create_alignment_output_projection& output_projection);
 
   const ResultTable& result_table() { return *result_table_; }
 

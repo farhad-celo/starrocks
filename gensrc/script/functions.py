@@ -1434,8 +1434,10 @@ celostar_functions = [
     [1000601, 'celonis_align_model', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisAlignModel::align_model', 'CelonisAlignModel::align_model_prepare', 'CelonisAlignModel::align_model_close'],
     # The fields of STRUCT are set in ExpressionAnalyzer.java in FE.
     [1000602, 'celonis_align_model_v2', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisAlignModelV2::align_model_v2', 'CelonisAlignModelV2::align_model_v2_prepare', 'CelonisAlignModelV2::align_model_v2_close'],
-    # The fields of STRUCT are set in ExpressionAnalyzer.java in FE.
+    # The fields of STRUCT are set in FunctionAnalyzer.java in FE.
     [1000603, 'celonis_create_alignment', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisCreateAlignment::create_alignment', 'CelonisCreateAlignment::create_alignment_prepare', 'CelonisCreateAlignment::create_alignment_close'],
+    # The fields of STRUCT are set in FunctionAnalyzer.java in FE.
+    [1000604, 'celonis_create_alignment_v2', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR', 'BIGINT'], 'CelonisCreateAlignment::create_alignment_v2', 'CelonisCreateAlignment::create_alignment_v2_prepare', 'CelonisCreateAlignment::create_alignment_close'],
 
     [1000800, 'celonis_greatest', True, False, 'BIGINT', ['BIGINT', '...'], 'CelonisGreatestLeast::celonis_greatest'],
     [1000801, 'celonis_greatest', True, False, 'DOUBLE', ['DOUBLE', '...'], 'CelonisGreatestLeast::celonis_greatest'],

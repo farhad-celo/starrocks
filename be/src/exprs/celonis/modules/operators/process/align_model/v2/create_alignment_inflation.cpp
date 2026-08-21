@@ -72,76 +72,73 @@ struct association_alignment_index_col {
 };
 
 struct alignment_columns {
-  static alignment_columns make(ResultTable& table, std::string_view prefix) {
-    return alignment_columns{table.AddColumn<variant_col::value_type>(variant_col::name),
-                             table.AddColumn<alignment_model_vertex_id_col::value_type>(
-                                 fmt::format("{}_{}", prefix, alignment_model_vertex_id_col::name)),
-                             table.AddColumn<alignment_vertex_label_col::value_type>(
-                                 fmt::format("{}_{}", prefix, alignment_vertex_label_col::name)),
-                             table.AddColumn<alignment_move_type_col::value_type>(
-                                 fmt::format("{}_{}", prefix, alignment_move_type_col::name)),
-                             table.AddColumn<alignment_activity_index_col::value_type>(
-                                 fmt::format("{}_{}", prefix, alignment_activity_index_col::name)),
-                             table.AddColumn<alignment_deviation_category_col::value_type>(
-                                 fmt::format("{}_{}", prefix, alignment_deviation_category_col::name))};
+  static alignment_columns make(ResultTable& table, std::string_view prefix,
+                                const create_alignment_output_projection& projection) {
+    return alignment_columns{
+        projection.includes_internal_variant() ? &table.AddColumn<variant_col::value_type>(variant_col::name) : nullptr,
+        projection.contains(alignment_output_column::MODEL_VERTEX_ID)
+            ? &table.AddColumn<alignment_model_vertex_id_col::value_type>(
+                  fmt::format("{}_{}", prefix, alignment_model_vertex_id_col::name))
+            : nullptr,
+        projection.contains(alignment_output_column::VERTEX_LABEL)
+            ? &table.AddColumn<alignment_vertex_label_col::value_type>(
+                  fmt::format("{}_{}", prefix, alignment_vertex_label_col::name))
+            : nullptr,
+        projection.contains(alignment_output_column::MOVE_TYPE)
+            ? &table.AddColumn<alignment_move_type_col::value_type>(
+                  fmt::format("{}_{}", prefix, alignment_move_type_col::name))
+            : nullptr,
+        projection.contains(alignment_output_column::ACTIVITY_INDEX)
+            ? &table.AddColumn<alignment_activity_index_col::value_type>(
+                  fmt::format("{}_{}", prefix, alignment_activity_index_col::name))
+            : nullptr,
+        projection.contains(alignment_output_column::DEVIATION_CATEGORY)
+            ? &table.AddColumn<alignment_deviation_category_col::value_type>(
+                  fmt::format("{}_{}", prefix, alignment_deviation_category_col::name))
+            : nullptr};
   }
-  ResultColumn<variant_col::value_type>& variant;
-  ResultColumn<alignment_model_vertex_id_col::value_type>& model_vertex_id;
-  ResultColumn<alignment_vertex_label_col::value_type>& vertex_label;
-  ResultColumn<alignment_move_type_col::value_type>& move_type;
-  ResultColumn<alignment_activity_index_col::value_type>& activity_index;
-  ResultColumn<alignment_deviation_category_col::value_type>& deviation_category;
-
- private:
-  alignment_columns(ResultColumn<variant_col::value_type>& variant,
-                    ResultColumn<alignment_model_vertex_id_col::value_type>& model_vertex_id,
-                    ResultColumn<alignment_vertex_label_col::value_type>& vertex_label,
-                    ResultColumn<alignment_move_type_col::value_type>& move_type,
-                    ResultColumn<alignment_activity_index_col::value_type>& activity_index,
-                    ResultColumn<alignment_deviation_category_col::value_type>& deviation_category)
-      : variant(variant),
-        model_vertex_id(model_vertex_id),
-        vertex_label(vertex_label),
-        move_type(move_type),
-        activity_index(activity_index),
-        deviation_category(deviation_category){};
+  ResultColumn<variant_col::value_type>* variant;
+  ResultColumn<alignment_model_vertex_id_col::value_type>* model_vertex_id;
+  ResultColumn<alignment_vertex_label_col::value_type>* vertex_label;
+  ResultColumn<alignment_move_type_col::value_type>* move_type;
+  ResultColumn<alignment_activity_index_col::value_type>* activity_index;
+  ResultColumn<alignment_deviation_category_col::value_type>* deviation_category;
 };
 
 struct association_columns {
-  static association_columns make(ResultTable& table, std::string_view prefix) {
-    return association_columns{table.AddColumn<association_edge_class_col::value_type>(
-                                   fmt::format("{}_{}", prefix, association_edge_class_col::name)),
-                               table.AddColumn<association_alignment_index_col::value_type>(
-                                   fmt::format("{}_{}", prefix, association_alignment_index_col::name)),
-                               table.AddColumn<alignment_model_vertex_id_col::value_type>(
-                                   fmt::format("{}_{}", prefix, alignment_model_vertex_id_col::name)),
-                               table.AddColumn<alignment_vertex_label_col::value_type>(
-                                   fmt::format("{}_{}", prefix, alignment_vertex_label_col::name)),
-                               table.AddColumn<alignment_move_type_col::value_type>(
-                                   fmt::format("{}_{}", prefix, alignment_move_type_col::name)),
-                               table.AddColumn<alignment_deviation_category_col::value_type>(
-                                   fmt::format("{}_{}", prefix, alignment_deviation_category_col::name))};
+  static association_columns make(ResultTable& table, std::string_view prefix, edge_type type,
+                                  const create_alignment_output_projection& projection) {
+    return association_columns{projection.contains(type, association_output_column::EDGE_CLASS)
+                                   ? &table.AddColumn<association_edge_class_col::value_type>(
+                                         fmt::format("{}_{}", prefix, association_edge_class_col::name))
+                                   : nullptr,
+                               projection.contains(type, association_output_column::ALIGNMENT_INDEX)
+                                   ? &table.AddColumn<association_alignment_index_col::value_type>(
+                                         fmt::format("{}_{}", prefix, association_alignment_index_col::name))
+                                   : nullptr,
+                               projection.contains(type, association_output_column::MODEL_VERTEX_ID)
+                                   ? &table.AddColumn<alignment_model_vertex_id_col::value_type>(
+                                         fmt::format("{}_{}", prefix, alignment_model_vertex_id_col::name))
+                                   : nullptr,
+                               projection.contains(type, association_output_column::VERTEX_LABEL)
+                                   ? &table.AddColumn<alignment_vertex_label_col::value_type>(
+                                         fmt::format("{}_{}", prefix, alignment_vertex_label_col::name))
+                                   : nullptr,
+                               projection.contains(type, association_output_column::MOVE_TYPE)
+                                   ? &table.AddColumn<alignment_move_type_col::value_type>(
+                                         fmt::format("{}_{}", prefix, alignment_move_type_col::name))
+                                   : nullptr,
+                               projection.contains(type, association_output_column::DEVIATION_CATEGORY)
+                                   ? &table.AddColumn<alignment_deviation_category_col::value_type>(
+                                         fmt::format("{}_{}", prefix, alignment_deviation_category_col::name))
+                                   : nullptr};
   }
-  ResultColumn<association_edge_class_col::value_type>& edge_class;
-  ResultColumn<association_alignment_index_col::value_type>& alignment_index;
-  ResultColumn<alignment_model_vertex_id_col::value_type>& model_vertex_id;
-  ResultColumn<alignment_vertex_label_col::value_type>& vertex_label;
-  ResultColumn<alignment_move_type_col::value_type>& move_type;
-  ResultColumn<alignment_deviation_category_col::value_type>& deviation_category;
-
- private:
-  association_columns(ResultColumn<association_edge_class_col::value_type>& edge_class,
-                      ResultColumn<association_alignment_index_col::value_type>& alignment_index,
-                      ResultColumn<alignment_model_vertex_id_col::value_type>& model_vertex_id,
-                      ResultColumn<alignment_vertex_label_col::value_type>& vertex_label,
-                      ResultColumn<alignment_move_type_col::value_type>& move_type,
-                      ResultColumn<alignment_deviation_category_col::value_type>& deviation_category)
-      : edge_class(edge_class),
-        alignment_index(alignment_index),
-        model_vertex_id(model_vertex_id),
-        vertex_label(vertex_label),
-        move_type(move_type),
-        deviation_category(deviation_category){};
+  ResultColumn<association_edge_class_col::value_type>* edge_class;
+  ResultColumn<association_alignment_index_col::value_type>* alignment_index;
+  ResultColumn<alignment_model_vertex_id_col::value_type>* model_vertex_id;
+  ResultColumn<alignment_vertex_label_col::value_type>* vertex_label;
+  ResultColumn<alignment_move_type_col::value_type>* move_type;
+  ResultColumn<alignment_deviation_category_col::value_type>* deviation_category;
 };
 
 using buffer_lookup_t = std::unordered_set<std::string_view>;
@@ -327,7 +324,8 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                               const memory::column_ptrs_t& case_to_trace_ptrs,
                               const bpmn::bpmn_to_string_t& bpmn_to_string, const memory::column_t& activity_column,
                               const memory::column_ptrs_abstract& case_id_column, size_t grain_size,
-                              common::execution_context& context) {
+                              common::execution_context& context,
+                              const create_alignment_output_projection& output_projection) {
   // #lizard forgives
   const auto condensed_alignments(
       compute_filtered_alignments(full_alignments, [](const alignment_move& move) { return !move.is_gateway_move(); }));
@@ -337,18 +335,27 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
   const auto& variant_table_size = table_sizes.variant_table_size;
 
   auto result_table = std::make_unique<ResultTable>("align_model", variant_table_size);
-  auto alignment_cols{alignment_columns::make(*result_table, "alignment")};
-  edge_type_array<association_columns> association_columns_per_edge_type{
-      for_each_edge_type<association_columns>([&result_table](const edge_type type) {
-        return association_columns::make(*result_table, edge_type_to_string_v2(type));
-      })};
+  auto alignment_cols{alignment_columns::make(*result_table, "alignment", output_projection)};
+  edge_type_array<std::optional<association_columns>> association_columns_per_edge_type{
+      for_each_edge_type<std::optional<association_columns>>(
+          [&result_table, &output_projection](const edge_type type) -> std::optional<association_columns> {
+            if (!output_projection.any_field_for_edge_type(type)) {
+              return std::nullopt;
+            }
+            return std::optional{
+                association_columns::make(*result_table, edge_type_to_string_v2(type), type, output_projection)};
+          })};
 
   // maps petri net label ids to strings to create alignment_labels - uses either the string dictionary (e.g. for
   // unmapped activities) or the bpmn model
-  auto alignment_label_buffer_with_lookup{
-      create_merged_buffer_for_alignment_labels(bpmn_to_string, *activity_column->get_string_dict(context), context)};
-  const petri_net_label_id_to_string_mapper petri_net_to_string_mapper{
-      bpmn_to_string, *activity_column->get_string_dict(context), alignment_label_buffer_with_lookup.buffer_lookup};
+  std::optional<buffer_with_lookup> alignment_label_buffer_with_lookup;
+  std::optional<petri_net_label_id_to_string_mapper> petri_net_to_string_mapper;
+  if (output_projection.needs_vertex_labels()) {
+    alignment_label_buffer_with_lookup.emplace(
+        create_merged_buffer_for_alignment_labels(bpmn_to_string, *activity_column->get_string_dict(context), context));
+    petri_net_to_string_mapper.emplace(petri_net_label_id_to_string_mapper{
+        bpmn_to_string, *activity_column->get_string_dict(context), alignment_label_buffer_with_lookup->buffer_lookup});
+  }
 
   // Create the data columns for the 3 tables and the corresponding join vectors:
   tbb::parallel_for_each(
@@ -360,7 +367,8 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
        &replay_results = std::as_const(replay_results),
        &petri_net_to_string_mapper = std::as_const(petri_net_to_string_mapper), &context,
        &association_columns_per_edge_type, &condensed_alignments = std::as_const(condensed_alignments),
-       &deviation_categories = std::as_const(deviation_categories)](const parallel_block& block) {
+       &deviation_categories = std::as_const(deviation_categories),
+       &output_projection = std::as_const(output_projection)](const parallel_block& block) {
         memory::cast_execute_column_pointers(
             [&](auto tup) {
               const auto activity_accessor{std::get<0>(tup).get_const_accessor()};
@@ -372,7 +380,8 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
               const auto& activity_to_case_join_vec{std::get<3>(tup)};
 
               auto current_variant_row{block.offset_variant};
-              const auto activity_dict{activity_column->get_string_dict(context)};
+              const auto activity_dict{alignment_cols.variant != nullptr ? activity_column->get_string_dict(context)
+                                                                         : nullptr};
               ctl::deprecated::for_each_group(
                   block.offset_in, block.offset_in + block.size_in, case_accessor, [&](auto interval) {
                     const auto activity_table_case_id_col_row{interval.begin()};
@@ -389,11 +398,8 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                     const auto& optional_full_alignment_for_case{full_alignments.at(variant_trace_id)};
                     const auto& optional_condensed_alignment_for_case{condensed_alignments.at(variant_trace_id)};
                     const auto& optional_replay_result_for_case{replay_results.at(variant_trace_id)};
-                    const auto& deviation_categories_for_case{deviation_categories.at(variant_trace_id)};
                     debug_assert(optional_full_alignment_for_case.has_value() ==
                                  optional_replay_result_for_case.has_value());
-                    debug_assert(optional_full_alignment_for_case.has_value() ==
-                                 !deviation_categories_for_case.empty());
                     debug_assert(optional_full_alignment_for_case.has_value() ==
                                  optional_condensed_alignment_for_case.has_value());
                     if (!optional_full_alignment_for_case || !optional_replay_result_for_case ||
@@ -403,119 +409,167 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                     const auto& alignment_for_case{optional_full_alignment_for_case.value()};
                     const auto& condensed_alignment_for_case{optional_condensed_alignment_for_case.value()};
                     const auto& replay_result_for_case{optional_replay_result_for_case.value()};
+                    const deviation_categories_for_case_t* deviation_categories_for_case{nullptr};
+                    if (output_projection.needs_deviation_categories()) {
+                      deviation_categories_for_case = &deviation_categories.at(variant_trace_id);
+                      debug_assert(!deviation_categories_for_case->empty());
+                    }
 
                     // 1. Fill the edge tables
                     // A counter for the current edge class id. Each edge type has its own counter as it is saola.
                     // Having separate counters for each type is not really necessary and a global counter is simpler to
                     // implement, but for now I would like to keep the implementation changes minimal.
-                    edge_type_array<size_t> edge_class_id{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
-                    edge_type_array<size_t> edges_per_type{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
-                    for (const auto& component : replay_result_for_case.components()) {
-                      edges_per_type.at(component.component_type) += component.size();
-                    }
-                    for (const auto type : EDGE_TYPES) {
-                      auto& association_cols{association_columns_per_edge_type.at(type)};
-                      const auto reserve_size{edges_per_type.at(type)};
-                      association_cols.edge_class.at(current_variant_row).reserve(reserve_size);
-                      association_cols.alignment_index.at(current_variant_row).reserve(reserve_size);
-                      association_cols.model_vertex_id.at(current_variant_row).reserve(reserve_size);
-                      association_cols.vertex_label.at(current_variant_row).reserve(reserve_size);
-                      association_cols.move_type.at(current_variant_row).reserve(reserve_size);
-                      association_cols.deviation_category.at(current_variant_row).reserve(reserve_size);
-                    }
-
-                    for (row_id id = 0; id < replay_result_for_case.components().size(); id++) {
-                      const auto& component{replay_result_for_case.components().at(id)};
-                      // Each component contains only a single edge type, fetch those columns
-                      auto& association_cols{association_columns_per_edge_type.at(component.component_type)};
-
-                      for (size_t vertex_id : component.edges_as_vertices) {
-                        association_cols.edge_class.at(current_variant_row)
-                            .push_back(edge_class_id.at(component.component_type));
-                        // represent edges by joining to the correct row in the alignment table, for each vertex in the
-                        // component
-                        // the aligned_variant_vertex_id is just an index into the alignment, to find the right join
-                        // partner on  the alignment table we need to first determine which preceding move in the
-                        // alignment this one joins to via the `preceding_move_join_map`, then determine the position of
-                        // that move in the condensed alignment via `map_full_alignment_to_condensed_for_case` and then
-                        // offset by start of the current alignment block.
-                        association_cols.alignment_index.at(current_variant_row)
-                            .push_back(condensed_alignment_for_case.get_full_to_condensed_idx_map().left.at(
-                                replay_result_for_case.alignment_to_preceding_move().at(vertex_id)));
-
-                        const auto& move{alignment_for_case.at(vertex_id)};
-                        // Write MODEL_VERTEX_ID column
-                        if (move.move_on_model()) {
-                          association_cols.model_vertex_id.at(current_variant_row)
-                              .push_back(move.move_on_model().value());
-                        } else {
-                          association_cols.model_vertex_id.at(current_variant_row).emplace_back();
+                    if (output_projection.any_association_field()) {
+                      edge_type_array<size_t> edge_class_id{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
+                      edge_type_array<size_t> edges_per_type{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
+                      for (const auto& component : replay_result_for_case.components()) {
+                        if (output_projection.any_field_for_edge_type(component.component_type)) {
+                          edges_per_type.at(component.component_type) += component.size();
                         }
-                        association_cols.vertex_label.at(current_variant_row)
-                            .emplace_back(petri_net_to_string_mapper(move));
-                        association_cols.move_type.at(current_variant_row)
-                            .emplace_back(alignment_move_to_string(move.move_type()));
-                        association_cols.deviation_category.at(current_variant_row)
-                            .emplace_back(deviation_category_to_string(deviation_categories_for_case.at(vertex_id)));
                       }
-                      edge_class_id.at(component.component_type)++;
+                      for (const auto type : EDGE_TYPES) {
+                        if (!output_projection.any_field_for_edge_type(type)) {
+                          continue;
+                        }
+                        auto& association_cols{association_columns_per_edge_type.at(type).value()};
+                        const auto reserve_size{edges_per_type.at(type)};
+                        if (association_cols.edge_class != nullptr) {
+                          association_cols.edge_class->at(current_variant_row).reserve(reserve_size);
+                        }
+                        if (association_cols.alignment_index != nullptr) {
+                          association_cols.alignment_index->at(current_variant_row).reserve(reserve_size);
+                        }
+                        if (association_cols.model_vertex_id != nullptr) {
+                          association_cols.model_vertex_id->at(current_variant_row).reserve(reserve_size);
+                        }
+                        if (association_cols.vertex_label != nullptr) {
+                          association_cols.vertex_label->at(current_variant_row).reserve(reserve_size);
+                        }
+                        if (association_cols.move_type != nullptr) {
+                          association_cols.move_type->at(current_variant_row).reserve(reserve_size);
+                        }
+                        if (association_cols.deviation_category != nullptr) {
+                          association_cols.deviation_category->at(current_variant_row).reserve(reserve_size);
+                        }
+                      }
+
+                      for (const auto& component : replay_result_for_case.components()) {
+                        if (!output_projection.any_field_for_edge_type(component.component_type)) {
+                          continue;
+                        }
+                        auto& association_cols{association_columns_per_edge_type.at(component.component_type).value()};
+
+                        for (size_t vertex_id : component.edges_as_vertices) {
+                          if (association_cols.edge_class != nullptr) {
+                            association_cols.edge_class->at(current_variant_row)
+                                .push_back(edge_class_id.at(component.component_type));
+                          }
+                          if (association_cols.alignment_index != nullptr) {
+                            association_cols.alignment_index->at(current_variant_row)
+                                .push_back(condensed_alignment_for_case.get_full_to_condensed_idx_map().left.at(
+                                    replay_result_for_case.alignment_to_preceding_move().at(vertex_id)));
+                          }
+
+                          const auto& move{alignment_for_case.at(vertex_id)};
+                          if (association_cols.model_vertex_id != nullptr) {
+                            if (move.move_on_model()) {
+                              association_cols.model_vertex_id->at(current_variant_row)
+                                  .push_back(move.move_on_model().value());
+                            } else {
+                              association_cols.model_vertex_id->at(current_variant_row).emplace_back();
+                            }
+                          }
+                          if (association_cols.vertex_label != nullptr) {
+                            debug_assert(petri_net_to_string_mapper.has_value());
+                            association_cols.vertex_label->at(current_variant_row)
+                                .emplace_back(petri_net_to_string_mapper.value()(move));
+                          }
+                          if (association_cols.move_type != nullptr) {
+                            association_cols.move_type->at(current_variant_row)
+                                .emplace_back(alignment_move_to_string(move.move_type()));
+                          }
+                          if (association_cols.deviation_category != nullptr) {
+                            debug_assert(deviation_categories_for_case != nullptr);
+                            association_cols.deviation_category->at(current_variant_row)
+                                .emplace_back(
+                                    deviation_category_to_string(deviation_categories_for_case->at(vertex_id)));
+                          }
+                        }
+                        edge_class_id.at(component.component_type)++;
+                      }
                     }
 
                     // 3. Fill ALIGNMENT table column data and join to Activity table
                     // copy the alignment (ids/move types) for each case into the arrays
-                    auto alignment_size = condensed_alignment_for_case.get_alignment().size();
-                    alignment_cols.variant.at(current_variant_row).reserve(interval.end() - interval.begin());
-                    for (auto i{interval.begin()}; i < interval.end(); ++i) {
-                      const auto activity_dict_id{activity_accessor.at(i)};
-                      alignment_cols.variant.at(current_variant_row)
-                          .emplace_back(activity_dict->get_string_value(activity_dict_id));
+                    const auto alignment_size{condensed_alignment_for_case.get_alignment().size()};
+                    if (alignment_cols.variant != nullptr) {
+                      alignment_cols.variant->at(current_variant_row).reserve(interval.end() - interval.begin());
+                      for (auto i{interval.begin()}; i < interval.end(); ++i) {
+                        const auto activity_dict_id{activity_accessor.at(i)};
+                        alignment_cols.variant->at(current_variant_row)
+                            .emplace_back(activity_dict->get_string_value(activity_dict_id));
+                      }
                     }
-                    alignment_cols.model_vertex_id.at(current_variant_row).reserve(alignment_size);
-                    alignment_cols.vertex_label.at(current_variant_row).reserve(alignment_size);
-                    alignment_cols.move_type.at(current_variant_row).reserve(alignment_size);
-                    alignment_cols.activity_index.at(current_variant_row).reserve(alignment_size);
-                    for (size_t offset{0}; offset != alignment_size; ++offset) {
-                      const auto& move{condensed_alignment_for_case.get_alignment().at(offset)};
-                      alignment_cols.vertex_label.at(current_variant_row)
-                          .emplace_back(petri_net_to_string_mapper(move));
-                      alignment_cols.move_type.at(current_variant_row)
-                          .emplace_back(alignment_move_to_string(move.move_type()));
-                      alignment_cols.deviation_category.at(current_variant_row)
-                          .emplace_back(deviation_category_to_string(deviation_categories_for_case.at(
-                              condensed_alignment_for_case.get_full_to_condensed_idx_map().right.at(offset))));
-                      if (move.move_on_model()) {
-                        alignment_cols.model_vertex_id.at(current_variant_row).push_back(move.move_on_model().value());
-                      } else {
-                        alignment_cols.model_vertex_id.at(current_variant_row).emplace_back();
+                    if (alignment_cols.model_vertex_id != nullptr) {
+                      alignment_cols.model_vertex_id->at(current_variant_row).reserve(alignment_size);
+                    }
+                    if (alignment_cols.vertex_label != nullptr) {
+                      alignment_cols.vertex_label->at(current_variant_row).reserve(alignment_size);
+                    }
+                    if (alignment_cols.move_type != nullptr) {
+                      alignment_cols.move_type->at(current_variant_row).reserve(alignment_size);
+                    }
+                    if (alignment_cols.deviation_category != nullptr) {
+                      alignment_cols.deviation_category->at(current_variant_row).reserve(alignment_size);
+                    }
+                    if (alignment_cols.model_vertex_id != nullptr || alignment_cols.vertex_label != nullptr ||
+                        alignment_cols.move_type != nullptr || alignment_cols.deviation_category != nullptr) {
+                      for (size_t offset{0}; offset != alignment_size; ++offset) {
+                        const auto& move{condensed_alignment_for_case.get_alignment().at(offset)};
+                        if (alignment_cols.vertex_label != nullptr) {
+                          debug_assert(petri_net_to_string_mapper.has_value());
+                          alignment_cols.vertex_label->at(current_variant_row)
+                              .emplace_back(petri_net_to_string_mapper.value()(move));
+                        }
+                        if (alignment_cols.move_type != nullptr) {
+                          alignment_cols.move_type->at(current_variant_row)
+                              .emplace_back(alignment_move_to_string(move.move_type()));
+                        }
+                        if (alignment_cols.deviation_category != nullptr) {
+                          debug_assert(deviation_categories_for_case != nullptr);
+                          alignment_cols.deviation_category->at(current_variant_row)
+                              .emplace_back(deviation_category_to_string(deviation_categories_for_case->at(
+                                  condensed_alignment_for_case.get_full_to_condensed_idx_map().right.at(offset))));
+                        }
+                        if (alignment_cols.model_vertex_id != nullptr) {
+                          if (move.move_on_model()) {
+                            alignment_cols.model_vertex_id->at(current_variant_row)
+                                .push_back(move.move_on_model().value());
+                          } else {
+                            alignment_cols.model_vertex_id->at(current_variant_row).emplace_back();
+                          }
+                        }
                       }
                     }
 
-                    auto variant_idx_to_row_map{compute_variant_idx_to_case_idx_map(interval, activity_accessor)};
+                    if (alignment_cols.activity_index != nullptr) {
+                      alignment_cols.activity_index->at(current_variant_row).reserve(alignment_size);
+                      const auto variant_idx_to_row_map{
+                          compute_variant_idx_to_case_idx_map(interval, activity_accessor)};
 
-                    for (size_t condensed_alignment_idx{0};
-                         condensed_alignment_idx < condensed_alignment_for_case.get_alignment().size();
-                         condensed_alignment_idx++) {
-                      // To find the right join partner for this move in the condensed alignment we first need to map it
-                      // back to the index in the full alignment via `full_to_condensed_idx_map` full_alignment_idx is
-                      // an index into the alignment. i.e. it points to a move.
-                      const auto full_alignment_idx{
-                          condensed_alignment_for_case.get_full_to_condensed_idx_map().right.at(
-                              condensed_alignment_idx)};
-                      // Then we map the move in the full alignment to the preceding LOG or SYNC_MOVE in the alignment,
-                      // full_alignment_preceding_move still points to a move in the full alignment
-                      const auto full_alignment_preceding_move{
-                          replay_result_for_case.alignment_to_preceding_move().at(full_alignment_idx)};
-                      // Then we map this to an index into the variant, which points to an activity
-                      const auto variant_idx{
-                          replay_result_for_case.alignment_idx_to_log_idx().at(full_alignment_preceding_move)};
-                      // Then we map the index into the variant to an index into the case (these indices may
-                      // differ if the case has null activities, e.g. B in case <A,null,B> would have variant
-                      // index 1 but case index 2)
-                      const auto case_idx{variant_idx_to_row_map.at(variant_idx)};
-                      // Finally we offset this by the begin of the current interval to get the right index relative to
-                      // the case start
-                      alignment_cols.activity_index.at(current_variant_row)
-                          .push_back(ctl::cast<row_id>(case_idx - interval.begin()));
+                      for (size_t condensed_alignment_idx{0}; condensed_alignment_idx < alignment_size;
+                           condensed_alignment_idx++) {
+                        const auto full_alignment_idx{
+                            condensed_alignment_for_case.get_full_to_condensed_idx_map().right.at(
+                                condensed_alignment_idx)};
+                        const auto full_alignment_preceding_move{
+                            replay_result_for_case.alignment_to_preceding_move().at(full_alignment_idx)};
+                        const auto variant_idx{
+                            replay_result_for_case.alignment_idx_to_log_idx().at(full_alignment_preceding_move)};
+                        const auto case_idx{variant_idx_to_row_map.at(variant_idx)};
+                        alignment_cols.activity_index->at(current_variant_row)
+                            .push_back(ctl::cast<row_id>(case_idx - interval.begin()));
+                      }
                     }
                     current_variant_row++;
                   });
@@ -537,11 +591,12 @@ memory::table_group_t create_tables(const alignments_t& alignments, const replay
                                     const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
                                     const memory::column_t& activity_column, const memory::column_t& case_id_column,
                                     const memory::join_projection_vector_t& activity_to_case_join,
-                                    const common::execution_context& context, size_t grain_size) {
+                                    const common::execution_context& context, size_t grain_size,
+                                    const create_alignment_output_projection& output_projection) {
   auto create_tables_context{context.create_sub_context("create_tables", {})};
   return inflate(alignments, replay_results, deviation_categories, activity_to_case_join,
                  variants->get_case_to_trace_col_ptrs().value(), bpmn_to_string, activity_column,
-                 case_id_column->get_column_pointers(context), grain_size, create_tables_context);
+                 case_id_column->get_column_pointers(context), grain_size, create_tables_context, output_projection);
 }
 
 }  // namespace celonis::accelerator::operators::process::align_model::v2

@@ -2,7 +2,9 @@
 
 #include <fmt/format.h>
 
+#include <memory>
 #include <optional>
+#include <variant>
 #include <vector>
 
 #include "column/array_column.h"
@@ -11,13 +13,12 @@
 #include "column/struct_column.h"
 #include "exprs/anyval_util.h"
 #include "exprs/celonis/modules/operators/process/align_model/align_model_helper.h"
-#include "exprs/celonis/modules/operators/process/align_model/align_model_types_proxy.h"
-#include "modules/operators/process/align_model/align_model_types_proxy.h"
+#include "exprs/celonis/modules/operators/process/align_model/v2/create_alignment_output_projection.h"
 #include "util.h"
 
 using celonis::accelerator::operators::process::align_model::AlignModelHelper;
-using celonis::accelerator::operators::process::align_model::cs_edge_type_to_string_v2;
-using celonis::accelerator::operators::process::align_model::CS_EDGE_TYPES;
+using celonis::accelerator::operators::process::align_model::v2::create_alignment_output_projection;
+using celonis::accelerator::operators::process::align_model::v2::create_alignment_output_value_type;
 using row_id = int32_t;
 
 namespace starrocks {
@@ -60,44 +61,87 @@ void AddNulls(Columns& fields) {
     }
 }
 
-std::unordered_map<std::string, int> string_to_idx_map(const std::vector<std::string>& vec) {
-    std::unordered_map<std::string, int> result;
+} // namespace
 
-    for (size_t i = 0; i < vec.size(); ++i) {
-        result.emplace(vec[i], i);
+struct CreateAlignmentStateFragmentLocal {
+    CreateAlignmentStateFragmentLocal(celonis::bpmn_model_description model,
+                                      create_alignment_output_projection projection)
+            : bpmn_model_description(std::move(model)), output_projection(std::move(projection)) {}
+
+    const celonis::bpmn_model_description bpmn_model_description;
+    const create_alignment_output_projection output_projection;
+};
+
+namespace {
+
+StatusOr<std::optional<celonis::bpmn_model_description>> parse_model_argument(FunctionContext* context,
+                                                                              std::string_view function_name) {
+    if (!context->is_constant_column(1)) {
+        return Status::InvalidArgument(
+                fmt::format("The second parameter of {}() only accepts a literal value", function_name));
+    }
+    if (!context->is_notnull_constant_column(1)) {
+        return std::nullopt;
     }
 
-    return result;
+    const auto json_bpmn_model_description =
+            ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(1)).to_string();
+    auto bpmn_model_description = AlignModelHelper::parse_bpmn_model_description(json_bpmn_model_description);
+    if (!bpmn_model_description.ok()) {
+        return bpmn_model_description.status();
+    }
+    return std::optional<celonis::bpmn_model_description>{std::move(bpmn_model_description).value()};
+}
+
+Status prepare_create_alignment(FunctionContext* context, FunctionContext::FunctionStateScope scope,
+                                create_alignment_output_projection output_projection, std::string_view function_name) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+
+    ASSIGN_OR_RETURN(auto bpmn_model_description, parse_model_argument(context, function_name));
+    if (!bpmn_model_description.has_value()) {
+        return Status::OK();
+    }
+
+    auto state = std::make_unique<CreateAlignmentStateFragmentLocal>(std::move(bpmn_model_description).value(),
+                                                                     std::move(output_projection));
+    context->set_function_state(scope, state.get());
+    state.release();
+    return Status::OK();
 }
 
 } // namespace
 
-struct CreateAlignmentStateFragmentLocal {
-    const celonis::bpmn_model_description bpmn_model_description;
-};
-
 Status CelonisCreateAlignment::create_alignment_prepare(FunctionContext* context,
                                                         FunctionContext::FunctionStateScope scope) {
-    if (scope == FunctionContext::FRAGMENT_LOCAL) {
-        if (!context->is_constant_column(1)) {
-            return Status::InvalidArgument(
-                    "The second parameter of celonis_create_alignment() only accepts a literal value");
-        }
-        if (!context->is_notnull_constant_column(1)) {
-            return Status::OK();
-        }
-        // As of 2023-10-11, get_const_value() is not thread-safe. So it shouldn't be called in align_model().
-        const auto json_bpmn_model_description =
-                ColumnHelper::get_const_value<TYPE_VARCHAR>(context->get_constant_column(1)).to_string();
-        auto bpmn_model_description = AlignModelHelper::parse_bpmn_model_description(json_bpmn_model_description);
-        if (!bpmn_model_description.ok()) {
-            return bpmn_model_description.status();
-        }
-        auto state = new CreateAlignmentStateFragmentLocal{std::move(bpmn_model_description).value()};
-        context->set_function_state(scope, state);
+    return prepare_create_alignment(context, scope, create_alignment_output_projection::all_fields(),
+                                    "celonis_create_alignment");
+}
+
+Status CelonisCreateAlignment::create_alignment_v2_prepare(FunctionContext* context,
+                                                           FunctionContext::FunctionStateScope scope) {
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+    const auto* mask_type = context->get_arg_type(2);
+    if (mask_type == nullptr || mask_type->type != TYPE_BIGINT) {
+        return Status::InvalidArgument(
+                "The third parameter required_fields_mask of celonis_create_alignment_v2() must have type BIGINT");
+    }
+    if (!context->is_constant_column(2)) {
+        return Status::InvalidArgument(
+                "The third parameter required_fields_mask of celonis_create_alignment_v2() must be constant");
+    }
+    if (!context->is_notnull_constant_column(2)) {
+        return Status::InvalidArgument(
+                "The third parameter required_fields_mask of celonis_create_alignment_v2() must not be NULL");
     }
 
-    return Status::OK();
+    const auto mask = ColumnHelper::get_const_value<TYPE_BIGINT>(context->get_constant_column(2));
+    ASSIGN_OR_RETURN(auto output_projection, create_alignment_output_projection::from_mask_and_return_fields(
+                                                     mask, context->get_return_type().field_names));
+    return prepare_create_alignment(context, scope, std::move(output_projection), "celonis_create_alignment_v2");
 }
 
 Status CelonisCreateAlignment::create_alignment_close(FunctionContext* context,
@@ -110,11 +154,22 @@ Status CelonisCreateAlignment::create_alignment_close(FunctionContext* context,
     return Status::OK();
 }
 
-StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* context, const Columns& columns) {
+namespace {
+
+using model_vertex_id_column = std::vector<std::optional<size_t>>;
+using string_column = std::vector<std::string>;
+using row_id_column = std::vector<row_id>;
+using result_column_source =
+        std::variant<const celonis::ResultColumn<model_vertex_id_column>*, const celonis::ResultColumn<string_column>*,
+                     const celonis::ResultColumn<row_id_column>*>;
+
+StatusOr<ColumnPtr> create_alignment_impl(FunctionContext* context, const Columns& columns,
+                                          std::string_view function_name) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     const auto* align_model_state_fragment_local = reinterpret_cast<const CreateAlignmentStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
     const auto& bpmn_model_description = align_model_state_fragment_local->bpmn_model_description;
+    const auto& output_projection = align_model_state_fragment_local->output_projection;
 
     ColumnPtr res = context->create_column(context->get_return_type(), false);
 
@@ -164,44 +219,35 @@ StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* co
     DCHECK_EQ(row_to_case_index.size(), chunk_size);
 
     AlignModelHelper helper;
-    RETURN_IF_ERROR(
-            helper.execute(deduped_cases, bpmn_model_description, AlignModelHelper::celostar_align_model_version::V2));
+    RETURN_IF_ERROR(helper.execute(deduped_cases, bpmn_model_description,
+                                   AlignModelHelper::celostar_align_model_version::V2, output_projection));
     const auto& result_table = helper.result_table();
 
-    // TODO(m.dierschke): Refactor this code for clarity and maintainability.
     // TODO(m.dierschke) Consider writing directly into starrocks columns instead of using an intermediate format.
     // TODO(m.dierschke) If an intermediate format is needed, consider using CRTP instead of hardcoded polymorphism.
-    using model_vertex_id_column = std::vector<std::optional<size_t>>;
-    using vertex_label_column = std::vector<std::string>;
-    using move_type_column = std::vector<std::string>;
-    using deviation_category_column = std::vector<std::string>;
-    using activity_index_column = std::vector<row_id>;
-    using edge_class_column = std::vector<row_id>;
-
-    constexpr std::string_view MODEL_VERTEX_ID_SUFFIX{"model_vertex_id"};
-    constexpr std::string_view VERTEX_LABEL_SUFFIX{"vertex_label"};
-    constexpr std::string_view MOVE_TYPE_SUFFIX{"move_type"};
-    constexpr std::string_view DEVIATION_CATEGORY_SUFFIX{"deviation_category"};
-    constexpr std::string_view ACTIVITY_INDEX_SUFFIX{"activity_index"};
-    constexpr std::string_view EDGE_CLASS_SUFFIX{"edge_class"};
-    constexpr std::string_view ALIGNMENT_INDEX_SUFFIX{"alignment_index"};
-    constexpr std::string_view ALIGNMENT_PREFIX{"alignment"};
-
-    const std::string alignment_model_vertex_id_name{fmt::format("{}_{}", ALIGNMENT_PREFIX, MODEL_VERTEX_ID_SUFFIX)};
-    const std::string alignment_vertex_label_name{fmt::format("{}_{}", ALIGNMENT_PREFIX, VERTEX_LABEL_SUFFIX)};
-    const std::string alignment_move_type_name{fmt::format("{}_{}", ALIGNMENT_PREFIX, MOVE_TYPE_SUFFIX)};
-    const std::string alignment_deviation_category_name{
-            fmt::format("{}_{}", ALIGNMENT_PREFIX, DEVIATION_CATEGORY_SUFFIX)};
-    const std::string alignment_activity_index_name{fmt::format("{}_{}", ALIGNMENT_PREFIX, ACTIVITY_INDEX_SUFFIX)};
-
-    const auto& alignment_model_vertex_id{result_table.column<model_vertex_id_column>(alignment_model_vertex_id_name)};
-    const auto& alignment_vertex_label{result_table.column<vertex_label_column>(alignment_vertex_label_name)};
-    const auto& alignment_move_type{result_table.column<move_type_column>(alignment_move_type_name)};
-    const auto& alignment_deviation_category{
-            result_table.column<deviation_category_column>(alignment_deviation_category_name)};
-    const auto& alignment_activity_index{result_table.column<activity_index_column>(alignment_activity_index_name)};
-
-    auto map{string_to_idx_map(st->field_names())};
+    std::vector<result_column_source> result_column_sources;
+    result_column_sources.reserve(st->field_names().size());
+    for (const auto& field_name : st->field_names()) {
+        const auto* descriptor = create_alignment_output_projection::find_field(field_name);
+        if (descriptor == nullptr) {
+            return Status::InternalError(fmt::format("{}: Unknown return field '{}'.", function_name, field_name));
+        }
+        if (!result_table.columns().contains(field_name)) {
+            return Status::InternalError(
+                    fmt::format("{}: Result field '{}' was not materialized.", function_name, field_name));
+        }
+        switch (descriptor->value_type) {
+        case create_alignment_output_value_type::OPTIONAL_MODEL_VERTEX_ID_ARRAY:
+            result_column_sources.emplace_back(&result_table.column<model_vertex_id_column>(field_name));
+            break;
+        case create_alignment_output_value_type::STRING_ARRAY:
+            result_column_sources.emplace_back(&result_table.column<string_column>(field_name));
+            break;
+        case create_alignment_output_value_type::ROW_ID_ARRAY:
+            result_column_sources.emplace_back(&result_table.column<row_id_column>(field_name));
+            break;
+        }
+    }
 
     for (auto index : row_to_case_index) {
         if (index < 0) {
@@ -209,40 +255,23 @@ StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* co
             continue;
         }
 
-        //Alignment table
-        AddArray(fields[map.at(alignment_model_vertex_id_name)], alignment_model_vertex_id[index]);
-        AddArray(fields[map.at(alignment_vertex_label_name)], alignment_vertex_label[index]);
-        AddArray(fields[map.at(alignment_move_type_name)], alignment_move_type[index]);
-        AddArray(fields[map.at(alignment_activity_index_name)], alignment_activity_index[index]);
-        AddArray(fields[map.at(alignment_deviation_category_name)], alignment_deviation_category[index]);
-
-        // Edge tables
-        for (auto type : CS_EDGE_TYPES) {
-            const std::string_view edge_type_str{cs_edge_type_to_string_v2(type)};
-            const std::string edge_class_name{fmt::format("{}_{}", edge_type_str, EDGE_CLASS_SUFFIX)};
-            const std::string model_vertex_id_name{fmt::format("{}_{}", edge_type_str, MODEL_VERTEX_ID_SUFFIX)};
-            const std::string vertex_label_name{fmt::format("{}_{}", edge_type_str, VERTEX_LABEL_SUFFIX)};
-            const std::string move_type_name{fmt::format("{}_{}", edge_type_str, MOVE_TYPE_SUFFIX)};
-            const std::string deviation_category_name{fmt::format("{}_{}", edge_type_str, DEVIATION_CATEGORY_SUFFIX)};
-            const std::string alignment_index_name{fmt::format("{}_{}", edge_type_str, ALIGNMENT_INDEX_SUFFIX)};
-
-            const auto& edge_class = result_table.column<edge_class_column>(edge_class_name);
-            const auto& model_vertex_id = result_table.column<model_vertex_id_column>(model_vertex_id_name);
-            const auto& vertex_label = result_table.column<vertex_label_column>(vertex_label_name);
-            const auto& move_type = result_table.column<move_type_column>(move_type_name);
-            const auto& deviation_category = result_table.column<deviation_category_column>(deviation_category_name);
-            const auto& alignment_index = result_table.column<activity_index_column>(alignment_index_name);
-
-            AddArray(fields[map.at(edge_class_name)], edge_class[index]);
-            AddArray(fields[map.at(model_vertex_id_name)], model_vertex_id[index]);
-            AddArray(fields[map.at(vertex_label_name)], vertex_label[index]);
-            AddArray(fields[map.at(move_type_name)], move_type[index]);
-            AddArray(fields[map.at(deviation_category_name)], deviation_category[index]);
-            AddArray(fields[map.at(alignment_index_name)], alignment_index[index]);
+        for (size_t field_index = 0; field_index < result_column_sources.size(); ++field_index) {
+            std::visit([&](const auto* source_column) { AddArray(fields[field_index], source_column->at(index)); },
+                       result_column_sources[field_index]);
         }
     }
 
     return res;
+}
+
+} // namespace
+
+StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* context, const Columns& columns) {
+    return create_alignment_impl(context, columns, "celonis_create_alignment");
+}
+
+StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment_v2(FunctionContext* context, const Columns& columns) {
+    return create_alignment_impl(context, columns, "celonis_create_alignment_v2");
 }
 
 } // namespace starrocks
