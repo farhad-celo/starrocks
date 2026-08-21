@@ -1520,8 +1520,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                         } else {
                             logNonStringFunctionMetric(call.getFnName(), nonConstantType);
                         }
-                    } else {
+                    } else if (supportLowCardinality(nonConstantType)) {
                         logUnsupportedScalarOperatorMetric(scalarOperator.getOpType().toString(), nonConstantType);
+                    } else {
+                        logNonStringScalarOperatorMetric(scalarOperator.getOpType().toString(), nonConstantType);
                     }
                 }
             } else if (scalarOperator instanceof CallOperator call
@@ -1742,6 +1744,11 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
         private void logUnsupportedScalarOperatorMetric(String op, Type inputType) {
             CelonisMetrics.increaseCounter("lco_unsupported_scalar_op", "lco unsupported scalar op",
+                    new MetricLabel("scalar_op", op), getTypeMetricLabel(inputType));
+        }
+
+        private void logNonStringScalarOperatorMetric(String op, Type inputType) {
+            CelonisMetrics.increaseCounter("lco_non_string_scalar_op", "lco non string scalar op",
                     new MetricLabel("scalar_op", op), getTypeMetricLabel(inputType));
         }
 
