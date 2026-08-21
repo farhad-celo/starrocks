@@ -5,10 +5,11 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
-#include "legacy_embedded_ctl/assert.h"
-#include "legacy_embedded_ctl/concepts.h"
-#include "legacy_embedded_ctl/conversion.h"
-#include "legacy_embedded_ctl/type_traits.h"
+#include <ctl/assert.h>
+#include <ctl/concepts.h>
+#include <ctl/conversion.h>
+#include <ctl/type_traits.h>
+
 #include "modules/common/aligned_blocked_range.h"
 #include "modules/common/case_aligned_range.h"
 #include "modules/common/int_types.h"
@@ -19,7 +20,7 @@ namespace celonis::accelerator::memory {
 
 namespace {
 
-template <legacy_embedded_ctl::standard_integer T>
+template <ctl::standard_integer T>
 class safe_max_int final {
  public:
   safe_max_int() noexcept = default;
@@ -67,7 +68,7 @@ row_id group_id_mapping_and_group_id_domain::get_or_compute_group_id_domain() {
     optional_group_id_domain = compute_group_id_domain(value);
   }
   // TODO(n.weber): TBD - Should this be validated in debug builds?
-  //  legacy_embedded_debug_assert(*optional_group_id_domain >= compute_group_id_domain(value));
+  //  debug_assert(*optional_group_id_domain >= compute_group_id_domain(value));
   return *optional_group_id_domain;
 }
 
@@ -87,19 +88,19 @@ group_id_mapping_and_group_id_domain case_id_column_to_mapping_and_group_id_doma
         using group_id_64_t = std::remove_const_t<join_projection64_t::value_type>;
         // If the width of case_col_ptr_t is less than or equal to group_id_32_t, 32bit suffice. Otherwise, use 64bit.
         using group_id_t = std::common_type_t<case_col_ptr_t, group_id_32_t>;
-        static_assert(legacy_embedded_ctl::one_of<group_id_t, group_id_32_t, group_id_64_t>);
+        static_assert(ctl::one_of<group_id_t, group_id_32_t, group_id_64_t>);
 
         safe_max_int<group_id_t> max_case_col_ptr{};
         const auto column_size{range.end};
-        auto group_id_mapping{legacy_embedded_ctl::make_shared_static_array_for_overwrite<group_id_t>(
-            column_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
+        auto group_id_mapping{ctl::make_shared_static_array_for_overwrite<group_id_t>(
+            column_size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
         tbb::parallel_for(range, [&case_id_acc = std::as_const(case_id_acc), &max_case_col_ptr,
                                   &group_id_mapping](const auto& range) {
           group_id_t local_max_case_col_ptr{-1};
           for (auto row_idx{range.begin}; row_idx < range.end; ++row_idx) {
             const group_id_t case_id_col_ptr{case_id_acc[row_idx]};
-            //            legacy_embedded_debug_assert(case_id_col_ptr != 0);
+            //            debug_assert(case_id_col_ptr != 0);
             local_max_case_col_ptr = std::max(local_max_case_col_ptr, case_id_col_ptr);
             group_id_mapping[row_idx] = case_id_col_ptr;
           }

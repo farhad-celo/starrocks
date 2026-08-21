@@ -97,8 +97,8 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces,
       }
     });
   });
-  auto activity_to_case_join = memory::join_projection_vector_t{legacy_embedded_ctl::make_shared_static_array<row_id>(
-      activity_to_case_join_temp, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
+  auto activity_to_case_join = memory::join_projection_vector_t{
+      ctl::make_shared_static_array<row_id>(activity_to_case_join_temp, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
   eventlog_params params;
   memory::table_t event_table{std::make_shared<memory::table>(

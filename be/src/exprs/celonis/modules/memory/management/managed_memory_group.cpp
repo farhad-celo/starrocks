@@ -1,11 +1,8 @@
 #include "managed_memory_group.h"
 
-#ifdef CELOSTAR
-#include <fmt/chrono.h>
-#else
-#include <date/date.h>  // replace with chrono after full compiler support
-#endif
 #include <mutex>
+
+#include <fmt/chrono.h>
 
 #include "log/log.h"
 #include "modules/memory/table.h"

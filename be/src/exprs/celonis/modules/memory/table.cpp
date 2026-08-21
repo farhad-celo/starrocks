@@ -10,10 +10,10 @@
 #include <fmt/format.h>
 
 #include "concurrency/concurrency_utils.h"
+#include "legacy_embedded_format/json/json.h"
 #include "log/log.h"
 #include "modules/memory/column.h"
 #include "modules/memory/column_pointers.h"
-#include "modules/memory/typed_dictionary.h"
 
 namespace celonis::accelerator::memory {
 

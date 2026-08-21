@@ -4,7 +4,8 @@
 #include <memory>
 #include <sstream>
 
-#include "legacy_embedded_ctl/static_array.h"
+#include <ctl/static_array.h>
+
 #include "modules/common/exceptions.h"
 #include "modules/common/execution_context.h"
 #include "modules/common/shared_types.h"
@@ -29,12 +30,6 @@ class materialized_data {
   virtual void add_to_group(std::shared_ptr<management::managed_memory_group> managed_group) = 0;
 
   virtual void swap_in(common::execution_context& context) = 0;
-
-#ifndef CELOSTAR
-  virtual void swap_out(common::execution_context& context) = 0;
-
-  virtual bool write_out(common::execution_context& context) = 0;
-#endif
 
   [[nodiscard]] virtual bool is_swappable() const = 0;
 
@@ -84,22 +79,7 @@ class materialized_typed_data : public materialized_data {
     null_flags->swap_in(context);
   }
 
-#ifndef CELOSTAR
-  void swap_out(common::execution_context& context) override {
-    data->swap_out(context);
-    null_flags->swap_out(context);
-  }
-#endif
-
   [[nodiscard]] bool is_swappable() const override { return data->is_swappable() && null_flags->is_swappable(); }
-
-#ifndef CELOSTAR
-  bool write_out(common::execution_context& context) override {
-    data->write_out(context);
-    null_flags->write_out(context);
-    return true;
-  }
-#endif
 
   [[nodiscard]] std::string get_string_value(row_id row, const common::execution_context& context) const override {
     return get_string_value_opt(row, context).value_or("NULL");
@@ -138,9 +118,11 @@ class materialized_typed_data : public materialized_data {
     null_flags->set_delete_from_disk_when_destructed(value);
   }
 
-  static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(
-      const std::string& id, const management::swap_info& s_info, const std::string& description, row_id row_count,
-      legacy_embedded_ctl::static_array<T> data, const memory::null_flags_t& null_flags) {
+  static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(const std::string& id,
+                                                                            const management::swap_info& s_info,
+                                                                            const std::string& description,
+                                                                            row_id row_count, ctl::static_array<T> data,
+                                                                            const memory::null_flags_t& null_flags) {
     std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
         null_flags, id + management::NULL_FLAGS_NEW_ENDING, s_info, description + management::NULL_FLAGS_DESC));
     management::raw_data_handler_t<T> data_handler = management::raw_data_handler<T>::create_data_handler(
@@ -152,7 +134,7 @@ class materialized_typed_data : public materialized_data {
 
   static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(
       const std::string& id, const management::swap_info& s_info, const std::string& description, row_id row_count,
-      const legacy_embedded_ctl::shared_static_array<T>& data, const memory::null_flags_t& null_flags) {
+      const ctl::shared_static_array<T>& data, const memory::null_flags_t& null_flags) {
     std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
         null_flags, id + management::NULL_FLAGS_NEW_ENDING, s_info, description + management::NULL_FLAGS_DESC));
     management::raw_data_handler_t<T> data_handler = management::raw_data_handler<T>::create_data_handler(
@@ -160,35 +142,6 @@ class materialized_typed_data : public materialized_data {
 
     return std::make_shared<materialized_typed_data<T>>(row_count, std::move(bitset), std::move(data_handler));
   }
-
-#ifndef CELOSTAR
-  static std::shared_ptr<materialized_typed_data<T>> init_from_swap(const std::string& id,
-                                                                    const management::swap_info& s_info,
-                                                                    const std::string& description) {
-    std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::init_from_swap(
-        id + management::NULL_FLAGS_NEW_ENDING, s_info, description + management::NULL_FLAGS_DESC));
-    if (bitset != nullptr) {
-      management::raw_data_handler_t<T> data_handler = management::raw_data_handler<T>::init_from_swap(
-          id + management::MATERIALIZED_DATA_NEW_ENDING, s_info, description + management::MATERIALIZED_DATA_DESC);
-      if (data_handler != nullptr) {
-        if (bitset->get_size() != data_handler->get_size()) {
-          throw common::internal_exception{
-              "Size of materialized data [{}] does not match size of materialized null flags [{}] for [{}].",
-              data_handler->get_size(), bitset->get_size(), description};
-        }
-        if (data_handler->get_size() > static_cast<size_t>(std::numeric_limits<row_id>::max())) {
-          throw common::cpm_exception{
-              "Size of materialized data for [{}] exceeds the limit of [{}]. Size of materialized data for [{}] is "
-              "[{}].",
-              description, std::numeric_limits<row_id>::max(), description, data_handler->get_size()};
-        }
-        return std::make_shared<materialized_typed_data<T>>(static_cast<row_id>(data_handler->get_size()),
-                                                            std::move(bitset), std::move(data_handler));
-      }
-    }
-    return std::shared_ptr<materialized_typed_data<T>>(nullptr);
-  }
-#endif
 
   ~materialized_typed_data() override = default;
 
@@ -214,22 +167,7 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
     null_flags->swap_in(context);
   }
 
-#ifndef CELOSTAR
-  void swap_out(common::execution_context& context) override {
-    string_data->swap_out(context);
-    null_flags->swap_out(context);
-  }
-#endif
-
   [[nodiscard]] bool is_swappable() const override { return string_data->is_swappable() && null_flags->is_swappable(); }
-
-#ifndef CELOSTAR
-  bool write_out(common::execution_context& context) override {
-    const bool success = string_data->write_out(context);
-    null_flags->write_out(context);
-    return success;
-  }
-#endif
 
   [[nodiscard]] std::string get_string_value(row_id row, const common::execution_context& context) const override {
     return get_string_value_opt(row, context).value_or("NULL");
@@ -267,8 +205,8 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
 
   static std::shared_ptr<materialized_typed_data<cel_string_t>> init_materialized_data(
       const std::string& id, const management::swap_info& s_info, const std::string& description, row_id row_count,
-      const legacy_embedded_ctl::shared_static_array<cel_string_t>& ptrs, size_t /*str_bfr_size*/,
-      const legacy_embedded_ctl::shared_static_array<char>& string_bfr, const memory::null_flags_t& null_flags) {
+      const ctl::shared_static_array<cel_string_t>& ptrs, size_t /*str_bfr_size*/,
+      const ctl::shared_static_array<char>& string_bfr, const memory::null_flags_t& null_flags) {
     std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
         null_flags, id + management::NULL_FLAGS_ENDING, s_info, description + management::NULL_FLAGS_DESC));
     std::shared_ptr<management::string_data_handler> data_handler =
@@ -278,35 +216,6 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
     return std::make_shared<materialized_typed_data<cel_string_t>>(row_count, std::move(bitset),
                                                                    std::move(data_handler));
   }
-
-#ifndef CELOSTAR
-  static std::shared_ptr<materialized_typed_data<cel_string_t>> init_from_swap(const std::string& id,
-                                                                               const management::swap_info& s_info,
-                                                                               const std::string& description) {
-    std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::init_from_swap(
-        id + management::NULL_FLAGS_ENDING, s_info, description + management::NULL_FLAGS_DESC));
-    if (bitset != nullptr) {
-      std::shared_ptr<management::string_data_handler> data_handler = management::string_data_handler::init_from_swap(
-          id, s_info, management::pointer_data_handler_swap_type::SWAPPED_MATERIALIZED, description);
-      if (data_handler != nullptr) {
-        if (bitset->get_size() != data_handler->get_size()) {
-          throw common::internal_exception{
-              "Size of materialized data [{}] does not match size of materialized null flags [{}] for [{}].",
-              data_handler->get_size(), bitset->get_size(), description};
-        }
-        if (data_handler->get_size() > static_cast<size_t>(std::numeric_limits<row_id>::max())) {
-          throw common::cpm_exception{
-              "Size of materialized data for [{}] exceeds the limit of [{}]. Size of materialized data for [{}] is "
-              "[{}].",
-              description, std::numeric_limits<row_id>::max(), description, data_handler->get_size()};
-        }
-        return std::make_shared<materialized_typed_data<cel_string_t>>(static_cast<row_id>(data_handler->get_size()),
-                                                                       std::move(bitset), std::move(data_handler));
-      }
-    }
-    return std::shared_ptr<materialized_typed_data<cel_string_t>>(nullptr);
-  }
-#endif
 
   ~materialized_typed_data() override = default;
 

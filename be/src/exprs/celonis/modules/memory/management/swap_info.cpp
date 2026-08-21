@@ -1,32 +1,12 @@
 #include "swap_info.h"
 
-#include "legacy_embedded_ctl/assert.h"
-#ifndef CELOSTAR
-#include "modules/io/storage_manager.h"
-#endif
+#include <ctl/assert.h>
 
 namespace celonis::accelerator::memory::management {
 
 static constexpr const char* TMP_SWAP_FILE_SUFFIX{".tmp"};
 
 std::string get_tmp_swap_file_name(const std::string& swap_file) { return swap_file + TMP_SWAP_FILE_SUFFIX; }
-
-#ifndef CELOSTAR
-swap_info::swap_info(const bool swappable, std::string base_directory, const persistence_status persistence_state,
-                     const io::storage_manager& storage_manager, std::shared_ptr<management::memory_manager> manager,
-                     std::string encryption_key)
-    : swappable(swappable),
-      swap_base_directory(std::move(base_directory)),
-      swap_persistence_state(persistence_state),
-      swap_storage_manager(&storage_manager),
-      manager(std::move(manager)),
-      swap_encryption_key(std::move(encryption_key)) {}
-
-const io::storage_manager& swap_info::storage_manager() const {
-  legacy_embedded_ctl::abort_assert(!is_no_swap(), "Trying to access the storage manager of a no_swap swap info");
-  return *swap_storage_manager;
-}
-#endif
 
 std::string swap_info::get_swap_file_path(const std::string& swap_file) const {
   return base_directory() + "/" + swap_file;

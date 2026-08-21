@@ -21,7 +21,6 @@
 #include <ctl/conversion.h>
 #include <ctl/named_type.h>
 #include <ctl/static_array.h>
-#include <ctl/static_array_fwd.h>
 #include <ctl/time.h>
 #include <ctl/utils/allocation_messages.h>
 #include <ctl/utils/time_utils.h>
@@ -29,7 +28,6 @@
 #include "align_model_statistics.h"
 #include "align_model_types.h"
 #include "exprs/celonis/cpml_utils/sr_context.h"
-#include "legacy_embedded_ctl/static_array.h"
 #include "modules/common/execution_context.h"
 #include "modules/memory/cache/remap_variants.h"
 #include "modules/memory/cache/variant_trace_cache.h"
@@ -67,8 +65,8 @@ class variant_accessor final : public cpml::variant::variant_accessor {
 constexpr std::string_view OPERATOR_NAME{"ALIGN_MODEL"};
 
 struct prune_variants_result {
-  legacy_embedded_ctl::shared_static_array<row_id> pruned_activity_ids;
-  legacy_embedded_ctl::shared_static_array<row_id> pruned_trace_ids;
+  ctl::shared_static_array<row_id> pruned_activity_ids;
+  ctl::shared_static_array<row_id> pruned_trace_ids;
 };
 
 /**
@@ -103,10 +101,8 @@ prune_variants_result prune_variants(const memory::cache::variant_trace_cache_t&
     }
   }
   prune_variants_result result{
-      legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
-          buffer.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG)),
-      legacy_embedded_ctl::make_shared_static_array_for_overwrite<row_id>(
-          buffer.size(), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG))};
+      ctl::make_shared_static_array_for_overwrite<row_id>(buffer.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG)),
+      ctl::make_shared_static_array_for_overwrite<row_id>(buffer.size(), ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
   std::ranges::copy(buffer, result.pruned_activity_ids.begin());
   std::ranges::copy(projection, result.pruned_trace_ids.begin());
   return result;

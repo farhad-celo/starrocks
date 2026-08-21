@@ -1,9 +1,6 @@
 #include "data_handler.h"
 
 #include "log/log.h"
-#ifndef CELOSTAR
-#include "modules/io/file_utils.h"
-#endif
 #include "modules/memory/table.h"
 
 namespace celonis::accelerator::memory::management {

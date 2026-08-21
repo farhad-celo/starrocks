@@ -3,8 +3,9 @@
 #include <memory>
 #include <type_traits>
 
-#include "legacy_embedded_ctl/assert.h"
-#include "legacy_embedded_ctl/static_array.h"
+#include <ctl/assert.h>
+#include <ctl/static_array.h>
+
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types.h"
 
@@ -23,7 +24,7 @@ class const_data_accessor<
  public:
   using const_iterator = const value_type_t*;
 
-  explicit const_data_accessor(legacy_embedded_ctl::shared_static_array<const value_type_t> ptr_data)
+  explicit const_data_accessor(ctl::shared_static_array<const value_type_t> ptr_data)
       : ptr_data_{std::move(ptr_data)} {}
 
   [[nodiscard]] value_type_t operator[](const size_t idx) const { return ptr_data_[idx]; }
@@ -40,12 +41,10 @@ class const_data_accessor<
   /**
    * @deprecated use the const_data_accessor instance instead
    */
-  [[nodiscard]] legacy_embedded_ctl::shared_static_array<const value_type_t> shared() const noexcept {
-    return ptr_data_;
-  }
+  [[nodiscard]] ctl::shared_static_array<const value_type_t> shared() const noexcept { return ptr_data_; }
 
  private:
-  legacy_embedded_ctl::shared_static_array<const value_type_t> ptr_data_;
+  ctl::shared_static_array<const value_type_t> ptr_data_;
 };
 
 template <typename T>
@@ -61,17 +60,17 @@ class const_data_accessor<
  public:
   using const_iterator = const value_type_t*;
 
-  const_data_accessor(legacy_embedded_ctl::shared_static_array<const storage_type_t> pointer_buffer_data,
-                      legacy_embedded_ctl::shared_static_array<const value_type_t> ptr_data)
+  const_data_accessor(ctl::shared_static_array<const storage_type_t> pointer_buffer_data,
+                      ctl::shared_static_array<const value_type_t> ptr_data)
       : pointer_buffer_data_{std::move(pointer_buffer_data)}, ptr_data_{std::move(ptr_data)} {}
 
   [[nodiscard]] value_type_t operator[](const size_t idx) const {
-    legacy_embedded_debug_assert(validate(idx));
+    debug_assert(validate(idx));
     return ptr_data_[idx];
   }
 
   [[nodiscard]] value_type_t at(const size_t idx) const {
-    legacy_embedded_debug_assert(validate(idx));
+    debug_assert(validate(idx));
     return ptr_data_.at(idx);
   }
 
@@ -105,17 +104,15 @@ class const_data_accessor<
 
   [[nodiscard]] const storage_type_t* buffer_get() const noexcept { return buffer_begin(); }
 
-  [[nodiscard]] legacy_embedded_ctl::shared_static_array<const value_type_t> data_shared() const noexcept {
-    return ptr_data_;
-  }
+  [[nodiscard]] ctl::shared_static_array<const value_type_t> data_shared() const noexcept { return ptr_data_; }
 
-  [[nodiscard]] legacy_embedded_ctl::shared_static_array<const storage_type_t> buffer_shared() const noexcept {
+  [[nodiscard]] ctl::shared_static_array<const storage_type_t> buffer_shared() const noexcept {
     return pointer_buffer_data_;
   }
 
  private:
-  legacy_embedded_ctl::shared_static_array<const storage_type_t> pointer_buffer_data_;
-  legacy_embedded_ctl::shared_static_array<const value_type_t> ptr_data_;
+  ctl::shared_static_array<const storage_type_t> pointer_buffer_data_;
+  ctl::shared_static_array<const value_type_t> ptr_data_;
 };
 
 }  // namespace celonis::accelerator::memory::management

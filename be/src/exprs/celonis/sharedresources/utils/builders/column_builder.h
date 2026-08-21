@@ -38,9 +38,8 @@ public:
             }
         } else {
             data_size_ = row_id_size;
-            data_array_ = legacy_embedded_ctl::make_static_array_for_overwrite<T>(
-                    legacy_embedded_ctl::cast<size_t>(size),
-                    LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG));
+            data_array_ =
+                    ctl::make_static_array_for_overwrite<T>(ctl::cast<size_t>(size), ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG));
             null_flags_ = memory::create_null_flags(size);
             size_set_ = true;
         }
@@ -99,7 +98,7 @@ private:
     bool data_set_ = false;
     bool state_modified_ = false;
     row_id data_size_ = 0;
-    legacy_embedded_ctl::static_array<T> data_array_;
+    ctl::static_array<T> data_array_;
     memory::null_flags_t null_flags_;
     memory::column_processing_state state_ = memory::column_processing_state();
     memory::table* owner_ = nullptr;
@@ -202,15 +201,14 @@ private:
     std::string cache_key_;
 
     struct string_buf_and_ptrs {
-        legacy_embedded_ctl::static_array<char> string_buf;
-        legacy_embedded_ctl::static_array<cel_string_t> ptrs;
+        ctl::static_array<char> string_buf;
+        ctl::static_array<cel_string_t> ptrs;
     };
 
     string_buf_and_ptrs create_string_buffer() {
         common::char_buffer arena;
-        auto ptrs{legacy_embedded_ctl::make_static_array_for_overwrite<cel_string_t>(
-                legacy_embedded_ctl::cast<size_t>(data_size_),
-                LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+        auto ptrs{ctl::make_static_array_for_overwrite<cel_string_t>(ctl::cast<size_t>(data_size_),
+                                                                     ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
         cel_string_t offset{nullptr};
         ska::bytell_hash_map<cel_string_t, cel_string_t> dict;
         for (row_id i = 0; i < data_size_; ++i) {

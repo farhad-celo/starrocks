@@ -5,8 +5,9 @@
 #include <utility>
 #include <vector>
 
-#include "legacy_embedded_ctl/array_view.h"
-#include "legacy_embedded_ctl/named_type.h"
+#include <ctl/array_view.h>
+#include <ctl/named_type.h>
+
 #include "modules/common/exceptions.h"
 #include "modules/common/shared_types.h"
 #include "modules/common/trace_types.h"
@@ -29,13 +30,11 @@ class variant_trace_cache {
   friend class cube::variant_trace_cache_manager;
 
  public:
-  using group_id_t = legacy_embedded_ctl::named_type<
-      row_id, struct group_id_tag, legacy_embedded_ctl::comparable, legacy_embedded_ctl::hashable,
-      legacy_embedded_ctl::implicitly_convertible_to<row_id>::templ, legacy_embedded_ctl::printable>;
-  using variant_id_t = legacy_embedded_ctl::named_type<
-      row_id, struct variant_id_tag, legacy_embedded_ctl::comparable, legacy_embedded_ctl::hashable,
-      legacy_embedded_ctl::implicitly_convertible_to<row_id>::templ, legacy_embedded_ctl::printable>;
-  using variant_view_t = legacy_embedded_ctl::array_view<const trace_element_type>;
+  using group_id_t = ctl::named_type<row_id, struct group_id_tag, ctl::comparable, ctl::hashable,
+                                     ctl::implicitly_convertible_to<row_id>::templ, ctl::printable>;
+  using variant_id_t = ctl::named_type<row_id, struct variant_id_tag, ctl::comparable, ctl::hashable,
+                                       ctl::implicitly_convertible_to<row_id>::templ, ctl::printable>;
+  using variant_view_t = ctl::array_view<const trace_element_type>;
   static constexpr variant_id_t INVALID_VARIANT_ID{0};  // ID/Index of the empty/null variant
 
   variant_trace_cache(std::shared_ptr<management::pointer_data_handler<trace_type>> data_handler,
@@ -101,7 +100,7 @@ class variant_trace_cache {
 
 using group_id_to_variant_id_mapping_t =
     std::unordered_map<variant_trace_cache::group_id_t, variant_trace_cache::variant_id_t>;
-using variant_id_to_group_size_mapping_t = legacy_embedded_ctl::static_array<size_t>;
+using variant_id_to_group_size_mapping_t = ctl::static_array<size_t>;
 
 /** Utilities (mostly for testing) which return various mappings from/to valid group/variant IDs */
 [[nodiscard]] group_id_to_variant_id_mapping_t compute_group_id_to_variant_id_mapping_from_col_ptrs(

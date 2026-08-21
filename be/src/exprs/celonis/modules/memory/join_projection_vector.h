@@ -3,8 +3,9 @@
 #include <memory>
 #include <variant>
 
-#include "legacy_embedded_ctl/cache_fwd.h"
-#include "legacy_embedded_ctl/static_array_fwd.h"
+#include <ctl/cache_fwd.h>
+#include <ctl/static_array_fwd.h>
+
 #include "modules/memory/join_data_handler.h"
 #include "modules/memory/row_id.h"
 
@@ -16,13 +17,12 @@ class identity_join_projection {
   explicit identity_join_projection(size_t size) : size_{size} {}
 
   [[nodiscard]] row_id operator[](row_id index) const {
-    legacy_embedded_debug_assert(std::cmp_less(index, size()));
+    debug_assert(std::cmp_less(index, size()));
     return index;
   }
   [[nodiscard]] row_id at(row_id index) const {
     if (static_cast<size_t>(index) >= size()) [[unlikely]] {
-      throw legacy_embedded_ctl::out_of_range{"Index [{}] is out of bounds for join projection vector of size [{}].",
-                                              index, size()};
+      throw ctl::out_of_range{"Index [{}] is out of bounds for join projection vector of size [{}].", index, size()};
     }
     return operator[](index);
   }
@@ -33,17 +33,15 @@ class identity_join_projection {
   size_t size_{0};
 };
 
-using join_projection32_t = legacy_embedded_ctl::shared_static_array<const join_32_t>;
-using join_projection64_t = legacy_embedded_ctl::shared_static_array<const join_64_t>;
+using join_projection32_t = ctl::shared_static_array<const join_32_t>;
+using join_projection64_t = ctl::shared_static_array<const join_64_t>;
 
 using join_projection_vector_t = std::variant<join_projection32_t, join_projection64_t>;
 using pull_up_vector_t = std::variant<identity_join_projection, join_projection32_t, join_projection64_t>;
 
 template <typename FUNCTION, typename... PROJECTION_VECTOR>
 [[nodiscard]] decltype(auto) cast_execute_projection_vector(FUNCTION&& f, PROJECTION_VECTOR&&... projections) {
-  return std::visit(legacy_embedded_ctl::overloaded{[&f](auto&&... projs) {
-                      return std::invoke(std::forward<FUNCTION>(f), projs...);
-                    }},
+  return std::visit(ctl::overloaded{[&f](auto&&... projs) { return std::invoke(std::forward<FUNCTION>(f), projs...); }},
                     projections...);
 }
 
@@ -57,7 +55,7 @@ template <typename FUNCTION, typename... PROJECTION_VECTOR>
 
 }  // namespace celonis::accelerator::memory
 
-namespace celonis::accelerator::legacy_embedded_ctl {
+namespace ctl {
 
 template <>
 struct is_cache_entry_unused<celonis::accelerator::memory::join_projection_vector_t> {
@@ -69,4 +67,4 @@ struct is_cache_entry_unused<celonis::accelerator::memory::join_projection_vecto
   }
 };
 
-}  // namespace celonis::accelerator::legacy_embedded_ctl
+}  // namespace ctl

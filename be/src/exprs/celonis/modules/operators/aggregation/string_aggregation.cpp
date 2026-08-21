@@ -12,17 +12,16 @@
 #include <tbb/parallel_for_each.h>
 #include <tbb/parallel_sort.h>
 
-#include "legacy_embedded_ctl/assert.h"
-#include "legacy_embedded_ctl/bits/half_open_interval.h"
-#include "legacy_embedded_ctl/conversion.h"
-#include "legacy_embedded_ctl/static_array.h"
-#include "legacy_embedded_ctl/utils/allocation_messages.h"
+#include <ctl/assert.h>
+#include <ctl/conversion.h>
+#include <ctl/interval.h>
+#include <ctl/static_array.h>
+
 #include "modules/common/trace_types.h"
 #include "modules/cube/variant_trace_utils.h"
 #include "modules/memory/column.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/table.h"
-#include "modules/memory/tracking/static_array_with_context_tracking.h"
 #include "modules/memory/transform/join_projection_factories.h"
 #include "modules/operators/process/variant_operator_common.h"
 
@@ -31,9 +30,9 @@ namespace celonis::accelerator::operators::aggregation {
 namespace {
 
 struct variant_row_id_result {
-  legacy_embedded_ctl::static_array<trace_type> trace_ptrs;
-  legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer_data;
-  legacy_embedded_ctl::static_array<trace_length_type> trace_lengths;
+  ctl::static_array<trace_type> trace_ptrs;
+  ctl::static_array<trace_buffer_type> trace_buffer_data;
+  ctl::static_array<trace_length_type> trace_lengths;
   common::owned_column_ptr_data_t group_id_to_trace_id;
   row_id num_unique_variants;
 };
@@ -110,10 +109,10 @@ struct deduplicate_local_init {
 
 struct trace_buffer_sizes_and_offsets_type {
   int64_t trace_buffer_size;
-  legacy_embedded_ctl::static_array<int64_t> slot_trace_buffer_offset;
+  ctl::static_array<int64_t> slot_trace_buffer_offset;
 
   trace_buffer_sizes_and_offsets_type(const int64_t trace_buffer_size,
-                                      legacy_embedded_ctl::static_array<int64_t> slot_trace_buffer_offset)
+                                      ctl::static_array<int64_t> slot_trace_buffer_offset)
       : trace_buffer_size{trace_buffer_size}, slot_trace_buffer_offset{std::move(slot_trace_buffer_offset)} {}
 };
 
@@ -122,15 +121,13 @@ struct trace_buffer_sizes_and_offsets_type {
  */
 struct buffer_sizes_and_offsets_type {
   int64_t string_buffer_size;
-  legacy_embedded_ctl::static_array<int64_t> slot_string_buffer_offset;
+  ctl::static_array<int64_t> slot_string_buffer_offset;
   // The following two members are specific to the VARIANT operator.
   int64_t trace_buffer_size;
-  legacy_embedded_ctl::static_array<int64_t> slot_trace_buffer_offset;
+  ctl::static_array<int64_t> slot_trace_buffer_offset;
 
-  buffer_sizes_and_offsets_type(const int64_t string_buffer_size,
-                                legacy_embedded_ctl::static_array<int64_t> slot_string_buffer_offset,
-                                const int64_t trace_buffer_size,
-                                legacy_embedded_ctl::static_array<int64_t> slot_trace_buffer_offset)
+  buffer_sizes_and_offsets_type(const int64_t string_buffer_size, ctl::static_array<int64_t> slot_string_buffer_offset,
+                                const int64_t trace_buffer_size, ctl::static_array<int64_t> slot_trace_buffer_offset)
       : string_buffer_size{string_buffer_size},
         slot_string_buffer_offset{std::move(slot_string_buffer_offset)},
         trace_buffer_size{trace_buffer_size},
@@ -168,8 +165,8 @@ void handle_aggregation_group(
     const OPERATOR_ACCESSOR& accessor, const row_id row, const row_id last_group_id,
     deduplicate_local<STRING_COL_PTR_T, eq_agg_group_handle<OPERATOR_ACCESSOR, STRING_COL_PTR_T>>& thread_local_ctx,
     agg_group_handle<STRING_COL_PTR_T>& current_agg_group, const STRING_PTR_AC_TYPE& string_ptrs_ac,
-    legacy_embedded_ctl::static_array<row_id>& project_group_id_to_group_table,
-    legacy_embedded_ctl::static_array<group_result>& result_per_group, const PROJECTION_TYPE projection_vector) {
+    ctl::static_array<row_id>& project_group_id_to_group_table, ctl::static_array<group_result>& result_per_group,
+    const PROJECTION_TYPE projection_vector) {
   if (last_group_id == VALUE_NOT_FOUND) {
     return;
   }
@@ -177,7 +174,7 @@ void handle_aggregation_group(
   current_agg_group.length = row - current_agg_group.row_start;
 
   // negative length does not make sense
-  legacy_embedded_debug_assert(current_agg_group.length > 0);
+  debug_assert(current_agg_group.length > 0);
 
   project_group_id_to_group_table[last_group_id] = accessor.get_group_id(projection_vector, row - 1);
 
@@ -204,7 +201,7 @@ void handle_aggregation_group(
 
   // Assign temporary aggregation group id
   result_per_group[last_group_id].agg_group_id = unique_variant_iter->second;  // local variant id within its thread
-  result_per_group[last_group_id].slot = legacy_embedded_ctl::cast<int>(slot);
+  result_per_group[last_group_id].slot = ctl::cast<int>(slot);
   result_per_group[last_group_id].thread_id = thread_local_ctx.thread_id;
 }
 
@@ -217,20 +214,18 @@ void handle_aggregation_group(
  */
 template <typename OPERATOR_ACCESSOR, typename PROJECTION_TYPE, class STRING_PTR_AC_TYPE>
 void collect_aggregation_groups(
-    const OPERATOR_ACCESSOR& accessor,
-    const std::vector<legacy_embedded_ctl::half_open_interval<row_id>>& group_aligned_blocks,
+    const OPERATOR_ACCESSOR& accessor, const std::vector<ctl::half_open_interval<row_id>>& group_aligned_blocks,
     thread_local_deduplicate_type<
         std::remove_reference_t<decltype(std::declval<const STRING_PTR_AC_TYPE&>()[row_id{}])>,
         eq_agg_group_handle<OPERATOR_ACCESSOR,
                             std::remove_reference_t<decltype(std::declval<const STRING_PTR_AC_TYPE&>()[row_id{}])>>>&
         thread_local_deduplicate_step_1,
-    const STRING_PTR_AC_TYPE& string_ptrs_ac,
-    legacy_embedded_ctl::static_array<row_id>& project_group_id_to_group_table,
-    legacy_embedded_ctl::static_array<group_result>& result_per_group, const PROJECTION_TYPE& projection) {
+    const STRING_PTR_AC_TYPE& string_ptrs_ac, ctl::static_array<row_id>& project_group_id_to_group_table,
+    ctl::static_array<group_result>& result_per_group, const PROJECTION_TYPE& projection) {
   using string_col_ptr_t = std::remove_reference_t<decltype(std::declval<const STRING_PTR_AC_TYPE&>()[row_id{}])>;
 
   // Deduplication loop - parallelization by group_aligned_blocks
-  tbb::parallel_for_each(group_aligned_blocks, [&](legacy_embedded_ctl::half_open_interval<row_id> block_data) {
+  tbb::parallel_for_each(group_aligned_blocks, [&](ctl::half_open_interval<row_id> block_data) {
     bool exists{false};
     auto& thread_local_ctx{thread_local_deduplicate_step_1.local(exists)};
 
@@ -281,7 +276,7 @@ row_id compute_offset_global_agg_group_id(
     aggregation_domain_size += thread_local_front.next_id[slot];
   }
   // NULL gets assigned agg_group_id 0. The first non-null group gets assigned 1.
-  legacy_embedded_debug_assert(id_offset[0] == 1);
+  debug_assert(id_offset[0] == 1);
 
   // adjust agg_group_id
   tbb::parallel_for(
@@ -290,9 +285,8 @@ row_id compute_offset_global_agg_group_id(
           const int slot{result_per_group_ptr[i].slot};
           // slot == -1 means that the case is a NULL trace case
           if (slot != -1) {
-            legacy_embedded_debug_assert(
-                static_cast<size_t>(result_per_group_ptr[i].agg_group_id) <
-                thread_slot_local_to_slot_local_maps[slot][result_per_group_ptr[i].thread_id].size());
+            debug_assert(static_cast<size_t>(result_per_group_ptr[i].agg_group_id) <
+                         thread_slot_local_to_slot_local_maps[slot][result_per_group_ptr[i].thread_id].size());
             result_per_group_ptr[i].agg_group_id =
                 id_offset[slot] + thread_slot_local_to_slot_local_maps[slot][result_per_group_ptr[i].thread_id]
                                                                       [result_per_group_ptr[i].agg_group_id];
@@ -307,10 +301,10 @@ row_id compute_offset_global_agg_group_id(
 
 trace_buffer_sizes_and_offsets_type compute_trace_buffer_sizes_and_offsets(auto& thread_local_front,
                                                                            const common::execution_context& context) {
-  auto required_trace_buffer_sizes{memory::tracking::make_static_array_for_overwrite<int64_t>(
-      process::HASHMAPS, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
+  auto required_trace_buffer_sizes{
+      ctl::make_static_array_for_overwrite<int64_t>(process::HASHMAPS, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
-  legacy_embedded_debug_assert(thread_local_front.set.size() == required_trace_buffer_sizes.size());
+  debug_assert(thread_local_front.set.size() == required_trace_buffer_sizes.size());
 
   //     for each slot, aggregate the output length of each variant to find the size of the required trace buffer
   //     for the slot
@@ -351,12 +345,9 @@ trace_buffer_sizes_and_offsets_type compute_trace_buffer_sizes_and_offsets(auto&
  */
 template <typename ACTIVITY_PTR_TYPE, typename OPERATOR_ACCESSOR>
 void fill_trace_buffer_and_sort_array(
-    legacy_embedded_ctl::static_array<trace_type>& trace_ptrs_array,
-    legacy_embedded_ctl::static_array<trace_length_type>& trace_length_array,
-    legacy_embedded_ctl::static_array<int16_t>& trace_buffer_data,
-    const trace_buffer_sizes_and_offsets_type& buffer_sizes_and_offsets,
-    const std::array<row_id, process::HASHMAPS>& id_offset,
-    legacy_embedded_ctl::static_array<sort_row_ids_handle>& to_sort,
+    ctl::static_array<trace_type>& trace_ptrs_array, ctl::static_array<trace_length_type>& trace_length_array,
+    ctl::static_array<int16_t>& trace_buffer_data, const trace_buffer_sizes_and_offsets_type& buffer_sizes_and_offsets,
+    const std::array<row_id, process::HASHMAPS>& id_offset, ctl::static_array<sort_row_ids_handle>& to_sort,
     const deduplicate_local<ACTIVITY_PTR_TYPE, eq_agg_group_handle<OPERATOR_ACCESSOR, ACTIVITY_PTR_TYPE>>&
         thread_local_front) {
   // variant_id == 0 represents NULL
@@ -375,7 +366,7 @@ void fill_trace_buffer_and_sort_array(
       for (const auto& [variant, next_id] : thread_local_front.set[slot]) {
         row_id variant_id{id_offset[slot] + next_id};
 
-        legacy_embedded_debug_assert(variant_id != 0);
+        debug_assert(variant_id != 0);
 
         auto* trace_start_ptr{slot_trace_data_ptr};
 
@@ -391,7 +382,7 @@ void fill_trace_buffer_and_sort_array(
   });
 }
 
-void sort_unique_agg_groups_row_ids(legacy_embedded_ctl::static_array<sort_row_ids_handle>& to_sort) {
+void sort_unique_agg_groups_row_ids(ctl::static_array<sort_row_ids_handle>& to_sort) {
   // skip the NULL entry by starting at the first entry
   tbb::parallel_sort(std::next(begin(to_sort)), end(to_sort),
                      [](const sort_row_ids_handle& h1, const sort_row_ids_handle& h2) {
@@ -402,15 +393,14 @@ void sort_unique_agg_groups_row_ids(legacy_embedded_ctl::static_array<sort_row_i
                      });
 }
 
-template <legacy_embedded_ctl::one_of<sort_agg_group_handle, sort_row_ids_handle> SORT_HANDLE_TYPE>
-void assign_sorted_traces(row_id aggregation_domain_size, legacy_embedded_ctl::static_array<trace_type>& traces_data,
-                          legacy_embedded_ctl::static_array<trace_buffer_type>& sorted_traces_buffer,
-                          legacy_embedded_ctl::static_array<trace_length_type>& trace_lengths_data,
-                          const legacy_embedded_ctl::static_array<SORT_HANDLE_TYPE>& to_sort,
-                          legacy_embedded_ctl::static_array<row_id>& sort_variant_map,
-                          legacy_embedded_ctl::static_array<cel_string_t>& pointers_sa) {
+template <ctl::one_of<sort_agg_group_handle, sort_row_ids_handle> SORT_HANDLE_TYPE>
+void assign_sorted_traces(row_id aggregation_domain_size, ctl::static_array<trace_type>& traces_data,
+                          ctl::static_array<trace_buffer_type>& sorted_traces_buffer,
+                          ctl::static_array<trace_length_type>& trace_lengths_data,
+                          const ctl::static_array<SORT_HANDLE_TYPE>& to_sort,
+                          ctl::static_array<row_id>& sort_variant_map, ctl::static_array<cel_string_t>& pointers_sa) {
   // Should never be zero since we always have at least the empty variant
-  legacy_embedded_debug_assert(aggregation_domain_size != 0);
+  debug_assert(aggregation_domain_size != 0);
 
   struct block {
     row_id trace_offset;
@@ -465,7 +455,7 @@ void assign_sorted_traces(row_id aggregation_domain_size, legacy_embedded_ctl::s
           pointers_sa[i] = to_sort[i].aggregated_string;
         }
 
-        legacy_embedded_debug_assert(to_sort[i].orig_id < aggregation_domain_size);
+        debug_assert(to_sort[i].orig_id < aggregation_domain_size);
         // map for trace and string column pointers
         sort_variant_map[to_sort[i].orig_id] = i;
       }
@@ -474,31 +464,30 @@ void assign_sorted_traces(row_id aggregation_domain_size, legacy_embedded_ctl::s
 
   // ensure that all variant ids are still valid
   for (row_id i{0}; i < aggregation_domain_size; ++i) {
-    legacy_embedded_debug_assert(sort_variant_map[i] < aggregation_domain_size);
+    debug_assert(sort_variant_map[i] < aggregation_domain_size);
   }
 }
 
-void assign_sorted_traces(row_id aggregation_domain_size, legacy_embedded_ctl::static_array<trace_type>& traces_data,
-                          legacy_embedded_ctl::static_array<trace_buffer_type>& sorted_traces_buffer,
-                          legacy_embedded_ctl::static_array<trace_length_type>& trace_lengths_data,
-                          const legacy_embedded_ctl::static_array<sort_row_ids_handle>& to_sort,
-                          legacy_embedded_ctl::static_array<row_id>& sort_variant_map,
-                          common::execution_context& context) {
-  legacy_embedded_ctl::static_array<cel_string_t> dummy_pointers{
-      memory::tracking::make_static_array_for_overwrite<cel_string_t>(
-          0, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
+void assign_sorted_traces(row_id aggregation_domain_size, ctl::static_array<trace_type>& traces_data,
+                          ctl::static_array<trace_buffer_type>& sorted_traces_buffer,
+                          ctl::static_array<trace_length_type>& trace_lengths_data,
+                          const ctl::static_array<sort_row_ids_handle>& to_sort,
+                          ctl::static_array<row_id>& sort_variant_map, common::execution_context& context) {
+  ctl::static_array<cel_string_t> dummy_pointers{
+      ctl::make_static_array_for_overwrite<cel_string_t>(0, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
   assign_sorted_traces(aggregation_domain_size, traces_data, sorted_traces_buffer, trace_lengths_data, to_sort,
                        sort_variant_map, dummy_pointers);
 }
 
 template <typename OPERATOR_ACCESSOR, typename PROJECTION_TYPE>
-std::vector<legacy_embedded_ctl::half_open_interval<row_id>> generate_group_aligned_blocks(
-    const OPERATOR_ACCESSOR& accessor, const row_id row_count, const PROJECTION_TYPE& projection_vector,
-    const size_t grain_size) {
+std::vector<ctl::half_open_interval<row_id>> generate_group_aligned_blocks(const OPERATOR_ACCESSOR& accessor,
+                                                                           const row_id row_count,
+                                                                           const PROJECTION_TYPE& projection_vector,
+                                                                           const size_t grain_size) {
   const auto grain_size_row_id{static_cast<row_id>(grain_size)};
 
-  std::vector<legacy_embedded_ctl::half_open_interval<row_id>> blocks{};
+  std::vector<ctl::half_open_interval<row_id>> blocks{};
   row_id block_start{0};
   row_id block_end{0};
   while (block_end < row_count) {
@@ -524,30 +513,29 @@ std::vector<legacy_embedded_ctl::half_open_interval<row_id>> generate_group_alig
 
 struct pu_string_agg_result {
   memory::raw_column_ptrs_t output_column_pointers;
-  legacy_embedded_ctl::static_array<cel_string_t> pointers_sa;
-  legacy_embedded_ctl::static_array<char> string_buffer_sa;
+  ctl::static_array<cel_string_t> pointers_sa;
+  ctl::static_array<char> string_buffer_sa;
   row_id dict_size;
 };
 
 struct variant_op_result {
   memory::raw_column_ptrs_t output_column_pointers;
-  legacy_embedded_ctl::static_array<cel_string_t> pointers_sa;
-  legacy_embedded_ctl::static_array<char> string_buffer_sa;
-  legacy_embedded_ctl::static_array<trace_type> trace_ptrs;
-  legacy_embedded_ctl::static_array<trace_buffer_type> trace_buffer_data;
-  legacy_embedded_ctl::static_array<trace_length_type> trace_lengths;
+  ctl::static_array<cel_string_t> pointers_sa;
+  ctl::static_array<char> string_buffer_sa;
+  ctl::static_array<trace_type> trace_ptrs;
+  ctl::static_array<trace_buffer_type> trace_buffer_data;
+  ctl::static_array<trace_length_type> trace_lengths;
   row_id num_unique_variants;
 };
 
 [[nodiscard]] variant_row_id_result create_empty_variant_row_id_result(const common::execution_context& context) {
   static constexpr trace_length_type EMPTY_TRACE_LENGTH{0};
-  auto trace_cache_data_sorted{memory::tracking::make_static_array_value_init<trace_buffer_type>(
-      EMPTY_TRACE_LENGTH, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
-  auto trace_lengths{memory::tracking::make_static_array<trace_length_type>(
-      {EMPTY_TRACE_LENGTH}, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
-  auto traces{memory::tracking::make_static_array<trace_type>(
-      {trace_cache_data_sorted.data()}, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG),
-      context)};
+  auto trace_cache_data_sorted{
+      ctl::make_static_array_value_init<trace_buffer_type>(EMPTY_TRACE_LENGTH, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+  auto trace_lengths{
+      ctl::make_static_array<trace_length_type>({EMPTY_TRACE_LENGTH}, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
+  auto traces{
+      ctl::make_static_array<trace_type>({trace_cache_data_sorted.data()}, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
   auto group_id_to_trace_id{common::create_owned_column_data(0, 1, memory::zero_init_t{true}, context)};
 
@@ -609,37 +597,35 @@ template <typename THREAD_LOCAL_TYPE>
     const row_id aggregation_domain_size, const row_id output_row_count,
     const trace_buffer_sizes_and_offsets_type& trace_buffer_sizes_and_offsets,
     const std::array<row_id, process::HASHMAPS>& id_offset, const THREAD_LOCAL_TYPE& thread_local_front_keep,
-    const legacy_embedded_ctl::static_array<group_result>& result_per_group,
-    const legacy_embedded_ctl::static_array<row_id>& project_group_id_to_group_table,
-    common::execution_context& context, const size_t grain_size) {
-  auto to_sort{memory::tracking::make_static_array_for_overwrite<sort_row_ids_handle>(
-      aggregation_domain_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
+    const ctl::static_array<group_result>& result_per_group,
+    const ctl::static_array<row_id>& project_group_id_to_group_table, common::execution_context& context,
+    const size_t grain_size) {
+  auto to_sort{ctl::make_static_array_for_overwrite<sort_row_ids_handle>(aggregation_domain_size,
+                                                                         ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG))};
 
   // variant_id_to_trace[variant_id] points into the sorted_trace_data_buffer for variant with id 'variant_id'
-  auto variant_id_to_trace{memory::tracking::make_static_array_for_overwrite<trace_type>(
-      aggregation_domain_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
+  auto variant_id_to_trace{
+      ctl::make_static_array_for_overwrite<trace_type>(aggregation_domain_size, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG))};
 
   // variant_id_to_length[variant_id]: gives the length of variant with id 'variant_id'
-  auto variant_id_to_trace_length{memory::tracking::make_static_array_for_overwrite<trace_length_type>(
-      aggregation_domain_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::RAW_DATA_ALLOC_MSG), context)};
+  auto variant_id_to_trace_length{ctl::make_static_array_for_overwrite<trace_length_type>(
+      aggregation_domain_size, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG))};
 
   // Stores the actual variant trace data i.e. row ids from the activity column representing the trace
   // this is int16_t since there can only be 2^15 - 1 == 32767 distinct activity types
-  auto trace_data_buffer{memory::tracking::make_static_array_value_init<int16_t>(
-      trace_buffer_sizes_and_offsets.trace_buffer_size,
-      LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
+  auto trace_data_buffer{ctl::make_static_array_value_init<int16_t>(trace_buffer_sizes_and_offsets.trace_buffer_size,
+                                                                    ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
-  auto sorted_trace_data_buffer{memory::tracking::make_static_array_value_init<int16_t>(
-      trace_buffer_sizes_and_offsets.trace_buffer_size,
-      LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
+  auto sorted_trace_data_buffer{ctl::make_static_array_value_init<int16_t>(
+      trace_buffer_sizes_and_offsets.trace_buffer_size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
   fill_trace_buffer_and_sort_array(variant_id_to_trace, variant_id_to_trace_length, trace_data_buffer,
                                    trace_buffer_sizes_and_offsets, id_offset, to_sort, thread_local_front_keep);
 
   sort_unique_agg_groups_row_ids(to_sort);
 
-  auto unsorted_to_sorted_variant_id_map{memory::tracking::make_static_array_value_init<row_id>(
-      aggregation_domain_size, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG), context)};
+  auto unsorted_to_sorted_variant_id_map{
+      ctl::make_static_array_value_init<row_id>(aggregation_domain_size, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
   assign_sorted_traces(aggregation_domain_size, variant_id_to_trace, sorted_trace_data_buffer,
                        variant_id_to_trace_length, to_sort, unsorted_to_sorted_variant_id_map, context);
@@ -742,9 +728,8 @@ struct exec_parallel_string_aggregation {
 
     using string_col_ptr_t = std::remove_reference_t<decltype(std::declval<const ACCESSOR&>()[row_id{}])>;
 
-    auto result_per_group{memory::tracking::make_static_array<group_result>(
-        static_cast<size_t>(output_row_count), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG),
-        context)};
+    auto result_per_group{ctl::make_static_array<group_result>(static_cast<size_t>(output_row_count),
+                                                               ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
     // atomic variable to get unique values for thread ids
     std::atomic<int> next_thread_id{0};
@@ -764,9 +749,8 @@ struct exec_parallel_string_aggregation {
     auto group_aligned_blocks{
         generate_group_aligned_blocks(accessor, string_column.row_count, projection_vector, grain_size)};
 
-    auto project_group_id_to_group_table{memory::tracking::make_static_array(
-        output_row_count, VALUE_NOT_FOUND, LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG),
-        context)};
+    auto project_group_id_to_group_table{
+        ctl::make_static_array(output_row_count, VALUE_NOT_FOUND, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
     // collect the unique groups in thread_local_deduplicate
     collect_aggregation_groups(accessor, group_aligned_blocks, thread_local_deduplicate, string_col_ptrs_ac,
@@ -831,7 +815,7 @@ template <typename ACCESSOR>
         compute_variants_context,
         projection_vector,
         num_case_rows,
-        column_info<false>{legacy_embedded_ctl::cast<row_id>(activity_column.size())},
+        column_info<false>{ctl::cast<row_id>(activity_column.size())},
         VARIANT_DELIMITER,
         grain_size}(activity_column);
   };
@@ -861,7 +845,7 @@ template <typename VALUES_ACCESSOR>
             compute_variants_context,
             mapping,
             number_of_groups,
-            column_info<false>{legacy_embedded_ctl::cast<row_id>(values.size())},
+            column_info<false>{ctl::cast<row_id>(values.size())},
             VARIANT_DELIMITER,
             grain_size}(values);
       },
@@ -945,8 +929,8 @@ memory::cache::variant_trace_cache_t compute_variant_row_ids(
 [[nodiscard]] memory::cache::variant_trace_cache_t compute_variant_row_ids(
     common::execution_context& context, [[maybe_unused]] const std::string& cache_key,
     [[maybe_unused]] const std::string& activity_table_name, row_id num_case_rows,
-    const memory::join_projection_vector_t& projection_vector,
-    const legacy_embedded_ctl::shared_static_array<row_id>& activity_column, size_t grain_size) {
+    const memory::join_projection_vector_t& projection_vector, const ctl::shared_static_array<row_id>& activity_column,
+    size_t grain_size) {
   return compute_variant_row_ids_impl(context, num_case_rows, projection_vector, activity_column, grain_size);
 }
 

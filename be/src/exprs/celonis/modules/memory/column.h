@@ -5,8 +5,9 @@
 #include <shared_mutex>
 #include <utility>
 
+#include <ctl/assert.h>
+
 #include "column_fwd.h"  // IWYU pragma: export
-#include "legacy_embedded_ctl/assert.h"
 #include "modules/common/execution_context.h"
 #include "modules/memory/column_loading/column_loader.h"
 #include "modules/memory/column_pointers.h"
@@ -162,7 +163,7 @@ class column {
         status_(status),
         managed_group_(std::move(managed_group)),
         processing_state_(std::move(processing_state)) {
-    legacy_embedded_ctl::abort_assert(config_.row_count >= 0);
+    ctl::abort_assert(config_.row_count >= 0);
   }
 
   column_loading::column_config config_;

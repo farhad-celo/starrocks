@@ -7,10 +7,9 @@
 #include <fmt/format.h>
 #include <tbb/enumerable_thread_specific.h>
 
+#include <ctl/utility.h>
+
 #include "concurrency/concurrency_utils.h"
-#include "legacy_embedded_ctl/assert.h"
-#include "legacy_embedded_ctl/source_location.h"
-#include "legacy_embedded_ctl/utility.h"
 #include "log/log.h"
 #include "modules/common/aligned_blocked_range.h"
 #include "modules/common/date/celonis_date_storage.h"

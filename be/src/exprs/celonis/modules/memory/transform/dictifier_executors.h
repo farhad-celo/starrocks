@@ -8,9 +8,9 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
-#include "legacy_embedded_ctl/bitset_base.h"
-#include "legacy_embedded_ctl/source_location.h"
-#include "legacy_embedded_ctl/static_array.h"
+#include <ctl/bitset.h>
+#include <ctl/static_array.h>
+
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
 #include "modules/memory/column_pointers.h"
@@ -23,11 +23,9 @@ namespace celonis::accelerator::memory::transform::details {
 template <typename TYPE>
 class exec_dictify_step2 final {
  public:
-  exec_dictify_step2(const std::vector<dictify_work_item>& work_items,
-                     legacy_embedded_ctl::static_array<TYPE>& distinct_values,
-                     const legacy_embedded_ctl::bitset_view_t null_flags, const row_id size,
-                     const row_id non_null_value_count, std::pair<TYPE, row_id>* index_prepared,
-                     const common::execution_context& context)
+  exec_dictify_step2(const std::vector<dictify_work_item>& work_items, ctl::static_array<TYPE>& distinct_values,
+                     const ctl::bitset_view_t null_flags, const row_id size, const row_id non_null_value_count,
+                     std::pair<TYPE, row_id>* index_prepared, const common::execution_context& context)
       : work_items(work_items),
         distinct_values(distinct_values),
         null_flags(null_flags),
@@ -45,9 +43,8 @@ class exec_dictify_step2 final {
       const dictify_work_item item = this->work_items[w];
 
       // The cast avoids the calls to the pair default constructor
-      auto actual_dict{memory::tracking::make_static_array<std::pair<TYPE, row_id>>(
-          static_cast<size_t>(item.value_count), LEGACY_EMBEDDED_ALLOC_MSG(legacy_embedded_ctl::TEMPORARY_STORAGE_MSG),
-          context)};
+      auto actual_dict{ctl::make_static_array<std::pair<TYPE, row_id>>(static_cast<size_t>(item.value_count),
+                                                                       ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
       // this maps values to RIDs - actual_dict_ptr points to the current value.
       std::pair<TYPE, row_id>* actual_dict_ptr = actual_dict.data();
@@ -110,8 +107,8 @@ class exec_dictify_step2 final {
 
  private:
   const std::vector<dictify_work_item>& work_items;
-  legacy_embedded_ctl::static_array<TYPE>& distinct_values;
-  const legacy_embedded_ctl::bitset_view_t null_flags;
+  ctl::static_array<TYPE>& distinct_values;
+  const ctl::bitset_view_t null_flags;
   row_id size;
   row_id non_null_value_count;
   std::pair<TYPE, row_id>* index_prepared;
@@ -153,10 +150,11 @@ class dictionary_id_resolver final {
 
 class exec_dictify_sort_based_str_step2 final {
  public:
-  exec_dictify_sort_based_str_step2(
-      const row_id rows, const legacy_embedded_ctl::static_array<std::pair<cel_string_t, row_id>>& sorted_strings,
-      const legacy_embedded_ctl::bitset_view_t null_flags, const std::vector<distinct_element_data::block_data>& blocks,
-      const row_id block_size, const common::execution_context& context)
+  exec_dictify_sort_based_str_step2(const row_id rows,
+                                    const ctl::static_array<std::pair<cel_string_t, row_id>>& sorted_strings,
+                                    const ctl::bitset_view_t null_flags,
+                                    const std::vector<distinct_element_data::block_data>& blocks,
+                                    const row_id block_size, const common::execution_context& context)
       : rows(rows),
         sorted_strings(sorted_strings),
         null_flags(null_flags),
@@ -195,8 +193,8 @@ class exec_dictify_sort_based_str_step2 final {
 
  private:
   row_id rows;
-  const legacy_embedded_ctl::static_array<std::pair<cel_string_t, row_id>>& sorted_strings;
-  const legacy_embedded_ctl::bitset_view_t null_flags;
+  const ctl::static_array<std::pair<cel_string_t, row_id>>& sorted_strings;
+  const ctl::bitset_view_t null_flags;
   const std::vector<distinct_element_data::block_data>& blocks;
   const size_t block_size;
   const common::execution_context& context;

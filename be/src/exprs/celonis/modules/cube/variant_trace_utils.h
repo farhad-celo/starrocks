@@ -2,7 +2,8 @@
 
 #include <memory>
 
-#include "legacy_embedded_ctl/static_array.h"
+#include <ctl/static_array.h>
+
 #include "modules/common/owned_column_ptr_data.h"
 #include "modules/common/trace_types.h"
 #include "modules/memory/cache/variant_trace_cache_fwd.h"
@@ -11,9 +12,9 @@
 
 namespace celonis::accelerator::cube {
 
-using trace_array_t = legacy_embedded_ctl::static_array<trace_type>;
-using trace_buffer_array_t = legacy_embedded_ctl::static_array<trace_buffer_type>;
-using trace_length_array_t = legacy_embedded_ctl::static_array<trace_length_type>;
+using trace_array_t = ctl::static_array<trace_type>;
+using trace_buffer_array_t = ctl::static_array<trace_buffer_type>;
+using trace_length_array_t = ctl::static_array<trace_length_type>;
 
 namespace details {
 

@@ -4,8 +4,9 @@
 #include <shared_mutex>
 #include <vector>
 
-#include "legacy_embedded_ctl/conversion.h"
-#include "legacy_embedded_ctl/static_array.h"
+#include <ctl/conversion.h>
+#include <ctl/static_array.h>
+
 #include "modules/memory/column.h"
 #include "modules/memory/table_fwd.h"
 #include "modules/memory/table_meta_data.h"
@@ -15,7 +16,7 @@ namespace celonis::accelerator::memory {
 // check rows is under both numeric_limits<row_id>::max() and table_row_limits
 template <typename T>
 [[nodiscard]] bool check_row_limit(T rows, int64_t table_row_limit) {
-  return legacy_embedded_ctl::is_safe_to_cast<row_id>(rows) && std::cmp_less_equal(rows, table_row_limit);
+  return ctl::is_safe_to_cast<row_id>(rows) && std::cmp_less_equal(rows, table_row_limit);
 }
 
 using optional_string_values_t = std::vector<std::optional<std::string>>;

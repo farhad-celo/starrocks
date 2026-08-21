@@ -53,7 +53,6 @@ list(APPEND SOURCES
 
 # modularization split
 add_module("concurrency")
-add_module("legacy_embedded_ctl")
 add_module("legacy_embedded_format")
 add_module("logging")
 add_module("types")

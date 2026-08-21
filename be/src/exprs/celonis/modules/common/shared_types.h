@@ -8,7 +8,8 @@
 
 #include <fmt/ostream.h>
 
-#include "legacy_embedded_ctl/type_traits.h"
+#include <ctl/type_traits.h>
+
 #include "modules/common/int_types.h"
 #include "modules/common/shared_types_fwd.h"
 
@@ -61,7 +62,7 @@ constexpr data_type get_matching_data_type() noexcept {
   } else if constexpr (is_same_underlying_type<T, cel_null_t>()) {
     return data_type::cel_null;
   } else {
-    static_assert(legacy_embedded_ctl::always_false_v<T>, "The type has no matching data type.");
+    static_assert(ctl::always_false_v<T>, "The type has no matching data type.");
   }
 }
 

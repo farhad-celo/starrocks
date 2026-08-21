@@ -6,9 +6,10 @@
 
 #include <tbb/blocked_range.h>
 
-#include "legacy_embedded_ctl/assert.h"
-#include "legacy_embedded_ctl/conversion.h"
-#include "legacy_embedded_ctl/interval.h"
+#include <ctl/assert.h>
+#include <ctl/conversion.h>
+#include <ctl/interval.h>
+
 #include "modules/common/exceptions.h"
 #include "modules/common/int_types.h"
 #include "modules/memory/column.h"
@@ -71,14 +72,14 @@ struct case_aligned_range {
         end(static_cast<size_t>(this->case_column->get_row_count())) {}
 };
 
-template <legacy_embedded_ctl::parallelism_settings_t PARALLELISM_SETTING>
+template <ctl::parallelism_settings_t PARALLELISM_SETTING>
 struct set_bit_aligned_range {
-  const legacy_embedded_ctl::dynamic_bitset<PARALLELISM_SETTING>& bitset;
+  const ctl::dynamic_bitset<PARALLELISM_SETTING>& bitset;
   size_t begin;
   size_t end;
   size_t grain_size;
-  explicit set_bit_aligned_range(const legacy_embedded_ctl::dynamic_bitset<PARALLELISM_SETTING>& bitset, size_t begin,
-                                 size_t end, size_t grain_size = 1) noexcept
+  explicit set_bit_aligned_range(const ctl::dynamic_bitset<PARALLELISM_SETTING>& bitset, size_t begin, size_t end,
+                                 size_t grain_size = 1) noexcept
       : bitset{bitset}, begin{begin}, end{end}, grain_size{grain_size} {}
   set_bit_aligned_range(set_bit_aligned_range& other, tbb::split /**/) noexcept
       : bitset{other.bitset}, begin{other.midpoint()}, end{other.end}, grain_size{other.grain_size} {
@@ -110,7 +111,7 @@ struct group_aligned_range {
   [[no_unique_address]] PROJECTION projection;
   [[nodiscard]] bool empty() const { return std::distance(begin, end) == 0; }
   [[nodiscard]] bool is_divisible() const {
-    return legacy_embedded_ctl::cast<size_t>(std::distance(begin, end)) > grain_size &&
+    return ctl::cast<size_t>(std::distance(begin, end)) > grain_size &&
            std::ranges::mismatch(std::next(begin), end, begin, end, std::ranges::equal_to{}, projection, projection)
                    .in1 != end;
   }
@@ -143,9 +144,10 @@ struct group_aligned_range {
 };
 
 template <class CASE_PTR_ACCESSOR>
-std::vector<legacy_embedded_ctl::half_open_interval<row_id>> generate_case_aligned_blocks(
-    const CASE_PTR_ACCESSOR& case_ptr_ac, const row_id row_count, const size_t grainsize) {
-  std::vector<legacy_embedded_ctl::half_open_interval<row_id>> ret;
+std::vector<ctl::half_open_interval<row_id>> generate_case_aligned_blocks(const CASE_PTR_ACCESSOR& case_ptr_ac,
+                                                                          const row_id row_count,
+                                                                          const size_t grainsize) {
+  std::vector<ctl::half_open_interval<row_id>> ret;
   int64_t laststart = 0;
   int64_t nextsplit = 0;
   // Must have same type for std::min()
@@ -163,8 +165,8 @@ std::vector<legacy_embedded_ctl::half_open_interval<row_id>> generate_case_align
     }
     ret.emplace_back(laststart, nextsplit);
     laststart = nextsplit;
-    legacy_embedded_debug_assert(nextsplit == row_count || case_ptr_ac[static_cast<row_id>(nextsplit) - 1] !=
-                                                               case_ptr_ac[static_cast<row_id>(nextsplit)]);
+    debug_assert(nextsplit == row_count ||
+                 case_ptr_ac[static_cast<row_id>(nextsplit) - 1] != case_ptr_ac[static_cast<row_id>(nextsplit)]);
   }
   return ret;
 }

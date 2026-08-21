@@ -1,13 +1,13 @@
 #pragma once
 
-#include "legacy_embedded_ctl/checked_ptr.h"
+#include <ctl/checked_ptr.h>
 
 namespace celonis::accelerator::memory {
 
 class column_processing_state;
 
 class column;
-using column_t = legacy_embedded_ctl::checked_shared_ptr<column>;
+using column_t = ctl::checked_shared_ptr<column>;
 
 struct col_cache_key;
 

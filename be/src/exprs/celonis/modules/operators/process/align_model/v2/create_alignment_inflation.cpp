@@ -200,16 +200,14 @@ struct petri_net_label_id_to_string_mapper {
   auto buffer_size{std::accumulate(std::begin(buffer_entries), std::end(buffer_entries), size_t{0},
                                    [](const auto acc, const auto& entry) { return acc + entry.size() + 1; })};
 
-  auto buffer{
-      ctl::make_static_array_for_overwrite<char>(buffer_size, ALLOC_MSG(legacy_embedded_ctl::OUTPUT_COLUMN_MSG))};
+  auto buffer{ctl::make_static_array_for_overwrite<char>(buffer_size, ALLOC_MSG(ctl::OUTPUT_COLUMN_MSG))};
 
   std::unordered_set<std::string_view> buffer_lookup;
 
   auto* buffer_ptr{buffer.data()};
   for (const auto& entry : buffer_entries) {
     const auto* old_buffer_ptr{buffer_ptr};
-    buffer_ptr = std::ranges::copy_n(entry.c_str(),
-                                     legacy_embedded_ctl::cast<std::iter_difference_t<cel_string_t>>(entry.size() + 1),
+    buffer_ptr = std::ranges::copy_n(entry.c_str(), ctl::cast<std::iter_difference_t<cel_string_t>>(entry.size() + 1),
                                      buffer_ptr)
                      .out;
     buffer_lookup.emplace(old_buffer_ptr, entry.size());
@@ -295,10 +293,10 @@ std::pair<std::vector<parallel_block>, table_sizes> get_blocks(
         table_sizes accumulated_table_sizes{.variant_table_size = 0};
         auto output_it{begin(result)};
         for (const auto& block_info : flattened_blocks) {
-          *output_it++ = parallel_block{
-              .offset_in = block_info.first,
-              .size_in = block_info.last - block_info.first,
-              .offset_variant = legacy_embedded_ctl::cast<row_id>(accumulated_table_sizes.variant_table_size)};
+          *output_it++ =
+              parallel_block{.offset_in = block_info.first,
+                             .size_in = block_info.last - block_info.first,
+                             .offset_variant = ctl::cast<row_id>(accumulated_table_sizes.variant_table_size)};
           accumulated_table_sizes.variant_table_size += block_info.variant_table_size;
         }
 

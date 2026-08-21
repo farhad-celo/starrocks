@@ -1,12 +1,11 @@
 #pragma once
 
-#include "legacy_embedded_ctl/bitset_view.h"
-#include "legacy_embedded_ctl/dynamic_bitset_fwd.h"
+#include <ctl/bitset.h>
+
 #include "modules/common/execution_context_fwd.h"
 #include "modules/memory/management/const_bitset_data_accessor_fwd.h"
 #include "modules/memory/management/data_handler.h"
 #include "modules/memory/management/raw_data_handler_fwd.h"
-#include "modules/memory/management/swap_info_fwd.h"
 #include "modules/memory/null_flags_fwd.h"
 
 /**

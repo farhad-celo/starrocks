@@ -2,7 +2,8 @@
 
 #include <nlohmann/json.hpp>
 
-#include "legacy_embedded_ctl/system_constants.h"
+#include <ctl/system_constants.h>
+
 #include "modules/common/exceptions.h"
 /**
  * nlohmann JSON conversion for custom type.

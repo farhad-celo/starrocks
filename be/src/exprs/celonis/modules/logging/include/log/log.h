@@ -12,7 +12,7 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
-#include "legacy_embedded_format/json/json_fwd.h"
+#include "legacy_embedded_format/json/json.h"
 #include "modules/common/int_types.h"
 
 namespace celonis::accelerator::log {
