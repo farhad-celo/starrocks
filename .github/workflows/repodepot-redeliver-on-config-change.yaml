@@ -27,6 +27,6 @@ jobs:
     with:
       repo-depot-version: stable
       repository-name: celonis/celostar-starrocks
-      service-name: celostar-fe
+      service-name: celostar-be
       skip-eligibility-check: true
     secrets: inherit
