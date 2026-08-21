@@ -61,7 +61,7 @@ outputs:
     value: ${{ steps.create-image.outputs.metadata }}
 
   celostar-docker-tag:
-    description: 'Celostar Docker tag (pr<pr-number>-<version>_RCxx) derived from the default branch and release branch.'
+    description: 'Celostar Docker tag (pr<pr-number>-<version>_RCxx) derived for release candidate builds; empty for development builds.'
     value: ${{ steps.celostar-docker-tag.outputs.celostar-docker-tag }}
 
 runs:
@@ -72,6 +72,8 @@ runs:
   steps:
     - name: Generate Celostar Docker tag
       id: celostar-docker-tag
+      # Development builds do not have a release branch and use image-tag as their embedded version.
+      if: inputs.is-dev-build != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
