@@ -970,6 +970,20 @@ public class GlobalTransactionMgrTest {
     }
 
     @Test
+    public void testRetryCommitMissingTransactionDoesNotThrowNpe()
+            throws StarRocksException {
+        Database db = new Database(10, "db0");
+        GlobalTransactionMgr globalTransactionMgr = spy(new GlobalTransactionMgr(GlobalStateMgr.getCurrentState()));
+
+        doReturn(null).when(globalTransactionMgr).getTransactionState(db.getId(), 1001);
+        StarRocksException exception = Assertions.assertThrows(StarRocksException.class,
+                () -> globalTransactionMgr.commitAndPublishTransaction(db, 1001,
+                        Collections.emptyList(), Collections.emptyList(), 10, null));
+        Assertions.assertTrue(exception.getMessage().contains("transaction not found: 1001"));
+        Assertions.assertFalse(exception.getMessage().contains("Cannot invoke"));
+    }
+
+    @Test
     public void testRetryCommitOnRateLimitExceededThrowLockTimeoutException()
             throws StarRocksException, LockTimeoutException {
         Database db = new Database(10L, "db0");
