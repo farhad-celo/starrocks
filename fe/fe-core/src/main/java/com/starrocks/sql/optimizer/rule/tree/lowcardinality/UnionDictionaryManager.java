@@ -22,6 +22,8 @@ import com.google.common.collect.Sets;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.Config;
 import com.starrocks.common.util.UnionFind;
+import com.starrocks.metric.MetricLabel;
+import com.starrocks.metric.celonis.CelonisMetrics;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.sql.optimizer.base.ColumnRefSet;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
@@ -61,6 +63,11 @@ public class UnionDictionaryManager {
         this.joinEqColumnGroupIds = joinEqColumnGroupIds;
     }
 
+    static void logUnionAllDecodeMetric(String reason) {
+        CelonisMetrics.increaseCounter("lco_union_all_decode", "lco union all decode",
+                new MetricLabel("reason", reason));
+    }
+
     private static ImmutableMap<ByteBuffer, Integer> mergeDictionaryData(List<ImmutableMap<ByteBuffer, Integer>> dicts,
                                                                          Collection<ByteBuffer> constants) {
         Set<ByteBuffer> uniques = Sets.newHashSet();
@@ -69,8 +76,16 @@ public class UnionDictionaryManager {
         int totalDictSize = uniques.stream().map(b -> b.remaining() + 4).reduce(0, Integer::sum);
         // TODO(farhad-celo): This constant is hardcoded in other places, refactor to a config.
         final int DICT_PAGE_MAX_SIZE = 1024 * 1024;
-        if (uniques.size() > Config.low_cardinality_threshold || totalDictSize > DICT_PAGE_MAX_SIZE - 32
-                || uniques.isEmpty()) {
+        if (uniques.isEmpty()) {
+            logUnionAllDecodeMetric("union_empty_dict");
+            return null;
+        }
+        if (uniques.size() > Config.low_cardinality_threshold) {
+            logUnionAllDecodeMetric("union_dict_cardinality_exceeded");
+            return null;
+        }
+        if (totalDictSize > DICT_PAGE_MAX_SIZE - 32) {
+            logUnionAllDecodeMetric("union_dict_page_size_exceeded");
             return null;
         }
         // Sort unsigned to match BE's memcmp order; plain sorted() is signed on JDK 8. See ColumnDict.UNSIGNED_LEX.
@@ -102,15 +117,19 @@ public class UnionDictionaryManager {
 
     Integer mergeDictionaries(List<Integer> columnIds, Integer outputColumnId) {
         if (!sessionVariable.isEnableLowCardinalityOptimizeForUnionAll()) {
+            logUnionAllDecodeMetric("disabled");
             return null;
         }
         List<ByteBuffer> allConstantData =
                 columnIds.stream().map(constantColumns::get).filter(Objects::nonNull).toList();
         List<Integer> nonConstantColumnIds = columnIds.stream().map(this::getSourceDictionaryColumnId)
                 .filter(cid -> cid == null || cid != CONSTANT_ID).toList();
-        if (nonConstantColumnIds.contains(null)
-                || !nonConstantColumnIds.stream().allMatch(globalDicts::containsKey)
-                || nonConstantColumnIds.stream().anyMatch(joinEqColumnGroupIds::contains)) {
+        if (nonConstantColumnIds.contains(null)) {
+            logUnionAllDecodeMetric("non_column_dict_branches");
+            return null;
+        }
+        if (nonConstantColumnIds.stream().anyMatch(joinEqColumnGroupIds::contains)) {
+            logUnionAllDecodeMetric("conflict_with_join_eq_groups");
             return null;
         }
         nonConstantColumnIds.forEach(cid -> {

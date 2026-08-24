@@ -776,6 +776,9 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                     }
                     result.outputStringColumns.union(outputColumn);
                 } else {
+                    if (!isCandidate && childColumns.stream().anyMatch(c -> context.outputStringColumns.contains(c))) {
+                        UnionDictionaryManager.logUnionAllDecodeMetric("undictified_branches");
+                    }
                     childColumns.stream().filter(c -> context.outputStringColumns.contains(c))
                             .forEach(result.decodeStringColumns::union);
                 }
