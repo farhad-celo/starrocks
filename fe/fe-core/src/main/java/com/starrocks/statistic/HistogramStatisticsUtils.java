@@ -15,11 +15,14 @@
 package com.starrocks.statistic;
 
 import com.google.gson.JsonArray;
+import com.starrocks.analysis.DateLiteral;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.NullLiteral;
 import com.starrocks.analysis.StringLiteral;
 import com.starrocks.analysis.TableName;
+import com.starrocks.catalog.Type;
 import com.starrocks.common.DdlException;
+import com.starrocks.common.Pair;
 import com.starrocks.common.util.SqlUtils;
 import com.starrocks.qe.OriginStatement;
 import com.starrocks.sql.ast.ColumnDef;
@@ -34,10 +37,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public final class HistogramStatisticsUtils {
     private HistogramStatisticsUtils() {
+    }
+
+    static Optional<Pair<String, String>> defaultBounds(Type columnType) {
+        if (columnType.isDate() || columnType.isDatetime()) {
+            return Optional.of(Pair.create(DateLiteral.createMinValue(columnType).getStringValue(),
+                    DateLiteral.createMaxValue(columnType).getStringValue()));
+        }
+        return Optional.empty();
     }
 
     static String buildMcvJson(Map<String, String> mostCommonValues) {

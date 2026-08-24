@@ -18,16 +18,20 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
+import com.starrocks.analysis.DateLiteral;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.NullLiteral;
 import com.starrocks.analysis.StringLiteral;
+import com.starrocks.catalog.Type;
 import com.starrocks.common.DdlException;
+import com.starrocks.common.Pair;
 import com.starrocks.qe.SqlModeHelper;
 import com.starrocks.sql.ast.InsertStmt;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.SelectRelation;
 import com.starrocks.sql.ast.StatementBase;
 import com.starrocks.sql.ast.ValuesRelation;
+import com.starrocks.sql.optimizer.statistics.Bucket;
 import com.starrocks.sql.optimizer.statistics.HistogramUtils;
 import com.starrocks.sql.parser.SqlParser;
 import com.starrocks.thrift.TStatisticData;
@@ -36,6 +40,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.starrocks.statistic.StatsConstants.HISTOGRAM_STATISTICS_TABLE_NAME;
 
@@ -95,6 +100,46 @@ public class HistogramStatisticsUtilsTest {
         Assertions.assertEquals(HistogramStatisticsUtils.quoteSqlString(buckets),
                 HistogramStatisticsUtils.buildBucketsSql(buckets));
         Assertions.assertEquals(buckets, HistogramStatisticsUtils.normalizeBucketsForHll(buckets));
+    }
+
+    @Test
+    public void testDefaultDateBoundsAreReadableByTheOptimizer() throws Exception {
+        // Given a date column whose sampled min/max is unusable
+        // WHEN the fallback bounds are used
+        // THEN they span the full domain of the type, as defined by DateLiteral, and the optimizer parses them back END
+
+        assertDefaultDateBounds(Type.DATE,
+                DateLiteral.createMinValue(Type.DATE).getStringValue(),
+                DateLiteral.createMaxValue(Type.DATE).getStringValue());
+        assertDefaultDateBounds(Type.DATETIME,
+                DateLiteral.createMinValue(Type.DATETIME).getStringValue(),
+                DateLiteral.createMaxValue(Type.DATETIME).getStringValue());
+
+        // Pin the literal strings too, so a change in DateLiteral's bounds does not slip through unnoticed.
+        Assertions.assertEquals(Pair.create("0000-01-01", "9999-12-31"),
+                HistogramStatisticsUtils.defaultBounds(Type.DATE).orElseThrow());
+        Assertions.assertEquals(Pair.create("0000-01-01 00:00:00", "9999-12-31 23:59:59.999999"),
+                HistogramStatisticsUtils.defaultBounds(Type.DATETIME).orElseThrow());
+
+        // Numeric and char-family columns keep the "Infinity" placeholder, so they get no date fallback.
+        Assertions.assertTrue(HistogramStatisticsUtils.defaultBounds(Type.BIGINT).isEmpty());
+        Assertions.assertTrue(HistogramStatisticsUtils.defaultBounds(Type.VARCHAR).isEmpty());
+    }
+
+    private static void assertDefaultDateBounds(Type dateType, String expectedMin, String expectedMax)
+            throws Exception {
+        Optional<Pair<String, String>> actualBounds = HistogramStatisticsUtils.defaultBounds(dateType);
+
+        Assertions.assertTrue(actualBounds.isPresent(), dateType.toString());
+        Assertions.assertEquals(expectedMin, actualBounds.get().first, dateType.toString());
+        Assertions.assertEquals(expectedMax, actualBounds.get().second, dateType.toString());
+
+        // The whole point of these bounds: unlike "Infinity", HistogramUtils can read them back. It drops
+        // buckets whose bounds fail to parse, so an empty list here would mean the fallback is useless.
+        List<Bucket> parsedBuckets = HistogramUtils.convertBuckets("{\"buckets\":[[\"" + expectedMin + "\",\"" +
+                expectedMax + "\",\"100\",\"0\"]]}", dateType);
+
+        Assertions.assertTrue(parsedBuckets.get(0).getLower() < parsedBuckets.get(0).getUpper());
     }
 
     @Test

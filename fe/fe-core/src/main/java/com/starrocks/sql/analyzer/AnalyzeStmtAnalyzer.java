@@ -87,6 +87,7 @@ public class AnalyzeStmtAnalyzer {
             StatsConstants.HISTOGRAM_BUCKET_NUM,
             StatsConstants.HISTOGRAM_MCV_SIZE,
             StatsConstants.HISTOGRAM_SAMPLE_RATIO,
+            StatsConstants.HISTOGRAM_STATS_SCOPE,
             StatsConstants.INIT_SAMPLE_STATS_JOB,
 
             StatsConstants.UNNEST_VIRTUAL_STATISTICS,
@@ -396,6 +397,19 @@ public class AnalyzeStmtAnalyzer {
                         p -> String.valueOf(Config.histogram_mcv_size));
                 properties.computeIfAbsent(StatsConstants.HISTOGRAM_SAMPLE_RATIO,
                         p -> String.valueOf(Config.histogram_sample_ratio));
+
+                // Validated but deliberately not defaulted into the map: omitting the property already
+                // means "collect every kind", so there is nothing to materialise.
+                if (properties.containsKey(StatsConstants.HISTOGRAM_STATS_SCOPE)) {
+                    try {
+                        StatsConstants.parseHistogramStatsScope(
+                                properties.get(StatsConstants.HISTOGRAM_STATS_SCOPE));
+                    } catch (IllegalArgumentException e) {
+                        throw new SemanticException("Property '%s' must be a comma-separated subset of %s: %s",
+                                StatsConstants.HISTOGRAM_STATS_SCOPE, StatsConstants.HISTOGRAM_STATS_SCOPE_VALUES,
+                                e.getMessage());
+                    }
+                }
 
                 double totalRows = 0;
                 if (analyzeTable.isNativeTableOrMaterializedView()) {

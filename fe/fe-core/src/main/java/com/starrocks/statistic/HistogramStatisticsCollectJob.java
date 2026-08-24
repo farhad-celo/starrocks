@@ -26,19 +26,25 @@ import com.starrocks.catalog.Table;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.Config;
 import com.starrocks.common.DdlException;
+import com.starrocks.common.Pair;
 import com.starrocks.common.util.SqlUtils;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.thrift.TStatisticData;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.velocity.VelocityContext;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.starrocks.statistic.HistogramStatisticsUtils.batchInsertPrefixSize;
 import static com.starrocks.statistic.HistogramStatisticsUtils.buildBatchInsertPrefix;
@@ -47,6 +53,7 @@ import static com.starrocks.statistic.HistogramStatisticsUtils.buildBucketsSql;
 import static com.starrocks.statistic.HistogramStatisticsUtils.buildMcvJson;
 import static com.starrocks.statistic.HistogramStatisticsUtils.buildStatsTargetColumnNames;
 import static com.starrocks.statistic.HistogramStatisticsUtils.createInsertStmt;
+import static com.starrocks.statistic.HistogramStatisticsUtils.defaultBounds;
 import static com.starrocks.statistic.HistogramStatisticsUtils.quoteSqlString;
 import static com.starrocks.statistic.HistogramStatisticsUtils.utf8Length;
 import static com.starrocks.statistic.StatsConstants.HISTOGRAM_STATISTICS_TABLE_NAME;
@@ -75,24 +82,35 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
                     "   WHERE $randFilter and $columnName is not null $MCVExclude" +
                     "   ORDER BY $columnName LIMIT $totalRows) t";
 
-
-
-    // For char-family columns we skip the histogram() bucket aggregate, but we still need
-    // Histogram.getTotalRows() to reflect the column's real cardinality. So instead of storing
-    // NULL buckets we store a single placeholder bucket that represents "all values excluding
-    // the MCVs".
-    private static final String COLLECT_DEFAULT_BUCKET_STATISTIC_TEMPLATE =
+    // A single bucket replaces the histogram() aggregate in two cases: char-family columns (whose buckets we
+    // cannot build) and jobs whose histogram_stats_scope excludes buckets. Either way we still need
+    // Histogram.getTotalRows() to reflect the column's real cardinality, so instead of storing NULL buckets we
+    // store one bucket representing "all values excluding the MCVs".
+    private static final String COLLECT_SINGLE_BUCKET_STATISTIC_TEMPLATE =
             "SELECT $tableId, '$columnNameStr', $dbId, '$dbName.$tableName'," +
                     " $bucketExpr," +
                     " $mcv," +
                     " NOW()" +
                     " FROM `$dbName`.`$tableName`$sampleClause$randFilter";
 
-    private static final String QUERY_DEFAULT_BUCKET_STATISTIC_TEMPLATE =
+    private static final String QUERY_SINGLE_BUCKET_STATISTIC_TEMPLATE =
             "SELECT cast(" + StatsConstants.STATISTIC_HISTOGRAM_VERSION + " as INT)," +
                     " cast($dbId as BIGINT), cast($tableId as BIGINT), '$columnNameStr'," +
                     " $bucketExpr" +
                     " FROM `$dbName`.`$tableName`$sampleClause$randFilter";
+
+    // Bounds of the single bucket stored when the bucket aggregate is skipped. Five result columns, because that
+    // is what the version-2 statistic result writer expects (version, dbId, tableId, varchar, varchar), so the
+    // min lands in TStatisticData.columnName and the max in TStatisticData.histogram.
+    private static final String SAMPLE_MIN_MAX_TEMPLATE =
+            "SELECT cast(" + StatsConstants.STATISTIC_HISTOGRAM_VERSION + " as INT)," +
+                    " cast($dbId as BIGINT), cast($tableId as BIGINT)," +
+                    " cast($minFunction as varchar), cast($maxFunction as varchar)" +
+                    " FROM (SELECT $columnName as column_key" +
+                    " FROM `$dbName`.`$tableName` $sampleClause" +
+                    " WHERE $randFilter and $columnName is not null $MCVExclude) t";
+
+    private static final String INFINITE_BOUND = "Infinity";
 
     private static final String COLLECT_MCV_STATISTIC_TEMPLATE =
             "select cast(version as INT), cast(db_id as BIGINT), cast(table_id as BIGINT), " +
@@ -120,35 +138,45 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
         double sampleRatio = Double.parseDouble(properties.get(StatsConstants.HISTOGRAM_SAMPLE_RATIO));
         long bucketNum = Long.parseLong(properties.get(StatsConstants.HISTOGRAM_BUCKET_NUM));
         long mcvSize = Long.parseLong(properties.get(StatsConstants.HISTOGRAM_MCV_SIZE));
+        EnumSet<StatsConstants.HistogramStatKind> statScope = StatsConstants.parseHistogramStatsScope(
+                properties.get(StatsConstants.HISTOGRAM_STATS_SCOPE));
+        boolean collectMcv = statScope.contains(StatsConstants.HistogramStatKind.MCV);
+        boolean collectBuckets = statScope.contains(StatsConstants.HistogramStatKind.BUCKETS);
 
         if (table.isTemporaryTable()) {
             context.setSessionId(((OlapTable) table).getSessionId());
         }
 
         if (Config.enable_batch_insert_histogram_statistics && columnNames.size() > 1) {
-            collectBatched(context, analyzeStatus, sampleRatio, bucketNum, mcvSize);
+            collectBatched(context, analyzeStatus, sampleRatio, bucketNum, mcvSize, collectMcv, collectBuckets);
         } else {
-            collectLegacy(context, analyzeStatus, sampleRatio, bucketNum, mcvSize);
+            collectLegacy(context, analyzeStatus, sampleRatio, bucketNum, mcvSize, collectMcv, collectBuckets);
         }
     }
 
     private void collectLegacy(ConnectContext context, AnalyzeStatus analyzeStatus, double sampleRatio, long bucketNum,
-                               long mcvSize) throws Exception {
+                               long mcvSize, boolean collectMcv, boolean collectBuckets) throws Exception {
         long finishedSQLNum = 0;
         long totalCollectSQL = columnNames.size();
+
+        StatisticExecutor statisticExecutor = new StatisticExecutor();
         for (int i = 0; i < columnNames.size(); i++) {
             String columnName = columnNames.get(i);
             Type columnType = columnTypes.get(i);
-            String sql = buildCollectMCV(db, table, mcvSize, columnName, sampleRatio);
-            StatisticExecutor statisticExecutor = new StatisticExecutor();
-            List<TStatisticData> mcv = statisticExecutor.queryMCV(context, sql);
 
-            Map<String, String> mostCommonValues = buildMostCommonValues(mcv, sampleRatio);
+            boolean skipBuckets = shouldSkipHistogramBuckets(columnType);
+            Map<String, String> mostCommonValues = collectMcv || skipBuckets
+                    ? collectMostCommonValues(context, statisticExecutor, mcvSize, columnName, sampleRatio)
+                    : Collections.emptyMap();
 
-            if (shouldSkipHistogramBuckets(columnType)) {
-                sql = buildCollectDefaultBucket(db, table, sampleRatio, mostCommonValues, columnName);
-            } else {
+            String sql;
+            if (collectBuckets && !skipBuckets) {
                 sql = buildCollectHistogram(db, table, sampleRatio, bucketNum, mostCommonValues, columnName, columnType);
+            } else {
+                Optional<Pair<String, String>> minMax = sampleColumnMinMax(context, statisticExecutor, columnName,
+                        columnType, sampleRatio, mostCommonValues);
+                sql = buildCollectSingleBucket(db, table, sampleRatio, mostCommonValues, columnName, columnType,
+                        minMax);
             }
             collectStatisticSync(sql, context, analyzeStatus);
 
@@ -159,7 +187,7 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
     }
 
     private void collectBatched(ConnectContext context, AnalyzeStatus analyzeStatus, double sampleRatio, long bucketNum,
-                                long mcvSize) throws Exception {
+                                long mcvSize, boolean collectMcv, boolean collectBuckets) throws Exception {
         List<List<Expr>> rowsBuffer = new ArrayList<>();
         List<String> sqlBuffer = new ArrayList<>();
         long bufferSize = batchInsertPrefixSize(HISTOGRAM_STATISTICS_TABLE_NAME);
@@ -172,16 +200,18 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
             String rowSql;
             long rowSize;
             try {
-                List<TStatisticData> mcv = queryStatisticSync(
-                        buildCollectMCV(db, table, mcvSize, columnName, sampleRatio), context, analyzeStatus);
-                Map<String, String> mostCommonValues = buildMostCommonValues(mcv, sampleRatio);
+                Map<String, String> mostCommonValues = collectMcv || shouldSkipHistogramBuckets(columnType)
+                        ? buildMostCommonValues(queryStatisticSync(
+                                buildCollectMCV(db, table, mcvSize, columnName, sampleRatio), context, analyzeStatus),
+                        sampleRatio)
+                        : Collections.emptyMap();
 
-                String histogramQuery = buildBatchedHistogramQuery(
+                String bucketQuery = buildBatchedBucketQuery(
                         context, analyzeStatus, sampleRatio, bucketNum,
-                        mostCommonValues, columnName, columnType);
+                        mostCommonValues, columnName, columnType, collectBuckets);
 
                 String buckets = getSingleHistogramResult(
-                        queryStatisticSync(histogramQuery, context, analyzeStatus), columnName).histogram;
+                        queryStatisticSync(bucketQuery, context, analyzeStatus), columnName).histogram;
                 String mcvJson = buildMcvJson(mostCommonValues);
                 row = buildBatchInsertRow(columnName, buckets, mcvJson);
                 rowSql = buildBatchInsertRowSql(columnName, buckets, mcvJson);
@@ -229,16 +259,26 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
         }
     }
 
-    private String buildBatchedHistogramQuery(
+    // The batched path needs the bucket value as a literal, so it queries the buckets instead of computing them
+    // inside the INSERT. Which query to run is decided here - the single decision point shared with collectLegacy.
+    private String buildBatchedBucketQuery(
             ConnectContext context, AnalyzeStatus analyzeStatus, double sampleRatio, long bucketNum,
             Map<String, String> mostCommonValues,
-            String columnName, Type columnType) throws Exception {
-        if (shouldSkipHistogramBuckets(columnType)) {
-            return buildQueryDefaultBucket(db, table, sampleRatio, mostCommonValues, columnName);
+            String columnName, Type columnType, boolean collectBuckets) throws Exception {
+        if (!collectBuckets || shouldSkipHistogramBuckets(columnType)) {
+            Optional<Pair<String, String>> minMax = queryColumnMinMax(context, analyzeStatus, columnName, columnType,
+                    sampleRatio, mostCommonValues);
+            return buildQuerySingleBucket(db, table, sampleRatio, mostCommonValues, columnName, columnType, minMax);
         }
 
         return buildQueryHistogram(db, table, sampleRatio, bucketNum, mostCommonValues, columnName,
                 columnType);
+    }
+
+    private Map<String, String> collectMostCommonValues(ConnectContext context, StatisticExecutor statisticExecutor,
+                                                        long mcvSize, String columnName, double sampleRatio) {
+        String sql = buildCollectMCV(db, table, mcvSize, columnName, sampleRatio);
+        return buildMostCommonValues(statisticExecutor.queryMCV(context, sql), sampleRatio);
     }
 
     private Map<String, String> buildMostCommonValues(List<TStatisticData> mcv, double sampleRatio) {
@@ -253,6 +293,65 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
             }
         }
         return mostCommonValues;
+    }
+
+    // Legacy path: the bounds query runs through StatisticExecutor directly.
+    private Optional<Pair<String, String>> sampleColumnMinMax(ConnectContext context,
+                                                              StatisticExecutor statisticExecutor, String columnName,
+                                                              Type columnType, double sampleRatio,
+                                                              Map<String, String> mostCommonValues) {
+        if (!canCarrySampledBounds(columnType)) {
+            return Optional.empty();
+        }
+
+        String sql = buildSampleMinMax(db, table, columnName, columnType, sampleRatio, mostCommonValues);
+        return parseSampledBounds(statisticExecutor.executeStatisticDQL(context, sql), columnName, columnType);
+    }
+
+    // Batched path: same query, but routed through queryStatisticSync so analyze cancellation and the remaining
+    // timeout are still honoured.
+    private Optional<Pair<String, String>> queryColumnMinMax(ConnectContext context, AnalyzeStatus analyzeStatus,
+                                                             String columnName, Type columnType, double sampleRatio,
+                                                             Map<String, String> mostCommonValues)
+            throws DdlException {
+        if (!canCarrySampledBounds(columnType)) {
+            return Optional.empty();
+        }
+
+        String sql = buildSampleMinMax(db, table, columnName, columnType, sampleRatio, mostCommonValues);
+        return parseSampledBounds(queryStatisticSync(sql, context, analyzeStatus), columnName, columnType);
+    }
+
+    private Optional<Pair<String, String>> parseSampledBounds(List<TStatisticData> sampled, String columnName,
+                                                              Type columnType) {
+        if (sampled.isEmpty()) {
+            return defaultBounds(columnType);
+        }
+
+        // The sql result is parsed and min and max values are stored in the variables named below.
+        String minValue = sampled.get(0).columnName;
+        String maxValue = sampled.get(0).histogram;
+        if (StringUtils.isBlank(minValue) || StringUtils.isBlank(maxValue)) {
+            LOG.info("[Stats] unusable sampled bounds, falling back to placeholder bucket | db={} table={} " +
+                    "column={} min={} max={}", db.getOriginName(), table.getName(), columnName, minValue, maxValue);
+            return defaultBounds(columnType);
+        }
+        return Optional.of(Pair.create(minValue, maxValue));
+    }
+
+    private static boolean canCarrySampledBounds(Type columnType) {
+        return columnType.getPrimitiveType().isNumericType() || columnType.getPrimitiveType().isDateType();
+    }
+
+    private String buildSampleMinMax(Database database, Table table, String columnName, Type columnType,
+                                     double sampleRatio, Map<String, String> mostCommonValues) {
+        VelocityContext context = buildBaseContext(database, table, columnName);
+        addMcvExcludeToContext(context, mostCommonValues, columnName, columnType);
+        context.put("minFunction", getMinMaxFunction(columnType, "`column_key`", false));
+        context.put("maxFunction", getMinMaxFunction(columnType, "`column_key`", true));
+        putSampleClause(context, sampleRatio);
+
+        return build(context, SAMPLE_MIN_MAX_TEMPLATE);
     }
 
     // Convert a sample ratio in (0, 1) into a percent string in (0, 100) for the SAMPLE('percent'=...) clause.
@@ -335,7 +434,6 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
         }
     }
 
-
     private String buildCollectHistogram(Database database, Table table, double sampleRatio, Long bucketNum,
                                          Map<String, String> mostCommonValues, String columnName, Type columnType) {
         VelocityContext context = buildBaseContext(database, table, columnName);
@@ -345,19 +443,22 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
         context.put("bucketNum", bucketNum);
         context.put("sampleRatio", sampleRatio);
         context.put("totalRows", Config.histogram_max_sample_row_count);
+        putSampleClause(context, sampleRatio);
 
-        // TODO: use it by default and remove this switch
+        return buildInsertIntoHistogramStatistics(build(context, COLLECT_HISTOGRAM_STATISTIC_TEMPLATE));
+    }
+
+    // TODO: use it by default and remove this switch
+    private void putSampleClause(VelocityContext context, double sampleRatio) {
         if (Config.enable_use_table_sample_collect_statistics && sampleRatio > 0.0 && sampleRatio < 1.0) {
             String sampleClause = String.format("SAMPLE('percent'='%s')", formatSamplePercent(sampleRatio));
             context.put("sampleClause", sampleClause);
             context.put("randFilter", "TRUE");
         } else {
-            String randFilter = String.format(" rand() <= %f", sampleRatio);
+            String randFilter = String.format(Locale.ROOT, " rand() <= %f", sampleRatio);
             context.put("randFilter", randFilter);
             context.put("sampleClause", "");
         }
-
-        return buildInsertIntoHistogramStatistics(build(context, COLLECT_HISTOGRAM_STATISTIC_TEMPLATE));
     }
 
     private String buildQueryHistogram(Database database, Table table, double sampleRatio, Long bucketNum,
@@ -368,38 +469,36 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
         context.put("totalRows", Config.histogram_max_sample_row_count);
         context.put("bucketNum", bucketNum);
         context.put("sampleRatio", sampleRatio);
-
-        if (Config.enable_use_table_sample_collect_statistics && sampleRatio > 0.0 && sampleRatio < 1.0) {
-            String sampleClause = String.format("SAMPLE('percent'='%s')", formatSamplePercent(sampleRatio));
-            context.put("sampleClause", sampleClause);
-            context.put("randFilter", "TRUE");
-        } else {
-            context.put("randFilter", String.format(" rand() <= %f", sampleRatio));
-            context.put("sampleClause", "");
-        }
+        putSampleClause(context, sampleRatio);
 
         return build(context, QUERY_HISTOGRAM_STATISTIC_TEMPLATE);
     }
 
-    // In case we skip histogram collection, we simply add one tail bucket that contains all values - sum(MCVs)
-    private String buildCollectDefaultBucket(Database database, Table table, double sampleRatio,
-                                             Map<String, String> mostCommonValues, String columnName) {
+    // In case we skip histogram collection, we simply add one tail bucket that contains all values - sum(MCVs).
+    // Its bounds are the sampled min/max when the column type can carry them, and the placeholder otherwise.
+    private String buildCollectSingleBucket(Database database, Table table, double sampleRatio,
+                                            Map<String, String> mostCommonValues, String columnName, Type columnType,
+                                            Optional<Pair<String, String>> minMax) {
         VelocityContext context = buildBaseContext(database, table, columnName);
         addMcvToContext(context, mostCommonValues);
-        addDefaultBucketToContext(context, table, sampleRatio, mostCommonValues, columnName);
+        addSingleBucketToContext(context, table, sampleRatio, mostCommonValues, columnName, columnType, minMax);
 
-        return buildInsertIntoHistogramStatistics(build(context, COLLECT_DEFAULT_BUCKET_STATISTIC_TEMPLATE));
+        return buildInsertIntoHistogramStatistics(build(context, COLLECT_SINGLE_BUCKET_STATISTIC_TEMPLATE));
     }
 
-    private String buildQueryDefaultBucket(Database database, Table table, double sampleRatio,
-                                           Map<String, String> mostCommonValues, String columnName) {
+    private String buildQuerySingleBucket(Database database, Table table, double sampleRatio,
+                                          Map<String, String> mostCommonValues, String columnName, Type columnType,
+                                          Optional<Pair<String, String>> minMax) {
         VelocityContext context = buildBaseContext(database, table, columnName);
-        addDefaultBucketToContext(context, table, sampleRatio, mostCommonValues, columnName);
-        return build(context, QUERY_DEFAULT_BUCKET_STATISTIC_TEMPLATE);
+        addSingleBucketToContext(context, table, sampleRatio, mostCommonValues, columnName, columnType, minMax);
+
+        return build(context, QUERY_SINGLE_BUCKET_STATISTIC_TEMPLATE);
     }
 
-    private void addDefaultBucketToContext(VelocityContext context, Table table, double sampleRatio,
-                                           Map<String, String> mostCommonValues, String columnName) {
+    // Shared by the INSERT and the batched query variant so the two cannot drift apart.
+    private void addSingleBucketToContext(VelocityContext context, Table table, double sampleRatio,
+                                          Map<String, String> mostCommonValues, String columnName, Type columnType,
+                                          Optional<Pair<String, String>> minMax) {
         String quoteColumName = StatisticUtils.quoting(table, columnName);
         String countExpr;
         if (sampleRatio > 0.0 && sampleRatio < 1.0) {
@@ -422,7 +521,9 @@ public class HistogramStatisticsCollectJob extends StatisticsCollectJob {
         String nonMcvExpr = "greatest(0, " + countExpr + " - " + mcvSum + ")";
 
         context.put("bucketExpr",
-                "concat('[[\"Infinity\",\"Infinity\",', cast(cast(" + nonMcvExpr + " as bigint) as varchar), ',0]]')");
+                "concat('[[\"" + minMax.map(minAndMax -> minAndMax.first).orElse(INFINITE_BOUND) + "\",\"" +
+                        minMax.map(minAndMax -> minAndMax.second).orElse(INFINITE_BOUND) + "\",', cast(cast(" +
+                        nonMcvExpr + " as bigint) as varchar), ',0]]')");
     }
 
     private TStatisticData getSingleHistogramResult(List<TStatisticData> results, String columnName)
