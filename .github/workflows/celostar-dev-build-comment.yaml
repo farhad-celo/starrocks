@@ -1,10 +1,38 @@
 name: Celostar Repo Depot Dev Build Comment
-run-name: 'Celostar Repo Depot Dev Build: PR #${{ github.event.issue.number }}'
+run-name: >-
+  Celostar Repo Depot Dev Build:
+  ${{ github.event_name == 'workflow_dispatch' && inputs.service-name || format('PR #{0}', github.event.issue.number || github.event.pull_request.number) }}
 
-# Comment-triggered builds run from the default branch and never execute the PR head.
+# To request a dev build from an open PR, add one of these exact comments:
+#   /dev-build     Build both celostar-be and celostar-fe.
+#   /dev-build be  Build only celostar-be.
+#   /dev-build fe  Build only celostar-fe.
+# Only comments from repository owners, members, or collaborators are accepted.
+# The workflow can also be run manually from the Actions tab by selecting BE, FE, or ALL.
+# Comment- and merge-triggered builds use the current default branch and never execute the PR head.
 on:
   issue_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      service-name:
+        type: choice
+        description: Component to build
+        required: true
+        options:
+          - celostar-be
+          - celostar-fe
+          - '~~ALL~~'
+  pull_request_target:
+    branches:
+      - branch-3.5-cc-ce1789ea-celo
+    paths:
+      - 'be/**'
+      - 'bin/**'
+      - 'fe/**'
+      - 'thirdparty/**'
+      - 'tools/**'
+    types: [closed]
 
 permissions:
   actions: read
@@ -14,6 +42,42 @@ permissions:
   pull-requests: write
 
 jobs:
+  build-on-dispatch:
+    name: Build Branch on Manual Dispatch
+    if: github.event_name == 'workflow_dispatch'
+    uses: celonis/repo-depot/.github/workflows/reusable-create-release-candidate.yaml@stable
+    secrets: inherit
+    with:
+      target-release: DEV
+      repo-depot-version: stable
+      service-names-as-csv: ${{ inputs.service-name == '~~ALL~~' && 'celostar-be,celostar-fe' || inputs.service-name }}
+
+  trigger-after-merge:
+    name: Trigger Dev Build after Merge
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch RepoDepot dev build
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const ref = context.payload.pull_request.base.ref;
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'repodepot-build-dev-branch.yaml',
+              ref,
+              inputs: {
+                'service-name': '~~ALL~~',
+              },
+            });
+
+            core.info(`Dispatched RepoDepot dev build for ${ref}`);
+
   prepare-comment:
     name: Acknowledge PR Comment Build
     if: >-
@@ -24,6 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      pull-requests: write
     outputs:
       service-names-as-csv: ${{ steps.announce.outputs.service-names-as-csv }}
     steps:
@@ -52,17 +117,21 @@ jobs:
             const defaultBranch = context.payload.repository.default_branch;
 
             core.setOutput('service-names-as-csv', command.serviceNames);
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: [
-                `Repo Depot dev build requested for **${command.label}**.`,
-                '',
-                `Source: current default branch \`${defaultBranch}\``,
-                `Workflow: [view run](${runUrl})`,
-              ].join('\n'),
-            });
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: [
+                  `Repo Depot dev build requested for **${command.label}**.`,
+                  '',
+                  `Source: current default branch \`${defaultBranch}\``,
+                  `Workflow: [view run](${runUrl})`,
+                ].join('\n'),
+              });
+            } catch (error) {
+              core.warning(`Could not post the build acknowledgement: ${error.message}`);
+            }
 
   build:
     name: Build Branch on PR Comment
