@@ -74,6 +74,7 @@
 #include "exprs/celonis/agg/moving_trimmed_mean.h"
 #include "exprs/celonis/agg/multi_array_agg.h"
 #include "exprs/celonis/agg/multi_array_agg_v2.h"
+#include "exprs/celonis/agg/multi_array_agg_v3.h"
 #include "exprs/celonis/agg/multi_linear_regression.h"
 #include "exprs/celonis/agg/percentile_disc.h"
 #include "exprs/celonis/agg/product.h"
@@ -155,6 +156,10 @@ public:
 
     static AggregateFunctionPtr MakeMultiArrayAggV2AggregateFunction() {
         return std::make_shared<MultiArrayAggV2AggregateFunction>();
+    }
+
+    static AggregateFunctionPtr MakeMultiArrayAggV3AggregateFunction() {
+        return std::make_shared<MultiArrayAggV3AggregateFunction>();
     }
 
     static AggregateFunctionPtr MakeGroupConcatAggregateFunctionV2() {

@@ -395,6 +395,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String MULTI_ARRAY_AGG_LOW_CARDINALITY_OPTIMIZE = "multi_array_agg_low_cardinality_optimize";
     public static final String CTE_LOW_CARDINALITY_OPTIMIZE = "cte_low_cardinality_optimize";
     public static final String ENABLE_MULTI_ARRAY_AGG_V2 = "enable_multi_array_agg_v2";
+    public static final String ENABLE_MULTI_ARRAY_AGG_V3 = "enable_multi_array_agg_v3";
     public static final String ENABLE_MULTI_ARRAY_AGG_V2_DICT_COMPACTION = "enable_multi_array_agg_v2_dict_compaction";
     public static final String MULTI_ARRAY_AGG_V2_DEBUG_LEVEL = "multi_array_agg_v2_debug_level";
     public static final String ENABLE_SHORTENED_VARIANT_LOW_CARDINALITY_OPTIMIZE =
@@ -1639,6 +1640,12 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VariableMgr.VarAttr(name = ENABLE_MULTI_ARRAY_AGG_V2)
     private boolean enableMultiArrayAggV2 = false;
 
+    // Picks the V3 state representation over V2. Only has an effect when enable_multi_array_agg_v2
+    // is also on, because V2 is what switches the intermediate type to VARBINARY and V3 reuses that
+    // same wire format. So: v2 + v3 -> V3 for non-sorted aggs, v2 alone -> V2, neither -> V1.
+    @VariableMgr.VarAttr(name = ENABLE_MULTI_ARRAY_AGG_V3)
+    private boolean enableMultiArrayAggV3 = false;
+
     @VariableMgr.VarAttr(name = ENABLE_MULTI_ARRAY_AGG_V2_DICT_COMPACTION)
     private boolean enableMultiArrayAggV2DictCompaction = false;
 
@@ -2128,6 +2135,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableMultiArrayAggV2(boolean enableMultiArrayAggV2) {
         this.enableMultiArrayAggV2 = enableMultiArrayAggV2;
+    }
+
+    public boolean isEnableMultiArrayAggV3() {
+        return enableMultiArrayAggV3;
+    }
+
+    public void setEnableMultiArrayAggV3(boolean enableMultiArrayAggV3) {
+        this.enableMultiArrayAggV3 = enableMultiArrayAggV3;
     }
 
     public boolean isEnableMultiArrayAggV2DictCompaction() {
@@ -5730,6 +5745,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
         tResult.setGroup_concat_max_len(groupConcatMaxLen);
         tResult.setMax_array_length(maxArrayLength);
         tResult.setMulti_array_agg_v2_debug_level(multiArrayAggV2DebugLevel);
+        tResult.setEnable_multi_array_agg_v3(enableMultiArrayAggV3);
         if (multiArrayAggMaxArrayLength > 0) {
             tResult.setMulti_array_agg_max_array_length(multiArrayAggMaxArrayLength);
         }

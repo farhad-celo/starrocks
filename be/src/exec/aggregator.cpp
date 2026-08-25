@@ -601,7 +601,10 @@ Status Aggregator::_create_aggregate_function(starrocks::RuntimeState* state, co
             DCHECK_LE(1, fn.arg_types.size());
             TypeDescriptor arg_type = arg_types[0];
             if (func_name == "multi_array_agg" && serde_type.is_string_type()) {
-                func_name = "multi_array_agg_v2";
+                const auto& query_options = state->query_options();
+                const bool use_v3 = !is_sorted() && query_options.__isset.enable_multi_array_agg_v3 &&
+                                    query_options.enable_multi_array_agg_v3;
+                func_name = use_v3 ? "multi_array_agg_v3" : "multi_array_agg_v2";
             }
             auto* func = get_aggregate_function(func_name, return_type, arg_types, is_result_nullable, fn.binary_type,
                                                 state->func_version());

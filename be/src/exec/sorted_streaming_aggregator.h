@@ -29,6 +29,8 @@ public:
 
     virtual Status open(RuntimeState* state) override;
 
+    bool is_sorted() const final { return true; }
+
     StatusOr<ChunkPtr> streaming_compute_agg_state(size_t chunk_size, bool is_update_phase = true);
 
     // only group by cols. no any aggregate functions

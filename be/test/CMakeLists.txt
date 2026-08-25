@@ -161,6 +161,7 @@ set(EXEC_FILES
         ./exprs/celonis/agg/inductive_miner_test.cpp
         ./exprs/celonis/agg/kmeans_test.cpp
         ./exprs/celonis/agg/mode_test.cpp
+        ./exprs/celonis/agg/multi_array_agg_v3_test.cpp
         ./exprs/celonis/agg/multi_linear_regression_test.cpp
         ./exprs/celonis/agg/percentile_disc_test.cpp
         ./exprs/celonis/agg/product_test.cpp
