@@ -1,7 +1,7 @@
 #include "data_handler.h"
 
 #include "log/log.h"
-#include "modules/memory/table.h"
+#include "modules/common/execution_context.h"
 
 namespace celonis::accelerator::memory::management {
 

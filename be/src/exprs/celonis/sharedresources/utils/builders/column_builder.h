@@ -10,7 +10,7 @@
 #include "modules/memory/builders/temp_column_builder.h"
 #include "modules/memory/column.h"
 #include "modules/memory/null_flags_fwd.h"
-#include "modules/memory/table.h"
+#include "modules/memory/table_row_limit_utils.h"
 #include "utils/nullable_pql_value.h"
 
 namespace celonis::accelerator {
@@ -29,8 +29,8 @@ class column_builder {
 public:
     column_builder() = default;
 
-    column_builder& owner(memory::table* new_owner) {
-        owner_ = new_owner;
+    column_builder& with_table_config(memory::table_config table_config) {
+        optional_table_config_ = std::move(table_config);
         return *this;
     }
 
@@ -88,10 +88,12 @@ public:
     }
 
     memory::column_t build() {
-        memory::column_t result = memory::builders::temp_column_builder(memory::col_name{col_name_},
-                                                                        memory::col_id{col_id_}, owner_, cache_key_)
-                                          .create_from_data<T>(static_cast<row_id>(data_size_), std::move(data_array_),
-                                                               null_flags_, state_);
+        memory::column_t result =
+                memory::builders::temp_column_builder(memory::col_name{col_name_}, memory::col_id{col_id_},
+                                                      optional_table_config_, cache_key_)
+                        .create_from_data<T>(static_cast<row_id>(data_size_), std::move(data_array_), null_flags_,
+                                             state_);
+        memory::verify_row_limit(result, memory::MAX_TABLE_ROW_LIMIT);
         reset();
         return result;
     }
@@ -100,7 +102,7 @@ protected:
     void reset() {
         size_set_ = false;
         data_set_ = false;
-        owner_ = nullptr;
+        optional_table_config_ = std::nullopt;
     }
 
 private:
@@ -111,7 +113,7 @@ private:
     ctl::static_array<T> data_array_;
     memory::null_flags_t null_flags_;
     memory::column_processing_state state_ = memory::column_processing_state();
-    memory::table* owner_ = nullptr;
+    std::optional<memory::table_config> optional_table_config_{std::nullopt};
     std::string col_name_;
     std::string col_id_;
     std::string cache_key_;
@@ -122,8 +124,8 @@ class column_builder<cel_string_t> {
 public:
     column_builder() = default;
 
-    column_builder& owner(memory::table* new_owner) {
-        owner_ = new_owner;
+    column_builder& with_table_config(memory::table_config table_config) {
+        optional_table_config_ = std::move(table_config);
         return *this;
     }
 
@@ -181,11 +183,12 @@ public:
         auto buf_result{create_string_buffer()};
 
         memory::column_t result{
-                memory::builders::temp_column_builder(memory::col_name(col_name_), memory::col_id(col_id_), owner_,
-                                                      cache_key_)
+                memory::builders::temp_column_builder(memory::col_name(col_name_), memory::col_id(col_id_),
+                                                      optional_table_config_, cache_key_)
                         .create_from_string_data(static_cast<row_id>(data_size_), std::move(buf_result.ptrs),
                                                  static_cast<row_id>(buf_result.string_buf.size()),
                                                  std::move(buf_result.string_buf), null_flags_, state_)};
+        memory::verify_row_limit(result, memory::MAX_TABLE_ROW_LIMIT);
         reset();
         return result;
     }
@@ -194,7 +197,7 @@ protected:
     void reset() {
         size_set_ = false;
         data_set_ = false;
-        owner_ = nullptr;
+        optional_table_config_ = std::nullopt;
     }
 
 private:
@@ -205,7 +208,7 @@ private:
     std::vector<std::string> data_array_;
     memory::null_flags_t null_flags_;
     memory::column_processing_state state_ = memory::column_processing_state();
-    memory::table* owner_ = nullptr;
+    std::optional<memory::table_config> optional_table_config_{std::nullopt};
     std::string col_name_;
     std::string col_id_;
     std::string cache_key_;

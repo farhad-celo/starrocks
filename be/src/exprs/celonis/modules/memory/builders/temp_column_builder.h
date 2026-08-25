@@ -4,7 +4,7 @@
 
 #include <ctl/static_array.h>
 
-#include "modules/memory/table.h"
+#include "modules/memory/column.h"
 
 namespace celonis::accelerator::memory::builders {
 
@@ -14,8 +14,12 @@ namespace celonis::accelerator::memory::builders {
  */
 class temp_column_builder {
  public:
-  temp_column_builder(col_name name, col_id id, table* owner, std::string cache_key)
-      : name(std::move(name)), id(std::move(id)), owner(owner), cache_key(std::move(cache_key)) {}
+  temp_column_builder(col_name name, col_id id, std::optional<table_config> optional_table_config,
+                      std::string cache_key)
+      : name(std::move(name)),
+        id(std::move(id)),
+        optional_table_config_(std::move(optional_table_config)),
+        cache_key(std::move(cache_key)) {}
 
   template <typename DATA_TYPE>
   column_t create_from_data(row_id row_count, ctl::static_array<DATA_TYPE> data, const null_flags_t& null_flags,
@@ -23,9 +27,9 @@ class temp_column_builder {
     std::string description{};
     std::shared_ptr<management::managed_memory_group> group{nullptr};
 
-    if (owner) {
-      description = owner->get_name() + "." + name.val;
-      group = std::make_shared<management::managed_memory_group>("Column", owner->get_id());
+    if (optional_table_config_) {
+      description = optional_table_config_->table_name() + "." + name.val;
+      group = std::make_shared<management::managed_memory_group>("Column", optional_table_config_->table_id());
     }
 
     auto plain_data = materialized_typed_data<DATA_TYPE>::init_materialized_data(
@@ -42,7 +46,7 @@ class temp_column_builder {
 
     // make_shared requires public constructor but constructors of column are private
     // NOLINTNEXTLINE(modernize-make-shared)
-    return column_t{new column(std::move(config), owner, nullptr, nullptr, nullptr, std::move(plain_data),
+    return column_t{new column(std::move(config), optional_table_config_, nullptr, nullptr, std::move(plain_data),
                                column_loading::column_status::MATERIALIZED, std::move(group), state)};
   }
 
@@ -53,7 +57,7 @@ class temp_column_builder {
  private:
   col_name name{""};
   col_id id{""};
-  table* owner{nullptr};
+  std::optional<table_config> optional_table_config_{std::nullopt};
   std::string cache_key;
 };
 

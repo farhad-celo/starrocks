@@ -14,6 +14,7 @@
 #include "modules/common/call_and_log_unsafe_callable.h"
 #include "modules/common/execution_context.h"
 #include "modules/memory/cache/variant_trace_cache.h"
+#include "modules/memory/column.h"
 #include "modules/memory/table_group.h"
 #include "modules/memory/typed_dictionary.h"
 #include "modules/operators/aggregation/string_aggregation.h"
@@ -51,7 +52,8 @@ std::string to_json_string_without_enclosing_braces(const format::json::json_obj
 
 memory::table_group_t create_align_model_tables::operator()(const common::execution_context& context) {
   // #lizard forgives
-  align_model_statistics stats{.num_rows_eventlog = activity_column_->get_owner()->get_rows()};
+  const auto num_rows_eventlog{activity_column_->get_row_count()};
+  align_model_statistics stats{.num_rows_eventlog = num_rows_eventlog};
   auto raii_logger{ctl::finally{[&stats]() noexcept {
     common::call_and_log_unsafe_callable(
         [&]() {
@@ -87,12 +89,11 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   stats.variant_count = variants->get_num_traces();
 
   // Threshold used to determine if the align_model input meta-data should be logged
-  const auto* const activity_table{activity_column_->get_owner()};
   static constexpr int VARIANT_COUNT_LOG_THRESHOLD{10'000};
   if (const auto number_of_variants{variants->get_num_traces()}; VARIANT_COUNT_LOG_THRESHOLD <= number_of_variants) {
     log::jinfo("Large ALIGN_MODEL input.",
                {{"number_of_variants", number_of_variants},
-                {"event_log_table_size", activity_table->get_rows()},
+                {"event_log_table_size", num_rows_eventlog},
                 {"case_table_size", case_table_row_count_},
                 {"distinct_events_count", activity_column_->get_domain_count(context, no_dictify_request{})}});
   }
@@ -100,8 +101,9 @@ memory::table_group_t create_align_model_tables::operator()(const common::execut
   auto config{align_model_config::make("CACHE_KEY_PRUNED_VARIANTS", settings_.get_alignment_execution_strategy())};
 
   // per variant alignments and replay results
-  const auto [alignments, parallel_vertices]{align_model(
-      variants, bpmn_graph, config, stats, activity_column_->get_owner()->get_name(), align_model_op_context)};
+  const auto [alignments, parallel_vertices]{align_model(variants, bpmn_graph, config, stats,
+                                                         activity_column_->optional_table_config().value().table_name(),
+                                                         align_model_op_context)};
 
   // We check whether the alignment table already exceeds the row limit to avoid unnecessarily replaying
   common::runtime_assert(variants->get_case_to_trace_col_ptrs().has_value(), "ALIGN_MODEL: Missing case->variant map");

@@ -13,7 +13,6 @@
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/column_processing_state.h"
 #include "modules/memory/management/raw_data_handler.h"
-#include "modules/memory/table_fwd.h"
 #include "modules/memory/typed_dictionary.h"
 #include "modules/operators/framework/dictify_inputs.h"
 
@@ -24,6 +23,47 @@ class temp_column_builder;
 }  // namespace celonis::accelerator::memory
 
 namespace celonis::accelerator::memory {
+
+/**
+ * @brief A simple utility wrapper containing a table name which can be shown to the user.
+ * @description Sometimes, there are internal tables (e.g., some operator tables, MEL tables, ...) which might have
+ * rather cryptic names (e.g., with internal tags). For the sake of user-facing warning/error reporting, additionally to
+ * the internal table name, one can define a user visible name which is shown in such cases.
+ */
+class user_visible_table_name {
+ public:
+  user_visible_table_name() = default;
+  explicit user_visible_table_name(std::string name) : name(std::move(name)) {}
+  [[nodiscard]] const std::string& get_name() const { return name; }
+
+ private:
+  std::string name;
+};
+
+class table_config {
+ public:
+  table_config(std::string table_id, std::string table_name, user_visible_table_name user_visible_table_name)
+      : table_id_{std::move(table_id)},
+        table_name_{std::move(table_name)},
+        optional_user_visible_table_name_(user_visible_table_name.get_name().empty()
+                                              ? std::nullopt
+                                              : std::make_optional(std::move(user_visible_table_name))) {}
+
+  [[nodiscard]] static table_config from_name_only(const std::string& table_name) {
+    return table_config{table_name, table_name, user_visible_table_name{table_name}};
+  }
+
+  [[nodiscard]] const std::string& table_id() const { return table_id_; }
+  [[nodiscard]] const std::string& table_name() const { return table_name_; }
+  [[nodiscard]] const std::optional<user_visible_table_name>& optional_user_visible_table_name() const {
+    return optional_user_visible_table_name_;
+  }
+
+ private:
+  std::string table_id_;
+  std::string table_name_;
+  std::optional<user_visible_table_name> optional_user_visible_table_name_;
+};
 
 /** Column ID strong type */
 struct col_id {
@@ -79,7 +119,7 @@ class column {
   bool is_cel_date_type() const { return get_data_type() == data_type::cel_date; }
   bool is_cel_boolean_type() const { return get_data_type() == data_type::cel_boolean; }
 
-  row_id get_row_count(const common::execution_context& context = {});
+  row_id get_row_count();
 
   std::shared_ptr<dictionary> get_dict(const common::execution_context& context,
                                        const no_dictify_request_t& no_dictify_request = std::nullopt) {
@@ -87,14 +127,13 @@ class column {
     return dict_;
   }
 
-  /** Returns a raw pointer to the table which owns this column */
-  table* get_owner() const { return owner_; }
+  [[nodiscard]] const std::optional<table_config>& optional_table_config() const { return optional_table_config_; }
 
   /* Trivial getters */
   const std::string& get_name() const noexcept { return config_.name; }
   const std::string& get_cache_key() const noexcept { return config_.cache_key; }
-  std::string get_user_visible_name(const common::execution_context& context);
-  std::string get_user_visible_owner_name(const common::execution_context& context) const;
+  std::string get_user_visible_name();
+  std::string get_user_visible_owner_name() const;
   [[nodiscard]] const management::swap_info& get_swap_info() const noexcept { return config_.swap_information; }
 
   const column_processing_state& get_processing_state() const noexcept { return processing_state_; }
@@ -103,7 +142,7 @@ class column {
                                                      const no_dictify_request_t& no_dictify_request = std::nullopt) {
     if (config_.type != data_type::cel_string) {
       throw common::internal_exception{"Column [{}] expected to be of type STRING, but got [{}].",
-                                       get_user_visible_name(context), convert_to_string(config_.type)};
+                                       get_user_visible_name(), convert_to_string(config_.type)};
     }
     return std::static_pointer_cast<string_dictionary>(get_dict(context, no_dictify_request));
   }
@@ -149,14 +188,14 @@ class column {
  private:
   void dictify_if_needed(const common::execution_context& context);
 
-  column(column_loading::column_config config, table* owner, const table* owner_after_pull_up,
+  column(column_loading::column_config config, std::optional<table_config> optional_table_config,
          column_ptrs_t column_pointers, std::shared_ptr<dictionary> dict, std::shared_ptr<materialized_data> plain_data,
          column_loading::column_status status, std::shared_ptr<management::managed_memory_group> managed_group,
          column_processing_state processing_state = column_processing_state(),
          std::shared_ptr<column_loading::column_loader> column_load =
              std::shared_ptr<column_loading::column_loader>(nullptr))
       : config_(std::move(config)),
-        owner_(owner),
+        optional_table_config_{std::move(optional_table_config)},
         column_pointers_(std::move(column_pointers)),
         dict_(std::move(dict)),
         plain_data_(std::move(plain_data)),
@@ -167,11 +206,7 @@ class column {
   }
 
   column_loading::column_config config_;
-  table* owner_;
-  // we store a reference to the owner - we need this in order to navigate in the object graph
-  // the mutex is used for making swapping operations exclusive.
-  // const row_id row_count;
-  // data is either dictified or ...
+  std::optional<table_config> optional_table_config_;
   column_ptrs_t column_pointers_;
   std::shared_ptr<dictionary> dict_;
   // plain, but never both to save memory

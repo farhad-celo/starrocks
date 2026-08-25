@@ -9,9 +9,9 @@ column_t temp_column_builder::create_from_string_data(row_id row_count, ctl::sta
   std::string description{};
   std::shared_ptr<management::managed_memory_group> group{nullptr};
 
-  if (owner != nullptr) {
-    description = owner->get_name() + "." + name.val;
-    group = std::make_shared<management::managed_memory_group>("Column", owner->get_id());
+  if (optional_table_config_.has_value()) {
+    description = optional_table_config_->table_name() + "." + name.val;
+    group = std::make_shared<management::managed_memory_group>("Column", optional_table_config_->table_id());
   }
 
   auto plain_data = materialized_typed_data<cel_string_t>::init_materialized_data(
@@ -27,7 +27,7 @@ column_t temp_column_builder::create_from_string_data(row_id row_count, ctl::sta
   config.row_count = row_count;
   config.description = std::move(description);
 
-  return column_t(new column(std::move(config), owner, nullptr, nullptr, nullptr, std::move(plain_data),
+  return column_t(new column(std::move(config), optional_table_config_, nullptr, nullptr, std::move(plain_data),
                              column_loading::column_status::MATERIALIZED, std::move(group), state));
 }
 

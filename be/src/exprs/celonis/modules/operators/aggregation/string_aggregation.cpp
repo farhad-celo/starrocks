@@ -21,7 +21,6 @@
 #include "modules/cube/variant_trace_utils.h"
 #include "modules/memory/column.h"
 #include "modules/memory/column_pointers.h"
-#include "modules/memory/table.h"
 #include "modules/memory/transform/join_projection_factories.h"
 #include "modules/operators/process/variant_operator_common.h"
 
@@ -866,9 +865,9 @@ std::string make_generalized_variant_row_ids_computation_cache_key(const memory:
   const std::string variants_source_name{[&values]() {
     auto source_column_tag{
         fmt::format("<{}>", values->get_cache_key().empty() ? values->get_name() : values->get_cache_key())};
-    const memory::raw_table_ptr_t owner_table{values->get_owner()};
-    if (owner_table != nullptr) {
-      return fmt::format("<{}>.{}", owner_table->get_name(), source_column_tag);
+    const auto& optional_table_config{values->optional_table_config()};
+    if (optional_table_config.has_value()) {
+      return fmt::format("<{}>.{}", optional_table_config->table_name(), source_column_tag);
     }
     return source_column_tag;
   }()};
@@ -899,9 +898,9 @@ std::string make_generalized_variant_row_ids_computation_cache_key(const memory:
     const size_t grain_size = operators::process::COMPUTE_VARIANTS_GRAIN_SIZE) {
   const auto& mapping_value{mapping_and_group_id_domain.value};
   const auto size{static_cast<row_id>(memory::get_projection_vector_size(mapping_value))};
-  common::runtime_assert(values->get_row_count(context) == size,
+  common::runtime_assert(values->get_row_count() == size,
                          "Size mismatch: The number of values [{}] and the group mapping size [{}] must match.",
-                         values->get_row_count(context), size);
+                         values->get_row_count(), size);
   const auto group_id_domain{mapping_and_group_id_domain.get_or_compute_group_id_domain()};
   return memory::cast_execute_column_pointers(
       [&]<typename TUPLE>(const TUPLE& tup) -> memory::cache::variant_entries_t {

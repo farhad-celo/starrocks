@@ -10,9 +10,10 @@
 
 #include "modules/common/exceptions.h"
 #include "modules/common/trace_types.h"
+#include "modules/memory/column_pointers.h"
 #include "modules/memory/management/pointer_data_handler.h"
 #include "modules/memory/management/raw_data_handler.h"
-#include "modules/memory/table.h"
+#include "modules/memory/row_id.h"
 
 namespace celonis::accelerator::cube {
 class variant_trace_cache_manager;

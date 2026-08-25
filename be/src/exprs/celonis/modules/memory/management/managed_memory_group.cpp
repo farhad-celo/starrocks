@@ -5,7 +5,8 @@
 #include <fmt/chrono.h>
 
 #include "log/log.h"
-#include "modules/memory/table.h"
+#include "modules/memory/management/data_handler.h"
+#include "modules/memory/types.h"
 
 namespace celonis::accelerator::memory::management {
 

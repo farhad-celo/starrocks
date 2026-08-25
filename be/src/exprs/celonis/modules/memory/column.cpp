@@ -13,32 +13,34 @@
 #include "modules/common/date/celonis_date_storage.h"
 #include "modules/common/exceptions.h"
 #include "modules/common/timer.h"
-#include "modules/memory/table.h"
 #include "modules/memory/transform/dictifier.h"
 
 namespace celonis::accelerator::memory {
 
-std::string column::get_user_visible_name(const common::execution_context& context) {
-  if (get_owner() == nullptr && get_row_count() == 1) {
+std::string column::get_user_visible_name() {
+  if (!optional_table_config_.has_value() && get_row_count() == 1) {
     return "constant " + get_string_value(0);
   }
   if (!config_.cache_key.empty()) {
     return config_.cache_key;
   }
-  return fmt::format(R"({}."{}")", get_user_visible_owner_name(context), get_name());
+  return fmt::format(R"({}."{}")", get_user_visible_owner_name(), get_name());
 }
 
-std::string column::get_user_visible_owner_name(const common::execution_context& context) const {
-  if (owner_ == nullptr) {
-    return "<no owner>";
+std::string column::get_user_visible_owner_name() const {
+  if (optional_table_config_.has_value()) {
+    if (optional_table_config_->optional_user_visible_table_name().has_value()) {
+      return fmt::format(R"(<{}>)", optional_table_config_->optional_user_visible_table_name()->get_name());
+    }
+    return fmt::format(R"("{}")", optional_table_config_->table_name());
   }
-  return owner_->get_user_visible_name(context);
+  return "<no owner>";
 }
 
 std::optional<std::string> column::get_string_value_opt(row_id row, const common::execution_context& context) {
   // Created to get a non-const context. Can be removed if context parameter becomes non-const
   auto get_value_context = context.create_sub_context("column::get_string_value_opt", {{"row", row}});
-  const auto row_count = get_row_count(get_value_context);
+  const auto row_count = get_row_count();
   if (row < 0 || row >= row_count) {
     throw common::out_of_bounds_exception{"column::get_string_value", row_id{0}, (row_count - 1), row};
   }
@@ -59,7 +61,7 @@ std::string column::get_string_value(row_id row, const common::execution_context
   return get_string_value_opt(row, context).value_or("NULL");
 }
 
-row_id column::get_row_count(const common::execution_context& context) {
+row_id column::get_row_count() {
   if (config_.row_count < 0) {
     log::warn("Row count is {} for column {} - {}. ", config_.row_count, config_.name, config_.id);
   }

@@ -112,27 +112,23 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces,
       ctl::make_shared_static_array<row_id>(activity_to_case_join_temp, ALLOC_MSG(ctl::TEMPORARY_STORAGE_MSG))};
 
   eventlog_params params;
-  memory::table_t event_table{std::make_shared<memory::table>(
-      case_column_data.size(), params.activity_table_name, params.activity_table_name, memory::management::no_swap(),
-      memory::table_meta_data::make_for_query_scope_aggregation_table(),
-      memory::user_visible_table_name{params.activity_table_name}, memory::MAX_TABLE_ROW_LIMIT)};
 
   const auto case_id_column{column_builder<cel_int_t>{}
-                                .owner(event_table.get())
+                                .with_table_config(memory::table_config::from_name_only(params.activity_table_name))
                                 .name(params.case_col_name)
                                 .data(case_column_data)
                                 .cache_key(fmt::format("{}.{}", params.activity_table_name, params.case_col_name))
                                 .build()};
 
   const auto activity_column{column_builder<cel_string_t>{}
-                                 .owner(event_table.get())
+                                 .with_table_config(memory::table_config::from_name_only(params.activity_table_name))
                                  .name(params.activity_col_name)
                                  .data(activity_column_data)
                                  .cache_key(fmt::format("{}.{}", params.activity_table_name, params.activity_col_name))
                                  .build()};
 
-  event_table->add_existing_column(case_id_column, memory::MAX_TABLE_ROW_LIMIT);
-  event_table->add_existing_column(activity_column, memory::MAX_TABLE_ROW_LIMIT);
+  common::runtime_assert(case_id_column->get_row_count() == activity_column->get_row_count(),
+                         "celonis_align_model: Case column and activity column must have the same row count.");
 
   // After some investigation, it was found that Celostar-SR never really required the memory::table data structure.
   // The only table usage was in the code below. When the table usage was followed, it was found that the only thing

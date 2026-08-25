@@ -33,6 +33,7 @@
 #include "modules/memory/cache/variant_trace_cache.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/row_id.h"
+#include "modules/memory/table_row_limit_utils.h"
 #include "modules/operators/aggregation/string_aggregation.h"
 #include "modules/operators/process/align_model/replay_aligned_variant.h"
 #include "modules/sr_glue_code/tbb_parallel_for.h"
