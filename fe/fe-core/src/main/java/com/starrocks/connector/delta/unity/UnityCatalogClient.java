@@ -67,6 +67,7 @@ public class UnityCatalogClient implements UnityCatalogApi {
     private static final String SCALA_APP_VERSION = "2.13.16";
     // Currently no way to retrieve this easily.
     private static final String STARROCKS_VERSION = "3.5";
+    private static final long INITIAL_RETRY_DELAY_MS = 1_000L;
 
     private final WorkspaceClient workspace;
     // delta/v1 read path, from the OSS unitycatalog-client. Null only in the WorkspaceClient-only
@@ -136,7 +137,9 @@ public class UnityCatalogClient implements UnityCatalogApi {
                 // maxAttempts counts the initial try, and the builder rejects 0, so translate the
                 // retry count into total attempts.
                 .retryPolicy(JitterDelayRetryPolicy.builder()
-                        .maxAttempts(properties.getMaxRetries() + 1).build());
+                        .maxAttempts(properties.getMaxRetries() + 1)
+                        .initDelayMs(INITIAL_RETRY_DELAY_MS)
+                        .build());
         addUserAgentAppVersions(builder, properties);
         ApiClient apiClient = builder.build();
 

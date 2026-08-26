@@ -35,13 +35,13 @@ import java.util.function.LongSupplier;
  * schemas per catalog, tables per (catalog, schema), and {@link DeltaCredentialsResponse} per
  * (catalog, schema, table, tableId, operation).
  *
- * <p>Metadata caches honor {@code unity.catalog.cache.enabled}; credentials honor only
- * {@code unity.catalog.cache.ttl-sec} and are additionally re-vended once the server-side
- * {@code expiration_time_ms} (minus a safety margin) is near. {@link #loadTable} is never cached
+ * <p>Metadata caches honor {@code unity.catalog.cache.enabled} and {@code unity.catalog.cache.ttl-sec};
+ * credentials use a separate TTL independent of that config and are additionally re-vended once
+ * the server-side {@code expiration_time_ms} (minus a safety margin) is near, so a cached entry is
+ * never served past that safety window regardless of the TTL. {@link #loadTable} is never cached
  * (commits must be read fresh) and {@link #tableExists} always delegates.
  */
 public class CachingUnityCatalogClient implements UnityCatalogApi {
-
     private final UnityCatalogApi delegate;
     private final long credentialsSafetyMarginMs;
     private final LongSupplier clockMillis;
@@ -69,7 +69,7 @@ public class CachingUnityCatalogClient implements UnityCatalogApi {
         long ttlSec = properties.getCacheTtlSec();
         this.schemasCache = newMetadataCache(ticker, ttlSec, properties.isCacheEnabled());
         this.tablesCache = newMetadataCache(ticker, ttlSec, properties.isCacheEnabled());
-        this.credentialsCache = newCredentialsCache(ticker, ttlSec);
+        this.credentialsCache = newCredentialsCache(ticker, properties.getCredentialsCacheTtlSec());
     }
 
     private static <K, V> Cache<K, V> newMetadataCache(Ticker ticker, long ttlSec, boolean enabled) {

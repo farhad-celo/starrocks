@@ -24,6 +24,7 @@ import com.starrocks.connector.MetastoreType;
 import com.starrocks.connector.delta.unity.CachingUnityCatalogClient;
 import com.starrocks.connector.delta.unity.UnityBackedDeltaMetastore;
 import com.starrocks.connector.delta.unity.UnityCatalogApi;
+import com.starrocks.connector.delta.unity.UnityCatalogProperties;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -231,6 +232,40 @@ public class DeltaLakeConnectorTest {
                 "HMS-backed Delta catalog must still be registered with the background refresh daemon");
     }
 
+    @Test
+    public void testUnityVendedSnapshotCacheTtlClampedToCredentialTtlAndSafetyMargin() {
+        UnityCatalogProperties props = unityPropertiesWithCache("600", "120", "90", true, true);
+        Assertions.assertEquals(90L, DeltaLakeInternalMgr.clampUnityVendedSnapshotTtlSec(3600L, props));
+        Assertions.assertEquals(90L, DeltaLakeInternalMgr.clampUnityVendedSnapshotTtlSec(90L, props));
+
+        UnityCatalogProperties credentialTtlProps = unityPropertiesWithCache("600", "120", "180", true, true);
+        Assertions.assertEquals(120L, DeltaLakeInternalMgr.clampUnityVendedSnapshotTtlSec(3600L, credentialTtlProps));
+    }
+
+    @Test
+    public void testUnityVendedSnapshotCacheClampHandlesNeverEvictAndDisabledCredentialCache() {
+        UnityCatalogProperties props = unityPropertiesWithCache("600", "0", "1200", true, true);
+        Assertions.assertEquals(0L, DeltaLakeInternalMgr.clampUnityVendedSnapshotTtlSec(-1L, props));
+    }
+
+    @Test
+    public void testUnitySnapshotCacheLifetimeNotClampedWhenVendingOrCacheDisabled() {
+        UnityCatalogProperties vendingDisabled = unityPropertiesWithCache("60", "30", "10", false, true);
+        UnityCatalogProperties cacheDisabled = unityPropertiesWithCache("60", "30", "10", true, false);
+        Assertions.assertEquals(3600L,
+                DeltaLakeInternalMgr.clampUnityVendedSnapshotTtlSec(3600L, vendingDisabled));
+        Assertions.assertEquals(3600L,
+                DeltaLakeInternalMgr.clampUnityVendedSnapshotTtlSec(3600L, cacheDisabled));
+    }
+
+    @Test
+    public void testUnitySnapshotRefreshDisabledOnlyForVendedCredentials() {
+        UnityCatalogProperties vendingEnabled = unityPropertiesWithCache("60", "30", "10", true, true);
+        UnityCatalogProperties vendingDisabled = unityPropertiesWithCache("60", "30", "10", false, true);
+        Assertions.assertEquals(-1L, DeltaLakeInternalMgr.unitySnapshotRefreshSec(60L, vendingEnabled));
+        Assertions.assertEquals(60L, DeltaLakeInternalMgr.unitySnapshotRefreshSec(60L, vendingDisabled));
+    }
+
     private static UnityBackedDeltaMetastore extractUnityBackedMetastore(Map<String, String> properties) {
         DeltaLakeInternalMgr mgr = new DeltaLakeInternalMgr("uc_delta", properties, new HdfsEnvironment());
         IDeltaLakeMetastore metastore = mgr.createUnityBackedDeltaLakeMetastore();
@@ -243,5 +278,20 @@ public class DeltaLakeConnectorTest {
 
     private static UnityCatalogApi extractUnityClient(Map<String, String> properties) {
         return extractUnityBackedMetastore(properties).getUnityCatalogClient();
+    }
+
+    private static UnityCatalogProperties unityPropertiesWithCache(String metadataTtlSec, String credentialsTtlSec,
+                                                                   String credentialsSafetyMarginSec,
+                                                                   boolean vendingEnabled, boolean cacheEnabled) {
+        return new UnityCatalogProperties(ImmutableMap.<String, String>builder()
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.vended-credentials-enabled", Boolean.toString(vendingEnabled))
+                .put("unity.catalog.cache.enabled", Boolean.toString(cacheEnabled))
+                .put("unity.catalog.cache.ttl-sec", metadataTtlSec)
+                .put("unity.catalog.cache.credentials.ttl-sec", credentialsTtlSec)
+                .put("unity.catalog.cache.credentials.safety-margin-sec", credentialsSafetyMarginSec)
+                .build());
     }
 }

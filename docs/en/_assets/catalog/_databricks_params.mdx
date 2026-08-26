@@ -1,8 +1,8 @@
 ##### Databricks Unity Catalog
 
-StarRocks 3.5 adds support for Databricks Unity Catalog (UC) as a Delta Lake metastore. When enabled, the FE talks to the UC REST API (via the official Databricks Java SDK) to list schemas/tables, resolve storage locations, and (optionally) request short-lived per-table vended credentials that are used by the BE to read storage without relying on catalog-level credentials.
+StarRocks 3.5 supports Databricks Unity Catalog (UC) as a Delta Lake metastore. The FE uses the UC REST API to list metadata, load Delta tables, and optionally vend short-lived table credentials for storage reads.
 
-Configure `MetastoreParams` as follows:
+Configure `MetastoreParams`:
 
 ```SQL
 "hive.metastore.type" = "unity",
@@ -12,65 +12,52 @@ Configure `MetastoreParams` as follows:
 "unity.catalog.vended-credentials-enabled" = "true"
 ```
 
-The following table describes the parameters you configure for Unity Catalog:
+Parameters:
 
 | Parameter | Required | Description |
 | --------- | -------- | ----------- |
-| hive.metastore.type | Yes | Set to `unity` to use Unity Catalog as the metastore. |
-| unity.catalog.host | Yes | Databricks workspace URL, e.g. `https://dbc-1234.cloud.databricks.com`. Trailing slashes are stripped. |
-| unity.catalog.auth.type | No | Authentication mode. Allowed values: `pat` (default) and `oauth-m2m`. With `pat`, set `unity.catalog.token`; with `oauth-m2m`, set `unity.catalog.client-id` and `unity.catalog.client-secret`. The two modes are mutually exclusive — supplying credentials for the wrong mode is rejected at catalog-creation time. |
-| unity.catalog.token | Conditional | Databricks PAT or service-principal token with USE CATALOG/SCHEMA and SELECT on the tables. Required when `unity.catalog.auth.type = pat`. Must not be set when `unity.catalog.auth.type = oauth-m2m`. |
-| unity.catalog.client-id | Conditional | OAuth 2.0 client ID for a Databricks service principal. Required when `unity.catalog.auth.type = oauth-m2m`. |
-| unity.catalog.client-secret | Conditional | OAuth 2.0 client secret paired with `unity.catalog.client-id`. Required when `unity.catalog.auth.type = oauth-m2m`. |
-| unity.catalog.name | Yes | Name of the UC catalog to expose as the StarRocks external catalog. |
-| unity.catalog.vended-credentials-enabled | No | Default `true`. When enabled, the FE calls the Unity Catalog `temporary-table-credentials` API per table and passes the resulting short-lived credentials to the BE. Vending is treated as a hard requirement in this mode — if any vend step fails (REST 4xx/5xx, missing `table_id`, missing AWS region, empty/unrecognized credential payload) the query fails fast at the FE with a clear error instead of silently falling back to catalog-level credentials. Set to `false` to opt out of vending entirely and rely on `StorageCredentialParams` for storage access. |
-| unity.catalog.spoof-user-agent | No | Default `false`. When disabled, the Unity Catalog delta/v1 client identifies itself as `StarRocks` and does not include a Scala app token. Set to `true` to use the Spark-shaped `User-Agent` (`Delta`, `Spark`, `Scala`, and `Java`) for environments where StarRocks is not whitelisted. Changing this requires setting the property in celostar via `additionalUnityConfig` and forcing catalog re-creation (done by DMM) |
-| unity.catalog.request-timeout-ms | No | Default `30000`. Per-request timeout (in milliseconds) for UC control plane calls; rounded up to the nearest second when handed to the SDK. |
-| unity.catalog.max-retries | No | Default `3`. Retained for backwards compatibility with prior catalog DDL. The Databricks SDK manages its own retry/backoff for transient errors, so this value is currently a hint only. |
-| unity.catalog.cache.enabled | No | Whether the FE caches Unity Catalog metadata REST responses (schemas, tables, and `TableInfo`) and the catalog-level Delta snapshot cache for Unity-backed catalogs. Defaults to `true`. Set to `false` to force fresh metadata reads, e.g. when debugging stale-metadata issues. Vended credentials are still cached separately. |
-| unity.catalog.delta-cache.enabled | No | Whether Unity-backed Delta catalogs use the shared FE-wide Delta JSON/checkpoint metadata-file cache. Defaults to `true`. Set to `false` to bypass that cache and re-read Delta log files on every miss. This is independent from `unity.catalog.cache.enabled`, which governs Unity Catalog REST metadata and the catalog-level Delta snapshot cache. |
-| unity.catalog.cache.ttl-sec | No | TTL, in seconds, applied to Unity Catalog metadata caches and, when positive, cached credentials. Defaults to `60`. Credentials also honor the safety-margin below for the expiration floor. When `unity.catalog.vended-credentials-enabled` and `unity.catalog.cache.enabled` are both `true`, this value also clamps the catalog-level Delta snapshot cache (`hive.cache.ttl-sec` / `hive.cache.refresh-interval-sec`) so cached snapshots do not outlive the Unity credential cache TTL. Set to `0` to force fresh Unity REST metadata, skip credential cache retention, and bypass cached snapshots for vended Unity catalogs. |
-| unity.catalog.cache.credentials.safety-margin-sec | No | Seconds subtracted from a cached credential's server-side `expirationTime` before StarRocks re-vends. Defaults to `1200` (20 minutes). A cached credential is only returned if `expirationTime - safety_margin > now`; credentials without `expirationTime` are not cached. Setting this to at least the maximum expected query duration ensures a handed-out credential remains valid for the full scan. |
-| unity.catalog.aws.region | Conditional | Optional AWS region override for vended credentials. When unset (the default), StarRocks infers the region from Unity Catalog's `metastore_summary` endpoint on first use (see *Region inference* below). AWS vended credentials require a region, so set this explicitly when `metastore_summary` cannot supply one — e.g. an OSS Unity Catalog deployment that does not expose the endpoint, or a workspace token without access to it. Otherwise vending fails fast at the FE. Has no effect on Azure or GCP metastores; on those backends the inference call is never consulted. |
+| hive.metastore.type | Yes | Must be `unity`. |
+| unity.catalog.host | Yes | Databricks workspace URL. Trailing slashes are stripped. |
+| unity.catalog.auth.type | No | `pat` (default) or `oauth-m2m`. The credential sets are mutually exclusive. |
+| unity.catalog.token | Conditional | PAT or service-principal token with table access. Required for `pat`; not allowed for `oauth-m2m`. |
+| unity.catalog.client-id | Conditional | Service-principal OAuth client ID. Required for `oauth-m2m`. |
+| unity.catalog.client-secret | Conditional | Service-principal OAuth client secret. Required for `oauth-m2m`. |
+| unity.catalog.name | Yes | UC catalog exposed as the StarRocks external catalog. |
+| unity.catalog.vended-credentials-enabled | No | Default `true`. Uses UC `temporary-table-credentials`; failures fail fast in FE. Set `false` to use `StorageCredentialParams`. |
+| unity.catalog.spoof-user-agent | No | Default `false`. Set `true` to send a Spark-like user agent when StarRocks is not whitelisted. Requires catalog re-creation. |
+| unity.catalog.request-timeout-ms | No | Default `30000`. UC request timeout in milliseconds. |
+| unity.catalog.max-retries | No | Default `3`. UC delta/v1 retries after the initial request. |
+| unity.catalog.cache.enabled | No | Default `true`. Caches UC metadata and Unity catalog snapshots. Credential caching is separate. |
+| unity.catalog.delta-cache.enabled | No | Default `true`. Controls the shared FE Delta JSON/checkpoint cache. |
+| unity.catalog.cache.ttl-sec | No | Default `60`. UC metadata TTL; also bounds vended snapshot TTL. `0` bypasses UC metadata and snapshot caches. |
+| unity.catalog.cache.credentials.ttl-sec | No | Default `1200`. TTL for cached vended credentials. `0` disables credential retention. |
+| unity.catalog.cache.credentials.safety-margin-sec | No | Default `1200`. Re-vend before the earliest credential `expirationTime`; credentials without expiration are not cached. |
+| unity.catalog.aws.region | Conditional | Optional AWS region override. Required if AWS vended credentials are enabled and `metastores.summary` cannot return a region. |
 
-When `unity.catalog.vended-credentials-enabled` is `true` you can usually omit `StorageCredentialParams`; the vended credentials minted by UC are used instead. AWS S3 and Azure ADLS Gen2 are supported in v1; GCS falls back to catalog-level credentials.
+With vended credentials enabled, AWS S3 and Azure ADLS Gen2 can usually omit `StorageCredentialParams`; GCS uses catalog-level credentials.
 
-**Example: AWS S3 with vended credentials (PAT auth)**
+**Example: PAT auth**
 
 ```SQL
-CREATE EXTERNAL CATALOG unity_aws
+CREATE EXTERNAL CATALOG unity_pat
 PROPERTIES (
     "type" = "deltalake",
     "hive.metastore.type" = "unity",
-    "unity.catalog.host" = "https://dbc-1234.cloud.databricks.com",
+    "unity.catalog.host" = "https://<workspace-host>",
     "unity.catalog.token" = "<databricks-pat>",
     "unity.catalog.name" = "main",
     "unity.catalog.vended-credentials-enabled" = "true"
 );
 ```
 
-**Example: Azure ADLS Gen2 with vended credentials (PAT auth)**
+**Example: OAuth M2M auth**
 
 ```SQL
-CREATE EXTERNAL CATALOG unity_azure
+CREATE EXTERNAL CATALOG unity_oauth
 PROPERTIES (
     "type" = "deltalake",
     "hive.metastore.type" = "unity",
-    "unity.catalog.host" = "https://adb-1234.azuredatabricks.net",
-    "unity.catalog.token" = "<databricks-pat>",
-    "unity.catalog.name" = "main",
-    "unity.catalog.vended-credentials-enabled" = "true"
-);
-```
-
-**Example: AWS S3 with OAuth M2M (service principal) auth**
-
-```SQL
-CREATE EXTERNAL CATALOG unity_aws_oauth
-PROPERTIES (
-    "type" = "deltalake",
-    "hive.metastore.type" = "unity",
-    "unity.catalog.host" = "https://dbc-1234.cloud.databricks.com",
+    "unity.catalog.host" = "https://<workspace-host>",
     "unity.catalog.auth.type" = "oauth-m2m",
     "unity.catalog.client-id" = "<service-principal-application-id>",
     "unity.catalog.client-secret" = "<service-principal-oauth-secret>",
@@ -79,29 +66,33 @@ PROPERTIES (
 );
 ```
 
-###### Client-side caching
+###### Caching
 
-In front of the UC REST client StarRocks keeps a lightweight per-catalog cache that memoizes `listSchemas`, `listTables`, table info lookups, and `temporary-table-credentials`. Metadata caches honor `unity.catalog.cache.enabled` and `unity.catalog.cache.ttl-sec` (default `60`). The credential cache stays active even when metadata caching is disabled and uses the same `unity.catalog.cache.ttl-sec` when the TTL is positive. When the TTL is `0`, credentials are fetched fresh just like metadata. Cached credentials additionally honor the server-side `expirationTime` minus `unity.catalog.cache.credentials.safety-margin-sec` (default `1200`), so a credential is never returned from the cache within 20 minutes of its actual expiry. Credentials without `expirationTime` are not cached. At the default 60 s TTL the safety margin usually does not come into play — every entry is evicted before the safety floor is reached — but it becomes the active guard if you raise the TTL toward the UC credential lifetime (~1 hour). Metadata caching is on by default and can be turned off with `unity.catalog.cache.enabled = false` or `unity.catalog.cache.ttl-sec = 0` — useful when debugging stale-metadata issues or while validating a newly promoted schema. `unity.catalog.cache.enabled = false` also bypasses the catalog-level Delta snapshot cache for Unity-backed catalogs, since the snapshot pointer is Unity metadata; the shared FE-wide Delta JSON/checkpoint metadata-file cache is independent — use `unity.catalog.delta-cache.enabled = false` to bypass that one.
+- UC metadata caches use `unity.catalog.cache.enabled` and `unity.catalog.cache.ttl-sec`.
+- Vended credentials use `unity.catalog.cache.credentials.ttl-sec` and are reused only while `expirationTime - safety_margin > now`.
+- The shared Delta JSON/checkpoint cache is controlled by `unity.catalog.delta-cache.enabled`.
 
-Separately, the FE issues a single `metastores.summary` call per catalog the first time vended credentials are translated, and stamps the returned `region` on every AWS credential so the BE's S3 client targets the correct region without any operator configuration. Region is immutable for the lifetime of a UC metastore, so the call is memoized on the catalog handle for the lifetime of the FE process — there is no TTL refresh and the `unity.catalog.cache.*` settings do not affect it. AWS vended credentials require a region: if `metastore_summary` does not return one (e.g. an OSS Unity Catalog deployment that does not expose the endpoint, or a workspace token without access to it) vending fails fast at the FE unless `unity.catalog.aws.region` is set explicitly. Azure and GCP credentials do not carry a region, so the inference call is never consulted on those code paths and a missing region there is harmless. Transient lookup failures are not memoized, so a 5xx on first attempt simply re-tries on the next query.
+`unity.catalog.cache.enabled = false` or `unity.catalog.cache.ttl-sec = 0` bypasses UC metadata and Unity catalog snapshot caches. It does not disable credential caching.
 
-If you would rather skip the inference call entirely you can set `unity.catalog.aws.region` on the catalog. When this property is set, StarRocks trusts it as-is and never calls `metastores.summary`; the inferred value (and its memoization) is bypassed. For AWS-backed catalogs this is also the required configuration when the workspace token cannot reach `metastores.summary` or the deployment (e.g. OSS Unity Catalog) does not expose the endpoint — without it, vending fails.
+###### AWS region
 
-###### Interaction with the catalog snapshot cache
+For AWS vended credentials, StarRocks infers the region from one `metastores.summary` call per catalog unless `unity.catalog.aws.region` is set. Missing AWS region fails vending. Azure and GCP do not use this setting.
 
-StarRocks also keeps a catalog-level Delta snapshot cache in front of the metastore (controlled by `hive.cache.ttl-sec` / `hive.cache.refresh-interval-sec`). Unity-backed catalogs additionally share one FE-level JSON/checkpoint metadata-file cache across Unity catalogs. Delta log JSON and checkpoint files are versioned immutable metadata artifacts, while the catalog-level snapshot cache stores the latest snapshot selected for a table name and can therefore be stale until its TTL expires. With Unity Catalog vended credentials, each cached snapshot embeds the per-table credentials inside its Delta `Engine`, so StarRocks automatically clamps the snapshot cache TTL (and refresh interval) to `unity.catalog.cache.ttl-sec` when vended credentials and `unity.catalog.cache.enabled` are both active. To bypass only the catalog-level snapshot cache for a Unity Catalog session or query, set the session variable `enable_unity_table_snapshot_cache = false`.
+###### Catalog snapshot cache
 
-If you set `unity.catalog.cache.enabled = false` (or `unity.catalog.cache.ttl-sec = 0`), StarRocks bypasses both the Unity REST metadata cache and the catalog-level Delta snapshot cache for Unity-backed catalogs — each query re-fetches `TableInfo` and re-loads the latest Delta snapshot. Vended credentials are independent: they continue to be served from the credential cache while the cached entry is fresh, and are re-vended only at `unity.catalog.cache.ttl-sec = 0` (no credential caching at all) or when the cached entry is within `unity.catalog.cache.credentials.safety-margin-sec` of its server-side expiry. `unity.catalog.delta-cache.enabled = false` only affects the shared FE-wide Delta JSON/checkpoint metadata-file cache: Delta log files are read directly instead of being served from that cache, while the snapshot pointer itself continues to follow `unity.catalog.cache.enabled`.
+Unity catalog snapshots use `metastore_cache_ttl_sec`. With vended credentials enabled, StarRocks clamps the snapshot TTL to the smallest of `unity.catalog.cache.ttl-sec`, `unity.catalog.cache.credentials.ttl-sec`, and `unity.catalog.cache.credentials.safety-margin-sec`.
 
-###### Sizing the shared Unity Delta metadata-file cache
+For vended Unity catalogs, snapshot refresh-after-write (`metastore_cache_refresh_interval_sec`) is disabled; expired snapshots reload on next access. Non-vended Unity catalogs still honor `metastore_cache_refresh_interval_sec`. To bypass the snapshot cache for a session or query, set `enable_unity_table_snapshot_cache = false`.
 
-The shared FE-wide JSON/checkpoint metadata-file cache is sized from `$STARROCKS_HOME/conf/unity-cache.properties`. The file is optional: every key falls back to a compile-time default matching the long-standing per-catalog defaults. Per-catalog DDL no longer carries these knobs for Unity-backed catalogs.
+###### Shared Delta metadata-file cache
+
+The shared FE JSON/checkpoint cache is configured in `$STARROCKS_HOME/conf/unity-cache.properties` and read at FE start. Per-catalog DDL does not configure these values.
 
 | Property | Default | Description |
 |---|---|---|
-| `unity.delta.json.meta.cache.ttl-sec` | `86400` | TTL for cached parsed Delta log JSON files. |
-| `unity.delta.json.meta.cache.memory-usage-ratio` | `0.1` | Fraction of FE heap reserved for the shared JSON cache. |
-| `unity.delta.checkpoint.meta.cache.ttl-sec` | `86400` | TTL for cached parsed Delta checkpoint files. |
-| `unity.delta.checkpoint.meta.cache.memory-usage-ratio` | `0.1` | Fraction of FE heap reserved for the shared checkpoint cache. |
+| `unity.delta.json.meta.cache.ttl-sec` | `86400` | Parsed Delta JSON log TTL. |
+| `unity.delta.json.meta.cache.memory-usage-ratio` | `0.1` | FE heap ratio for JSON logs. |
+| `unity.delta.checkpoint.meta.cache.ttl-sec` | `86400` | Parsed Delta checkpoint TTL. |
+| `unity.delta.checkpoint.meta.cache.memory-usage-ratio` | `0.1` | FE heap ratio for checkpoints. |
 
-Values are read once at FE start. Changing them requires editing the file and restarting the FE. A malformed individual value logs a single WARN and falls back to the default for that key only; remaining keys are parsed normally.
+Malformed values fall back per key.

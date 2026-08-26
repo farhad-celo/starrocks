@@ -37,13 +37,15 @@ public class UnityCatalogProperties {
     // latency on cold start, restricted token scope, OSS UC deployments that do not
     // expose the endpoint, etc.).
     public static final String UNITY_CATALOG_AWS_REGION = "unity.catalog.aws.region";
-    // Client-side metadata cache in front of the UC REST client. Credentials use the same TTL
-    // and additionally honor the server-side expiration_time minus a safety margin.
+    // Client-side metadata cache in front of the UC REST client. Credentials have their own fixed
+    // TTL and additionally honor the server-side expiration_time minus a safety margin.
     public static final String UNITY_CACHE_ENABLED = "unity.catalog.cache.enabled";
     // Unity-specific Delta caches: the catalog-level latest-snapshot cache plus the shared
     // checkpoint/JSON metadata file cache. This is intentionally separate from TableInfo caching.
     public static final String UNITY_DELTA_CACHE_ENABLED = "unity.catalog.delta-cache.enabled";
     public static final String UNITY_CACHE_TTL_SEC = "unity.catalog.cache.ttl-sec";
+    public static final String UNITY_CACHE_CREDENTIALS_TTL_SEC =
+            "unity.catalog.cache.credentials.ttl-sec";
     public static final String UNITY_CACHE_CREDENTIALS_SAFETY_MARGIN_SEC =
             "unity.catalog.cache.credentials.safety-margin-sec";
 
@@ -57,7 +59,8 @@ public class UnityCatalogProperties {
     public static final String AUTH_TYPE_OAUTH_M2M = "oauth-m2m";
 
     private static final long DEFAULT_CACHE_TTL_SEC = 60L;
-    private static final long DEFAULT_CREDENTIALS_SAFETY_MARGIN_SEC = 1200L;
+    private static final long DEFAULT_CREDENTIALS_CACHE_TTL_SEC = 20 * 60L;
+    private static final long DEFAULT_CREDENTIALS_SAFETY_MARGIN_SEC = 20 * 60L;
 
     /** Mode used to authenticate against the Unity Catalog REST API. */
     public enum AuthType {
@@ -78,6 +81,7 @@ public class UnityCatalogProperties {
     private final boolean cacheEnabled;
     private final boolean deltaCacheEnabled;
     private final long cacheTtlSec;
+    private final long credentialsCacheTtlSec;
     private final long credentialsSafetyMarginSec;
     // null when the operator did not specify an override -- callers fall back to the
     // inferred region from Unity Catalog's metastore_summary endpoint.
@@ -122,6 +126,10 @@ public class UnityCatalogProperties {
         this.cacheTtlSec = parseLong(properties, UNITY_CACHE_TTL_SEC, DEFAULT_CACHE_TTL_SEC);
         Preconditions.checkArgument(this.cacheTtlSec >= 0,
                 "%s must be >= 0", UNITY_CACHE_TTL_SEC);
+        this.credentialsCacheTtlSec = parseLong(properties,
+                UNITY_CACHE_CREDENTIALS_TTL_SEC, DEFAULT_CREDENTIALS_CACHE_TTL_SEC);
+        Preconditions.checkArgument(this.credentialsCacheTtlSec >= 0,
+                "%s must be >= 0", UNITY_CACHE_CREDENTIALS_TTL_SEC);
         this.credentialsSafetyMarginSec = parseLong(properties,
                 UNITY_CACHE_CREDENTIALS_SAFETY_MARGIN_SEC, DEFAULT_CREDENTIALS_SAFETY_MARGIN_SEC);
         Preconditions.checkArgument(this.credentialsSafetyMarginSec >= 0,
@@ -179,9 +187,14 @@ public class UnityCatalogProperties {
         return deltaCacheEnabled;
     }
 
-    /** TTL applied to UC metadata caches and, when positive, the credential cache. */
+    /** TTL applied to UC metadata caches. */
     public long getCacheTtlSec() {
         return cacheTtlSec;
+    }
+
+    /** TTL applied to the per-table vended-credentials cache. */
+    public long getCredentialsCacheTtlSec() {
+        return credentialsCacheTtlSec;
     }
 
     /** Seconds subtracted from each credential's {@code expirationTime} before re-vending. */

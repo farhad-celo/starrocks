@@ -44,6 +44,7 @@ import static com.starrocks.connector.hive.HiveConnector.HIVE_METASTORE_URIS;
 
 public class DeltaLakeInternalMgr {
     public static final List<String> SUPPORTED_METASTORE_TYPE = ImmutableList.of("hive", "glue", "dlf", "unity");
+    private static final long NEVER_REFRESH_SNAPSHOT_CACHE_SEC = -1L;
     protected final String catalogName;
     protected final DeltaLakeCatalogProperties deltaLakeCatalogProperties;
     protected final HdfsEnvironment hdfsEnvironment;
@@ -103,23 +104,42 @@ public class DeltaLakeInternalMgr {
             refreshHiveMetastoreExecutor = Executors.newCachedThreadPool(
                     new ThreadFactoryBuilder().setNameFormat("deltalake-metastore-refresh-%d").build());
             Executor executor = new ReentrantExecutor(refreshHiveMetastoreExecutor, hmsConf.getCacheRefreshThreadMaxNum());
-            // When vended credentials are active, the cached snapshot embeds the per-table
-            // cloud credentials inside its DeltaLakeEngine. Bound the snapshot cache TTL to
-            // the Unity metadata cache TTL so a cached snapshot's baked-in credentials cannot
-            // outlive the credential cache entry that minted them. unity.catalog.delta-cache.enabled
-            // is independent and only governs the shared JSON/checkpoint cache.
             long snapshotTtlSec = hmsConf.getCacheTtlSec();
-            long snapshotRefreshSec = hmsConf.getCacheRefreshIntervalSec();
-            if (unityCatalogProperties.isVendedCredentialsEnabled()
-                    && unityCatalogProperties.isCacheEnabled()) {
-                long unityTtlSec = unityCatalogProperties.getCacheTtlSec();
-                snapshotTtlSec = Math.min(snapshotTtlSec, unityTtlSec);
-                snapshotRefreshSec = Math.min(snapshotRefreshSec, unityTtlSec);
-            }
+            long snapshotRefreshSec = unitySnapshotRefreshSec(
+                    hmsConf.getCacheRefreshIntervalSec(), unityCatalogProperties);
+            snapshotTtlSec = clampUnityVendedSnapshotTtlSec(snapshotTtlSec, unityCatalogProperties);
             deltaLakeMetastore = CachingDeltaLakeMetastore.createCatalogLevelInstance(unityBackedDeltaMetastore, executor,
                     snapshotTtlSec, snapshotRefreshSec, hmsConf.getCacheMaxNum());
         }
         return deltaLakeMetastore;
+    }
+
+    static long unitySnapshotRefreshSec(long configuredSec, UnityCatalogProperties unityProperties) {
+        if (unityProperties != null && unityProperties.isVendedCredentialsEnabled()) {
+            return NEVER_REFRESH_SNAPSHOT_CACHE_SEC;
+        }
+        return configuredSec;
+    }
+
+    static long clampUnityVendedSnapshotTtlSec(long configuredSec, UnityCatalogProperties unityProperties) {
+        // A cached DeltaLakeSnapshot embeds the DeltaLakeEngine that was built with vended
+        // credentials. Keep that snapshot TTL no longer than UC metadata, credential cache, or
+        // credential safety-margin TTLs. unity.catalog.delta-cache.enabled is independent and only
+        // governs the shared JSON/checkpoint cache.
+        if (unityProperties == null || !unityProperties.isVendedCredentialsEnabled()
+                || !unityProperties.isCacheEnabled()) {
+            return configuredSec;
+        }
+        long clampedSec = clampCacheLifetimeSec(configuredSec, unityProperties.getCacheTtlSec());
+        clampedSec = clampCacheLifetimeSec(clampedSec, unityProperties.getCredentialsCacheTtlSec());
+        return clampCacheLifetimeSec(clampedSec, unityProperties.getCredentialsSafetyMarginSec());
+    }
+
+    private static long clampCacheLifetimeSec(long configuredSec, long maxLifetimeSec) {
+        if (configuredSec < 0) {
+            return maxLifetimeSec;
+        }
+        return Math.min(configuredSec, maxLifetimeSec);
     }
 
     public IDeltaLakeMetastore createHMSBackedDeltaLakeMetastore() {

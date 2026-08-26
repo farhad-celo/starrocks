@@ -47,13 +47,22 @@ public class CachingUnityCatalogClientTest {
 
     private static UnityCatalogProperties propsWith(long ttlSec, long credentialsSafetyMarginSec,
                                                     boolean metadataCacheEnabled) {
-        return new UnityCatalogProperties(ImmutableMap.of(
-                "unity.catalog.host", "https://example.cloud.databricks.com",
-                "unity.catalog.token", "dapiTEST",
-                "unity.catalog.name", "main",
-                "unity.catalog.cache.enabled", Boolean.toString(metadataCacheEnabled),
-                "unity.catalog.cache.ttl-sec", Long.toString(ttlSec),
-                "unity.catalog.cache.credentials.safety-margin-sec", Long.toString(credentialsSafetyMarginSec)));
+        return propsWith(ttlSec, credentialsSafetyMarginSec, metadataCacheEnabled, null);
+    }
+
+    private static UnityCatalogProperties propsWith(long ttlSec, long credentialsSafetyMarginSec,
+                                                    boolean metadataCacheEnabled, Long credentialsCacheTtlSec) {
+        ImmutableMap.Builder<String, String> builder = ImmutableMap.<String, String>builder()
+                .put("unity.catalog.host", "https://example.cloud.databricks.com")
+                .put("unity.catalog.token", "dapiTEST")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.cache.enabled", Boolean.toString(metadataCacheEnabled))
+                .put("unity.catalog.cache.ttl-sec", Long.toString(ttlSec))
+                .put("unity.catalog.cache.credentials.safety-margin-sec", Long.toString(credentialsSafetyMarginSec));
+        if (credentialsCacheTtlSec != null) {
+            builder.put("unity.catalog.cache.credentials.ttl-sec", Long.toString(credentialsCacheTtlSec));
+        }
+        return new UnityCatalogProperties(builder.build());
     }
 
     /** Manually-advanceable ticker; avoids pulling in guava-testlib. */
@@ -197,7 +206,33 @@ public class CachingUnityCatalogClientTest {
     }
 
     @Test
-    public void testTtlExpiryReloadsCredentialEntry(@Mocked UnityCatalogApi delegate) {
+    public void testCredentialsUseDefaultTwentyMinuteTtlIndependentOfMetadataConfig(@Mocked UnityCatalogApi delegate) {
+        DeltaCredentialsResponse first = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
+        DeltaCredentialsResponse second = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
+
+        new Expectations() {
+            {
+                delegate.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                returns(first, second);
+                times = 2;
+            }
+        };
+
+        // ttl-sec = 2, but credentials must ignore metadata TTL and use the default 20-minute TTL.
+        AdvanceableTicker ticker = new AdvanceableTicker();
+        CachingUnityCatalogClient client = newClient(delegate, propsWith(2, 60), ticker, new AtomicLong());
+
+        Assertions.assertSame(first, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        // Well past the 2s metadata ttl but within 20 minutes: still cached.
+        ticker.advance(10, TimeUnit.MINUTES);
+        Assertions.assertSame(first, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        // Past the default 20-minute credentials ttl: reloaded.
+        ticker.advance(11, TimeUnit.MINUTES);
+        Assertions.assertSame(second, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+    }
+
+    @Test
+    public void testCredentialsUseConfiguredTtl(@Mocked UnityCatalogApi delegate) {
         DeltaCredentialsResponse first = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
         DeltaCredentialsResponse second = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
 
@@ -210,10 +245,13 @@ public class CachingUnityCatalogClientTest {
         };
 
         AdvanceableTicker ticker = new AdvanceableTicker();
-        CachingUnityCatalogClient client = newClient(delegate, propsWith(2, 60), ticker, new AtomicLong());
+        CachingUnityCatalogClient client = newClient(delegate,
+                propsWith(60, 60, true, 5L), ticker, new AtomicLong());
 
         Assertions.assertSame(first, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
-        ticker.advance(3, TimeUnit.SECONDS);
+        ticker.advance(4, TimeUnit.SECONDS);
+        Assertions.assertSame(first, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        ticker.advance(2, TimeUnit.SECONDS);
         Assertions.assertSame(second, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
     }
 
@@ -272,19 +310,19 @@ public class CachingUnityCatalogClientTest {
     }
 
     @Test
-    public void testZeroTtlBypassesMetadataAndCredentialsCache(@Mocked UnityCatalogApi delegate) {
+    public void testZeroTtlBypassesMetadataButNotCredentialsCache(@Mocked UnityCatalogApi delegate) {
         SchemaInfo s = new SchemaInfo().setName("sales");
-        DeltaCredentialsResponse firstCreds = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
-        DeltaCredentialsResponse secondCreds = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
+        DeltaCredentialsResponse creds = UnityDeltaModelFixtures.awsCredsResponse(Long.MAX_VALUE);
 
         new Expectations() {
             {
                 delegate.listSchemas("main");
                 result = ImmutableList.of(s);
                 times = 2;
+                // Credentials use their own default 20-minute TTL, so ttl-sec=0 does not disable their cache.
                 delegate.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
-                returns(firstCreds, secondCreds);
-                times = 2;
+                result = creds;
+                times = 1;
             }
         };
 
@@ -292,8 +330,8 @@ public class CachingUnityCatalogClientTest {
                 new AdvanceableTicker(), new AtomicLong());
         client.listSchemas("main");
         client.listSchemas("main");
-        Assertions.assertSame(firstCreds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
-        Assertions.assertSame(secondCreds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        Assertions.assertSame(creds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
+        Assertions.assertSame(creds, client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ"));
     }
 
     @Test

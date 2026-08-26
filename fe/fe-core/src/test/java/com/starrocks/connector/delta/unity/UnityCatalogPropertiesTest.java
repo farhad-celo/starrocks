@@ -122,6 +122,7 @@ public class UnityCatalogPropertiesTest {
         Assertions.assertTrue(p.isCacheEnabled(), "cache should default to enabled");
         Assertions.assertTrue(p.isDeltaCacheEnabled(), "delta cache should default to enabled");
         Assertions.assertEquals(60L, p.getCacheTtlSec());
+        Assertions.assertEquals(1200L, p.getCredentialsCacheTtlSec());
         Assertions.assertEquals(1200L, p.getCredentialsSafetyMarginSec());
     }
 
@@ -134,12 +135,14 @@ public class UnityCatalogPropertiesTest {
                 .put("unity.catalog.cache.enabled", "false")
                 .put("unity.catalog.delta-cache.enabled", "false")
                 .put("unity.catalog.cache.ttl-sec", "300")
+                .put("unity.catalog.cache.credentials.ttl-sec", "1800")
                 .put("unity.catalog.cache.credentials.safety-margin-sec", "30")
                 .build();
         UnityCatalogProperties p = new UnityCatalogProperties(props);
         Assertions.assertFalse(p.isCacheEnabled());
         Assertions.assertFalse(p.isDeltaCacheEnabled());
         Assertions.assertEquals(300L, p.getCacheTtlSec());
+        Assertions.assertEquals(1800L, p.getCredentialsCacheTtlSec());
         Assertions.assertEquals(30L, p.getCredentialsSafetyMarginSec());
     }
 
@@ -191,6 +194,16 @@ public class UnityCatalogPropertiesTest {
         props.put("unity.catalog.token", "dapiXYZ");
         props.put("unity.catalog.name", "main");
         props.put("unity.catalog.cache.credentials.safety-margin-sec", "-5");
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new UnityCatalogProperties(props));
+    }
+
+    @Test
+    public void testNegativeCredentialsTtlRejected() {
+        Map<String, String> props = new HashMap<>();
+        props.put("unity.catalog.host", "https://example.cloud.databricks.com");
+        props.put("unity.catalog.token", "dapiXYZ");
+        props.put("unity.catalog.name", "main");
+        props.put("unity.catalog.cache.credentials.ttl-sec", "-1");
         Assertions.assertThrows(IllegalArgumentException.class, () -> new UnityCatalogProperties(props));
     }
 
