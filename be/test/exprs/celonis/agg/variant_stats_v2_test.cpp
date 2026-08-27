@@ -4,6 +4,7 @@
 
 #include "../util.h"
 #include "column/column_builder.h"
+#include "common/config.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/celonis/anyval_util.h"
@@ -66,9 +67,9 @@ public:
     TypeDescriptor TYPE_ARRAY_INT = celonis::array_type(TYPE_INT);
 
 protected:
-    void SetUp() override {}
+    void SetUp() override { original_max_proto_size_bytes_ = config::celonis_variant_stats_max_proto_size_bytes; }
 
-    void TearDown() override {}
+    void TearDown() override { config::celonis_variant_stats_max_proto_size_bytes = original_max_proto_size_bytes_; }
 
     TypeDescriptor get_return_type() { return TypeDescriptor::from_logical_type(TYPE_VARCHAR); }
 
@@ -220,6 +221,7 @@ protected:
 
     std::vector<std::unique_ptr<MemPool>> mem_pools_;
     std::vector<std::unique_ptr<RuntimeState>> runtime_states_;
+    int64_t original_max_proto_size_bytes_{};
 };
 
 // TODO(y.zhang): Add more unit tests.
@@ -456,6 +458,30 @@ TEST_F(CelonisVariantStatsV2Test, proto_encoding_enabled) {
              "\"dst\":0},{\"count\":\"4\",\"countCase\":\"4\",\"src\":1,\"dst\":2},{\"count\":\"1\",\"countCase\":"
              "\"1\",\"src\":2,\"dst\":1},{\"count\":\"2\",\"countCase\":\"2\",\"src\":2,\"dst\":3}]}"
              ""});
+}
+
+TEST_F(CelonisVariantStatsV2Test, configurable_proto_size_limit) {
+    config::celonis_variant_stats_max_proto_size_bytes = 1;
+
+    auto [local_ctx, state, func] = RunUpdate({DatumArray{0}}, {1}, DatumArray{"A"}, -1, true, true);
+    auto result = local_ctx->create_column(local_ctx->get_return_type(), false);
+    func->finalize_to_column(local_ctx.get(), state->state(), result.get());
+
+    ASSERT_TRUE(local_ctx->has_error());
+    EXPECT_NE(std::string(local_ctx->error_msg()).find("celonis_variant_stats_max_proto_size_bytes (1 bytes)"),
+              std::string::npos);
+}
+
+TEST_F(CelonisVariantStatsV2Test, proto_size_limit_can_be_disabled) {
+    config::celonis_variant_stats_max_proto_size_bytes = 0;
+
+    auto [local_ctx, state, func] = RunUpdate({DatumArray{0}}, {1}, DatumArray{"A"}, -1, true, true);
+    auto result = local_ctx->create_column(local_ctx->get_return_type(), false);
+    func->finalize_to_column(local_ctx.get(), state->state(), result.get());
+
+    ASSERT_FALSE(local_ctx->has_error());
+    ASSERT_EQ(result->size(), 1);
+    EXPECT_TRUE(to_statistics_json_string(result->get(0).get_slice().to_string()).has_value());
 }
 
 TEST_F(CelonisVariantStatsV2Test, proto_encoding_enabled_with_top_variant_stats) {

@@ -66,6 +66,9 @@ CONF_mBool(adjust_passthrough, "false");
 // When false, uses deterministic sorting with hash as tie-breaker.
 CONF_mBool(variant_stats_use_count_only_sort, "true");
 
+// Maximum serialized protobuf size in bytes returned by CELONIS_VARIANT_STATS and CELONIS_VARIANT_STATS_V2.
+// Set to 0 or a negative value to disable the limit.
+CONF_mInt64(celonis_variant_stats_max_proto_size_bytes, "104857600"); // 100 MiB
 
 // End of Celonis configures
 

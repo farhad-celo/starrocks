@@ -1,8 +1,10 @@
 #include "variant_stats.h"
 
+#include <limits>
 #include <queue>
 
 #include "column/column_helper.h"
+#include "common/config.h"
 #include "exprs/celonis/agg/util.h"
 #include "exprs/celonis/agg/variant_stats_edge_utils.h"
 #include "modules/query/variantstats.pb.h"
@@ -96,10 +98,13 @@ std::optional<std::string> VariantStatsFinalizer::base64_encoded_string(
     if (variant_analysis.has_value()) {
         build_variant_analysis_proto(variant_analysis.value(), statistics_proto, get_log_prefix(query_id));
     }
-    // Limit size to 100M.
-    std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto, (100LL << 20), false);
+    const int64_t configured_size_limit = config::celonis_variant_stats_max_proto_size_bytes;
+    const size_t size_limit =
+            configured_size_limit > 0 ? static_cast<size_t>(configured_size_limit) : std::numeric_limits<size_t>::max();
+    std::optional<std::string> encoded_string = to_base64_encoded_string(statistics_proto, size_limit, false);
     if (!encoded_string.has_value()) {
-        LOG(ERROR) << "CELONIS_VARIANT_STATS: proto serialized size exceeds maximum supported length (100M).\n";
+        LOG(ERROR) << "CELONIS_VARIANT_STATS: proto serialized size " << statistics_proto.ByteSizeLong()
+                   << " exceeds configured limit " << configured_size_limit << " bytes.\n";
     }
     return encoded_string;
 }
@@ -182,7 +187,10 @@ std::optional<std::string> VariantStatsFinalizer::finalize(FunctionContext* ctx)
     if (rv.has_value()) {
         LOG(INFO) << log_prefix << ": done to_string (length = " << rv->size() << ")\n";
     } else {
-        ctx->set_error(std::string("CELONIS_VARIANT_STATS: output string size exceeds the limit (100M)").c_str(),
+        ctx->set_error(std::string("CELONIS_VARIANT_STATS: output protobuf size exceeds "
+                                   "celonis_variant_stats_max_proto_size_bytes (" +
+                                   std::to_string(config::celonis_variant_stats_max_proto_size_bytes) + " bytes)")
+                               .c_str(),
                        false);
     }
     return rv;

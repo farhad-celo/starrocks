@@ -1,6 +1,6 @@
 #include "exprs/celonis/util.h"
 
-#include <cmath>
+#include <limits>
 
 #include "column/array_column.h"
 #include "column/column_helper.h"
@@ -15,15 +15,25 @@ std::optional<std::string> to_base64_encoded_string(const google::protobuf::Mess
         return std::nullopt;
     }
     std::string binary_string;
-    message.SerializeToString(&binary_string);
+    if (!message.SerializeToString(&binary_string)) {
+        return std::nullopt;
+    }
     if (compress && !binary_string.empty()) {
         binary_string = std::move(compress_string(binary_string, true));
     }
-    int cipher_len = (size_t)(4.0 * ceil((double)binary_string.length() / 3.0)) + 1;
-    std::string p(cipher_len, '\0');
 
-    int len = base64_encode3((unsigned char*)binary_string.data(), binary_string.length(), (unsigned char*)p.data());
-    std::string encoded_string(p.data(), len);
+    const size_t encoded_blocks = binary_string.size() / 3 + (binary_string.size() % 3 != 0);
+    if (encoded_blocks > std::numeric_limits<size_t>::max() / 4) {
+        return std::nullopt;
+    }
+    const size_t encoded_size = encoded_blocks * 4;
+    std::string encoded_string(encoded_size, '\0');
+    const size_t actual_encoded_size =
+            base64_encode3(reinterpret_cast<const unsigned char*>(binary_string.data()), binary_string.size(),
+                           reinterpret_cast<unsigned char*>(encoded_string.data()));
+    if (actual_encoded_size != encoded_size) {
+        return std::nullopt;
+    }
     return encoded_string;
 }
 

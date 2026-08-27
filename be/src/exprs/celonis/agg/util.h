@@ -10,7 +10,8 @@ namespace starrocks {
 constexpr size_t DEFAULT_CELONIS_PROTO_SIZE_LIMIT = 1LL << 30; // 1GB
 
 // Serializes a protobuf message to a base64-encoded string.
-// If the serialized message size exceeds size_limit, returns std::nullopt.
+// Returns std::nullopt if the serialized message exceeds size_limit, serialization fails, or the encoded size
+// cannot be represented.
 // If compress is true, the serialized data is compressed before encoding.
 std::optional<std::string> to_base64_encoded_string(const google::protobuf::Message& message, size_t size_limit,
                                                     bool compress);

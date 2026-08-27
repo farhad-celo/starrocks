@@ -9,6 +9,7 @@
 #include "column/column_builder.h"
 #include "column/fixed_length_column.h"
 #include "column/vectorized_fwd.h"
+#include "common/config.h"
 #include "exprs/agg/aggregate_factory.h"
 #include "exprs/agg/nullable_aggregate.h"
 #include "exprs/arithmetic_operation.h"
@@ -412,12 +413,14 @@ public:
     CelonisVariantStatsTest() = default;
 
     void SetUp() override {
+        original_max_proto_size_bytes = config::celonis_variant_stats_max_proto_size_bytes;
         runtime_state = new RuntimeState();
         utils = new FunctionUtils(runtime_state);
         ctx = utils->get_fn_ctx();
     }
 
     void TearDown() override {
+        config::celonis_variant_stats_max_proto_size_bytes = original_max_proto_size_bytes;
         delete utils;
         // FunctionUtils does not delete runtime_state.
         if (runtime_state != nullptr) {
@@ -519,6 +522,7 @@ private:
     FunctionUtils* utils{};
     FunctionContext* ctx{};
     RuntimeState* runtime_state{};
+    int64_t original_max_proto_size_bytes{};
 };
 
 TEST_F(CelonisVariantStatsTest, test_equality) {
@@ -2214,6 +2218,53 @@ TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding) {
     sort_statistics(&expected);
 
     EXPECT_TRUE(google::protobuf::util::MessageDifferencer::Equals(statistics_proto.value(), expected));
+}
+
+TEST_F(CelonisVariantStatsTest, test_configurable_proto_size_limit) {
+    config::celonis_variant_stats_max_proto_size_bytes = 1;
+
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+    auto variants = build_variant_column({{"a1"}});
+    auto weights = build_weight_column({1});
+    auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(-1, variants->size());
+    auto skip_variant_analysis = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, variants->size());
+    auto enable_proto_encoding = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, variants->size());
+    std::vector<const Column*> raw_columns = {variants.get(), weights.get(), edge_count.get(),
+                                              skip_variant_analysis.get(), enable_proto_encoding.get()};
+    ctx->set_constant_columns({nullptr, nullptr, edge_count, skip_variant_analysis, enable_proto_encoding});
+    auto state = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, variants->size(), raw_columns.data(), state->state());
+
+    auto result = BinaryColumn::create();
+    func->finalize_to_column(ctx, state->state(), result.get());
+
+    ASSERT_TRUE(ctx->has_error());
+    EXPECT_EQ(result->size(), 0);
+    EXPECT_NE(std::string(ctx->error_msg()).find("celonis_variant_stats_max_proto_size_bytes (1 bytes)"),
+              std::string::npos);
+}
+
+TEST_F(CelonisVariantStatsTest, test_proto_size_limit_can_be_disabled) {
+    config::celonis_variant_stats_max_proto_size_bytes = 0;
+
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+    auto variants = build_variant_column({{"a1"}});
+    auto weights = build_weight_column({1});
+    auto edge_count = ColumnHelper::create_const_column<TYPE_BIGINT>(-1, variants->size());
+    auto skip_variant_analysis = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, variants->size());
+    auto enable_proto_encoding = ColumnHelper::create_const_column<TYPE_BOOLEAN>(true, variants->size());
+    std::vector<const Column*> raw_columns = {variants.get(), weights.get(), edge_count.get(),
+                                              skip_variant_analysis.get(), enable_proto_encoding.get()};
+    ctx->set_constant_columns({nullptr, nullptr, edge_count, skip_variant_analysis, enable_proto_encoding});
+    auto state = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, variants->size(), raw_columns.data(), state->state());
+
+    auto result = BinaryColumn::create();
+    func->finalize_to_column(ctx, state->state(), result.get());
+
+    ASSERT_FALSE(ctx->has_error());
+    ASSERT_EQ(result->size(), 1);
+    EXPECT_TRUE(to_statistics_proto(result->get_slice(0).to_string()).has_value());
 }
 
 TEST_F(CelonisVariantStatsTest, test_enable_proto_encoding_empty) {
