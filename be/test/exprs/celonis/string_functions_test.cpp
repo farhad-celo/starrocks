@@ -168,6 +168,58 @@ TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_equality_to_fe_implement
 }
 
 /*
+ * This tests equality to the multi-argument FE implementation of xx_hash3_128_v3.
+ * If you adjust this test, you also must adjust XXHASH3128V3Test.testMultipleInputsEqualityToNativeFunction.
+ */
+TEST_F(CelonisStringFunctionsTest, test_xx_hash3_128_v3_multi_arg_equality_to_fe_implementation) {
+    {
+        // GIVEN
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+        auto return_type =
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+
+        auto first = BinaryColumn::create();
+        first->append("hello");
+        auto second = BinaryColumn::create();
+        second->append("world");
+
+        // WHEN
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {first, second}).value();
+
+        // THEN
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ(int128_to_string(result->get(0).get_int128()), "144019643735392052535165383538110996661");
+    }
+
+    {
+        // GIVEN
+        std::vector<FunctionContext::TypeDesc> arg_types = {
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR)),
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_VARCHAR))};
+        auto return_type =
+                CelonisAnyValUtil::column_type_to_type_desc(TypeDescriptor::from_logical_type(TYPE_LARGEINT));
+        std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context(std::move(arg_types), return_type));
+
+        auto first = BinaryColumn::create();
+        first->append("hello");
+        auto second = ColumnHelper::create_const_null_column(1);
+        auto third = BinaryColumn::create();
+        third->append("world");
+
+        // WHEN
+        ColumnPtr result = CelonisStringFunctions::xx_hash3_128_v3(ctx.get(), {first, second, third}).value();
+
+        // THEN
+        ASSERT_EQ(1, result->size());
+        EXPECT_EQ(int128_to_string(result->get(0).get_int128()), "18679293785523661598860211660857963851");
+    }
+}
+
+/*
  * This tests equality to the FE implementation of xx_hash3_128_nullable.
  * The behavior of this hash function is identical to xx_hash3_128_v3 up to handling of null values.
  * If you adjust this test, you also must adjust the corresponding frontend implementation.

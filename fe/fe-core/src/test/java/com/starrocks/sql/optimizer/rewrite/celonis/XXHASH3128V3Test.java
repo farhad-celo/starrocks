@@ -17,6 +17,7 @@ package com.starrocks.sql.optimizer.rewrite.celonis;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class XXHASH3128V3Test {
     @Test
@@ -26,5 +27,22 @@ public class XXHASH3128V3Test {
         assertEquals("-144608462304864223298616749235096385510", hasher.compute("1").toString());
         assertEquals("-13577519804223448105674676604219862806", hasher.compute("fWn!ɔԕڈ#ÅLm{FΟ̉WʊHUɌIɹ̬©;ޤݦм۸ˢoӏ0").toString());
         assertEquals("-94392335423945087845847157094108824607", hasher.computeNull().toString());
+    }
+
+    @Test
+    public void testMultipleInputsEqualityToNativeFunction() throws CelonisHashCalculationException {
+        final var hasher = new XXHASH3128V3();
+
+        assertEquals("144019643735392052535165383538110996661",
+                hasher.compute("hello", "world").toString());
+        assertEquals("18679293785523661598860211660857963851",
+                hasher.compute("hello", null, "world").toString());
+    }
+
+    @Test
+    public void testRequiresAtLeastOneInput() {
+        final var hasher = new XXHASH3128V3();
+
+        assertThrows(CelonisHashCalculationException.class, hasher::compute);
     }
 }

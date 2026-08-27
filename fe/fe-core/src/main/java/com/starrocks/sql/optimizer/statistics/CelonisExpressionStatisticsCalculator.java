@@ -21,14 +21,12 @@ import com.starrocks.catalog.ArrayType;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
-import com.starrocks.metric.celonis.CelonisMetrics;
-import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
-import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashFunction;
+import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashCalculationException;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
 import java.util.HashMap;
@@ -36,8 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.POSITIVE_INFINITY;
@@ -87,12 +83,12 @@ public class CelonisExpressionStatisticsCalculator {
                 minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
                 maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
                 nullsFraction = 0.0;
-                histogram = projectHistogramThroughHash(histogram, callOperator, columnStatistic, rowCount);
+                histogram = CelonisHashMcvProjector.projectSingleArgHash(callOperator, columnStatistic, rowCount);
                 break;
             case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
                 minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
                 maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
-                histogram = projectHistogramThroughHash(histogram, callOperator, columnStatistic, rowCount);
+                histogram = CelonisHashMcvProjector.projectSingleArgHash(callOperator, columnStatistic, rowCount);
                 break;
             case FunctionSet.CELONIS_ARRAY_COUNT:
             case FunctionSet.CELONIS_ARRAY_COUNT_DISTINCT:
@@ -167,46 +163,6 @@ public class CelonisExpressionStatisticsCalculator {
                 .setHistogram(histogram)
                 .setCollectionSize(collectionSize)
                 .build();
-    }
-
-    private static Histogram projectHistogramThroughHash(@Nullable Histogram histogram,
-                                                         CallOperator callOperator, ColumnStatistic columnStatistic,
-                                                         double rowCount) {
-        if (ConnectContext.get() == null || !ConnectContext.get().getSessionVariable().getEnableCelonisHashMcvs()) {
-            return null;
-        }
-
-        final var hashFunction = CelonisHashFunction.of(callOperator);
-
-        if (hashFunction == null) {
-            // There is no Java implementation of the hash function, hence we can not project the MCVs.
-            return null;
-        }
-
-        if (!callOperator.getChild(0).getType().isVarchar()) {
-            // For now, we only support this for VARCHAR invocations (i.e. non-array inputs).
-            return null;
-        }
-
-        final var projectedMcvs = new HashMap<String, Long>();
-        // Project the NULL MCV
-        if (hashFunction.computeNull() != null) {
-            final var projectedNullRowCount = (long) (rowCount * columnStatistic.getNullsFraction());
-            if (projectedNullRowCount > 0) {
-                projectedMcvs.put(hashFunction.computeNull().toString(), projectedNullRowCount);
-            }
-        }
-
-        if (histogram != null) {
-            // Project other (non-null) MCVs
-            projectedMcvs.putAll(histogram.getMCV() //
-                    .entrySet() //
-                    .stream() //
-                    .collect(Collectors.toMap(key -> hashFunction.compute(key.getKey()).toString(), Map.Entry::getValue)));
-        }
-
-        CelonisMetrics.increaseCounter("celonis_hash_mcv_propagation", "Amount of propagated Celonis hash MCVs");
-        return new Histogram(List.of(), projectedMcvs);
     }
 
     private static Optional<Type> extractArrayItemType(ScalarOperator operator) {
@@ -391,7 +347,7 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_XX_HASH3_128_V2:
             case FunctionSet.CELONIS_XX_HASH3_128_V3:
             case FunctionSet.CELONIS_XX_HASH3_128_V4:
-                return calculateNonNullableCelonisHashStats(callOperator, List.of(left, right), rowCount);
+                return calculateNonNullableMultiArgCelonisHashStats(callOperator, List.of(left, right), rowCount);
             case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
                 minValue = LargeIntLiteral.LARGE_INT_MIN.doubleValue();
                 maxValue = LargeIntLiteral.LARGE_INT_MAX.doubleValue();
@@ -662,7 +618,7 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_XX_HASH3_128_V2:
             case FunctionSet.CELONIS_XX_HASH3_128_V3:
             case FunctionSet.CELONIS_XX_HASH3_128_V4:
-                return calculateNonNullableCelonisHashStats(callOperator, childrenColumnStatistics, rowCount);
+                return calculateNonNullableMultiArgCelonisHashStats(callOperator, childrenColumnStatistics, rowCount);
             case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE: {
                 if (childrenColumnStatistics.stream().anyMatch(ColumnStatistic::isUnknown)) {
                     return null;
@@ -693,9 +649,37 @@ public class CelonisExpressionStatisticsCalculator {
     }
 
 
-    private static ColumnStatistic calculateNonNullableCelonisHashStats(CallOperator callOperator,
+    /**
+     * Computes the statistics of a multi-argument, non-nullable Celonis hash call. The MCVs of the arguments are
+     * projected through the call for the hash functions that have a Java implementation for multiple inputs, the others
+     * just keep their base statistics.
+     */
+    private static ColumnStatistic calculateNonNullableMultiArgCelonisHashStats(CallOperator callOperator,
                                                                         List<ColumnStatistic> childrenColumnStatistics,
                                                                         double rowCount) {
+        final var hashStats = calculateNonNullableMultiArgCelonisHashBaseStats(callOperator, childrenColumnStatistics, rowCount);
+        if (hashStats == null) {
+            return null;
+        }
+
+        final Histogram projectedHistogram;
+        try {
+            projectedHistogram = CelonisHashMcvProjector.projectMultiArgHash(callOperator, childrenColumnStatistics,
+                    rowCount);
+        } catch (CelonisHashCalculationException exception) {
+            return hashStats;
+        }
+
+        if (projectedHistogram == null) {
+            return hashStats;
+        }
+
+        return ColumnStatistic.buildFrom(hashStats).setHistogram(projectedHistogram).build();
+    }
+
+    private static ColumnStatistic calculateNonNullableMultiArgCelonisHashBaseStats(CallOperator callOperator,
+                                                                           List<ColumnStatistic> childrenColumnStatistics,
+                                                                           double rowCount) {
         if (childrenColumnStatistics.stream().anyMatch(ColumnStatistic::isUnknown)) {
             return null;
         }

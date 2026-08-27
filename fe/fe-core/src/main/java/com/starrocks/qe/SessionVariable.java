@@ -964,6 +964,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String BACK_PRESSURE_THROTTLE_TIME_UPPER_BOUND = "back_pressure_throttle_time_upper_bound";
 
     public static final String ENABLE_CELONIS_HASH_MCVS = "enable_celonis_hash_mcvs";
+    public static final String ENABLE_CELONIS_HASH_MCVS_MULTI_ARG = "enable_celonis_hash_mcvs_multi_arg";
+    public static final String CELONIS_HASH_MCVS_MULTI_ARG_LIMIT_MCVS = "celonis_hash_mcvs_multi_arg_limit_mcvs";
 
     public static final String LOWER_UPPER_SUPPORT_UTF8 = "lower_upper_support_utf8";
 
@@ -1996,6 +1998,15 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VarAttr(name = ENABLE_CELONIS_HASH_MCVS)
     private boolean enableCelonisHashMcvs = false;
+
+    // Projecting MCVs through a multi-argument Celonis hash call
+    @VarAttr(name = ENABLE_CELONIS_HASH_MCVS_MULTI_ARG)
+    private boolean enableCelonisHashMcvsMultiArg = false;
+
+    // Upper bound on the number of MCVs propagated out of a multi-argument Celonis hash call. Only the MCVs with the
+    // highest estimated row counts are kept.
+    @VarAttr(name = CELONIS_HASH_MCVS_MULTI_ARG_LIMIT_MCVS)
+    private int celonisHashMcvsMultiArgLimitMcvs = 20;
 
 
     // Determines whether the upper/lower function supports utf8,
@@ -5550,6 +5561,22 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableCelonisHashMcvs(boolean enableCelonisHashMcvs) {
         this.enableCelonisHashMcvs = enableCelonisHashMcvs;
+    }
+
+    public boolean getEnableCelonisHashMcvsMultiArg() {
+        return enableCelonisHashMcvsMultiArg;
+    }
+
+    public void setEnableCelonisHashMcvsMultiArg(boolean enableCelonisHashMcvsMultiArg) {
+        this.enableCelonisHashMcvsMultiArg = enableCelonisHashMcvsMultiArg;
+    }
+
+    public int getCelonisHashMcvsMultiArgLimitMcvs() {
+        return celonisHashMcvsMultiArgLimitMcvs;
+    }
+
+    public void setCelonisHashMcvsMultiArgLimitMcvs(int celonisHashMcvsMultiArgLimitMcvs) {
+        this.celonisHashMcvsMultiArgLimitMcvs = celonisHashMcvsMultiArgLimitMcvs;
     }
 
 

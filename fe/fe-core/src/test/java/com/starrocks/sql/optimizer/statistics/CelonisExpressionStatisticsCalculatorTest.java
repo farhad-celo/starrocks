@@ -19,15 +19,19 @@ import com.starrocks.analysis.LargeIntLiteral;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
+import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
+import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashCalculationException;
 import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashFunction;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128NULLABLE;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V3;
 import com.starrocks.sql.optimizer.rewrite.celonis.XXHASH3128V4;
 import com.starrocks.utframe.UtFrameUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -38,8 +42,22 @@ import static java.lang.Double.POSITIVE_INFINITY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class CelonisExpressionStatisticsCalculatorTest {
+
+    /**
+     * The MCV projections are read from the session variables of the current connect context, so leaving them enabled
+     * would leak into whichever test runs next on this thread.
+     */
+    @AfterEach
+    public void disableCelonisHashMcvProjection() {
+        final var context = ConnectContext.get();
+        if (context != null) {
+            context.getSessionVariable().setEnableCelonisHashMcvs(false);
+            context.getSessionVariable().setEnableCelonisHashMcvsMultiArg(false);
+        }
+    }
 
     private static class UnaryTestScenario {
         private final ColumnRefOperator intColumnRefOperator;
@@ -1673,5 +1691,172 @@ public class CelonisExpressionStatisticsCalculatorTest {
         assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
         assertEquals(0.2, columnStatistic.getNullsFraction(), 0.001);
         assertEquals(4, columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+    /**
+     * Three VARCHAR columns carrying MCVs, for hash calls whose argument MCVs can be projected. All three histograms were
+     * collected over the same 10000 rows the hash is estimated over, of which 200 have a NULL in the first column and 100
+     * in the second one. So "foo" covers a tenth of the rows, "x" covers 8% of them, "z" a fifth, and so on.
+     */
+    private static class MultiArgHashMcvScenario {
+        private final ColumnRefOperator firstColumn = new ColumnRefOperator(20, Type.VARCHAR, "str1", true);
+        private final ColumnRefOperator secondColumn = new ColumnRefOperator(21, Type.VARCHAR, "str2", true);
+        private final ColumnRefOperator thirdColumn = new ColumnRefOperator(22, Type.VARCHAR, "str3", true);
+        private final Statistics statistics;
+
+        MultiArgHashMcvScenario() {
+            statistics = Statistics.builder() //
+                    .addColumnStatistic(firstColumn,
+                            varcharStatistic(1000, 0.02, 9800, Map.of("foo", 1000L, "bar", 500L))) //
+                    .addColumnStatistic(secondColumn,
+                            varcharStatistic(500, 0.01, 9900, Map.of("x", 800L, "y", 300L))) //
+                    .addColumnStatistic(thirdColumn,
+                            varcharStatistic(200, 0.0, 10000, Map.of("z", 2000L))) //
+                    .setOutputRowCount(10000) //
+                    .build();
+        }
+
+        private static ColumnStatistic varcharStatistic(double distinctValues, double nullsFraction,
+                                                        long collectedNonNullRowCount, Map<String, Long> mcv) {
+            // The MCV rows are counted separately from the buckets, so the bucket holds whatever the MCVs do not cover.
+            // This mirrors the single placeholder bucket the collect job stores for VARCHAR columns.
+            final var mcvRowCount = mcv.values().stream().mapToLong(Long::longValue).sum();
+            final var bucket = new Bucket(POSITIVE_INFINITY, POSITIVE_INFINITY,
+                    Math.max(0, collectedNonNullRowCount - mcvRowCount), 0L);
+
+            return ColumnStatistic.builder() //
+                    .setMinValue(NEGATIVE_INFINITY) //
+                    .setMaxValue(POSITIVE_INFINITY) //
+                    .setDistinctValuesCount(distinctValues) //
+                    .setNullsFraction(nullsFraction) //
+                    .setAverageRowSize(10) //
+                    .setHistogram(new Histogram(List.of(bucket), mcv)) //
+                    .build();
+        }
+    }
+
+    private static ConnectContext contextWithMultiArgHashMcvProjection() {
+        final var context = UtFrameUtils.createDefaultCtx();
+        context.getSessionVariable().setEnableCelonisHashMcvs(true);
+        context.getSessionVariable().setEnableCelonisHashMcvsMultiArg(true);
+        return context;
+    }
+
+    private static String hashOf(String... values) {
+        try {
+            return new XXHASH3128V3().compute(values).toString();
+        } catch (CelonisHashCalculationException exception) {
+            throw new AssertionError("Test values could not be hashed", exception);
+        }
+    }
+
+    @Test
+    public void testCelonisMultiArgHashMcvProjectionForTwoArguments() {
+        // GIVEN
+        contextWithMultiArgHashMcvProjection();
+        final var scenario = new MultiArgHashMcvScenario();
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3, Type.LARGEINT,
+                Lists.newArrayList(scenario.firstColumn, scenario.secondColumn));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, scenario.statistics);
+
+        // THEN every combination of the two arguments' values becomes an MCV of the hash.
+        assertNotNull(columnStatistic.getHistogram());
+        assertThat(columnStatistic.getHistogram().getMCV()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                hashOf("foo", "x"), 80L, // 10% * 8% * 10000
+                hashOf("foo", "y"), 30L, // 10% * 3% * 10000
+                hashOf("foo", null), 10L, // 10% * 1% * 10000
+                hashOf("bar", "x"), 40L, // 5% * 8% * 10000
+                hashOf("bar", "y"), 15L, // 5% * 3% * 10000
+                hashOf("bar", null), 5L, // 5% * 1% * 10000
+                hashOf(null, "x"), 16L, // 2% * 8% * 10000
+                hashOf(null, "y"), 5L, // 2% * 3% * 10000 = 5.999999999999999, truncated
+                hashOf(null, null), 2L // 2% * 1% * 10000
+        ));
+
+        // THEN attaching the MCVs leaves the remaining statistics of the hash call untouched.
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(1000, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(Type.LARGEINT.getTypeSize(), columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+    @Test
+    public void testCelonisMultiArgHashMcvProjectionForThreeArguments() {
+        // GIVEN
+        contextWithMultiArgHashMcvProjection();
+        final var scenario = new MultiArgHashMcvScenario();
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3, Type.LARGEINT,
+                Lists.newArrayList(scenario.firstColumn, scenario.secondColumn, scenario.thirdColumn));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, scenario.statistics);
+
+        // THEN the fraction of the third argument is multiplied in as well. The combination of the two NULLs with "z" is
+        // left out, because it is expected in less than a whole row.
+        assertNotNull(columnStatistic.getHistogram());
+        assertThat(columnStatistic.getHistogram().getMCV()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                hashOf("foo", "x", "z"), 16L, // 10% * 8% * 20% * 10000
+                hashOf("foo", "y", "z"), 6L, // 10% * 3% * 20% * 10000
+                hashOf("foo", null, "z"), 2L, // 10% * 1% * 20% * 10000
+                hashOf("bar", "x", "z"), 8L, // 5% * 8% * 20% * 10000
+                hashOf("bar", "y", "z"), 3L, // 5% * 3% * 20% * 10000
+                hashOf("bar", null, "z"), 1L, // 5% * 1% * 20% * 10000
+                hashOf(null, "x", "z"), 3L, // 2% * 8% * 20% * 10000 = 3.2
+                hashOf(null, "y", "z"), 1L // 2% * 3% * 20% * 10000 = 1.2
+        ));
+
+        // THEN attaching the MCVs leaves the remaining statistics of the hash call untouched.
+        assertEquals(LargeIntLiteral.LARGE_INT_MIN.doubleValue(), columnStatistic.getMinValue(), 0.001);
+        assertEquals(LargeIntLiteral.LARGE_INT_MAX.doubleValue(), columnStatistic.getMaxValue(), 0.001);
+        assertEquals(1000, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(0.0, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(Type.LARGEINT.getTypeSize(), columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+    @Test
+    public void testCelonisMultiArgHashWithoutMcvProjection() {
+        // GIVEN the multi-argument projection is disabled, which is the default.
+        final var context = UtFrameUtils.createDefaultCtx();
+        context.getSessionVariable().setEnableCelonisHashMcvs(true);
+        context.getSessionVariable().setEnableCelonisHashMcvsMultiArg(false);
+
+        final var scenario = new MultiArgHashMcvScenario();
+        final List<ScalarOperator> arguments =
+                List.of(scenario.firstColumn, scenario.secondColumn, scenario.thirdColumn);
+
+        // WHEN
+        final var v3Statistic = ExpressionStatisticCalculator.calculate(
+                new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3, Type.LARGEINT, arguments), scenario.statistics);
+        final var v4Statistic = ExpressionStatisticCalculator.calculate(
+                new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V4, Type.LARGEINT, arguments), scenario.statistics);
+
+        // THEN V3 is indistinguishable from a hash function that does not project MCVs at all.
+        assertNull(v3Statistic.getHistogram());
+        assertEquals(v4Statistic.getMinValue(), v3Statistic.getMinValue(), 0.001);
+        assertEquals(v4Statistic.getMaxValue(), v3Statistic.getMaxValue(), 0.001);
+        assertEquals(v4Statistic.getDistinctValuesCount(), v3Statistic.getDistinctValuesCount(), 0.001);
+        assertEquals(v4Statistic.getNullsFraction(), v3Statistic.getNullsFraction(), 0.001);
+        assertEquals(v4Statistic.getAverageRowSize(), v3Statistic.getAverageRowSize(), 0.001);
+    }
+
+    @Test
+    public void testCelonisMultiArgHashMcvProjectionWithUnknownArgumentStatistics() {
+        // GIVEN one of the two arguments has no statistics.
+        contextWithMultiArgHashMcvProjection();
+        final var scenario = new MultiArgHashMcvScenario();
+        final var statistics = Statistics.buildFrom(scenario.statistics) //
+                .addColumnStatistic(scenario.secondColumn, ColumnStatistic.unknown()) //
+                .build();
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_XX_HASH3_128_V3, Type.LARGEINT,
+                Lists.newArrayList(scenario.firstColumn, scenario.secondColumn));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+        // THEN nothing is projected, as we do not know which values the second argument takes.
+        assertNull(columnStatistic.getHistogram());
     }
 }

@@ -23,6 +23,16 @@ public interface CelonisHashFunction {
     BigInteger compute(String input);
     BigInteger computeNull();
 
+    /**
+     * Computes the hash of an ordered sequence of inputs. Only implemented for the hash functions whose multi-input
+     * encoding is known to match the backend.
+     *
+     * @throws CelonisHashCalculationException if this hash function does not support multiple inputs
+     */
+    default BigInteger compute(String... inputs) throws CelonisHashCalculationException {
+        throw new CelonisHashCalculationException(getClass().getSimpleName() + " does not support multiple inputs");
+    }
+
     static CelonisHashFunction of(CallOperator callOperator) {
         switch (callOperator.getFnName().toLowerCase()) {
             case FunctionSet.CELONIS_XX_HASH3_128_NULLABLE:
