@@ -74,7 +74,13 @@ public class DataSkew {
         }
     }
 
-    private record McvSkewInfo(boolean skewed, Optional<Double> mcvSkewFactor, Optional<List<Pair<String, Long>>> mcvs,
+    public record AllSkewInfo(McvSkewInfo mcvSkewInfo, NullSkewInfo nullSkewInfo) {
+        public AllSkewInfo(AdditionalInfo additionalInfo) {
+            this(new McvSkewInfo(false, additionalInfo), new NullSkewInfo(false));
+        }
+    }
+
+    public record McvSkewInfo(boolean skewed, Optional<Double> mcvSkewFactor, Optional<List<Pair<String, Long>>> mcvs,
                                AdditionalInfo additionalInfo) {
         public McvSkewInfo(boolean skewed) {
             this(skewed, Optional.empty(), Optional.empty(), AdditionalInfo.NONE);
@@ -90,7 +96,7 @@ public class DataSkew {
 
     }
 
-    private static McvSkewInfo getMcvSkewInfo(@NotNull Statistics statistics, @NotNull ColumnStatistic columnStatistic,
+    public static McvSkewInfo getMcvSkewInfo(@NotNull Statistics statistics, @NotNull ColumnStatistic columnStatistic,
                                               Thresholds thresholds) {
         final var rowCount = statistics.getOutputRowCount();
         final var histogram = columnStatistic.getHistogram();
@@ -124,7 +130,7 @@ public class DataSkew {
         return new McvSkewInfo(false);
     }
 
-    private record NullSkewInfo(boolean skewed, Optional<Double> nullSkewFactor) {
+    public record NullSkewInfo(boolean skewed, Optional<Double> nullSkewFactor) {
         public NullSkewInfo(boolean skewed) {
             this(skewed, Optional.empty());
         }
@@ -154,6 +160,14 @@ public class DataSkew {
     }
 
     /**
+     * We cannot make a decision about skew without sufficient information.
+     */
+    private static boolean hasInsufficientInformation(@NotNull Statistics statistics) {
+        final var rowCount = statistics.getOutputRowCount();
+        return rowCount < 1 || (statistics.isTableRowCountMayInaccurate() && shouldEnforceRowCountAccuracy());
+    }
+
+    /**
      * Utility method to get detailed information about if a column is skewed and how it is skewed.
      */
     public static SkewInfo getColumnSkewInfo(@NotNull Statistics statistics, @NotNull ColumnStatistic columnStatistic) {
@@ -165,9 +179,7 @@ public class DataSkew {
      */
     public static SkewInfo getColumnSkewInfo(@NotNull Statistics statistics, @NotNull ColumnStatistic columnStatistic,
                                              Thresholds thresholds) {
-        final var rowCount = statistics.getOutputRowCount();
-        if (rowCount < 1 || (statistics.isTableRowCountMayInaccurate() && shouldEnforceRowCountAccuracy())) {
-            // Without sufficient information we can not make a decision.
+        if (hasInsufficientInformation(statistics)) {
             return new SkewInfo(SkewType.NOT_SKEWED, AdditionalInfo.INACCURATE_ROW_COUNT);
         }
 
@@ -193,6 +205,28 @@ public class DataSkew {
 
         // Can not deduce skew.
         return new SkewInfo(SkewType.NOT_SKEWED, mcvSkewInfo.additionalInfo);
+    }
+
+    public static AllSkewInfo getColumnAllSkewInfo(@NotNull Statistics statistics,
+                                                   @NotNull ColumnStatistic columnStatistic) {
+        return getColumnAllSkewInfo(statistics, columnStatistic, DEFAULT_THRESHOLDS);
+    }
+
+    public static AllSkewInfo getColumnAllSkewInfo(@NotNull Statistics statistics,
+                                                   @NotNull ColumnStatistic columnStatistic,
+                                                   Thresholds thresholds) {
+        if (hasInsufficientInformation(statistics)) {
+            return new AllSkewInfo(AdditionalInfo.INACCURATE_ROW_COUNT);
+        }
+
+        final var nullSkewInfo = getNullSkewInfo(columnStatistic, thresholds);
+        final var mcvSkewInfo = getMcvSkewInfo(statistics, columnStatistic, thresholds);
+
+        if (columnStatistic.isUnknown() && !nullSkewInfo.skewed && !mcvSkewInfo.skewed) {
+            return new AllSkewInfo(AdditionalInfo.UNKNOWN_STATS);
+        }
+
+        return new AllSkewInfo(mcvSkewInfo, nullSkewInfo);
     }
 
     /**

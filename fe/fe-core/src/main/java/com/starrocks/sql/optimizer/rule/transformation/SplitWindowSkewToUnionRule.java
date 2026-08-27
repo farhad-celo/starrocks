@@ -18,6 +18,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.starrocks.analysis.BinaryType;
 import com.starrocks.metric.celonis.CelonisRuleUsageMetrics;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.OptimizerContext;
@@ -35,7 +36,6 @@ import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.IsNullPredicateOperator;
-import com.starrocks.sql.optimizer.operator.scalar.PredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.rule.RuleType;
 import com.starrocks.sql.optimizer.rule.transformation.materialization.OptExpressionDuplicator;
@@ -43,20 +43,25 @@ import com.starrocks.sql.optimizer.skew.DataSkew;
 import com.starrocks.sql.optimizer.statistics.ColumnStatistic;
 import com.starrocks.sql.optimizer.statistics.Statistics;
 
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.starrocks.sql.optimizer.operator.OpRuleBit.OP_SPLIT_WINDOW_SKEW;
+import static com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator.CompoundType.NOT;
+import static com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator.CompoundType.OR;
 
 /*
  * Rule Objective:
  *
- * Optimize a Window operator with a skewed partition column by splitting it into a UNION of two branches.
- * One branch handles the skewed value (where partitioning can often be eliminated or optimized),
- * and the other handles the remaining data.
+ * Optimize a Window operator with a skewed partition column by splitting it into a UNION of multiple branches.
+ * Each skewed value will be handled by a branch (where partitioning can often be eliminated or optimized).
+ * The rest of the values will be handled together by another branch.
  *
  * Transform the following SQL:
  *   SELECT row_number() OVER (PARTITION BY k1 ORDER BY v1)
@@ -87,27 +92,27 @@ import static com.starrocks.sql.optimizer.operator.OpRuleBit.OP_SPLIT_WINDOW_SKE
  *                                     +-------+
  *                                     | UNION |
  *                                     +-------+
- *                                      /     \
- *                                     /       \
- *                           +--------+         +--------+
- *                           | Window |         | Window |
- *                           | (No Ptn)|        |(Org Ptn)|
- *                           +--------+         +--------+
- *                               |                  |
- *                               |                  |
- *                          +----+-----+       +----+-------------------+
- *                          |  Filter  |       |         Filter         |
- *                          |   (p=V)  |       | (p!=V OR p IS NULL)    |
- *                          +----+-----+       +----+-------------------+
- *                               |                  |
- *                               v                  v
- *                           +-------+          +-------+
- *                           | Child |          | Child |
- *                           +-------+          +-------+
- *
+ *                                      /   \  \ \__________________
+ *                                     /     \  \____________       \
+ *                         +----------+     +----------+     \       +---------+
+ *                         | Window   |     | Window   |     ...     | Window  |
+ *                         | (No Ptn) |     | (No Ptn) |             |(Org Ptn)|
+ *                         +---+------+     +----+-----+             +---+-----+
+ *                             |                 |                       |
+ *                             |                 |                       |
+ *                        +----+-----+      +----+-----+          +------+---------------------------------+
+ *                        |  Filter  |      |  Filter  |          |         Filter                         |
+ *                        |  (p=V1)  |      |  (p=V2)  |          | (p!=V1 AND p!=V2 AND ...) OR p IS NULL |
+ *                        +----+-----+      +----+-----+          +----------------------+-----------------+
+ *                             |                 |                                       |
+ *                             v                 v                                       v
+ *                         +-------+         +-------+                               +-------+
+ *                         | Child |         | Child |                               | Child |
+ *                         +-------+         +-------+                               +-------+
  * Where:
  *   - p: partition column
  *   - V: skewed value
+ *   - V_i: i-th skewed value
  */
 
 public class SplitWindowSkewToUnionRule extends TransformationRule {
@@ -115,11 +120,10 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
     private static final String RULE_NAME = "split_window_skew_to_union_rule";
     private static final String RULE_CATEGORY = "celonis_skew_rules";
 
-    public enum TriggerReason { SKEWED_NULL, SKEWED_MCV }
+    public enum TriggerReason { SKEWED_NULL, SKEWED_MCV, SKEWED_NULL_AND_MCV }
 
     public enum NoTriggerReason {
         NOT_SKEWED,
-        MULTIPLE_SKEWED,
         NO_PARTITION_COLUMN,
         NO_ORDER_BY_COLUMN,
         MULTIPLE_PARTITION_COLUMNS,
@@ -179,6 +183,23 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
             this.column = column;
             this.value = value;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            SkewedInfo that = (SkewedInfo) o;
+            return Objects.equals(column, that.column) && Objects.equals(value, that.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(column, value);
+        }
     }
 
     @Override
@@ -186,73 +207,71 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
         LogicalWindowOperator window = (LogicalWindowOperator) input.getOp();
         OptExpression child = input.inputAt(0);
         Statistics statistics = child.getStatistics();
+        SessionVariable sessionVariable = context.getSessionVariable();
+        final int maxBranchCount = sessionVariable.getSplitWindowSkewToUnionMaxSkewedBranchCount();
 
-        // 1. Identify Skew
+        // Step 1: Identify Skew
         // First check for explicit skew hint from user (takes precedence over statistics)
-        // Then fallback to statistics-based detection
-        List<SkewedInfo> skewedInfos = findSkewedPartitionFromHint(window);
+        List<SkewedInfo> skewedInfos = findSkewedPartitionFromHint(window)
+                .stream().distinct().limit(maxBranchCount).toList();
+
+        // If no hint is provided by the user, fall back to statistics-based detection
         if (skewedInfos.isEmpty()) {
-            skewedInfos = findSkewedPartition(window.getPartitionExpressions(), statistics);
+            skewedInfos = findSkewedPartition(window.getPartitionExpressions(), statistics, sessionVariable)
+                    .stream().distinct().limit(maxBranchCount).toList();
         }
 
-        //todo (m.bogusz) in theory we could have multiple skewed values, but for now we only handle one
-        if (skewedInfos.size() != 1) {
-            // Other not skewed reasons are handled in `findSkewedPartition`
-            if (skewedInfos.size() > 1) {
-                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MULTIPLE_SKEWED);
-            }
-
+        if (skewedInfos.isEmpty()) {
+            // NoTriggerReason was already reported in `findSkewedPartition` method
             return Collections.emptyList();
         }
 
-        SkewedInfo skewInfo = skewedInfos.get(0);
-        ColumnRefOperator skewedColumn = skewInfo.column;
-        ConstantOperator skewedValue = skewInfo.value;
+        // Step 2: Build Predicates for Branches
+        boolean hasNullSkew = false;
+        boolean hasValueSkew = false;
+        List<ScalarOperator> skewedPredicates = new ArrayList<>();
 
-        PredicateOperator skewedPredicate;
-        PredicateOperator unskewedPredicate;
-
-        if (skewedValue.isNull()) {
-            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_NULL);
-            skewedPredicate = new IsNullPredicateOperator(skewedColumn);
-            unskewedPredicate = new IsNullPredicateOperator(true, skewedColumn);
-        } else {
-            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_MCV);
-            skewedPredicate = new BinaryPredicateOperator(BinaryType.EQ, skewedColumn, skewedValue);
-            // In the unskewed branch, we need to include NULL values if the skewed value is NOT NULL.
-            // Since standard SQL inequality (col != value) filters out NULLs, we must explicitly add 'OR col IS NULL'.
-            unskewedPredicate = new CompoundPredicateOperator(CompoundPredicateOperator.CompoundType.OR,
-                    List.of(new BinaryPredicateOperator(BinaryType.NE, skewedColumn, skewedValue),
-                            new IsNullPredicateOperator(false, skewedColumn)));
+        for (SkewedInfo skew : skewedInfos) {
+            if (skew.value.isNull()) {
+                hasNullSkew = true;
+                skewedPredicates.add(new IsNullPredicateOperator(skew.column));
+            } else {
+                hasValueSkew = true;
+                skewedPredicates.add(new BinaryPredicateOperator(BinaryType.EQ, skew.column, skew.value));
+            }
         }
 
-        // 2. Build Skewed Branch (where p == skewed_value)
-        // In this branch, we remove the partitioning to handle the skewed data separately.
-        // We do not duplicate the child since we can reuse it directly.
-        BranchResult skewedBranch = buildBranch(
-                context,
-                child,
-                window,
-                List.of(),
-                skewedPredicate,
-                false
-        );
+        if (hasNullSkew && hasValueSkew) {
+            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_NULL_AND_MCV);
+        } else if (hasNullSkew) {
+            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_NULL);
+        } else if (hasValueSkew) {
+            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_MCV);
+        }
 
-        // 3. Build Unskewed Branch (where p != skewed_value)
-        // We keep the original partition expressions for the rest of the data.
-        // We need to duplicate the child to avoid conflicts in column references.
-        BranchResult unskewedBranch = buildBranch(
-                context,
+        ScalarOperator unskewedPredicate =
+                buildUnskewedPredicate(skewedInfos.get(0).column, skewedPredicates, hasNullSkew);
+
+        // Step 3: Build Unskewed Branch
+        // A single branch will be built which excludes all the skewed values
+        BranchResult unskewedBranch = buildUnskewedBranch(
                 child,
                 window,
                 window.getPartitionExpressions(),
-                unskewedPredicate,
-                true
+                unskewedPredicate
         );
 
-        // 4. Build Union
-        LogicalUnionOperator unionOp = buildUnionOperator(context, child, window, unskewedBranch);
-        OptExpression unionExpr = OptExpression.create(unionOp, skewedBranch.root, unskewedBranch.root);
+        // Step 4: Build Skewed Branches
+        // A new branch will be built for each skewed predicate
+        List<BranchResult> skewedBranches = skewedPredicates.stream().map(
+                predicate -> buildSkewedBranch(
+                        context,
+                        child,
+                        window,
+                        predicate)).toList();
+
+        // Step 5: Build Union
+        OptExpression unionExpr = buildUnionOperator(context, window, child, unskewedBranch, skewedBranches);
         // The split builds a fresh UNION subtree and the duplicated branch starts without logical properties or
         // statistics. Derive logical properties first so statistics estimators can inspect output columns, then
         // calculate fresh statistics for the duplicated branch.
@@ -262,79 +281,134 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
         return Lists.newArrayList(unionExpr);
     }
 
-    private LogicalUnionOperator buildUnionOperator(OptimizerContext context,
-                                                    OptExpression child,
-                                                    LogicalWindowOperator window,
-                                                    BranchResult unskewedBranch) {
-        List<ColumnRefOperator> outputColumns = Lists.newArrayList();
-        List<ColumnRefOperator> skewedChildColumns = Lists.newArrayList();
-        List<ColumnRefOperator> unskewedChildColumns = Lists.newArrayList();
-
-        // Combine window output columns and child pass-through columns
-        List<ColumnRefOperator> allColumns = Lists.newArrayList(window.getWindowCall().keySet());
-        if (child.getOutputColumns() != null) {
-            allColumns.addAll(child.getOutputColumns().getColumnRefOperators(context.getColumnRefFactory()));
-        }
-
-        // Populate lists based on mappings
-        for (ColumnRefOperator col : allColumns) {
-            outputColumns.add(col);
-            // For the skewed branch, we use the original columns.
-            skewedChildColumns.add(col);
-            unskewedChildColumns.add(unskewedBranch.columnMapping.get(col));
-        }
-
-        return new LogicalUnionOperator(outputColumns, List.of(skewedChildColumns, unskewedChildColumns), true);
+    /**
+     * Performs a left-fold on a non-empty list of predicates and connects them with the given logical connective (AND/OR).
+     * Examples:
+     * [a, b, c, d] yields "((a OR b) OR c) OR d"
+     * [a, b]       yields "a OR b"
+     * [a]          yields "a"
+     * []           throws
+     */
+    private ScalarOperator buildLogicalConnective(CompoundPredicateOperator.CompoundType connector,
+                                                  List<ScalarOperator> predicates) {
+        return predicates.stream().reduce((a, b) -> new CompoundPredicateOperator(connector, a, b)).orElseThrow();
     }
 
-    private BranchResult buildBranch(OptimizerContext context,
-                                     OptExpression child,
-                                     LogicalWindowOperator originalWindow,
-                                     List<ScalarOperator> partitionExprs,
-                                     ScalarOperator predicate,
-                                     boolean needsDuplication) {
 
-        OptExpression filterExpr = OptExpression.create(new LogicalFilterOperator(predicate), child);
-        Map<ColumnRefOperator, ColumnRefOperator> mapping = Maps.newHashMap();
+    private ScalarOperator buildUnskewedPredicate(ColumnRefOperator skewColumn,
+                                                  List<ScalarOperator> skewedPredicates,
+                                                  boolean hasNullSkew) {
+        // We build a single predicate for the unskewed branch by negating the skewed predicates.
+        // For example, if the skewed predicates are {"col = 1", "col = 2"}, then the unskewed predicate will be
+        // "NOT (col = 1 OR col = 2)" which is equivalent to "col != 1 AND col != 2".
+        // De Morgan law will be applied by the query optimizer in the ruleset PUSH_DOWN_PREDICATE_RULES after this rule.
+
+        // The tricky part is handling nulls correctly. Standard SQL equality comparison filters out NULLs.
+        // For example, neither the predicate "col = 1" nor "col != 1" matches the nulls values.
+        // Instead, "col IS NULL" or "col IS NOT NULL" needs to be used to include/exclude nulls explicitly.
+
+        var notAnySkewedPredicate = new CompoundPredicateOperator(NOT, buildLogicalConnective(OR, skewedPredicates));
+
+        // If there is no null skew, null values need to be explicitly included in the unskewed branch.
+        var skewColumnIsNull = new IsNullPredicateOperator(skewColumn);
+        return hasNullSkew
+                ? notAnySkewedPredicate
+                : new CompoundPredicateOperator(OR, skewColumnIsNull, notAnySkewedPredicate);
+    }
+
+    private OptExpression buildUnionOperator(OptimizerContext context,
+                                             LogicalWindowOperator originalWindow,
+                                             OptExpression originalChild,
+                                             BranchResult unskewedBranch,
+                                             List<BranchResult> skewedBranches) {
+
+        // Determine the output columns of the original window operator before rewrite
+        List<ColumnRefOperator> allColumns = new ArrayList<>(originalWindow.getWindowCall().keySet());
+        if (originalChild.getOutputColumns() != null) {
+            allColumns.addAll(originalChild.getOutputColumns().getColumnRefOperators(context.getColumnRefFactory()));
+        }
+
+        // The output columns of the UNION operator needs to be the same as the original window operator's output columns,
+        // since the UNION becomes the topmost operator in the sub-plan after the rewrite.
+        List<ColumnRefOperator> outputColumns = new ArrayList<>(allColumns);
+
+        // The first input for the UNION operator is the root of the unskewed branch, which uses the original columns.
+        List<OptExpression> inputRoots = Lists.newArrayList(unskewedBranch.root);
+        List<List<ColumnRefOperator>> inputColumns = Lists.newArrayList(List.of(allColumns));
+
+        // Rest of the inputs for the UNION operator are the roots of the skewed branches, which use the mapped columns.
+        for (BranchResult branch : skewedBranches) {
+            inputRoots.add(branch.root);
+            inputColumns.add(allColumns.stream().map(
+                    col -> branch.columnMapping.get(col)).toList());
+        }
+
+        return OptExpression.create(
+                new LogicalUnionOperator(outputColumns, inputColumns, true), inputRoots);
+    }
+
+    private BranchResult buildUnskewedBranch(OptExpression child,
+                                             LogicalWindowOperator originalWindow,
+                                             List<ScalarOperator> partitionExpressions,
+                                             ScalarOperator predicate) {
+        // We reuse the original query plan for the unskewed branch, keep the original partitioning,
+        // and add a filter to exclude the skewed values.
 
         LogicalWindowOperator.Builder windowBuilder = new LogicalWindowOperator.Builder()
                 .withOperator(originalWindow)
-                .setSkewColumn(null)
+                .setSkewColumn(null) // unset to prevent the rule from being reapplied infinitely
                 .setSkewValues(List.of())
-                .setUseHashBasedPartition(partitionExprs.isEmpty() && originalWindow.isUseHashBasedPartition())
-                .setIsSkewed(partitionExprs.isEmpty() && originalWindow.isSkewed());
+                .setUseHashBasedPartition(originalWindow.isUseHashBasedPartition())
+                .setPartitionExpressions(partitionExpressions)
+                .setIsSkewed(false);
 
-        if (needsDuplication) {
-            OptExpressionDuplicator duplicator = new OptExpressionDuplicator(context.getColumnRefFactory(), context);
-            filterExpr = duplicator.duplicate(filterExpr);
+        OptExpression filterExpr = OptExpression.create(new LogicalFilterOperator(predicate), child);
+        LogicalWindowOperator branchWindow = windowBuilder.build();
+        branchWindow.setOpRuleBit(OP_SPLIT_WINDOW_SKEW);
+        return new BranchResult(OptExpression.create(branchWindow, filterExpr), Maps.newHashMap());
+    }
 
-            windowBuilder.setPartitionExpressions(rewriteExpressions(partitionExprs, duplicator));
-            windowBuilder.setOrderByElements(rewriteOrderings(originalWindow.getOrderByElements(), duplicator));
-            windowBuilder.setEnforceSortColumns(rewriteOrderings(originalWindow.getEnforceSortColumns(), duplicator));
+    private BranchResult buildSkewedBranch(OptimizerContext context,
+                                           OptExpression child,
+                                           LogicalWindowOperator originalWindow,
+                                           ScalarOperator predicate) {
 
-            Map<ColumnRefOperator, CallOperator> newWindowCalls = Maps.newHashMap();
-            ColumnRefFactory factory = context.getColumnRefFactory();
+        LogicalWindowOperator.Builder windowBuilder = new LogicalWindowOperator.Builder()
+                .withOperator(originalWindow)
+                .setSkewColumn(null) // unset to prevent the rule from being reapplied infinitely
+                .setSkewValues(List.of())
+                .setPartitionExpressions(List.of())
+                .setUseHashBasedPartition(originalWindow.isUseHashBasedPartition())
+                .setIsSkewed(originalWindow.isSkewed());
 
-            for (Map.Entry<ColumnRefOperator, CallOperator> entry : originalWindow.getWindowCall().entrySet()) {
-                ColumnRefOperator originalCol = entry.getKey();
-                CallOperator originalCall = entry.getValue();
+        OptExpressionDuplicator duplicator = new OptExpressionDuplicator(context.getColumnRefFactory(), context);
+        ColumnRefFactory columnFactory = context.getColumnRefFactory();
 
-                CallOperator newCall = (CallOperator) duplicator.rewriteAfterDuplicate(originalCall);
-                // Create a new output column for the duplicated window function
-                ColumnRefOperator newCol = factory.create(newCall.toString(), originalCol.getType(), originalCol.isNullable());
-                newWindowCalls.put(newCol, newCall);
-                mapping.put(originalCol, newCol);
-            }
+        OptExpression filterExpr = duplicator.duplicate(OptExpression.create(new LogicalFilterOperator(predicate), child));
 
-            windowBuilder.setWindowCall(newWindowCalls);
-            mapping.putAll(duplicator.getColumnMapping());
-        } else {
-            windowBuilder.setPartitionExpressions(partitionExprs);
+        windowBuilder.setOrderByElements(rewriteOrderings(originalWindow.getOrderByElements(), duplicator));
+        windowBuilder.setEnforceSortColumns(rewriteOrderings(originalWindow.getEnforceSortColumns(), duplicator));
+
+        Map<ColumnRefOperator, ColumnRefOperator> columnMapping = Maps.newHashMap();
+        Map<ColumnRefOperator, CallOperator> newWindowCalls = Maps.newHashMap();
+
+        for (Map.Entry<ColumnRefOperator, CallOperator> entry : originalWindow.getWindowCall().entrySet()) {
+            ColumnRefOperator originalCol = entry.getKey();
+            CallOperator originalCall = entry.getValue();
+
+            CallOperator newCall = (CallOperator) duplicator.rewriteAfterDuplicate(originalCall);
+            // Create a new output column for the duplicated window function
+            ColumnRefOperator newCol = columnFactory.create(newCall.toString(), originalCol.getType(), originalCol.isNullable());
+            newWindowCalls.put(newCol, newCall);
+            columnMapping.put(originalCol, newCol);
         }
+
+        windowBuilder.setWindowCall(newWindowCalls);
+        columnMapping.putAll(duplicator.getColumnMapping());
 
         LogicalWindowOperator branchWindow = windowBuilder.build();
         branchWindow.setOpRuleBit(OP_SPLIT_WINDOW_SKEW);
-        return new BranchResult(OptExpression.create(branchWindow, filterExpr), mapping);
+        return new BranchResult(OptExpression.create(branchWindow, filterExpr), columnMapping);
     }
 
     private void deriveLogicalProperty(OptExpression root) {
@@ -346,15 +420,6 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
             deriveLogicalProperty(child);
         }
         root.deriveLogicalPropertyItself();
-    }
-
-    private List<ScalarOperator> rewriteExpressions(List<ScalarOperator> exprs, OptExpressionDuplicator duplicator) {
-        if (exprs == null) {
-            return Collections.emptyList();
-        }
-        return exprs.stream()
-                .map(duplicator::rewriteAfterDuplicate)
-                .toList();
     }
 
     private List<Ordering> rewriteOrderings(List<Ordering> orderings, OptExpressionDuplicator duplicator) {
@@ -421,49 +486,102 @@ public class SplitWindowSkewToUnionRule extends TransformationRule {
                 .toList();
     }
 
-    private List<SkewedInfo> findSkewedPartition(List<ScalarOperator> partitionExprs, Statistics statistics) {
+    /**
+     * Retrieve a list of skewed values for the partition column based on statistics.
+     * The values are sorted by their individual skew factor (most skewed values first).
+     * Null skew and MCV skew are both included in the result.
+     */
+    private List<SkewedInfo> findSkewedPartition(List<ScalarOperator> partitionExprs, Statistics statistics,
+                                                 SessionVariable sessionVariable) {
         if (statistics == null) {
             RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
             return Collections.emptyList();
         }
+
         var op = partitionExprs.get(0);
-        if (op instanceof ColumnRefOperator col) {
-            if (!statistics.getColumnStatistics().containsKey(col)) {
-                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
-                return Collections.emptyList();
-            }
 
-            ColumnStatistic colStat = statistics.getColumnStatistic(col);
-            var skewInfo = DataSkew.getColumnSkewInfo(statistics, colStat, DataSkew.Thresholds.withMcvLimit(1));
-            if (skewInfo.isSkewed()) {
-                if (skewInfo.type() == DataSkew.SkewType.SKEWED_NULL) {
-                    return List.of(new SkewedInfo(col, ConstantOperator.createNull(col.getType())));
-                }
-
-                final var skewedPartitions = skewInfo.maybeMcvs().stream() //
-                        .flatMap(Collection::stream) //
-                        .map(mcv -> ConstantOperator.createVarchar(mcv.first).castTo(col.getType())) //
-                        .filter(Optional::isPresent) //
-                        .map(value -> new SkewedInfo(col, value.get())) //
-                        .toList();
-
-                if (skewedPartitions.isEmpty()) {
-                    RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MCV_CAST_FAILED);
-                }
-                return skewedPartitions;
-            }
-
-            switch (skewInfo.additionalInfo()) {
-                case NONE -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NOT_SKEWED);
-                case INACCURATE_ROW_COUNT -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.INACCURATE_ROW_COUNT);
-                case UNKNOWN_STATS -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
-                case NO_MCV -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_MCV);
-                case NO_HISTOGRAM -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_HISTOGRAM);
-            }
-        } else {
+        if (!(op instanceof ColumnRefOperator col)) {
             RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NON_COLUMN_REF_PARTITION_EXPRESSION);
+            return Collections.emptyList();
         }
 
-        return Collections.emptyList();
+        if (!statistics.getColumnStatistics().containsKey(col)) {
+            RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
+            return Collections.emptyList();
+        }
+
+        DataSkew.Thresholds thresholds = new DataSkew.Thresholds(
+                sessionVariable.getSkewJoinOptimizeUseMCVCount(),
+                sessionVariable.getSkewJoinDataSkewThreshold());
+
+        ColumnStatistic colStat = statistics.getColumnStatistic(col);
+
+        DataSkew.AllSkewInfo info = DataSkew.getColumnAllSkewInfo(statistics, colStat, thresholds);
+
+        final var mcvs = info.mcvSkewInfo().mcvs().orElse(List.of());
+        final boolean hasNullSkew = info.nullSkewInfo().skewed();
+        final double nullSkewFactor = info.nullSkewInfo().nullSkewFactor().orElse(0.0);
+        final double singleValueThreshold = sessionVariable.getSkewJoinMcvSingleThreshold();
+        final double outputRowCount = Math.max(1.0, statistics.getOutputRowCount());
+
+        // A SkewedItem is the uniform representation of both MCV and NULL skew values
+        // For null skew, SkewedItem.value is `null` and fraction is the
+        //   number of total null values divided by the row count.
+        // For mcv skew, SkewedItem.value is the value (string) and fraction is the
+        //   number of occurrences of that particular value divided by the row count.
+        record SkewedItem(String value, double fraction) {
+        }
+        var skewedItems = new ArrayList<SkewedItem>();
+
+        for (var mcv : mcvs) {
+            double fraction = mcv.second / outputRowCount;
+            if (fraction >= singleValueThreshold) {
+                skewedItems.add(new SkewedItem(mcv.first, fraction));
+            }
+        }
+
+        if (hasNullSkew) {
+            skewedItems.add(new SkewedItem(null, nullSkewFactor));
+        }
+
+        // SkewedItems will be sorted by descending order of importance (most skewed first).
+        // It can be the case that both null skew and mcv skew is present,
+        // but a single mcv has a higher fraction than the null skew, followed by
+        // other mcvs with lower fractions.
+        var descending = Comparator.comparingDouble((SkewedItem item) -> item.fraction).reversed();
+        var sortedSkewedItems = skewedItems.stream().sorted(descending).toList();
+
+        // SkewedItems will be mapped to SkewedInfos by casting into column type. Ordering is preserved.
+        var skewedInfos = new ArrayList<SkewedInfo>();
+        boolean mcvCastFailed = false;
+
+        for (var item : sortedSkewedItems) {
+            try {
+                skewedInfos.add(new SkewedInfo(col, item.value == null
+                        ? ConstantOperator.createNull(col.getType())
+                        : ConstantOperator.createVarchar(item.value).castTo(col.getType()).orElseThrow()
+                ));
+            } catch (NoSuchElementException e) {
+                mcvCastFailed = true;
+            }
+        }
+
+        if (skewedInfos.isEmpty() && mcvCastFailed) {
+            RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MCV_CAST_FAILED);
+            return Collections.emptyList();
+        }
+
+        if (skewedInfos.isEmpty()) {
+            RULE_USAGE_METRICS.notTriggered(switch (info.mcvSkewInfo().additionalInfo()) {
+                case NONE -> NoTriggerReason.NOT_SKEWED;
+                case INACCURATE_ROW_COUNT -> NoTriggerReason.INACCURATE_ROW_COUNT;
+                case UNKNOWN_STATS -> NoTriggerReason.MISSING_STATS;
+                case NO_MCV -> NoTriggerReason.NO_MCV;
+                case NO_HISTOGRAM -> NoTriggerReason.NO_HISTOGRAM;
+            });
+            return Collections.emptyList();
+        }
+
+        return skewedInfos;
     }
 }

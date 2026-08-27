@@ -459,6 +459,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String SKEW_JOIN_OPTIMIZE_USE_MCV_COUNT = "skew_join_use_mcv_count";
     public static final String SKEW_JOIN_DATA_SKEW_THRESHOLD = "skew_join_data_skew_threshold";
     public static final String SKEW_JOIN_MAX_OTHER_SIDE_OVERLAP_ROW_COUNT = "skew_join_max_other_side_overlap_row_count";
+    public static final String SKEW_JOIN_MCV_SINGLE_THRESHOLD = "skew_join_mcv_single_threshold";
     public static final String ENABLE_SKEW_DETECT_WITH_INACCURATE_STATS = "enable_skew_detect_with_inaccurate_stats";
 
     public static final String CHOOSE_EXECUTE_INSTANCES_MODE = "choose_execute_instances_mode";
@@ -800,6 +801,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String ENABLE_FORCE_GROUP_BY_SKEW_ELIMINATE_WHEN_SKEWED =
             "enable_force_group_by_skew_eliminate_when_skewed";
     public static final String ENABLE_SPLIT_WINDOW_SKEW_TO_UNION = "enable_split_window_skew_to_union";
+    public static final String SPLIT_WINDOW_SKEW_TO_UNION_MAX_SKEWED_BRANCH_COUNT = "split_window_skew_to_union_max_branch_count";
     public static final String ENABLE_WINDOW_SKEW_MERGE_SORT = "enable_window_skew_merge_sort";
     public static final String HDFS_BACKEND_SELECTOR_SCAN_RANGE_SHUFFLE = "hdfs_backend_selector_scan_range_shuffle";
 
@@ -2653,6 +2655,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VariableMgr.VarAttr(name = ENABLE_SPLIT_WINDOW_SKEW_TO_UNION)
     private boolean enableSplitWindowSkewToUnion = false;
 
+    @VariableMgr.VarAttr(name = SPLIT_WINDOW_SKEW_TO_UNION_MAX_SKEWED_BRANCH_COUNT)
+    private int splitWindowSkewToUnionMaxSkewedBranchCount = 1;
+
     @VariableMgr.VarAttr(name = ENABLE_WINDOW_SKEW_MERGE_SORT, flag = VariableMgr.INVISIBLE)
     private boolean enableWindowSkewMergeSort = false;
 
@@ -2882,6 +2887,10 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     // With the default value of `skewJoinRandRange` = 1000, an overlap of 1M leads to 1Bn rows.
     @VarAttr(name = SKEW_JOIN_MAX_OTHER_SIDE_OVERLAP_ROW_COUNT, flag = VariableMgr.INVISIBLE)
     private long skewJoinMaxOtherSideOverlapRowCount = 1_000_000;
+
+    // A single MCV value must exceed this total-domain ratio to be considered as a skew value candidate.
+    @VarAttr(name = SKEW_JOIN_MCV_SINGLE_THRESHOLD, flag = VariableMgr.INVISIBLE)
+    private double skewJoinMcvSingleThreshold = 0.1;
 
     // When enabled, skew detection proceeds even when table row count is marked as potentially inaccurate (isTableRowCountMayInaccurate).
     // This allows rules consuming skew info (joins, aggregations, window functions) to fire based on
@@ -3231,6 +3240,18 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableSplitWindowSkewToUnion(boolean enableSplitWindowSkewToUnion) {
         this.enableSplitWindowSkewToUnion = enableSplitWindowSkewToUnion;
+    }
+
+    public int getSplitWindowSkewToUnionMaxSkewedBranchCount() {
+        return splitWindowSkewToUnionMaxSkewedBranchCount;
+    }
+
+    public void setSplitWindowSkewToUnionMaxSkewedBranchCount(int splitWindowSkewToUnionMaxSkewedBranchCount) {
+        if (splitWindowSkewToUnionMaxSkewedBranchCount < 1) {
+            throw new IllegalArgumentException(
+                    "Max skewed branch count for SplitWindowSkewToUnion rewrite rule must be greater than 0.");
+        }
+        this.splitWindowSkewToUnionMaxSkewedBranchCount = splitWindowSkewToUnionMaxSkewedBranchCount;
     }
 
     public boolean isEnableWindowSkewMergeSort() {
@@ -5337,6 +5358,10 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setSkewJoinMaxOtherSideOverlapRowCount(long skewJoinMaxOtherSideOverlapRowCount) {
         this.skewJoinMaxOtherSideOverlapRowCount = skewJoinMaxOtherSideOverlapRowCount;
+    }
+
+    public double getSkewJoinMcvSingleThreshold() {
+        return skewJoinMcvSingleThreshold;
     }
 
     public boolean isEnableStrictOrderBy() {
