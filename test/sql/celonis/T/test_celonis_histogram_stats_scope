@@ -1,0 +1,295 @@
+-- The histogram_stats_scope ANALYZE property selects which kinds of histogram statistic to collect.
+-- Reference: StatsConstants.parseHistogramStatsScope, HistogramStatisticsCollectJob.collect.
+--
+-- histogram_sample_ratio is pinned to 1 in every ANALYZE below. AnalyzeStmtAnalyzer already rewrites
+-- it to 1 for tables under statistic_sample_collect_rows rows, but that rewrite is guarded by
+-- "totalRows != 0", and the reported row count lags tablet reports right after an INSERT. Passing it
+-- explicitly keeps the collected counts exact.
+
+
+-- name: test_histogram_scope_default
+
+create database histo_test_${uuid0};
+use histo_test_${uuid0};
+
+CREATE TABLE `t1` (
+    `k_num`  bigint
+)
+PROPERTIES ('replication_num' = '1');
+
+-- 5000 distinct values, well above the default histogram_mcv_size of 100, so MCV exclusion leaves
+-- rows behind and the histogram() aggregate produces real buckets.
+INSERT INTO t1
+SELECT g1
+FROM TABLE(generate_series(1, 5000)) AS t(g1);
+
+-- No histogram_stats_scope property at all. The analyzer deliberately does not materialise a default
+-- (AnalyzeStmtAnalyzer only validates the property when it is present), and
+-- parseHistogramStatsScope(null) returns EnumSet.allOf, so an absent property collects every kind.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_num PROPERTIES('histogram_sample_ratio' = '1') WITH SYNC MODE;
+
+select count(1) from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1';
+select mcv is not null, buckets is not null from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+
+-- More than one bucket, which is what separates a real histogram from the single bucket stored when
+-- the bucket aggregate is skipped.
+select json_length(parse_json(buckets)) > 1 from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+
+drop database histo_test_${uuid0} force;
+
+
+-- name: test_histogram_scope_mcv
+
+create database histo_test_${uuid0};
+use histo_test_${uuid0};
+
+CREATE TABLE `t1` (
+    `k_num`  bigint
+)
+PROPERTIES ('replication_num' = '1');
+
+-- 5000 distinct values, one row each.
+INSERT INTO t1
+SELECT g1
+FROM TABLE(generate_series(1, 5000)) AS t(g1);
+
+-- Four extra rows for each of 2001..2100, so those 100 values are the unambiguous top-100 MCVs
+-- (count 5 against 1). The MCV query orders by count descending, so without a strict count
+-- difference the top-100 would be an arbitrary tie-break. The band sits strictly inside 1..5000,
+-- so the bounds query - which excludes the MCVs - still sees 1 and 5000.
+INSERT INTO t1
+SELECT 2001 + (g1 % 100)
+FROM TABLE(generate_series(1, 400)) AS t(g1);
+
+-- scope 'mcv' skips the bucket aggregate entirely. A numeric column can carry sampled bounds
+-- (canCarrySampledBounds covers numeric and date types), so the single bucket gets real min/max
+-- rather than the "Infinity" fallback used for types that cannot carry bounds.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_num PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'mcv') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)) from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+
+-- One bucket holding the sampled bounds and the non-MCV row count: 5400 rows total, minus the
+-- 100 MCVs at 5 rows each, leaves 4900.
+select buckets from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+select json_length(parse_json(buckets)) from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+
+-- Scope value matching is case insensitive (parseHistogramStatsScope compares with equalsIgnoreCase).
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_num PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'MCV') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)), buckets from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+
+drop database histo_test_${uuid0} force;
+
+
+-- name: test_histogram_scope_buckets
+
+create database histo_test_${uuid0};
+use histo_test_${uuid0};
+
+CREATE TABLE `t1` (
+    `k_num`  bigint
+)
+PROPERTIES ('replication_num' = '1');
+
+INSERT INTO t1
+SELECT g1
+FROM TABLE(generate_series(1, 5000)) AS t(g1);
+
+-- scope 'buckets' skips MCV collection, so mcv is written as SQL NULL and no values are excluded
+-- from the bucket aggregate.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_num PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'buckets') WITH SYNC MODE;
+
+select mcv is null, buckets is not null from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+
+-- A real histogram, not the single bucket: more than one bucket, and because nothing was excluded
+-- the lower bound is the column minimum rather than the "Infinity" fallback.
+select json_length(parse_json(buckets)) > 1 from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+select buckets like '[["1",%' from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+
+drop database histo_test_${uuid0} force;
+
+
+-- name: test_histogram_scope_all_kinds
+
+create database histo_test_${uuid0};
+use histo_test_${uuid0};
+
+CREATE TABLE `t1` (
+    `k_num`  bigint,
+    `k_str`  varchar(32)
+)
+PROPERTIES ('replication_num' = '1');
+
+INSERT INTO t1
+SELECT g1, concat('v_', g1 % 40)
+FROM TABLE(generate_series(1, 5000)) AS t(g1);
+
+-- Naming both kinds collects MCVs and real buckets into the same row.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_num PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'mcv,buckets') WITH SYNC MODE;
+
+select mcv is not null, buckets is not null, json_length(parse_json(buckets)) > 1 from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_num';
+
+-- Two columns in one statement each get their own row. This is also the only statement in the suite
+-- that reaches collectBatched: enable_batch_insert_histogram_statistics defaults to true, and the
+-- batched path is taken only when columnNames.size() > 1. k_str is char family, so it takes the
+-- single-bucket path while k_num still gets a real histogram.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_num, k_str PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'mcv,buckets') WITH SYNC MODE;
+
+[ORDER] select column_name, mcv is not null, buckets is not null from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' order by column_name;
+
+drop database histo_test_${uuid0} force;
+
+
+-- name: test_histogram_scope_low_cardinality
+
+create database histo_test_${uuid0};
+use histo_test_${uuid0};
+
+CREATE TABLE `t1` (
+    `k_low`   int,
+    `k_low2`  int
+)
+PROPERTIES ('replication_num' = '1');
+
+-- Both columns hold 20 distinct values at 250 rows each, under the default histogram_mcv_size of 100.
+INSERT INTO t1
+SELECT g1 % 20, g1 % 20
+FROM TABLE(generate_series(1, 5000)) AS t(g1);
+
+-- Every value becomes an MCV, so the bucket subquery excludes all rows and the histogram() aggregate
+-- sees no input. The BE returns the string "[]" for an empty bucket list, and the legacy collect path
+-- - taken here because this statement names a single column - inserts that string verbatim. So
+-- buckets is the literal '[]', not SQL NULL. The MCVs already describe the column completely.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_low PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'mcv,buckets') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)), buckets from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_low';
+
+-- The same collection over two columns takes the batched path, which normalises "[]" to SQL NULL
+-- through HistogramStatisticsUtils.isEmptyBuckets before building the INSERT. This is the only
+-- difference between the two paths for an empty bucket list.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_low, k_low2 PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'mcv,buckets') WITH SYNC MODE;
+
+[ORDER] select column_name, mcv is not null, buckets is null from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' order by column_name;
+
+-- Same column under scope 'buckets': no MCVs are collected, so nothing is excluded and real buckets
+-- are produced even though the cardinality is low.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_low PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'buckets') WITH SYNC MODE;
+
+select mcv is null, buckets is not null, json_length(parse_json(buckets)) > 1 from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_low';
+
+-- Capping the MCV size below the cardinality leaves values for the buckets. Which 5 of the 20 equally
+-- frequent values become MCVs is an arbitrary tie-break, but that does not matter here: 15 values at
+-- 250 rows each are left either way.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_low PROPERTIES('histogram_sample_ratio' = '1', 'histogram_mcv_size' = '5', 'histogram_stats_scope' = 'mcv,buckets') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)), buckets is not null from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_low';
+
+drop database histo_test_${uuid0} force;
+
+
+-- name: test_histogram_scope_date_bounds
+
+create database histo_test_${uuid0};
+use histo_test_${uuid0};
+
+CREATE TABLE `t1` (
+    `k_date`      date,
+    `k_low_date`  date
+)
+PROPERTIES ('replication_num' = '1');
+
+-- k_date: 366 dates covering exactly 2024, ten rows each.
+-- k_low_date: 10 distinct dates, all of which become MCVs under the default histogram_mcv_size.
+INSERT INTO t1
+SELECT days_add('2024-01-01', g1 % 366), days_add('2024-01-01', g1 % 10)
+FROM TABLE(generate_series(1, 3660)) AS t(g1);
+
+-- Ten extra rows for each of the 100 dates from 2024-05-01, making them the unambiguous top-100 MCVs
+-- for k_date (count 20 against 10). That band is 2024-05-01..2024-08-08, strictly inside 2024, so the
+-- bounds query - which excludes the MCVs - still sees 2024-01-01 and 2024-12-31.
+INSERT INTO t1
+SELECT days_add('2024-05-01', g1 % 100), days_add('2024-01-01', g1 % 10)
+FROM TABLE(generate_series(1, 1000)) AS t(g1);
+
+-- A date column can carry sampled bounds, so the single bucket holds real dates: 4660 rows total,
+-- minus the 100 MCVs at 20 rows each, leaves 2660 in the bucket.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_date PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'mcv') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)) from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_date';
+select buckets from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_date';
+
+-- k_low_date's MCVs cover every row, so the bounds query sees an empty population and its
+-- IFNULL(MIN(...), '') comes back blank. HistogramStatisticsUtils.defaultBounds then falls back to
+-- the full DATE domain rather than "Infinity": HistogramUtils.convertBuckets parses date bounds with
+-- DateUtils, so an "Infinity" bound would throw, drop the bucket with only a LOG.warn, and silently
+-- lose the non-MCV count from Histogram.getTotalRows().
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_low_date PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'mcv') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)) from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_low_date';
+select buckets from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_low_date';
+
+drop database histo_test_${uuid0} force;
+
+
+-- name: test_histogram_scope_varchar
+
+create database histo_test_${uuid0};
+use histo_test_${uuid0};
+
+CREATE TABLE `t1` (
+    `k_str`  varchar(32)
+)
+PROPERTIES ('replication_num' = '1');
+
+-- 40 distinct values at 125 rows each, all of which fit under the default histogram_mcv_size of 100.
+INSERT INTO t1
+SELECT concat('v_', g1 % 40)
+FROM TABLE(generate_series(1, 5000)) AS t(g1);
+
+-- Char family columns always skip the bucket aggregate (shouldSkipHistogramBuckets), and they cannot
+-- carry sampled bounds, so the single bucket uses the "Infinity" fallback for both bounds. The MCVs
+-- describe the column completely here, so the bucket is left with no rows.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_str PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'mcv') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)), buckets from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_str';
+
+-- scope 'buckets' on a char family column cannot produce buckets, so the MCVs are collected anyway
+-- rather than storing a row that carries no information at all - the optimizer needs the MCVs to
+-- plan queries. The result is identical to scope 'mcv' above.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_str PROPERTIES('histogram_sample_ratio' = '1', 'histogram_stats_scope' = 'buckets') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)), buckets from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_str';
+
+-- Capping the MCV size below the cardinality leaves rows for the bucket, which proves the MCVs
+-- collected under scope 'buckets' are also excluded from its count: 5 of the 40 values are MCVs at
+-- 125 rows each, so the bucket keeps 5000 - 625 rows. Which 5 values are picked is an arbitrary
+-- tie-break, but every value has the same count, so the total is fixed.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_str PROPERTIES('histogram_sample_ratio' = '1', 'histogram_mcv_size' = '5', 'histogram_stats_scope' = 'buckets') WITH SYNC MODE;
+
+select json_length(parse_json(mcv)), buckets from _statistics_.histogram_statistics where table_name = 'histo_test_${uuid0}.t1' and column_name = 'k_str';
+
+drop database histo_test_${uuid0} force;
+
+
+-- name: test_histogram_scope_invalid
+
+create database histo_test_${uuid0};
+use histo_test_${uuid0};
+
+CREATE TABLE `t1` (
+    `k_num`  bigint
+)
+PROPERTIES ('replication_num' = '1');
+
+INSERT INTO t1
+SELECT g1
+FROM TABLE(generate_series(1, 100)) AS t(g1);
+
+-- A value that names no known kind is rejected by AnalyzeStmtAnalyzer.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_num PROPERTIES('histogram_stats_scope' = 'nonsense');
+
+-- Present but naming no kind is an error too, rather than a silent "collect everything": only an
+-- absent property means every kind.
+ANALYZE TABLE t1 UPDATE HISTOGRAM ON k_num PROPERTIES('histogram_stats_scope' = '');
+
+drop database histo_test_${uuid0} force;
