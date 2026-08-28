@@ -270,4 +270,18 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 "DictDecode(5: ACTIVITIES, [<place-holder>], celonis_calc_crop_to_null(5: ACTIVITIES, " +
                         "dict_encode('a', 5), 'ALL', dict_encode('b', 5), 'ALL'))"), plan);
     }
+
+    @Test
+    public void testMatchStringsWithEmptyListParam() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_match_activities_low_cardinality_optimize', 'true') */
+                CELONIS_MATCH_ACTIVITIES(ACTIVITIES, ['a'], [], [], [], [], [])
+                FROM TestActivityTimestampTable
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "celonis_match_activities(5: ACTIVITIES, [dict_encode('a', 5)], CAST([] AS ARRAY<INT>), " +
+                        "CAST([] AS ARRAY<INT>), CAST([] AS ARRAY<INT>), CAST([] AS ARRAY<INT>), " +
+                        "CAST([] AS ARRAY<INT>))"), plan);
+    }
 }

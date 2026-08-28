@@ -31,6 +31,7 @@ import com.starrocks.sql.optimizer.base.ColumnRefSet;
 import com.starrocks.sql.optimizer.operator.Operator;
 import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
+import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CollectionElementOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
@@ -336,6 +337,10 @@ class DecodeContext {
                     arrayOp.getChildren().stream().map(k -> (ScalarOperator) new CallOperator(
                                     DICT_ENCODE, Type.INT, List.of(k, dictSlotConstant), DICT_ENCODE_FN))
                             .collect(Collectors.toCollection(ArrayList::new)));
+        }
+        if (constant instanceof CastOperator && constant.getType().isStringArrayType()
+                && constant.getChild(0) instanceof ArrayOperator array && array.getChildren().isEmpty()) {
+            return new CastOperator(ArrayType.ARRAY_INT, constant.getChild(0));
         }
         throw new IllegalArgumentException("Invalid constant argument for array function: " + constant);
     }
