@@ -21,6 +21,7 @@ metadata:
     repo-depot.com/release-manager-opsgenie-schedule-id: 5d6fef26-8404-489f-bd1e-b2b7df6e2ec4
     prr-slo.celonis.dev/alerts_slack_channel: celostar-oncall
     prr-slo.celonis.dev/opsgenie_handle: Celostar
+    repo-depot.celonis.dev/deploy-strategy: kargo
   links:
     - title: Celostar JIRA
       url: https://celonis.atlassian.net/jira/software/c/projects/CELOSTAR/boards/925
