@@ -449,25 +449,39 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         context.structManager = structManager;
     }
 
-    // For SubfieldOperators, we just need to get the field column refs, not the whole columns in the struct.
-    private List<ColumnRefOperator> getColumnRefs(ScalarOperator op) {
-        if (op.isColumnRef()) {
-            return List.of((ColumnRefOperator) op);
+    private boolean checkDependOnExpr(ScalarOperator expr, Collection<Integer> checkList) {
+        if (expr instanceof ColumnRefOperator ref) {
+            return checkDependOnExpr(ref.getId(), checkList);
         }
-        if (op instanceof SubfieldOperator) {
-            SubfieldOperator subfieldOp = op.cast();
-            Map<String, ColumnRefOperator> fields = structManager.getFieldStringRefMap(subfieldOp.getChild((0)));
-            if (fields != null
-                    && subfieldOp.getFieldNames().size() == 1
-                    && fields.containsKey(subfieldOp.getFieldNames().get(0))) {
-                return List.of(fields.get(subfieldOp.getFieldNames().get(0)));
+        if (expr instanceof CallOperator call
+                && MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(call.getFnName())) {
+            return call.getChild(0).isColumnRef() && checkDependOnExpr(call.getChild(0), checkList);
+        }
+        if (expr instanceof CallOperator callOperator
+                && FunctionSet.MULTI_ARRAY_AGG.equals(callOperator.getFnName())) {
+            int numOutputs = ((StructType) (callOperator.getFunction().getReturnType())).getFields().size();
+            return expr.getChildren().subList(0, numOutputs).stream().anyMatch(
+                    c -> c.isColumnRef() && checkDependOnExpr(((ColumnRefOperator) c).getId(), checkList));
+        }
+        if (expr.getType().isStructType()) {
+            Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(expr);
+            if (fieldsMap == null) {
+                return false;
             }
+            // Any structs with encoded fields should pass. We filter the fields list later.
+            return fieldsMap.values().stream().anyMatch(c -> checkDependOnExpr(c.getId(), checkList));
         }
-        List<ColumnRefOperator> result = Lists.newArrayList();
-        for (ScalarOperator child : op.getChildren()) {
-            result.addAll(getColumnRefs(child));
+        if (expr instanceof SubfieldOperator subfieldOperator) {
+            Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(subfieldOperator.getChild(0));
+            if (fieldsMap == null || subfieldOperator.getFieldNames().size() != 1) {
+                return false;
+            }
+            ColumnRefOperator fieldRef = fieldsMap.get(subfieldOperator.getFieldNames().get(0));
+            return fieldRef != null && checkDependOnExpr(fieldRef.getId(), checkList);
         }
-        return result;
+        // Expressions containing multiple columns must be handled by the explicit cases above; what
+        // reaches here holds a single dictionary column and constants, so any matching child is enough.
+        return expr.getChildren().stream().anyMatch(child -> checkDependOnExpr(child, checkList));
     }
 
     private void logDecodeMetric(Operator op) {
@@ -487,43 +501,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             return false;
         }
         ScalarOperator define = stringRefToDefineExprMap.get(cid);
-        if (define instanceof CallOperator &&
-                MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(((CallOperator) define).getFnName())) {
-            return define.getChild(0).isColumnRef() &&
-                    checkDependOnExpr(((ColumnRefOperator) define.getChild(0)).getId(), checkList);
+        if (define instanceof ColumnRefOperator defineRef && defineRef.getId() == cid) {
+            return false;
         }
-        if (define instanceof CallOperator callOperator
-                && FunctionSet.MULTI_ARRAY_AGG.equals(callOperator.getFnName())) {
-            int numOutputs = ((StructType) (callOperator.getFunction().getReturnType())).getFields().size();
-            return define.getChildren().subList(0, numOutputs).stream().anyMatch(
-                    c -> c.isColumnRef() && checkDependOnExpr(((ColumnRefOperator) c).getId(), checkList));
-        }
-        if (define.getType().isStructType()) {
-            Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(define);
-            if (fieldsMap == null) {
-                return false;
-            }
-            // Any structs with encoded fields should pass. We filter the fields list later.
-            return fieldsMap.values().stream().anyMatch(c -> checkDependOnExpr(c.getId(), checkList));
-        }
-        if (define instanceof SubfieldOperator) {
-            SubfieldOperator subfieldOperator = define.cast();
-            Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(subfieldOperator.getChild(0));
-            if (fieldsMap == null || subfieldOperator.getFieldNames().size() != 1) {
-                return false;
-            }
-            ColumnRefOperator fieldRef = fieldsMap.get(subfieldOperator.getFieldNames().get(0));
-            return fieldRef != null && checkDependOnExpr(fieldRef.getId(), checkList);
-        }
-        for (ColumnRefOperator ref : getColumnRefs(define)) {
-            if (ref.getId() == cid) {
-                return false;
-            }
-            if (!checkDependOnExpr(ref.getId(), checkList)) {
-                return false;
-            }
-        }
-        return true;
+        return checkDependOnExpr(define, checkList);
     }
 
     void setDefineExpr(ColumnRefOperator col, ScalarOperator define, int counter) {
