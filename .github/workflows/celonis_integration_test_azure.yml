@@ -287,6 +287,8 @@ jobs:
   celostar-presubmit-test:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     needs: build-manifest
+    outputs:
+      workflow_url: ${{ steps.run-test.outputs.workflow_url }}
     env:
       test_image_tag: ${{needs.build-manifest.outputs.allin1_image_tag}}
     steps:
@@ -343,12 +345,12 @@ jobs:
 
   create-rebase-pr:
     runs-on: [runs-on, runner=1cpu-linux-x64, image=ubuntu22-full-x64, "run-id=${{ github.run_id }}"]
-    # Run even when e2e-tests (or other needs) fail so the rebase PR is still created; workflow still shows E2E failure.
-    if: ${{ always() && (github.event_name == 'schedule' || inputs.branch_to_test == '') }}
-    needs:
-      - e2e-tests
-      - sync-and-rebase-upstream
-      - celostar-compliance-test
+    # Create the PR as soon as the sync/rebase succeeds so its checks can start immediately.
+    if: ${{ needs.sync-and-rebase-upstream.result == 'success' && (github.event_name == 'schedule' || inputs.branch_to_test == '') }}
+    needs: sync-and-rebase-upstream
+    outputs:
+      pr_number: ${{ steps.create_pr.outputs.pr_number }}
+      pr_url: ${{ steps.create_pr.outputs.pr_url }}
     steps:
       - name: Create pull request
         id: create_pr
@@ -357,8 +359,6 @@ jobs:
           HEAD_BRANCH: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
           BASE_BRANCH: ${{ needs.sync-and-rebase-upstream.outputs.pr_base_branch }}
           SYNCED_CELO: ${{ needs.sync-and-rebase-upstream.outputs.synced_celo_branch }}
-          E2E_URL: ${{ needs.e2e-tests.outputs.workflow_url }}
-          COMPLIANCE_URL: ${{ needs.celostar-compliance-test.outputs.workflow_url }}
         run: |
           set -euo pipefail
           if [[ -z "${HEAD_BRANCH}" || -z "${BASE_BRANCH}" ]]; then
@@ -370,18 +370,12 @@ jobs:
           TITLE="Integration rebase: ${HEAD_BRANCH} → ${SYNCED_CELO}"
           BODY_FILE=$(mktemp)
           {
-            echo "Automated PR after **Integration Test on AKS** (E2E on Azure)."
+            echo "Automated PR created after the **sync-and-rebase-upstream** job completed successfully."
             echo ""
             echo "- **Head (rebased test branch):** \`${HEAD_BRANCH}\`"
             echo "- **Base:** \`${BASE_BRANCH}\`"
             echo "- **Upstream-aligned celo branch:** \`${SYNCED_CELO}\`"
             echo "- **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            if [[ -n "${E2E_URL:-}" ]]; then
-              echo "- **Celostar E2E run:** ${E2E_URL}"
-            fi
-            if [[ -n "${COMPLIANCE_URL:-}" ]]; then
-              echo "- **Celostar compliance test run:** ${COMPLIANCE_URL}"
-            fi
           } > "$BODY_FILE"
           BODY_JSON=$(jq -Rs . < "$BODY_FILE")
           rm -f "$BODY_FILE"
@@ -399,7 +393,9 @@ jobs:
             "$API") || true
           if [[ "$HTTP" == "201" ]]; then
             PR_URL=$(jq -r '.html_url // empty' /tmp/pr_resp.json)
+            PR_NUMBER=$(jq -r '.number // empty' /tmp/pr_resp.json)
             echo "Created PR: ${PR_URL}"
+            echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
             echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"
           elif [[ "$HTTP" == "422" ]]; then
             echo "PR not created (422 — branch may already have an open PR or not be ahead of base). Response:"
@@ -470,6 +466,8 @@ jobs:
   celostar-compliance-test:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     needs: build-manifest
+    outputs:
+      workflow_url: ${{ steps.run-test.outputs.workflow_url }}
     env:
       test_image_tag: ${{ needs.build-manifest.outputs.allin1_image_tag }}
     steps:
@@ -491,3 +489,38 @@ jobs:
             echo "The compliance test workflow is: ${{steps.run-test.outputs.workflow_url}}"
           } >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
+
+  post-test-urls-to-pr:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    if: ${{ always() && needs.create-rebase-pr.result == 'success' && needs.create-rebase-pr.outputs.pr_number != '' }}
+    needs:
+      - create-rebase-pr
+      - celostar-presubmit-test
+      - e2e-tests
+      - celostar-compliance-test
+    steps:
+      - name: Post test workflow URLs to pull request
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ needs.create-rebase-pr.outputs.pr_number }}
+          PRESUBMIT_URL: ${{ needs.celostar-presubmit-test.outputs.workflow_url }}
+          E2E_URL: ${{ needs.e2e-tests.outputs.workflow_url }}
+          COMPLIANCE_URL: ${{ needs.celostar-compliance-test.outputs.workflow_url }}
+        with:
+          github-token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          script: |
+            const tests = [
+              ['Celostar presubmit test', process.env.PRESUBMIT_URL],
+              ['Celostar E2E test', process.env.E2E_URL],
+              ['Celostar compliance test', process.env.COMPLIANCE_URL],
+            ];
+            const lines = ['## Celostar test runs', ''];
+            for (const [name, url] of tests) {
+              lines.push(url ? `- [${name}](${url})` : `- ${name}: workflow URL unavailable`);
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PR_NUMBER),
+              body: lines.join('\n'),
+            });
