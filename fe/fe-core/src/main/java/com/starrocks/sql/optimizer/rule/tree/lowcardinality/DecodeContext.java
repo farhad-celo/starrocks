@@ -71,7 +71,7 @@ import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeUtil.ge
  *  e. Generate the global dictionary expression
  */
 class DecodeContext {
-    private final ColumnRefFactory factory;
+    final ColumnRefFactory factory;
 
     // Global DictCache
     // string ColumnRefId -> ColumnDict
@@ -112,7 +112,7 @@ class DecodeContext {
 
     Map<ColumnRefOperator, ScalarOperator> dictRefToDefineExprMap = Maps.newHashMap();
 
-    Map<ScalarOperator, ScalarOperator> stringExprToDictExprMap = Maps.newHashMap();
+    Map<ScalarOperator, ScalarOperator> stringExprToDictExprMap = Maps.newIdentityHashMap();
 
     Map<ScalarOperator, ScalarOperator> stringExprToDictDefineExprMap = Maps.newIdentityHashMap();
 

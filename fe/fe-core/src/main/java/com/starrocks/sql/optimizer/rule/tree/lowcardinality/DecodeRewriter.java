@@ -89,18 +89,11 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         this.session = session;
     }
 
-    // For structs, we only return the encoded fields collected by DecodeCollector.
-    static ColumnRefSet getUsedColumns(ScalarOperator scalarOperator, DecodeContext context) {
-        if (scalarOperator.isColumnRef()) {
-            return new ColumnRefSet(((ColumnRefOperator) scalarOperator).getId());
-        }
-        Map<String, ColumnRefOperator> structFieldsData = context.structManager.getFieldStringRefMap(scalarOperator);
-        if (structFieldsData != null) {
-            return new ColumnRefSet(structFieldsData.values());
-        }
-        ColumnRefSet result = new ColumnRefSet();
-        scalarOperator.getChildren().forEach(c -> result.union(getUsedColumns(c, context)));
-        return result;
+    // Encoding is only forbidden for a column ref whose dict column is not live here. Anything else is
+    // permitted as far as this check goes; callers establish that a dict form actually exists separately
+    // (a dict projection key, or membership in a dict-expr map).
+    static boolean encodingAllowed(ScalarOperator op, ColumnRefSet supportColumns) {
+        return !op.isColumnRef() || supportColumns.contains(op.cast());
     }
 
     public OptExpression rewrite(OptExpression optExpression) {
@@ -846,7 +839,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
                 newColumnRefMap.put(key, value.accept(replacer, null));
                 continue;
             }
-            if (!inputs.containsAll(getUsedColumns(value, context))) {
+            if (!encodingAllowed(value, inputs)) {
                 newColumnRefMap.put(key, value);
                 continue;
             }
@@ -896,8 +889,12 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
 
         @Override
         public Optional<ScalarOperator> preprocess(ScalarOperator scalarOperator) {
-            if (exprMapping.containsKey(scalarOperator)
-                    && supportColumns.containsAll(getUsedColumns(scalarOperator, context))) {
+            if (scalarOperator instanceof ColumnRefOperator col) {
+                // TODO(farhad-celo): Temporary hack to preserve the current behavior for the structs.
+                //  Will be removed in the next PR.
+                scalarOperator = context.factory.getColumnRef(col.getId());
+            }
+            if (exprMapping.containsKey(scalarOperator) && encodingAllowed(scalarOperator, supportColumns)) {
                 return Optional.of(exprMapping.get(scalarOperator));
             }
             return Optional.empty();

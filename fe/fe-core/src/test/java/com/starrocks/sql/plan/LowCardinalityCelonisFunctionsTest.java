@@ -284,4 +284,24 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                         "CAST([] AS ARRAY<INT>), CAST([] AS ARRAY<INT>), CAST([] AS ARRAY<INT>), " +
                         "CAST([] AS ARRAY<INT>))"), plan);
     }
+
+    @Test
+    public void testSupportColumns() throws Exception {
+        // Inner ACTIVITIES[1] is dictified, outer one is not.
+        String sql = """
+                WITH T AS (SELECT ACTIVITIES, ACTIVITIES[1] f FROM TestActivityTimestampTable ORDER BY 1)
+                SELECT f, ACTIVITIES[1], ARRAY_AGG(ACTIVITIES) FROM T GROUP BY ACTIVITIES, f
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains(
+                "  7:Decode\n" +
+                        "  |  <dict id 9> : <string id 4>\n" +
+                        "  |  cardinality: 1\n" +
+                        "  |  \n" +
+                        "  6:Project\n" +
+                        "  |  output columns:\n" +
+                        "  |  5 <-> [5: array_agg, ARRAY<ARRAY<VARCHAR(40)>>, true]\n" +
+                        "  |  6 <-> 2: ACTIVITIES[1]\n" +
+                        "  |  9 <-> [9: expr, INT, true]"), plan);
+    }
 }
