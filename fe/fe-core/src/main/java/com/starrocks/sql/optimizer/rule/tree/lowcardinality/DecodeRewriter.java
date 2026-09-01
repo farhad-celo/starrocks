@@ -821,7 +821,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         }
 
         // replace string predicate to dict predicate
-        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs, context);
+        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs);
         return predicate.accept(replacer, null);
     }
 
@@ -830,7 +830,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
             return null;
         }
 
-        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs, context);
+        ExprReplacer replacer = new ExprReplacer(context.stringExprToDictExprMap, inputs);
         Map<ColumnRefOperator, ScalarOperator> newColumnRefMap = Maps.newHashMap();
         for (ColumnRefOperator key : projection.getColumnRefMap().keySet()) {
             ScalarOperator value = projection.getColumnRefMap().get(key);
@@ -877,23 +877,14 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
     private static class ExprReplacer extends BaseScalarOperatorShuttle {
         private final Map<ScalarOperator, ScalarOperator> exprMapping;
         private final ColumnRefSet supportColumns;
-        private final DecodeContext context;
 
-        public ExprReplacer(Map<ScalarOperator, ScalarOperator> exprMapping,
-                            ColumnRefSet supportColumns,
-                            DecodeContext context) {
+        public ExprReplacer(Map<ScalarOperator, ScalarOperator> exprMapping, ColumnRefSet supportColumns) {
             this.exprMapping = exprMapping;
             this.supportColumns = supportColumns;
-            this.context = context;
         }
 
         @Override
         public Optional<ScalarOperator> preprocess(ScalarOperator scalarOperator) {
-            if (scalarOperator instanceof ColumnRefOperator col) {
-                // TODO(farhad-celo): Temporary hack to preserve the current behavior for the structs.
-                //  Will be removed in the next PR.
-                scalarOperator = context.factory.getColumnRef(col.getId());
-            }
             if (exprMapping.containsKey(scalarOperator) && encodingAllowed(scalarOperator, supportColumns)) {
                 return Optional.of(exprMapping.get(scalarOperator));
             }

@@ -105,8 +105,8 @@ public class LowCardinalityStructTest extends PlanTestBase {
                 FROM T
                 """;
         String plan = getVerboseExplain(sql);
-        String expected = "5 <-> DictDecode(6: VARCHAR_COL, [upper(<place-holder>)], row(6: VARCHAR_COL, " +
-                "3: ARRAY_VARCHAR_COL, 4: INTEGER_COL).col1[true])";
+        String expected = "DictDecode(6: VARCHAR_COL, [upper(<place-holder>)], " +
+                "row(6: VARCHAR_COL, 7: ARRAY_VARCHAR_COL, 4: INTEGER_COL).col1[true])\n";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 
@@ -117,7 +117,7 @@ public class LowCardinalityStructTest extends PlanTestBase {
                 FROM T
                 """;
         String plan = getVerboseExplain(sql);
-        String expected = "5 <-> row(2: VARCHAR_COL, 4: INTEGER_COL).col2[true]";
+        String expected = " row(6: VARCHAR_COL, 4: INTEGER_COL).col2[true]";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 
@@ -133,12 +133,11 @@ public class LowCardinalityStructTest extends PlanTestBase {
         String plan = getVerboseExplain(sql);
         String expected = "  1:Project\n" +
                 "  |  output columns:\n" +
-                "  |  6 <-> DictDecode(9: VARCHAR_COL, [<place-holder>], row(9: VARCHAR_COL, 10: ARRAY_VARCHAR_COL," +
-                " 4: INTEGER_COL).col1[true])\n" +
-                "  |  7 <-> DictDecode(10: ARRAY_VARCHAR_COL, [<place-holder>], row(9: " +
-                "VARCHAR_COL, 10: ARRAY_VARCHAR_COL, 4: INTEGER_COL).col2[true])\n" +
-                "  |  8 <-> row(DictDecode(9: VARCHAR_COL, [<place-holder>]), DictDecode(10: " +
-                "ARRAY_VARCHAR_COL, [<place-holder>]), 4: INTEGER_COL).col3[true]\n";
+                "  |  6 <-> DictDecode(9: VARCHAR_COL, [<place-holder>], row(9: VARCHAR_COL, 10: ARRAY_VARCHAR_COL, " +
+                "4: INTEGER_COL).col1[true])\n" +
+                "  |  7 <-> DictDecode(10: ARRAY_VARCHAR_COL, [<place-holder>], row(9: VARCHAR_COL, " +
+                "10: ARRAY_VARCHAR_COL, 4: INTEGER_COL).col2[true])\n" +
+                "  |  8 <-> row(9: VARCHAR_COL, 10: ARRAY_VARCHAR_COL, 4: INTEGER_COL).col3[true]";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 
@@ -148,21 +147,21 @@ public class LowCardinalityStructTest extends PlanTestBase {
                 SELECT TO_JSON(STRUCT(VARCHAR_COL, INTEGER_COL, ARRAY_VARCHAR_COL))
                 FROM T
                 """;
-        String plan = getVerboseExplain(sql);
-        String expected = "5 <-> to_json[(row[([2: VARCHAR_COL, VARCHAR, true], [4: INTEGER_COL, INT, true], " +
-                "[3: ARRAY_VARCHAR_COL, ARRAY<VARCHAR(40)>, true]); args: VARCHAR,INT,INVALID_TYPE; result: " +
-                "struct<col1 varchar(25), col2 int(11), col3 array<varchar(40)>>; args nullable: true; result " +
-                "nullable: true]); args: INVALID_TYPE; result: JSON; args nullable: true; result nullable: true]";
+        String plan = getFragmentPlan(sql);
+        String expected = "<slot 5> : to_json(named_struct('col1', DictDecode(6: VARCHAR_COL, [<place-holder>], " +
+                "row(6: VARCHAR_COL, 4: INTEGER_COL, 7: ARRAY_VARCHAR_COL).col1[true]), " +
+                "'col2', row(6: VARCHAR_COL, 4: INTEGER_COL, 7: ARRAY_VARCHAR_COL).col2[true], " +
+                "'col3', DictDecode(7: ARRAY_VARCHAR_COL, [<place-holder>], row(6: VARCHAR_COL, 4: INTEGER_COL, " +
+                "7: ARRAY_VARCHAR_COL).col3[true])))\n";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 
     @Test
-    public void testTopLevelStructNonProfitable() throws Exception {
+    public void testTopLevelStructProfitable() throws Exception {
         String sql = "SELECT STRUCT(VARCHAR_COL, ARRAY_VARCHAR_COL, INTEGER_COL) FROM T";
         String plan = getVerboseExplain(sql);
-        String expected = "5 <-> row[([2: VARCHAR_COL, VARCHAR, true], [3: ARRAY_VARCHAR_COL, " +
-                "ARRAY<VARCHAR(40)>, true], [4: INTEGER_COL, INT, true])";
-        Assertions.assertTrue(plan.contains(expected), plan);
+        Assertions.assertTrue(plan.contains("8 <-> row[([6: VARCHAR_COL, INT, true], " +
+                "[7: ARRAY_VARCHAR_COL, ARRAY<INT>, true], [4: INTEGER_COL, INT, true])"), plan);
     }
 
     @Test
@@ -191,14 +190,14 @@ public class LowCardinalityStructTest extends PlanTestBase {
                 SELECT S.c1, S.c2, S.c3 FROM TB2
                 """;
         String plan = getVerboseExplain(sql);
-        String expected = " 1:Project\n" +
+        String expected = "  1:Project\n" +
                 "  |  output columns:\n" +
                 "  |  6 <-> DictDecode(9: VARCHAR_COL, [<place-holder>], named_struct('c1', 9: VARCHAR_COL, 'c2'," +
                 " 10: ARRAY_VARCHAR_COL, 'c3', 4: INTEGER_COL).c1[true])\n" +
                 "  |  7 <-> DictDecode(10: ARRAY_VARCHAR_COL, [<place-holder>], named_struct('c1', 9: VARCHAR_COL," +
                 " 'c2', 10: ARRAY_VARCHAR_COL, 'c3', 4: INTEGER_COL).c2[true])\n" +
-                "  |  8 <-> named_struct('c1', DictDecode(9: VARCHAR_COL, [<place-holder>]), 'c2', DictDecode(10:" +
-                " ARRAY_VARCHAR_COL, [<place-holder>]), 'c3', 4: INTEGER_COL).c3[true]";
+                "  |  8 <-> named_struct('c1', 9: VARCHAR_COL, 'c2', 10: ARRAY_VARCHAR_COL, 'c3', 4: INTEGER_COL)" +
+                ".c3[true]";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 
@@ -221,8 +220,8 @@ public class LowCardinalityStructTest extends PlanTestBase {
     public void testArrayDictField() throws Exception {
         String sql = "SELECT STRUCT(ARRAY_VARCHAR_COL, VARCHAR_COL).col1 FROM T";
         String plan = getVerboseExplain(sql);
-        String expected = "5 <-> DictDecode(6: ARRAY_VARCHAR_COL, [<place-holder>], " +
-                "row(6: ARRAY_VARCHAR_COL, 2: VARCHAR_COL).col1[true]";
+        String expected = "DictDecode(7: ARRAY_VARCHAR_COL, [<place-holder>], row(7: ARRAY_VARCHAR_COL, " +
+                "6: VARCHAR_COL).col1[true])";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 
@@ -230,8 +229,8 @@ public class LowCardinalityStructTest extends PlanTestBase {
     public void testArrayElementDictField() throws Exception {
         String sql = "SELECT STRUCT(ARRAY_VARCHAR_COL, VARCHAR_COL).col1[1] FROM T";
         String plan = getVerboseExplain(sql);
-        String expected = "5 <-> DictDecode(6: ARRAY_VARCHAR_COL, [<place-holder>], " +
-                "row(6: ARRAY_VARCHAR_COL, 2: VARCHAR_COL).col1[true][1])";
+        String expected = "DictDecode(7: ARRAY_VARCHAR_COL, [<place-holder>], row(7: ARRAY_VARCHAR_COL, " +
+                "6: VARCHAR_COL).col1[true][1])";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 
@@ -246,10 +245,11 @@ public class LowCardinalityStructTest extends PlanTestBase {
         String expected = "  1:Project\n" +
                 "  |  output columns:\n" +
                 "  |  4 <-> [4: INTEGER_COL, INT, true]\n" +
-                "  |  5 <-> row[(row[(DictDecode(7: VARCHAR_COL, [<place-holder>])); args: VARCHAR; result: " +
-                "struct<col1 varchar(25)>; args nullable: true; result nullable: true], [3: ARRAY_VARCHAR_COL, " +
-                "ARRAY<VARCHAR(40)>, true]); args: INVALID_TYPE,INVALID_TYPE; result: struct<col1 struct<col1 " +
-                "varchar(25)>, col2 array<varchar(40)>>; args nullable: true; result nullable: true]\n" +
+                "  |  5 <-> row[(named_struct[('col1', DictDecode(7: VARCHAR_COL, [<place-holder>], " +
+                "row(7: VARCHAR_COL).col1[true])); args: VARCHAR,VARCHAR; result: struct<col1 varchar(25)>; " +
+                "args nullable: true; result nullable: true], [3: ARRAY_VARCHAR_COL, ARRAY<VARCHAR(40)>, true]); " +
+                "args: INVALID_TYPE,INVALID_TYPE; result: struct<col1 struct<col1 varchar(25)>, " +
+                "col2 array<varchar(40)>>; args nullable: true; result nullable: true]\n" +
                 "  |  8 <-> DictDefine(7: VARCHAR_COL, [upper(<place-holder>)])";
         Assertions.assertTrue(plan.contains(expected), plan);
     }

@@ -17,6 +17,7 @@ package com.starrocks.sql.optimizer.rule.tree.lowcardinality;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.FunctionName;
 import com.starrocks.catalog.AggregateFunction;
@@ -45,7 +46,6 @@ import com.starrocks.thrift.TFunctionBinaryType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -94,7 +94,7 @@ class DecodeContext {
     // select upper(a) from t0 where lower(a) = 'tt'
     // a is string column
     // upper(a), lower(a) is relation expression
-    Map<Integer, List<ScalarOperator>> stringExprsMap = Maps.newHashMap();
+    Set<ScalarOperator> stringExpressions = Sets.newIdentityHashSet();
 
     // all string aggregate expressions
     Map<Integer, List<CallOperator>> stringAggregateExprs = Maps.newHashMap();
@@ -254,11 +254,8 @@ class DecodeContext {
     }
 
     private void rewriteStringExpressions() {
-        // rewrite string expression
-        for (Integer stringId : stringExprsMap.keySet()) {
-            for (ScalarOperator stringExpr : stringExprsMap.getOrDefault(stringId, Collections.emptyList())) {
-                decode(stringExpr);
-            }
+        for (ScalarOperator stringExpr : stringExpressions) {
+            decode(stringExpr);
         }
     }
 
