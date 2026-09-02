@@ -1,0 +1,390 @@
+name: Rebase and Build Images
+run-name: Rebase and Build Images - ${{ inputs.branch_to_build || 'sync and rebase upstream' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_to_build:
+        description: "Existing rebased branch to build. Leave empty to sync and rebase upstream first."
+        required: false
+        type: string
+        default: ''
+      image_tag:
+        description: "Exact image tag. Leave empty to derive it from the build branch."
+        required: false
+        type: string
+        default: ''
+      pull_request_base:
+        description: "Draft PR base. Required when branch_to_build is provided."
+        required: false
+        type: string
+        default: ''
+
+env:
+  LATEST_UPSTREAM_BRANCH: branch-3.5-cc
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
+  GITHUB_USERNAME: ${{ github.repository }}
+  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.branch_to_build || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-rebase:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    outputs:
+      build_branch: ${{ steps.rebase.outputs.build_branch || steps.existing-branch.outputs.build_branch }}
+      release_image_tag: ${{ steps.rebase.outputs.release_image_tag || steps.existing-branch.outputs.release_image_tag }}
+      pull_request_base: ${{ steps.rebase.outputs.pull_request_base || steps.existing-branch.outputs.pull_request_base }}
+      source_branch: ${{ steps.rebase.outputs.source_branch }}
+      source_sha: ${{ steps.rebase.outputs.source_sha }}
+      synced_celo_branch: ${{ steps.rebase.outputs.synced_celo_branch || steps.existing-branch.outputs.pull_request_base }}
+    steps:
+      - name: Checkout existing branch
+        if: ${{ inputs.branch_to_build != '' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.branch_to_build }}
+
+      - name: Prepare existing branch
+        if: ${{ inputs.branch_to_build != '' }}
+        id: existing-branch
+        shell: bash
+        env:
+          BUILD_BRANCH: ${{ inputs.branch_to_build }}
+          REQUESTED_IMAGE_TAG: ${{ inputs.image_tag }}
+          PULL_REQUEST_BASE: ${{ inputs.pull_request_base }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PULL_REQUEST_BASE}" ]]; then
+            echo "pull_request_base is required when branch_to_build is provided" >&2
+            exit 1
+          fi
+          git check-ref-format --branch "${BUILD_BRANCH}"
+          if ! git ls-remote --exit-code --heads origin "refs/heads/${PULL_REQUEST_BASE}" >/dev/null; then
+            echo "Pull request base does not exist on origin: ${PULL_REQUEST_BASE}" >&2
+            exit 1
+          fi
+          git fetch --no-tags origin \
+            "${PULL_REQUEST_BASE}:refs/remotes/origin/${PULL_REQUEST_BASE}"
+          if ! git merge-base --is-ancestor "refs/remotes/origin/${PULL_REQUEST_BASE}" HEAD; then
+            echo "${BUILD_BRANCH} is not based on ${PULL_REQUEST_BASE}" >&2
+            exit 1
+          fi
+          if [[ -n "${REQUESTED_IMAGE_TAG}" ]]; then
+            release_image_tag="${REQUESTED_IMAGE_TAG}"
+          else
+            release_image_tag="${BUILD_BRANCH//\//_}_${GITHUB_RUN_ID}"
+          fi
+          if ! [[ "${release_image_tag}" =~ ^[a-zA-Z0-9_][a-zA-Z0-9._-]*$ ]]; then
+            echo "Invalid image tag: ${release_image_tag}" >&2
+            exit 1
+          fi
+          echo "The branch to build is: ${BUILD_BRANCH}"
+          echo "The release image tag is: ${release_image_tag}"
+          echo "The draft PR base is: ${PULL_REQUEST_BASE}"
+          echo "build_branch=${BUILD_BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "release_image_tag=${release_image_tag}" >> "$GITHUB_OUTPUT"
+          echo "pull_request_base=${PULL_REQUEST_BASE}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout bootstrap branch
+        if: ${{ inputs.branch_to_build == '' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: branch-3.0-c0d5082c-celo
+
+      - name: Sync upstream and rebase
+        if: ${{ inputs.branch_to_build == '' }}
+        id: rebase
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config user.email "celostar-starrocks@noreply.github.com"
+          git config user.name "celostar-starrocks"
+          git remote add upstream https://github.com/starrocks/starrocks.git 2>/dev/null || \
+            git remote set-url upstream https://github.com/starrocks/starrocks.git
+
+          git fetch --no-tags upstream \
+            "${LATEST_UPSTREAM_BRANCH}:refs/remotes/upstream/${LATEST_UPSTREAM_BRANCH}"
+          upstream_sha=$(git rev-parse "refs/remotes/upstream/${LATEST_UPSTREAM_BRANCH}")
+          latest_commit=$(git rev-parse --short=8 "${upstream_sha}")
+          synced_celo_branch="${LATEST_UPSTREAM_BRANCH}-${latest_commit}-celo"
+
+          git push origin \
+            "refs/remotes/upstream/${LATEST_UPSTREAM_BRANCH}:refs/heads/${LATEST_UPSTREAM_BRANCH}"
+          if ! git ls-remote --exit-code --heads origin "refs/heads/${synced_celo_branch}" >/dev/null; then
+            git push origin "${upstream_sha}:refs/heads/${synced_celo_branch}"
+          fi
+          git fetch --no-tags origin \
+            "${synced_celo_branch}:refs/remotes/origin/${synced_celo_branch}"
+          synced_celo_sha=$(git rev-parse "refs/remotes/origin/${synced_celo_branch}")
+          if [[ "${synced_celo_sha}" != "${upstream_sha}" ]]; then
+            echo "Existing ${synced_celo_branch} does not point to upstream ${upstream_sha}" >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}"
+          source_sha=$(git rev-parse "refs/remotes/origin/${SOURCE_BRANCH}")
+          timestamp=$(date +'%Y-%m-%dT%H-%M-%S')
+          build_branch="gh-${LATEST_UPSTREAM_BRANCH}-${latest_commit}-${timestamp}"
+          release_image_tag="${build_branch}"
+
+          echo "the current default branch is ${SOURCE_BRANCH}"
+          echo "The rebase source commit is: ${source_sha}"
+          echo "The new default branch is: ${synced_celo_branch}"
+          echo "The branch to build is: ${build_branch}"
+          echo "The release image tag is: ${release_image_tag}"
+
+          git switch --create "${build_branch}" "${source_sha}"
+          git rebase "refs/remotes/origin/${synced_celo_branch}"
+          git push --set-upstream origin "${build_branch}"
+
+          echo "build_branch=${build_branch}" >> "$GITHUB_OUTPUT"
+          echo "release_image_tag=${release_image_tag}" >> "$GITHUB_OUTPUT"
+          echo "pull_request_base=${synced_celo_branch}" >> "$GITHUB_OUTPUT"
+          echo "source_branch=${SOURCE_BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "source_sha=${source_sha}" >> "$GITHUB_OUTPUT"
+          echo "synced_celo_branch=${synced_celo_branch}" >> "$GITHUB_OUTPUT"
+
+      - name: Compare rebased patch series
+        if: ${{ inputs.branch_to_build == '' }}
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.rebase.outputs.source_sha }}
+          SYNCED_CELO_BRANCH: ${{ steps.rebase.outputs.synced_celo_branch }}
+        run: |
+          set -euo pipefail
+          synced_celo_sha=$(git rev-parse "refs/remotes/origin/${SYNCED_CELO_BRANCH}")
+          old_base=$(git merge-base "${SOURCE_SHA}" "${synced_celo_sha}")
+          range_diff=$(git range-diff "${old_base}..${SOURCE_SHA}" "${synced_celo_sha}..HEAD" 2>&1) || true
+          {
+            echo "### Rebase range-diff"
+            echo
+            echo '```text'
+            echo "${range_diff}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  create-draft-pr:
+    runs-on: [runs-on, runner=1cpu-linux-x64, image=ubuntu22-full-x64, "run-id=${{ github.run_id }}"]
+    needs: prepare-rebase
+    outputs:
+      pr_number: ${{ steps.create-pr.outputs.pr_number }}
+      pr_url: ${{ steps.create-pr.outputs.pr_url }}
+    steps:
+      - name: Create or reuse draft pull request
+        id: create-pr
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          HEAD_BRANCH: ${{ needs.prepare-rebase.outputs.build_branch }}
+          BASE_BRANCH: ${{ needs.prepare-rebase.outputs.pull_request_base }}
+        run: |
+          set -euo pipefail
+          existing=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --head "${HEAD_BRANCH}" \
+            --base "${BASE_BRANCH}" \
+            --json number,url \
+            --jq '.[0] // empty')
+          if [[ -n "${existing}" ]]; then
+            pr_number=$(jq -r '.number' <<<"${existing}")
+            pr_url=$(jq -r '.url' <<<"${existing}")
+            echo "Reusing pull request: ${pr_url}"
+          else
+            title="Integration rebase: ${HEAD_BRANCH} → ${BASE_BRANCH}"
+            printf -v body \
+              'Automated draft PR for the rebased image build.\n\n- **Head:** `%s`\n- **Base:** `%s`\n- **Build workflow:** %s\n' \
+              "${HEAD_BRANCH}" \
+              "${BASE_BRANCH}" \
+              "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            pr_url=$(gh pr create \
+              --repo "${{ github.repository }}" \
+              --head "${HEAD_BRANCH}" \
+              --base "${BASE_BRANCH}" \
+              --title "${title}" \
+              --body "${body}" \
+              --draft)
+            pr_number=${pr_url##*/}
+            echo "Created draft pull request: ${pr_url}"
+          fi
+          echo "pr_number=${pr_number}" >> "$GITHUB_OUTPUT"
+          echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
+
+  build-arm:
+    needs: prepare-rebase
+    uses: ./.github/workflows/celonis_reusable_build_arch.yml
+    secrets: inherit
+    with:
+      variant: release
+      runs_on_json: '["runs-on","runner=64cpu-linux-arm64","image=ubuntu24-full-arm64","disk=large","run-id=${{ github.run_id }}"]'
+      test_branch: ${{ needs.prepare-rebase.outputs.build_branch }}
+      image_tag: ${{ needs.prepare-rebase.outputs.release_image_tag }}-arm
+      test_image_tag: ${{ needs.prepare-rebase.outputs.release_image_tag }}
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
+
+  build-x86:
+    needs: prepare-rebase
+    uses: ./.github/workflows/celonis_reusable_build_arch.yml
+    secrets: inherit
+    with:
+      variant: release
+      runs_on_json: '["runs-on","runner=64cpu-linux-x64","image=ubuntu24-full-x64","disk=large","run-id=${{ github.run_id }}"]'
+      test_branch: ${{ needs.prepare-rebase.outputs.build_branch }}
+      image_tag: ${{ needs.prepare-rebase.outputs.release_image_tag }}-x86
+      test_image_tag: ${{ needs.prepare-rebase.outputs.release_image_tag }}
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
+
+  build-manifest:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: [build-arm, build-x86]
+    env:
+      BUILD_BRANCH: ${{ needs.build-x86.outputs.test_branch }}
+      ARM_IMAGE_TAG: ${{ needs.build-arm.outputs.allin1_image }}
+      X86_IMAGE_TAG: ${{ needs.build-x86.outputs.allin1_image }}
+      RELEASE_IMAGE_TAG: ${{ needs.build-x86.outputs.test_image_tag }}
+    outputs:
+      build_branch: ${{ env.BUILD_BRANCH }}
+      allin1_image_tag: ${{ env.RELEASE_IMAGE_TAG }}
+      fe_be_image_tag: ${{ env.RELEASE_IMAGE_TAG }}
+    steps:
+      - name: GHCR login
+        shell: bash
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_USERNAME}" --password-stdin
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.BUILD_BRANCH }}
+      - name: Build and push allin1 manifest
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.ARM_IMAGE_TAG }}
+          x86_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.X86_IMAGE_TAG }}
+          mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.RELEASE_IMAGE_TAG }}
+      - name: Build and push starrocks-be manifest to GHCR
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: ghcr.io/celonis/celostar/starrocks-be:${{ env.ARM_IMAGE_TAG }}
+          x86_image_tag: ghcr.io/celonis/celostar/starrocks-be:${{ env.X86_IMAGE_TAG }}
+          mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-be:${{ env.RELEASE_IMAGE_TAG }}
+      - name: Build and push starrocks-fe manifest to GHCR
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.ARM_IMAGE_TAG }}
+          x86_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.X86_IMAGE_TAG }}
+          mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.RELEASE_IMAGE_TAG }}
+      - name: Configure prod AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+      - name: prod Amazon ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push starrocks-be manifest to ECR
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: ${{ steps.login-ecr.outputs.registry }}/celostar/starrocks-be:${{ env.ARM_IMAGE_TAG }}
+          x86_image_tag: ${{ steps.login-ecr.outputs.registry }}/celostar/starrocks-be:${{ env.X86_IMAGE_TAG }}
+          mul_arch_image_tag: ${{ steps.login-ecr.outputs.registry }}/celostar/starrocks-be:${{ env.RELEASE_IMAGE_TAG }}
+      - name: Build and push starrocks-fe manifest to ECR
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: ${{ steps.login-ecr.outputs.registry }}/celostar/starrocks-fe:${{ env.ARM_IMAGE_TAG }}
+          x86_image_tag: ${{ steps.login-ecr.outputs.registry }}/celostar/starrocks-fe:${{ env.X86_IMAGE_TAG }}
+          mul_arch_image_tag: ${{ steps.login-ecr.outputs.registry }}/celostar/starrocks-fe:${{ env.RELEASE_IMAGE_TAG }}
+
+  build-asan-arm:
+    needs: prepare-rebase
+    uses: ./.github/workflows/celonis_reusable_build_arch.yml
+    secrets: inherit
+    with:
+      variant: asan
+      runs_on_json: '["runs-on","runner=64cpu-linux-arm64","image=ubuntu24-full-arm64","disk=large","run-id=${{ github.run_id }}"]'
+      test_branch: ${{ needs.prepare-rebase.outputs.build_branch }}
+      image_tag: ${{ needs.prepare-rebase.outputs.release_image_tag }}-asan-arm
+      test_image_tag: ${{ needs.prepare-rebase.outputs.release_image_tag }}
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
+
+  build-asan-x86:
+    needs: prepare-rebase
+    uses: ./.github/workflows/celonis_reusable_build_arch.yml
+    secrets: inherit
+    with:
+      variant: asan
+      runs_on_json: '["runs-on","runner=64cpu-linux-x64","image=ubuntu24-full-x64","disk=large","run-id=${{ github.run_id }}"]'
+      test_branch: ${{ needs.prepare-rebase.outputs.build_branch }}
+      image_tag: ${{ needs.prepare-rebase.outputs.release_image_tag }}-asan-x86
+      test_image_tag: ${{ needs.prepare-rebase.outputs.release_image_tag }}
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
+
+  build-asan-manifest:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: [build-asan-arm, build-asan-x86]
+    env:
+      BUILD_BRANCH: ${{ needs.build-asan-x86.outputs.test_branch }}
+      ARM_IMAGE_TAG: ${{ needs.build-asan-arm.outputs.allin1_image }}
+      X86_IMAGE_TAG: ${{ needs.build-asan-x86.outputs.allin1_image }}
+      ASAN_IMAGE_TAG: ${{ needs.build-asan-x86.outputs.test_image_tag }}-asan
+    outputs:
+      build_branch: ${{ env.BUILD_BRANCH }}
+      allin1_image_tag: ${{ env.ASAN_IMAGE_TAG }}
+    steps:
+      - name: GHCR login
+        shell: bash
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_USERNAME}" --password-stdin
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.BUILD_BRANCH }}
+      - name: Build and push ASAN allin1 manifest
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.ARM_IMAGE_TAG }}
+          x86_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.X86_IMAGE_TAG }}
+          mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-allin1:${{ env.ASAN_IMAGE_TAG }}
+
+  summarize:
+    if: ${{ always() }}
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    needs: [prepare-rebase, create-draft-pr, build-manifest, build-asan-manifest]
+    env:
+      BUILD_BRANCH: ${{ needs.prepare-rebase.outputs.build_branch }}
+      RELEASE_IMAGE_TAG: ${{ needs.build-manifest.outputs.allin1_image_tag }}
+      ASAN_IMAGE_TAG: ${{ needs.build-asan-manifest.outputs.allin1_image_tag }}
+      PR_URL: ${{ needs.create-draft-pr.outputs.pr_url }}
+    steps:
+      - name: Summarize outputs
+        shell: bash
+        run: |
+          echo "The branch built is: ${BUILD_BRANCH}"
+          echo "The release image tag is: ${RELEASE_IMAGE_TAG}"
+          echo "The ASAN image tag is: ${ASAN_IMAGE_TAG}"
+          echo "The draft PR is: ${PR_URL}"
+          {
+            echo "## Rebase and image build"
+            echo
+            echo "- Build branch: \`${BUILD_BRANCH}\`"
+            echo "- Release image tag: \`${RELEASE_IMAGE_TAG}\`"
+            echo "- ASAN image tag: \`${ASAN_IMAGE_TAG}\`"
+            echo "- Draft PR: ${PR_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${{ needs.prepare-rebase.result }}" != "success" ||
+                "${{ needs.create-draft-pr.result }}" != "success" ||
+                "${{ needs.build-manifest.result }}" != "success" ||
+                "${{ needs.build-asan-manifest.result }}" != "success" ]]; then
+            exit 1
+          fi
