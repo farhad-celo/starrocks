@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 #include "../util.h"
 #include "column/column_helper.h"
 #include "exprs/anyval_util.h"
@@ -192,6 +194,25 @@ protected:
                 EXPECT_EQ(datum.get_int64(), expected_paths[i][j]) << "Mismatch at path " << i << ", element " << j;
             }
         }
+    }
+
+    // Extracts the emitted paths so that tests can compare them order-independently.
+    template <LogicalType LT>
+    static std::vector<std::vector<RunTimeCppType<LT>>> CollectPaths(const ColumnPtr& result_column) {
+        auto array_col = down_cast<const ArrayColumn*>(result_column.get());
+        auto elements = array_col->elements_column().get();
+        auto offsets = array_col->offsets_column();
+
+        std::vector<std::vector<RunTimeCppType<LT>>> paths;
+        paths.reserve(array_col->size());
+        for (size_t i = 0; i < array_col->size(); ++i) {
+            std::vector<RunTimeCppType<LT>> path;
+            for (size_t j = offsets->get_data()[i]; j < offsets->get_data()[i + 1]; ++j) {
+                path.push_back(elements->get(j).get<RunTimeCppType<LT>>());
+            }
+            paths.push_back(std::move(path));
+        }
+        return paths;
     }
 
     std::unique_ptr<RuntimeState> rt_state_;
@@ -564,6 +585,23 @@ TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_less_equal_pruning) {
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
+// Older callers always appended a trailing ":0" placeholder after single-value length
+// comparisons (e.g. "N:LE:3:0"). The parser must keep accepting and ignoring it.
+TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_less_equal_legacy_trailing_zero) {
+    auto adj_matrix = BuildLengthTestGraph();
+
+    const auto [table_state, function] = Prepare<TYPE_BIGINT>(adj_matrix, {{0L}}, {{21L}}, std::nullopt, "N:LE:3:0");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    std::vector<std::vector<int64_t>> expected_paths;
+    for (int i = 1; i <= 10; ++i) {
+        expected_paths.push_back({0L, static_cast<int64_t>(i), 21L});
+    }
+
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], expected_paths);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
 // (See BuildLengthTestGraph for representation)
 TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_equal_pruning) {
     auto adj_matrix = BuildLengthTestGraph();
@@ -657,6 +695,298 @@ TEST_F(CelonisObjectLinkExtractPathsTest, isolated_and_complex_cycles_combined) 
     EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L}, {1L, 2L, 2L, 4L}, {1L, 2L, 3L, 4L}, {1L, 2L, 4L}});
 
     EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Helper graph generator used by the prefix count tests.
+// Graph Representation:
+//                     +--> 4
+//                     |
+//              +--> 2 +
+//              |      |
+//              |      +--> 5
+// 0 ---> 1(end)+
+//              |      +--> 6
+//              |      |
+//              +--> 3 +
+//                     |
+//                     +--> 7
+std::vector<std::vector<std::optional<int64_t>>> BuildPrefixCountTestGraph() {
+    return {{1}, {2, 3}, {4, 5}, {6, 7}, {}, {}, {}, {}};
+}
+
+// (See BuildPrefixCountTestGraph for representation)
+// Round 0 (the start node alone) and round 1 both undershoot the desired count of 4, so the search
+// keeps growing the frontier. Manual trace:
+//   round 0 frontier: [0]                            -> terminal: {},        1 row  (< 4)
+//   round 1 frontier: [0,1]                          -> terminal: {},        1 row  (< 4)
+//   round 2 frontier: [0,1,2], [0,1,3]               -> terminal: {[0,1]},   3 rows (< 4)
+//   round 3 frontier: [0,1,2,4], [0,1,2,5], [0,1,3,6], [0,1,3,7]
+//                                                    -> terminal: {[0,1]},   5 rows (>= 4, stop)
+// [0,1] was completed back in round 2 and must still show up in the final output.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_grows_frontier_until_satisfied) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>(BuildPrefixCountTestGraph(), {{0L}}, {{1L}}, std::nullopt, "N:PC4");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0],
+                               {{0L, 1L}, {0L, 1L, 2L, 4L}, {0L, 1L, 2L, 5L}, {0L, 1L, 3L, 6L}, {0L, 1L, 3L, 7L}});
+    EXPECT_EQ(table_state->processed_rows(), 1);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// (See BuildPrefixCountTestGraph for representation)
+// The finalized result is streamed back through the normal chunked output contract.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_chunked_output) {
+    rt_state_->set_chunk_size(2);
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>(BuildPrefixCountTestGraph(), {{0L}}, {{1L}}, std::nullopt, "N:PC4");
+
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 1L}, {0L, 1L, 2L, 4L}});
+        EXPECT_EQ(offset->get(1).get_uint32(), 2);
+        EXPECT_EQ(table_state->processed_rows(), 0);
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 1L, 2L, 5L}, {0L, 1L, 3L, 6L}});
+        EXPECT_EQ(offset->get(1).get_uint32(), 2);
+        EXPECT_EQ(table_state->processed_rows(), 0);
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 1L, 3L, 7L}});
+        EXPECT_EQ(offset->get(1).get_uint32(), 1);
+        EXPECT_EQ(table_state->processed_rows(), 1);
+    }
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// (See BuildLengthTestGraph for representation)
+// The completed paths are found across two different rounds and streamed out in round order, four
+// rows per call: the ten 3-node paths of round 2 first, then the five 4-node paths of round 3.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_chunked_output_across_rounds) {
+    rt_state_->set_chunk_size(4);
+    auto adj_matrix = BuildLengthTestGraph();
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>(adj_matrix, {{0L}}, {{21L}}, std::nullopt, "N:BW:3:4:PC1000");
+
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 1L, 21L}, {0L, 2L, 21L}, {0L, 3L, 21L}, {0L, 4L, 21L}});
+        EXPECT_EQ(table_state->processed_rows(), 0);
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 5L, 21L}, {0L, 6L, 21L}, {0L, 7L, 21L}, {0L, 8L, 21L}});
+        EXPECT_EQ(table_state->processed_rows(), 0);
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0],
+                                   {{0L, 9L, 21L}, {0L, 10L, 21L}, {0L, 11L, 16L, 21L}, {0L, 12L, 17L, 21L}});
+        EXPECT_EQ(table_state->processed_rows(), 0);
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 13L, 18L, 21L}, {0L, 14L, 19L, 21L}, {0L, 15L, 20L, 21L}});
+        EXPECT_EQ(table_state->processed_rows(), 1);
+    }
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+// 0 (end, isolated)      1 ---> 2      3 (end, isolated)
+// Both start nodes are valid end nodes with no outgoing edges, so the desired count of 2 is already
+// satisfied by the start nodes themselves and no prefixes are emitted.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_satisfied_by_start_nodes) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{}, {2}, {}, {}}, {{0L, 3L}}, {{0L, 3L}}, std::nullopt, "N:PC2");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L}, {3L}});
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+// 0 ---> 1 ---> 4(end)      2 ---> 3 ---> 4(end)
+// The seeded round-0 frontier takes no part in the stop check, so prefix mode always advances by at
+// least one hop: two start nodes with a desired count of 2 would already satisfy the count as bare
+// seeds, yet what comes back is the round-1 frontier, one hop further along. Unlike
+// prefix_count_satisfied_by_start_nodes - whose start nodes have no outgoing edges - this graph can
+// tell the two behaviors apart.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_always_advances_at_least_one_hop) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{1}, {4}, {3}, {4}, {}}, {{0L, 2L}}, {{4L}}, std::nullopt, "N:PC2");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L}, {2L, 3L}});
+    EXPECT_EQ(table_state->processed_rows(), 1);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+//    +-------+
+//    v       |
+//    0 ----> 1
+// (no end nodes at all)
+// The whole frontier search runs inside a single process() call, so it has to notice cancellation
+// itself rather than relying on the pipeline driver's between-operator check. This is the shape that
+// runs longest - an unreachable non-branching cycle spinning to the round cap - so a cancelled query
+// must come back with a Cancelled status instead of the rows it would otherwise have produced.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_search_honors_cancellation) {
+    rt_state_->set_is_cancelled(true);
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{1}, {0}}, {{0L}}, std::vector<std::optional<int64_t>>{}, std::nullopt, "W:PC5");
+    Run(table_state, function.get());
+
+    EXPECT_TRUE(table_state->status().is_cancelled()) << table_state->status().to_string();
+    EXPECT_EQ(table_state->processed_rows(), 0);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// (See BuildLengthTestGraph for representation)
+// With a desired count far above what the graph can produce, the search runs until the frontier
+// empties naturally. The resulting row set must then be identical to legacy mode on the same graph.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_exhausted_matches_legacy_mode) {
+    auto adj_matrix = BuildLengthTestGraph();
+
+    auto sorted_paths_for = [&](const std::optional<std::string>& config_str) {
+        const auto [table_state, function] =
+                Prepare<TYPE_BIGINT>(adj_matrix, {{0L}}, {{21L}}, std::nullopt, config_str);
+        const auto [result_columns, offset] = Run(table_state, function.get());
+        EXPECT_OK(table_state->status());
+        EXPECT_EQ(table_state->processed_rows(), 1);
+        auto paths = CollectPaths<TYPE_BIGINT>(result_columns[0]);
+        EXPECT_OK(function->close(nullptr, table_state));
+        std::sort(paths.begin(), paths.end());
+        return paths;
+    };
+
+    const auto prefix_mode_paths = sorted_paths_for("N:BW:3:4:PC1000");
+    const auto legacy_mode_paths = sorted_paths_for("N:BW:3:4");
+
+    EXPECT_FALSE(legacy_mode_paths.empty());
+    EXPECT_EQ(prefix_mode_paths, legacy_mode_paths);
+}
+
+// Graph Representation:
+//    +-------+
+//    v       |
+//    0 ----> 1
+// (no end nodes at all)
+// A single non-branching cycle keeps the frontier at exactly one path forever: it is never terminal
+// and always has exactly one extension, so neither the desired count nor an empty frontier can stop
+// the search. The hard round cap (bounded by the node count) makes the call return promptly.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_unreachable_end_hits_safety_cap) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{1}, {0}}, {{0L}}, std::vector<std::optional<int64_t>>{}, std::nullopt, "W:PC5");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    // 2 nodes => at most 2 extra rounds after the first, i.e. paths of at most 4 nodes.
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 0L, 1L}});
+    EXPECT_EQ(table_state->processed_rows(), 1);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+// 0 <--> 1 ---> 2
+// Cycles are allowed without an upper-bounded length comparison, which is only valid because a
+// prefix count is requested.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_allows_cycles_without_upper_bound) {
+    const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1}, {0, 2}, {}}, {{0L}}, {{2L}}, std::nullopt, "W:PC3");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 2L}, {0L, 1L, 0L, 1L, 0L}, {0L, 1L, 0L, 1L, 2L}});
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+// 0 --+
+//     +--> 2 ---> 3
+// 1 --+
+// Two independent frontier paths both need to traverse node 2. A shared/global visited set would
+// wrongly block the second one, so this pins down that cycle detection is genuinely per path.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_cycle_detection_is_per_path) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{2}, {2}, {3}, {}}, {{0L, 1L}}, {{3L}}, std::nullopt, "N:PC100");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 2L, 3L}, {1L, 2L, 3L}});
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+//    +-------+
+//    v       |
+//    0 ----> 1 (end)
+// With cycles allowed, a path may revisit nodes until the upper bound prunes it, so it can end up
+// longer than the graph has nodes: 'LE:9' permits paths of up to 9 nodes over a 2-node graph. The
+// round cap therefore has to scale with max_nodes, not just with the node count - capped at
+// num_nodes the search would stop after two rounds and report one completed path plus an unfinished
+// prefix instead of all four completed paths.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_upper_bound_above_node_count) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{1}, {0}}, {{0L}}, {{1L}}, std::nullopt, "W:LE:9:PC1000");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(
+            result_columns[0],
+            {{0L, 1L}, {0L, 1L, 0L, 1L}, {0L, 1L, 0L, 1L, 0L, 1L}, {0L, 1L, 0L, 1L, 0L, 1L, 0L, 1L}});
+    EXPECT_EQ(table_state->processed_rows(), 1);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// (See BuildPrefixCountTestGraph for representation)
+// Config tokens may appear in any order, so a prefix count ahead of the length comparison has to
+// behave exactly like the same config with the two tokens swapped.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_token_order_is_irrelevant) {
+    auto paths_for = [&](const std::string& config_str) {
+        const auto [table_state, function] =
+                Prepare<TYPE_BIGINT>(BuildPrefixCountTestGraph(), {{0L}}, {{1L}}, std::nullopt, config_str);
+        const auto [result_columns, offset] = Run(table_state, function.get());
+        EXPECT_TRUE(table_state->status().ok()) << "Config '" << config_str << "' was rejected";
+        auto paths = CollectPaths<TYPE_BIGINT>(result_columns[0]);
+        EXPECT_OK(function->close(nullptr, table_state));
+        return paths;
+    };
+
+    const auto count_first_paths = paths_for("N:PC4:BW:2:4");
+    EXPECT_FALSE(count_first_paths.empty());
+    EXPECT_EQ(count_first_paths, paths_for("N:BW:2:4:PC4"));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_malformed_config) {
+    const std::vector<std::string> invalid_configs = {
+            "N:PC",           // no digits after the marker
+            "N:PC0",          // must be positive
+            "N:PC-1",         // must be positive
+            "N:PCx",          // non-numeric
+            "N:LE:3:PC0",     // must be positive
+            "N:LE:3:PC-1",    // must be positive
+            "N:LE:3:PCx",     // non-numeric
+            "N:LE:3:PC",      // no digits after the marker
+            "N:LE:3:5",       // trailing part that is neither a prefix count nor an operator
+            "N:BW:3:4:5",     // trailing part that is neither a prefix count nor an operator
+            "N:PC5:LE",       // operator without its length parameter
+            "N:PC5:BW:3",     // between operator with only one length parameter
+            "N:LE:3:PC5:PC5", // at most one prefix count
+            "N:LE:3:GE:1"     // at most one length comparison
+    };
+
+    for (const auto& config_str : invalid_configs) {
+        const auto [table_state, function] =
+                Prepare<TYPE_BIGINT>({{1}, {2}, {}}, {{0L}}, {{2L}}, std::nullopt, config_str);
+        Run(table_state, function.get());
+
+        EXPECT_TRUE(table_state->status().is_invalid_argument()) << "Config '" << config_str << "' was accepted";
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
 }
 
 } // namespace starrocks

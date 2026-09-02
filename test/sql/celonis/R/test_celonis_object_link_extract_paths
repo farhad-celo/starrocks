@@ -105,3 +105,55 @@ ORDER BY id, f.path;
 -- result:
 1	[0,1,2,3]
 -- !result
+
+-- Test 10 (prefix count only, satisfied after one hop: emits prefixes instead of full paths)
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, NULL, 'N:PC2') f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+-- result:
+1	[0,1]
+1	[0,2]
+-- !result
+
+-- Test 11 (prefix count never reached, so the frontier empties and the full paths of Test 1 come back)
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, NULL, 'N:PC4') f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+-- result:
+1	[0,1,2,3]
+1	[0,2,3]
+-- !result
+
+-- Test 12 (length filter combined with a prefix count)
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, t_paths.start_nodes, t_paths.end_nodes, NULL, 'N:LE:3:PC3') f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+-- result:
+1	[0,1]
+1	[0,2]
+1	[1,2]
+-- !result
+
+-- Test 13 (cycles allowed without an upper-bounded length comparison, which the prefix count permits)
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, [0], t_paths.end_nodes, NULL, 'W:PC2') f(path)
+WHERE id = 2
+ORDER BY id, f.path;
+-- result:
+2	[0,1,2,0]
+2	[0,1,2,3]
+-- !result
+
+-- Test 14 (the prefix count may also precede the length filter)
+SELECT id, f.path
+FROM t_paths, celonis_object_link_extract_paths(t_paths.adj_matrix, t_paths.start_nodes, t_paths.end_nodes, NULL, 'N:PC3:LE:3') f(path)
+WHERE id = 1
+ORDER BY id, f.path;
+-- result:
+1	[0,1]
+1	[0,2]
+1	[1,2]
+-- !result
