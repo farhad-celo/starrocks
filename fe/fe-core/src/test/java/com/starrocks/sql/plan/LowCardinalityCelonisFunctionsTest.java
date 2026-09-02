@@ -61,6 +61,23 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                     "in_memory" = "false"
                 );
                 """);
+        starRocksAssert.withTable("""
+                CREATE TABLE multi_input_functions_test_table (
+                    KEY_COL          INTEGER NOT NULL,
+                    string_array1    ARRAY<VARCHAR(40)>,
+                    string_array2    ARRAY<VARCHAR(40)>,
+                    string_array3    ARRAY<VARCHAR(40)>,
+                    boolean_array    ARRAY<BOOLEAN>,
+                    integer_array    ARRAY<INTEGER>)
+                ENGINE=OLAP
+                DUPLICATE KEY(`KEY_COL`)
+                COMMENT "OLAP"
+                DISTRIBUTED by HASH(`KEY_COL`) BUCKETS 1
+                PROPERTIES (
+                    "replication_num" = "1",
+                    "in_memory" = "false"
+                );
+                """);
 
         FeConstants.USE_MOCK_DICT_MANAGER = true;
         connectContext.getSessionVariable().setSqlMode(2);
@@ -303,5 +320,32 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                         "  |  5 <-> [5: array_agg, ARRAY<ARRAY<VARCHAR(40)>>, true]\n" +
                         "  |  6 <-> 2: ACTIVITIES[1]\n" +
                         "  |  9 <-> [9: expr, INT, true]"), plan);
+    }
+
+    @Test
+    public void testArrayFilterDictifiedByNonDictified() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_multi_input_functions_low_cardinality_optimize', 'true') */
+                ARRAY_FILTER(string_array1, boolean_array) FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "DictDecode(8: string_array1, [<place-holder>], array_filter(8: string_array1, 5: boolean_array))"),
+                plan);
+
+    }
+
+    @Test
+    public void testArrayFilterDictifiedByRewritten() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_multi_input_functions_low_cardinality_optimize', 'true') */
+                ARRAY_FILTER(string_array1, CAST(ARRAY_SORT(string_array2) AS ARRAY<BOOLEAN>))
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("DictDecode(8: string_array1, [<place-holder>], array_filter(8: " +
+                        "string_array1, CAST(DictDecode(9: string_array2, [<place-holder>], " +
+                        "array_sort(9: string_array2)) AS ARRAY<BOOLEAN>)))"),
+                plan);
     }
 }

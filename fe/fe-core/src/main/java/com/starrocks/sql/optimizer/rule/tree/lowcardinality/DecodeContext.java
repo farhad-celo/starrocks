@@ -49,11 +49,13 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_ARRAY_FN_PARAM_CONFIGS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_ARRAY_FUNCTIONS;
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.LOW_CARD_STRUCT_FUNCTIONS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS;
 import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeCollector.supportLowCardinality;
@@ -101,6 +103,8 @@ class DecodeContext {
 
     Map<Integer, ColumnRefSet> aggIdToSupportColumns = Maps.newHashMap();
 
+    Map<ScalarOperator, ColumnRefSet> stringExprToSupportColumns = Maps.newIdentityHashMap();
+
     // The string columns used by the operator
     // IdentityHashMap: use object == object, operator equals is not enough
     Map<Operator, DecodeInfo> operatorDecodeInfo = Maps.newIdentityHashMap();
@@ -145,8 +149,9 @@ class DecodeContext {
             }
             return getUseStringRef(fieldsUseRefMap.get(subfieldOperator.getFieldNames().get(0)));
         }
-        if (operator instanceof CallOperator
-                && MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(((CallOperator) operator).getFnName())) {
+        if (operator instanceof CallOperator call
+                && (MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(call.getFnName())
+                    || LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.contains(call.getFnName()))) {
             return getUseStringRef(operator.getChild(0));
         }
         List<ColumnRefOperator> columnRefs = Lists.newArrayList();
@@ -397,14 +402,15 @@ class DecodeContext {
     }
 
     public ScalarOperator decodeImpl(ScalarOperator expression) {
-        DictExprEncoder encoder = new DictExprEncoder();
+        ColumnRefSet supportColumns = stringExprToSupportColumns.get(expression);
+        DictExprEncoder encoder = new DictExprEncoder(supportColumns);
         ScalarOperator result = expression.accept(encoder, null);
         if (result.getType().isStructType()) {
             Preconditions.checkState(encoder.getAnchorOp() == null);
             return decodeStruct(result, expression);
         }
         ColumnRefOperator useStringRef = getUseStringRef(expression);
-        if (useStringRef == null) {
+        if (useStringRef == null || (supportColumns != null && !supportColumns.contains(useStringRef))) {
             // e.g. getting a non dictified field from a struct
             return result;
         }
@@ -430,13 +436,14 @@ class DecodeContext {
     }
 
     public ScalarOperator defineImpl(ScalarOperator expression) {
-        DictExprEncoder encoder = new DictExprEncoder();
+        ColumnRefSet supportColumns = stringExprToSupportColumns.get(expression);
+        DictExprEncoder encoder = new DictExprEncoder(supportColumns);
         ScalarOperator result = expression.accept(encoder, null);
         if (expression.getType().isStructType()) {
             return result;
         }
         ColumnRefOperator useStringRef = getUseStringRef(expression);
-        if (useStringRef == null) {
+        if (useStringRef == null || (supportColumns != null && !supportColumns.contains(useStringRef))) {
             return result;
         }
         ColumnRefOperator useDictRef = stringRefToDictRefMap.get(useStringRef);
@@ -460,19 +467,59 @@ class DecodeContext {
         return stringExprToDictDefineExprMap.computeIfAbsent(expression, this::defineImpl);
     }
 
-    // Returns a half-baked encoding of a string-typed scalar expression into its dict-encoded form.
-    // Every column ref present in stringRefToDictRefMap becomes its dict ref; there is no per-operator
-    // liveness filter here, callers decide which expressions to hand in. Supported array/struct ops are
-    // rewritten to operate on codes (int / array<int>) instead of strings.
-    // For expressions that collapse an array/struct into scalar form, anchorOp marks where the
-    // array/struct -> string transformation happens, and the returned operator carries a mock string
-    // ref in place of that transformation.
-    // The result must always be post-processed by define() or decode().
+    // Rewrites the input expr into its dict form by replacing any expression in stringExpressions to its decoded dict
+    // format. For ColumnRefOperators, only column refs in supportColumns will be processed and the rest will be left
+    // untouched.
+    public ScalarOperator rewrite(ScalarOperator expr, ColumnRefSet supportColumns) {
+        class ExprRewriter extends BaseScalarOperatorShuttle {
+            final ColumnRefSet supportColumns;
+
+            ExprRewriter(ColumnRefSet supportColumns) {
+                Preconditions.checkNotNull(supportColumns);
+                this.supportColumns = supportColumns;
+            }
+
+            @Override
+            public Optional<ScalarOperator> preprocess(ScalarOperator expr) {
+                if (expr instanceof ColumnRefOperator ref) {
+                    return Optional.of(supportColumns.contains(ref) ? decode(ref) : ref);
+                }
+                if (stringExpressions.contains(expr)) {
+                    return Optional.of(decode(expr));
+                }
+                return Optional.empty();
+            }
+        }
+        ExprRewriter rewriter = new ExprRewriter(supportColumns);
+        return expr.accept(rewriter, null);
+    }
+
+    // Returns define(expr) if expr exists in stringExpressions, otherwise returns rewrite(expr, supportColumns)
+    ScalarOperator defineOrRewrite(ScalarOperator expr, ColumnRefSet supportColumns) {
+        if (expr instanceof ColumnRefOperator ref && !supportColumns.contains(ref)) {
+            return ref;
+        }
+        return stringExpressions.contains(expr) ? define(expr) : rewrite(expr, supportColumns);
+    }
+
+    // Returns a half backed form of encoded a string-typed scalar expression into its dict-encoded form.
+    // String column refs become dict refs (via stringRefToDictRefMap) and supported array/struct ops are rewritten to
+    // operate on codes (int / array<int>) instead of strings. Only columns in supportColumns are encoded
+    // others pass through untouched.
+    // For expressions that take an array/struct column into scalar form, anchorOp marks location in which
+    // array/struct -> string transformation happens and the returning scalar operator contains a mock string ref
+    // instead of this transformation.
+    // The result must always be processed in define() or decode() functions.
     class DictExprEncoder extends BaseScalarOperatorShuttle {
         // to mark special array expression: array_min/array_max/array[x]
         // their return type is string, but use low cardinality optimization, we need execute them first
         private ScalarOperator anchorOp;
         private boolean useAnchor;
+        private final ColumnRefSet supportColumns;
+
+        public DictExprEncoder(ColumnRefSet supportColumns) {
+            this.supportColumns = supportColumns;
+        }
 
         ScalarOperator getAnchorOp() {
             return anchorOp;
@@ -493,11 +540,24 @@ class DecodeContext {
                 return super.visitCall(call, context);
             }
             boolean[] hasChange = new boolean[1];
-            List<ScalarOperator> newChildren = visitList(call.getChildren(), hasChange);
+            List<ScalarOperator> newChildren;
+            if (!LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.contains(call.getFnName())) {
+                newChildren = visitList(call.getChildren(), hasChange);
+            } else {
+                useAnchor = true;
+                newChildren = Lists.newArrayList();
+                newChildren.add(defineOrRewrite(call.getChild(0), supportColumns));
+                for (int i = 1; i < call.getChildren().size(); ++i) {
+                    newChildren.add(rewrite(call.getChild(i), supportColumns));
+                }
+                for (int i = 0; i < newChildren.size(); ++i) {
+                    hasChange[0] |= newChildren.get(i) != call.getChild(i);
+                }
+            }
             if (!hasChange[0]) {
                 return call;
             }
-            if (isSupportedArrayFunction(call)) {
+            if (isSupportedSingleInputArrayFunction(call)) {
                 ColumnRefOperator stringRef = getUseStringRef(call);
                 ColumnRefOperator dictRef = stringRefToDictRefMap.get(stringRef);
                 Preconditions.checkNotNull(dictRef);
@@ -725,9 +785,15 @@ class DecodeContext {
         }
     }
 
-    private boolean isSupportedArrayFunction(CallOperator call) {
+    private boolean isSupportedSingleInputArrayFunction(CallOperator call) {
         // Array Function may has same name with String Function
         return LOW_CARD_ARRAY_FUNCTIONS.contains(call.getFnName()) &&
                 Arrays.stream(call.getFunction().getArgs()).anyMatch(Type::isArrayType);
+    }
+
+    private boolean isSupportedArrayFunction(CallOperator call) {
+        // Array Function may has same name with String Function
+        return isSupportedSingleInputArrayFunction(call)
+                || LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.contains(call.getFnName());
     }
 }
