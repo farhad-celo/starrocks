@@ -184,7 +184,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     // Array functions that accept more than one non-constant columns. These columns should always be processed
     // independently. Any child that needs a rewrite should be saved in StringExpressions separately.
     public static final Set<String> LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS = ImmutableSet.of(
-            FunctionSet.ARRAY_FILTER);
+            FunctionSet.ARRAY_FILTER, FunctionSet.ARRAY_SORTBY);
 
     public static final Set<String> CELONIS_LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
             FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_SHORTENED_VARIANT, FunctionSet.CELONIS_ARRAY_FIRST,

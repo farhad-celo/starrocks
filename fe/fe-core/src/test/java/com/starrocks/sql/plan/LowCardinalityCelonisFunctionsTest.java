@@ -348,4 +348,75 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                         "array_sort(9: string_array2)) AS ARRAY<BOOLEAN>)))"),
                 plan);
     }
+
+    @Test
+    public void testArraySortByDictifiedByDictifiedAndNonDictified() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_multi_input_functions_low_cardinality_optimize', 'true') */
+                ARRAY_SORTBY(string_array1, string_array2, ARRAY_SORT(string_array3), boolean_array)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("DictDecode(8: string_array1, [<place-holder>], " +
+                "array_sortby(8: string_array1, 9: string_array2, array_sort(10: string_array3), 5: boolean_array))\n"),
+                plan);
+        Assertions.assertTrue(plan.contains("dict_col=string_array1,string_array2,string_array3"), plan);
+    }
+
+    @Test
+    public void testArraySortByNonDictifiedByDictifiedAndNonDictified() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_multi_input_functions_low_cardinality_optimize', 'true') */
+                ARRAY_SORTBY(string_array1, string_array2, ARRAY_SORT(string_array3), boolean_array)
+                FROM multi_input_functions_test_table
+                """;
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("string_array1"), anyLong);
+                result = false;
+            }
+        };
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("array_sortby[([2: string_array1, ARRAY<VARCHAR(40)>, true]," +
+                " [8: string_array2, ARRAY<INT>, true], array_sort[([9: string_array3, ARRAY<INT>, true]);" +
+                " args: INVALID_TYPE; result: ARRAY<INT>; args nullable: true; result nullable: true], " +
+                "[5: boolean_array, ARRAY<BOOLEAN>, true]); args: INVALID_TYPE,INVALID_TYPE,INVALID_TYPE; result:" +
+                " ARRAY<VARCHAR(40)>; args nullable: true; result nullable: true]\n"), plan);
+    }
+
+    @Test
+    public void testArraySortBySupportColumns() throws Exception {
+        String sql = """
+                WITH T AS (
+                    SELECT /*+ SET_VAR('enable_multi_input_functions_low_cardinality_optimize', 'true') */
+                    string_array1, string_array2, string_array3
+                    FROM multi_input_functions_test_table
+                    ORDER BY 1, 2, 3
+                ), T2 AS (
+                    SELECT string_array1, string_array2, string_array3, ARRAY_AGG(string_array1) tmp
+                    FROM T
+                    GROUP BY string_array1, string_array2, string_array3
+                )
+                SELECT ARRAY_SORTBY(string_array1, string_array2), tmp
+                FROM T2
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("array_sortby[([2: string_array1, ARRAY<VARCHAR(40)>, true], " +
+                "[10: string_array2, ARRAY<INT>, true]); args: INVALID_TYPE,INVALID_TYPE; result: " +
+                "ARRAY<VARCHAR(40)>; args nullable: true; result nullable: true]"), plan);
+        Assertions.assertTrue(plan.contains("  3:Decode\n" +
+                "  |  <dict id 9> : <string id 2>"));
+    }
+
+    @Test
+    public void testArraySortNestedInput() throws Exception {
+        String sql = """
+                SELECT ARRAY_SORTBY(IF(KEY_COL > 0, string_array1, string_array2), string_array3)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "array_sortby(if(1: KEY_COL > 0, 2: string_array1, 3: string_array2), 8: string_array3)"), plan);
+    }
 }

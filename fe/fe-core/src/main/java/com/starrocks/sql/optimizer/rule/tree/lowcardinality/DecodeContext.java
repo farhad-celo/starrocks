@@ -150,8 +150,13 @@ class DecodeContext {
             return getUseStringRef(fieldsUseRefMap.get(subfieldOperator.getFieldNames().get(0)));
         }
         if (operator instanceof CallOperator call
-                && (MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(call.getFnName())
-                    || LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.contains(call.getFnName()))) {
+                && MULTI_INPUT_SINGLE_OUTPUT_LOW_CARD_AGGS.contains(call.getFnName())) {
+            return getUseStringRef(operator.getChild(0));
+        }
+        if (operator instanceof CallOperator call && LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.contains(call.getFnName())) {
+            if (!stringExpressions.contains(operator.getChild(0))) {
+                return null;
+            }
             return getUseStringRef(operator.getChild(0));
         }
         List<ColumnRefOperator> columnRefs = Lists.newArrayList();
@@ -547,8 +552,10 @@ class DecodeContext {
                 useAnchor = true;
                 newChildren = Lists.newArrayList();
                 newChildren.add(defineOrRewrite(call.getChild(0), supportColumns));
+                boolean useDefine = call.getFnName().equals(FunctionSet.ARRAY_SORTBY);
                 for (int i = 1; i < call.getChildren().size(); ++i) {
-                    newChildren.add(rewrite(call.getChild(i), supportColumns));
+                    newChildren.add(useDefine ? defineOrRewrite(call.getChild(i), supportColumns)
+                            : rewrite(call.getChild(i), supportColumns));
                 }
                 for (int i = 0; i < newChildren.size(); ++i) {
                     hasChange[0] |= newChildren.get(i) != call.getChild(i);
