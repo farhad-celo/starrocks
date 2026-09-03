@@ -1228,4 +1228,25 @@ public class LowCardinalityArrayTest extends PlanTestBase {
                 "  |  <slot 9> : DictDecode(10: S_ADDRESS, [<place-holder>], " +
                 "array_intersect(10: S_ADDRESS, array_distinct(10: S_ADDRESS)))"), plan);
     }
+
+    @Test
+    public void testCTEGlobalDictExprLeakage() throws Exception {
+        String sql = """
+                WITH CTE AS (
+                    SELECT v1, a1 FROM s1 ORDER BY UPPER(a2[1])
+                ) [MATERIALIZED]
+                SELECT * FROM CTE;
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("PLAN FRAGMENT 2(F00)\n" +
+                "\n" +
+                "  Input Partition: RANDOM\n" +
+                "  OutPut Partition: UNPARTITIONED\n" +
+                "  OutPut Exchange Id: 03\n" +
+                "\n" +
+                "  Global Dict Exprs:\n" +
+                "    11: DictDefine(10: a2, [upper(<place-holder>)])\n" +
+                "\n" +
+                "  2:SORT\n"), plan);
+    }
 }

@@ -41,6 +41,7 @@ import com.starrocks.sql.optimizer.operator.Operator;
 import com.starrocks.sql.optimizer.operator.Projection;
 import com.starrocks.sql.optimizer.operator.ScanOperatorPredicates;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalCTEConsumeOperator;
+import com.starrocks.sql.optimizer.operator.physical.PhysicalCTEProduceOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalDecodeOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalDistributionOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalHashAggregateOperator;
@@ -128,7 +129,8 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         fragmentUsedDictExprs.union(decodeInfo.outputStringColumns);
         fragmentUsedDictExprs.union(decodeInfo.usedStringColumns);
         fragmentUsedDictExprs.union(decodeInfo.inProgressStringAggregations);
-        ColumnRefSet childFragmentUsedDictExpr = optExpression.getOp() instanceof PhysicalDistributionOperator ?
+        ColumnRefSet childFragmentUsedDictExpr = optExpression.getOp() instanceof PhysicalDistributionOperator
+                || optExpression.getOp() instanceof PhysicalCTEProduceOperator ?
                 new ColumnRefSet() : fragmentUsedDictExprs;
 
         for (int i = 0; i < optExpression.arity(); i++) {
