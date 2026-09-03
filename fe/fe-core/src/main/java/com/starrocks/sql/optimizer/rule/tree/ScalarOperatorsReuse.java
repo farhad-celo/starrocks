@@ -301,6 +301,8 @@ public class ScalarOperatorsReuse {
         // this information will help us determine whether an operator can be reused.
         public Set<ColumnRefOperator> currentLambdaArguments = Sets.newHashSet();
         public Set<ColumnRefOperator> outerLambdaArguments = Sets.newHashSet();
+        public Set<ColumnRefOperator> currentLambdaLocalRefs = Sets.newHashSet();
+        public Set<ColumnRefOperator> outerLambdaLocalRefs = Sets.newHashSet();
 
         public CommonSubScalarOperatorCollectorContext(boolean isPartOfLambdaExpr) {
             this.isPartOfLambdaExpr = isPartOfLambdaExpr;
@@ -355,6 +357,16 @@ public class ScalarOperatorsReuse {
             if (operator.getOpType().equals(OperatorType.LAMBDA_ARGUMENT)) {
                 return context.currentLambdaArguments.contains(operator);
             }
+            if (operator instanceof ColumnRefOperator) {
+                return context.currentLambdaLocalRefs.contains(operator);
+            }
+            if (operator instanceof LambdaFunctionOperator) {
+                for (ScalarOperator value : ((LambdaFunctionOperator) operator).getColumnRefMap().values()) {
+                    if (isDependentOnCurrentLambdaArguments(value, context)) {
+                        return true;
+                    }
+                }
+            }
             for (ScalarOperator child : operator.getChildren()) {
                 if (isDependentOnCurrentLambdaArguments(child, context)) {
                     return true;
@@ -367,6 +379,16 @@ public class ScalarOperatorsReuse {
                                                           CommonSubScalarOperatorCollectorContext context) {
             if (operator.getOpType().equals(OperatorType.LAMBDA_ARGUMENT)) {
                 return context.outerLambdaArguments.contains(operator);
+            }
+            if (operator instanceof ColumnRefOperator) {
+                return context.outerLambdaLocalRefs.contains(operator);
+            }
+            if (operator instanceof LambdaFunctionOperator) {
+                for (ScalarOperator value : ((LambdaFunctionOperator) operator).getColumnRefMap().values()) {
+                    if (isDependentOnOuterLambdaArguments(value, context)) {
+                        return true;
+                    }
+                }
             }
             for (ScalarOperator child : operator.getChildren()) {
                 if (isDependentOnOuterLambdaArguments(child, context)) {
@@ -393,6 +415,8 @@ public class ScalarOperatorsReuse {
 
             if (scalarOperator instanceof LambdaFunctionOperator) {
                 context.currentLambdaArguments.addAll(((LambdaFunctionOperator) scalarOperator).getRefColumns());
+                context.currentLambdaLocalRefs.addAll(
+                        ((LambdaFunctionOperator) scalarOperator).getColumnRefMap().keySet());
             }
 
             return collectCommonOperatorsByDepth(scalarOperator.getChildren().stream().map(argument ->
@@ -409,6 +433,9 @@ public class ScalarOperatorsReuse {
             newContext.outerLambdaArguments.addAll(context.outerLambdaArguments);
             newContext.outerLambdaArguments.addAll(context.currentLambdaArguments);
             newContext.currentLambdaArguments.addAll(scalarOperator.getRefColumns());
+            newContext.outerLambdaLocalRefs.addAll(context.outerLambdaLocalRefs);
+            newContext.outerLambdaLocalRefs.addAll(context.currentLambdaLocalRefs);
+            newContext.currentLambdaLocalRefs.addAll(scalarOperator.getColumnRefMap().keySet());
             return visit(scalarOperator.getLambdaExpr(), newContext);
         }
 

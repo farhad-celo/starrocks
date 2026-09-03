@@ -122,4 +122,29 @@ public class ScalarOperatorsReuseRuleTest extends PlanTestBase {
             connectContext.getSessionVariable().setEnablePredicateExprReuse(true);
         }
     }
+
+    @Test
+    public void testNestedLambdaHoistingKeepsTransitiveArgumentDependency() throws Exception {
+        String query = "select array_map(x -> array_map(y -> array_map(z -> abs(x) + abs(y) + z, v3), v3), v3)"
+                + " from tarray";
+        String plan = getFragmentPlan(query);
+        PlanTestBase.assertContains(plan, "1:Project\n" +
+                "  |  <slot 7> : array_map(<slot 4> -> array_map(<slot 5> -> array_map(<slot 6> -> <slot 12> + " +
+                "CAST(<slot 6> AS LARGEINT), 3: v3)\n" +
+                "        lambda common expressions:{<slot 10> <-> abs(<slot 4>)}{<slot 11> <-> abs(<slot 5>)}" +
+                "{<slot 12> <-> <slot 10> + <slot 11>}\n" +
+                "        , 3: v3), 3: v3)");
+    }
+
+    @Test
+    public void testNestedInnerLambdaHoistsSurviveOuterRewrite() throws Exception {
+        String query = "select array_map(x -> array_map(y -> array_map("
+                + "z -> abs(x) + abs(x) + abs(y) + abs(y) + z, v3), v3), v3) from tarray";
+        String plan = getFragmentPlan(query);
+        PlanTestBase.assertContains(plan, "1:Project\n" +
+                "  |  <slot 7> : array_map(<slot 4> -> array_map(<slot 5> -> array_map(<slot 6> -> <slot 9> + " +
+                "<slot 9> + <slot 10> + <slot 10> + CAST(<slot 6> AS LARGEINT)\n" +
+                "        lambda common expressions:{<slot 9> <-> abs(<slot 4>)}{<slot 10> <-> abs(<slot 5>)}\n" +
+                "        , 3: v3), 3: v3), 3: v3)");
+    }
 }
