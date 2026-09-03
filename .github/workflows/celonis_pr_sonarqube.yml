@@ -5,6 +5,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - ".github/workflows/celonis_pr_sonarqube.yml"
       - "fe/**/*.java"
       - "be/**/celonis/**/*.c"
       - "be/**/celonis/**/*.cc"
@@ -35,13 +36,16 @@ permissions:
 
 env:
   RELEASE_VERSION: fe-test
-  GITHUB_USERNAME: ${{ github.repository }}
-  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+  GITHUB_USERNAME: ${{ github.actor }}
+  GITHUB_TOKEN: ${{ github.token }}
   BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
   BUILD_PARALLELISM: 16
 
 jobs:
   setup:
+    # Manual runs must use the protected default branch. The sonar-main
+    # Environment enforces the same restriction for secret-bearing jobs.
+    if: github.event_name != 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     outputs:
       builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
@@ -51,6 +55,10 @@ jobs:
   fe-coverage:
     runs-on: [runs-on, "runner=64cpu-linux-x64,volume=100g", "run-id=${{ github.run_id }}"]
     needs: setup
+    # SONAR_TOKEN_ENV is an Environment secret. PR runs require approval in
+    # sonar-pr; trusted manual runs use sonar-main.
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'sonar-pr' || 'sonar-main' }}
     container:
       image: ${{ needs.setup.outputs.builder_image }}
       credentials:
@@ -61,11 +69,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: FE Build and Test with JaCoCo
         shell: bash
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           STARROCKS_HOME: ${{ github.workspace }}
         run: |
           export FE_UT_PARALLEL=6
@@ -133,8 +141,8 @@ jobs:
         if: always() && github.event_name == 'pull_request' && hashFiles('fe/fe-core/target/site/jacoco/jacoco.xml') != ''
         uses: SonarSource/sonarqube-scan-action@v6
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_ENV }}
         with:
           args: >
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
@@ -153,8 +161,8 @@ jobs:
         if: always() && github.event_name == 'workflow_dispatch' && hashFiles('fe/fe-core/target/site/jacoco/jacoco.xml') != ''
         uses: SonarSource/sonarqube-scan-action@v6
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_ENV }}
         with:
           args: >
             -Dsonar.branch.name=${{ github.ref_name }}
@@ -171,6 +179,10 @@ jobs:
     name: be-sonarQube-scan
     runs-on: [runs-on, "runner=64cpu-linux-x64,volume=150g", "run-id=${{ github.run_id }}"]
     needs: setup
+    # SONAR_TOKEN_ENV is an Environment secret. PR runs require approval in
+    # sonar-pr; trusted manual runs use sonar-main.
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'sonar-pr' || 'sonar-main' }}
     env:
       BUILD_PARALLELISM: 32
       BE_TEST_TIMEOUT: 1h
@@ -183,6 +195,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python 3.8 for gcovr
         uses: actions/setup-python@v4
@@ -408,8 +421,8 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: SonarSource/sonarqube-scan-action@v6
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_ENV }}
         with:
           args: >
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
@@ -427,8 +440,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: SonarSource/sonarqube-scan-action@v6
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_ENV }}
         with:
           args: >
             -Dsonar.branch.name=${{ github.ref_name }}

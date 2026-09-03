@@ -18,6 +18,10 @@ on:
   # To manually trigger the workflow. For debugging purpose.
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: read
+
 # This allows a subsequently queued workflow run to interrupt previous runs
 concurrency:
   group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
@@ -25,8 +29,8 @@ concurrency:
 
 env:
   RELEASE_VERSION: presubmit-test
-  GITHUB_USERNAME: ${{ github.repository }}
-  GITHUB_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+  GITHUB_USERNAME: ${{ github.actor }}
+  GITHUB_TOKEN: ${{ github.token }}
 
 jobs:
   setup:
