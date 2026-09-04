@@ -419,4 +419,64 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
         Assertions.assertTrue(plan.contains(
                 "array_sortby(if(1: KEY_COL > 0, 2: string_array1, 3: string_array2), 8: string_array3)"), plan);
     }
+    
+    @Test
+    public void testDuplicatedCteLambdaArgumentsGetDistinctIds() throws Exception {
+        String sql = """
+                WITH mapped_input AS (
+                    SELECT KEY_COL, ARRAY_MAP(x -> UPPER(x), string_array1) AS mapped
+                    FROM multi_input_functions_test_table
+                )
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = '%b') */
+                left_copy.mapped c1, right_copy.mapped c2
+                FROM mapped_input left_copy JOIN mapped_input right_copy
+                    ON left_copy.KEY_COL = right_copy.KEY_COL
+                """;
+        String plan = getFragmentPlan(sql.formatted(true));
+        Assertions.assertTrue(plan.contains("<slot 22> : array_map(<slot 23> -> upper(<slot 23>), 17: string_array1)"));
+        Assertions.assertTrue(plan.contains("<slot 15> : array_map(<slot 7> -> upper(<slot 7>), 10: string_array1)"));
+
+        plan = getFragmentPlan(sql.formatted(false));
+        Assertions.assertTrue(plan.contains("<slot 15> : array_map(<slot 7> -> upper(<slot 7>), 10: string_array1)"));
+        Assertions.assertTrue(plan.contains("<slot 22> : array_map(<slot 7> -> upper(<slot 7>), 17: string_array1)"));
+    }
+
+    @Test
+    public void testImmutableProjectionIsNotWrittenBack() throws Exception {
+        String sql = """
+                select /*+ SET_VAR('cbo_cte_reuse', 'true') */
+                avg(distinct t1b), sum(distinct t1b), count(distinct t1b, t1c)
+                from test_all_type group by rollup(t1c, t1b)
+                """;
+        String plan = getFragmentPlan(sql);
+        // Both markers confirm the query really did reach the immutable projection: MultiCastDataSinks
+        // is the CTE producer, REPEAT_NODE the rollup underneath it.
+        assertContains(plan, "MultiCastDataSinks");
+        assertContains(plan, "REPEAT_NODE");
+    }
+
+    @Test
+    public void testNestedMultiArgumentLambdaArgumentsGetDistinctIds() throws Exception {
+        String sql = """
+                WITH mapped_input AS (
+                    SELECT KEY_COL,
+                           ARRAY_MAP((x, y) -> ARRAY_JOIN(
+                                         ARRAY_MAP((p, q) -> CONCAT(p, q, x, y), string_array3, string_array3),
+                                         '-'),
+                                     string_array1, string_array2) AS mapped
+                    FROM multi_input_functions_test_table
+                )
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                left_copy.mapped c1, right_copy.mapped c2
+                FROM mapped_input left_copy JOIN mapped_input right_copy
+                    ON left_copy.KEY_COL = right_copy.KEY_COL
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("array_map((<slot 26>, <slot 27>) -> array_join(array_map(" +
+                "(<slot 28>, <slot 29>) -> concat(<slot 28>, <slot 29>, <slot 26>, <slot 27>), 22: string_array3," +
+                " 22: string_array3), '-'), 20: string_array1, 21: string_array2)\n"), plan);
+        Assertions.assertTrue(plan.contains("array_map((<slot 7>, <slot 8>) -> array_join(array_map(" +
+                "(<slot 9>, <slot 10>) -> concat(<slot 9>, <slot 10>, <slot 7>, <slot 8>), 15: string_array3, " +
+                "15: string_array3), '-'), 13: string_array1, 14: string_array2)\n"), plan);
+    }
 }

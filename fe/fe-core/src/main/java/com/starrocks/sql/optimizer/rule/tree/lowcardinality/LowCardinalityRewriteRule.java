@@ -29,6 +29,9 @@ public class LowCardinalityRewriteRule implements TreeRewriteRule {
         if (!session.isEnableLowCardinalityOptimize() || !session.isUseLowCardinalityOptimizeV2()) {
             return root;
         }
+        if (session.isEnableArrayMapLowCardinalityOptimize()) {
+            root = new UniqueLambdaArgumentRule().rewrite(root, taskContext);
+        }
 
         ColumnRefFactory factory = taskContext.getOptimizerContext().getColumnRefFactory();
         DecodeContext context = new DecodeContext(factory);
