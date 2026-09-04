@@ -147,4 +147,31 @@ public class ScalarOperatorsReuseRuleTest extends PlanTestBase {
                 "        lambda common expressions:{<slot 9> <-> abs(<slot 4>)}{<slot 10> <-> abs(<slot 5>)}\n" +
                 "        , 3: v3), 3: v3), 3: v3)");
     }
+    @Test
+    public void testOuterCommonExprRewriteKeepsInnerLambdaHoists() throws Exception {
+        String query = "select array_map(x -> array_slice(array_map(y -> abs(x) + abs(x) + y, v3), x * 2, x * 2),"
+                + " v3) from tarray";
+        String plan = getFragmentPlan(query);
+        PlanTestBase.assertContains(plan, "1:Project\n" +
+                "  |  <slot 6> : array_map(<slot 4> -> array_slice(array_map(<slot 5> -> <slot 8> + <slot 8> + " +
+                "CAST(<slot 5> AS LARGEINT)\n" +
+                "        lambda common expressions:{<slot 8> <-> abs(<slot 4>)}\n" +
+                "        , 3: v3), <slot 10>, <slot 10>)\n" +
+                "        lambda common expressions:{<slot 10> <-> <slot 4> * 2}\n" +
+                "        , 3: v3)");
+    }
+
+    @Test
+    public void testOuterCommonExprRewriteKeepsInnerLambdaHoistsUnderAdd() throws Exception {
+        String query = "select array_map(x -> array_length(array_map(y -> abs(x) + abs(x) + y, v3))"
+                + " + x * 2 + x * 2, v3) from tarray";
+        String plan = getFragmentPlan(query);
+        PlanTestBase.assertContains(plan, "1:Project\n" +
+                "  |  <slot 6> : array_map(<slot 4> -> CAST(array_length(array_map(<slot 5> -> <slot 8> + " +
+                "<slot 8> + CAST(<slot 5> AS LARGEINT)\n" +
+                "        lambda common expressions:{<slot 8> <-> abs(<slot 4>)}\n" +
+                "        , 3: v3)) AS BIGINT) + <slot 10> + <slot 10>\n" +
+                "        lambda common expressions:{<slot 10> <-> <slot 4> * 2}\n" +
+                "        , 3: v3)");
+    }
 }

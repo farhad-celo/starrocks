@@ -176,9 +176,10 @@ public class ScalarOperatorsReuse {
 
         @Override
         public ScalarOperator visitLambdaFunctionOperator(LambdaFunctionOperator operator, Void context) {
-            ScalarOperator newOperator = new LambdaFunctionOperator(operator.getRefColumns(),
+            LambdaFunctionOperator newOperator = new LambdaFunctionOperator(operator.getRefColumns(),
                     operator.getLambdaExpr().accept(this, null), operator.getType()
             );
+            newOperator.addColumnToExpr(operator.getColumnRefMap());
             return tryRewrite(newOperator);
         }
 
