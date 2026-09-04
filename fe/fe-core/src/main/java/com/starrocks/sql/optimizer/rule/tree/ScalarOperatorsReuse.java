@@ -278,7 +278,12 @@ public class ScalarOperatorsReuse {
 
         @Override
         public ScalarOperator visitDictMappingOperator(DictMappingOperator operator, Void context) {
-            return tryRewrite(operator.clone());
+            if (operator.getStringProvideOperator() == null) {
+                return tryRewrite(operator.clone());
+            }
+            DictMappingOperator newOperator = (DictMappingOperator) operator.clone();
+            newOperator.setChild(0, operator.getStringProvideOperator().accept(this, null));
+            return tryRewrite(newOperator);
         }
 
         @Override
@@ -361,6 +366,11 @@ public class ScalarOperatorsReuse {
             if (operator instanceof ColumnRefOperator) {
                 return context.currentLambdaLocalRefs.contains(operator);
             }
+            if (operator instanceof DictMappingOperator dictMapping
+                    && (isDependentOnCurrentLambdaArguments(dictMapping.getDictColumn(), context)
+                    || isDependentOnCurrentLambdaArguments(dictMapping.getOriginScalaOperator(), context))) {
+                return true;
+            }
             if (operator instanceof LambdaFunctionOperator) {
                 for (ScalarOperator value : ((LambdaFunctionOperator) operator).getColumnRefMap().values()) {
                     if (isDependentOnCurrentLambdaArguments(value, context)) {
@@ -383,6 +393,11 @@ public class ScalarOperatorsReuse {
             }
             if (operator instanceof ColumnRefOperator) {
                 return context.outerLambdaLocalRefs.contains(operator);
+            }
+            if (operator instanceof DictMappingOperator dictMapping
+                    && (isDependentOnOuterLambdaArguments(dictMapping.getDictColumn(), context)
+                    || isDependentOnOuterLambdaArguments(dictMapping.getOriginScalaOperator(), context))) {
+                return true;
             }
             if (operator instanceof LambdaFunctionOperator) {
                 for (ScalarOperator value : ((LambdaFunctionOperator) operator).getColumnRefMap().values()) {
@@ -461,7 +476,11 @@ public class ScalarOperatorsReuse {
         @Override
         public Integer visitDictMappingOperator(DictMappingOperator scalarOperator,
                                                 CommonSubScalarOperatorCollectorContext context) {
-            return collectCommonOperatorsByDepth(1, scalarOperator, context);
+            if (scalarOperator.getStringProvideOperator() == null) {
+                return collectCommonOperatorsByDepth(1, scalarOperator, context);
+            }
+            int providerDepth = scalarOperator.getStringProvideOperator().accept(this, context);
+            return collectCommonOperatorsByDepth(providerDepth + 1, scalarOperator, context);
         }
     }
 

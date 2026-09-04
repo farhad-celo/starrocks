@@ -14,7 +14,10 @@
 
 package com.starrocks.sql.optimizer.rewrite;
 
+import com.starrocks.common.FeConstants;
 import com.starrocks.sql.plan.PlanTestBase;
+import com.starrocks.utframe.StarRocksAssert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class ScalarOperatorsReuseRuleTest extends PlanTestBase {
@@ -173,5 +176,42 @@ public class ScalarOperatorsReuseRuleTest extends PlanTestBase {
                 "        , 3: v3)) AS BIGINT) + <slot 10> + <slot 10>\n" +
                 "        lambda common expressions:{<slot 10> <-> <slot 4> * 2}\n" +
                 "        , 3: v3)");
+    }
+
+    @Test
+    public void testDictMappingOperatorHoisting() throws Exception {
+        StarRocksAssert starRocksAssert = new StarRocksAssert(connectContext);
+        starRocksAssert.withTable("""
+                CREATE TABLE T (
+                    k      INTEGER NOT NULL,
+                    a      ARRAY<VARCHAR(40)>
+                )
+                ENGINE=OLAP
+                DUPLICATE KEY(`k`)
+                COMMENT "OLAP"
+                DISTRIBUTED BY HASH(`k`) BUCKETS 1
+                PROPERTIES (
+                    "replication_num" = "1",
+                    "in_memory" = "false"
+                );
+                """);
+
+        String sql = """
+                SELECT /*+ SET_VAR(cbo_enable_low_cardinality_optimize='true', 'low_cardinality_optimize_v2'='true') */
+                array_sort(a)[1], array_sort(a)[2]
+                FROM T
+                """;
+        boolean prev = FeConstants.USE_MOCK_DICT_MANAGER;
+        FeConstants.USE_MOCK_DICT_MANAGER = true;
+        try {
+            String plan = getFragmentPlan(sql);
+            Assertions.assertTrue(plan.contains("  1:Project\n" +
+                    "  |  <slot 3> : DictDecode(5: a, [<place-holder>], 6: array_sort[1])\n" +
+                    "  |  <slot 4> : DictDecode(5: a, [<place-holder>], 6: array_sort[2])\n" +
+                    "  |  common expressions:\n" +
+                    "  |  <slot 6> : array_sort(5: a)"), plan);
+        } finally {
+            FeConstants.USE_MOCK_DICT_MANAGER = prev;
+        }
     }
 }
