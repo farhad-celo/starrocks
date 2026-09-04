@@ -103,6 +103,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeUtil.collectAllColumnRefs;
+
 public class ScalarOperatorToExpr {
     public static Expr buildExecExpression(ScalarOperator expression, FormatterContext descTbl) {
         return expression.accept(new Formatter(ScalarOperatorToExpr::buildExecExpression), descTbl);
@@ -653,9 +655,20 @@ public class ScalarOperatorToExpr {
         public Expr visitDictMappingOperator(DictMappingOperator operator, FormatterContext context) {
             // @todo: rewrite ScalarOperatorToExpr process when v1 is deprecated
             final ColumnRefOperator dictColumn = operator.getDictColumn();
-            final SlotRef dictExpr = (SlotRef) dictColumn.accept(this, context);
+            final SlotRef dictExpr;
+            if (operator.getStringProvideOperator() != null) {
+                // When stringProvideOperator is present, dictSlot is just a meta column that shows the dictionary id
+                // to be used. It doesn't need to be present in the context. We just create the SlotRef.
+                // TODO(farhad-celo): Replace with IgnoreSlotFormatter, needs updating many unit tests
+                dictExpr = new SlotRef(dictColumn.toString(), new SlotDescriptor(new SlotId(dictColumn.getId()),
+                        dictColumn.getName(), dictColumn.getType(), dictColumn.isNullable()));
+            } else {
+                dictExpr = (SlotRef) dictColumn.accept(this, context);
+            }
             final ScalarOperator call = operator.getOriginScalaOperator();
-            final ColumnRefOperator key = call.getColumnRefs().get(0);
+            List<ColumnRefOperator> callColumnRefs = collectAllColumnRefs(call);
+            Preconditions.checkState(callColumnRefs.stream().distinct().count() == 1);
+            final ColumnRefOperator key = callColumnRefs.get(0);
             // Because we need to rewrite the string column to PlaceHolder when we build DictExpr,
             // the PlaceHolder and the original string column have the same id,
             // so we need to save the original string column first and restore it after we build the expression
@@ -674,6 +687,8 @@ public class ScalarOperatorToExpr {
             // 3. recover the previous column
             if (old != null) {
                 context.colRefToExpr.put(key, old);
+            } else {
+                context.colRefToExpr.remove(key);
             }
             Expr result;
             if (operator.getStringProvideOperator() != null) {

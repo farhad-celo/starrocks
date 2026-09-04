@@ -74,6 +74,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.starrocks.sql.optimizer.rule.tree.lowcardinality.DecodeUtil.collectAllColumnRefs;
+
 /*
  * Rewrite the whole plan using the dict column by from bottom-up
  */
@@ -731,7 +733,7 @@ public class DecodeRewriter extends OptExpressionVisitor<OptExpression, ColumnRe
         if (expr == null) {
             return;
         }
-        for (ColumnRefOperator ref : expr.getColumnRefs()) {
+        for (ColumnRefOperator ref : collectAllColumnRefs(expr)) {
             if (context.stringRefToDicts.containsKey(ref.getId())) {
                 dictMap.put(context.stringRefToDictRefMap.get(ref).getId(),
                         context.stringRefToDicts.get(ref.getId()));

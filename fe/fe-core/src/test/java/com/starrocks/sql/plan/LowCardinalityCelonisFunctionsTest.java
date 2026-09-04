@@ -433,8 +433,10 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                     ON left_copy.KEY_COL = right_copy.KEY_COL
                 """;
         String plan = getFragmentPlan(sql.formatted(true));
-        Assertions.assertTrue(plan.contains("<slot 22> : array_map(<slot 23> -> upper(<slot 23>), 17: string_array1)"));
-        Assertions.assertTrue(plan.contains("<slot 15> : array_map(<slot 7> -> upper(<slot 7>), 10: string_array1)"));
+        Assertions.assertTrue(plan.contains("<slot 28> : array_map(<slot 30> -> DictDefine(<slot 30>, " +
+                "[upper(<place-holder>)]), 27: string_array1)"), plan);
+        Assertions.assertTrue(plan.contains("array_map(<slot 29> -> DictDefine(<slot 29>, [upper(<place-holder>)]), " +
+                "26: string_array1)"));
 
         plan = getFragmentPlan(sql.formatted(false));
         Assertions.assertTrue(plan.contains("<slot 15> : array_map(<slot 7> -> upper(<slot 7>), 10: string_array1)"));
@@ -472,11 +474,221 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                     ON left_copy.KEY_COL = right_copy.KEY_COL
                 """;
         String plan = getFragmentPlan(sql);
-        Assertions.assertTrue(plan.contains("array_map((<slot 26>, <slot 27>) -> array_join(array_map(" +
-                "(<slot 28>, <slot 29>) -> concat(<slot 28>, <slot 29>, <slot 26>, <slot 27>), 22: string_array3," +
-                " 22: string_array3), '-'), 20: string_array1, 21: string_array2)\n"), plan);
-        Assertions.assertTrue(plan.contains("array_map((<slot 7>, <slot 8>) -> array_join(array_map(" +
-                "(<slot 9>, <slot 10>) -> concat(<slot 9>, <slot 10>, <slot 7>, <slot 8>), 15: string_array3, " +
-                "15: string_array3), '-'), 13: string_array1, 14: string_array2)\n"), plan);
+        Assertions.assertTrue(plan.contains("array_map((<slot 40>, <slot 41>) -> array_join(array_map(" +
+                "(<slot 42>, <slot 43>) -> concat(DictDecode(<slot 42>, [<place-holder>]), DictDecode(<slot 43>," +
+                " [<place-holder>]), <slot 50>, <slot 51>), 35: string_array3, 35: string_array3), '-')\n" +
+                "        lambda common expressions:{<slot 50> <-> DictDecode(<slot 40>, [<place-holder>])}" +
+                "{<slot 51> <-> DictDecode(<slot 41>, [<place-holder>])}\n" +
+                "        , 33: string_array1, 34: string_array2)"), plan);
+        Assertions.assertTrue(plan.contains("array_map((<slot 36>, <slot 37>) -> array_join(array_map((<slot 38>, " +
+                "<slot 39>) -> concat(DictDecode(<slot 38>, [<place-holder>]), DictDecode(<slot 39>, " +
+                "[<place-holder>]), <slot 46>, <slot 47>), 32: string_array3, 32: string_array3), '-')\n" +
+                "        lambda common expressions:{<slot 46> <-> DictDecode(<slot 36>, [<place-holder>])}" +
+                "{<slot 47> <-> DictDecode(<slot 37>, [<place-holder>])}\n" +
+                "        , 30: string_array1, 31: string_array2)"), plan);
+    }                              
+                                  
+    @Test
+    public void testArrayMap() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                ARRAY_MAP(x -> UPPER(x), string_array1),
+                ARRAY_MAP(string_array2, x -> LOWER(x))
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("DictDecode(17: array_map, [<place-holder>], " +
+                "array_map(<slot 15> -> DictDefine(<slot 15>, [upper(<place-holder>)]), 13: string_array1))"), plan);
+        Assertions.assertTrue(plan.contains("DictDecode(18: array_map, [<place-holder>], " +
+                "array_map(<slot 16> -> DictDefine(<slot 16>, [lower(<place-holder>)]), 14: string_array2))"), plan);
+    }
+
+    @Test
+    public void testArrayMapNested() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                ARRAY_MAP(x -> UPPER(x), ARRAY_MAP(x -> CONCAT(x), string_array1))
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("DictDecode(16: array_map, [<place-holder>], " +
+                "array_map(<slot 13> -> DictDefine(<slot 13>, [upper(<place-holder>)]), " +
+                "array_map(<slot 14> -> DictDefine(<slot 14>, [concat(<place-holder>)]), 12: string_array1)))"), plan);
+    }
+
+    @Test
+    public void testNestedArrayMaps() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                array_map(x -> array_map(y -> array_map(z -> concat(x, y, z), string_array3), string_array2),
+                string_array1) FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("  1:Project\n" +
+                "  |  <slot 10> : array_map(<slot 14> -> array_map(<slot 15> -> array_map(<slot 16> -> " +
+                "concat(<slot 19>, <slot 20>, DictDecode(<slot 16>, [<place-holder>])), 13: string_array3)\n" +
+                "        lambda common expressions:{<slot 19> <-> DictDecode(<slot 14>, [<place-holder>])}{<slot 20> " +
+                "<-> DictDecode(<slot 15>, [<place-holder>])}\n" +
+                "        , 12: string_array2), 11: string_array1)"), plan);
+    }
+
+    @Test
+    public void testNestedArrayMapsWithDuplicatedCaptures() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                array_map(x -> array_map(y -> array_map(z -> concat(x, x, y, y, z), string_array3),
+                string_array2), string_array1) FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("  1:Project\n" +
+                "  |  <slot 10> : array_map(<slot 14> -> array_map(<slot 15> -> array_map(<slot 16> -> " +
+                "concat(<slot 18>, <slot 18>, <slot 19>, <slot 19>, DictDecode(<slot 16>, [<place-holder>]))\n" +
+                "        lambda common expressions:{<slot 18> <-> DictDecode(<slot 14>, [<place-holder>])}" +
+                "{<slot 19> <-> DictDecode(<slot 15>, [<place-holder>])}\n" +
+                "        , 13: string_array3), 12: string_array2), 11: string_array1)"), plan);
+    }
+
+    @Test
+    public void testArrayMapOutsideCapture() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                ARRAY_MAP(x -> string_array2[1], string_array1)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("  1:Project\n" +
+                "  |  <slot 8> : DictDecode(13: array_map, [<place-holder>], " +
+                "array_map(<slot 12> -> 14: expr, 10: string_array1))\n" +
+                "  |  common expressions:\n" +
+                "  |  <slot 14> : 11: string_array2[1]"), plan);
+    }
+
+    @Test
+    public void testArrayMapReturnArrayOfArray() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                ARRAY_MAP(x -> string_array2, string_array1)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "array_map(<slot 11> -> DictDecode(10: string_array2, [<place-holder>]), 9: string_array1)"), plan);
+    }
+
+    @Test
+    public void testArrayMapReturnArrayOfStruct() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                ARRAY_MAP(x -> ROW(x), string_array1)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("array_map(<slot 10> -> named_struct('col1', " +
+                "DictDecode(10: x, [<place-holder>], row(<slot 10>).col1[true])), 9: string_array1)"), plan);
+    }
+
+    @Test
+    public void testArrayMapReturnNonStringScalar() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                ARRAY_MAP(x -> LENGTH(x), string_array1)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains(
+                "array_map(<slot 10> -> DictDecode(<slot 10>, [length(<place-holder>)]), 9: string_array1)"), plan);
+    }
+
+    @Test
+    public void testArrayMapDecodeInLambda() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                ARRAY_MAP(string_array1, string_array2, (x, y) -> concat(upper(x), lower(y)))
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("array_map((<slot 12>, <slot 13>) -> " +
+                "concat(DictDecode(<slot 12>, [upper(<place-holder>)]), DictDecode(<slot 13>, " +
+                "[lower(<place-holder>)])), 10: string_array1, 11: string_array2)"), plan);
+    }
+
+    @Test
+    public void testArrayMapReuse() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                m[1] AS a, m[2] AS b
+                FROM (
+                    SELECT ARRAY_MAP(string_array1, x -> UPPER(x)) AS m
+                    FROM multi_input_functions_test_table
+                ) T
+                """;
+        String plan = getFragmentPlan(sql);
+        assertContains(plan, "  1:Project\n" +
+                "  |  <slot 9> : DictDecode(14: array_map, [<place-holder>], 15: array_map[1])\n" +
+                "  |  <slot 10> : DictDecode(14: array_map, [<place-holder>], 15: array_map[2])\n" +
+                "  |  common expressions:\n" +
+                "  |  <slot 15> : array_map(<slot 13> -> DictDefine(<slot 13>, [upper(<place-holder>)]), " +
+                "12: string_array1)");
+    }
+
+    @Test
+    public void testArrayMapReuseKeepsLambdaDependentDecodeInsideLambda() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                m[1] AS a, m[2] AS b
+                FROM (
+                    SELECT ARRAY_MAP(string_array1, string_array2, (x, y) -> concat(upper(x), lower(y))) AS m
+                    FROM multi_input_functions_test_table
+                ) T
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("  1:Project\n" +
+                "  |  <slot 10> : 16: array_map[1]\n" +
+                "  |  <slot 11> : 16: array_map[2]\n" +
+                "  |  common expressions:\n" +
+                "  |  <slot 16> : array_map((<slot 14>, <slot 15>) -> concat(DictDecode(<slot 14>, " +
+                "[upper(<place-holder>)]), DictDecode(<slot 15>, [lower(<place-holder>)])), 12: string_array1," +
+                " 13: string_array2)\n"), plan);
+    }
+
+    @Test
+    public void testArrayMapPredicateReuseKeepsDecodeInsideLambda() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_array_map_low_cardinality_optimize' = 'true') */
+                KEY_COL
+                FROM (
+                    SELECT KEY_COL, ARRAY_MAP(string_array1, x -> UPPER(x)) AS m
+                    FROM multi_input_functions_test_table
+                ) T
+                WHERE m[1] = 'A' AND m[2] = 'B'
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("  2:SELECT\n" +
+                "  |  predicates: DictDecode(12: array_map, [<place-holder> = 'A'], 13: array_map[1]), " +
+                "DictDecode(12: array_map, [<place-holder> = 'B'], 13: array_map[2])\n" +
+                "  |    common sub expr:\n" +
+                "  |    <slot 13> : array_map(<slot 11> -> DictDefine(<slot 11>, [upper(<place-holder>)]), " +
+                "10: string_array1)"), plan);
+    }
+
+    @Test
+    public void testArrayMapGlobalDictExpr() throws Exception {
+        String sql = """
+                WITH T AS (
+                    SELECT ARRAY_SORT(ARRAY_MAP(x -> UPPER(x), string_array1)) a
+                    FROM multi_input_functions_test_table
+                ) [MATERIALIZED]
+                SELECT a[1] FROM T;
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains(
+                "14 <-> array_sort[(array_map[([13, INT, true] -> DictDefine(<slot 13>, [upper(<place-holder>)]), " +
+                        "[12: string_array1, ARRAY<INT>, true])"), plan);
+        Assertions.assertTrue(plan.contains("15 <-> [14: array_sort, ARRAY<INT>, true]"));
+        Assertions.assertTrue(plan.contains("16 <-> 15: array_sort[1]"));
+        Assertions.assertTrue(plan.contains("Decode\n" +
+                "  |  <dict id 16> : <string id 10>"));
+        Assertions.assertTrue(plan.contains("14: DictDefine(12: string_array1, [upper(<place-holder>)])"));
+        Assertions.assertTrue(plan.contains("16: DictDefine(12: string_array1, [upper(<place-holder>)])"));
     }
 }
