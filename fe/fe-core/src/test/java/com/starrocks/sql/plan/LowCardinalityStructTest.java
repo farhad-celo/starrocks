@@ -148,11 +148,10 @@ public class LowCardinalityStructTest extends PlanTestBase {
                 FROM T
                 """;
         String plan = getFragmentPlan(sql);
-        String expected = "<slot 5> : to_json(named_struct('col1', DictDecode(6: VARCHAR_COL, [<place-holder>], " +
-                "row(6: VARCHAR_COL, 4: INTEGER_COL, 7: ARRAY_VARCHAR_COL).col1[true]), " +
-                "'col2', row(6: VARCHAR_COL, 4: INTEGER_COL, 7: ARRAY_VARCHAR_COL).col2[true], " +
-                "'col3', DictDecode(7: ARRAY_VARCHAR_COL, [<place-holder>], row(6: VARCHAR_COL, 4: INTEGER_COL, " +
-                "7: ARRAY_VARCHAR_COL).col3[true])))\n";
+        String expected = "<slot 5> : to_json(named_struct(" +
+                "'col1', DictDecode(6: VARCHAR_COL, [<place-holder>], 6: VARCHAR_COL), " +
+                "'col2', 4: INTEGER_COL, " +
+                "'col3', DictDecode(7: ARRAY_VARCHAR_COL, [<place-holder>], 7: ARRAY_VARCHAR_COL)))";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 
@@ -246,11 +245,11 @@ public class LowCardinalityStructTest extends PlanTestBase {
                 "  |  output columns:\n" +
                 "  |  4 <-> [4: INTEGER_COL, INT, true]\n" +
                 "  |  5 <-> row[(named_struct[('col1', DictDecode(7: VARCHAR_COL, [<place-holder>], " +
-                "row(7: VARCHAR_COL).col1[true])); args: VARCHAR,VARCHAR; result: struct<col1 varchar(25)>; " +
-                "args nullable: true; result nullable: true], [3: ARRAY_VARCHAR_COL, ARRAY<VARCHAR(40)>, true]); " +
-                "args: INVALID_TYPE,INVALID_TYPE; result: struct<col1 struct<col1 varchar(25)>, " +
-                "col2 array<varchar(40)>>; args nullable: true; result nullable: true]\n" +
-                "  |  8 <-> DictDefine(7: VARCHAR_COL, [upper(<place-holder>)])";
+                "7: VARCHAR_COL)); args: VARCHAR,VARCHAR; result: struct<col1 varchar(25)>; args nullable: " +
+                "true; result nullable: true], [3: ARRAY_VARCHAR_COL, ARRAY<VARCHAR(40)>, true]); args: " +
+                "INVALID_TYPE,INVALID_TYPE; result: struct<col1 struct<col1 varchar(25)>, col2 array<varchar(40)>>; " +
+                "args nullable: true; result nullable: true]\n" +
+                "  |  8 <-> DictDefine(7: VARCHAR_COL, [upper(<place-holder>)])\n";
         Assertions.assertTrue(plan.contains(expected), plan);
     }
 

@@ -584,7 +584,7 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 """;
         String plan = getFragmentPlan(sql);
         Assertions.assertTrue(plan.contains("array_map(<slot 10> -> named_struct('col1', " +
-                "DictDecode(10: x, [<place-holder>], row(<slot 10>).col1[true])), 9: string_array1)"), plan);
+                "DictDecode(10: x, [<place-holder>], <slot 10>)), 9: string_array1)"), plan);
     }
 
     @Test

@@ -396,12 +396,15 @@ class DecodeContext {
         List<ScalarOperator> newFields = Lists.newArrayList();
         Map<String, ColumnRefOperator> fieldsStringRefMap = structManager.getFieldStringRefMap(expression);
         Preconditions.checkNotNull(fieldsStringRefMap);
+        boolean isStructGenerator = expression instanceof CallOperator call &&
+                (FunctionSet.ROW.equals(call.getFnName()) || FunctionSet.STRUCT.equals(call.getFnName()));
         for (int i = 0; i < exprType.getFields().size(); ++i) {
             String fieldName = exprType.getField(i).getName();
             newFields.add(ConstantOperator.createVarchar(fieldName));
             Type fieldOriginalType =  exprType.getField(i).getType();
             Type fieldDictType = dictType.getField(i).getType();
-            ScalarOperator fieldExpr =  new SubfieldOperator(dictExpression, fieldDictType, List.of(fieldName));
+            ScalarOperator fieldExpr = isStructGenerator ? dictExpression.getChild(i)
+                    : new SubfieldOperator(dictExpression, fieldDictType, List.of(fieldName));
             if (fieldOriginalType.matchesType(fieldDictType)) {
                 newFields.add(fieldExpr);
             } else {
