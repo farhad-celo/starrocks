@@ -691,4 +691,81 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
         Assertions.assertTrue(plan.contains("14: DictDefine(12: string_array1, [upper(<place-holder>)])"));
         Assertions.assertTrue(plan.contains("16: DictDefine(12: string_array1, [upper(<place-holder>)])"));
     }
+
+    @Test
+    public void testCelonisMultiIn() throws Exception {
+        String sql = """
+                SELECT 
+                celonis_multi_in(row(VARCHAR_COL, INTEGER_COL, VARCHAR_COL2), row(['a', 'b'], [1, 2], ['x', 'y'])) 
+                FROM T
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("celonis_multi_in[(row[([7: VARCHAR_COL, INT, true], " +
+                "[5: INTEGER_COL, INT, true], [8: VARCHAR_COL2, INT, true]); args: INT,INT,INT; result: " +
+                "struct<col1 int(11), col2 int(11), col3 int(11)>; args nullable: true; result nullable: true], " +
+                "row[([dict_encode('a', 7),dict_encode('b', 7)], [1,2], [dict_encode('x', 8),dict_encode('y', 8)]); " +
+                "args: INVALID_TYPE,INVALID_TYPE,INVALID_TYPE; result: struct<col1 array<int(11)>, " +
+                "col2 array<tinyint(4)>, col3 array<int(11)>>; args nullable: true; result nullable: true]); " +
+                "args: INVALID_TYPE,INVALID_TYPE; result: BOOLEAN; args nullable: true; result nullable: true]"), plan);
+    }
+
+    @Test
+    public void testCelonisMultiInPartialEncode() throws Exception {
+        String sql = """
+                SELECT KEY_COL FROM T
+                WHERE celonis_multi_in(row(VARCHAR_COL, INTEGER_COL, VARCHAR_COL2), row(['a', 'b'], [1, 2], ['x', 'y']))
+                """;
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("VARCHAR_COL"), anyLong);
+                result = false;
+            }
+        };
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("celonis_multi_in(row(2: VARCHAR_COL, 5: INTEGER_COL, 6: VARCHAR_COL2), " +
+                        "row(['a','b'], [1,2], [dict_encode('x', 6),dict_encode('y', 6)]))"), plan);
+        Assertions.assertFalse(getThriftPlan(sql).isEmpty());
+    }
+
+    @Test
+    public void testCelonisMultiInNoEncode() throws Exception {
+        String sql = """
+                SELECT KEY_COL FROM T
+                WHERE celonis_multi_in(
+                    row(VARCHAR_COL, INTEGER_COL, VARCHAR_COL2), row(['a', VARCHAR_COL], [1, 2], ['x', 'y']))
+                """;
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("VARCHAR_COL"), anyLong);
+                result = false;
+            }
+        };
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("celonis_multi_in(named_struct('col1', 2: VARCHAR_COL, 'col2'," +
+                " 5: INTEGER_COL, 'col3', DictDecode(6: VARCHAR_COL2, [<place-holder>], 6: VARCHAR_COL2))," +
+                " row(['a',2: VARCHAR_COL], [1,2], ['x','y']))"), plan);
+    }
+
+    @Test
+    public void testCelonisMultiInDisabled() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_multi_in_low_cardinality_optimize', 'false') */ KEY_COL
+                FROM T
+                WHERE celonis_multi_in(
+                    row(VARCHAR_COL, INTEGER_COL, VARCHAR_COL2), row(['a', 'b'], [1, 2], ['x', 'y']))
+                """;
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("VARCHAR_COL"), anyLong);
+                result = false;
+            }
+        };
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("celonis_multi_in(named_struct('col1', 2: VARCHAR_COL, 'col2', " +
+                "5: INTEGER_COL, 'col3', DictDecode(6: VARCHAR_COL2, [<place-holder>], 6: VARCHAR_COL2)), " +
+                "row(['a','b'], [1,2], ['x','y']))"), plan);
+    }
 }

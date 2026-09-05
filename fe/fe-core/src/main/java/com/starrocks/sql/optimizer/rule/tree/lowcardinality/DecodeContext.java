@@ -378,6 +378,12 @@ class DecodeContext {
             fn = Expr.getBuiltinFunction(
                     fnName, argTypes, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF).copy();
             fn.setRetType(new ArrayType(((LambdaFunctionOperator) args.get(0)).getLambdaExpr().getType()));
+        } else if (fnName.equals(FunctionSet.CELONIS_MULTI_IN)) {
+            Type[] argTypes = args.stream().map(ScalarOperator::getType).toArray(Type[]::new);
+            fn = Expr.getBuiltinFunction(
+                    fnName, argTypes, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF).copy();
+            fn.setArgsType(argTypes);
+            fn.setRetType(Type.BOOLEAN);
         } else {
             Type[] argTypes = args.stream().map(ScalarOperator::getType).toArray(Type[]::new);
             fn = Expr.getBuiltinFunction(fnName, argTypes, Function.CompareMode.IS_SUPERTYPE_OF);
@@ -437,6 +443,9 @@ class DecodeContext {
         if (result.getType().isStructType()) {
             Preconditions.checkState(encoder.getAnchorOp() == null);
             return decodeStruct(result, expression);
+        }
+        if (expression instanceof CallOperator call && call.getFnName().equals(FunctionSet.CELONIS_MULTI_IN)) {
+            return result;
         }
         ColumnRefOperator useStringRef = getUseStringRef(expression);
         if (useStringRef == null || (supportColumns != null && !supportColumns.contains(useStringRef))) {
@@ -610,6 +619,26 @@ class DecodeContext {
             }
             if (!hasChange[0]) {
                 return call;
+            }
+            if (FunctionSet.CELONIS_MULTI_IN.equals(call.getFnName())) {
+                ScalarOperator newInput = newChildren.get(0);
+                Map<String, ColumnRefOperator> fieldsMap = structManager.getFieldStringRefMap(call.getChild(0));
+                Preconditions.checkNotNull(fieldsMap);
+                StructType inputType = (StructType) call.getChild(0).getType();
+                CallOperator matchCall = call.getChild(1).cast();
+                List<ScalarOperator> newMatchChildren = Lists.newArrayList(matchCall.getChildren());
+                for (int i = 0; i < inputType.getFields().size(); ++i) {
+                    String fieldName = inputType.getField(i).getName();
+                    if (!fieldsMap.containsKey(fieldName)) {
+                        continue;
+                    }
+                    ColumnRefOperator stringRef = fieldsMap.get(inputType.getField(i).getName());
+                    ColumnRefOperator dictRef = stringRefToDictRefMap.get(stringRef);
+                    Preconditions.checkNotNull(dictRef);
+                    newMatchChildren.set(i, dictEncodeConstant(newMatchChildren.get(i), dictRef.getId()));
+                }
+                return buildCallOperator(call,
+                        List.of(newInput, buildCallOperator(matchCall, newMatchChildren)));
             }
             if (isSupportedSingleInputArrayFunction(call)) {
                 ColumnRefOperator stringRef = getUseStringRef(call);

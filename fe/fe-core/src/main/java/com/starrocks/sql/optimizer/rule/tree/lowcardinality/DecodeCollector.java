@@ -169,8 +169,15 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         }
     }
 
-    public static final Set<String> LOW_CARD_STRUCT_FUNCTIONS =
-            ImmutableSet.of(FunctionSet.NAMED_STRUCT, FunctionSet.STRUCT, FunctionSet.ROW);
+    public static final Set<String> LOW_CARD_STRUCT_FUNCTIONS = Sets.newHashSet(
+            FunctionSet.NAMED_STRUCT, FunctionSet.STRUCT, FunctionSet.ROW);
+
+    public static final Set<String> CELONIS_LOW_CARD_STRUCT_FUNCTIONS =
+            ImmutableSet.of(FunctionSet.CELONIS_MULTI_IN);
+
+    static {
+        LOW_CARD_STRUCT_FUNCTIONS.addAll(CELONIS_LOW_CARD_STRUCT_FUNCTIONS);
+    }
 
     // array<string> support:
     //  array<string> -> array<string>: array function
@@ -1587,6 +1594,45 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                         && op.getChild(0) instanceof ArrayOperator array && array.getChildren().isEmpty());
         }
 
+        private static boolean isSupportedMultiInMatchConfig(ScalarOperator input, ScalarOperator match) {
+            if (!(match instanceof CallOperator matchCall) || !(matchCall.getFnName().equals(FunctionSet.ROW) ||
+                    matchCall.getFnName().equals(FunctionSet.STRUCT))) {
+                return false;
+            }
+            if (!input.getType().isStructType()) {
+                return false;
+            }
+            StructType inputType = (StructType) input.getType();
+            StructType matchType = (StructType) match.getType();
+            if (inputType.getFields().size() != matchType.getFields().size()) {
+                return false;
+            }
+            for (int i = 0; i < inputType.getFields().size(); ++i) {
+                Type inputFieldType = inputType.getField(i).getType();
+                Type matchFieldType = match.getChild(i).getType();
+                if (inputFieldType.isArrayType() || !matchFieldType.isArrayType()) {
+                    return false;
+                }
+                Type elementType = ((ArrayType) matchFieldType).getItemType();
+                if (inputFieldType.isStringType() && !elementType.isStringType()) {
+                    return false;
+                }
+            }
+            int tupleCount = -1;
+            for (ScalarOperator field : match.getChildren()) {
+                if (!(field instanceof ArrayOperator array)
+                        || !array.getChildren().stream().allMatch(ScalarOperator::isConstantRef)) {
+                    return false;
+                }
+                if (tupleCount < 0) {
+                    tupleCount = array.getChildren().size();
+                } else if (tupleCount != array.getChildren().size()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         @Override
         public ScalarOperator visitCall(CallOperator call, Void context) {
             if (FunctionSet.CELONIS_SHORTENED_VARIANT.equals(call.getFnName())
@@ -1689,6 +1735,19 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             }
             if (LOW_CARD_STRING_FUNCTIONS.contains(call.getFnName())) {
                 return merge(visitChildren(call, context), call);
+            }
+            if (FunctionSet.CELONIS_MULTI_IN.equals(call.getFnName())) {
+                if (!sessionVariable.isEnableMultiInLowCardinalityOptimize()) {
+                    return forbidden(visitChildren(call, context), call);
+                }
+                List<ScalarOperator> newChildren = visitChildren(call, context);
+                if (structManager.contains(newChildren.get(0))
+                        && CONSTANTS.equals(newChildren.get(1))
+                        && isSupportedMultiInMatchConfig(call.getChild(0), call.getChild(1))) {
+                    saveDictExpr(newChildren.get(0), call);
+                    return VARIABLES;
+                }
+                return forbidden(newChildren, call);
             }
             if (structManager.isEnableStructLowCardinalityOptimize()
                     && LOW_CARD_STRUCT_FUNCTIONS.contains(call.getFnName())
