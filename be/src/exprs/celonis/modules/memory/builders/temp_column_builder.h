@@ -32,15 +32,14 @@ class temp_column_builder {
       group = std::make_shared<management::managed_memory_group>("Column", optional_table_config_->table_id());
     }
 
-    auto plain_data = materialized_typed_data<DATA_TYPE>::init_materialized_data(
-        id.val, management::no_swap(), description, row_count, std::move(data), null_flags);
+    auto plain_data = materialized_typed_data<DATA_TYPE>::init_materialized_data(id.val, description, row_count,
+                                                                                 std::move(data), null_flags);
 
     column_loading::column_config config;
     config.type = get_matching_data_type<DATA_TYPE>();
     config.cache_key = cache_key;
     config.name = name.val;
     config.id = id.val;
-    config.swap_information = management::no_swap();
     config.row_count = row_count;
     config.description = description;
 

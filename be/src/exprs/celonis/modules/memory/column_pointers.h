@@ -156,11 +156,8 @@ class column_ptrs_abstract : public details::column_ptrs_abstract_base {
   template <class COL_PTRS_TYPE>
   using concrete_type = column_ptrs_impl<COL_PTRS_TYPE>;
 
-  virtual void swap_in(common::execution_context& context) = 0;
   [[nodiscard]] virtual usage_time_t time_of_last_usage() const = 0;
-  [[nodiscard]] virtual bool is_swappable() const = 0;
   [[nodiscard]] virtual management::load_status get_load_status() const = 0;
-  virtual void set_delete_from_disk_when_destructed(bool value) = 0;
   /**
    * return column pointer at position rid.
    *
@@ -169,7 +166,6 @@ class column_ptrs_abstract : public details::column_ptrs_abstract_base {
    */
   [[nodiscard]] virtual row_id get_ptr_slow(row_id rid) const = 0;
   [[nodiscard]] virtual column_ptrs_abstract* clone(const std::string& id, const std::string& description,
-                                                    const management::swap_info& sinfo,
                                                     common::execution_context& context) const = 0;
   [[nodiscard]] virtual std::shared_ptr<management::data_handler> get_abstract() = 0;
   [[nodiscard]] virtual size_t max_value() const = 0;
@@ -195,22 +191,16 @@ class column_ptrs_impl final : public column_ptrs_abstract {
   [[nodiscard]] size_t get_row_count() const override { return ptrs->get_size(); }
 
   // column_ptrs_abstract interface
-  void swap_in(common::execution_context& context) override { ptrs->swap_in(context); }
   [[nodiscard]] usage_time_t time_of_last_usage() const override { return ptrs->get_last_usage(); }
-  [[nodiscard]] bool is_swappable() const override { return ptrs->is_swappable(); }
   [[nodiscard]] management::load_status get_load_status() const override { return ptrs->get_load_status(); }
-  void set_delete_from_disk_when_destructed(const bool value) override {
-    ptrs->set_delete_from_disk_when_destructed(value);
-  }
   [[nodiscard]] row_id get_ptr_slow(row_id rid) const override { return ptrs->get_const_data()[rid]; }
   [[nodiscard]] column_ptrs_abstract* clone(const std::string& id, const std::string& description,
-                                            const management::swap_info& sinfo,
                                             common::execution_context& context) const override {
     auto row_count = ptrs->get_size();
     auto data{ctl::make_static_array_for_overwrite<COL_PTRS_TYPE>(row_count, ALLOC_MSG(ctl::RAW_DATA_ALLOC_MSG))};
     std::copy_n(ptrs->get_const_data(context).get(), row_count, data.get());
     auto raw_clone{management::raw_data_handler<COL_PTRS_TYPE>::create_data_handler(
-        std::move(data), id + management::COLUMN_PTR_ENDING, sinfo, description + " " + management::COLUMN_PTR_DESC)};
+        std::move(data), description + " " + management::COLUMN_PTR_DESC)};
     return new column_ptrs_impl<COL_PTRS_TYPE>(std::move(raw_clone));
   }
   [[nodiscard]] std::shared_ptr<management::data_handler> get_abstract() noexcept override { return ptrs; }
@@ -454,8 +444,7 @@ template <typename FUNCTION>
 /** Create column pointers based on raw column pointers. Only to be used "internally", don't use in operators
  */
 [[nodiscard]] column_ptrs_t create_column_pointers(const raw_column_ptrs_t& raw_column_pointers,
-                                                   const std::string& cache_id, const std::string& cache_description,
-                                                   const management::swap_info& sinfo);
+                                                   const std::string& cache_id, const std::string& cache_description);
 
 template <typename COL_PTR_TYPE>
 [[nodiscard]] std::shared_ptr<raw_column_ptrs_impl<COL_PTR_TYPE>> create_raw_column_pointer(

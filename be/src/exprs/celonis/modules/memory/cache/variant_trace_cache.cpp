@@ -107,12 +107,4 @@ variant_id_to_group_size_mapping_t compute_variant_id_to_group_size_mapping_from
   return variant_id_to_group_size_mapping;
 }
 
-void variant_trace_cache::set_delete_from_disk_when_destructed() {
-  data_handle->set_delete_from_disk_when_destructed(true);
-  trace_lengths->set_delete_from_disk_when_destructed(true);
-  if (optional_group_id_to_trace_id_.has_value()) {
-    optional_group_id_to_trace_id_.value()->set_delete_from_disk_when_destructed(true);
-  }
-}
-
 }  // namespace celonis::accelerator::memory::cache

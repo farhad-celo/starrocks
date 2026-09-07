@@ -28,12 +28,4 @@ void log_warning_if_swap_in_too_long(common::timer& timer_with_lock, common::tim
   }
 }
 
-bool data_handler::swap_file_exists(const std::string& swap_file, const swap_info& sinfo) {
-#ifdef CELOSTAR
-  return false;
-#else
-  return io::file_exists(swap_file, sinfo);
-#endif
-}
-
 }  // namespace celonis::accelerator::memory::management

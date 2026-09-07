@@ -19,7 +19,6 @@
 #include "modules/memory/management/const_data_accessor.h"
 #include "modules/memory/management/data_handler.h"
 #include "modules/memory/management/managed_memory_group.h"
-#include "modules/memory/management/swap_info.h"
 #include "modules/memory/raw_dictionary.h"
 #include "types/uuid/uuid_storage.h"
 
@@ -73,23 +72,8 @@ typename typed_dictionary<T>::const_data_accessor_t typed_dictionary<T>::get_con
 }
 
 template <typename T>
-void typed_dictionary<T>::swap_in(common::execution_context& context) {
-  data_handler->swap_in(context);
-}
-
-template <typename T>
 management::load_status typed_dictionary<T>::get_load_status() const {
   return data_handler->get_load_status();
-}
-
-template <typename T>
-bool typed_dictionary<T>::is_swappable() const {
-  return data_handler->is_swappable();
-}
-
-template <typename T>
-bool typed_dictionary<T>::swap_file_broken() const {
-  return data_handler->swap_file_broken();
 }
 
 template <typename T>
@@ -220,37 +204,22 @@ raw_dictionary_t typed_dictionary<T>::copy_to_raw_dictionary(common::execution_c
 }
 
 template <typename T>
-void typed_dictionary<T>::set_delete_from_disk_when_destructed(const bool value) {
-  data_handler->set_delete_from_disk_when_destructed(value);
-}
-
-template <typename T>
-dictionary_t typed_dictionary<T>::create_dictionary(ctl::static_array<T>&& data, const std::string& swap_file_name,
-                                                    const management::swap_info& sinfo,
-                                                    const std::string& description) {
-  return std::make_shared<typed_dictionary<T>>(management::raw_data_handler<T>::create_data_handler(
-      std::move(data), swap_file_name + memory::management::DICT_ENDING, sinfo, description));
+dictionary_t typed_dictionary<T>::create_dictionary(ctl::static_array<T>&& data, const std::string& description) {
+  return std::make_shared<typed_dictionary<T>>(
+      management::raw_data_handler<T>::create_data_handler(std::move(data), description));
 }
 
 typed_dictionary<cel_string_t>::typed_dictionary(std::shared_ptr<management::string_data_handler> string_data)
     : dictionary(data_type::cel_string), string_data_(std::move(string_data)) {}
-
-using const_data_accessor_t = management::string_data_handler::const_data_accessor_t;
 
 [[nodiscard]] typed_dictionary<cel_string_t>::const_data_accessor_t typed_dictionary<cel_string_t>::get_const_data(
     const common::execution_context& context) const {
   return string_data_->get_const_data(context);
 }
 
-void typed_dictionary<cel_string_t>::swap_in(common::execution_context& context) { string_data_->swap_in(context); }
-
 management::load_status typed_dictionary<cel_string_t>::get_load_status() const {
   return string_data_->get_load_status();
 }
-
-[[nodiscard]] bool typed_dictionary<cel_string_t>::is_swappable() const { return string_data_->is_swappable(); }
-
-[[nodiscard]] bool typed_dictionary<cel_string_t>::swap_file_broken() const { return string_data_->swap_file_broken(); }
 
 [[nodiscard]] row_id typed_dictionary<cel_string_t>::get_size() const {
   const size_t size{string_data_->get_size()};
@@ -281,10 +250,6 @@ raw_dictionary_t typed_dictionary<cel_string_t>::copy_to_raw_dictionary(common::
   }
 
   return std::make_unique<typed_raw_dictionary<cel_string_t>>(std::move(output_array), std::move(buffer));
-}
-
-void typed_dictionary<cel_string_t>::set_delete_from_disk_when_destructed(const bool value) {
-  string_data_->set_delete_from_disk_when_destructed(value);
 }
 
 row_id typed_dictionary<cel_string_t>::get_row_id_for(const cel_string_t v,
@@ -376,12 +341,9 @@ std::string_view typed_dictionary<cel_string_t>::get_string_value_view(row_id pt
 
 [[nodiscard]] dictionary_t typed_dictionary<cel_string_t>::create_dictionary(ctl::static_array<cel_string_t>&& ptr,
                                                                              ctl::static_array<char>&& buffer,
-                                                                             const std::string& swap_file,
-                                                                             const management::swap_info& sinfo,
                                                                              const std::string& description) {
   return std::make_shared<typed_dictionary<cel_string_t>>(management::string_data_handler::create_data_handler(
-      std::move(ptr), std::move(buffer), swap_file, management::pointer_data_handler_swap_type::SWAPPED_DICTIONARY,
-      sinfo, description));
+      std::move(ptr), std::move(buffer), management::pointer_data_handler_swap_type::SWAPPED_DICTIONARY, description));
 }
 
 // These are needed for the correct linkage of the test

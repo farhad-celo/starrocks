@@ -9,12 +9,34 @@
 
 #include "column_fwd.h"  // IWYU pragma: export
 #include "modules/common/execution_context.h"
-#include "modules/memory/column_loading/column_loader.h"
+#include "modules/common/shared_types.h"
 #include "modules/memory/column_pointers.h"
 #include "modules/memory/column_processing_state.h"
 #include "modules/memory/management/raw_data_handler.h"
+#include "modules/memory/materialized_data.h"
+#include "modules/memory/row_id.h"
 #include "modules/memory/typed_dictionary.h"
 #include "modules/operators/framework/dictify_inputs.h"
+
+namespace celonis::accelerator::memory::column_loading {
+
+struct column_config {
+  data_type type{};
+  std::string name;
+  std::string id;
+  std::string cache_key;
+  row_id row_count{0};
+  std::string description;
+};
+
+enum column_status {
+  MISSING,       // Column is not loaded yet.
+  MATERIALIZED,  // Means the data is stored simply in an array.
+  DICTIFIED      // Dictionary compressed. Most of the time this needs less memory, but the dictionary is expensive to
+                 // create
+};
+
+}  // namespace celonis::accelerator::memory::column_loading
 
 namespace celonis::accelerator::memory {
 namespace builders {
@@ -134,7 +156,6 @@ class column {
   const std::string& get_cache_key() const noexcept { return config_.cache_key; }
   std::string get_user_visible_name();
   std::string get_user_visible_owner_name() const;
-  [[nodiscard]] const management::swap_info& get_swap_info() const noexcept { return config_.swap_information; }
 
   const column_processing_state& get_processing_state() const noexcept { return processing_state_; }
 
@@ -154,7 +175,6 @@ class column {
   const column_ptrs_abstract& get_column_pointers(const common::execution_context& context,
                                                   const no_dictify_request_t& no_dictify_request = std::nullopt) {
     dictify_if_needed(context);
-    column_pointers_->get_abstract()->swap_in(context);
     return *column_pointers_.get();
   }
 
@@ -191,9 +211,7 @@ class column {
   column(column_loading::column_config config, std::optional<table_config> optional_table_config,
          column_ptrs_t column_pointers, std::shared_ptr<dictionary> dict, std::shared_ptr<materialized_data> plain_data,
          column_loading::column_status status, std::shared_ptr<management::managed_memory_group> managed_group,
-         column_processing_state processing_state = column_processing_state(),
-         std::shared_ptr<column_loading::column_loader> column_load =
-             std::shared_ptr<column_loading::column_loader>(nullptr))
+         column_processing_state processing_state = column_processing_state())
       : config_(std::move(config)),
         optional_table_config_{std::move(optional_table_config)},
         column_pointers_(std::move(column_pointers)),

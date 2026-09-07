@@ -2,8 +2,6 @@
 
 #include <ctl/static_array.h>
 
-#include "modules/memory/management/swap_info.h"
-
 namespace celonis::accelerator::memory {
 
 namespace {
@@ -31,12 +29,9 @@ join_raw_t create_raw_join(row_id fact_table_size, row_id dim_table_size, zero_i
   return create_raw_join_impl<join_32_t>(fact_table_size, initialize_to_0, context);
 }
 
-join_data_handler_t create_join_from_raw_data(const join_raw_t& raw_join, const std::string& file_name,
-                                              const std::string& description, const management::swap_info& sinfo) {
+join_data_handler_t create_join_from_raw_data(const join_raw_t& raw_join, const std::string& description) {
   return cast_execute_join(
-      [&file_name, &description, &sinfo](const auto& join) {
-        return join_data_handler_t{create_join_from_raw_data(join, file_name, description, sinfo)};
-      },
+      [&description](const auto& join) { return join_data_handler_t{create_join_from_raw_data(join, description)}; },
       raw_join);
 }
 

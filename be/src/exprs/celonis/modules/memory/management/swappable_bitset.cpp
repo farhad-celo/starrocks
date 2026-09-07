@@ -13,7 +13,6 @@
 #include "modules/memory/management/data_handler.h"
 #include "modules/memory/management/load_status.h"
 #include "modules/memory/management/raw_data_handler.h"
-#include "modules/memory/management/swap_info.h"
 
 namespace celonis::accelerator::memory::management {
 
@@ -33,25 +32,14 @@ namespace {
 }  // namespace
 
 std::shared_ptr<swappable_bitset> swappable_bitset::create_data_handler(const memory::null_flags_t& data,
-                                                                        const std::string& swap_file,
-                                                                        const swap_info& sinfo,
                                                                         const std::string& description) {
-  debug_assert(sinfo.is_no_swap() || swap_file.ends_with(NULL_FLAGS_ENDING) ||
-               swap_file.ends_with(NULL_FLAGS_NEW_ENDING));
   auto data_handler_data{copy_to_static_array(*data)};
-  const std::string swap_file_bs_ending{swap_file.substr(0, swap_file.find_last_of('.')) + BITSET_ENDING};
-  auto data_handler{raw_data_handler<uint64_t>::create_data_handler(std::move(data_handler_data), swap_file_bs_ending,
-                                                                    sinfo, description)};
-  std::shared_ptr<swappable_bitset> raw_data(
-      new swappable_bitset(std::move(data_handler), swap_file, sinfo, data->size()));
+  auto data_handler{raw_data_handler<uint64_t>::create_data_handler(std::move(data_handler_data), description)};
+  std::shared_ptr<swappable_bitset> raw_data(new swappable_bitset(std::move(data_handler), data->size()));
   return raw_data;
 }
 
 load_status swappable_bitset::get_load_status() const { return data_handler_->get_load_status(); }
-
-persistence_status swappable_bitset::get_persistence_status() const { return data_handler_->get_persistence_status(); }
-
-bool swappable_bitset::swap_file_broken() const { return data_handler_->swap_file_broken(); }
 
 swappable_bitset::const_data_accessor_t swappable_bitset::get_const_data(
     [[maybe_unused]] const common::execution_context& context) {
@@ -63,13 +51,10 @@ swappable_bitset::const_data_accessor_t swappable_bitset::get_const_data(
   return swappable_bitset::const_data_accessor_t{view, std::move(data_handler_data)};
 }
 
-bool swappable_bitset::is_swappable() const { return data_handler_->is_swappable(); }
-
 size_t swappable_bitset::get_size_in_memory() const { return data_handler_->get_size_in_memory(); };
 
 size_t swappable_bitset::get_size() const { return size_; }
 
-size_t swappable_bitset::get_size_on_disk() const { return size_on_disk_ + data_handler_->get_size_on_disk(); }
 size_t swappable_bitset::get_usage_count() const { return data_handler_->get_usage_count(); }
 
 usage_time_t swappable_bitset::get_last_usage() const { return data_handler_->get_last_usage(); }
@@ -78,22 +63,11 @@ std::thread::id swappable_bitset::get_loaded_by() const { return data_handler_->
 
 [[nodiscard]] load_time_t swappable_bitset::get_loaded_at() const { return data_handler_->get_loaded_at(); }
 
-std::string swappable_bitset::description() const { return data_handler_->description(); }
-
-void swappable_bitset::swap_in(const common::execution_context& context) { data_handler_->swap_in(context); }
-
-bool swappable_bitset::is_persisted() const { return persisted_; }
-
-void swappable_bitset::set_delete_from_disk_when_destructed(const bool value) {
-  delete_from_disk_when_destructed_ = value;
-  data_handler_->set_delete_from_disk_when_destructed(value);
-}
-
 swappable_bitset::~swappable_bitset() = default;
 
 swappable_bitset::swappable_bitset(memory::management::raw_data_handler_t<uint64_t>&& data_handler,
-                                   std::string swap_file, swap_info sinfo, std::optional<size_t> size)
-    : data_handler_{std::move(data_handler)}, swap_file_{std::move(swap_file)}, sinfo_{std::move(sinfo)} {
+                                   std::optional<size_t> size)
+    : data_handler_{std::move(data_handler)} {
   common::execution_context context;
   // if this constructor is called from init_from_swap, we read it once directly in order to read the size
   // of the bits, which is stored as the last uint64_t element in the data.

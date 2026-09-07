@@ -15,15 +15,13 @@ column_t temp_column_builder::create_from_string_data(row_id row_count, ctl::sta
   }
 
   auto plain_data = materialized_typed_data<cel_string_t>::init_materialized_data(
-      id.val, management::no_swap(), description, row_count, std::move(data), str_bfr_size, std::move(string_bfr),
-      null_flags);
+      id.val, description, row_count, std::move(data), str_bfr_size, std::move(string_bfr), null_flags);
 
   column_loading::column_config config;
   config.type = data_type::cel_string;
   config.cache_key = cache_key;
   config.name = name.val;
   config.id = id.val;
-  config.swap_information = management::no_swap();
   config.row_count = row_count;
   config.description = std::move(description);
 

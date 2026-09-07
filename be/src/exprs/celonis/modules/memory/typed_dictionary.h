@@ -31,13 +31,7 @@ class typed_dictionary : public dictionary {
 
   [[nodiscard]] const_data_accessor_t get_const_data(const common::execution_context& context = {}) const;
 
-  void swap_in(common::execution_context& context) override;
-
   [[nodiscard]] management::load_status get_load_status() const override;
-
-  [[nodiscard]] bool is_swappable() const override;
-
-  [[nodiscard]] bool swap_file_broken() const override;
 
   [[nodiscard]] row_id get_size() const override;
 
@@ -82,8 +76,6 @@ class typed_dictionary : public dictionary {
 
   [[nodiscard]] raw_dictionary_t copy_to_raw_dictionary(common::execution_context& context) override;
 
-  void set_delete_from_disk_when_destructed(bool value) override;
-
   /**
    *
    * @param data The data for the dictionary.
@@ -92,9 +84,7 @@ class typed_dictionary : public dictionary {
    * @param description The description of the swap file.
    * @return A typed dictionary of datatype T.
    */
-  [[nodiscard]] static dictionary_t create_dictionary(ctl::static_array<T>&& data, const std::string& swap_file_name,
-                                                      const management::swap_info& sinfo,
-                                                      const std::string& description);
+  [[nodiscard]] static dictionary_t create_dictionary(ctl::static_array<T>&& data, const std::string& description);
 
  private:
   management::raw_data_handler_t<T> data_handler;
@@ -113,13 +103,7 @@ class typed_dictionary<cel_string_t> : public dictionary {
 
   [[nodiscard]] const_data_accessor_t get_const_data(const common::execution_context& context = {}) const;
 
-  void swap_in(common::execution_context& context) override;
-
   [[nodiscard]] management::load_status get_load_status() const override;
-
-  [[nodiscard]] bool is_swappable() const override;
-
-  [[nodiscard]] bool swap_file_broken() const override;
 
   [[nodiscard]] row_id get_size() const override;
 
@@ -151,8 +135,6 @@ class typed_dictionary<cel_string_t> : public dictionary {
 
   [[nodiscard]] raw_dictionary_t copy_to_raw_dictionary(common::execution_context& context) override;
 
-  void set_delete_from_disk_when_destructed(bool value) override;
-
   /**
    * @param ptr Pointers to the string data for the dictionary.
    * @param str_buffer The buffer containing the string data.
@@ -162,9 +144,7 @@ class typed_dictionary<cel_string_t> : public dictionary {
    * @return A typed dictionary of the string data type.
    */
   [[nodiscard]] static dictionary_t create_dictionary(ctl::static_array<cel_string_t>&& ptr,
-                                                      ctl::static_array<char>&& buffer, const std::string& swap_file,
-                                                      const management::swap_info& sinfo,
-                                                      const std::string& description);
+                                                      ctl::static_array<char>&& buffer, const std::string& description);
 
  private:
   std::shared_ptr<management::string_data_handler> string_data_;

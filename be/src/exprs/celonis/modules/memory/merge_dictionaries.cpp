@@ -9,9 +9,8 @@
 namespace celonis::accelerator::memory {
 
 std::pair<dictionary_t, std::vector<ctl::shared_static_array<row_id>>> merge_n_dictionaries(
-    const std::vector<std::pair<dictionary_t, std::string>>& dictionaries, const std::string& swap_file_prefix,
-    const management::swap_info& sinfo, const std::string& description, const std::string& op_name,
-    common::execution_context& context) {
+    const std::vector<std::pair<dictionary_t, std::string>>& dictionaries, const std::string& description,
+    const std::string& op_name, common::execution_context& context) {
   auto result = merge_n_dictionaries_raw(dictionaries, op_name, context);
 
   const raw_dictionary_t new_raw_dictionary{
@@ -25,8 +24,7 @@ std::pair<dictionary_t, std::vector<ctl::shared_static_array<row_id>>> merge_n_d
   std::transform(result.mappings.begin(), result.mappings.end(), std::back_inserter(ptr_mappings),
                  [](ctl::static_array<row_id>& mapping) { return std::move(mapping); });
 
-  return {new_raw_dictionary->convert_to_dictionary_t_release_data(swap_file_prefix, sinfo, description),
-          std::move(ptr_mappings)};
+  return {new_raw_dictionary->convert_to_dictionary_t_release_data(description), std::move(ptr_mappings)};
 }
 
 /**
@@ -57,10 +55,6 @@ size_t get_merge_null_dicts_result_index(const std::vector<std::pair<dictionary_
     data_type curr_type = dics[i].first->type;
     if (curr_type != result_type) {
       continue;
-    }
-
-    if (dics[i].first->is_swappable()) {
-      return i;
     }
 
     result_index = i;

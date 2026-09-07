@@ -24,7 +24,6 @@ struct raw_dictionary_and_pointers {
   raw_column_ptrs_t column_pointers;
 
   [[nodiscard]] std::pair<dictionary_t, column_ptrs_t> to_swappable(const std::string& id,
-                                                                    const management::swap_info& sinfo,
                                                                     const std::string& description);
 };
 

@@ -101,8 +101,7 @@ void column::dictify_if_needed(const common::execution_context& context) {
     dictify_timer.restart();
     auto raw = transform::dictify(std::span{materialized_data.get(), static_cast<size_t>(config_.row_count)},
                                   null_flags_bitset.get(), config_.description, dictify_context);
-    auto [resulting_dict,
-          resulting_column_pointers]{raw.to_swappable(config_.id, config_.swap_information, config_.description)};
+    auto [resulting_dict, resulting_column_pointers]{raw.to_swappable(config_.id, config_.description)};
     dict_ = std::move(resulting_dict);
     column_pointers_ = std::move(resulting_column_pointers);
   };
@@ -137,9 +136,6 @@ void column::dictify_if_needed(const common::execution_context& context) {
     dict_->add_to_group(managed_group_);
   }
   status_ = column_loading::column_status::DICTIFIED;
-  if (config_.swap_information.is_persistent()) {
-    plain_data_->set_delete_from_disk_when_destructed(true);
-  }
   plain_data_ = nullptr;
 
   dictify_timer.stop();

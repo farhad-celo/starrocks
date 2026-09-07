@@ -7,11 +7,9 @@ namespace celonis::accelerator::memory {
 namespace {
 template <class COL_PTR_TYPE>
 [[nodiscard]] column_ptrs_t create_column_pointers(const raw_column_ptrs_impl<COL_PTR_TYPE>* raw_column_pointers,
-                                                   const std::string& cache_id, const std::string& cache_description,
-                                                   const management::swap_info& sinfo) {
+                                                   const std::string& cache_id, const std::string& cache_description) {
   auto column_pointer_handle = management::raw_data_handler<COL_PTR_TYPE>::create_data_handler(
-      raw_column_pointers->get_data(), cache_id + management::COLUMN_PTR_ENDING, sinfo,
-      cache_description + management::COLUMN_PTR_DESC);
+      raw_column_pointers->get_data(), cache_description + management::COLUMN_PTR_DESC);
   return std::make_shared<column_ptrs_impl<COL_PTR_TYPE>>(column_pointer_handle);
 }
 
@@ -33,23 +31,23 @@ size_t type_to_size(col_pointer_type type) {
 }
 
 column_ptrs_t create_column_pointers(const raw_column_ptrs_t& raw_column_pointers, const std::string& cache_id,
-                                     const std::string& cache_description, const management::swap_info& sinfo) {
+                                     const std::string& cache_description) {
   if constexpr (COL_PTR_64_NEEDED) {
     if (raw_column_pointers->get_type() == col_pointer_type::PTR_64) {
       return create_column_pointers(dynamic_cast<raw_column_ptrs_impl<col_ptr_64_t>*>(raw_column_pointers.get()),
-                                    cache_id, cache_description, sinfo);
+                                    cache_id, cache_description);
     }
   }
   if (raw_column_pointers->get_type() == col_pointer_type::PTR_32) {
     return create_column_pointers(dynamic_cast<raw_column_ptrs_impl<col_ptr_32_t>*>(raw_column_pointers.get()),
-                                  cache_id, cache_description, sinfo);
+                                  cache_id, cache_description);
   }
   if (raw_column_pointers->get_type() == col_pointer_type::PTR_16) {
     return create_column_pointers(dynamic_cast<raw_column_ptrs_impl<col_ptr_16_t>*>(raw_column_pointers.get()),
-                                  cache_id, cache_description, sinfo);
+                                  cache_id, cache_description);
   }
   return create_column_pointers(dynamic_cast<raw_column_ptrs_impl<col_ptr_8_t>*>(raw_column_pointers.get()), cache_id,
-                                cache_description, sinfo);
+                                cache_description);
 }
 
 raw_column_ptrs_t create_raw_column_pointer(const row_id row_count, const row_id dict_size_with_null,
@@ -73,7 +71,7 @@ namespace {
 template <class COL_PTR_TYPE>
 column_ptrs_t create_tmp_column_pointers(const raw_column_ptrs_impl<COL_PTR_TYPE>* raw_column_pointers) {
   auto column_pointer_handle{management::raw_data_handler<COL_PTR_TYPE>::create_data_handler(
-      raw_column_pointers->get_data(), "TMP", management::no_swap(), "Temp Raw Pointers")};
+      raw_column_pointers->get_data(), "Temp Raw Pointers")};
   return std::make_shared<column_ptrs_impl<COL_PTR_TYPE>>(std::move(column_pointer_handle));
 }
 }  // namespace

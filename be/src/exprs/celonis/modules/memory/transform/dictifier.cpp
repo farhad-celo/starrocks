@@ -515,9 +515,9 @@ raw_dictionary_and_pointers dictify_hash(std::span<const T> data, const size_t e
 }  // namespace details
 
 [[nodiscard]] std::pair<dictionary_t, column_ptrs_t> raw_dictionary_and_pointers::to_swappable(  // NOLINT
-    const std::string& id, const management::swap_info& sinfo, const std::string& description) {
-  return {std::move(*dictionary).convert_to_dictionary_t_release_data(id, sinfo, description + management::DICT_DESC),
-          create_column_pointers(column_pointers, id, description, sinfo)};
+    const std::string& id, const std::string& description) {
+  return {std::move(*dictionary).convert_to_dictionary_t_release_data(description + management::DICT_DESC),
+          create_column_pointers(column_pointers, id, description)};
 }
 
 template <typename TYPE>

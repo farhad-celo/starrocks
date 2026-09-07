@@ -80,8 +80,6 @@ class variant_trace_cache {
   // Deprecated
   [[nodiscard]] row_id get_num_cases() const { return get_group_id_domain(); }
 
-  void set_delete_from_disk_when_destructed();
-
  private:
   std::shared_ptr<management::pointer_data_handler<trace_type>> data_handle;
   management::raw_data_handler_t<trace_length_type> trace_lengths;

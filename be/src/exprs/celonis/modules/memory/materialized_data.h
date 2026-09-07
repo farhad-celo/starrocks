@@ -29,12 +29,6 @@ class materialized_data {
 
   virtual void add_to_group(std::shared_ptr<management::managed_memory_group> managed_group) = 0;
 
-  virtual void swap_in(common::execution_context& context) = 0;
-
-  [[nodiscard]] virtual bool is_swappable() const = 0;
-
-  [[nodiscard]] virtual bool swap_file_broken() const = 0;
-
   [[nodiscard]] virtual std::string get_string_value(row_id row, const common::execution_context& context) const = 0;
 
   [[nodiscard]] virtual std::optional<std::string> get_string_value_opt(
@@ -43,8 +37,6 @@ class materialized_data {
   [[nodiscard]] virtual management::load_status get_load_status() const = 0;
 
   [[nodiscard]] virtual usage_time_t time_of_last_usage() const = 0;
-
-  virtual void set_delete_from_disk_when_destructed(bool value) = 0;
 
   materialized_data(materialized_data&&) = delete;
   materialized_data(const materialized_data&) = delete;
@@ -74,13 +66,6 @@ class materialized_typed_data : public materialized_data {
     return data->get_const_data(context);
   }
 
-  void swap_in(common::execution_context& context) override {
-    data->swap_in(context);
-    null_flags->swap_in(context);
-  }
-
-  [[nodiscard]] bool is_swappable() const override { return data->is_swappable() && null_flags->is_swappable(); }
-
   [[nodiscard]] std::string get_string_value(row_id row, const common::execution_context& context) const override {
     return get_string_value_opt(row, context).value_or("NULL");
   }
@@ -104,41 +89,32 @@ class materialized_typed_data : public materialized_data {
 
   [[nodiscard]] usage_time_t time_of_last_usage() const override { return data->get_last_usage(); }
 
-  [[nodiscard]] bool swap_file_broken() const override {
-    return data->swap_file_broken() || null_flags->swap_file_broken();
-  }
-
   void add_to_group(std::shared_ptr<management::managed_memory_group> managed_group) override {
     managed_group->add_to_group(data);
     managed_group->add_to_group(null_flags);
   }
 
-  void set_delete_from_disk_when_destructed(const bool value) override {
-    data->set_delete_from_disk_when_destructed(value);
-    null_flags->set_delete_from_disk_when_destructed(value);
-  }
-
   static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(const std::string& id,
-                                                                            const management::swap_info& s_info,
                                                                             const std::string& description,
                                                                             row_id row_count, ctl::static_array<T> data,
                                                                             const memory::null_flags_t& null_flags) {
-    std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
-        null_flags, id + management::NULL_FLAGS_NEW_ENDING, s_info, description + management::NULL_FLAGS_DESC));
+    std::shared_ptr<management::swappable_bitset> bitset(
+        management::swappable_bitset::create_data_handler(null_flags, description + management::NULL_FLAGS_DESC));
     management::raw_data_handler_t<T> data_handler = management::raw_data_handler<T>::create_data_handler(
-        std::move(data), id + management::MATERIALIZED_DATA_NEW_ENDING, s_info,
-        description + management::MATERIALIZED_DATA_DESC);
+        std::move(data), description + management::MATERIALIZED_DATA_DESC);
 
     return std::make_shared<materialized_typed_data<T>>(row_count, std::move(bitset), std::move(data_handler));
   }
 
-  static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(
-      const std::string& id, const management::swap_info& s_info, const std::string& description, row_id row_count,
-      const ctl::shared_static_array<T>& data, const memory::null_flags_t& null_flags) {
-    std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
-        null_flags, id + management::NULL_FLAGS_NEW_ENDING, s_info, description + management::NULL_FLAGS_DESC));
-    management::raw_data_handler_t<T> data_handler = management::raw_data_handler<T>::create_data_handler(
-        data, id + management::MATERIALIZED_DATA_NEW_ENDING, s_info, description + management::MATERIALIZED_DATA_DESC);
+  static std::shared_ptr<materialized_typed_data<T>> init_materialized_data(const std::string& id,
+                                                                            const std::string& description,
+                                                                            row_id row_count,
+                                                                            const ctl::shared_static_array<T>& data,
+                                                                            const memory::null_flags_t& null_flags) {
+    std::shared_ptr<management::swappable_bitset> bitset(
+        management::swappable_bitset::create_data_handler(null_flags, description + management::NULL_FLAGS_DESC));
+    management::raw_data_handler_t<T> data_handler =
+        management::raw_data_handler<T>::create_data_handler(data, description + management::MATERIALIZED_DATA_DESC);
 
     return std::make_shared<materialized_typed_data<T>>(row_count, std::move(bitset), std::move(data_handler));
   }
@@ -162,13 +138,6 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
     return string_data->get_const_data(context);
   }
 
-  void swap_in(common::execution_context& context) override {
-    string_data->swap_in(context);
-    null_flags->swap_in(context);
-  }
-
-  [[nodiscard]] bool is_swappable() const override { return string_data->is_swappable() && null_flags->is_swappable(); }
-
   [[nodiscard]] std::string get_string_value(row_id row, const common::execution_context& context) const override {
     return get_string_value_opt(row, context).value_or("NULL");
   }
@@ -189,29 +158,20 @@ class materialized_typed_data<cel_string_t> : public materialized_data {
 
   [[nodiscard]] usage_time_t time_of_last_usage() const override { return string_data->get_last_usage(); }
 
-  [[nodiscard]] bool swap_file_broken() const override {
-    return string_data->swap_file_broken() || null_flags->swap_file_broken();
-  }
-
   void add_to_group(std::shared_ptr<management::managed_memory_group> managed_group) override {
     managed_group->add_to_group(string_data);
     managed_group->add_to_group(null_flags);
   }
 
-  void set_delete_from_disk_when_destructed(const bool value) override {
-    string_data->set_delete_from_disk_when_destructed(value);
-    null_flags->set_delete_from_disk_when_destructed(value);
-  }
-
   static std::shared_ptr<materialized_typed_data<cel_string_t>> init_materialized_data(
-      const std::string& id, const management::swap_info& s_info, const std::string& description, row_id row_count,
+      const std::string& id, const std::string& description, row_id row_count,
       const ctl::shared_static_array<cel_string_t>& ptrs, size_t /*str_bfr_size*/,
       const ctl::shared_static_array<char>& string_bfr, const memory::null_flags_t& null_flags) {
-    std::shared_ptr<management::swappable_bitset> bitset(management::swappable_bitset::create_data_handler(
-        null_flags, id + management::NULL_FLAGS_ENDING, s_info, description + management::NULL_FLAGS_DESC));
+    std::shared_ptr<management::swappable_bitset> bitset(
+        management::swappable_bitset::create_data_handler(null_flags, description + management::NULL_FLAGS_DESC));
     std::shared_ptr<management::string_data_handler> data_handler =
         management::string_data_handler::create_data_handler(
-            ptrs, string_bfr, id, management::pointer_data_handler_swap_type::SWAPPED_MATERIALIZED, s_info,
+            ptrs, string_bfr, management::pointer_data_handler_swap_type::SWAPPED_MATERIALIZED,
             description + management::MATERIALIZED_DATA_DESC);
     return std::make_shared<materialized_typed_data<cel_string_t>>(row_count, std::move(bitset),
                                                                    std::move(data_handler));

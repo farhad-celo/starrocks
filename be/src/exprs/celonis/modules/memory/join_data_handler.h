@@ -31,16 +31,13 @@ using join_data_handler_t = std::variant<join_data_handler64_t, join_data_handle
 
 template <typename JOIN_TYPE>
 [[nodiscard]] management::raw_data_handler_t<JOIN_TYPE> create_join_from_raw_data(
-    const ctl::shared_static_array<JOIN_TYPE>& raw_join, const std::string& file_name, const std::string& description,
-    const management::swap_info& sinfo) {
+    const ctl::shared_static_array<JOIN_TYPE>& raw_join, const std::string& description) {
   debug_assert(std::is_same_v<decltype(raw_join), const raw_join64_t&> ||
                std::is_same_v<decltype(raw_join), const raw_join32_t&>);
-  return management::raw_data_handler<JOIN_TYPE>::create_data_handler(raw_join, file_name, sinfo, description);
+  return management::raw_data_handler<JOIN_TYPE>::create_data_handler(raw_join, description);
 }
 
-[[nodiscard]] join_data_handler_t create_join_from_raw_data(const join_raw_t& raw_join, const std::string& file_name,
-                                                            const std::string& description,
-                                                            const management::swap_info& sinfo);
+[[nodiscard]] join_data_handler_t create_join_from_raw_data(const join_raw_t& raw_join, const std::string& description);
 
 template <typename T>
 concept join_concept =

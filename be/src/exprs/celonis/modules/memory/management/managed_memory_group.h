@@ -17,7 +17,6 @@ namespace celonis::accelerator::memory::management {
 
 struct memory_entity_info {
   std::string description{};
-  size_t size_on_disk{0};
   size_t size_in_memory{0};
   size_t access_count{0};
   std::string last_access{};
@@ -41,15 +40,7 @@ class managed_memory_group {
 
   void clear_group();
 
-  size_t get_size_on_disk() const;
-
   size_t get_size_in_memory() const;
-
-  void force_swap_in(const common::execution_context& context) const;
-
-  [[nodiscard]] bool is_persisted() const;
-
-  memory_group_info dump_header() const;
 
   const std::string& get_type() const;
 

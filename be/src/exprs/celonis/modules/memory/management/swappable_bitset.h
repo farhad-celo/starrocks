@@ -21,26 +21,17 @@ namespace celonis::accelerator::memory::management {
 class swappable_bitset : public data_handler {
  public:
   static std::shared_ptr<swappable_bitset> create_data_handler(const memory::null_flags_t& data,
-                                                               const std::string& swap_file, const swap_info& sinfo,
                                                                const std::string& description);
 
   [[nodiscard]] load_status get_load_status() const override;
-
-  [[nodiscard]] persistence_status get_persistence_status() const override;
-
-  [[nodiscard]] bool swap_file_broken() const override;
 
   using const_data_accessor_t = const_bitset_data_accessor;
 
   const_data_accessor_t get_const_data(const common::execution_context& context);
 
-  [[nodiscard]] bool is_swappable() const override;
-
   [[nodiscard]] size_t get_size_in_memory() const override;
 
   [[nodiscard]] size_t get_size() const;
-
-  [[nodiscard]] size_t get_size_on_disk() const override;
 
   [[nodiscard]] size_t get_usage_count() const override;
 
@@ -50,29 +41,15 @@ class swappable_bitset : public data_handler {
 
   [[nodiscard]] load_time_t get_loaded_at() const override;
 
-  [[nodiscard]] std::string description() const override;
-
-  void swap_in(const common::execution_context& context) override;
-
-  [[nodiscard]] bool is_persisted() const override;
-
-  void set_delete_from_disk_when_destructed(bool value);
-
   ~swappable_bitset() override;
 
  private:
-  swappable_bitset(memory::management::raw_data_handler_t<uint64_t>&& data_handler, std::string swap_file,
-                   swap_info sinfo, std::optional<size_t> size = {});
-
-  void write_null_flag_ending_to_disk(common::execution_context& context);
+  swappable_bitset(memory::management::raw_data_handler_t<uint64_t>&& data_handler, std::optional<size_t> size = {});
 
   size_t size_{0};
   memory::management::raw_data_handler_t<uint64_t> data_handler_;
   // below are for backwards compatibility
   mutable std::shared_mutex data_mutex_;
-  size_t size_on_disk_{0};
-  std::string swap_file_;  // null flag ending swap file
-  swap_info sinfo_;
   std::atomic<bool> persisted_{false};
   std::atomic<bool> delete_from_disk_when_destructed_{false};
 };

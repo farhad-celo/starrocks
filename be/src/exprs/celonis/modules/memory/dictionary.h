@@ -34,16 +34,7 @@ class dictionary {
    */
   virtual void add_to_group(std::shared_ptr<management::managed_memory_group> managed_group) = 0;
 
-  /**
-   * Swaps the column into memory.
-   */
-  virtual void swap_in(common::execution_context& context) = 0;
-
   [[nodiscard]] virtual management::load_status get_load_status() const = 0;
-
-  [[nodiscard]] virtual bool is_swappable() const = 0;
-
-  [[nodiscard]] virtual bool swap_file_broken() const = 0;
 
   [[nodiscard]] virtual row_id get_size() const = 0;
 
@@ -64,8 +55,6 @@ class dictionary {
   [[nodiscard]] virtual std::optional<std::string> get_string_value_opt(row_id ptr) const = 0;
 
   [[nodiscard]] virtual raw_dictionary_t copy_to_raw_dictionary(common::execution_context& context) = 0;
-
-  virtual void set_delete_from_disk_when_destructed(bool value) = 0;
 
   dictionary(const dictionary&) = delete;
   dictionary& operator=(const dictionary&) = delete;
