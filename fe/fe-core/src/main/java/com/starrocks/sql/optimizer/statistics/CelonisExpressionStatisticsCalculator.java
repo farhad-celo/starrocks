@@ -110,6 +110,14 @@ public class CelonisExpressionStatisticsCalculator {
                 maxValue = 1;
                 distinctValue = 3;
                 break;
+            case FunctionSet.CELONIS_NULL_TO_EMPTY:
+                final var originalNullsFraction = nullsFraction;
+                nullsFraction = 0.0;
+                collectionSize = columnStatistic.getCollectionSize() == ColumnStatistic.DEFAULT_COLLECTION_SIZE
+                                ? ColumnStatistic.DEFAULT_COLLECTION_SIZE
+                                : columnStatistic.getCollectionSize() * (1 - originalNullsFraction);
+                // The data column is unwrapped, so all other statistics are the same as for the child operator
+                break;
             case FunctionSet.CELONIS_SQUARE:
                 double celonisSquareMinValue;
                 double celonisSquareMaxValue = Math.max(minValue * minValue, maxValue * maxValue);

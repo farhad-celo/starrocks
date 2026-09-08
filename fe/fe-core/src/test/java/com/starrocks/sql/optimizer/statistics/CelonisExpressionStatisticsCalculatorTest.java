@@ -527,6 +527,63 @@ public class CelonisExpressionStatisticsCalculatorTest {
 
         assertEquals(ColumnStatistic.unknown(), unknownStatistic);
     }
+    
+    @Test
+    public void testCelonisNullToEmpty() {
+        // GIVEN
+        final var unaryTestScenario = unaryTestScenario();
+     
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_NULL_TO_EMPTY, Type.ARRAY_INT,
+                Lists.newArrayList(unaryTestScenario.arrayColumnRefOperator));
+
+        {
+            final var statistics = unaryTestScenario.statistics;
+            // WHEN
+            final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+            // THEN correctly sets Non zero NullFractions to zero
+            assertEquals(0.0, columnStatistic.getNullsFraction());
+
+            // THEN keeps other statistics the same
+            assertEquals(40, columnStatistic.getAverageRowSize(), 0.001);
+            assertEquals(NEGATIVE_INFINITY, columnStatistic.getMinValue(), 0.001);
+            assertEquals(POSITIVE_INFINITY, columnStatistic.getMaxValue(), 0.001);
+            assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+            assertEquals(8, columnStatistic.getCollectionSize(), 0.001);
+        }
+        {
+            final var unknownStatistics = unaryTestScenario.unknownStatistics;
+
+            // WHEN
+            final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, unknownStatistics);
+
+            // THEN correctly sets Non zero NullFractions to zero
+            assertEquals(0.0, columnStatistic.getNullsFraction());
+
+            // THEN keeps other statistics the same
+            assertEquals(1, columnStatistic.getAverageRowSize(), 0.001);
+            assertEquals(NEGATIVE_INFINITY, columnStatistic.getMinValue(), 0.001);
+            assertEquals(POSITIVE_INFINITY, columnStatistic.getMaxValue(), 0.001);
+            assertEquals(1, columnStatistic.getDistinctValuesCount(), 0.001);
+            assertEquals(ColumnStatistic.DEFAULT_COLLECTION_SIZE, columnStatistic.getCollectionSize(), 0.001);
+        }
+        {
+            final var emptyStatistics = unaryTestScenario.emptyCollectionStatistics;
+
+            // WHEN
+            final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, emptyStatistics);
+
+            // THEN correctly sets Non zero NullFractions to zero
+            assertEquals(0.0, columnStatistic.getNullsFraction());
+
+            // THEN keeps other statistics the same
+            assertEquals(40, columnStatistic.getAverageRowSize(), 0.001);
+            assertEquals(NEGATIVE_INFINITY, columnStatistic.getMinValue(), 0.001);
+            assertEquals(POSITIVE_INFINITY, columnStatistic.getMaxValue(), 0.001);
+            assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+            assertEquals(0, columnStatistic.getCollectionSize(), 0.001);
+        }
+    }
 
     @Test
     public void testCelonisEncodeString() {
