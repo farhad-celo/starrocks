@@ -52,6 +52,29 @@ runs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         OCI_VERSION: ${{ inputs.oci_version }}
       run: |
+        # Registry pushes can fail transiently, for example when GHCR returns "unknown blob".
+        push_with_retry() {
+          local image="$1"
+          local max_attempts=5
+          local delay_seconds=5
+          local attempt
+
+          for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+            if docker push "${image}"; then
+              return 0
+            fi
+
+            if ((attempt == max_attempts)); then
+              echo "::error::Failed to push ${image} after ${max_attempts} attempts"
+              return 1
+            fi
+
+            echo "Push attempt ${attempt}/${max_attempts} failed for ${image}; retrying in ${delay_seconds}s"
+            sleep "${delay_seconds}"
+            delay_seconds=$((delay_seconds * 2))
+          done
+        }
+
         IMAGE_TAG=${{ inputs.image_tag }}
         ARTIFACT_IMAGE=${{ inputs.artifact_image }}
 
@@ -76,5 +99,5 @@ runs:
           -t ghcr.io/celonis/celostar/starrocks-be:$IMAGE_TAG \
           -t ${ECR_REGISTRY}/celostar/starrocks-be:$IMAGE_TAG .
 
-        docker push ghcr.io/celonis/celostar/starrocks-be:$IMAGE_TAG
-        docker push ${ECR_REGISTRY}/celostar/starrocks-be:$IMAGE_TAG
+        push_with_retry "ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}"
+        push_with_retry "${ECR_REGISTRY}/celostar/starrocks-be:${IMAGE_TAG}"
