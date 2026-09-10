@@ -15,6 +15,7 @@
 package com.starrocks.sql.optimizer.rule.transformation;
 
 import com.google.common.collect.Lists;
+import com.starrocks.metric.celonis.CelonisRuleUsageMetrics;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.OptimizerContext;
 import com.starrocks.sql.optimizer.operator.OperatorType;
@@ -42,6 +43,27 @@ import java.util.List;
 public class WindowSkewToMergeSortRule extends TransformationRule {
 
     private static final WindowSkewToMergeSortRule INSTANCE = new WindowSkewToMergeSortRule();
+    private static final String RULE_NAME = "window_skew_to_merge_sort_rule";
+    private static final String RULE_CATEGORY = "celonis_skew_rules";
+
+    public enum TriggerReason { SKEWED_NULL, SKEWED_MCV, SKEWED_NULL_AND_MCV }
+
+    public enum NoTriggerReason {
+        NO_PARTITION_COLUMN,
+        SINGLE_PARTITION_COLUMN,
+        NO_ORDER_BY_COLUMN,
+        ALREADY_FORCE_MERGE_SORT,
+        SKEW_HINT_PRESENT,
+        MISSING_STATS,
+        NON_COLUMN_REF_PARTITION_EXPRESSION,
+        NOT_SKEWED,
+        INACCURATE_ROW_COUNT,
+        NO_MCV,
+        NO_HISTOGRAM,
+    }
+
+    public static final CelonisRuleUsageMetrics<TriggerReason, NoTriggerReason>
+            RULE_USAGE_METRICS = new CelonisRuleUsageMetrics<>(RULE_NAME, RULE_CATEGORY);
 
     private WindowSkewToMergeSortRule() {
         super(RuleType.TF_WINDOW_SKEW_TO_MERGE_SORT, Pattern.create(OperatorType.LOGICAL_WINDOW));
@@ -55,6 +77,18 @@ public class WindowSkewToMergeSortRule extends TransformationRule {
     public boolean check(OptExpression input, OptimizerContext context) {
         if (input.getOp() instanceof LogicalWindowOperator lwo) {
             List<ScalarOperator> partitionExprs = lwo.getPartitionExpressions();
+            if (partitionExprs == null || partitionExprs.isEmpty()) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_PARTITION_COLUMN);
+            } else if (partitionExprs.size() == 1) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.SINGLE_PARTITION_COLUMN);
+            } else if (lwo.getOrderByElements() == null || lwo.getOrderByElements().isEmpty()) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_ORDER_BY_COLUMN);
+            } else if (lwo.isForceMergeSort()) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.ALREADY_FORCE_MERGE_SORT);
+            } else if (lwo.isSkewed() || lwo.getSkewColumn() != null) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.SKEW_HINT_PRESENT);
+            }
+
             return partitionExprs != null
                     && partitionExprs.size() > 1
                     && lwo.getOrderByElements() != null
@@ -74,6 +108,7 @@ public class WindowSkewToMergeSortRule extends TransformationRule {
         OptExpression child = input.inputAt(0);
         Statistics statistics = child.getStatistics();
         if (statistics == null) {
+            RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
             return Collections.emptyList();
         }
 
@@ -88,22 +123,53 @@ public class WindowSkewToMergeSortRule extends TransformationRule {
                                               OptimizerContext context) {
         double threshold = context.getSessionVariable().getDataSkewRowPercentageThreshold();
         DataSkew.Thresholds thresholds = DataSkew.Thresholds.withRelativeRowThreshold(threshold);
+        boolean hasNullSkew = false;
+        boolean hasMcvSkew = false;
 
         for (ScalarOperator partitionExpr : window.getPartitionExpressions()) {
             // A partition column we cannot analyze cannot be considered skewed, so it prevents
             // the rule from triggering when we require every column to be skewed.
             if (!(partitionExpr instanceof ColumnRefOperator col)) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NON_COLUMN_REF_PARTITION_EXPRESSION);
                 return false;
             }
             if (!statistics.getColumnStatistics().containsKey(col)) {
+                RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
                 return false;
             }
 
-            if (!DataSkew.isColumnSkewed(statistics, statistics.getColumnStatistic(col), thresholds)) {
+            final var skewInfo =
+                    DataSkew.getColumnSkewInfo(statistics, statistics.getColumnStatistic(col), thresholds);
+            if (!skewInfo.isSkewed()) {
+                reportNotTriggered(skewInfo.additionalInfo());
                 return false;
             }
+
+            if (skewInfo.type() == DataSkew.SkewType.SKEWED_NULL) {
+                hasNullSkew = true;
+            } else if (skewInfo.type() == DataSkew.SkewType.SKEWED_MCV) {
+                hasMcvSkew = true;
+            }
+        }
+
+        if (hasNullSkew && hasMcvSkew) {
+            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_NULL_AND_MCV);
+        } else if (hasNullSkew) {
+            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_NULL);
+        } else if (hasMcvSkew) {
+            RULE_USAGE_METRICS.triggered(TriggerReason.SKEWED_MCV);
         }
         return true;
+    }
+
+    private static void reportNotTriggered(DataSkew.AdditionalInfo additionalInfo) {
+        switch (additionalInfo) {
+            case NONE -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NOT_SKEWED);
+            case UNKNOWN_STATS -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.MISSING_STATS);
+            case INACCURATE_ROW_COUNT -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.INACCURATE_ROW_COUNT);
+            case NO_MCV -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_MCV);
+            case NO_HISTOGRAM -> RULE_USAGE_METRICS.notTriggered(NoTriggerReason.NO_HISTOGRAM);
+        }
     }
 
     private List<OptExpression> buildResult(LogicalWindowOperator originalWindow, OptExpression input) {
