@@ -9,9 +9,21 @@ on:
       branch_to_test:
         description: "The branch to build images and run tests. If empty, will rebase upstream code and then build images to test"
         default: ''
+        type: string
       image_to_build:
         description: "The image tag to build. Only take effect when above input is not empty. If empty, will construct one from the above input branch name"
         default: ''
+        type: string
+  workflow_call:
+    inputs:
+      branch_to_test:
+        description: "The immutable branch or commit to build and test"
+        required: true
+        type: string
+      image_to_build:
+        description: "Optional image tag prefix"
+        default: ''
+        type: string
 
 env:
   LATEST_UPSTREAM_BRANCH: branch-3.5-cc
@@ -319,14 +331,25 @@ jobs:
     runs-on: [runs-on,runner=1cpu-linux-x64, image=ubuntu22-full-x64, "run-id=${{ github.run_id }}"]
     needs: build-manifest
     outputs:
-      workflow_url: ${{ steps.run-test.outputs.workflow_url }}
+      workflow_url: ${{ steps.verify-run.outputs.workflow_url }}
     env:
       test_image_tag: ${{ needs.build-manifest.outputs.fe_be_image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Run celostar e2e test
+
+      - name: Restore the dispatched Celostar E2E run
+        id: restore-run
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: celostar-e2e-run-${{ github.run_id }}
+          path: ${{ runner.temp }}/celostar-e2e-state
+
+      - name: Dispatch Celostar E2E test
         id: run-test
+        if: ${{ steps.restore-run.outcome != 'success' }}
+        continue-on-error: true
         uses: ./.github/actions/trigger-celostar-test
         with:
           owner: celonis
@@ -340,11 +363,61 @@ jobs:
                 \"starrocks_image_tag\":\"${test_image_tag}\",
                 \"gateway_image_tag\":\"branch\"}
             }
+
+      - name: Record the dispatched Celostar E2E run
+        if: >-
+          ${{
+            always() &&
+            steps.restore-run.outcome != 'success' &&
+            steps.run-test.outputs.workflow_id != ''
+          }}
+        env:
+          CELOSTAR_RUN_ID: ${{ steps.run-test.outputs.workflow_id }}
+          E2E_STATE_DIR: ${{ runner.temp }}/celostar-e2e-state
+        run: |
+          mkdir -p "${E2E_STATE_DIR}"
+          printf '%s\n' "${CELOSTAR_RUN_ID}" > "${E2E_STATE_DIR}/run-id"
+
+      - name: Persist the dispatched Celostar E2E run
+        if: >-
+          ${{
+            always() &&
+            steps.restore-run.outcome != 'success' &&
+            steps.run-test.outputs.workflow_id != ''
+          }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: celostar-e2e-run-${{ github.run_id }}
+          path: ${{ runner.temp }}/celostar-e2e-state/run-id
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Verify the existing Celostar E2E run
+        id: verify-run
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          E2E_STATE_DIR: ${{ runner.temp }}/celostar-e2e-state
+        run: |
+          state_file="${E2E_STATE_DIR}/run-id"
+          if [[ ! -s "${state_file}" ]]; then
+            echo "No Celostar E2E run ID was restored or dispatched" >&2
+            exit 1
+          fi
+          run_id=$(cat "${state_file}")
+          if [[ ! "${run_id}" =~ ^[0-9]+$ ]]; then
+            echo "Invalid Celostar E2E run ID: ${run_id}" >&2
+            exit 1
+          fi
+          workflow_url=$(gh run view "${run_id}" -R celonis/celostar --json url --jq .url)
+          echo "workflow_url=${workflow_url}" >> "$GITHUB_OUTPUT"
+          gh run watch "${run_id}" -R celonis/celostar --exit-status
+
       - name: Summarize the result
-        if: always() && steps.run-test.outcome != 'skipped'
+        if: ${{ always() && steps.verify-run.outputs.workflow_url != '' }}
         run: |
           {
-            echo "The E2E test workflow is: ${{steps.run-test.outputs.workflow_url}}"
+            echo "The E2E test workflow is: ${{ steps.verify-run.outputs.workflow_url }}"
           } >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
 
@@ -364,6 +437,8 @@ jobs:
           HEAD_BRANCH: ${{ needs.sync-and-rebase-upstream.outputs.test_branch }}
           BASE_BRANCH: ${{ needs.sync-and-rebase-upstream.outputs.pr_base_branch }}
           SYNCED_CELO: ${{ needs.sync-and-rebase-upstream.outputs.synced_celo_branch }}
+          E2E_URL: ${{ needs.e2e-tests.outputs.workflow_url }}
+          COMPLIANCE_URL: ${{ needs.celostar-compliance-test.outputs.workflow_url }}
         run: |
           set -euo pipefail
           if [[ -z "${HEAD_BRANCH}" || -z "${BASE_BRANCH}" ]]; then

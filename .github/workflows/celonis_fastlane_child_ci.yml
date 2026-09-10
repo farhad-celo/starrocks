@@ -1,0 +1,119 @@
+name: Fastlane Rebase Child CI
+
+on:
+  pull_request:
+    types: [ready_for_review, synchronize, reopened]
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+  pull-requests: read
+  statuses: read
+
+jobs:
+  metadata:
+    if: >-
+      ${{
+        github.event_name == 'pull_request' &&
+        !github.event.pull_request.draft &&
+        contains(github.event.pull_request.title, '[FASTLANE-REBASE]')
+      }}
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    outputs:
+      run_id: ${{ steps.state.outputs.run_id }}
+    steps:
+      - name: Read orchestration state
+        id: state
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const match = body.match(/<!--\s*fastlane-rebase-state\s+(\{.*?\})\s*-->/s);
+            if (!match) throw new Error('Missing fastlane orchestration metadata');
+            const state = JSON.parse(match[1]);
+            if (state.role !== 'child') throw new Error('PR metadata role is not child');
+            core.setOutput('run_id', String(state.run_id));
+
+  validate:
+    needs: metadata
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      base_sha: ${{ steps.validate.outputs.base_sha }}
+      head_sha: ${{ steps.validate.outputs.head_sha }}
+      status_context: ${{ steps.validate.outputs.status_context }}
+    steps:
+      - name: Checkout trusted validator
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+
+      - name: Checkout child branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: child
+
+      - name: Download immutable snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: fastlane-manifest-${{ needs.metadata.outputs.run_id }}
+          path: ${{ runner.temp }}/fastlane
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.metadata.outputs.run_id }}
+
+      - name: Validate child history
+        id: validate
+        working-directory: child
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 ../trusted/celonis/tools/fastlane_rebase.py validate-child \
+            --manifest "${{ runner.temp }}/fastlane/fastlane-manifest.json" \
+            --repo "${{ github.repository }}" \
+            --pr-number "${{ github.event.pull_request.number }}"
+
+  presubmit-tests:
+    needs: validate
+    uses: ./.github/workflows/celonis_presubmit_test.yml
+    with:
+      ref_to_test: ${{ needs.validate.outputs.head_sha }}
+      base_ref: ${{ github.event.pull_request.base.ref }}
+
+  attest:
+    needs: [validate, presubmit-tests]
+    if: ${{ always() && needs.validate.result == 'success' }}
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - name: Publish current-base result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.validate.outputs.head_sha }}
+          BASE_SHA: ${{ needs.validate.outputs.base_sha }}
+          CONTEXT: ${{ needs.validate.outputs.status_context }}
+          PRESUBMIT_RESULT: ${{ needs.presubmit-tests.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          state=success
+          description="Passed base ${BASE_SHA:0:12}; manifest ${CONTEXT: -12}"
+          if [[ "${PRESUBMIT_RESULT}" != "success" ]]; then
+            state=failure
+            description="Failed base ${BASE_SHA:0:12}; manifest ${CONTEXT: -12}"
+          fi
+          gh api --method POST "repos/${{ github.repository }}/statuses/${HEAD_SHA}" \
+            -f state="${state}" \
+            -f context="${CONTEXT}" \
+            -f description="${description}" \
+            -f target_url="${RUN_URL}"
+          [[ "${state}" == success ]]

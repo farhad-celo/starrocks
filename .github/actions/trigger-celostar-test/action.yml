@@ -11,6 +11,8 @@ inputs:
     required: false
 
 outputs:
+  workflow_id:
+    value: ${{steps.trigger.outputs.workflow_id}}
   workflow_url:
     value: ${{steps.trigger.outputs.workflow_url}}
 

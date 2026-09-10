@@ -1,0 +1,205 @@
+name: Fastlane Rebase Merge Command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  pull-requests: write
+  statuses: read
+
+jobs:
+  authorize:
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    outputs:
+      valid: ${{ steps.authorize.outputs.valid }}
+      run_id: ${{ steps.authorize.outputs.run_id }}
+      pr_number: ${{ steps.authorize.outputs.pr_number }}
+      head_sha: ${{ steps.authorize.outputs.head_sha }}
+      base_sha: ${{ steps.authorize.outputs.base_sha }}
+      parent_pr: ${{ steps.authorize.outputs.parent_pr }}
+    steps:
+      - name: Authorize command and verify current-base checks
+        id: authorize
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = context.issue.number;
+            const reject = async (message) => {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: `❌ /merge rejected: ${message}`,
+              });
+              core.setOutput('valid', 'false');
+            };
+            try {
+              if ((context.payload.comment.body || '').trim() !== '/merge') return;
+              const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner, repo, username: context.payload.comment.user.login,
+              });
+              if (!['write', 'maintain', 'admin'].includes(permission.data.permission)) {
+                return await reject(`@${context.payload.comment.user.login} does not have write permission.`);
+              }
+              const response = await github.rest.pulls.get({owner, repo, pull_number: prNumber});
+              const pr = response.data;
+              if (!pr.title.includes('[FASTLANE-REBASE]')) {
+                return await reject('PR title is not a distributed fastlane rebase title.');
+              }
+              if (pr.draft) return await reject('mark the PR ready before requesting a merge.');
+              const match = (pr.body || '').match(/<!--\s*fastlane-rebase-state\s+(\{.*?\})\s*-->/s);
+              if (!match) return await reject('missing orchestration metadata.');
+              const state = JSON.parse(match[1]);
+              if (state.role !== 'child') return await reject('orchestration role is not child.');
+              if (!Number.isInteger(state.parent_pr) || !state.author || !state.central_branch) {
+                return await reject('child orchestration metadata is incomplete.');
+              }
+              const parent = (await github.rest.pulls.get({
+                owner, repo, pull_number: state.parent_pr,
+              })).data;
+              const parentMatch = (parent.body || '').match(/<!--\s*fastlane-rebase-state\s+(\{.*?\})\s*-->/s);
+              if (!parentMatch) return await reject('parent PR is missing orchestration metadata.');
+              const parentState = JSON.parse(parentMatch[1]);
+              if (
+                parentState.role !== 'parent' ||
+                String(parentState.run_id) !== String(state.run_id) ||
+                parentState.manifest_sha256 !== state.manifest_sha256 ||
+                parentState.central_branch !== state.central_branch ||
+                !(parentState.children || []).includes(prNumber)
+              ) {
+                return await reject('child metadata does not match its parent PR.');
+              }
+              const authorSlug = String(state.author)
+                .replace(/[^A-Za-z0-9_.-]+/g, '-')
+                .replace(/^[-.]+|[-.]+$/g, '')
+                .toLowerCase();
+              const expectedBranch = `fastlane-rebase/${state.run_id}/author/${authorSlug}`;
+              const expectedTitle = `[FASTLANE-REBASE] ${state.central_branch} - ${state.author}`;
+              if (
+                pr.base.ref !== state.central_branch ||
+                pr.head.ref !== expectedBranch ||
+                pr.title !== expectedTitle
+              ) {
+                return await reject('child branch, base, or title does not match its orchestration metadata.');
+              }
+
+              const currentBase = await github.rest.repos.getBranch({owner, repo, branch: pr.base.ref});
+              const baseSha = currentBase.data.commit.sha;
+              const refreshed = (await github.rest.pulls.get({owner, repo, pull_number: prNumber})).data;
+              const headSha = refreshed.head.sha;
+              const comparison = await github.rest.repos.compareCommitsWithBasehead({
+                owner, repo, basehead: `${baseSha}...${headSha}`,
+              });
+              if (comparison.data.behind_by !== 0) {
+                return await reject(`the child is not based on current central SHA ${baseSha}; rebase and rerun CI.`);
+              }
+              const statuses = await github.rest.repos.getCombinedStatusForRef({
+                owner, repo, ref: headSha, per_page: 100,
+              });
+              const expectedContext = `fastlane-child/${baseSha.slice(0, 12)}/${state.manifest_sha256}`;
+              const attestation = statuses.data.statuses.find(status => status.context === expectedContext);
+              if (!attestation || attestation.state !== 'success') {
+                return await reject(`missing a successful ${expectedContext} status on current head ${headSha}.`);
+              }
+              core.setOutput('valid', 'true');
+              core.setOutput('run_id', String(state.run_id));
+              core.setOutput('pr_number', String(prNumber));
+              core.setOutput('head_sha', headSha);
+              core.setOutput('base_sha', baseSha);
+              core.setOutput('parent_pr', String(state.parent_pr));
+            } catch (error) {
+              await reject(error.message);
+            }
+
+  merge:
+    needs: authorize
+    if: ${{ needs.authorize.outputs.valid == 'true' }}
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    concurrency:
+      group: fastlane-rebase-${{ needs.authorize.outputs.run_id }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+      PR_NUMBER: ${{ needs.authorize.outputs.pr_number }}
+      PARENT_PR: ${{ needs.authorize.outputs.parent_pr }}
+      RUN_ID: ${{ needs.authorize.outputs.run_id }}
+      EXPECTED_HEAD: ${{ needs.authorize.outputs.head_sha }}
+      EXPECTED_BASE: ${{ needs.authorize.outputs.base_sha }}
+    steps:
+      - name: Recheck and rebase-merge
+        run: |
+          set -euo pipefail
+          current_head=$(gh pr view "${PR_NUMBER}" -R "${{ github.repository }}" --json headRefOid --jq .headRefOid)
+          current_base=$(gh pr view "${PR_NUMBER}" -R "${{ github.repository }}" --json baseRefOid --jq .baseRefOid)
+          if [[ "${current_head}" != "${EXPECTED_HEAD}" || "${current_base}" != "${EXPECTED_BASE}" ]]; then
+            gh pr comment "${PR_NUMBER}" -R "${{ github.repository }}" \
+              --body "❌ /merge rejected: head or central base changed after validation; rerun child CI."
+            exit 1
+          fi
+          if ! gh pr merge "${PR_NUMBER}" -R "${{ github.repository }}" \
+            --rebase --match-head-commit "${EXPECTED_HEAD}"; then
+            gh pr comment "${PR_NUMBER}" -R "${{ github.repository }}" \
+              --body "❌ /merge failed during the rebase merge. Update the branch and retry."
+            exit 1
+          fi
+          gh pr comment "${PR_NUMBER}" -R "${{ github.repository }}" \
+            --body "✅ Rebase-merged after validating head \`${EXPECTED_HEAD}\` against central \`${EXPECTED_BASE}\`."
+
+      - name: Update parent and trigger finalization when complete
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const parentNumber = Number(process.env.PARENT_PR);
+            const mergedNumber = Number(process.env.PR_NUMBER);
+            const parent = (await github.rest.pulls.get({owner, repo, pull_number: parentNumber})).data;
+            const match = (parent.body || '').match(/<!--\s*fastlane-rebase-state\s+(\{.*?\})\s*-->/s);
+            if (!match) throw new Error('Parent PR lost orchestration metadata');
+            const state = JSON.parse(match[1]);
+            if (String(state.run_id) !== process.env.RUN_ID) throw new Error('Parent run ID mismatch');
+            const updatedBody = (parent.body || '').replace(`- [ ] #${mergedNumber}`, `- [x] #${mergedNumber}`);
+            await github.rest.pulls.update({owner, repo, pull_number: parentNumber, body: updatedBody});
+
+            let complete = true;
+            for (const number of state.children || []) {
+              const child = (await github.rest.pulls.get({owner, repo, pull_number: number})).data;
+              if (!child.merged_at) complete = false;
+            }
+            if (!complete) return;
+            const repository = await github.rest.repos.get({owner, repo});
+            const inputs = {mode: 'finalize', run_id: process.env.RUN_ID};
+            const dispatch = await github.request(
+              'POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches',
+              {
+                owner,
+                repo,
+                workflow_id: 'celonis_fastlane_rebase.yml',
+                ref: repository.data.default_branch,
+                inputs,
+                return_run_details: true,
+                headers: {
+                  accept: 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2026-03-10',
+                },
+              },
+            );
+            const finalizationUrl = dispatch.data?.html_url;
+            if (!finalizationUrl) {
+              throw new Error('Finalization dispatch did not return its workflow run URL');
+            }
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: parentNumber,
+              body: `All distributed fastlane PRs are merged. [Final integration CI](${finalizationUrl}) was dispatched automatically.`,
+            });

@@ -1,0 +1,509 @@
+name: Fastlane Rebase and Test
+run-name: Fastlane rebase ${{ inputs.mode }} ${{ inputs.run_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Start a rebase, continue a locally resolved rebase, or retry finalization
+        required: true
+        type: choice
+        default: start
+        options:
+          - start
+          - continue
+          - finalize
+      run_id:
+        description: Original start workflow run ID; leave empty for start
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  packages: read
+  pull-requests: write
+
+concurrency:
+  group: celostar-fastlane-rebase
+  cancel-in-progress: false
+
+env:
+  LATEST_UPSTREAM_BRANCH: branch-3.5-cc
+  GH_TOKEN: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+
+jobs:
+  prepare:
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    outputs:
+      operation_run_id: ${{ steps.values.outputs.operation_run_id }}
+      central_branch: ${{ steps.values.outputs.central_branch }}
+      central_sha: ${{ steps.values.outputs.central_sha }}
+      base_branch: ${{ steps.values.outputs.base_branch }}
+      base_sha: ${{ steps.values.outputs.base_sha }}
+      pending_count: ${{ steps.values.outputs.pending_count }}
+      run_tests: ${{ steps.values.outputs.run_tests }}
+      distribute: ${{ steps.values.outputs.distribute }}
+      parent_pr: ${{ steps.values.outputs.parent_pr }}
+      rebase_ok: ${{ steps.values.outputs.rebase_ok }}
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
+    steps:
+      - name: Validate inputs
+        env:
+          REQUESTED_MODE: ${{ inputs.mode }}
+          REQUESTED_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          if [[ "${REQUESTED_MODE}" == start && -n "${REQUESTED_RUN_ID}" ]]; then
+            echo "run_id must be empty in start mode" >&2
+            exit 1
+          fi
+          if [[ "${REQUESTED_MODE}" != start && ! "${REQUESTED_RUN_ID}" =~ ^[0-9]+$ ]]; then
+            echo "continue/finalize require the numeric run ID of the original start" >&2
+            exit 1
+          fi
+
+      - name: Resolve repository default branch
+        id: repository
+        run: |
+          default_branch=$(gh api "repos/${{ github.repository }}" --jq .default_branch)
+          echo "default_branch=${default_branch}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout trusted default branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.repository.outputs.default_branch }}
+
+      - name: Record trusted tooling SHA
+        id: trusted
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Git
+        run: |
+          git config user.email "celostar-starrocks@noreply.github.com"
+          git config user.name "celostar-starrocks"
+          git remote add starrocks-public https://github.com/StarRocks/starrocks.git || true
+
+      - name: Download original snapshot
+        if: ${{ inputs.mode != 'start' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: fastlane-manifest-${{ inputs.run_id }}
+          path: ${{ runner.temp }}/fastlane
+          github-token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.run_id }}
+
+      - name: Snapshot start state
+        id: snapshot
+        if: ${{ inputs.mode == 'start' }}
+        env:
+          OPERATION_RUN_ID: ${{ github.run_id }}
+          DEFAULT_BRANCH: ${{ steps.repository.outputs.default_branch }}
+        run: |
+          set -euo pipefail
+          git fetch origin \
+            "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}"
+          git fetch starrocks-public "${LATEST_UPSTREAM_BRANCH}"
+          old_head=$(git rev-parse "origin/${DEFAULT_BRANCH}")
+          new_head=$(git rev-parse FETCH_HEAD)
+          short_head=$(git rev-parse --short=8 "${new_head}")
+          base_branch="${LATEST_UPSTREAM_BRANCH}-${short_head}-celo"
+          recovery_branch="fastlane-rebase/${OPERATION_RUN_ID}/recovery"
+
+          existing_base=$(git ls-remote --heads origin "${base_branch}" | awk '{print $1}')
+          if [[ -n "${existing_base}" && "${existing_base}" != "${new_head}" ]]; then
+            echo "Existing base branch ${base_branch} points at unexpected ${existing_base}" >&2
+            exit 1
+          elif [[ -z "${existing_base}" ]]; then
+            git push origin "${new_head}:refs/heads/${base_branch}"
+          fi
+
+          existing_recovery=$(git ls-remote --heads origin "${recovery_branch}" | awk '{print $1}')
+          if [[ -n "${existing_recovery}" && "${existing_recovery}" != "${old_head}" ]]; then
+            echo "Recovery branch already contains user changes; refusing to overwrite it" >&2
+            exit 1
+          elif [[ -z "${existing_recovery}" ]]; then
+            git push origin "${old_head}:refs/heads/${recovery_branch}"
+          fi
+
+          mkdir -p "${{ runner.temp }}/fastlane"
+          python3 celonis/tools/fastlane_rebase.py snapshot \
+            --repo "${{ github.repository }}" \
+            --old-head "${old_head}" \
+            --old-default-branch "${DEFAULT_BRANCH}" \
+            --new-head "${new_head}" \
+            --base-branch "${base_branch}" \
+            --run-id "${OPERATION_RUN_ID}" \
+            --actor "${{ github.actor }}" \
+            --output "${{ runner.temp }}/fastlane/fastlane-manifest.json" \
+            --report "${{ runner.temp }}/fastlane/fastlane-report.txt"
+
+      - name: Upload immutable snapshot
+        if: ${{ inputs.mode == 'start' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastlane-manifest-${{ github.run_id }}
+          path: ${{ runner.temp }}/fastlane
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Attempt automated fastlane-free rebase
+        id: start_rebase
+        if: ${{ inputs.mode == 'start' }}
+        run: |
+          set +e
+          manifest="${{ runner.temp }}/fastlane/fastlane-manifest.json"
+          old_head=$(jq -r .old_head "${manifest}")
+          central=$(jq -r .central_branch "${manifest}")
+          git switch --force-create "${central}" "${old_head}"
+          python3 celonis/tools/fastlane_rebase.py rebase \
+            --manifest "${manifest}" \
+            --report "${{ runner.temp }}/fastlane/range-diff.txt"
+          result=$?
+          if [[ ${result} -ne 0 ]]; then
+            git rebase --abort || true
+            echo "rebase_ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          set -e
+          remote_sha=$(git ls-remote --heads origin "${central}" | awk '{print $1}')
+          local_sha=$(git rev-parse HEAD)
+          if [[ -n "${remote_sha}" && "${remote_sha}" != "${local_sha}" ]]; then
+            echo "Central branch exists with unexpected changes; refusing to overwrite it" >&2
+            exit 1
+          elif [[ -z "${remote_sha}" ]]; then
+            git push --set-upstream origin "HEAD:refs/heads/${central}"
+          fi
+          echo "rebase_ok=true" >> "$GITHUB_OUTPUT"
+          echo "central_sha=${local_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout locally continued rebase candidate
+        if: ${{ inputs.mode == 'continue' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fastlane-rebase/${{ inputs.run_id }}/recovery
+          path: continued-rebase
+
+      - name: Validate locally continued rebase
+        id: continue_rebase
+        if: ${{ inputs.mode == 'continue' }}
+        working-directory: continued-rebase
+        run: |
+          set -euo pipefail
+          manifest="${{ runner.temp }}/fastlane/fastlane-manifest.json"
+          [[ "$(jq -r .run_id "${manifest}")" == "${{ inputs.run_id }}" ]]
+          recovery=$(jq -r .recovery_branch "${manifest}")
+          [[ "${recovery}" == "fastlane-rebase/${{ inputs.run_id }}/recovery" ]]
+          central=$(jq -r .central_branch "${manifest}")
+          python3 "${GITHUB_WORKSPACE}/celonis/tools/fastlane_rebase.py" validate-rebase \
+            --manifest "${manifest}" \
+            --candidate HEAD \
+            --report "${{ runner.temp }}/fastlane/range-diff.txt"
+          remote_sha=$(git ls-remote --heads origin "${central}" | awk '{print $1}')
+          local_sha=$(git rev-parse HEAD)
+          if [[ -n "${remote_sha}" && "${remote_sha}" != "${local_sha}" ]]; then
+            echo "Central branch exists with unexpected changes; refusing to overwrite it" >&2
+            exit 1
+          elif [[ -z "${remote_sha}" ]]; then
+            git push origin "HEAD:refs/heads/${central}"
+          fi
+          echo "rebase_ok=true" >> "$GITHUB_OUTPUT"
+          echo "central_sha=${local_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate final distributed state
+        id: final
+        if: ${{ inputs.mode == 'finalize' }}
+        run: |
+          python3 celonis/tools/fastlane_rebase.py validate-final \
+            --manifest "${{ runner.temp }}/fastlane/fastlane-manifest.json" \
+            --repo "${{ github.repository }}"
+
+      - name: Derive orchestration outputs
+        id: values
+        env:
+          MODE: ${{ inputs.mode }}
+          START_REBASE_OK: ${{ steps.start_rebase.outputs.rebase_ok }}
+          START_CENTRAL_SHA: ${{ steps.start_rebase.outputs.central_sha }}
+          CONTINUE_REBASE_OK: ${{ steps.continue_rebase.outputs.rebase_ok }}
+          CONTINUE_CENTRAL_SHA: ${{ steps.continue_rebase.outputs.central_sha }}
+          FINAL_PARENT_PR: ${{ steps.final.outputs.parent_pr }}
+          FINAL_BASE_BRANCH: ${{ steps.final.outputs.base_branch }}
+          FINAL_CENTRAL_SHA: ${{ steps.final.outputs.central_sha }}
+        run: |
+          set -euo pipefail
+          manifest="${{ runner.temp }}/fastlane/fastlane-manifest.json"
+          operation_run_id=$(jq -r .run_id "${manifest}")
+          central=$(jq -r .central_branch "${manifest}")
+          base_sha=$(jq -r .new_head "${manifest}")
+          if ! base_branch=$(jq -er '.base_branch | select(type == "string" and length > 0)' "${manifest}"); then
+            if [[ "${MODE}" == finalize && -n "${FINAL_BASE_BRANCH}" ]]; then
+              base_branch="${FINAL_BASE_BRANCH}"
+            else
+              echo "The immutable manifest does not contain a valid base branch; start a new rebase" >&2
+              exit 1
+            fi
+          fi
+          if [[ "${MODE}" == finalize && "${FINAL_BASE_BRANCH}" != "${base_branch}" ]]; then
+            echo "Final validation returned base branch ${FINAL_BASE_BRANCH}, expected ${base_branch}" >&2
+            exit 1
+          fi
+          pending=$(jq '[.entries[] | select(.upstream_pr.classification == "pending")] | length' "${manifest}")
+          rebase_ok=true
+          central_sha=''
+          if [[ "${MODE}" == start ]]; then
+            rebase_ok="${START_REBASE_OK}"
+            central_sha="${START_CENTRAL_SHA}"
+          elif [[ "${MODE}" == continue ]]; then
+            rebase_ok="${CONTINUE_REBASE_OK}"
+            central_sha="${CONTINUE_CENTRAL_SHA}"
+          elif [[ "${MODE}" == finalize ]]; then
+            central_sha="${FINAL_CENTRAL_SHA}"
+          fi
+          if [[ "${rebase_ok}" == true && ! "${central_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Successful validation did not produce an immutable central SHA" >&2
+            exit 1
+          fi
+          run_tests=false
+          distribute=false
+          if [[ "${MODE}" == finalize ]]; then
+            run_tests=true
+          elif [[ "${rebase_ok}" == true && "${pending}" == 0 ]]; then
+            run_tests=true
+          elif [[ "${rebase_ok}" == true && "${pending}" -gt 0 ]]; then
+            distribute=true
+          fi
+          {
+            echo "operation_run_id=${operation_run_id}"
+            echo "central_branch=${central}"
+            echo "central_sha=${central_sha}"
+            echo "base_branch=${base_branch}"
+            echo "base_sha=${base_sha}"
+            echo "pending_count=${pending}"
+            echo "run_tests=${run_tests}"
+            echo "distribute=${distribute}"
+            echo "parent_pr=${FINAL_PARENT_PR}"
+            echo "rebase_ok=${rebase_ok}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate old default snapshot before clean CI
+        if: >-
+          ${{
+            inputs.mode != 'finalize' &&
+            steps.values.outputs.rebase_ok == 'true' &&
+            steps.values.outputs.pending_count == '0'
+          }}
+        run: |
+          python3 celonis/tools/fastlane_rebase.py validate-old-default-unchanged \
+            --manifest "${{ runner.temp }}/fastlane/fastlane-manifest.json" \
+            --repo "${{ github.repository }}"
+
+      - name: Upload rebase validation report
+        if: ${{ (inputs.mode == 'start' || inputs.mode == 'continue') && steps.values.outputs.rebase_ok == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastlane-rebase-report-${{ steps.values.outputs.operation_run_id }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/fastlane/range-diff.txt
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Publish recovery instructions and fail
+        if: ${{ steps.values.outputs.rebase_ok == 'false' }}
+        env:
+          RUN_ID: ${{ steps.values.outputs.operation_run_id }}
+        run: |
+          recovery="fastlane-rebase/${RUN_ID}/recovery"
+          {
+            echo "### Rebase requires local conflict resolution"
+            echo '```shell'
+            echo "gh run download ${RUN_ID} --repo ${{ github.repository }} -n fastlane-manifest-${RUN_ID} -D .fastlane-rebase-state"
+            echo "git fetch origin ${recovery}"
+            echo "git switch -C ${recovery} origin/${recovery}"
+            echo "python3 celonis/tools/fastlane_rebase.py rebase \\"
+            echo "  --manifest .fastlane-rebase-state/fastlane-manifest.json"
+            echo "# Resolve conflicts and use git rebase --continue until complete."
+            echo "git push --force-with-lease origin HEAD:${recovery}"
+            echo "gh workflow run celonis_fastlane_rebase.yml --repo ${{ github.repository }} -f mode=continue -f run_id=${RUN_ID}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+  distribute:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.distribute == 'true' }}
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    steps:
+      - name: Checkout trusted orchestration tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Checkout prepared central commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.central_sha }}
+          path: central
+      - uses: actions/download-artifact@v4
+        with:
+          name: fastlane-manifest-${{ needs.prepare.outputs.operation_run_id }}
+          path: ${{ runner.temp }}/fastlane
+          github-token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.prepare.outputs.operation_run_id }}
+      - name: Configure Git
+        working-directory: central
+        env:
+          CENTRAL_BRANCH: ${{ needs.prepare.outputs.central_branch }}
+          CENTRAL_SHA: ${{ needs.prepare.outputs.central_sha }}
+        run: |
+          set -euo pipefail
+          remote_sha=$(git ls-remote --heads origin "${CENTRAL_BRANCH}" | awk '{print $1}')
+          if [[ "${remote_sha}" != "${CENTRAL_SHA}" ]]; then
+            echo "Central branch moved from prepared SHA ${CENTRAL_SHA} to ${remote_sha:-<missing>}" >&2
+            exit 1
+          fi
+          git switch --force-create "${CENTRAL_BRANCH}" "${CENTRAL_SHA}"
+          git config user.email "celostar-starrocks@noreply.github.com"
+          git config user.name "celostar-starrocks"
+      - name: Create central and author PRs
+        working-directory: central
+        run: |
+          python3 ../trusted/celonis/tools/fastlane_rebase.py distribute \
+            --manifest "${{ runner.temp }}/fastlane/fastlane-manifest.json" \
+            --central-branch "${{ needs.prepare.outputs.central_branch }}" \
+            --base-branch "${{ needs.prepare.outputs.base_branch }}"
+
+  presubmit-tests:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.run_tests == 'true' }}
+    uses: ./.github/workflows/celonis_presubmit_test.yml
+    with:
+      ref_to_test: ${{ needs.prepare.outputs.central_sha }}
+      base_ref: ${{ needs.prepare.outputs.base_branch }}
+
+  integration-tests:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.run_tests == 'true' }}
+    uses: ./.github/workflows/celonis_integration_test_azure.yml
+    with:
+      branch_to_test: ${{ needs.prepare.outputs.central_sha }}
+    secrets: inherit
+
+  complete:
+    needs: [prepare, presubmit-tests, integration-tests]
+    if: >-
+      ${{
+        needs.prepare.outputs.run_tests == 'true' &&
+        needs.presubmit-tests.result == 'success' &&
+        needs.integration-tests.result == 'success'
+      }}
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    steps:
+      - name: Checkout trusted orchestration tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.trusted_sha }}
+          path: trusted
+
+      - name: Download immutable snapshot report
+        uses: actions/download-artifact@v4
+        with:
+          name: fastlane-manifest-${{ needs.prepare.outputs.operation_run_id }}
+          path: ${{ runner.temp }}/fastlane
+          github-token: ${{ secrets.CELOBOT_GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.prepare.outputs.operation_run_id }}
+
+      - name: Revalidate old default snapshot for clean rebase
+        if: ${{ inputs.mode != 'finalize' }}
+        working-directory: trusted
+        run: |
+          python3 celonis/tools/fastlane_rebase.py validate-old-default-unchanged \
+            --manifest "${{ runner.temp }}/fastlane/fastlane-manifest.json" \
+            --repo "${{ github.repository }}"
+
+      - name: Revalidate final distributed state
+        if: ${{ inputs.mode == 'finalize' }}
+        working-directory: trusted
+        run: |
+          python3 celonis/tools/fastlane_rebase.py validate-final \
+            --manifest "${{ runner.temp }}/fastlane/fastlane-manifest.json" \
+            --repo "${{ github.repository }}"
+
+      - name: Create or ready central PR
+        env:
+          CENTRAL: ${{ needs.prepare.outputs.central_branch }}
+          CENTRAL_SHA: ${{ needs.prepare.outputs.central_sha }}
+          BASE: ${{ needs.prepare.outputs.base_branch }}
+          BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          PARENT_PR: ${{ needs.prepare.outputs.parent_pr }}
+          RUN_ID: ${{ needs.prepare.outputs.operation_run_id }}
+          INTEGRATION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          current_branch_sha=$(gh api \
+            "repos/${{ github.repository }}/git/ref/heads/${CENTRAL}" \
+            --jq .object.sha)
+          if [[ "${current_branch_sha}" != "${CENTRAL_SHA}" ]]; then
+            echo "Central branch moved from tested SHA ${CENTRAL_SHA} to ${current_branch_sha}; rerun final CI" >&2
+            exit 1
+          fi
+          current_base_sha=$(gh api \
+            "repos/${{ github.repository }}/git/ref/heads/${BASE}" \
+            --jq .object.sha)
+          if [[ "${current_base_sha}" != "${BASE_SHA}" ]]; then
+            echo "Snapshot base branch moved from ${BASE_SHA} to ${current_base_sha}; rerun the rebase" >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.mode }}" == finalize ]]; then
+            parent_json=$(gh api "repos/${{ github.repository }}/pulls/${PARENT_PR}")
+            current_pr_head_ref=$(jq -r .head.ref <<< "${parent_json}")
+            current_pr_head_sha=$(jq -r .head.sha <<< "${parent_json}")
+            current_pr_base_ref=$(jq -r .base.ref <<< "${parent_json}")
+            current_pr_base_sha=$(jq -r .base.sha <<< "${parent_json}")
+            if [[ "${current_pr_head_ref}" != "${CENTRAL}" || \
+                  "${current_pr_head_sha}" != "${CENTRAL_SHA}" ]]; then
+              echo "Parent PR no longer has the tested central branch and SHA; rerun final CI" >&2
+              exit 1
+            fi
+            if [[ "${current_pr_base_ref}" != "${BASE}" || \
+                  "${current_pr_base_sha}" != "${BASE_SHA}" ]]; then
+              echo "Parent PR no longer targets the snapshotted base branch and SHA; rerun the rebase" >&2
+              exit 1
+            fi
+            gh pr ready "${PARENT_PR}" -R "${{ github.repository }}"
+            gh pr comment "${PARENT_PR}" -R "${{ github.repository }}" \
+              --body "✅ Final fastlane integration CI passed for ${CENTRAL_SHA}: ${INTEGRATION_URL}"
+            exit 0
+          fi
+          existing=$(gh pr list -R "${{ github.repository }}" --state open \
+            --head "${CENTRAL}" --base "${BASE}" --json number --jq '.[0].number // empty')
+          if [[ -n "${existing}" ]]; then
+            echo "Reusing PR #${existing}"
+            exit 0
+          fi
+          body=$(mktemp)
+          {
+            echo "Automated fastlane-aware rebase with no pending distributed work."
+            echo
+            echo "- Run: ${RUN_ID}"
+            echo "- Central branch: \`${CENTRAL}\`"
+            echo "- Tested commit: \`${CENTRAL_SHA}\`"
+            echo "- Upstream-aligned base: \`${BASE}\`"
+            echo "- Integration CI: ${INTEGRATION_URL}"
+            echo
+            echo "### Snapshot and classification report"
+            sed 's/^/> /' "${{ runner.temp }}/fastlane/fastlane-report.txt"
+          } > "${body}"
+          gh pr create -R "${{ github.repository }}" --head "${CENTRAL}" --base "${BASE}" \
+            --title "[Tool] Integration rebase: ${CENTRAL} → ${BASE} (sync #${RUN_ID})" \
+            --body-file "${body}" \
+            --label sync

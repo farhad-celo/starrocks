@@ -1,0 +1,48 @@
+name: Validate Fastlane Reference
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate-fastlane-reference:
+    name: validate-fastlane-reference
+    runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
+    steps:
+      - name: Classify generated integration PR
+        id: generated
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          skip=false
+          if [[ "${HEAD_REF}" =~ ^fastlane-rebase/[0-9]+/central$ ]]; then
+            skip=true
+            echo "Skipping normal fastlane validation for generated central PR ${HEAD_REF}."
+          elif [[ "${HEAD_REF}" == gh-branch-3.5-cc-* ]]; then
+            skip=true
+            echo "Skipping normal fastlane validation for generated legacy rebase PR ${HEAD_REF}."
+          fi
+          echo "skip=${skip}" >> "$GITHUB_OUTPUT"
+
+      # Always execute the trusted validator from the PR base, never code from
+      # the untrusted head of a pull_request_target event.
+      - name: Checkout trusted base
+        if: ${{ steps.generated.outputs.skip != 'true' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Validate fastlane marker and upstream PR
+        if: ${{ steps.generated.outputs.skip != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 celonis/tools/fastlane_rebase.py validate-pr \
+            --repo "${{ github.repository }}" \
+            --pr-number "${{ github.event.pull_request.number }}" \
+            --default-branch "${{ github.event.repository.default_branch }}"
