@@ -151,6 +151,7 @@ set(CELONIS_FILES
   celonis/align_model_v2.cpp
   celonis/array_avg.cpp
   celonis/array_count_distinct.cpp
+  celonis/array_deduplicate_by_key.cpp
   celonis/array_end_finder.cpp
   celonis/array_functions.cpp
   celonis/array_trimmed_mean.cpp

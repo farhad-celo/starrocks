@@ -179,6 +179,8 @@ set(EXEC_FILES
         ./exprs/celonis/anyval_util.cpp
         ./exprs/celonis/array_avg_test.cpp
         ./exprs/celonis/array_count_distinct_test.cpp
+        ./exprs/celonis/array_deduplicate_by_key_behavior_test.cpp
+        ./exprs/celonis/array_deduplicate_by_key_type_compatibility_test.cpp
         ./exprs/celonis/array_end_finder_test.cpp
         ./exprs/celonis/array_functions_test.cpp
         ./exprs/celonis/array_trimmed_mean_test.cpp

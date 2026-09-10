@@ -76,6 +76,7 @@ ${license}
 #include "exprs/celonis/align_model_v2.h"
 #include "exprs/celonis/array_avg.h"
 #include "exprs/celonis/array_count_distinct.h"
+#include "exprs/celonis/array_deduplicate_by_key.h"
 #include "exprs/celonis/array_end_finder.h"
 #include "exprs/celonis/array_functions.h"
 #include "exprs/celonis/array_trimmed_mean.h"

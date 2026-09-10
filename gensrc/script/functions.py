@@ -1564,6 +1564,27 @@ celostar_functions = [
     [2000300, 'celonis_transpose_array_of_struct', True, False, 'ANY_STRUCT', ['ANY_ARRAY'], 'CelonisTransposeArrayOfStruct::transpose_array_of_struct'],
     [2000310, 'celonis_activities_to_variant',     True, False, 'VARCHAR', ['ARRAY_VARCHAR'], 'CelonisArrayFunctions::activities_to_variant'],
     [2000320, 'celonis_string_array_join',         True, False, 'VARCHAR', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisArrayFunctions::string_array_join'],
+    # celonis_deduplicate_by_key
+    # bigint key version
+    [2000330, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_BIGINT', ['ARRAY_BIGINT', 'ARRAY_BIGINT'], 'CelonisArrayDeduplicateByKey<TYPE_BIGINT, TYPE_BIGINT>::array_deduplicate_by_key'],
+    [2000331, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_DOUBLE', ['ARRAY_BIGINT', 'ARRAY_DOUBLE'], 'CelonisArrayDeduplicateByKey<TYPE_BIGINT, TYPE_DOUBLE>::array_deduplicate_by_key'],
+    [2000332, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_VARCHAR', ['ARRAY_BIGINT', 'ARRAY_VARCHAR'], 'CelonisArrayDeduplicateByKey<TYPE_BIGINT, TYPE_VARCHAR>::array_deduplicate_by_key'],
+    [2000333, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_DATETIME', ['ARRAY_BIGINT', 'ARRAY_DATETIME'], 'CelonisArrayDeduplicateByKey<TYPE_BIGINT, TYPE_DATETIME>::array_deduplicate_by_key'],
+    # double key version
+    [2000334, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_BIGINT', ['ARRAY_DOUBLE', 'ARRAY_BIGINT'], 'CelonisArrayDeduplicateByKey<TYPE_DOUBLE, TYPE_BIGINT>::array_deduplicate_by_key'],
+    [2000335, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_DOUBLE', ['ARRAY_DOUBLE', 'ARRAY_DOUBLE'], 'CelonisArrayDeduplicateByKey<TYPE_DOUBLE, TYPE_DOUBLE>::array_deduplicate_by_key'],
+    [2000336, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_VARCHAR', ['ARRAY_DOUBLE', 'ARRAY_VARCHAR'], 'CelonisArrayDeduplicateByKey<TYPE_DOUBLE, TYPE_VARCHAR>::array_deduplicate_by_key'],
+    [2000337, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_DATETIME', ['ARRAY_DOUBLE', 'ARRAY_DATETIME'], 'CelonisArrayDeduplicateByKey<TYPE_DOUBLE, TYPE_DATETIME>::array_deduplicate_by_key'],
+    # varchar key version
+    [2000338, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_BIGINT', ['ARRAY_VARCHAR', 'ARRAY_BIGINT'], 'CelonisArrayDeduplicateByKey<TYPE_VARCHAR, TYPE_BIGINT>::array_deduplicate_by_key'],
+    [2000339, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_DOUBLE', ['ARRAY_VARCHAR', 'ARRAY_DOUBLE'], 'CelonisArrayDeduplicateByKey<TYPE_VARCHAR, TYPE_DOUBLE>::array_deduplicate_by_key'],
+    [2000340, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_VARCHAR', ['ARRAY_VARCHAR', 'ARRAY_VARCHAR'], 'CelonisArrayDeduplicateByKey<TYPE_VARCHAR, TYPE_VARCHAR>::array_deduplicate_by_key'],
+    [2000341, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_DATETIME', ['ARRAY_VARCHAR', 'ARRAY_DATETIME'], 'CelonisArrayDeduplicateByKey<TYPE_VARCHAR, TYPE_DATETIME>::array_deduplicate_by_key'],
+    # datetime key version
+    [2000342, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_BIGINT', ['ARRAY_DATETIME', 'ARRAY_BIGINT'], 'CelonisArrayDeduplicateByKey<TYPE_DATETIME, TYPE_BIGINT>::array_deduplicate_by_key'],
+    [2000343, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_DOUBLE', ['ARRAY_DATETIME', 'ARRAY_DOUBLE'], 'CelonisArrayDeduplicateByKey<TYPE_DATETIME, TYPE_DOUBLE>::array_deduplicate_by_key'],
+    [2000344, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_VARCHAR', ['ARRAY_DATETIME', 'ARRAY_VARCHAR'], 'CelonisArrayDeduplicateByKey<TYPE_DATETIME, TYPE_VARCHAR>::array_deduplicate_by_key'],
+    [2000345, 'celonis_array_deduplicate_by_key', True, False, 'ARRAY_DATETIME', ['ARRAY_DATETIME', 'ARRAY_DATETIME'], 'CelonisArrayDeduplicateByKey<TYPE_DATETIME, TYPE_DATETIME>::array_deduplicate_by_key'],
 
     # Time functions
     [3000100, 'celonis_timestamp_millis',            True, False, 'DATETIME', ['BIGINT'], 'CelonisTimeFunctions::timestamp_millis'],
